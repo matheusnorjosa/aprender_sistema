@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'core',       # Adição dos seus apps
     'relatorios',
     'api',
+    'django_extensions',
 ]
 
 MIDDLEWARE = [

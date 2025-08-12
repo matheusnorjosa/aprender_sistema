@@ -1,0 +1,28 @@
+# Virtualenv local
+venv/
+
+# Caches Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Arquivos de ambiente
+.env
+*.sqlite3
+
+# Git
+.git/
+.gitignore
+
+# Sistema/IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Node.js (se tiver)
+node_modules/
+
+# Build/output
+dist/
+build/

@@ -1,27 +1,34 @@
 # Use a imagem oficial do Python 3.13.5 como base
 FROM python:3.13.5
 
-# Defina o diretório de trabalho dentro do container
+# Variáveis úteis para containers Python
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+# Diretório de trabalho
 WORKDIR /app
 
-# Copie o arquivo de dependências e instale-as
+# System deps (netcat) + limpeza de cache do apt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends netcat-traditional \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copie e instale as dependências Python primeiro (melhor cache)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --upgrade pip \
+    && python -m pip install -r requirements.txt
 
-# Instale o netcat para que o entrypoint.sh possa usá-lo
-RUN apt-get update && apt-get install -y netcat-traditional
-
-# Copie todo o código do seu projeto para o container
+# Agora copie o restante do código
 COPY . .
 
-# Expõe a porta que o Django usará (padrão 8000)
+# Expõe a porta do Django
 EXPOSE 8000
 
-# Adicione permissão de execução ao script de entrada
+# Permissão de execução ao entrypoint
 RUN chmod +x /app/entrypoint.sh
 
-# O ENTRYPOINT executa nosso script de espera, e o CMD são os argumentos
+# ENTRYPOINT + CMD
 ENTRYPOINT ["/app/entrypoint.sh"]
-
-# O CMD é a parte do comando que nosso script irá executar depois de esperar
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

@@ -1,34 +1,39 @@
 services:
-  # Serviço para o banco de dados PostgreSQL
   db:
     image: postgres:15
     container_name: aprender_db
     environment:
-      # Use as mesmas credenciais que você configurou no settings.py
       POSTGRES_DB: aprender_sistema_db
       POSTGRES_USER: adm_aprender
       POSTGRES_PASSWORD: aprender123456
     ports:
-      # Mapeia a porta do container (5432) para a sua máquina local (5432)
       - "5432:5432"
     volumes:
-      # Persiste os dados do banco de dados em um volume nomeado
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adm_aprender -d aprender_sistema_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  # Serviço para a aplicação Django
   web:
     build: .
     container_name: aprender_web
+    environment:
+      DB_NAME: aprender_sistema_db
+      DB_USER: adm_aprender
+      DB_PASSWORD: aprender123456
+      DB_HOST: db
+      DB_PORT: "5432"
+      DJANGO_ENV: development
+      # DJANGO_SETTINGS_MODULE: seu_projeto.settings  # descomente se usar um módulo custom
     volumes:
-      # Sincroniza a pasta do seu projeto local com a pasta dentro do container
       - .:/app
     ports:
-      # Mapeia a porta do container (8000) para a sua máquina local (8000)
       - "8000:8000"
     depends_on:
-      # Garante que o serviço do banco de dados seja iniciado antes do serviço web
-      - db
+      db:
+        condition: service_healthy
 
 volumes:
-  # Define um volume para persistir os dados do banco de dados
   postgres_data:

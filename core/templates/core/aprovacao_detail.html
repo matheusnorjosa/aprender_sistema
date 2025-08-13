@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8"><title>Decidir Solicitação</title></head>
+  <body>
+    <p><a href="{% url 'aprovacoes_pendentes' %}">← Voltar</a>
+</p>
+    <h1>Decidir Solicitação</h1>
+
+    <h2>{{ sol.titulo_evento }}</h2>
+    <ul>
+      <li><b>Projeto:</b> {{ sol.projeto }}</li>
+      <li><b>Município:</b> {{ sol.municipio }}</li>
+      <li><b>Tipo:</b> {{ sol.tipo_evento }}</li>
+      <li><b>Início:</b> {{ sol.data_inicio|date:"d/m/Y H:i" }}</li>
+      <li><b>Fim:</b> {{ sol.data_fim|date:"d/m/Y H:i" }}</li>
+      <li><b>Formadores:</b>
+        {% for f in formadores %}
+          {{ f.nome }}{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+      </li>
+      {% if sol.observacoes %}<li><b>Observações:</b> {{ sol.observacoes }}</li>{% endif %}
+    </ul>
+
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <p>{{ form.decisao.label_tag }} {{ form.decisao }}</p>
+      <p>{{ form.justificativa.label_tag }}<br>{{ form.justificativa }}</p>
+      <button type="submit">Confirmar decisão</button>
+    </form>
+  </body>
+</html>

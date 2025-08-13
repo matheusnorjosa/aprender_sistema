@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8"><title>Aprovações Pendentes</title></head>
+  <body>
+    <h1>Aprovações Pendentes</h1>
+
+    <form method="get" style="margin-bottom:1rem">
+      <input type="text" name="q" placeholder="Buscar por título" value="{{ request.GET.q }}">
+      <button type="submit">Buscar</button>
+      <a href="{% url 'aprovacoes_pendentes' %}">Limpar</a>
+    </form>
+
+    {% if pendentes %}
+      <table border="1" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Título</th>
+            <th>Projeto</th>
+            <th>Município</th>
+            <th>Tipo</th>
+            <th>Início</th>
+            <th>Fim</th>
+            <th>Formadores</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in pendentes %}
+            <tr>
+              <td>{{ s.titulo_evento }}</td>
+              <td>{{ s.projeto }}</td>
+              <td>{{ s.municipio }}</td>
+              <td>{{ s.tipo_evento }}</td>
+              <td>{{ s.data_inicio|date:"d/m/Y H:i" }}</td>
+              <td>{{ s.data_fim|date:"d/m/Y H:i" }}</td>
+              <td>
+                {% for f in s.formadores.all %}
+                  {{ f.nome }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+              </td>
+              <td><a href="{% url 'aprovacao_detail' s.id %}">Analisar</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% if is_paginated %}
+        <div style="margin-top:1rem">
+          {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">« Anterior</a>
+          {% endif %}
+          <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+          {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Próxima »</a>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% else %}
+      <p>Não há solicitações pendentes.</p>
+    {% endif %}
+  </body>
+</html>

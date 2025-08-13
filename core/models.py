@@ -251,3 +251,23 @@ class LogAuditoria(models.Model):
 
     def __str__(self):
         return f"[{self.data_hora:%d/%m/%Y %H:%M}] {self.acao}"
+
+
+# =========================
+# 4) Deslocamento (para mapa mensal)
+# =========================
+class Deslocamento(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    data = models.DateField()
+    origem = models.CharField(max_length=255, blank=True, default="")
+    destino = models.CharField(max_length=255, blank=True, default="")
+    formadores = models.ManyToManyField("Formador", related_name="deslocamentos")
+
+    class Meta:
+        verbose_name = "Deslocamento"
+        verbose_name_plural = "Deslocamentos"
+        indexes = [models.Index(fields=["data"])]
+        ordering = ["-data"]
+
+    def __str__(self):
+        return f"{self.data:%d/%m/%Y} {self.origem} → {self.destino}"

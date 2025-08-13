@@ -1,10 +1,9 @@
-# aprender_sistema/core/admin.py
 from django.contrib import admin
 from .models import (
     Projeto, Municipio, TipoEvento,
     Formador, Solicitacao, FormadoresSolicitacao,
     Aprovacao, EventoGoogleCalendar,
-    DisponibilidadeFormadores, LogAuditoria
+    DisponibilidadeFormadores, LogAuditoria, Deslocamento
 )
 
 @admin.register(Projeto)
@@ -67,3 +66,10 @@ class LogAuditoriaAdmin(admin.ModelAdmin):
     list_display = ("data_hora", "usuario", "acao", "entidade_afetada_id")
     list_filter = ("data_hora",)
     search_fields = ("acao", "detalhes")
+
+@admin.register(Deslocamento)
+class DeslocamentoAdmin(admin.ModelAdmin):
+    list_display = ("data", "origem", "destino")
+    list_filter = ("data",)
+    search_fields = ("origem", "destino", "formadores__nome")
+    filter_horizontal = ("formadores",)

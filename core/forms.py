@@ -2,13 +2,14 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from core.models import Solicitacao, Formador
+from core.models import Solicitacao, Formador, AprovacaoStatus
 from core.services.conflicts import check_conflicts
 
+# -------- RF02: Solicitação --------
 class SolicitacaoForm(forms.ModelForm):
     formadores = forms.ModelMultipleChoiceField(
         queryset=Formador.objects.filter(ativo=True).order_by("nome"),
-        widget=forms.CheckboxSelectMultiple,  # mude para SelectMultiple se preferir
+        widget=forms.CheckboxSelectMultiple,
         required=True,
         label="Formadores",
     )
@@ -38,30 +39,23 @@ class SolicitacaoForm(forms.ModelForm):
         if di and df and formadores and len(formadores) > 0:
             conflitos = check_conflicts(formadores, di, df)
             msgs = []
-
             if conflitos["bloqueios"]:
                 linhas = []
                 for b in conflitos["bloqueios"]:
                     linhas.append(f"- {b.formador.nome} indisponível em {b.data_bloqueio} {b.hora_inicio}-{b.hora_fim} ({b.tipo_bloqueio})")
                 msgs.append("Conflitos de disponibilidade:\n" + "\n".join(linhas))
-
             if conflitos["solicitacoes"]:
                 linhas = []
                 for s in conflitos["solicitacoes"]:
                     nomes = ", ".join([f.nome for f in s.formadores.all()])
                     linhas.append(f"- {s.titulo_evento} ({s.data_inicio:%d/%m %H:%M}-{s.data_fim:%d/%m %H:%M}) — Formadores: {nomes}")
                 msgs.append("Conflitos com solicitações aprovadas:\n" + "\n".join(linhas))
-
             if msgs:
                 raise ValidationError("\n\n".join(msgs))
-
         return cleaned
-    
-# === RF04: Formulário de decisão de aprovação ===
-from django import forms
-from django.core.exceptions import ValidationError
-from core.models import AprovacaoStatus
 
+
+# -------- RF04: Formulário de decisão --------
 class AprovacaoDecisionForm(forms.Form):
     decisao = forms.ChoiceField(
         choices=AprovacaoStatus.choices,
@@ -80,4 +74,26 @@ class AprovacaoDecisionForm(forms.Form):
         justificativa = cleaned.get("justificativa", "").strip()
         if decisao == AprovacaoStatus.REPROVADO and not justificativa:
             raise ValidationError("Justificativa é obrigatória para reprovar.")
+        return cleaned
+
+
+# -------- Bloqueio de Agenda (Apps Script -> Django) --------
+class BloqueioAgendaForm(forms.Form):
+    formador = forms.ModelChoiceField(
+        queryset=Formador.objects.filter(ativo=True).order_by("nome"),
+        label="Formador",
+        required=True,
+        widget=forms.Select(attrs={"class": "campo"})
+    )
+    inicio = forms.DateField(label="Início", widget=forms.DateInput(attrs={"type": "date"}))
+    fim = forms.DateField(label="Fim", widget=forms.DateInput(attrs={"type": "date"}))
+    TIPO_CHOICES = (("Total","Total"), ("Parcial","Parcial"))
+    tipo = forms.ChoiceField(choices=TIPO_CHOICES, label="Tipo")
+
+    def clean(self):
+        cleaned = super().clean()
+        di = cleaned.get("inicio")
+        df = cleaned.get("fim")
+        if di and df and df < di:
+            raise ValidationError(_("A data final não pode ser menor que a inicial."))
         return cleaned

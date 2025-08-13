@@ -141,3 +141,6 @@ LOGGING = {
         "level": os.getenv("LOG_LEVEL", "INFO"),
     },
 }
+# Emails de desenvolvimento (escreve no console)
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "nao-responda@aprender.local"

@@ -24,3 +24,10 @@ urlpatterns = [
     # Mapa mensal (JSON)
     path("mapa-mensal/", MapaMensalView.as_view(), name="mapa_mensal"),
 ]
+
+from .views_calendar import MapaMensalView, MapaMensalPageView
+
+urlpatterns += [
+    # Página visual (HTML)
+    path("disponibilidade/", MapaMensalPageView.as_view(), name="mapa_mensal_page"),
+]

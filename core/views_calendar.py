@@ -37,3 +37,9 @@ class MapaMensalView(View):
             "linhas": linhas
         }
         return JsonResponse(payload)
+    
+# --- Página HTML que consome o endpoint JSON ---
+from django.views.generic import TemplateView
+
+class MapaMensalPageView(TemplateView):
+    template_name = "core/mapa_mensal.html"

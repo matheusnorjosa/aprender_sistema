@@ -4,6 +4,7 @@ from django.http import JsonResponse, Http404
 from django.views import View
 from core.models import Formador
 from core.services.calendar_codes import marcador_do_dia
+from django.views.generic import TemplateView
 
 class MapaMensalView(View):
     def get(self, request):
@@ -43,3 +44,9 @@ from django.views.generic import TemplateView
 
 class MapaMensalPageView(TemplateView):
     template_name = "core/mapa_mensal.html"
+class MapaMensalHTMLView(TemplateView):
+    """
+    Página estática que consome a API /mapa-mensal/?ano=YYYY&mes=M
+    e renderiza o grid no navegador (HTML+JS).
+    """
+    template_name = "core/mapa_mensal_view.html"

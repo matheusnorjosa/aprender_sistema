@@ -3,12 +3,18 @@ from django.urls import path
 from .views import (
     SolicitacaoCreateView, SolicitacaoOKView,
     AprovacoesPendentesView, AprovacaoDetailView,
-    BloqueioCreateView
+    BloqueioCreateView,
+    home
 )
-from .views_calendar import MapaMensalView
+from .views_calendar import MapaMensalView, MapaMensalPageView
 from django.views.generic import TemplateView
 
+app_name = "core"
+
 urlpatterns = [
+    # Adicionei a URL para a página inicial
+    path("", home, name="home"),
+    
     # RF02
     path("solicitar/", SolicitacaoCreateView.as_view(), name="solicitar_evento"),
     path("solicitar/ok/", SolicitacaoOKView.as_view(), name="solicitacao_ok"),
@@ -23,11 +29,7 @@ urlpatterns = [
 
     # Mapa mensal (JSON)
     path("mapa-mensal/", MapaMensalView.as_view(), name="mapa_mensal"),
-]
-
-from .views_calendar import MapaMensalView, MapaMensalPageView
-
-urlpatterns += [
+    
     # Página visual (HTML)
     path("disponibilidade/", MapaMensalPageView.as_view(), name="mapa_mensal_page"),
 ]

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Aprender Sistema{% endblock %}</title>
+    <!-- Adicione aqui os seus arquivos CSS (futuramente) -->
+</head>
+<body>
+    <header>
+        <nav>
+            <ul>
+                <li><a href="{% url 'core:home' %}">Início</a></li>
+                <li><a href="{% url 'core:solicitar_evento' %}">Solicitar Evento</a></li>
+                <li><a href="{% url 'core:aprovacoes_pendentes' %}">Aprovações</a></li>
+                <li><a href="{% url 'admin:index' %}">Admin</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        {% block content %}
+            <!-- O conteúdo de cada página será inserido aqui -->
+        {% endblock %}
+    </main>
+    <footer>
+        <p>&copy; 2025 Aprender Sistema</p>
+    </footer>
+</body>
+</html>

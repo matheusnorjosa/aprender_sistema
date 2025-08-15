@@ -1,10 +1,11 @@
 # aprender_sistema/core/views.py
+
 from datetime import timedelta, time
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, TemplateView, ListView, FormView
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
@@ -14,11 +15,20 @@ from core.models import (
     Solicitacao, SolicitacaoStatus, Aprovacao, AprovacaoStatus, LogAuditoria,
 )
 
+
+def home(request):
+    """
+    Renderiza a página inicial do sistema.
+    """
+    return render(request, "core/home.html")
+
+
 # ----- RF02 -----
 class IsCoordenadorMixin(UserPassesTestMixin):
     def test_func(self):
         u = self.request.user
         return u.is_authenticated and (getattr(u, "papel", "") == "coordenador" or u.is_superuser)
+
 
 class SolicitacaoCreateView(LoginRequiredMixin, IsCoordenadorMixin, CreateView):
     model = Solicitacao
@@ -31,6 +41,7 @@ class SolicitacaoCreateView(LoginRequiredMixin, IsCoordenadorMixin, CreateView):
         messages.success(self.request, "Solicitação registrada com sucesso.")
         return super().form_valid(form)
 
+
 class SolicitacaoOKView(LoginRequiredMixin, TemplateView):
     template_name = "core/solicitacao_ok.html"
 
@@ -41,11 +52,13 @@ class IsSuperintendenciaMixin(UserPassesTestMixin):
         u = self.request.user
         return u.is_authenticated and (getattr(u, "papel", "") == "superintendencia" or u.is_superuser)
 
+
 class AprovacoesPendentesView(LoginRequiredMixin, IsSuperintendenciaMixin, ListView):
     template_name = "core/aprovacoes_pendentes.html"
     model = Solicitacao
     context_object_name = "pendentes"
     paginate_by = 20
+
     def get_queryset(self):
         qs = (
             Solicitacao.objects
@@ -58,6 +71,7 @@ class AprovacoesPendentesView(LoginRequiredMixin, IsSuperintendenciaMixin, ListV
         if termo:
             qs = qs.filter(titulo_evento__icontains=termo)
         return qs
+
 
 class AprovacaoDetailView(LoginRequiredMixin, IsSuperintendenciaMixin, FormView):
     template_name = "core/aprovacao_detail.html"
@@ -117,7 +131,7 @@ class BloqueioCreateView(LoginRequiredMixin, FormView):
     success_url = reverse_lazy("bloqueio_ok")
 
     def form_valid(self, form):
-        from core.models import DisponibilidadeFormadores  # evitar import circular
+        from core.models import DisponibilidadeFormadores
         formador = form.cleaned_data["formador"]
         inicio = form.cleaned_data["inicio"]
         fim = form.cleaned_data["fim"]

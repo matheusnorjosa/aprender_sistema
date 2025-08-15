@@ -1,10 +1,11 @@
 # aprender_sistema/core/urls.py
 from django.urls import path
 from .views import (
+    HomeView,  # Nova importação
     SolicitacaoCreateView, SolicitacaoOKView,
     AprovacoesPendentesView, AprovacaoDetailView,
     BloqueioCreateView,
-    home
+    home  # Mantendo a função home também (opcional)
 )
 from .views_calendar import MapaMensalView, MapaMensalPageView
 from django.views.generic import TemplateView
@@ -12,8 +13,9 @@ from django.views.generic import TemplateView
 app_name = "core"
 
 urlpatterns = [
-    # Adicionei a URL para a página inicial
-    path("", home, name="home"),
+    # Home - ambas as versões (você pode escolher uma ou manter ambas)
+    path("", HomeView.as_view(), name="home"),  # Versão class-based
+    # path("", home, name="home"),  # Versão function-based (mantenha se precisar)
     
     # RF02
     path("solicitar/", SolicitacaoCreateView.as_view(), name="solicitar_evento"),

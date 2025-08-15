@@ -23,6 +23,10 @@ def home(request):
     return render(request, "core/home.html")
 
 
+class HomeView(TemplateView):
+    template_name = "core/home.html"
+
+
 # ----- RF02 -----
 class IsCoordenadorMixin(UserPassesTestMixin):
     def test_func(self):

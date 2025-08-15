@@ -1,8 +1,135 @@
-{% extends "base.html" %}
+{% load static %}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Aprender — Início</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#f6f7fb; --card:#fff; --text:#111827; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb;
+      --ok:#16a34a; --warn:#d97706; --danger:#b91c1c;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    .wrap{max-width:1200px; margin:0 auto; padding:24px}
+    header{display:flex; align-items:center; gap:12px; margin-bottom:16px}
+    header h1{font-size:22px; margin:0; font-weight:800}
+    header .sub{color:var(--muted); font-size:13px}
+    .grid{display:grid; grid-template-columns:repeat(12, 1fr); gap:16px}
+    .col-12{grid-column:span 12}
+    .col-6 {grid-column:span 6}
+    .col-4 {grid-column:span 4}
+    .col-3 {grid-column:span 3}
+    @media(max-width:1200px){.col-4,.col-3{grid-column:span 6}}
+    @media(max-width:720px){.col-6,.col-4,.col-3{grid-column:span 12}}
+    .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .card h3{margin:0 0 8px 0; font-size:16px}
+    .card p {margin:0 0 12px 0; color:var(--muted); font-size:13px}
+    .actions{display:flex; flex-wrap:wrap; gap:8px}
+    .btn{display:inline-block; padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; text-decoration:none; color:var(--text); font-size:13px}
+    .btn:hover{background:#f8fafc}
+    .btn-primary{border-color:var(--accent); background:var(--accent); color:#fff}
+    .btn-primary:hover{filter:brightness(.95)}
+    .section-title{margin:24px 0 8px 0; font-size:12px; color:var(--muted); letter-spacing:.06em; font-weight:700; text-transform:uppercase}
+    footer{margin-top:24px; color:var(--muted); font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Aprender — Início</h1>
+      <div class="sub">Atalhos para as funcionalidades principais</div>
+      <div style="flex:1"></div>
+      <a class="btn" href="/admin/">Admin</a>
+    </header>
 
-{% block title %}Página Inicial{% endblock %}
+    <!-- Operações do dia a dia -->
+    <div class="section-title">Operações</div>
+    <div class="grid">
+      <div class="card col-4">
+        <h3>Solicitar Evento</h3>
+        <p>Crie uma solicitação com checagem automática de conflitos.</p>
+        <div class="actions">
+          <a class="btn-primary btn" href="/solicitar/">Abrir formulário</a>
+        </div>
+      </div>
 
-{% block content %}
-    <h1>Bem-vindo ao Aprender Sistema!</h1>
-    <p>Use o menu acima para navegar no sistema.</p>
-{% endblock %}
+      <div class="card col-4">
+        <h3>Bloqueio de Agenda</h3>
+        <p>Inclua bloqueios totais ou parciais por data.</p>
+        <div class="actions">
+          <a class="btn-primary btn" href="/bloqueios/novo/">Novo bloqueio</a>
+        </div>
+      </div>
+
+      <div class="card col-4">
+        <h3>Mapa Mensal</h3>
+        <p>Visual gráfico da disponibilidade por formador (consome a API).</p>
+        <div class="actions">
+          <a class="btn-primary btn" href="/disponibilidade/">Visual interativo</a>
+          <a class="btn" href="/mapa-mensal/view/">Via API + HTML</a>
+          <a class="btn" href="/mapa-mensal/?ano=2025&mes=9">JSON cru</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Superintendência / Aprovações -->
+    <div class="section-title">Superintendência</div>
+    <div class="grid">
+      <div class="card col-6">
+        <h3>Aprovações Pendentes</h3>
+        <p>Revisão e decisão de solicitações pendentes.</p>
+        <div class="actions">
+          <a class="btn-primary btn" href="/aprovacoes/pendentes/">Abrir lista</a>
+        </div>
+      </div>
+
+      <div class="card col-6">
+        <h3>Deslocamentos</h3>
+        <p>Cadastro e gerenciamento de deslocamentos de formadores.</p>
+        <div class="actions">
+          <a class="btn" href="/admin/core/deslocamento/">Abrir no Admin</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cadastros / Administração rápida -->
+    <div class="section-title">Cadastros rápidos</div>
+    <div class="grid">
+      <div class="card col-3">
+        <h3>Formadores</h3>
+        <p>Gerenciar formadores e e-mails.</p>
+        <div class="actions">
+          <a class="btn" href="/admin/core/formador/">Admin</a>
+        </div>
+      </div>
+      <div class="card col-3">
+        <h3>Municípios</h3>
+        <p>Cadastro de municípios e UF.</p>
+        <div class="actions">
+          <a class="btn" href="/admin/core/municipio/">Admin</a>
+        </div>
+      </div>
+      <div class="card col-3">
+        <h3>Projetos</h3>
+        <p>Cadastro de projetos ativos.</p>
+        <div class="actions">
+          <a class="btn" href="/admin/core/projeto/">Admin</a>
+        </div>
+      </div>
+      <div class="card col-3">
+        <h3>Tipos de Evento</h3>
+        <p>Definição de tipos e se são online.</p>
+        <div class="actions">
+          <a class="btn" href="/admin/core/tipoevento/">Admin</a>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      DAT • Desenvolvimento e Apoio Tecnológico — {{ request.user.username }}
+    </footer>
+  </div>
+</body>
+</html>

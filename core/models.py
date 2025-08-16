@@ -177,6 +177,9 @@ class Aprovacao(models.Model):
     class Meta:
         ordering = ["-data_aprovacao"]
 
+    def __str__(self):
+        return f"{self.status_decisao} — {self.solicitacao.titulo_evento}"
+
 
 class EventoGoogleCalendar(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

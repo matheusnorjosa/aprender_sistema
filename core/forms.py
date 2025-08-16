@@ -106,30 +106,43 @@ class SolicitacaoForm(forms.ModelForm):
             if conflitos["bloqueios"]:
                 linhas = []
                 for b in conflitos["bloqueios"]:
-                    linhas.append(f"- {b.formador.nome} indisponível em {b.data_bloqueio} {b.hora_inicio}-{b.hora_fim} ({b.tipo_bloqueio})")
+                    # RD-08: Incluir código de conflito (T ou P) na mensagem
+                    tipo_codigo = 'T' if (b.tipo_bloqueio.upper() == 'T' or b.tipo_bloqueio.lower() == 'total') else 'P'
+                    data_formatada = b.data_bloqueio.strftime('%d/%m')
+                    hora_inicio = b.hora_inicio.strftime('%H:%M')
+                    hora_fim = b.hora_fim.strftime('%H:%M')
+                    linhas.append(f"- [{tipo_codigo}] {b.formador.nome} indisponível em {data_formatada} {hora_inicio}-{hora_fim}")
                 msgs.append("Conflitos de disponibilidade:\n" + "\n".join(linhas))
             if conflitos["solicitacoes"]:
                 linhas = []
                 for s in conflitos["solicitacoes"]:
+                    # RD-08: Código E para eventos confirmados
                     nomes = ", ".join([f.nome for f in s.formadores.all()])
-                    linhas.append(f"- {s.titulo_evento} ({s.data_inicio:%d/%m %H:%M}-{s.data_fim:%d/%m %H:%M}) — Formadores: {nomes}")
+                    data_inicio = s.data_inicio.strftime('%d/%m %H:%M')
+                    data_fim = s.data_fim.strftime('%d/%m %H:%M')
+                    linhas.append(f"- [E] {s.titulo_evento} ({data_inicio}-{data_fim}) — Formadores: {nomes}")
                 msgs.append("Conflitos com solicitações aprovadas:\n" + "\n".join(linhas))
             if conflitos["deslocamentos"]:
                 linhas = []
                 for d in conflitos["deslocamentos"]:
+                    # RD-08: Código D para deslocamento
                     sol = d['solicitacao']
                     gap = d['gap_minutes']
                     required = d['required_minutes']
-                    linhas.append(f"- Buffer insuficiente: {sol.titulo_evento} em {sol.municipio} (gap: {gap:.0f}min, necessário: {required}min)")
+                    data_inicio = sol.data_inicio.strftime('%d/%m %H:%M')
+                    data_fim = sol.data_fim.strftime('%d/%m %H:%M')
+                    linhas.append(f"- [D] Buffer insuficiente para {sol.titulo_evento} em {sol.municipio} ({data_inicio}-{data_fim}) — Gap: {gap:.0f}min, necessário: {required}min")
                 msgs.append("Conflitos de deslocamento:\n" + "\n".join(linhas))
             if conflitos["capacidade_diaria"]:
                 linhas = []
                 for c in conflitos["capacidade_diaria"]:
+                    # RD-08: Código M para mais de um evento (capacidade excedida)
                     formador = c['formador']
+                    data_formatada = c['data'].strftime('%d/%m')
                     total = c['total_com_novo']
                     limite = c['limite_diario']
                     excesso = c['excesso']
-                    linhas.append(f"- {formador.nome}: capacidade diária excedida ({total:.1f}h/{limite}h, excesso: {excesso:.1f}h)")
+                    linhas.append(f"- [M] {formador.nome} em {data_formatada}: capacidade diária excedida ({total:.1f}h/{limite}h, excesso: {excesso:.1f}h)")
                 msgs.append("Conflitos de capacidade diária:\n" + "\n".join(linhas))
             if msgs:
                 raise ValidationError("\n\n".join(msgs))

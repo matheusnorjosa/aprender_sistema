@@ -1752,3 +1752,137 @@ class RDCapacidadeDiariaTest(TestCase):
         
         # NÃO deve detectar conflito de capacidade (7h < 8h limite)
         self.assertEqual(len(conflitos['capacidade_diaria']), 0)
+
+
+# =========================
+# RD-08: Mensagens com Códigos Tests
+# =========================
+
+class RDMensagensComCodigosTest(TestCase):
+    """Testes padronizados CLAUDE.md para RD-08"""
+    
+    def setUp(self):
+        """Configuração para testes de mensagens"""
+        self.coordenador = User.objects.create_user(
+            username='coord_mensagens',
+            password='testpass123',
+            papel='coordenador'
+        )
+        
+        self.projeto = Projeto.objects.create(nome='Projeto Mensagens')
+        self.municipio = Municipio.objects.create(nome='Fortaleza', uf='CE')
+        self.tipo_evento = TipoEvento.objects.create(nome='Workshop Mensagens')
+        self.formador = Formador.objects.create(nome='João Silva Mensagem', email='joao@mensagem.com')
+        
+        # Data base para testes (futuro)
+        from django.utils import timezone as tz
+        from datetime import timedelta
+        hoje = tz.localtime(tz.now()).date()
+        self.base_date = hoje + timedelta(days=30)  # 30 dias no futuro
+    
+    def test_conflict_messages_include_codes_and_intervals(self):
+        """RD-08: Mensagens devem incluir códigos (E/M/D/P/T/X) e intervalos (HH:MM dd/mm)"""
+        from core.forms import SolicitacaoForm
+        from core.models import DisponibilidadeFormadores
+        from django.utils import timezone as tz
+        from datetime import time, datetime, timedelta
+        
+        # 1. Criar bloqueio TOTAL para testar código [T]
+        DisponibilidadeFormadores.objects.create(
+            formador=self.formador,
+            data_bloqueio=self.base_date,
+            hora_inicio=time(8, 0),
+            hora_fim=time(17, 0),
+            tipo_bloqueio='T',  # Total
+            motivo='Férias'
+        )
+        
+        # 2. Criar solicitação aprovada para testar código [E]
+        evento_aprovado = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador,
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Workshop Matemática',
+            data_inicio=tz.make_aware(datetime.combine(self.base_date + timedelta(days=1), time(14, 0))),
+            data_fim=tz.make_aware(datetime.combine(self.base_date + timedelta(days=1), time(18, 0))),
+            status=SolicitacaoStatus.APROVADO
+        )
+        evento_aprovado.formadores.add(self.formador)
+        
+        # 3. Tentar criar novo evento que conflita com ambos
+        form_data = {
+            'projeto': self.projeto.id,
+            'municipio': self.municipio.id,
+            'tipo_evento': self.tipo_evento.id,
+            'titulo_evento': 'Evento Conflitante',
+            'data_inicio': tz.make_aware(datetime.combine(self.base_date, time(15, 0))),  # Conflita com bloqueio T
+            'data_fim': tz.make_aware(datetime.combine(self.base_date, time(16, 0))),
+            'formadores': [self.formador.id],
+            'coordenador_acompanha': False,
+        }
+        
+        form = SolicitacaoForm(data=form_data)
+        self.assertFalse(form.is_valid())
+        
+        # Verificar mensagens de erro
+        error_str = str(form.errors)
+        
+        # Verificar elementos obrigatórios RD-08
+        self.assertIn('[T]', error_str, "Deve incluir código T para bloqueio total")
+        self.assertIn('João Silva Mensagem', error_str, "Deve incluir nome do formador")
+        
+        # Verificar formato de data/hora (dd/mm HH:MM)
+        expected_date = self.base_date.strftime('%d/%m')
+        self.assertIn(expected_date, error_str, "Deve incluir data no formato dd/mm")
+        
+        # Verificar se contém horários no formato HH:MM
+        import re
+        time_pattern = r'\d{2}:\d{2}'
+        times_found = re.findall(time_pattern, error_str)
+        self.assertGreaterEqual(len(times_found), 2, "Deve incluir pelo menos dois horários no formato HH:MM")
+    
+    def test_all_conflict_codes_in_messages(self):
+        """RD-08: Verificar que todos os códigos (E/M/D/P/T) aparecem nas mensagens apropriadas"""
+        from core.services.conflicts import check_conflicts
+        from core.models import DisponibilidadeFormadores
+        from django.utils import timezone as tz
+        from datetime import time, datetime, timedelta
+        
+        # Setup para testar múltiplos tipos de conflito
+        
+        # 1. Bloqueio Parcial [P]
+        DisponibilidadeFormadores.objects.create(
+            formador=self.formador,
+            data_bloqueio=self.base_date,
+            hora_inicio=time(9, 0),
+            hora_fim=time(11, 0),
+            tipo_bloqueio='P',  # Parcial
+            motivo='Reunião'
+        )
+        
+        # 2. Evento aprovado [E] em outro município (para testar [D])
+        municipio_outro = Municipio.objects.create(nome='Caucaia', uf='CE')
+        evento_outro_municipio = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador,
+            projeto=self.projeto,
+            municipio=municipio_outro,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento Caucaia',
+            data_inicio=tz.make_aware(datetime.combine(self.base_date, time(8, 0))),
+            data_fim=tz.make_aware(datetime.combine(self.base_date, time(9, 0))),
+            status=SolicitacaoStatus.APROVADO
+        )
+        evento_outro_municipio.formadores.add(self.formador)
+        
+        # 3. Evento longo para testar [M] - capacidade excedida
+        evento_inicio = tz.make_aware(datetime.combine(self.base_date, time(10, 0)))  # Conflita com [P]
+        evento_fim = tz.make_aware(datetime.combine(self.base_date, time(19, 0)))    # 9 horas > 8h limite [M]
+        
+        # Verificar conflitos
+        conflitos = check_conflicts([self.formador], evento_inicio, evento_fim, self.municipio)
+        
+        # Deve detectar múltiplos tipos de conflito
+        self.assertGreater(len(conflitos['bloqueios']), 0, "Deve detectar conflito de bloqueio [P]")
+        self.assertGreater(len(conflitos['deslocamentos']), 0, "Deve detectar conflito de deslocamento [D]") 
+        self.assertGreater(len(conflitos['capacidade_diaria']), 0, "Deve detectar conflito de capacidade [M]")

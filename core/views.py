@@ -38,7 +38,7 @@ class SolicitacaoCreateView(LoginRequiredMixin, IsCoordenadorMixin, CreateView):
     model = Solicitacao
     form_class = SolicitacaoForm
     template_name = "core/solicitacao_form.html"
-    success_url = reverse_lazy("solicitacao_ok")
+    success_url = reverse_lazy("core:solicitacao_ok")
 
     def form_valid(self, form):
         form.instance.usuario_solicitante = self.request.user

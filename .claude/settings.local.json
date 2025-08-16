@@ -2,10 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(venvScripts:*)",
-      "Bash(curl:*)",
-      "Bash(docker-compose exec:*)",
-      "Bash(docker-compose logs:*)",
-      "Bash(rm:*)"
+      "Bash(docker-compose exec web python manage.py test:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

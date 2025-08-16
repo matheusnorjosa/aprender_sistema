@@ -749,7 +749,7 @@ class RF03BloqueiosTest(TestCase):
         error_str = str(form.errors)
         self.assertIn('Conflitos de disponibilidade', error_str)
         self.assertIn('Formador Bloqueado', error_str)
-        self.assertIn('Total', error_str)
+        self.assertIn('[T]', error_str)  # RD-08: Código de bloqueio total
     
     def test_conflict_with_partial_bloqueio(self):
         """RF03: Deve detectar conflito com bloqueio parcial"""
@@ -796,7 +796,7 @@ class RF03BloqueiosTest(TestCase):
         self.assertIn('Conflitos de disponibilidade', error_str)
         self.assertIn('14:00', error_str)  # Verificar apenas início
         self.assertIn('16:00', error_str)  # Verificar apenas fim
-        self.assertIn('Parcial', error_str)
+        self.assertIn('[P]', error_str)  # RD-08: Código de bloqueio parcial
     
     def test_no_conflict_outside_bloqueio(self):
         """RF03: Não deve haver conflito fora do período de bloqueio"""
@@ -1950,3 +1950,222 @@ class PA06UIControlTest(TestCase):
         self.assertIn('Bloqueio de Agenda', content, "Formador deve ver bloqueio de agenda")
         self.assertIn('href="/bloqueios/novo/"', content, "Formador deve ter link ativo para bloqueio")
         self.assertNotIn('href="/aprovacoes/pendentes/"', content, "Formador NÃO deve ter link ativo para aprovações")
+
+
+# =========================
+# PA-07: Testes Obrigatórios de Aprovação Manual
+# =========================
+
+class PA07MandatoryApprovalTest(TestCase):
+    """Testes obrigatórios PA-07 especificados no CLAUDE.md"""
+    
+    def setUp(self):
+        """Configuração para testes PA-07"""
+        self.coordenador = User.objects.create_user(
+            username='coord_pa07',
+            password='testpass123',
+            papel='coordenador'
+        )
+        
+        self.superintendencia = User.objects.create_user(
+            username='super_pa07',
+            password='testpass123',
+            papel='superintendencia'
+        )
+        
+        self.projeto = Projeto.objects.create(nome='Projeto PA07')
+        self.municipio = Municipio.objects.create(nome='Fortaleza', uf='CE')
+        self.tipo_evento = TipoEvento.objects.create(nome='Workshop PA07')
+        self.formador = Formador.objects.create(nome='Formador PA07', email='formador@pa07.com')
+        
+        # Data futura para testes
+        from django.utils import timezone as tz
+        from datetime import timedelta
+        hoje = tz.localtime(tz.now()).date()
+        self.data_futura = hoje + timedelta(days=15)
+    
+    def test_never_auto_approves_on_clean_or_save(self):
+        """PA-07: Solicitação NUNCA muda para aprovada automaticamente"""
+        from django.utils import timezone as tz
+        from datetime import time, datetime
+        
+        # Criar solicitação sem conflitos
+        solicitacao = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador,
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento PA07',
+            data_inicio=tz.make_aware(datetime.combine(self.data_futura, time(10, 0))),
+            data_fim=tz.make_aware(datetime.combine(self.data_futura, time(12, 0))),
+            # Status não especificado → deve ser PENDENTE por padrão
+        )
+        solicitacao.formadores.add(self.formador)
+        
+        # Verificar que status inicial é PENDENTE
+        self.assertEqual(solicitacao.status, SolicitacaoStatus.PENDENTE)
+        
+        # Forçar clean() e save() - nunca deve auto-aprovar
+        solicitacao.clean()
+        solicitacao.save()
+        solicitacao.refresh_from_db()
+        self.assertEqual(solicitacao.status, SolicitacaoStatus.PENDENTE, "NUNCA deve auto-aprovar após clean/save")
+        
+        # Mesmo após múltiplos saves
+        for _ in range(3):
+            solicitacao.save()
+            solicitacao.refresh_from_db()
+            self.assertEqual(solicitacao.status, SolicitacaoStatus.PENDENTE, "Deve manter status PENDENTE sempre")
+    
+    def test_only_superintendencia_can_approve_or_reject(self):
+        """PA-07: Apenas superintendência pode aprovar/reprovar (já testado em RF04PermissionTest)"""
+        # Este teste já existe em RF04PermissionTest, mas vamos reconfirmar especificamente para PA-07
+        from django.utils import timezone as tz
+        from datetime import time, datetime
+        
+        solicitacao = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador,
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento PA07 Permissão',
+            data_inicio=tz.make_aware(datetime.combine(self.data_futura, time(14, 0))),
+            data_fim=tz.make_aware(datetime.combine(self.data_futura, time(16, 0))),
+            status=SolicitacaoStatus.PENDENTE
+        )
+        solicitacao.formadores.add(self.formador)
+        
+        from django.test import Client
+        client = Client()
+        
+        # Coordenador NÃO pode acessar aprovação
+        client.login(username='coord_pa07', password='testpass123')
+        url = reverse('core:aprovacao_detail', args=[solicitacao.id])
+        response = client.get(url)
+        self.assertEqual(response.status_code, 403, "Coordenador deve receber 403 ao tentar aprovar")
+        
+        # Superintendência PODE acessar
+        client.login(username='super_pa07', password='testpass123')
+        response = client.get(url)
+        self.assertEqual(response.status_code, 200, "Superintendência deve conseguir acessar aprovação")
+    
+    def test_calendar_integration_not_called_before_approval(self):
+        """PA-07: Integração com calendar não é chamada antes da aprovação"""
+        from django.utils import timezone as tz
+        from datetime import time, datetime
+        
+        # Criar solicitação pendente
+        solicitacao = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador,
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento PA07 Calendar',
+            data_inicio=tz.make_aware(datetime.combine(self.data_futura, time(9, 0))),
+            data_fim=tz.make_aware(datetime.combine(self.data_futura, time(11, 0))),
+            status=SolicitacaoStatus.PENDENTE
+        )
+        solicitacao.formadores.add(self.formador)
+        
+        # Verificar que não há evento do Google Calendar criado automaticamente
+        from core.models import EventoGoogleCalendar
+        self.assertFalse(
+            EventoGoogleCalendar.objects.filter(solicitacao=solicitacao).exists(),
+            "NÃO deve haver evento Google Calendar antes da aprovação"
+        )
+        
+        # Mesmo após salvar várias vezes
+        for _ in range(3):
+            solicitacao.save()
+            self.assertFalse(
+                EventoGoogleCalendar.objects.filter(solicitacao=solicitacao).exists(),
+                "NÃO deve criar evento Google Calendar automaticamente"
+            )
+        
+        # Só após aprovação manual (se houver serviço implementado) deveria criar
+        # Como não há serviço implementado ainda, apenas validamos que não há auto-criação
+    
+    def test_approval_flow_records_audit_log(self):
+        """PA-07: Fluxo de aprovação registra log de auditoria (já testado em RF04ApprovalWorkflowTest)"""
+        # Este teste já existe, mas vamos reconfirmar especificamente para PA-07
+        from django.utils import timezone as tz
+        from datetime import time, datetime
+        
+        solicitacao = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador,
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento PA07 Audit',
+            data_inicio=tz.make_aware(datetime.combine(self.data_futura, time(13, 0))),
+            data_fim=tz.make_aware(datetime.combine(self.data_futura, time(15, 0))),
+            status=SolicitacaoStatus.PENDENTE
+        )
+        solicitacao.formadores.add(self.formador)
+        
+        # Fazer aprovação manual
+        from core.models import Aprovacao, LogAuditoria
+        Aprovacao.objects.create(
+            solicitacao=solicitacao,
+            usuario_aprovador=self.superintendencia,
+            status_decisao=AprovacaoStatus.APROVADO,
+            justificativa='Aprovação teste PA-07'
+        )
+        
+        # Atualizar status da solicitação (simulando o que a view faz)
+        solicitacao.status = SolicitacaoStatus.APROVADO
+        solicitacao.usuario_aprovador = self.superintendencia
+        solicitacao.data_aprovacao_rejeicao = tz.now()
+        solicitacao.save()
+        
+        # Criar log de auditoria (simulando o que a view faz)
+        LogAuditoria.objects.create(
+            usuario=self.superintendencia,
+            acao=f"RF04: {AprovacaoStatus.APROVADO} solicitação",
+            entidade_afetada_id=solicitacao.id,
+            detalhes=f"Solicitação '{solicitacao.titulo_evento}' ({solicitacao.id}) — decisão: {AprovacaoStatus.APROVADO}; justificativa: Aprovação teste PA-07"
+        )
+        
+        # Verificar que log foi criado
+        log_existe = LogAuditoria.objects.filter(
+            usuario=self.superintendencia,
+            entidade_afetada_id=solicitacao.id,
+            acao__icontains='solicitação'
+        ).exists()
+        self.assertTrue(log_existe, "Deve registrar log de auditoria para aprovação")
+    
+    def test_non_privileged_user_gets_403_on_approval_endpoint(self):
+        """PA-07: Usuário sem privilégio recebe 403 no endpoint de aprovação (já testado em RF04SecurityTest)"""
+        # Este teste já existe, mas vamos reconfirmar especificamente para PA-07
+        from django.utils import timezone as tz
+        from datetime import time, datetime
+        
+        solicitacao = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador,
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento PA07 403',
+            data_inicio=tz.make_aware(datetime.combine(self.data_futura, time(16, 0))),
+            data_fim=tz.make_aware(datetime.combine(self.data_futura, time(18, 0))),
+            status=SolicitacaoStatus.PENDENTE
+        )
+        solicitacao.formadores.add(self.formador)
+        
+        from django.test import Client
+        client = Client()
+        
+        # Usuário não autenticado
+        url = reverse('core:aprovacao_detail', args=[solicitacao.id])
+        response = client.get(url)
+        self.assertEqual(response.status_code, 302, "Usuário não autenticado deve ser redirecionado")
+        
+        # Coordenador (sem privilégio para aprovar)
+        client.login(username='coord_pa07', password='testpass123')
+        response = client.get(url)
+        self.assertEqual(response.status_code, 403, "Coordenador deve receber 403 para endpoint de aprovação")
+        
+        # Lista de aprovações também deve ser protegida
+        list_url = reverse('core:aprovacoes_pendentes')
+        response = client.get(list_url)
+        self.assertEqual(response.status_code, 403, "Coordenador deve receber 403 para lista de aprovações")

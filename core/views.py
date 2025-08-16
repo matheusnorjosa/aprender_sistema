@@ -131,6 +131,54 @@ class AprovacaoDetailView(LoginRequiredMixin, IsSuperintendenciaMixin, FormView)
                      f" — decisão: {decisao}; justificativa: {justificativa or '-'}"
         )
 
+        # RF05: Hook para sincronização com Google Calendar (apenas se APROVADO)
+        if self.solicitacao.status == SolicitacaoStatus.APROVADO:
+            # PA-03 garantida: só aqui damos follow-up
+            from django.conf import settings
+            from core.services.integrations.calendar_mapper import map_solicitacao_to_google_event
+            from core.services.integrations.calendar_stub import GoogleCalendarServiceStub
+            from core.models import EventoGoogleCalendar
+            
+            if settings.FEATURE_GOOGLE_SYNC:
+                try:
+                    gevent = map_solicitacao_to_google_event(self.solicitacao)
+                    svc = GoogleCalendarServiceStub()
+                    result = svc.create_event(gevent)
+
+                    if result.get("id"):
+                        EventoGoogleCalendar.objects.create(
+                            solicitacao=self.solicitacao,
+                            usuario_criador=self.request.user,
+                            provider_event_id=result["id"],
+                            html_link=result.get("htmlLink", ""),
+                            meet_link=result.get("hangoutLink", ""),
+                            raw_payload=result,
+                            status_sincronizacao=EventoGoogleCalendar.SincronizacaoStatus.OK
+                        )
+                        LogAuditoria.objects.create(
+                            usuario=self.request.user,
+                            acao="RF05: Evento sincronizado com Google Calendar",
+                            entidade_afetada_id=self.solicitacao.id,
+                            detalhes=f"Evento criado no Google Calendar: {result.get('id')}"
+                        )
+                    else:
+                        # Log que não foi possível criar
+                        LogAuditoria.objects.create(
+                            usuario=self.request.user,
+                            acao="RF05: Falha ao sincronizar com Google Calendar",
+                            entidade_afetada_id=self.solicitacao.id,
+                            detalhes=f"Resposta: {result}"
+                        )
+                except Exception as e:
+                    # Log de erro sem quebrar o fluxo principal
+                    LogAuditoria.objects.create(
+                        usuario=self.request.user,
+                        acao="RF05: Erro na sincronização com Google Calendar",
+                        entidade_afetada_id=self.solicitacao.id,
+                        detalhes=f"Erro: {str(e)}"
+                    )
+            # Se flag OFF, não faz nada (PA-03 respeitada)
+
         messages.success(self.request, f"Solicitação {decisao.lower()} com sucesso.")
         return redirect("core:aprovacoes_pendentes")
 

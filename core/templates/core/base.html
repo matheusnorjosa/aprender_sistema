@@ -1,81 +1,266 @@
-<!DOCTYPE html>
-<html lang="pt-br">
+{% load static %}
+<!doctype html>
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Aprender Sistema{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="utf-8" />
+  <title>{% block title %}Sistema Aprender{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#f8f9fa; --sidebar-bg:#343a40; --sidebar-hover:#495057; --card:#fff; 
+      --text:#212529; --muted:#6c757d; --line:#dee2e6; --accent:#0d6efd;
+      --ok:#198754; --warn:#fd7e14; --danger:#dc3545; --sidebar-width:280px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; overflow-x:hidden}
+    
+    /* Layout principal */
+    .layout{display:flex; min-height:100vh}
+    .sidebar{width:var(--sidebar-width); background:var(--sidebar-bg); color:#fff; position:fixed; height:100vh; overflow-y:auto; z-index:1000; transition:transform 0.3s ease}
+    .main-content{flex:1; margin-left:var(--sidebar-width); transition:margin-left 0.3s ease}
+    
+    /* Sidebar styles */
+    .sidebar-header{padding:1.5rem 1rem; border-bottom:1px solid rgba(255,255,255,0.1)}
+    .sidebar-header h4{margin:0; font-size:1.2rem; font-weight:600}
+    .sidebar-header .sub{font-size:0.8rem; color:rgba(255,255,255,0.7); margin-top:0.25rem}
+    
+    .sidebar-nav{padding:1rem 0}
+    .nav-section{margin-bottom:1.5rem}
+    .nav-section-title{padding:0.5rem 1rem; font-size:0.75rem; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.1em; font-weight:600; margin-bottom:0.5rem}
+    
+    .nav-item{display:block; padding:0.75rem 1rem; color:rgba(255,255,255,0.8); text-decoration:none; transition:all 0.2s ease; border-left:3px solid transparent}
+    .nav-item:hover{background:var(--sidebar-hover); color:#fff; border-left-color:var(--accent)}
+    .nav-item.active{background:var(--accent); color:#fff; border-left-color:#fff}
+    .nav-item i{width:1.25rem; margin-right:0.75rem; font-size:1rem}
+    .nav-item .badge{float:right; margin-top:0.125rem}
+    
+    /* Responsive sidebar */
+    @media (max-width: 768px) {
+      .sidebar{transform:translateX(-100%)}
+      .sidebar.show{transform:translateX(0)}
+      .main-content{margin-left:0}
+      .mobile-toggle{display:block}
+    }
+    .mobile-toggle{display:none; position:fixed; top:1rem; left:1rem; z-index:1001; background:var(--sidebar-bg); color:#fff; border:none; padding:0.5rem; border-radius:0.375rem}
+    
+    /* Main content */
+    .content-wrap{padding:2rem}
+    .page-header{background:#fff; border-bottom:1px solid var(--line); padding:1.5rem 2rem; margin:-2rem -2rem 2rem -2rem; box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+    .page-header h1{margin:0; font-size:1.75rem; font-weight:600; color:var(--accent)}
+    .page-header .breadcrumb{margin:0.5rem 0 0 0; font-size:0.875rem; color:var(--muted)}
+    .page-header .actions{margin-top:1rem}
+    
+    /* Forms */
+    .form-group{margin-bottom:1.5rem}
+    .form-label{display:block; margin-bottom:0.5rem; font-weight:500; color:var(--text)}
+    .form-control{width:100%; padding:0.75rem; border:1px solid var(--line); border-radius:0.5rem; font-size:0.875rem; transition:all 0.2s ease}
+    .form-control:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(13, 110, 253, 0.1)}
+    .form-select{appearance:none; background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e"); background-position:right 0.75rem center; background-repeat:no-repeat; background-size:1.25rem; padding-right:2.5rem}
+    .form-text{font-size:0.8rem; color:var(--muted); margin-top:0.25rem}
+    
+    /* Cards */
+    .card{background:var(--card); border:1px solid var(--line); border-radius:0.75rem; padding:1.5rem; box-shadow:0 2px 4px rgba(0,0,0,0.05); margin-bottom:1.5rem}
+    .card-header{background:#f8f9fa; border-bottom:1px solid var(--line); padding:1rem 1.5rem; margin:-1.5rem -1.5rem 1.5rem -1.5rem; border-radius:0.75rem 0.75rem 0 0}
+    .card-title{margin:0; font-size:1.125rem; font-weight:600; color:var(--accent)}
+    
+    /* Tables */
+    .table-container{overflow-x:auto; border-radius:0.75rem; border:1px solid var(--line)}
+    .table{width:100%; margin:0; border-collapse:collapse}
+    .table th{background:#f8f9fa; padding:1rem; border-bottom:1px solid var(--line); font-weight:600; color:var(--text); text-align:left}
+    .table td{padding:1rem; border-bottom:1px solid var(--line)}
+    .table tbody tr:hover{background:#f8f9fa}
+    .table tbody tr:last-child td{border-bottom:none}
+    
+    /* Buttons */
+    .btn{display:inline-flex; align-items:center; padding:0.75rem 1.5rem; border:1px solid var(--line); border-radius:0.5rem; background:#fff; text-decoration:none; color:var(--text); font-size:0.875rem; font-weight:500; transition:all 0.2s ease; cursor:pointer}
+    .btn:hover{background:#f8f9fa; text-decoration:none; color:var(--text); transform:translateY(-1px)}
+    .btn-primary{border-color:var(--accent); background:var(--accent); color:#fff}
+    .btn-primary:hover{background:#0b5ed7; border-color:#0a58ca; color:#fff}
+    .btn-success{border-color:var(--ok); background:var(--ok); color:#fff}
+    .btn-success:hover{background:#157347; border-color:#146c43; color:#fff}
+    .btn-warning{border-color:var(--warn); background:var(--warn); color:#fff}
+    .btn-warning:hover{background:#e08e0b; border-color:#c77c0b; color:#fff}
+    .btn-danger{border-color:var(--danger); background:var(--danger); color:#fff}
+    .btn-danger:hover{background:#bb2d3b; border-color:#b02a37; color:#fff}
+    .btn-sm{padding:0.5rem 1rem; font-size:0.8rem}
+    .btn-lg{padding:1rem 2rem; font-size:1rem}
+    .btn i{margin-right:0.5rem}
+    .btn-group{display:flex; gap:0.5rem}
+    
+    /* Alerts */
+    .alert{padding:1rem; border-radius:0.5rem; margin-bottom:1rem; border:1px solid}
+    .alert-success{background:#d1e7dd; border-color:#badbcc; color:#0f5132}
+    .alert-warning{background:#fff3cd; border-color:#ffecb5; color:#664d03}
+    .alert-danger{background:#f8d7da; border-color:#f5c2c7; color:#842029}
+    .alert-info{background:#d1ecf1; border-color:#b6effb; color:#055160}
+    
+    /* Badges */
+    .badge{display:inline-block; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.375rem; color:#fff}
+    .badge-primary{background:var(--accent)}
+    .badge-success{background:var(--ok)}
+    .badge-warning{background:var(--warn)}
+    .badge-danger{background:var(--danger)}
+    .badge-secondary{background:var(--muted)}
+    
+    /* Utility classes */
+    .text-primary{color:var(--accent)!important}
+    .text-success{color:var(--ok)!important}
+    .text-warning{color:var(--warn)!important}
+    .text-danger{color:var(--danger)!important}
+    .text-muted{color:var(--muted)!important}
+    .mb-0{margin-bottom:0!important}
+    .mb-1{margin-bottom:0.5rem!important}
+    .mb-2{margin-bottom:1rem!important}
+    .mb-3{margin-bottom:1.5rem!important}
+    .mt-0{margin-top:0!important}
+    .mt-1{margin-top:0.5rem!important}
+    .mt-2{margin-top:1rem!important}
+    .mt-3{margin-top:1.5rem!important}
+    .text-center{text-align:center!important}
+    .d-flex{display:flex!important}
+    .justify-content-between{justify-content:space-between!important}
+    .align-items-center{align-items:center!important}
+    .gap-2{gap:1rem!important}
+    
+    footer{margin-top:3rem; padding:1.5rem 0; border-top:1px solid var(--line); color:var(--muted); font-size:0.8rem; text-center}
+    
+    {% block extra_css %}{% endblock %}
+  </style>
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-            <div class="container">
-                <a class="navbar-brand" href="{% url 'core:home' %}">Aprender Sistema</a>
-                
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav me-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'core:home' %}">Início</a>
-                        </li>
-                        {% if user.is_authenticated %}
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'core:solicitar_evento' %}">Solicitar Evento</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'core:aprovacoes_pendentes' %}">Aprovações</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
-                            </li>
-                        {% endif %}
-                    </ul>
-                    
-                    <ul class="navbar-nav">
-                        {% if user.is_authenticated %}
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
-                                    {{ user.get_full_name|default:user.username }}
-                                </a>
-                                <ul class="dropdown-menu">
-                                    <li><span class="dropdown-item-text">Papel: {{ user.get_papel_display|default:"N/A" }}</span></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item" href="{% url 'admin:logout' %}">Sair</a></li>
-                                </ul>
-                            </li>
-                        {% else %}
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'core:login' %}">Entrar</a>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </div>
-            </div>
-        </nav>
-    </header>
-    
-    <main class="container mt-4">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
+  <!-- Mobile toggle -->
+  <button class="mobile-toggle" onclick="toggleSidebar()">
+    <i class="bi bi-list"></i>
+  </button>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h4><i class="bi bi-mortarboard"></i> Sistema Aprender</h4>
+        <div class="sub">Gestão de Eventos e Formações</div>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <!-- Navegação Principal -->
+        <div class="nav-section">
+          <div class="nav-section-title">Principal</div>
+          <a href="{% url 'core:home' %}" class="nav-item {% block nav_home %}{% endblock %}">
+            <i class="bi bi-house"></i> Início
+          </a>
+          <a href="/disponibilidade/" class="nav-item {% block nav_mapa %}{% endblock %}">
+            <i class="bi bi-calendar-check"></i> Mapa Mensal
+          </a>
+        </div>
+
+        <!-- Operações por papel -->
+        {% if user.papel == 'coordenador' or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Coordenação</div>
+          <a href="/solicitar/" class="nav-item {% block nav_solicitar %}{% endblock %}">
+            <i class="bi bi-plus-circle"></i> Solicitar Evento
+          </a>
+        </div>
         {% endif %}
-        
-        {% block content %}
-            <!-- O conteúdo de cada página será inserido aqui -->
-        {% endblock %}
-    </main>
+
+        {% if user.papel == 'formador' or user.papel == 'coordenador' or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Formador</div>
+          <a href="/bloqueios/novo/" class="nav-item {% block nav_bloqueio %}{% endblock %}">
+            <i class="bi bi-calendar-x"></i> Bloqueio de Agenda
+          </a>
+        </div>
+        {% endif %}
+
+        {% if user.papel == 'superintendencia' or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Superintendência</div>
+          <a href="/aprovacoes/pendentes/" class="nav-item {% block nav_aprovacoes %}{% endblock %}">
+            <i class="bi bi-clipboard-check"></i> Aprovações Pendentes
+          </a>
+          <a href="/admin/core/deslocamento/" class="nav-item {% block nav_deslocamentos %}{% endblock %}">
+            <i class="bi bi-geo-alt"></i> Deslocamentos
+          </a>
+        </div>
+        {% endif %}
+
+        <!-- Cadastros -->
+        <div class="nav-section">
+          <div class="nav-section-title">Cadastros</div>
+          <a href="/admin/core/formador/" class="nav-item">
+            <i class="bi bi-people"></i> Formadores
+          </a>
+          <a href="/admin/core/municipio/" class="nav-item">
+            <i class="bi bi-geo"></i> Municípios
+          </a>
+          <a href="/admin/core/projeto/" class="nav-item">
+            <i class="bi bi-folder"></i> Projetos
+          </a>
+          <a href="/admin/core/tipoevento/" class="nav-item">
+            <i class="bi bi-tag"></i> Tipos de Evento
+          </a>
+        </div>
+
+        <!-- Administração -->
+        <div class="nav-section">
+          <div class="nav-section-title">Sistema</div>
+          <a href="/admin/" class="nav-item">
+            <i class="bi bi-gear"></i> Administração
+          </a>
+        </div>
+      </nav>
+    </div>
+
+    <!-- Main content -->
+    <div class="main-content">
+      <div class="page-header">
+        <h1>{% block page_title %}{% endblock %}</h1>
+        <div class="breadcrumb">
+          {% block breadcrumb %}{% endblock %}
+        </div>
+        {% block page_actions %}{% endblock %}
+      </div>
+      
+      <div class="content-wrap">
+        <!-- Django messages -->
+        {% if messages %}
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+              <i class="bi {% if message.tags == 'success' %}bi-check-circle{% elif message.tags == 'warning' %}bi-exclamation-triangle{% elif message.tags == 'error' %}bi-x-circle{% else %}bi-info-circle{% endif %}"></i>
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+
+        <footer>
+          <i class="bi bi-gear"></i> DAT • Desenvolvimento e Apoio Tecnológico — {{ user.username }}
+        </footer>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('show');
+    }
     
-    <footer class="bg-light text-center py-3 mt-5">
-        <p class="mb-0">&copy; 2025 Aprender Sistema</p>
-    </footer>
+    // Close sidebar when clicking outside on mobile
+    document.addEventListener('click', function(event) {
+      const sidebar = document.getElementById('sidebar');
+      const toggle = document.querySelector('.mobile-toggle');
+      
+      if (window.innerWidth <= 768 && 
+          !sidebar.contains(event.target) && 
+          !toggle.contains(event.target) && 
+          sidebar.classList.contains('show')) {
+        sidebar.classList.remove('show');
+      }
+    });
     
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+  </script>
 </body>
 </html>

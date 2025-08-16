@@ -1552,3 +1552,98 @@ class RDBloqueiosTotalParcialTest(TestCase):
         
         conflitos_borda = check_conflicts([self.formador], evento_inicio_borda, evento_fim_borda)
         self.assertEqual(len(conflitos_borda['bloqueios']), 0, "Não deve conflitar quando fim do bloqueio == início do evento")
+
+
+# =========================
+# RD-04: Buffer de Deslocamento Tests
+# =========================
+
+class RDBufferDeslocamentoTest(TestCase):
+    """Testes padronizados CLAUDE.md para RD-04"""
+    
+    def setUp(self):
+        """Configuração para testes de buffer de deslocamento"""
+        self.coordenador = User.objects.create_user(
+            username='coord_buffer',
+            password='testpass123',
+            papel='coordenador'
+        )
+        
+        self.projeto = Projeto.objects.create(nome='Projeto Buffer')
+        
+        # Criar dois municípios diferentes
+        self.municipio_fortaleza = Municipio.objects.create(nome='Fortaleza', uf='CE')
+        self.municipio_caucaia = Municipio.objects.create(nome='Caucaia', uf='CE')
+        
+        self.tipo_evento = TipoEvento.objects.create(nome='Workshop Buffer')
+        self.formador = Formador.objects.create(nome='Formador Buffer', email='formador@buffer.com')
+        
+        # Data base para testes
+        from django.utils import timezone as tz
+        self.base_date = tz.localtime(tz.now()).date().replace(day=20)  # Dia 20 do mês atual
+    
+    def test_travel_buffer_between_cities_required(self):
+        """RD-04: Buffer de deslocamento obrigatório entre municípios diferentes"""
+        from core.services.conflicts import check_conflicts
+        from django.utils import timezone as tz
+        from datetime import time, datetime, timedelta
+        
+        # Criar evento aprovado em Fortaleza: 10:00-12:00
+        evento_fortaleza = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador,
+            projeto=self.projeto,
+            municipio=self.municipio_fortaleza,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento em Fortaleza',
+            data_inicio=tz.make_aware(datetime.combine(self.base_date, time(10, 0))),
+            data_fim=tz.make_aware(datetime.combine(self.base_date, time(12, 0))),
+            status=SolicitacaoStatus.APROVADO
+        )
+        evento_fortaleza.formadores.add(self.formador)
+        
+        # Tentar criar evento em Caucaia com buffer insuficiente: 13:00-15:00 
+        # (apenas 60 min de gap, buffer configurado = 90 min)
+        novo_evento_inicio = tz.make_aware(datetime.combine(self.base_date, time(13, 0)))
+        novo_evento_fim = tz.make_aware(datetime.combine(self.base_date, time(15, 0)))
+        
+        conflitos = check_conflicts([self.formador], novo_evento_inicio, novo_evento_fim, self.municipio_caucaia)
+        
+        # Deve detectar conflito de buffer
+        self.assertEqual(len(conflitos['deslocamentos']), 1)
+        conflito_buffer = conflitos['deslocamentos'][0]
+        self.assertEqual(conflito_buffer['tipo_conflito'], 'D')
+        self.assertEqual(conflito_buffer['solicitacao'], evento_fortaleza)
+        self.assertEqual(conflito_buffer['gap_minutes'], 60.0)  # 60 minutos de gap
+        self.assertEqual(conflito_buffer['required_minutes'], 90)  # 90 minutos necessários
+    
+    def test_same_city_allows_zero_buffer(self):
+        """RD-04: Mesmo município permite buffer zero"""
+        from core.services.conflicts import check_conflicts
+        from django.utils import timezone as tz
+        from datetime import time, datetime, timedelta
+        
+        # Criar evento aprovado em Fortaleza: 10:00-12:00
+        evento_fortaleza = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador,
+            projeto=self.projeto,
+            municipio=self.municipio_fortaleza,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Primeiro Evento Fortaleza',
+            data_inicio=tz.make_aware(datetime.combine(self.base_date, time(10, 0))),
+            data_fim=tz.make_aware(datetime.combine(self.base_date, time(12, 0))),
+            status=SolicitacaoStatus.APROVADO
+        )
+        evento_fortaleza.formadores.add(self.formador)
+        
+        # Tentar criar outro evento no MESMO município logo depois: 12:00-14:00
+        # (gap = 0 minutos, mas mesmo município)
+        novo_evento_inicio = tz.make_aware(datetime.combine(self.base_date, time(12, 0)))
+        novo_evento_fim = tz.make_aware(datetime.combine(self.base_date, time(14, 0)))
+        
+        conflitos = check_conflicts([self.formador], novo_evento_inicio, novo_evento_fim, self.municipio_fortaleza)
+        
+        # NÃO deve detectar conflito de buffer (mesmo município)
+        self.assertEqual(len(conflitos['deslocamentos']), 0)
+        
+        # E também não deve ter conflito de sobreposição (RD-01: fim == início)
+        self.assertEqual(len(conflitos['solicitacoes']), 0)

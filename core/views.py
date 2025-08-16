@@ -85,7 +85,7 @@ class AprovacaoDetailView(LoginRequiredMixin, IsSuperintendenciaMixin, FormView)
         self.solicitacao = get_object_or_404(Solicitacao, pk=kwargs["pk"])
         if self.solicitacao.status != SolicitacaoStatus.PENDENTE:
             messages.warning(request, "Esta solicitação já foi decidida.")
-            return redirect("aprovacoes_pendentes")
+            return redirect("core:aprovacoes_pendentes")
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -125,7 +125,7 @@ class AprovacaoDetailView(LoginRequiredMixin, IsSuperintendenciaMixin, FormView)
         )
 
         messages.success(self.request, f"Solicitação {decisao.lower()} com sucesso.")
-        return redirect("aprovacoes_pendentes")
+        return redirect("core:aprovacoes_pendentes")
 
 
 # ----- Bloqueio de agenda (Apps Script -> Django) -----

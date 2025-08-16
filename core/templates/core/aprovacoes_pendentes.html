@@ -1,62 +1,227 @@
 <!doctype html>
-<html>
-  <head><meta charset="utf-8"><title>Aprovações Pendentes</title></head>
-  <body>
-    <h1>Aprovações Pendentes</h1>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aprovações Pendentes - Sistema de Aprendizado</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .status-badge {
+            font-size: 0.875rem;
+        }
+        .formadores-list {
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .event-card {
+            transition: all 0.2s ease-in-out;
+        }
+        .event-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .search-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            padding: 2rem;
+            color: white;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-12">
+                <!-- Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h1 class="h2 text-primary mb-1">
+                            <i class="bi bi-clipboard-check"></i> Aprovações Pendentes
+                        </h1>
+                        <p class="text-muted mb-0">Gerencie solicitações de eventos aguardando aprovação</p>
+                    </div>
+                    <div>
+                        <a href="{% url 'core:home' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-house"></i> Início
+                        </a>
+                    </div>
+                </div>
 
-    <form method="get" style="margin-bottom:1rem">
-      <input type="text" name="q" placeholder="Buscar por título" value="{{ request.GET.q }}">
-      <button type="submit">Buscar</button>
-      <a href="{% url 'aprovacoes_pendentes' %}">Limpar</a>
-    </form>
+                <!-- Search Section -->
+                <div class="search-section">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="mb-3">
+                                <i class="bi bi-search"></i> Buscar Solicitações
+                            </h5>
+                            <form method="get" class="d-flex gap-2">
+                                <div class="flex-grow-1">
+                                    <input type="text" name="q" class="form-control form-control-lg" 
+                                           placeholder="Buscar por título do evento..." 
+                                           value="{{ request.GET.q }}"
+                                           style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white;">
+                                </div>
+                                <button type="submit" class="btn btn-light btn-lg">
+                                    <i class="bi bi-search"></i> Buscar
+                                </button>
+                                {% if request.GET.q %}
+                                    <a href="{% url 'core:aprovacoes_pendentes' %}" class="btn btn-outline-light btn-lg">
+                                        <i class="bi bi-x-circle"></i> Limpar
+                                    </a>
+                                {% endif %}
+                            </form>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <div class="mt-3 mt-md-0">
+                                <span class="badge bg-warning fs-6">
+                                    <i class="bi bi-clock"></i> {{ pendentes|length }} pendente{{ pendentes|length|pluralize:"s" }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    {% if pendentes %}
-      <table border="1" cellpadding="6" cellspacing="0">
-        <thead>
-          <tr>
-            <th>Título</th>
-            <th>Projeto</th>
-            <th>Município</th>
-            <th>Tipo</th>
-            <th>Início</th>
-            <th>Fim</th>
-            <th>Formadores</th>
-            <th>Ação</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for s in pendentes %}
-            <tr>
-              <td>{{ s.titulo_evento }}</td>
-              <td>{{ s.projeto }}</td>
-              <td>{{ s.municipio }}</td>
-              <td>{{ s.tipo_evento }}</td>
-              <td>{{ s.data_inicio|date:"d/m/Y H:i" }}</td>
-              <td>{{ s.data_fim|date:"d/m/Y H:i" }}</td>
-              <td>
-                {% for f in s.formadores.all %}
-                  {{ f.nome }}{% if not forloop.last %}, {% endif %}
-                {% endfor %}
-              </td>
-              <td><a href="{% url 'aprovacao_detail' s.id %}">Analisar</a></td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+                {% if pendentes %}
+                    <!-- Table Section -->
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white py-3">
+                            <h6 class="card-title mb-0 text-primary">
+                                <i class="bi bi-list-ul"></i> Solicitações Encontradas
+                            </h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-primary">
+                                        <tr>
+                                            <th scope="col">
+                                                <i class="bi bi-calendar-event"></i> Evento
+                                            </th>
+                                            <th scope="col">
+                                                <i class="bi bi-folder"></i> Projeto
+                                            </th>
+                                            <th scope="col">
+                                                <i class="bi bi-geo-alt"></i> Local
+                                            </th>
+                                            <th scope="col">
+                                                <i class="bi bi-clock"></i> Período
+                                            </th>
+                                            <th scope="col">
+                                                <i class="bi bi-people"></i> Formadores
+                                            </th>
+                                            <th scope="col" class="text-center">
+                                                <i class="bi bi-gear"></i> Ações
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for s in pendentes %}
+                                            <tr class="event-card">
+                                                <td>
+                                                    <div>
+                                                        <h6 class="mb-1 text-primary">{{ s.titulo_evento }}</h6>
+                                                        <small class="text-muted">
+                                                            <i class="bi bi-tag"></i> {{ s.tipo_evento }}
+                                                        </small>
+                                                        {% if s.numero_encontro_formativo %}
+                                                            <br><small class="text-info">{{ s.numero_encontro_formativo }}</small>
+                                                        {% endif %}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-secondary">{{ s.projeto }}</span>
+                                                </td>
+                                                <td>
+                                                    <i class="bi bi-geo-alt-fill text-danger"></i> {{ s.municipio }}
+                                                </td>
+                                                <td>
+                                                    <div class="small">
+                                                        <div class="text-success">
+                                                            <i class="bi bi-play-circle"></i> {{ s.data_inicio|date:"d/m/Y H:i" }}
+                                                        </div>
+                                                        <div class="text-danger">
+                                                            <i class="bi bi-stop-circle"></i> {{ s.data_fim|date:"d/m/Y H:i" }}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="formadores-list" title="{% for f in s.formadores.all %}{{ f.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+                                                        {% for f in s.formadores.all %}
+                                                            <span class="badge bg-info text-dark me-1 mb-1">{{ f.nome|truncatechars:15 }}</span>
+                                                        {% endfor %}
+                                                    </div>
+                                                </td>
+                                                <td class="text-center">
+                                                    <a href="{% url 'core:aprovacao_detail' s.id %}" 
+                                                       class="btn btn-primary btn-sm">
+                                                        <i class="bi bi-eye"></i> Analisar
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
 
-      {% if is_paginated %}
-        <div style="margin-top:1rem">
-          {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">« Anterior</a>
-          {% endif %}
-          <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
-          {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Próxima »</a>
-          {% endif %}
+                    <!-- Pagination -->
+                    {% if is_paginated %}
+                        <div class="d-flex justify-content-center mt-4">
+                            <nav aria-label="Paginação">
+                                <ul class="pagination">
+                                    {% if page_obj.has_previous %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                                                <i class="bi bi-chevron-left"></i> Anterior
+                                            </a>
+                                        </li>
+                                    {% endif %}
+                                    
+                                    <li class="page-item active">
+                                        <span class="page-link">
+                                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                                        </span>
+                                    </li>
+                                    
+                                    {% if page_obj.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                                                Próxima <i class="bi bi-chevron-right"></i>
+                                            </a>
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <!-- Empty State -->
+                    <div class="text-center py-5">
+                        <div class="card border-0 d-inline-block" style="max-width: 400px;">
+                            <div class="card-body">
+                                <i class="bi bi-inbox display-1 text-muted mb-3"></i>
+                                <h4 class="text-muted">Nenhuma solicitação pendente</h4>
+                                <p class="text-muted">
+                                    {% if request.GET.q %}
+                                        Não foram encontradas solicitações com o termo "{{ request.GET.q }}".
+                                        <br><a href="{% url 'core:aprovacoes_pendentes' %}" class="btn btn-link">Limpar busca</a>
+                                    {% else %}
+                                        Todas as solicitações foram processadas ou não há novas solicitações.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
         </div>
-      {% endif %}
-    {% else %}
-      <p>Não há solicitações pendentes.</p>
-    {% endif %}
-  </body>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
 </html>

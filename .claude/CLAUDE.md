@@ -22,6 +22,42 @@
 - Separar responsabilidades por app: `core`, `relatorios`, `api`.
 - Templates Django sem SPA nesta fase.
 
+## Diretrizes de UX/IHC — ISO 9241-110
+Todo o sistema deve seguir os princípios ergonômicos para design de sistemas interativos:
+1. **Adequação à tarefa**  
+   - Mostrar apenas informações e ações necessárias para a tarefa atual.  
+   - Evitar sobrecarga de opções irrelevantes.
+
+2. **Auto-descritividade**  
+   - Elementos da interface (botões, campos, mensagens) devem indicar claramente sua função.  
+   - Fornecer feedback imediato após cada ação.
+
+3. **Conformidade com expectativas do usuário**  
+   - Usar termos, ícones e fluxos que sigam convenções amplamente conhecidas.  
+   - Manter consistência de comportamento entre telas.
+
+4. **Tolerância a erros**  
+   - Prevenir erros sempre que possível.  
+   - Fornecer mensagens claras e opções para corrigir ou desfazer ações críticas.
+
+5. **Controle explícito**  
+   - Executar ações apenas quando o usuário confirmar.  
+   - Evitar execuções automáticas sem consentimento.
+
+6. **Adequação à individualização**  
+   - Permitir ajustes não-críticos de preferência (ex.: filtros, visualização).  
+   - Manter consistência geral.
+
+7. **Adequação à aprendizagem**  
+   - Interfaces intuitivas para novos usuários, com padrões repetidos.  
+   - Usar tooltips ou dicas contextuais quando necessário.
+
+### Diretrizes visuais complementares
+- Uso consistente de **Bootstrap 5.3** para responsividade.
+- Paleta de cores e tipografia padronizadas.
+- Destaque visual para ações primárias.
+- Layouts limpos, com hierarquia visual clara.
+
 ## Fluxos essenciais (Fase 1)
 - RF02 — Solicitar evento.
 - RF03 — Verificar conflitos para formadores.
@@ -33,6 +69,7 @@
 - Escreva/atualize **testes primeiro** quando possível (TDD). Só depois implemente.
 - Use **Playwright MCP** para validar fluxos end-to-end quando apropriado.
 - Ao finalizar, atualize este `CLAUDE.md` com decisões, comandos e avisos.
+- Garanta que toda implementação siga as diretrizes de UX/IHC descritas acima.
 
 ## Ações que o Claude **deve priorizar**
 1. Ler código e **entender** onde alterar (sem editar ainda).
@@ -40,6 +77,7 @@
 3. Implementar em pequenos commits verificados por testes.
 4. Escrever mensagens de commit descritivas.
 5. Evitar mudanças não solicitadas em testes (exceto quando o plano exigir).
+6. Validar se a interface gerada cumpre todos os princípios de UX/IHC.
 
 ## Testes
 - Unitários/integração: `python manage.py test`

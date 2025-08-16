@@ -156,3 +156,6 @@ DEFAULT_FROM_EMAIL = "nao-responda@aprender.local"
 
 # RD-04: Configurações de buffer de deslocamento
 TRAVEL_BUFFER_MINUTES = 90  # Buffer mínimo entre municípios diferentes (90 minutos)
+
+# RD-05: Configurações de capacidade diária
+MAX_DAILY_HOURS = 8  # Máximo de horas de eventos por formador por dia

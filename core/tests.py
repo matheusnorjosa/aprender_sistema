@@ -1,11 +1,13 @@
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime, time
+from unittest.mock import patch
 from core.models import (
     Solicitacao, SolicitacaoStatus, Projeto, Municipio, TipoEvento, 
-    Formador, DisponibilidadeFormadores, Aprovacao, AprovacaoStatus, LogAuditoria
+    Formador, DisponibilidadeFormadores, Aprovacao, AprovacaoStatus, LogAuditoria,
+    EventoGoogleCalendar
 )
 from core.forms import SolicitacaoForm
 
@@ -2169,3 +2171,143 @@ class PA07MandatoryApprovalTest(TestCase):
         list_url = reverse('core:aprovacoes_pendentes')
         response = client.get(list_url)
         self.assertEqual(response.status_code, 403, "Coordenador deve receber 403 para lista de aprovações")
+
+
+# =============================================================================
+# RF05: GOOGLE CALENDAR SYNC (FEATURE FLAG)
+# =============================================================================
+
+class RF05CalendarFlagTest(TestCase):
+    def setUp(self):
+        self.coord = User.objects.create_user(username="coord_rf05", password="x", papel="coordenador")
+        self.super = User.objects.create_user(username="super_rf05", password="x", papel="superintendencia")
+        self.proj = Projeto.objects.create(nome="Proj RF05")
+        self.mun = Municipio.objects.create(nome="Fortaleza", uf="CE")
+        self.tipo = TipoEvento.objects.create(nome="Oficina")
+        self.formador = Formador.objects.create(nome="Formador RF05", email="formador@rf05.com")
+
+        base = timezone.localtime(timezone.now()).date() + timedelta(days=7)
+        self.solic = Solicitacao.objects.create(
+            usuario_solicitante=self.coord,
+            projeto=self.proj,
+            municipio=self.mun,
+            tipo_evento=self.tipo,
+            titulo_evento="Evento RF05",
+            data_inicio=timezone.make_aware(datetime.combine(base, time(9,0))),
+            data_fim=timezone.make_aware(datetime.combine(base, time(11,0))),
+            status=SolicitacaoStatus.PENDENTE
+        )
+        self.solic.formadores.add(self.formador)
+
+    @override_settings(FEATURE_GOOGLE_SYNC=0)
+    def test_flag_off_does_not_create_calendar_event(self):
+        # simula aprovação sem calendar
+        self.client.login(username="super_rf05", password="x")
+        resp = self.client.get(reverse("core:aprovacao_detail", args=[self.solic.id]))
+        self.assertEqual(resp.status_code, 200)
+
+        # poste decisão
+        post = self.client.post(reverse("core:aprovacao_detail", args=[self.solic.id]), {
+            "decisao": "Aprovado", "justificativa": "ok"
+        })
+        self.assertIn(post.status_code, (200, 302))
+        self.solic.refresh_from_db()
+        self.assertEqual(self.solic.status, SolicitacaoStatus.APROVADO)
+
+        self.assertFalse(EventoGoogleCalendar.objects.filter(solicitacao=self.solic).exists(),
+                         "Com flag OFF, não deve criar EventoGoogleCalendar")
+
+    @override_settings(FEATURE_GOOGLE_SYNC=1)
+    @patch("core.services.integrations.calendar_stub.GoogleCalendarServiceStub.create_event")
+    def test_flag_on_calls_service_and_persists_record(self, mock_create):
+        mock_create.return_value = {
+            "id": "evt_fake_123",
+            "htmlLink": "https://calendar.google.com/calendar/u/0/r/eventedit/evt_fake_123",
+            "hangoutLink": "https://meet.google.com/fake-code-xyz",
+        }
+
+        self.client.login(username="super_rf05", password="x")
+        self.client.get(reverse("core:aprovacao_detail", args=[self.solic.id]))
+        self.client.post(reverse("core:aprovacao_detail", args=[self.solic.id]), {
+            "decisao": "Aprovado", "justificativa": "ok"
+        })
+        self.solic.refresh_from_db()
+        self.assertEqual(self.solic.status, SolicitacaoStatus.APROVADO)
+
+        mock_create.assert_called_once()
+        self.assertTrue(EventoGoogleCalendar.objects.filter(solicitacao=self.solic, provider_event_id="evt_fake_123").exists())
+
+    @override_settings(FEATURE_GOOGLE_SYNC=1)
+    def test_reprovacao_nao_cria_evento_calendar(self):
+        # mesmo com flag ON, reprovação não deve criar evento
+        self.client.login(username="super_rf05", password="x")
+        self.client.post(reverse("core:aprovacao_detail", args=[self.solic.id]), {
+            "decisao": "Reprovado", "justificativa": "Não aprovado para teste"
+        })
+        self.solic.refresh_from_db()
+        self.assertEqual(self.solic.status, SolicitacaoStatus.REPROVADO)
+
+        self.assertFalse(EventoGoogleCalendar.objects.filter(solicitacao=self.solic).exists(),
+                         "Reprovação não deve criar EventoGoogleCalendar mesmo com flag ON")
+
+    def test_mapper_converte_solicitacao_corretamente(self):
+        # testa o mapper independentemente
+        from core.services.integrations.calendar_mapper import map_solicitacao_to_google_event
+        
+        gevent = map_solicitacao_to_google_event(self.solic)
+        
+        self.assertEqual(gevent.summary, f"{self.tipo.nome} — {self.solic.titulo_evento}")
+        self.assertIn(self.proj.nome, gevent.description)
+        self.assertIn(self.mun.nome, gevent.description)
+        self.assertIn(self.coord.username, gevent.description)
+        self.assertEqual(gevent.location, self.mun.nome)
+        self.assertEqual(len(gevent.attendees), 1)
+        self.assertEqual(gevent.attendees[0].email, self.formador.email)
+        self.assertEqual(gevent.attendees[0].display_name, self.formador.nome)
+        self.assertTrue(gevent.conference)
+
+    @override_settings(FEATURE_GOOGLE_SYNC=0)
+    def test_stub_respeta_flag_off(self):
+        # testa que o stub respeita a flag
+        from core.services.integrations.calendar_stub import GoogleCalendarServiceStub
+        from core.services.integrations.calendar_types import GoogleEvent, GoogleAttendee
+        
+        svc = GoogleCalendarServiceStub()
+        gevent = GoogleEvent(
+            summary="Test Event",
+            description="Test Description",
+            start_iso="2025-01-01T09:00:00-03:00",
+            end_iso="2025-01-01T11:00:00-03:00",
+            location="Test Location",
+            attendees=[GoogleAttendee(email="test@example.com")],
+            conference=True
+        )
+        
+        result = svc.create_event(gevent)
+        self.assertEqual(result["status"], "skipped")
+        self.assertEqual(result["reason"], "FEATURE_GOOGLE_SYNC=0")
+
+    @override_settings(FEATURE_GOOGLE_SYNC=1)
+    def test_stub_simula_criacao_com_flag_on(self):
+        # testa que o stub simula criação com flag ON
+        from core.services.integrations.calendar_stub import GoogleCalendarServiceStub
+        from core.services.integrations.calendar_types import GoogleEvent, GoogleAttendee
+        
+        svc = GoogleCalendarServiceStub()
+        gevent = GoogleEvent(
+            summary="Test Event",
+            description="Test Description", 
+            start_iso="2025-01-01T09:00:00-03:00",
+            end_iso="2025-01-01T11:00:00-03:00",
+            location="Test Location",
+            attendees=[GoogleAttendee(email="test@example.com")],
+            conference=True
+        )
+        
+        result = svc.create_event(gevent)
+        self.assertIn("id", result)
+        self.assertIn("htmlLink", result)
+        self.assertIn("hangoutLink", result)
+        self.assertTrue(result["id"].startswith("evt_fake_"))
+        self.assertIn("calendar.google.com", result["htmlLink"])
+        self.assertIn("meet.google.com", result["hangoutLink"])

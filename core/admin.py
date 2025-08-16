@@ -51,9 +51,9 @@ class AprovacaoAdmin(admin.ModelAdmin):
 
 @admin.register(EventoGoogleCalendar)
 class EventoGoogleCalendarAdmin(admin.ModelAdmin):
-    list_display = ("solicitacao", "google_calendar_id", "status_sincronizacao", "data_criacao")
+    list_display = ("solicitacao", "provider_event_id", "status_sincronizacao", "data_criacao")
     list_filter = ("status_sincronizacao",)
-    search_fields = ("google_calendar_id", "link_evento", "link_meet")
+    search_fields = ("provider_event_id", "html_link", "meet_link")
 
 @admin.register(DisponibilidadeFormadores)
 class DisponibilidadeFormadoresAdmin(admin.ModelAdmin):

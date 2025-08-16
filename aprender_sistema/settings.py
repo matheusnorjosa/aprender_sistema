@@ -159,3 +159,13 @@ TRAVEL_BUFFER_MINUTES = 90  # Buffer mínimo entre municípios diferentes (90 mi
 
 # RD-05: Configurações de capacidade diária
 MAX_DAILY_HOURS = 8  # Máximo de horas de eventos por formador por dia
+
+# --- RF05: Feature flag de sincronização com Google Calendar ---
+FEATURE_GOOGLE_SYNC = bool(int(os.getenv("FEATURE_GOOGLE_SYNC", "0")))
+# 0 = DESLIGADO (default, só stub/testes) | 1 = LIGADO (chama serviço)
+
+# ID do calendário de destino (pode ser "primary" ou o ID do recurso)
+GOOGLE_CALENDAR_CALENDAR_ID = os.getenv("GOOGLE_CALENDAR_CALENDAR_ID", "primary")
+
+# Quando ligarmos "de verdade", usaremos:
+# GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_SERVICE_ACCOUNT_JSON, etc.

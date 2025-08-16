@@ -187,9 +187,11 @@ class EventoGoogleCalendar(models.Model):
     usuario_criador = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="eventos_criados"
     )
-    google_calendar_id = models.CharField(max_length=255, unique=True)
-    link_evento = models.TextField(blank=True, null=True)
-    link_meet = models.TextField(blank=True, null=True)
+    # RF05: Campos atualizados para nova estrutura
+    provider_event_id = models.CharField(max_length=255, verbose_name="ID do evento no provedor")  # google_calendar_id renomeado
+    html_link = models.TextField(blank=True, null=True, verbose_name="Link do evento")  # link_evento renomeado
+    meet_link = models.TextField(blank=True, null=True, verbose_name="Link do Meet")  # link_meet renomeado
+    raw_payload = models.JSONField(blank=True, null=True, verbose_name="Payload bruto da resposta")  # novo campo
     data_criacao = models.DateTimeField(auto_now_add=True)
 
     class SincronizacaoStatus(models.TextChoices):
@@ -205,10 +207,10 @@ class EventoGoogleCalendar(models.Model):
     class Meta:
         verbose_name = "Evento Google Calendar"
         verbose_name_plural = "Eventos Google Calendar"
-        indexes = [models.Index(fields=["google_calendar_id"])]
+        indexes = [models.Index(fields=["provider_event_id"])]
 
     def __str__(self):
-        return f"GC:{self.google_calendar_id} — {self.solicitacao}"
+        return f"GC:{self.provider_event_id} — {self.solicitacao}"
 
 
 class DisponibilidadeFormadores(models.Model):

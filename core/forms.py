@@ -100,7 +100,8 @@ class SolicitacaoForm(forms.ModelForm):
 
         # Verificação de conflitos
         if di and df and formadores and len(formadores) > 0:
-            conflitos = check_conflicts(formadores, di, df)
+            municipio = cleaned.get("municipio")
+            conflitos = check_conflicts(formadores, di, df, municipio)
             msgs = []
             if conflitos["bloqueios"]:
                 linhas = []
@@ -113,6 +114,14 @@ class SolicitacaoForm(forms.ModelForm):
                     nomes = ", ".join([f.nome for f in s.formadores.all()])
                     linhas.append(f"- {s.titulo_evento} ({s.data_inicio:%d/%m %H:%M}-{s.data_fim:%d/%m %H:%M}) — Formadores: {nomes}")
                 msgs.append("Conflitos com solicitações aprovadas:\n" + "\n".join(linhas))
+            if conflitos["deslocamentos"]:
+                linhas = []
+                for d in conflitos["deslocamentos"]:
+                    sol = d['solicitacao']
+                    gap = d['gap_minutes']
+                    required = d['required_minutes']
+                    linhas.append(f"- Buffer insuficiente: {sol.titulo_evento} em {sol.municipio} (gap: {gap:.0f}min, necessário: {required}min)")
+                msgs.append("Conflitos de deslocamento:\n" + "\n".join(linhas))
             if msgs:
                 raise ValidationError("\n\n".join(msgs))
         return cleaned

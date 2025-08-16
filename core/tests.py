@@ -1461,3 +1461,94 @@ class RF04SecurityTest(TestCase):
         
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
+
+
+# =========================
+# RD-02/RD-03: Bloqueios Total vs Parcial Tests
+# =========================
+
+class RDBloqueiosTotalParcialTest(TestCase):
+    """Testes padronizados CLAUDE.md para RD-02/RD-03"""
+    
+    def setUp(self):
+        """Configuração para testes de bloqueios"""
+        self.coordenador = User.objects.create_user(
+            username='coord_rd',
+            password='testpass123',
+            papel='coordenador'
+        )
+        
+        self.projeto = Projeto.objects.create(nome='Projeto RD')
+        self.municipio = Municipio.objects.create(nome='Fortaleza', uf='CE')
+        self.tipo_evento = TipoEvento.objects.create(nome='Workshop RD')
+        self.formador = Formador.objects.create(nome='Formador RD', email='formador@rd.com')
+        
+        # Data base para testes
+        from django.utils import timezone as tz
+        self.base_date = tz.localtime(tz.now()).date().replace(day=15)  # Dia 15 do mês atual
+    
+    def test_block_total_T_prevents_any_event(self):
+        """RD-02: Bloqueio total (T) impede qualquer evento no dia"""
+        from core.models import DisponibilidadeFormadores
+        from core.services.conflicts import check_conflicts
+        from django.utils import timezone as tz
+        from datetime import time, datetime, timedelta
+        
+        # Criar bloqueio total no dia
+        DisponibilidadeFormadores.objects.create(
+            formador=self.formador,
+            data_bloqueio=self.base_date,
+            hora_inicio=time(8, 0),   # Horário não importa para bloqueio total
+            hora_fim=time(17, 0),     # Horário não importa para bloqueio total
+            tipo_bloqueio='T',        # Total
+            motivo='Bloqueio total de teste'
+        )
+        
+        # Tentar evento em qualquer horário do dia
+        evento_inicio = tz.make_aware(datetime.combine(self.base_date, time(10, 0)))
+        evento_fim = tz.make_aware(datetime.combine(self.base_date, time(12, 0)))
+        
+        conflitos = check_conflicts([self.formador], evento_inicio, evento_fim)
+        
+        # Deve detectar conflito
+        self.assertEqual(len(conflitos['bloqueios']), 1)
+        self.assertEqual(conflitos['bloqueios'][0].tipo_bloqueio, 'T')
+        self.assertEqual(conflitos['bloqueios'][0].formador, self.formador)
+    
+    def test_block_partial_P_prevents_inside_allows_outside(self):
+        """RD-03: Bloqueio parcial (P) impede apenas dentro do subintervalo"""
+        from core.models import DisponibilidadeFormadores
+        from core.services.conflicts import check_conflicts
+        from django.utils import timezone as tz
+        from datetime import time, datetime, timedelta
+        
+        # Criar bloqueio parcial 14:00-16:00
+        DisponibilidadeFormadores.objects.create(
+            formador=self.formador,
+            data_bloqueio=self.base_date,
+            hora_inicio=time(14, 0),  # 14:00
+            hora_fim=time(16, 0),     # 16:00
+            tipo_bloqueio='P',        # Parcial
+            motivo='Bloqueio parcial de teste'
+        )
+        
+        # Teste 1: Evento dentro do bloqueio (15:00-15:30) → deve conflitar
+        evento_inicio = tz.make_aware(datetime.combine(self.base_date, time(15, 0)))
+        evento_fim = tz.make_aware(datetime.combine(self.base_date, time(15, 30)))
+        
+        conflitos = check_conflicts([self.formador], evento_inicio, evento_fim)
+        self.assertEqual(len(conflitos['bloqueios']), 1, "Deve detectar conflito dentro do bloqueio parcial")
+        
+        # Teste 2: Evento fora do bloqueio (10:00-12:00) → não deve conflitar
+        evento_inicio_fora = tz.make_aware(datetime.combine(self.base_date, time(10, 0)))
+        evento_fim_fora = tz.make_aware(datetime.combine(self.base_date, time(12, 0)))
+        
+        conflitos_fora = check_conflicts([self.formador], evento_inicio_fora, evento_fim_fora)
+        self.assertEqual(len(conflitos_fora['bloqueios']), 0, "Não deve detectar conflito fora do bloqueio parcial")
+        
+        # Teste 3: Evento exatamente na borda (16:00-17:00) → não deve conflitar (RD-01)
+        evento_inicio_borda = tz.make_aware(datetime.combine(self.base_date, time(16, 0)))
+        evento_fim_borda = tz.make_aware(datetime.combine(self.base_date, time(17, 0)))
+        
+        conflitos_borda = check_conflicts([self.formador], evento_inicio_borda, evento_fim_borda)
+        self.assertEqual(len(conflitos_borda['bloqueios']), 0, "Não deve conflitar quando fim do bloqueio == início do evento")

@@ -1886,3 +1886,67 @@ class RDMensagensComCodigosTest(TestCase):
         self.assertGreater(len(conflitos['bloqueios']), 0, "Deve detectar conflito de bloqueio [P]")
         self.assertGreater(len(conflitos['deslocamentos']), 0, "Deve detectar conflito de deslocamento [D]") 
         self.assertGreater(len(conflitos['capacidade_diaria']), 0, "Deve detectar conflito de capacidade [M]")
+
+
+# =========================
+# PA-06: UI/UX Controle Explícito Tests
+# =========================
+
+class PA06UIControlTest(TestCase):
+    """Testes para PA-06: esconder ações para perfis sem permissão"""
+    
+    def setUp(self):
+        """Configuração para testes de controle de UI"""
+        self.coordenador = User.objects.create_user(
+            username='coord_ui',
+            password='testpass123',
+            papel='coordenador'
+        )
+        
+        self.superintendencia = User.objects.create_user(
+            username='super_ui',
+            password='testpass123',
+            papel='superintendencia'
+        )
+        
+        self.formador = User.objects.create_user(
+            username='formador_ui',
+            password='testpass123',
+            papel='formador'
+        )
+        
+        self.client = Client()
+    
+    def test_home_shows_appropriate_actions_by_role(self):
+        """PA-06: Home deve mostrar apenas ações apropriadas para cada perfil"""
+        
+        # Teste 1: Coordenador deve ver solicitação de eventos
+        self.client.login(username='coord_ui', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        
+        self.assertIn('Solicitar Evento', content, "Coordenador deve ver link para solicitar evento")
+        self.assertIn('Bloqueio de Agenda', content, "Coordenador deve ver link para bloqueio")
+        self.assertNotIn('Aprovações Pendentes', content, "Coordenador NÃO deve ver seção de superintendência")
+        
+        # Teste 2: Superintendência deve ver aprovações
+        self.client.login(username='super_ui', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        
+        self.assertIn('Aprovações Pendentes', content, "Superintendência deve ver aprovações")
+        self.assertIn('Superintendência', content, "Deve mostrar seção de superintendência")
+        
+        # Teste 3: Formador deve ver apenas bloqueio próprio
+        self.client.login(username='formador_ui', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        
+        # Verificar que não há link ativo para Solicitar Evento (pode estar em comentário)
+        self.assertNotIn('href="/solicitar/"', content, "Formador NÃO deve ter link ativo para solicitar evento")
+        self.assertIn('Bloqueio de Agenda', content, "Formador deve ver bloqueio de agenda")
+        self.assertIn('href="/bloqueios/novo/"', content, "Formador deve ter link ativo para bloqueio")
+        self.assertNotIn('href="/aprovacoes/pendentes/"', content, "Formador NÃO deve ter link ativo para aprovações")

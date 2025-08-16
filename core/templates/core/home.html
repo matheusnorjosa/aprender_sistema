@@ -47,6 +47,8 @@
     <!-- Operações do dia a dia -->
     <div class="section-title">Operações</div>
     <div class="grid">
+      <!-- PA-06: Solicitar Evento - apenas coordenadores e admins -->
+      {% if user.papel == 'coordenador' or user.is_superuser %}
       <div class="card col-4">
         <h3>Solicitar Evento</h3>
         <p>Crie uma solicitação com checagem automática de conflitos.</p>
@@ -54,7 +56,10 @@
           <a class="btn-primary btn" href="/solicitar/">Abrir formulário</a>
         </div>
       </div>
+      {% endif %}
 
+      <!-- PA-06: Bloqueio de Agenda - formadores podem bloquear sua própria agenda -->
+      {% if user.papel == 'formador' or user.papel == 'coordenador' or user.is_superuser %}
       <div class="card col-4">
         <h3>Bloqueio de Agenda</h3>
         <p>Inclua bloqueios totais ou parciais por data.</p>
@@ -62,7 +67,9 @@
           <a class="btn-primary btn" href="/bloqueios/novo/">Novo bloqueio</a>
         </div>
       </div>
+      {% endif %}
 
+      <!-- Mapa Mensal - disponível para todos -->
       <div class="card col-4">
         <h3>Mapa Mensal</h3>
         <p>Visual gráfico da disponibilidade por formador (consome a API).</p>
@@ -74,7 +81,8 @@
       </div>
     </div>
 
-    <!-- Superintendência / Aprovações -->
+    <!-- PA-06: Superintendência / Aprovações - apenas superintendência e admins -->
+    {% if user.papel == 'superintendencia' or user.is_superuser %}
     <div class="section-title">Superintendência</div>
     <div class="grid">
       <div class="card col-6">
@@ -93,6 +101,7 @@
         </div>
       </div>
     </div>
+    {% endif %}
 
     <!-- Cadastros / Administração rápida -->
     <div class="section-title">Cadastros rápidos</div>

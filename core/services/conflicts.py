@@ -94,19 +94,74 @@ def check_travel_buffer_conflict(formador, municipio_evento, dt_inicio, dt_fim):
     
     return conflitos_buffer
 
+def check_daily_capacity_conflict(formador, dt_inicio, dt_fim):
+    """
+    RD-05: Verifica se o formador excederia a capacidade diária máxima
+    
+    Retorna dict com informações sobre a violação de capacidade, se houver.
+    """
+    from django.conf import settings
+    from django.utils import timezone as tz
+    from datetime import timedelta
+    
+    max_daily_hours = getattr(settings, 'MAX_DAILY_HOURS', 8)
+    
+    # Calcular duração do novo evento em horas
+    duracao_novo_evento = (dt_fim - dt_inicio).total_seconds() / 3600
+    
+    # Buscar todos os eventos aprovados do formador no mesmo dia
+    data_evento = dt_inicio.date()
+    
+    eventos_do_dia = (
+        Solicitacao.objects.filter(
+            status=SolicitacaoStatus.APROVADO,
+            formadores=formador,
+            data_inicio__date=data_evento,
+        )
+        .exclude(
+            # Excluir o próprio evento se estiver editando
+            data_inicio=dt_inicio,
+            data_fim=dt_fim
+        )
+    )
+    
+    # Calcular total de horas já ocupadas no dia
+    horas_ocupadas = 0
+    for evento in eventos_do_dia:
+        duracao = (evento.data_fim - evento.data_inicio).total_seconds() / 3600
+        horas_ocupadas += duracao
+    
+    # Verificar se novo evento excederia o limite
+    total_com_novo = horas_ocupadas + duracao_novo_evento
+    
+    if total_com_novo > max_daily_hours:
+        return {
+            'formador': formador,
+            'data': data_evento,
+            'horas_ocupadas': horas_ocupadas,
+            'duracao_novo_evento': duracao_novo_evento,
+            'total_com_novo': total_com_novo,
+            'limite_diario': max_daily_hours,
+            'excesso': total_com_novo - max_daily_hours,
+            'tipo_conflito': 'M',  # Mais de um evento (excesso de capacidade)
+            'eventos_do_dia': list(eventos_do_dia)
+        }
+    
+    return None
+
 def check_conflicts(formadores_qs, dt_inicio, dt_fim, municipio_evento=None):
     """
     Retorna dict com conflitos seguindo RD-07 (ordem de prioridade):
     1. Bloqueios (T, P)
     2. Conflitos por eventos aprovados (sobreposição)
     3. Buffer de deslocamento (D)
-    4. Limite diário (M) - TODO: próxima fase
+    4. Limite diário (M)
     
     Args:
         formadores_qs: QuerySet de Formador ou lista de objetos Formador
         municipio_evento: Municipio do evento (para RD-04)
     """
-    result = {"bloqueios": [], "solicitacoes": [], "deslocamentos": []}
+    result = {"bloqueios": [], "solicitacoes": [], "deslocamentos": [], "capacidade_diaria": []}
     
     # Suporte tanto para QuerySet quanto para lista
     if hasattr(formadores_qs, 'values_list'):
@@ -150,5 +205,11 @@ def check_conflicts(formadores_qs, dt_inicio, dt_fim, municipio_evento=None):
                 formador, municipio_evento, dt_inicio, dt_fim
             )
             result["deslocamentos"].extend(conflitos_buffer)
+    
+    # RD-07.4: Prioridade 4 - Limite diário (RD-05)
+    for formador in formadores_objs:
+        conflito_capacidade = check_daily_capacity_conflict(formador, dt_inicio, dt_fim)
+        if conflito_capacidade:
+            result["capacidade_diaria"].append(conflito_capacidade)
     
     return result

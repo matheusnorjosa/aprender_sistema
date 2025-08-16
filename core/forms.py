@@ -122,6 +122,15 @@ class SolicitacaoForm(forms.ModelForm):
                     required = d['required_minutes']
                     linhas.append(f"- Buffer insuficiente: {sol.titulo_evento} em {sol.municipio} (gap: {gap:.0f}min, necessário: {required}min)")
                 msgs.append("Conflitos de deslocamento:\n" + "\n".join(linhas))
+            if conflitos["capacidade_diaria"]:
+                linhas = []
+                for c in conflitos["capacidade_diaria"]:
+                    formador = c['formador']
+                    total = c['total_com_novo']
+                    limite = c['limite_diario']
+                    excesso = c['excesso']
+                    linhas.append(f"- {formador.nome}: capacidade diária excedida ({total:.1f}h/{limite}h, excesso: {excesso:.1f}h)")
+                msgs.append("Conflitos de capacidade diária:\n" + "\n".join(linhas))
             if msgs:
                 raise ValidationError("\n\n".join(msgs))
         return cleaned

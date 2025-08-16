@@ -1647,3 +1647,108 @@ class RDBufferDeslocamentoTest(TestCase):
         
         # E também não deve ter conflito de sobreposição (RD-01: fim == início)
         self.assertEqual(len(conflitos['solicitacoes']), 0)
+
+
+# =========================
+# RD-05: Capacidade Diária Tests
+# =========================
+
+class RDCapacidadeDiariaTest(TestCase):
+    """Testes padronizados CLAUDE.md para RD-05"""
+    
+    def setUp(self):
+        """Configuração para testes de capacidade diária"""
+        self.coordenador = User.objects.create_user(
+            username='coord_capacidade',
+            password='testpass123',
+            papel='coordenador'
+        )
+        
+        self.projeto = Projeto.objects.create(nome='Projeto Capacidade')
+        self.municipio = Municipio.objects.create(nome='Fortaleza', uf='CE')
+        self.tipo_evento = TipoEvento.objects.create(nome='Workshop Capacidade')
+        self.formador = Formador.objects.create(nome='Formador Capacidade', email='formador@capacidade.com')
+        
+        # Data base para testes
+        from django.utils import timezone as tz
+        self.base_date = tz.localtime(tz.now()).date().replace(day=25)  # Dia 25 do mês atual
+    
+    def test_daily_capacity_M_exceeded(self):
+        """RD-05: Capacidade diária excedida deve gerar conflito tipo M"""
+        from core.services.conflicts import check_conflicts
+        from django.utils import timezone as tz
+        from datetime import time, datetime, timedelta
+        
+        # Criar eventos aprovados que já ocupam 6 horas do dia (08:00-14:00)
+        evento_manha = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador,
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento Manhã',
+            data_inicio=tz.make_aware(datetime.combine(self.base_date, time(8, 0))),
+            data_fim=tz.make_aware(datetime.combine(self.base_date, time(11, 0))),  # 3 horas
+            status=SolicitacaoStatus.APROVADO
+        )
+        evento_manha.formadores.add(self.formador)
+        
+        evento_tarde = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador,
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento Tarde',
+            data_inicio=tz.make_aware(datetime.combine(self.base_date, time(11, 30))),
+            data_fim=tz.make_aware(datetime.combine(self.base_date, time(14, 30))),  # 3 horas
+            status=SolicitacaoStatus.APROVADO
+        )
+        evento_tarde.formadores.add(self.formador)
+        
+        # Total já ocupado: 6 horas (limite configurado = 8 horas)
+        
+        # Tentar adicionar evento de 3 horas (15:00-18:00) que excederia o limite
+        novo_evento_inicio = tz.make_aware(datetime.combine(self.base_date, time(15, 0)))
+        novo_evento_fim = tz.make_aware(datetime.combine(self.base_date, time(18, 0)))  # + 3 horas = 9 horas total
+        
+        conflitos = check_conflicts([self.formador], novo_evento_inicio, novo_evento_fim, self.municipio)
+        
+        # Deve detectar conflito de capacidade
+        self.assertEqual(len(conflitos['capacidade_diaria']), 1)
+        conflito_cap = conflitos['capacidade_diaria'][0]
+        self.assertEqual(conflito_cap['tipo_conflito'], 'M')
+        self.assertEqual(conflito_cap['formador'], self.formador)
+        self.assertEqual(conflito_cap['horas_ocupadas'], 6.0)  # 6 horas já ocupadas
+        self.assertEqual(conflito_cap['duracao_novo_evento'], 3.0)  # 3 horas do novo evento
+        self.assertEqual(conflito_cap['total_com_novo'], 9.0)  # 9 horas total
+        self.assertEqual(conflito_cap['limite_diario'], 8)  # Limite de 8 horas
+        self.assertEqual(conflito_cap['excesso'], 1.0)  # 1 hora de excesso
+    
+    def test_daily_capacity_within_limit_allowed(self):
+        """RD-05: Capacidade diária dentro do limite deve ser permitida"""
+        from core.services.conflicts import check_conflicts
+        from django.utils import timezone as tz
+        from datetime import time, datetime, timedelta
+        
+        # Criar evento aprovado que ocupa 4 horas do dia (08:00-12:00)
+        evento_existente = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador,
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento Existente',
+            data_inicio=tz.make_aware(datetime.combine(self.base_date, time(8, 0))),
+            data_fim=tz.make_aware(datetime.combine(self.base_date, time(12, 0))),  # 4 horas
+            status=SolicitacaoStatus.APROVADO
+        )
+        evento_existente.formadores.add(self.formador)
+        
+        # Total já ocupado: 4 horas (limite configurado = 8 horas)
+        
+        # Tentar adicionar evento de 3 horas (13:00-16:00) que ficaria dentro do limite
+        novo_evento_inicio = tz.make_aware(datetime.combine(self.base_date, time(13, 0)))
+        novo_evento_fim = tz.make_aware(datetime.combine(self.base_date, time(16, 0)))  # + 3 horas = 7 horas total
+        
+        conflitos = check_conflicts([self.formador], novo_evento_inicio, novo_evento_fim, self.municipio)
+        
+        # NÃO deve detectar conflito de capacidade (7h < 8h limite)
+        self.assertEqual(len(conflitos['capacidade_diaria']), 0)

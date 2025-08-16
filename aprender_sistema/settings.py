@@ -153,3 +153,6 @@ AUTH_USER_MODEL = 'core.Usuario' # Informa ao Django para usar o nosso modelo de
 # Emails de desenvolvimento (escreve no console)
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "nao-responda@aprender.local"
+
+# RD-04: Configurações de buffer de deslocamento
+TRAVEL_BUFFER_MINUTES = 90  # Buffer mínimo entre municípios diferentes (90 minutos)

@@ -36,26 +36,87 @@ def check_bloqueio_conflict(bloqueio, dt_inicio, dt_fim):
     
     return intervals_overlap(dt_inicio, dt_fim, b_start, b_end)
 
-def check_conflicts(formadores_qs, dt_inicio, dt_fim):
+def check_travel_buffer_conflict(formador, municipio_evento, dt_inicio, dt_fim):
+    """
+    RD-04: Verifica conflito de buffer de deslocamento
+    
+    Entre municípios distintos, exigir tempo mínimo de deslocamento.
+    Para eventos no mesmo município, buffer pode ser zero.
+    """
+    from django.conf import settings
+    from django.utils import timezone as tz
+    from datetime import timedelta
+    
+    buffer_minutes = getattr(settings, 'TRAVEL_BUFFER_MINUTES', 90)
+    
+    # Buscar solicitações aprovadas do mesmo formador próximas no tempo
+    conflitos_buffer = []
+    
+    # Intervalo de busca: buffer antes e depois do evento
+    search_start = dt_inicio - timedelta(minutes=buffer_minutes)
+    search_end = dt_fim + timedelta(minutes=buffer_minutes)
+    
+    # Buscar todas as solicitações aprovadas do formador para calcular gaps
+    solicitacoes_proximas = (
+        Solicitacao.objects.filter(
+            status=SolicitacaoStatus.APROVADO,
+            formadores=formador,
+        )
+        .exclude(
+            # Excluir o próprio evento se estiver editando
+            data_inicio=dt_inicio,
+            data_fim=dt_fim
+        )
+        .select_related("municipio")
+    )
+    
+    for sol in solicitacoes_proximas:
+        # Verificar se são municípios diferentes
+        if sol.municipio.id != municipio_evento.id:
+            # Calcular tempo entre eventos
+            if sol.data_fim <= dt_inicio:
+                # Evento anterior: verificar tempo entre fim do anterior e início do novo
+                gap = dt_inicio - sol.data_fim
+            elif sol.data_inicio >= dt_fim:
+                # Evento posterior: verificar tempo entre fim do novo e início do posterior
+                gap = sol.data_inicio - dt_fim
+            else:
+                # Eventos se sobrepõem (será detectado em RD-01)
+                continue
+            
+            if gap.total_seconds() < (buffer_minutes * 60):
+                conflitos_buffer.append({
+                    'solicitacao': sol,
+                    'gap_minutes': gap.total_seconds() / 60,
+                    'required_minutes': buffer_minutes,
+                    'tipo_conflito': 'D'  # Deslocamento
+                })
+    
+    return conflitos_buffer
+
+def check_conflicts(formadores_qs, dt_inicio, dt_fim, municipio_evento=None):
     """
     Retorna dict com conflitos seguindo RD-07 (ordem de prioridade):
     1. Bloqueios (T, P)
     2. Conflitos por eventos aprovados (sobreposição)
-    3. Buffer de deslocamento (D) - TODO: próxima fase
+    3. Buffer de deslocamento (D)
     4. Limite diário (M) - TODO: próxima fase
     
     Args:
         formadores_qs: QuerySet de Formador ou lista de objetos Formador
+        municipio_evento: Municipio do evento (para RD-04)
     """
-    result = {"bloqueios": [], "solicitacoes": []}
+    result = {"bloqueios": [], "solicitacoes": [], "deslocamentos": []}
     
     # Suporte tanto para QuerySet quanto para lista
     if hasattr(formadores_qs, 'values_list'):
         # É um QuerySet
         formadores_ids = list(formadores_qs.values_list("id", flat=True))
+        formadores_objs = list(formadores_qs)
     else:
         # É uma lista de objetos Formador
         formadores_ids = [f.id for f in formadores_qs]
+        formadores_objs = formadores_qs
 
     # RD-07.1: Prioridade 1 - Bloqueios de disponibilidade (RD-02/RD-03)
     bloqueios = DisponibilidadeFormadores.objects.filter(
@@ -81,5 +142,13 @@ def check_conflicts(formadores_qs, dt_inicio, dt_fim):
             .distinct()
         )
         result["solicitacoes"].extend(list(solicitacoes))
+    
+    # RD-07.3: Prioridade 3 - Buffer de deslocamento (RD-04)
+    if municipio_evento:
+        for formador in formadores_objs:
+            conflitos_buffer = check_travel_buffer_conflict(
+                formador, municipio_evento, dt_inicio, dt_fim
+            )
+            result["deslocamentos"].extend(conflitos_buffer)
     
     return result

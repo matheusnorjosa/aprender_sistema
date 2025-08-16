@@ -1,11 +1,12 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(venvScripts:*)",
+      "Bash(docker-compose exec web python manage.py test:*)"
+    ]
+  },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "playwright"
-  ],
-  "permissions": {
-    "allow": [
-      "Bash(venvScripts:*)"
-    ]
-  }
+  ]
 }

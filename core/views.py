@@ -23,8 +23,14 @@ def home(request):
     return render(request, "core/home.html")
 
 
-class HomeView(TemplateView):
+class HomeView(LoginRequiredMixin, TemplateView):
     template_name = "core/home.html"
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # PA-06: Garantir que o contexto do usuário esteja disponível no template
+        context['user'] = self.request.user
+        return context
 
 
 # ----- RF02 -----

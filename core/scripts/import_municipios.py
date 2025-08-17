@@ -5,7 +5,7 @@ from core.models import Municipio
 
 def run():
     # Caminho corrigido para o arquivo CSV dentro do container Docker
-    csv_file_path = os.path.join('/app', 'data', 'Municipios.csv')
+    csv_file_path = os.path.join('/app', 'aprender_sistema', 'data', 'Municipios.csv')
 
     if not os.path.exists(csv_file_path):
         print(f"❌ Arquivo não encontrado: {csv_file_path}")

@@ -4,7 +4,7 @@ import os
 from core.models import Projeto
 
 def run():
-    csv_file_path = os.path.join('/app', 'data', 'Projetos.csv')
+    csv_file_path = os.path.join('/app', 'aprender_sistema', 'data', 'Projetos.csv')
 
     if not os.path.exists(csv_file_path):
         print(f"❌ Arquivo não encontrado: {csv_file_path}")
@@ -14,7 +14,7 @@ def run():
     existentes = 0
 
     with open(csv_file_path, 'r', encoding='utf-8') as file:
-        reader = csv.reader(file)
+        reader = csv.reader(file, delimiter=';')
         next(reader)  # Pular o cabeçalho
 
         for row in reader:

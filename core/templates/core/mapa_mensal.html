@@ -7,7 +7,7 @@
   <style>
     :root{
       --bg:#f6f7fb; --card:#fff; --text:#222; --muted:#6b7280; --grid-border:#e5e7eb;
-      --evento:#3b82f6; --multi:#b91c1c; --desloc:#f59e0b; --bloq-total:#111827; --bloq-parc:#9ca3af; --conflito:#111827;
+      --evento:#3b82f6; --multi:#b91c1c; --desloc:#f59e0b; --bloq-total:#111827; --bloq-parc:#9ca3af; --conflito:#dc2626;
       --badge-bg:#b91c1c; --badge:#fff; --hover:#eff6ff; --head:#fafafa; --sticky:#f3f4f6;
     }
     body{background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:0; padding:24px;}
@@ -21,21 +21,22 @@
     .legend{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-bottom:10px}
     .legend .dot{display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:middle}
     .table-wrap{overflow:auto; border:1px solid var(--grid-border); border-radius:12px}
-    table{border-collapse:separate; border-spacing:0; width:100%; min-width:900px}
+    table{border-collapse:separate; border-spacing:0; width:100%; min-width:700px}
     thead th{position:sticky; top:0; background:var(--head); z-index:2}
     tbody th{position:sticky; left:0; background:var(--sticky); z-index:1; text-align:left}
-    th,td{border-bottom:1px solid var(--grid-border); border-right:1px solid var(--grid-border); padding:8px; font-size:12px}
-    thead th{padding:10px 8px; font-weight:700}
+    th,td{border-bottom:1px solid var(--grid-border); border-right:1px solid var(--grid-border); padding:4px; font-size:10px}
+    thead th{padding:6px 4px; font-weight:700}
     tbody tr:hover td{background:var(--hover)}
-    .cell{width:28px; height:24px; text-align:center; border-radius:4px; position:relative; user-select:none}
+    .cell{width:16px; height:16px; text-align:center; border-radius:3px; position:relative; user-select:none}
     .c-empty{background:transparent}
     .c-event{background:var(--evento)}
     .c-desloc{background:var(--desloc)}
     .c-block-total{background:var(--bloq-total); color:#fff}
     .c-block-parc{background:var(--bloq-parc); color:#fff}
-    .c-conflict{outline:2px solid var(--conflito); position:relative}
-    .c-conflict::after{content:"X"; color:var(--conflito); font-weight:800; position:absolute; inset:0; display:flex; align-items:center; justify-content:center}
-    .badge{position:absolute; top:-6px; right:-6px; font-size:10px; line-height:1; background:var(--badge-bg); color:var(--badge); border-radius:10px; padding:3px 5px; min-width:14px; text-align:center}
+    .c-conflict{background:var(--conflito); position:relative; animation:pulse 2s infinite}
+    .c-conflict::after{content:"✕"; color:#fff; font-weight:900; font-size:10px; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-shadow:0 1px 2px rgba(0,0,0,0.3)}
+    @keyframes pulse{0%,100%{opacity:1} 50%{opacity:0.8}}
+    .badge{position:absolute; top:-4px; right:-4px; font-size:8px; line-height:1; background:var(--badge-bg); color:var(--badge); border-radius:8px; padding:2px 3px; min-width:10px; text-align:center}
     .c-desloc .badge{background:#1f2937}
   </style>
 </head>
@@ -55,7 +56,7 @@
       <span><span class="dot" style="background:var(--desloc)"></span>Deslocamento</span>
       <span><span class="dot" style="background:var(--bloq-parc)"></span>Bloqueio Parcial (P)</span>
       <span><span class="dot" style="background:var(--bloq-total)"></span>Bloqueio Total (T)</span>
-      <span><span class="dot" style="border:2px solid var(--conflito)"></span>Conflito (X)</span>
+      <span><span class="dot" style="background:var(--conflito)"></span>Conflito (✕)</span>
     </div>
 
     <div class="card table-wrap">
@@ -95,7 +96,7 @@
       if(!res.ok){ alert("Falha ao buscar dados."); return; }
       const data = await res.json();
 
-      headRow.innerHTML = `<th style="min-width:220px">Formador</th>` + data.dias.map(d=>`<th style="text-align:center;width:28px">${d}</th>`).join('');
+      headRow.innerHTML = `<th style="min-width:150px">Formador</th>` + data.dias.map(d=>`<th style="text-align:center;width:16px">${d}</th>`).join('');
 
       const rows=[];
       for(const linha of data.linhas){

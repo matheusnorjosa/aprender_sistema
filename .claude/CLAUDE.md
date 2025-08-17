@@ -12,7 +12,7 @@
 - Subir ambiente: `docker compose up -d --build`
 - Logs da app: `docker compose logs -f web`
 - Executar comandos Django: `docker exec -it aprender_web python manage.py <comando>`
-  - Exemplos: `migrate`, `makemigrations`, `createsuperuser`, `check`, `test`
+  - Exemplos: `migrate`, `makemigrations`, `createsuperuser`, `check`, `test`
 - Importar formadores: `docker exec -it aprender_web python manage.py runscript core.scripts.import_formadores`
 - Abrir Django Admin: `http://localhost:8000/admin/`
 - App local: `http://localhost:8000/`
@@ -24,33 +24,33 @@
 
 ## Diretrizes de UX/IHC — ISO 9241-110
 Todo o sistema deve seguir os princípios ergonômicos para design de sistemas interativos:
-1. **Adequação à tarefa**  
-   - Mostrar apenas informações e ações necessárias para a tarefa atual.  
-   - Evitar sobrecarga de opções irrelevantes.
+1. **Adequação à tarefa**  
+   - Mostrar apenas informações e ações necessárias para a tarefa atual.  
+   - Evitar sobrecarga de opções irrelevantes.
 
-2. **Auto-descritividade**  
-   - Elementos da interface (botões, campos, mensagens) devem indicar claramente sua função.  
-   - Fornecer feedback imediato após cada ação.
+2. **Auto-descritividade**  
+   - Elementos da interface (botões, campos, mensagens) devem indicar claramente sua função.  
+   - Fornecer feedback imediato após cada ação.
 
-3. **Conformidade com expectativas do usuário**  
-   - Usar termos, ícones e fluxos que sigam convenções amplamente conhecidas.  
-   - Manter consistência de comportamento entre telas.
+3. **Conformidade com expectativas do usuário**  
+   - Usar termos, ícones e fluxos que sigam convenções amplamente conhecidas.  
+   - Manter consistência de comportamento entre telas.
 
-4. **Tolerância a erros**  
-   - Prevenir erros sempre que possível.  
-   - Fornecer mensagens claras e opções para corrigir ou desfazer ações críticas.
+4. **Tolerância a erros**  
+   - Prevenir erros sempre que possível.  
+   - Fornecer mensagens claras e opções para corrigir ou desfazer ações críticas.
 
-5. **Controle explícito**  
-   - Executar ações apenas quando o usuário confirmar.  
-   - Evitar execuções automáticas sem consentimento.
+5. **Controle explícito**  
+   - Executar ações apenas quando o usuário confirmar.  
+   - Evitar execuções automáticas sem consentimento.
 
-6. **Adequação à individualização**  
-   - Permitir ajustes não-críticos de preferência (ex.: filtros, visualização).  
-   - Manter consistência geral.
+6. **Adequação à individualização**  
+   - Permitir ajustes não-críticos de preferência (ex.: filtros, visualização).  
+   - Manter consistência geral.
 
-7. **Adequação à aprendizagem**  
-   - Interfaces intuitivas para novos usuários, com padrões repetidos.  
-   - Usar tooltips ou dicas contextuais quando necessário.
+7. **Adequação à aprendizagem**  
+   - Interfaces intuitivas para novos usuários, com padrões repetidos.  
+   - Usar tooltips ou dicas contextuais quando necessário.
 
 ### Diretrizes visuais complementares
 - Uso consistente de **Bootstrap 5.3** para responsividade.
@@ -63,6 +63,23 @@ Todo o sistema deve seguir os princípios ergonômicos para design de sistemas i
 - RF03 — Verificar conflitos para formadores.
 - RF04 — Aprovar/Reprovar solicitações.
 - RF05/RF06 — Criar evento no Google Calendar + gerar link do Meet.
+
+---
+
+## Diretrizes de Segurança (IMPORTANTE)
+O projeto deve seguir estas 10 diretrizes para proteger a aplicação contra a maioria dos ataques:
+- **Proteja os endpoints da sua API de administrador**: Não permita acesso não autorizado.
+- **Não vaze a lógica de administrador no lado do cliente**: Esconda a lógica de negócios sensível do código que é exposto no navegador.
+- **Garanta que um usuário não possa acessar o recurso de outro**: Use validações robustas em cada requisição para impedir o acesso a dados não autorizados.
+- **Não vaze segredos no frontend**: Nenhuma chave de API, token ou credencial deve ser exposta no código que roda no navegador.
+- **Garanta que um usuário não possa atualizar propriedades protegidas**: Impeça que usuários mal-intencionados alterem campos críticos, como privilégios ou status.
+- **Revise seus sitemaps/listas de endpoints**: Verifique se não há rotas não utilizadas ou esquecidas que possam ser um ponto de entrada.
+- **Se usar Supabase/Firebase, verifique o RLS**: Garanta que as regras de segurança do banco de dados estejam configuradas para impedir o acesso a toda a base de dados.
+- **Não retorne dados desnecessários nos endpoints**: Limite o que é retornado, evitando expor informações como `password_hash`.
+- **Não use IDs incrementais**: Use **UUIDs** para dificultar a enumeração de dados e o *dump* do banco.
+- **Faça uma verificação rápida com Google Dorks**: Use `filetype:pdf <url>` para encontrar arquivos públicos que possam ter sido expostos acidentalmente.
+
+---
 
 ## Como colaborar (IMPORTANTE)
 - Sempre **planeje antes de codar**. Use `/permissions plan` ou inicie com `--permission-mode plan`.

@@ -1,11 +1,15 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(venvScripts:*)",
+      "Bash(curl:*)",
+      "Bash(docker-compose exec:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(rm:*)"
+    ]
+  },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "playwright"
-  ],
-  "permissions": {
-    "allow": [
-      "Bash(venvScripts:*)"
-    ]
-  }
+  ]
 }

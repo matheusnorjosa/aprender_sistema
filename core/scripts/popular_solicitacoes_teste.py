@@ -1,5 +1,5 @@
 from django.utils import timezone
-from core.models import Solicitacao, Formador, Municipio
+from core.models import Solicitacao, Formador, Municipio, Projeto, TipoEvento
 from django.contrib.auth import get_user_model
 
 def run():
@@ -16,25 +16,34 @@ def run():
             is_staff=True
         )
 
-    # Busca alguns formadores e municípios existentes
-    formadores = list(Formador.objects.all()[:3])
-    municipios = list(Municipio.objects.all()[:2])
+    # Busca dados existentes
+    formadores = list(Formador.objects.all()[:5])
+    municipios = list(Municipio.objects.all()[:5])
+    projetos = list(Projeto.objects.all())
+    tipos_evento = list(TipoEvento.objects.all())
 
-    if not formadores or not municipios:
-        print("⚠️ É necessário ter pelo menos 1 Formador e 1 Município cadastrados.")
+    if not formadores or not municipios or not projetos or not tipos_evento:
+        print("⚠️ É necessário ter pelo menos 1 Formador, 1 Município, 1 Projeto e 1 Tipo de Evento cadastrados.")
         return
 
     agora = timezone.now()
 
-    for i in range(1, 4):
+    for i in range(1, 6):
+        # Criar a solicitação
         solicitacao = Solicitacao.objects.create(
-            titulo=f"Evento de Teste {i}",
-            descricao=f"Descrição do evento de teste {i}",
-            data_inicio=agora + timezone.timedelta(days=i),
-            data_fim=agora + timezone.timedelta(days=i, hours=2),
+            usuario_solicitante=solicitante,
+            projeto=projetos[0],  # Usar primeiro projeto
             municipio=municipios[i % len(municipios)],
-            solicitante=solicitante,
-            status="pendente"
+            tipo_evento=tipos_evento[i % len(tipos_evento)],
+            titulo_evento=f"Evento de Teste {i}",
+            data_inicio=agora + timezone.timedelta(days=i*7),  # Uma semana de intervalo
+            data_fim=agora + timezone.timedelta(days=i*7, hours=2),
+            observacoes=f"Observações do evento de teste {i}",
+            numero_encontro_formativo=f"Encontro {i}"
         )
+        
+        # Associar formadores
         solicitacao.formadores.set([formadores[i % len(formadores)]])
-        print(f"✅ Solicitação criada: {solicitacao.titulo}")
+        print(f"✅ Solicitação criada: {solicitacao.titulo_evento}")
+
+    print(f"\n📊 Total de {Solicitacao.objects.count()} solicitações no sistema.")

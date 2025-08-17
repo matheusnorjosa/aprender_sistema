@@ -3,6 +3,7 @@
 from datetime import timedelta, time
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.views import LoginView
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, TemplateView, ListView, FormView
 from django.shortcuts import get_object_or_404, redirect, render
@@ -181,4 +182,20 @@ class BloqueioCreateView(LoginRequiredMixin, FormView):
             pass
 
         messages.success(self.request, "Bloqueio registrado e e‑mail enviado (console em dev).")
+        return super().form_valid(form)
+
+
+# ----- Autenticação customizada -----
+class CustomLoginView(LoginView):
+    template_name = "core/login.html"
+    redirect_authenticated_user = True
+    
+    def get_success_url(self):
+        next_url = self.request.GET.get('next')
+        if next_url:
+            return next_url
+        return reverse_lazy('core:home')
+    
+    def form_valid(self, form):
+        messages.success(self.request, f"Bem-vindo(a), {form.get_user().get_full_name() or form.get_user().username}!")
         return super().form_valid(form)

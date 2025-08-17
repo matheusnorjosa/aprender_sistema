@@ -1,5 +1,5 @@
 ---
-description: Create or update a Playwright MCP smoke test for the RF02→RF04→RF05 flow
+description: Create or update a Playwright MCP smoke test for the RF01→RF02→RF03→RF04→RF05→RF06→RF07 flow
 ---
 
 Goal: Have a basic end-to-end test using Playwright MCP that covers:

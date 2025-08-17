@@ -4,7 +4,7 @@ import os
 from core.models import TipoEvento
 
 def run():
-    csv_file_path = os.path.join('/app', 'data', 'TiposDeEvento.csv')
+    csv_file_path = os.path.join('/app', 'aprender_sistema', 'data', 'TiposDeEvento.csv')
 
     if not os.path.exists(csv_file_path):
         print(f"❌ Arquivo não encontrado: {csv_file_path}")
@@ -14,16 +14,20 @@ def run():
     existentes = 0
 
     with open(csv_file_path, 'r', encoding='utf-8') as file:
-        reader = csv.reader(file)
+        reader = csv.reader(file, delimiter=';')
         next(reader)  # Pular o cabeçalho
 
         for row in reader:
-            if not row or len(row) < 2:
+            if not row or len(row) < 1:
                 print("⚠️ Linha ignorada (incompleta):", row)
                 continue
 
-            nome, online_str = row[0], row[1]
-            online = online_str.lower() == 'true'
+            nome = row[0].strip()
+            # Se não tiver coluna online, determinar pelo nome
+            if len(row) > 1 and row[1].strip():
+                online = row[1].strip().lower() == 'true'
+            else:
+                online = nome.lower() == 'online'
 
             tipoevento, created = TipoEvento.objects.get_or_create(
                 nome=nome,

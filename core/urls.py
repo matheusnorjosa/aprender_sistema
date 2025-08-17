@@ -4,7 +4,7 @@ from .views import (
     HomeView,  # Nova importação
     SolicitacaoCreateView, SolicitacaoOKView,
     AprovacoesPendentesView, AprovacaoDetailView,
-    BloqueioCreateView,
+    BloqueioCreateView, CustomLoginView,
     home  # Mantendo a função home também (opcional)
 )
 from .views_calendar import MapaMensalView, MapaMensalPageView
@@ -16,6 +16,9 @@ urlpatterns = [
     # Home - ambas as versões (você pode escolher uma ou manter ambas)
     path("", HomeView.as_view(), name="home"),  # Versão class-based
     # path("", home, name="home"),  # Versão function-based (mantenha se precisar)
+    
+    # Autenticação
+    path("login/", CustomLoginView.as_view(), name="login"),
     
     # RF02
     path("solicitar/", SolicitacaoCreateView.as_view(), name="solicitar_evento"),

@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from django.http import JsonResponse, Http404
 from django.views import View
 from core.models import Formador
-from core.services.calendar_codes import marcador_do_dia
+from core.services.calendar_codes import marcador_do_dia, gerar_mapa_mensal_otimizado
 from django.views.generic import TemplateView
 
 class MapaMensalView(View):
@@ -22,12 +22,18 @@ class MapaMensalView(View):
             dias.append(d)
             d += timedelta(days=1)
 
+        # Buscar formadores ativos
+        formadores = list(Formador.objects.filter(ativo=True).order_by("nome"))
+        
+        # Usar função otimizada para gerar todo o mapa de uma vez
+        mapa_otimizado = gerar_mapa_mensal_otimizado(formadores, dias)
+        
         linhas = []
-        for f in Formador.objects.filter(ativo=True).order_by("nome"):
+        for f in formadores:
             linha = {
                 "formador_id": str(f.id),
                 "formador": f.nome,
-                "celulas": [marcador_do_dia(f, dia) for dia in dias],
+                "celulas": mapa_otimizado.get(f.id, ["-"] * len(dias)),
             }
             linhas.append(linha)
 

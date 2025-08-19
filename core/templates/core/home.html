@@ -390,6 +390,21 @@
         </div>
         {% endif %}
 
+        {% if user.papel == 'controle' or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Controle</div>
+          <a href="{% url 'core:controle_google_calendar' %}" class="nav-item">
+            <i class="bi bi-cloud-check"></i> Monitor Google Calendar
+          </a>
+          <a href="{% url 'core:controle_auditoria' %}" class="nav-item">
+            <i class="bi bi-shield-check"></i> Logs de Auditoria
+          </a>
+          <a href="{% url 'core:controle_api_status' %}" class="nav-item">
+            <i class="bi bi-speedometer2"></i> Status do Sistema
+          </a>
+        </div>
+        {% endif %}
+
         <!-- Cadastros -->
         <div class="nav-section">
           <div class="nav-section-title">Cadastros</div>
@@ -503,6 +518,32 @@
             <div class="actions">
               <a class="btn btn-primary" href="/aprovacoes/pendentes/">
                 <i class="bi bi-hourglass-bottom"></i> Pendentes (<span id="aprovacoes-badge">-</span>)
+              </a>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Perfil Controle - Monitoramento -->
+          {% if user.papel == 'controle' or user.is_superuser %}
+          <div class="card">
+            <h3><i class="bi bi-cloud-check-fill" style="color:#28a745;"></i> Monitor Google Calendar</h3>
+            <p>Monitore a sincronização de eventos com Google Calendar, visualize estatísticas de sucesso e identifique problemas de integração em tempo real.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="{% url 'core:controle_google_calendar' %}">
+                <i class="bi bi-graph-up"></i> Ver Sincronizações
+              </a>
+              <a class="btn" href="{% url 'core:controle_api_status' %}">
+                <i class="bi bi-file-earmark-code"></i> API Status
+              </a>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3><i class="bi bi-shield-check-fill" style="color:#6f42c1;"></i> Auditoria do Sistema</h3>
+            <p>Acesse logs completos de auditoria, monitore atividades dos usuários e analise padrões de uso do sistema com ferramentas avançadas de filtragem.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="{% url 'core:controle_auditoria' %}">
+                <i class="bi bi-shield-lock"></i> Ver Logs
               </a>
             </div>
           </div>

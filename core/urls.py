@@ -4,7 +4,7 @@ from .views import (
     HomeView,  # Nova importação
     SolicitacaoCreateView, SolicitacaoOKView,
     AprovacoesPendentesView, AprovacaoDetailView,
-    BloqueioCreateView, CustomLoginView,
+    BloqueioCreateView, CustomLoginView, FormadorEventosView,
     home  # Mantendo a função home também (opcional)
 )
 from .views_calendar import MapaMensalView, MapaMensalPageView
@@ -31,6 +31,9 @@ urlpatterns = [
     # Bloqueio de agenda
     path("bloqueios/novo/", BloqueioCreateView.as_view(), name="bloqueio_novo"),
     path("bloqueios/ok/", TemplateView.as_view(template_name="core/bloqueio_ok.html"), name="bloqueio_ok"),
+
+    # Página do Formador
+    path("formador/eventos/", FormadorEventosView.as_view(), name="formador_eventos"),
 
     # Mapa mensal (JSON)
     path("mapa-mensal/", MapaMensalView.as_view(), name="mapa_mensal"),

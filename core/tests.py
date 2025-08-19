@@ -2311,3 +2311,266 @@ class RF05CalendarFlagTest(TestCase):
         self.assertTrue(result["id"].startswith("evt_fake_"))
         self.assertIn("calendar.google.com", result["htmlLink"])
         self.assertIn("meet.google.com", result["hangoutLink"])
+
+
+class FormadorEventosViewTest(TestCase):
+    """Testes de segurança para a página de eventos do formador"""
+    
+    def setUp(self):
+        """Configuração inicial para os testes"""
+        # Criar projetos, municípios e tipos de eventos
+        self.projeto = Projeto.objects.create(
+            nome='Projeto Teste',
+            descricao='Descrição do projeto teste'
+        )
+        
+        self.municipio = Municipio.objects.create(
+            nome='São Paulo',
+            uf='SP'
+        )
+        
+        self.tipo_evento = TipoEvento.objects.create(
+            nome='Workshop',
+            online=False
+        )
+        
+        # Criar formadores
+        self.formador1 = Formador.objects.create(
+            nome='João Silva',
+            email='joao@test.com',
+            area_atuacao='Matemática'
+        )
+        
+        self.formador2 = Formador.objects.create(
+            nome='Maria Santos',
+            email='maria@test.com',
+            area_atuacao='Português'
+        )
+        
+        # Criar usuários com diferentes papéis
+        self.user_formador1 = User.objects.create_user(
+            username='joao_formador',
+            email='joao@test.com',  # Mesmo email do formador1
+            password='testpass123',
+            papel='formador'
+        )
+        
+        self.user_formador2 = User.objects.create_user(
+            username='maria_formador',
+            email='maria@test.com',  # Mesmo email do formador2
+            password='testpass123',
+            papel='formador'
+        )
+        
+        self.user_coordenador = User.objects.create_user(
+            username='coord_test',
+            email='coord@test.com',
+            password='testpass123',
+            papel='coordenador'
+        )
+        
+        self.user_superintendencia = User.objects.create_user(
+            username='super_test',
+            email='super@test.com',
+            password='testpass123',
+            papel='superintendencia'
+        )
+        
+        # Criar eventos para formador1
+        self.evento_formador1 = Solicitacao.objects.create(
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento do João',
+            data_inicio=timezone.now() + timedelta(days=1),
+            data_fim=timezone.now() + timedelta(days=1, hours=2),
+            usuario_solicitante=self.user_coordenador,
+            status=SolicitacaoStatus.APROVADO
+        )
+        self.evento_formador1.formadores.add(self.formador1)
+        
+        # Criar eventos para formador2
+        self.evento_formador2 = Solicitacao.objects.create(
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento da Maria',
+            data_inicio=timezone.now() + timedelta(days=2),
+            data_fim=timezone.now() + timedelta(days=2, hours=2),
+            usuario_solicitante=self.user_coordenador,
+            status=SolicitacaoStatus.APROVADO
+        )
+        self.evento_formador2.formadores.add(self.formador2)
+        
+        self.url = reverse('core:formador_eventos')
+    
+    def test_formador_autorizado_acessa_proprios_eventos(self):
+        """Teste crítico: Formador logado vê apenas seus próprios eventos"""
+        # Login com formador1
+        self.client.login(username='joao_formador', password='testpass123')
+        response = self.client.get(self.url)
+        
+        # Verificar acesso autorizado
+        self.assertEqual(response.status_code, 200)
+        
+        # Verificar que vê apenas seus eventos
+        self.assertContains(response, 'Evento do João')
+        self.assertNotContains(response, 'Evento da Maria')
+        
+        # Verificar estrutura da página
+        self.assertContains(response, 'Meus Eventos')
+        self.assertContains(response, 'joao@test.com')
+        self.assertContains(response, 'João Silva')
+    
+    def test_formador_nao_ve_eventos_de_outros(self):
+        """Teste crítico: Formador não consegue ver eventos de outros formadores"""
+        # Login com formador2
+        self.client.login(username='maria_formador', password='testpass123')
+        response = self.client.get(self.url)
+        
+        # Verificar acesso autorizado
+        self.assertEqual(response.status_code, 200)
+        
+        # Verificar que vê apenas seus eventos
+        self.assertContains(response, 'Evento da Maria')
+        self.assertNotContains(response, 'Evento do João')
+        
+        # Verificar informações do formador correto
+        self.assertContains(response, 'maria@test.com')
+        self.assertContains(response, 'Maria Santos')
+        self.assertNotContains(response, 'João Silva')
+    
+    def test_coordenador_nao_pode_acessar(self):
+        """Teste crítico: Coordenador não consegue acessar página do formador"""
+        self.client.login(username='coord_test', password='testpass123')
+        response = self.client.get(self.url)
+        
+        # Deve retornar 403 (Forbidden)
+        self.assertEqual(response.status_code, 403)
+    
+    def test_superintendencia_nao_pode_acessar(self):
+        """Teste crítico: Superintendência não consegue acessar página do formador"""
+        self.client.login(username='super_test', password='testpass123')
+        response = self.client.get(self.url)
+        
+        # Deve retornar 403 (Forbidden)
+        self.assertEqual(response.status_code, 403)
+    
+    def test_formador_sem_eventos_recebe_mensagem_adequada(self):
+        """Teste crítico: Formador sem eventos recebe mensagem adequada"""
+        # Criar formador sem eventos
+        formador_sem_eventos = Formador.objects.create(
+            nome='Pedro Novo',
+            email='pedro@test.com',
+            area_atuacao='História'
+        )
+        
+        user_pedro = User.objects.create_user(
+            username='pedro_formador',
+            email='pedro@test.com',
+            password='testpass123',
+            papel='formador'
+        )
+        
+        # Login e acessar página
+        self.client.login(username='pedro_formador', password='testpass123')
+        response = self.client.get(self.url)
+        
+        # Verificar acesso autorizado
+        self.assertEqual(response.status_code, 200)
+        
+        # Verificar mensagem de eventos vazios
+        self.assertContains(response, 'Você não possui eventos agendados')
+        self.assertContains(response, 'Pedro Novo')
+    
+    def test_usuario_nao_autenticado_redireciona_login(self):
+        """Teste: Usuário não autenticado é redirecionado para login"""
+        response = self.client.get(self.url)
+        
+        # Deve redirecionar para login
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+    
+    def test_formador_sem_cadastro_recebe_erro(self):
+        """Teste: Formador logado mas sem cadastro no sistema recebe erro"""
+        # Criar usuário formador sem correspondente na tabela Formador
+        user_sem_formador = User.objects.create_user(
+            username='sem_formador',
+            email='sem_formador@test.com',
+            password='testpass123',
+            papel='formador'
+        )
+        
+        # Login e acessar página
+        self.client.login(username='sem_formador', password='testpass123')
+        response = self.client.get(self.url)
+        
+        # Verificar acesso autorizado mas com erro
+        self.assertEqual(response.status_code, 200)
+        
+        # Verificar mensagem de erro apropriada
+        self.assertContains(response, 'Formador não encontrado')
+        self.assertContains(response, 'Verifique se seu email está registrado')
+    
+    def test_url_sem_bypass_de_seguranca(self):
+        """Teste crítico: URL não aceita parâmetros para bypass de segurança"""
+        # Login com formador1
+        self.client.login(username='joao_formador', password='testpass123')
+        
+        # Tentar acessar com parâmetro formador_id (que não deve mais funcionar)
+        url_com_parametro = f"{self.url}?formador_id={self.formador2.id}"
+        response = self.client.get(url_com_parametro)
+        
+        # Verificar que ainda vê apenas seus eventos (não o do formador2)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Evento do João')
+        self.assertNotContains(response, 'Evento da Maria')
+    
+    def test_estrutura_tabela_conforme_especificacao(self):
+        """Teste: Verificar se a página usa tabela clara conforme especificação"""
+        self.client.login(username='joao_formador', password='testpass123')
+        response = self.client.get(self.url)
+        
+        # Verificar estrutura da tabela
+        self.assertContains(response, '<table>')
+        self.assertContains(response, 'Título do Evento')
+        self.assertContains(response, 'Data/Hora')
+        self.assertContains(response, 'Município')
+        self.assertContains(response, 'Projeto')
+        self.assertContains(response, 'Status')
+        
+        # Verificar conteúdo específico na tabela
+        self.assertContains(response, 'Evento do João')
+        self.assertContains(response, 'São Paulo')
+        self.assertContains(response, 'Projeto Teste')
+    
+    def test_menu_lateral_aparece_para_formador(self):
+        """Teste: Verificar se o menu lateral mostra link para página do formador"""
+        self.client.login(username='joao_formador', password='testpass123')
+        
+        # Acessar home page para ver o menu
+        home_response = self.client.get('/')
+        
+        # Verificar se o menu do formador aparece
+        self.assertContains(home_response, 'Meus Eventos')
+        self.assertContains(home_response, 'person-workspace')
+        self.assertContains(home_response, '/formador/eventos/')
+        
+        # Acessar a própria página para verificar funcionamento
+        page_response = self.client.get(self.url)
+        
+        # A página deve carregar corretamente e mostrar o título
+        self.assertEqual(page_response.status_code, 200)
+        self.assertContains(page_response, 'Meus Eventos')
+    
+    def test_menu_nao_aparece_para_coordenador(self):
+        """Teste: Verificar se o menu não mostra link para coordenador"""
+        self.client.login(username='coord_test', password='testpass123')
+        
+        # Acessar home page
+        response = self.client.get('/')
+        
+        # Menu de formador não deve aparecer para coordenador
+        self.assertNotContains(response, 'Meus Eventos')
+        # Mas deve ter seção de Coordenação
+        self.assertContains(response, 'Solicitar Evento')

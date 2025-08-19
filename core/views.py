@@ -91,7 +91,8 @@ class IsDiretoriaMixin(UserPassesTestMixin):
 # ----- RF02 -----
 
 
-class SolicitacaoCreateView(LoginRequiredMixin, IsCoordenadorMixin, CreateView):
+class SolicitacaoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'core.add_solicitacao'
     model = Solicitacao
     form_class = SolicitacaoForm
     template_name = "core/solicitacao_form.html"
@@ -110,7 +111,8 @@ class SolicitacaoOKView(LoginRequiredMixin, TemplateView):
 # ----- RF04 -----
 
 
-class AprovacoesPendentesView(LoginRequiredMixin, IsSuperintendenciaMixin, ListView):
+class AprovacoesPendentesView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'core.view_aprovacao'
     template_name = "core/aprovacoes_pendentes.html"
     model = Solicitacao
     context_object_name = "pendentes"
@@ -130,7 +132,8 @@ class AprovacoesPendentesView(LoginRequiredMixin, IsSuperintendenciaMixin, ListV
         return qs
 
 
-class AprovacaoDetailView(LoginRequiredMixin, IsSuperintendenciaMixin, FormView):
+class AprovacaoDetailView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
+    permission_required = 'core.add_aprovacao'
     template_name = "core/aprovacao_detail.html"
     form_class = AprovacaoDecisionForm
 
@@ -230,7 +233,8 @@ class AprovacaoDetailView(LoginRequiredMixin, IsSuperintendenciaMixin, FormView)
 
 
 # ----- Bloqueio de agenda (Apps Script -> Django) -----
-class BloqueioCreateView(LoginRequiredMixin, IsFormadorOrAdminMixin, FormView):
+class BloqueioCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
+    permission_required = 'core.add_disponibilidadeformadores'
     template_name = "core/bloqueio_form.html"
     form_class = BloqueioAgendaForm
     success_url = reverse_lazy("bloqueio_ok")
@@ -287,19 +291,39 @@ class BloqueioCreateView(LoginRequiredMixin, IsFormadorOrAdminMixin, FormView):
 
 
 
-class FormadorEventosView(LoginRequiredMixin, IsFormadorMixin, TemplateView):
+class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = 'core.view_solicitacao'  # Formadores podem ver solicitações onde participam
     template_name = "core/formador_eventos.html"
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         
-        # Encontrar o formador associado ao usuário logado
-        # Apenas o email do usuário logado é usado - sem bypass para outros formadores
-        try:
-            formador = Formador.objects.get(email=user.email, ativo=True)
-        except Formador.DoesNotExist:
-            formador = None
+        # 🔑 MODO ADMIN: Superuser pode ver qualquer formador ou todos os eventos
+        if user.is_superuser:
+            admin_formador_id = self.request.GET.get('admin_formador_id')
+            admin_mode = self.request.GET.get('admin_mode', 'geral')  # 'geral' ou 'formador'
+            
+            context['admin_mode'] = True
+            context['admin_mode_type'] = admin_mode
+            
+            if admin_mode == 'formador' and admin_formador_id:
+                # Simular formador específico
+                try:
+                    formador = Formador.objects.get(id=admin_formador_id, ativo=True)
+                    context['admin_formador_simulado'] = formador
+                except Formador.DoesNotExist:
+                    formador = None
+            else:
+                # Modo admin geral - mostrar dados de exemplo/resumo
+                formador = None
+                context['formadores_disponiveis'] = Formador.objects.filter(ativo=True).order_by('nome')
+        else:
+            # 👤 MODO NORMAL: Encontrar formador pelo email
+            try:
+                formador = Formador.objects.get(email=user.email, ativo=True)
+            except Formador.DoesNotExist:
+                formador = None
         
         if formador:
             # Buscar solicitações onde o formador está participando
@@ -368,16 +392,44 @@ class FormadorEventosView(LoginRequiredMixin, IsFormadorMixin, TemplateView):
                 'total_eventos': len(todos_eventos),
             })
         else:
-            context.update({
-                'formador': None,
-                'eventos_futuros': [],
-                'eventos_andamento': [],
-                'eventos_passados': [],
-                'eventos_pendentes': [],
-                'todos_eventos': [],
-                'total_eventos': 0,
-                'erro': 'Formador não encontrado. Verifique se seu email está registrado no sistema.',
-            })
+            # Sem formador específico - comportamento depende do modo
+            if user.is_superuser and context.get('admin_mode'):
+                # Modo admin: mostrar dados gerais ou seletor
+                agora = timezone.now()
+                
+                # Estatísticas gerais para administradores
+                total_formadores = Formador.objects.filter(ativo=True).count()
+                eventos_admin_sample = (
+                    Solicitacao.objects
+                    .filter(status=SolicitacaoStatus.APROVADO, data_inicio__gte=agora)
+                    .select_related("projeto", "municipio", "tipo_evento", "usuario_solicitante")
+                    .prefetch_related("formadores")
+                    .order_by("data_inicio")[:10]  # Amostra dos próximos eventos
+                )
+                
+                context.update({
+                    'formador': None,
+                    'eventos_futuros': eventos_admin_sample,
+                    'eventos_andamento': [],
+                    'eventos_passados': [],
+                    'eventos_pendentes': [],
+                    'todos_eventos': list(eventos_admin_sample),
+                    'total_eventos': eventos_admin_sample.count(),
+                    'total_formadores': total_formadores,
+                    'admin_message': f'Modo Admin: Visualizando dados gerais. {total_formadores} formadores disponíveis.',
+                })
+            else:
+                # Usuário normal sem formador correspondente
+                context.update({
+                    'formador': None,
+                    'eventos_futuros': [],
+                    'eventos_andamento': [],
+                    'eventos_passados': [],
+                    'eventos_pendentes': [],
+                    'todos_eventos': [],
+                    'total_eventos': 0,
+                    'erro': 'Formador não encontrado. Verifique se seu email está registrado no sistema.',
+                })
             
         return context
 
@@ -399,7 +451,8 @@ class CustomLoginView(LoginView):
 
 
 # ----- Perfil Controle: Monitoramento e Auditoria -----
-class GoogleCalendarMonitorView(LoginRequiredMixin, IsControleMixin, ListView):
+class GoogleCalendarMonitorView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'core.sync_calendar'
     """Monitor de sincronização com Google Calendar para perfil Controle"""
     template_name = "core/controle/google_calendar_monitor.html"
     model = EventoGoogleCalendar
@@ -451,7 +504,8 @@ class GoogleCalendarMonitorView(LoginRequiredMixin, IsControleMixin, ListView):
         return context
 
 
-class AuditoriaLogView(LoginRequiredMixin, IsControleMixin, ListView):
+class AuditoriaLogView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'core.view_logauditoria'
     """Dashboard de auditoria para perfil Controle"""
     template_name = "core/controle/auditoria_log.html"
     model = LogAuditoria
@@ -523,7 +577,8 @@ class AuditoriaLogView(LoginRequiredMixin, IsControleMixin, ListView):
         return context
 
 
-class ControleAPIStatusView(LoginRequiredMixin, IsControleMixin, View):
+class ControleAPIStatusView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'core.sync_calendar'
     """API endpoint para status do sistema para perfil Controle"""
     def get(self, request):
         # Coleta de métricas do sistema
@@ -578,7 +633,8 @@ class ControleAPIStatusView(LoginRequiredMixin, IsControleMixin, View):
 
 
 # ----- Perfil Coordenador: Meus Eventos -----
-class CoordenadorMeusEventosView(LoginRequiredMixin, IsCoordenadorMixin, ListView):
+class CoordenadorMeusEventosView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'core.view_own_solicitacoes'  # Apenas coordenadores podem ver seus próprios eventos
     """Página para coordenador visualizar seus próprios eventos solicitados"""
     template_name = "core/coordenador/meus_eventos.html"
     model = Solicitacao
@@ -647,42 +703,52 @@ class CoordenadorMeusEventosView(LoginRequiredMixin, IsCoordenadorMixin, ListVie
         # Opções para filtros
         projetos_opcoes = Projeto.objects.filter(ativo=True).order_by('nome')
         
-        context.update({
-            # Estatísticas
-            'total_solicitacoes': total_solicitacoes,
-            'eventos_pendentes': eventos_pendentes,
-            'eventos_aprovados': eventos_aprovados,
-            'eventos_reprovados': eventos_reprovados,
-            'taxa_aprovacao': taxa_aprovacao,
-            'proximos_eventos': proximos_eventos,
-            
-            # Filtros
-            'status_filter': self.request.GET.get("status", ""),
-            'periodo_filter': self.request.GET.get("periodo", ""),
-            'projeto_filter': self.request.GET.get("projeto", ""),
-            'projetos_opcoes': projetos_opcoes,
-            
-            # Choices para template
+        # Configurar filter_options para o template
+        filter_options = {
             'status_choices': [
-                ('', 'Todos os status'),
                 ('PENDENTE', 'Pendente'),
                 ('APROVADO', 'Aprovado'),
                 ('REPROVADO', 'Reprovado'),
             ],
             'periodo_choices': [
-                ('', 'Todo o período'),
                 ('7', 'Últimos 7 dias'),
                 ('30', 'Últimos 30 dias'),
-                ('90', 'Últimos 90 dias'),
+                ('90', 'Últimos 3 meses'),
                 ('365', 'Último ano'),
             ],
+            'projetos': projetos_opcoes,
+        }
+        
+        # Estatísticas para os cards
+        stats = {
+            'total_solicitacoes': total_solicitacoes,
+            'eventos_pendentes': eventos_pendentes,
+            'eventos_aprovados': eventos_aprovados,
+            'eventos_reprovados': eventos_reprovados,
+        }
+        
+        context.update({
+            # Estatísticas
+            'stats': stats,
+            'taxa_aprovacao': taxa_aprovacao,
+            'proximos_eventos': proximos_eventos,
+            
+            # Opções de filtro para o template
+            'filter_options': filter_options,
+            
+            # Filtros ativos
+            'status_filter': self.request.GET.get("status", ""),
+            'periodo_filter': self.request.GET.get("periodo", ""),
+            'projeto_filter': self.request.GET.get("projeto", ""),
+            
         })
         
         return context
 
 
 # ----- Perfil Diretoria: Visão Estratégica e Relatórios Executivos -----
-class DiretoriaExecutiveDashboardView(LoginRequiredMixin, IsDiretoriaMixin, TemplateView):
+class DiretoriaExecutiveDashboardView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = 'core.view_relatorios'
     """Dashboard executivo para perfil Diretoria com métricas estratégicas"""
     template_name = "core/diretoria/executive_dashboard.html"
     
@@ -824,7 +890,8 @@ class DiretoriaExecutiveDashboardView(LoginRequiredMixin, IsDiretoriaMixin, Temp
         return context
 
 
-class DiretoriaRelatoriosView(LoginRequiredMixin, IsDiretoriaMixin, TemplateView):
+class DiretoriaRelatoriosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = 'core.view_relatorios'
     """Relatórios consolidados para perfil Diretoria"""
     template_name = "core/diretoria/relatorios.html"
     
@@ -907,7 +974,8 @@ class DiretoriaRelatoriosView(LoginRequiredMixin, IsDiretoriaMixin, TemplateView
         return context
 
 
-class DiretoriaAPIMetricsView(LoginRequiredMixin, IsDiretoriaMixin, View):
+class DiretoriaAPIMetricsView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'core.view_relatorios'
     """API endpoint para métricas executivas da Diretoria"""
     def get(self, request):
         agora = timezone.now()

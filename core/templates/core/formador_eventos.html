@@ -14,6 +14,16 @@ Visualize todos os eventos em que você está participando
 
 {% block page_actions %}
 <div class="actions">
+  {% if admin_mode %}
+    <div class="btn-group me-2">
+      <a href="?admin_mode=geral" class="btn {% if admin_mode_type == 'geral' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="bi bi-gear"></i> Modo Admin
+      </a>
+      <a href="?admin_mode=formador" class="btn {% if admin_mode_type == 'formador' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="bi bi-person"></i> Simular Formador
+      </a>
+    </div>
+  {% endif %}
   <a href="{% url 'core:home' %}" class="btn">
     <i class="bi bi-house"></i> Início
   </a>
@@ -151,6 +161,65 @@ Visualize todos os eventos em que você está participando
 
 {% block content %}
 <div style="max-width: 1200px; margin: 0 auto;">
+  
+  <!-- 🔑 INTERFACE ADMIN -->
+  {% if admin_mode %}
+    <div class="alert alert-info mb-4 border border-primary">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-1">
+            <i class="bi bi-shield-check text-primary"></i>
+            <strong>Modo Administrador Ativo</strong>
+          </h5>
+          <p class="mb-0">
+            {% if admin_formador_simulado %}
+              Simulando formador: <strong>{{ admin_formador_simulado.nome }}</strong>
+            {% elif admin_message %}
+              {{ admin_message }}
+            {% else %}
+              Você está visualizando como superuser.
+            {% endif %}
+          </p>
+        </div>
+        <div>
+          <span class="badge bg-primary">
+            <i class="bi bi-person-gear"></i> ADMIN
+          </span>
+        </div>
+      </div>
+      
+      <!-- Seletor de Formador para Admin -->
+      {% if admin_mode_type == 'formador' and formadores_disponiveis %}
+        <hr class="my-3">
+        <form method="get" class="row g-3">
+          <input type="hidden" name="admin_mode" value="formador">
+          <div class="col-md-8">
+            <label for="admin_formador_id" class="form-label fw-semibold">
+              <i class="bi bi-person-plus"></i> Selecionar Formador para Simular:
+            </label>
+            <select name="admin_formador_id" id="admin_formador_id" class="form-select" onchange="this.form.submit()">
+              <option value="">Escolha um formador...</option>
+              {% for formador_opt in formadores_disponiveis %}
+                <option value="{{ formador_opt.id }}" 
+                        {% if admin_formador_simulado.id == formador_opt.id %}selected{% endif %}>
+                  {{ formador_opt.nome }} ({{ formador_opt.email }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">&nbsp;</label>
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-eye"></i> Visualizar
+              </button>
+            </div>
+          </div>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
+  
   {% if erro %}
     <div class="error-message">
       <i class="bi bi-exclamation-triangle"></i>

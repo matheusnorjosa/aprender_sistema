@@ -13,7 +13,10 @@
       "Bash(docker-compose restart:*)",
       "Bash(source:*)",
       "Bash(python:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(.venvScriptspython.exe manage.py setup_groups)"
     ]
   },
   "enableAllProjectMcpServers": true,

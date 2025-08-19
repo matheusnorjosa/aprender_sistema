@@ -155,7 +155,7 @@
         </div>
 
         <!-- Operações por papel -->
-        {% if user.papel == 'coordenador' or user.is_superuser %}
+        {% if perms.core.add_solicitacao or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Coordenação</div>
           <a href="/solicitar/" class="nav-item {% block nav_solicitar %}{% endblock %}">
@@ -167,7 +167,7 @@
         </div>
         {% endif %}
 
-        {% if user.papel == 'formador' or user.is_superuser %}
+        {% if perms.core.add_disponibilidadeformadores or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Formador</div>
           <a href="{% url 'core:formador_eventos' %}" class="nav-item {% block nav_formador %}{% endblock %}">
@@ -180,7 +180,7 @@
         {% endif %}
         
 
-        {% if user.papel == 'superintendencia' or user.is_superuser %}
+        {% if perms.core.view_aprovacao or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Superintendência</div>
           <a href="/aprovacoes/pendentes/" class="nav-item {% block nav_aprovacoes %}{% endblock %}">
@@ -192,7 +192,7 @@
         </div>
         {% endif %}
 
-        {% if user.papel == 'controle' or user.is_superuser %}
+        {% if perms.core.sync_calendar or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Controle</div>
           <a href="{% url 'core:controle_google_calendar' %}" class="nav-item {% block nav_controle_calendar %}{% endblock %}">
@@ -207,7 +207,7 @@
         </div>
         {% endif %}
 
-        {% if user.papel == 'diretoria' or user.is_superuser %}
+        {% if perms.core.view_relatorios or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Diretoria</div>
           <a href="{% url 'core:diretoria_dashboard' %}" class="nav-item {% block nav_diretoria_dashboard %}{% endblock %}">
@@ -226,7 +226,7 @@
         {% endif %}
 
         <!-- Cadastros - apenas para administradores e superintendência -->
-        {% if user.papel == 'superintendencia' or user.is_superuser %}
+        {% if perms.core.view_aprovacao or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Cadastros</div>
           <a href="/admin/core/formador/" class="nav-item {% block nav_formadores %}{% endblock %}">

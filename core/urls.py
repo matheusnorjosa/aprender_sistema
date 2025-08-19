@@ -5,6 +5,7 @@ from .views import (
     SolicitacaoCreateView, SolicitacaoOKView,
     AprovacoesPendentesView, AprovacaoDetailView,
     BloqueioCreateView, CustomLoginView, FormadorEventosView,
+    GoogleCalendarMonitorView, AuditoriaLogView, ControleAPIStatusView,
     home  # Mantendo a função home também (opcional)
 )
 from .views_calendar import MapaMensalView, MapaMensalPageView
@@ -40,4 +41,9 @@ urlpatterns = [
     
     # Página visual (HTML)
     path("disponibilidade/", MapaMensalPageView.as_view(), name="mapa_mensal_page"),
+    
+    # Perfil Controle - Monitoramento e Auditoria
+    path("controle/google-calendar/", GoogleCalendarMonitorView.as_view(), name="controle_google_calendar"),
+    path("controle/auditoria/", AuditoriaLogView.as_view(), name="controle_auditoria"),
+    path("controle/api/status/", ControleAPIStatusView.as_view(), name="controle_api_status"),
 ]

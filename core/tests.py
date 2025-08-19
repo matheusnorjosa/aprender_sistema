@@ -2737,3 +2737,177 @@ class SecurityCriticalTest(TestCase):
         if data['linhas']:  # Se há formadores
             self.assertIn('formador', data['linhas'][0])
             self.assertIn('celulas', data['linhas'][0])
+
+
+class ControleProfileTest(TestCase):
+    """Testes específicos para funcionalidades do perfil Controle"""
+    
+    def setUp(self):
+        """Configuração inicial para testes do perfil Controle"""
+        # Criar usuários
+        self.user_controle = User.objects.create_user(
+            username='controle_test',
+            email='controle@test.com',
+            password='testpass123',
+            papel='controle'
+        )
+        
+        self.user_formador = User.objects.create_user(
+            username='formador_test',
+            email='formador@test.com',
+            password='testpass123',
+            papel='formador'
+        )
+        
+        self.user_admin = User.objects.create_superuser(
+            username='admin_test',
+            email='admin@test.com',
+            password='testpass123'
+        )
+        
+        # Criar dados de teste
+        self.formador = Formador.objects.create(
+            nome="Formador Teste",
+            email="formador@test.com",
+            ativo=True
+        )
+        
+        # URLs do perfil Controle
+        self.google_calendar_url = reverse('core:controle_google_calendar')
+        self.auditoria_url = reverse('core:controle_auditoria')
+        self.api_status_url = reverse('core:controle_api_status')
+    
+    def test_controle_acesso_google_calendar_monitor(self):
+        """Teste: Apenas perfil Controle e admin podem acessar monitor Google Calendar"""
+        # Controle deve conseguir acessar
+        self.client.login(username='controle_test', password='testpass123')
+        response = self.client.get(self.google_calendar_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Admin deve conseguir acessar
+        self.client.login(username='admin_test', password='testpass123')
+        response = self.client.get(self.google_calendar_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Formador NÃO deve conseguir acessar
+        self.client.login(username='formador_test', password='testpass123')
+        response = self.client.get(self.google_calendar_url)
+        self.assertEqual(response.status_code, 403)
+    
+    def test_controle_acesso_auditoria_log(self):
+        """Teste: Apenas perfil Controle e admin podem acessar logs de auditoria"""
+        # Controle deve conseguir acessar
+        self.client.login(username='controle_test', password='testpass123')
+        response = self.client.get(self.auditoria_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Admin deve conseguir acessar
+        self.client.login(username='admin_test', password='testpass123')
+        response = self.client.get(self.auditoria_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Formador NÃO deve conseguir acessar
+        self.client.login(username='formador_test', password='testpass123')
+        response = self.client.get(self.auditoria_url)
+        self.assertEqual(response.status_code, 403)
+    
+    def test_controle_api_status_endpoint(self):
+        """Teste: API de status deve retornar dados estruturados para perfil Controle"""
+        self.client.login(username='controle_test', password='testpass123')
+        response = self.client.get(self.api_status_url)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/json')
+        
+        # Verificar estrutura da resposta JSON
+        import json
+        data = json.loads(response.content)
+        
+        # Verificar campos obrigatórios
+        self.assertIn('timestamp', data)
+        self.assertIn('sistema_status', data)
+        self.assertIn('metricas', data)
+        
+        # Verificar métricas
+        metricas = data['metricas']
+        self.assertIn('solicitacoes', metricas)
+        self.assertIn('google_calendar', metricas)
+        self.assertIn('auditoria', metricas)
+        self.assertIn('formadores_ativos', metricas)
+        
+        # Verificar tipos de dados
+        self.assertIsInstance(metricas['formadores_ativos'], int)
+        self.assertIsInstance(metricas['solicitacoes']['pendentes'], int)
+        self.assertIsInstance(metricas['google_calendar']['taxa_sucesso_24h'], (int, float))
+    
+    def test_controle_google_calendar_filtros(self):
+        """Teste: Monitor Google Calendar deve suportar filtros"""
+        # Criar evento de teste
+        from core.models import Solicitacao, EventoGoogleCalendar
+        
+        solicitacao = Solicitacao.objects.create(
+            titulo_evento="Evento Teste",
+            data_inicio=timezone.now(),
+            data_fim=timezone.now() + timedelta(hours=2),
+            usuario_solicitante=self.user_controle
+        )
+        
+        evento_sync = EventoGoogleCalendar.objects.create(
+            solicitacao=solicitacao,
+            usuario_criador=self.user_controle,
+            provider_event_id="test_event_123",
+            status_sincronizacao="OK"
+        )
+        
+        self.client.login(username='controle_test', password='testpass123')
+        
+        # Teste filtro por status
+        response = self.client.get(self.google_calendar_url + '?status=OK')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'test_event_123')
+        
+        # Teste filtro por período
+        response = self.client.get(self.google_calendar_url + '?periodo=1')
+        self.assertEqual(response.status_code, 200)
+    
+    def test_controle_auditoria_filtros(self):
+        """Teste: Dashboard de auditoria deve suportar filtros"""
+        # Criar log de auditoria de teste
+        LogAuditoria.objects.create(
+            usuario=self.user_controle,
+            acao="Teste de auditoria",
+            entidade_afetada_id="test_id_123",
+            detalhes="Teste de funcionalidade"
+        )
+        
+        self.client.login(username='controle_test', password='testpass123')
+        
+        # Teste filtro por ação
+        response = self.client.get(self.auditoria_url + '?acao=Teste')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Teste de auditoria')
+        
+        # Teste filtro por usuário
+        response = self.client.get(self.auditoria_url + '?usuario=controle_test')
+        self.assertEqual(response.status_code, 200)
+        
+        # Teste filtro por período
+        response = self.client.get(self.auditoria_url + '?periodo=1')
+        self.assertEqual(response.status_code, 200)
+    
+    def test_controle_usuario_nao_autenticado_negado(self):
+        """Teste: Usuários não autenticados devem ser redirecionados"""
+        # Google Calendar Monitor
+        response = self.client.get(self.google_calendar_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+        
+        # Auditoria Log
+        response = self.client.get(self.auditoria_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+        
+        # API Status
+        response = self.client.get(self.api_status_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)

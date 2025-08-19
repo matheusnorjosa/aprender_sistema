@@ -141,6 +141,9 @@ class Solicitacao(models.Model):
             models.Index(fields=["data_fim"]),
             models.Index(fields=["status"]),
         ]
+        permissions = [
+            ('sync_calendar', 'Can sync with Google Calendar'),
+        ]
 
     def __str__(self):
         return f"{self.titulo_evento} ({self.data_inicio:%d/%m/%Y %H:%M})"
@@ -253,6 +256,9 @@ class LogAuditoria(models.Model):
         verbose_name = "Log de Auditoria"
         verbose_name_plural = "Logs de Auditoria"
         ordering = ["-data_hora"]
+        permissions = [
+            ('view_relatorios', 'Can view consolidated reports'),
+        ]
 
     def __str__(self):
         return f"[{self.data_hora:%d/%m/%Y %H:%M}] {self.acao}"

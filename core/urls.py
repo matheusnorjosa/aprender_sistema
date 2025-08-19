@@ -7,6 +7,7 @@ from .views import (
     BloqueioCreateView, CustomLoginView, FormadorEventosView,
     GoogleCalendarMonitorView, AuditoriaLogView, ControleAPIStatusView,
     DiretoriaExecutiveDashboardView, DiretoriaRelatoriosView, DiretoriaAPIMetricsView,
+    CoordenadorMeusEventosView,
     home  # Mantendo a função home também (opcional)
 )
 from .views_calendar import MapaMensalView, MapaMensalPageView
@@ -36,6 +37,9 @@ urlpatterns = [
 
     # Página do Formador
     path("formador/eventos/", FormadorEventosView.as_view(), name="formador_eventos"),
+    
+    # Perfil Coordenador - Gestão de Eventos
+    path("coordenador/meus-eventos/", CoordenadorMeusEventosView.as_view(), name="coordenador_meus_eventos"),
 
     # Mapa mensal (JSON)
     path("mapa-mensal/", MapaMensalView.as_view(), name="mapa_mensal"),

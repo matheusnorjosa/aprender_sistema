@@ -161,10 +161,13 @@
           <a href="/solicitar/" class="nav-item {% block nav_solicitar %}{% endblock %}">
             <i class="bi bi-plus-circle"></i> Solicitar Evento
           </a>
+          <a href="{% url 'core:coordenador_meus_eventos' %}" class="nav-item {% block nav_coordenador_eventos %}{% endblock %}">
+            <i class="bi bi-calendar-check"></i> Meus Eventos
+          </a>
         </div>
         {% endif %}
 
-        {% if user.papel == 'formador' %}
+        {% if user.papel == 'formador' or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Formador</div>
           <a href="{% url 'core:formador_eventos' %}" class="nav-item {% block nav_formador %}{% endblock %}">
@@ -176,14 +179,6 @@
         </div>
         {% endif %}
         
-        {% if user.papel == 'coordenador' or user.is_superuser %}
-        <div class="nav-section">
-          <div class="nav-section-title">Administração</div>
-          <a href="/bloqueios/novo/" class="nav-item {% block nav_bloqueio_admin %}{% endblock %}">
-            <i class="bi bi-calendar-x"></i> Bloqueio de Agenda
-          </a>
-        </div>
-        {% endif %}
 
         {% if user.papel == 'superintendencia' or user.is_superuser %}
         <div class="nav-section">
@@ -197,30 +192,67 @@
         </div>
         {% endif %}
 
-        <!-- Cadastros -->
+        {% if user.papel == 'controle' or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Controle</div>
+          <a href="{% url 'core:controle_google_calendar' %}" class="nav-item {% block nav_controle_calendar %}{% endblock %}">
+            <i class="bi bi-cloud-check"></i> Monitor Google Calendar
+          </a>
+          <a href="{% url 'core:controle_auditoria' %}" class="nav-item {% block nav_controle_auditoria %}{% endblock %}">
+            <i class="bi bi-shield-check"></i> Logs de Auditoria
+          </a>
+          <a href="{% url 'core:controle_api_status' %}" class="nav-item {% block nav_controle_api %}{% endblock %}">
+            <i class="bi bi-speedometer2"></i> Status do Sistema
+          </a>
+        </div>
+        {% endif %}
+
+        {% if user.papel == 'diretoria' or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Diretoria</div>
+          <a href="{% url 'core:diretoria_dashboard' %}" class="nav-item {% block nav_diretoria_dashboard %}{% endblock %}">
+            <i class="bi bi-graph-up"></i> Dashboard Executivo
+          </a>
+          <a href="{% url 'core:diretoria_relatorios' %}" class="nav-item {% block nav_diretoria_relatorios %}{% endblock %}">
+            <i class="bi bi-file-earmark-bar-graph"></i> Relatórios Consolidados
+          </a>
+          <a href="/disponibilidade/" class="nav-item {% block nav_diretoria_calendar %}{% endblock %}">
+            <i class="bi bi-calendar-month"></i> Visão Mensal
+          </a>
+          <a href="{% url 'core:diretoria_api_metrics' %}" class="nav-item {% block nav_diretoria_api %}{% endblock %}">
+            <i class="bi bi-file-earmark-code"></i> Métricas API
+          </a>
+        </div>
+        {% endif %}
+
+        <!-- Cadastros - apenas para administradores e superintendência -->
+        {% if user.papel == 'superintendencia' or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Cadastros</div>
-          <a href="/admin/core/formador/" class="nav-item">
+          <a href="/admin/core/formador/" class="nav-item {% block nav_formadores %}{% endblock %}">
             <i class="bi bi-people"></i> Formadores
           </a>
-          <a href="/admin/core/municipio/" class="nav-item">
+          <a href="/admin/core/municipio/" class="nav-item {% block nav_municipios %}{% endblock %}">
             <i class="bi bi-geo"></i> Municípios
           </a>
-          <a href="/admin/core/projeto/" class="nav-item">
+          <a href="/admin/core/projeto/" class="nav-item {% block nav_projetos %}{% endblock %}">
             <i class="bi bi-folder"></i> Projetos
           </a>
-          <a href="/admin/core/tipoevento/" class="nav-item">
+          <a href="/admin/core/tipoevento/" class="nav-item {% block nav_tipos %}{% endblock %}">
             <i class="bi bi-tag"></i> Tipos de Evento
           </a>
         </div>
+        {% endif %}
 
-        <!-- Administração -->
+        <!-- Administração do Sistema - apenas para administradores -->
+        {% if user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Sistema</div>
-          <a href="/admin/" class="nav-item">
+          <a href="/admin/" class="nav-item {% block nav_admin %}{% endblock %}">
             <i class="bi bi-gear"></i> Administração
           </a>
         </div>
+        {% endif %}
       </nav>
     </div>
 

@@ -12,7 +12,8 @@
       "Bash(docker exec:*)",
       "Bash(docker-compose restart:*)",
       "Bash(source:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(rm:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

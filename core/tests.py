@@ -3107,3 +3107,567 @@ class DiretoriaProfileTest(TestCase):
         response = self.client.get(self.api_metrics_url)
         self.assertEqual(response.status_code, 302)
         self.assertIn('/login/', response.url)
+
+
+class CoordenadorProfileTest(TestCase):
+    """Testes específicos para funcionalidades do perfil Coordenador - COMMIT 4"""
+    
+    def setUp(self):
+        """Setup específico para testes do Coordenador"""
+        self.client = Client()
+        
+        # Usuário Coordenador
+        self.coordenador_user = User.objects.create_user(
+            username='coordenador',
+            email='coordenador@test.com',
+            password='testpass123',
+            papel='coordenador'
+        )
+        
+        # Outro coordenador para testar isolamento
+        self.outro_coordenador = User.objects.create_user(
+            username='outro_coord',
+            email='outro@test.com',
+            password='testpass123',
+            papel='coordenador'
+        )
+        
+        # Usuário não-autorizado
+        self.formador_user = User.objects.create_user(
+            username='formador',
+            email='formador@test.com',
+            password='testpass123',
+            papel='formador'
+        )
+        
+        # Dados de teste
+        self.projeto1 = Projeto.objects.create(nome='Projeto A')
+        self.projeto2 = Projeto.objects.create(nome='Projeto B')
+        self.municipio = Municipio.objects.create(nome='São Paulo', uf='SP')
+        self.tipo_evento = TipoEvento.objects.create(nome='Workshop')
+        
+        # Criar solicitações do coordenador atual
+        self.solicitacao1 = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador_user,
+            projeto=self.projeto1,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento do Coordenador 1',
+            data_inicio=timezone.now() + timedelta(days=1),
+            data_fim=timezone.now() + timedelta(days=1, hours=2),
+            status='Pendente'
+        )
+        
+        self.solicitacao2 = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador_user,
+            projeto=self.projeto2,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento do Coordenador 2',
+            data_inicio=timezone.now() + timedelta(days=2),
+            data_fim=timezone.now() + timedelta(days=2, hours=2),
+            status='Aprovado'
+        )
+        
+        self.solicitacao3 = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador_user,
+            projeto=self.projeto1,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento do Coordenador 3',
+            data_inicio=timezone.now() + timedelta(days=5),
+            data_fim=timezone.now() + timedelta(days=5, hours=2),
+            status='Reprovado',
+            justificativa_rejeicao='Conflito de agenda'
+        )
+        
+        # Criar solicitação de outro coordenador (não deve aparecer)
+        self.solicitacao_outro = Solicitacao.objects.create(
+            usuario_solicitante=self.outro_coordenador,
+            projeto=self.projeto1,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento de Outro Coordenador',
+            data_inicio=timezone.now() + timedelta(days=3),
+            data_fim=timezone.now() + timedelta(days=3, hours=2),
+            status='Pendente'
+        )
+    
+    def test_coordenador_meus_eventos_access_authorized(self):
+        """Teste: Coordenador deve acessar página Meus Eventos"""
+        self.client.login(username='coordenador', password='testpass123')
+        response = self.client.get(reverse('core:coordenador_meus_eventos'))
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Meus Eventos Solicitados')
+        self.assertContains(response, 'Evento do Coordenador 1')
+        self.assertContains(response, 'Evento do Coordenador 2')
+        self.assertContains(response, 'Evento do Coordenador 3')
+    
+    def test_coordenador_meus_eventos_access_unauthorized(self):
+        """Teste: Formador NÃO deve acessar página Meus Eventos de coordenador"""
+        self.client.login(username='formador', password='testpass123')
+        response = self.client.get(reverse('core:coordenador_meus_eventos'))
+        
+        self.assertEqual(response.status_code, 403)
+    
+    def test_coordenador_eventos_user_isolation(self):
+        """Teste: Coordenadores só devem ver seus próprios eventos"""
+        self.client.login(username='coordenador', password='testpass123')
+        response = self.client.get(reverse('core:coordenador_meus_eventos'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Deve conter os eventos do coordenador logado
+        self.assertContains(response, 'Evento do Coordenador 1')
+        self.assertContains(response, 'Evento do Coordenador 2')
+        self.assertContains(response, 'Evento do Coordenador 3')
+        
+        # NÃO deve conter eventos de outros coordenadores
+        self.assertNotContains(response, 'Evento de Outro Coordenador')
+    
+    def test_coordenador_eventos_filtering_by_status(self):
+        """Teste: Filtragem por status deve funcionar corretamente"""
+        self.client.login(username='coordenador', password='testpass123')
+        
+        # Filtrar apenas eventos pendentes
+        response = self.client.get(reverse('core:coordenador_meus_eventos'), {
+            'status': 'Pendente'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Evento do Coordenador 1')
+        self.assertNotContains(response, 'Evento do Coordenador 2')
+        self.assertNotContains(response, 'Evento do Coordenador 3')
+        
+        # Filtrar apenas eventos aprovados
+        response = self.client.get(reverse('core:coordenador_meus_eventos'), {
+            'status': 'Aprovado'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Evento do Coordenador 1')
+        self.assertContains(response, 'Evento do Coordenador 2')
+        self.assertNotContains(response, 'Evento do Coordenador 3')
+        
+        # Filtrar apenas eventos reprovados
+        response = self.client.get(reverse('core:coordenador_meus_eventos'), {
+            'status': 'Reprovado'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Evento do Coordenador 1')
+        self.assertNotContains(response, 'Evento do Coordenador 2')
+        self.assertContains(response, 'Evento do Coordenador 3')
+    
+    def test_coordenador_eventos_filtering_by_project(self):
+        """Teste: Filtragem por projeto deve funcionar corretamente"""
+        self.client.login(username='coordenador', password='testpass123')
+        
+        # Filtrar apenas eventos do Projeto A
+        response = self.client.get(reverse('core:coordenador_meus_eventos'), {
+            'projeto': self.projeto1.id
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Evento do Coordenador 1')
+        self.assertNotContains(response, 'Evento do Coordenador 2')
+        self.assertContains(response, 'Evento do Coordenador 3')
+        
+        # Filtrar apenas eventos do Projeto B
+        response = self.client.get(reverse('core:coordenador_meus_eventos'), {
+            'projeto': self.projeto2.id
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Evento do Coordenador 1')
+        self.assertContains(response, 'Evento do Coordenador 2')
+        self.assertNotContains(response, 'Evento do Coordenador 3')
+    
+    def test_coordenador_eventos_statistics(self):
+        """Teste: Estatísticas devem estar corretas na página Meus Eventos"""
+        self.client.login(username='coordenador', password='testpass123')
+        response = self.client.get(reverse('core:coordenador_meus_eventos'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Verifica dados de contexto
+        context = response.context
+        self.assertIn('stats', context)
+        
+        stats = context['stats']
+        self.assertEqual(stats['total_solicitacoes'], 3)
+        self.assertEqual(stats['eventos_pendentes'], 1)
+        self.assertEqual(stats['eventos_aprovados'], 1)
+        self.assertEqual(stats['eventos_reprovados'], 1)
+        self.assertEqual(stats['taxa_aprovacao'], 33.3)  # 1/3 * 100
+    
+    def test_coordenador_eventos_pagination(self):
+        """Teste: Paginação deve funcionar corretamente"""
+        self.client.login(username='coordenador', password='testpass123')
+        
+        # Criar mais eventos para testar paginação
+        for i in range(20):
+            Solicitacao.objects.create(
+                usuario_solicitante=self.coordenador_user,
+                projeto=self.projeto1,
+                municipio=self.municipio,
+                tipo_evento=self.tipo_evento,
+                titulo_evento=f'Evento Extra {i+1}',
+                data_inicio=timezone.now() + timedelta(days=i+10),
+                data_fim=timezone.now() + timedelta(days=i+10, hours=2),
+                status='Pendente'
+            )
+        
+        response = self.client.get(reverse('core:coordenador_meus_eventos'))
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['is_paginated'])
+        self.assertEqual(len(response.context['eventos']), 15)  # paginate_by = 15
+        
+        # Testar segunda página
+        response = self.client.get(reverse('core:coordenador_meus_eventos') + '?page=2')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['eventos']), 8)  # Total 23 - 15 da primeira página
+    
+    def test_coordenador_eventos_filter_options_context(self):
+        """Teste: Opções de filtro devem estar disponíveis no contexto"""
+        self.client.login(username='coordenador', password='testpass123')
+        response = self.client.get(reverse('core:coordenador_meus_eventos'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        context = response.context
+        self.assertIn('filter_options', context)
+        
+        filter_options = context['filter_options']
+        self.assertIn('status_choices', filter_options)
+        self.assertIn('periodo_choices', filter_options)
+        self.assertIn('projetos', filter_options)
+        
+        # Verifica se os projetos estão corretos
+        projetos_ids = [str(p.id) for p in filter_options['projetos']]
+        self.assertIn(str(self.projeto1.id), projetos_ids)
+        self.assertIn(str(self.projeto2.id), projetos_ids)
+        
+        # Verifica opções de status
+        status_options = [choice[0] for choice in filter_options['status_choices']]
+        self.assertIn('Pendente', status_options)
+        self.assertIn('Aprovado', status_options)
+        self.assertIn('Reprovado', status_options)
+    
+    def test_coordenador_eventos_period_filtering(self):
+        """Teste: Filtragem por período deve funcionar corretamente"""
+        self.client.login(username='coordenador', password='testpass123')
+        
+        # Criar evento antigo (fora do período de 7 dias)
+        evento_antigo = Solicitacao.objects.create(
+            usuario_solicitante=self.coordenador_user,
+            projeto=self.projeto1,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            titulo_evento='Evento Antigo',
+            data_inicio=timezone.now() - timedelta(days=10),
+            data_fim=timezone.now() - timedelta(days=10, hours=-2),
+            status='Aprovado'
+        )
+        
+        # Filtrar por período de 7 dias
+        response = self.client.get(reverse('core:coordenador_meus_eventos'), {
+            'periodo': '7'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        # Os 3 eventos criados no setUp estão dentro do período (futuro)
+        # O evento antigo NÃO deve aparecer
+        self.assertNotContains(response, 'Evento Antigo')
+        self.assertContains(response, 'Evento do Coordenador 1')
+    
+    def test_coordenador_eventos_combined_filters(self):
+        """Teste: Combinação de múltiplos filtros deve funcionar"""
+        self.client.login(username='coordenador', password='testpass123')
+        
+        # Combinar filtro por status e projeto
+        response = self.client.get(reverse('core:coordenador_meus_eventos'), {
+            'status': 'Pendente',
+            'projeto': self.projeto1.id
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Evento do Coordenador 1')  # Pendente + Projeto A
+        self.assertNotContains(response, 'Evento do Coordenador 2')  # Aprovado + Projeto B
+        self.assertNotContains(response, 'Evento do Coordenador 3')  # Reprovado + Projeto A
+    
+    def test_coordenador_eventos_menu_link_visible(self):
+        """Teste: Link 'Meus Eventos' deve estar visível no menu para coordenadores"""
+        self.client.login(username='coordenador', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Meus Eventos')
+        self.assertContains(response, reverse('core:coordenador_meus_eventos'))
+    
+    def test_coordenador_eventos_unauthenticated_redirect(self):
+        """Teste: Usuários não autenticados devem ser redirecionados para login"""
+        response = self.client.get(reverse('core:coordenador_meus_eventos'))
+        
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+
+
+class MenuVisibilityTest(TestCase):
+    """Testes para verificar visibilidade correta dos menus por perfil - COMMIT 5"""
+    
+    def setUp(self):
+        """Setup específico para testes de visibilidade de menus"""
+        self.client = Client()
+        
+        # Criar usuários para cada perfil
+        self.admin_user = User.objects.create_superuser(
+            username='admin',
+            email='admin@test.com',
+            password='testpass123'
+        )
+        
+        self.coordenador_user = User.objects.create_user(
+            username='coordenador',
+            email='coordenador@test.com',
+            password='testpass123',
+            papel='coordenador'
+        )
+        
+        self.formador_user = User.objects.create_user(
+            username='formador',
+            email='formador@test.com',
+            password='testpass123',
+            papel='formador'
+        )
+        
+        self.superintendencia_user = User.objects.create_user(
+            username='superintendencia',
+            email='superintendencia@test.com',
+            password='testpass123',
+            papel='superintendencia'
+        )
+        
+        self.controle_user = User.objects.create_user(
+            username='controle',
+            email='controle@test.com',
+            password='testpass123',
+            papel='controle'
+        )
+        
+        self.diretoria_user = User.objects.create_user(
+            username='diretoria',
+            email='diretoria@test.com',
+            password='testpass123',
+            papel='diretoria'
+        )
+    
+    def test_coordenador_menu_visibility(self):
+        """Teste: Coordenador deve ver apenas suas seções específicas"""
+        self.client.login(username='coordenador', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Deve ver seções do coordenador
+        self.assertContains(response, 'Coordenação')
+        self.assertContains(response, 'Solicitar Evento')
+        self.assertContains(response, 'Meus Eventos')
+        
+        # NÃO deve ver seções de outros perfis
+        self.assertNotContains(response, 'Superintendência')
+        self.assertNotContains(response, 'Controle')
+        self.assertNotContains(response, 'Diretoria')
+        self.assertNotContains(response, 'Cadastros')
+        self.assertNotContains(response, 'Sistema')
+        
+        # Deve ver mapa de disponibilidade (não restrito)
+        self.assertNotContains(response, 'Mapa de Disponibilidade')
+    
+    def test_formador_menu_visibility(self):
+        """Teste: Formador deve ver apenas suas seções específicas"""
+        self.client.login(username='formador', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Deve ver seções do formador
+        self.assertContains(response, 'Formador')
+        self.assertContains(response, 'Meus Eventos')
+        self.assertContains(response, 'Bloqueio de Agenda')
+        
+        # NÃO deve ver seções administrativas
+        self.assertNotContains(response, 'Coordenação')
+        self.assertNotContains(response, 'Superintendência')
+        self.assertNotContains(response, 'Controle')
+        self.assertNotContains(response, 'Diretoria')
+        self.assertNotContains(response, 'Cadastros')
+        self.assertNotContains(response, 'Sistema')
+    
+    def test_superintendencia_menu_visibility(self):
+        """Teste: Superintendência deve ver seções administrativas"""
+        self.client.login(username='superintendencia', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Deve ver seções da superintendência
+        self.assertContains(response, 'Superintendência')
+        self.assertContains(response, 'Aprovações Pendentes')
+        self.assertContains(response, 'Cadastros')
+        self.assertContains(response, 'Formadores')
+        self.assertContains(response, 'Municípios')
+        self.assertContains(response, 'Projetos')
+        
+        # Deve ver mapa de disponibilidade
+        self.assertContains(response, 'Mapa de Disponibilidade')
+        
+        # NÃO deve ver administração do sistema (apenas admin)
+        self.assertNotContains(response, 'Sistema')
+    
+    def test_controle_menu_visibility(self):
+        """Teste: Controle deve ver seções de monitoramento"""
+        self.client.login(username='controle', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Deve ver seções do controle
+        self.assertContains(response, 'Controle')
+        self.assertContains(response, 'Monitor Google Calendar')
+        self.assertContains(response, 'Logs de Auditoria')
+        self.assertContains(response, 'Status do Sistema')
+        self.assertContains(response, 'Auditoria do Sistema')
+        
+        # Deve ver mapa de disponibilidade
+        self.assertContains(response, 'Mapa de Disponibilidade')
+        self.assertContains(response, 'Dados JSON')  # Acesso especial ao JSON
+        
+        # NÃO deve ver seções administrativas
+        self.assertNotContains(response, 'Cadastros')
+        self.assertNotContains(response, 'Sistema')
+    
+    def test_diretoria_menu_visibility(self):
+        """Teste: Diretoria deve ver seções estratégicas"""
+        self.client.login(username='diretoria', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Deve ver seções da diretoria
+        self.assertContains(response, 'Diretoria')
+        self.assertContains(response, 'Dashboard Executivo')
+        self.assertContains(response, 'Relatórios Consolidados')
+        self.assertContains(response, 'Visão Mensal')
+        self.assertContains(response, 'Métricas API')
+        
+        # Deve ver mapa de disponibilidade
+        self.assertContains(response, 'Mapa de Disponibilidade')
+        
+        # NÃO deve ver seções operacionais
+        self.assertNotContains(response, 'Cadastros')
+        self.assertNotContains(response, 'Sistema')
+        self.assertNotContains(response, 'Coordenação')
+    
+    def test_admin_menu_visibility(self):
+        """Teste: Admin deve ver todas as seções"""
+        self.client.login(username='admin', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Deve ver todas as seções
+        self.assertContains(response, 'Coordenação')
+        self.assertContains(response, 'Formador')
+        self.assertContains(response, 'Superintendência')
+        self.assertContains(response, 'Controle')
+        self.assertContains(response, 'Diretoria')
+        self.assertContains(response, 'Cadastros')
+        self.assertContains(response, 'Sistema')
+        
+        # Deve ver todos os cards de ação
+        self.assertContains(response, 'Solicitar Evento')
+        self.assertContains(response, 'Bloqueio de Agenda')
+        self.assertContains(response, 'Central de Aprovações')
+        self.assertContains(response, 'Monitor Google Calendar')
+        self.assertContains(response, 'Dashboard Executivo')
+    
+    def test_restricted_cards_by_profile(self):
+        """Teste: Cards específicos devem aparecer apenas para perfis autorizados"""
+        # Cards que devem aparecer apenas para superintendência
+        self.client.login(username='coordenador', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        self.assertNotContains(response, 'Central de Aprovações')
+        
+        self.client.login(username='superintendencia', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        self.assertContains(response, 'Central de Aprovações')
+        
+        # Cards que devem aparecer apenas para controle
+        self.client.login(username='formador', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        self.assertNotContains(response, 'Monitor Google Calendar')
+        
+        self.client.login(username='controle', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        self.assertContains(response, 'Monitor Google Calendar')
+        
+        # Cards que devem aparecer apenas para diretoria
+        self.client.login(username='coordenador', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        self.assertNotContains(response, 'Dashboard Executivo')
+        
+        self.client.login(username='diretoria', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        self.assertContains(response, 'Dashboard Executivo')
+    
+    def test_formador_no_coordenador_features(self):
+        """Teste: Formadores NÃO devem ver funcionalidades de coordenador"""
+        self.client.login(username='formador', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # NÃO deve ver funcionalidades de coordenador
+        self.assertNotContains(response, 'Solicitar Evento')
+        self.assertNotContains(response, 'coordenador_meus_eventos')
+        
+        # NÃO deve ter acesso a aprovações
+        self.assertNotContains(response, 'Aprovações Pendentes')
+    
+    def test_coordenador_no_admin_features(self):
+        """Teste: Coordenadores NÃO devem ver funcionalidades administrativas"""
+        self.client.login(username='coordenador', password='testpass123')
+        response = self.client.get(reverse('core:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # NÃO deve ver cadastros
+        self.assertNotContains(response, 'Formadores')
+        self.assertNotContains(response, 'Municípios')
+        self.assertNotContains(response, 'Projetos')
+        
+        # NÃO deve ver administração do sistema
+        self.assertNotContains(response, 'Administração')
+        self.assertNotContains(response, '/admin/')
+    
+    def test_menu_consistency_between_base_and_home(self):
+        """Teste: Menus em base.html e home.html devem ser consistentes"""
+        # Testar algumas páginas que usam base.html
+        self.client.login(username='coordenador', password='testpass123')
+        
+        # Página home
+        home_response = self.client.get(reverse('core:home'))
+        self.assertEqual(home_response.status_code, 200)
+        
+        # Página de solicitação (que usa base.html)
+        solicitacao_response = self.client.get(reverse('core:solicitar_evento'))
+        self.assertEqual(solicitacao_response.status_code, 200)
+        
+        # Ambas devem conter links do coordenador
+        for response in [home_response, solicitacao_response]:
+            self.assertContains(response, 'Coordenação')
+            self.assertContains(response, 'Meus Eventos')
+            self.assertNotContains(response, 'Superintendência')

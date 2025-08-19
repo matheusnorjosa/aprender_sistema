@@ -1,7 +1,7 @@
 # aprender_sistema/core/models.py
 import uuid
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, Group
 from django.conf import settings
 
 # =========================
@@ -65,7 +65,7 @@ class Formador(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nome = models.CharField(max_length=255, verbose_name="Nome do Formador")
     email = models.EmailField(max_length=255, unique=True, verbose_name="E-mail")
-    area_atuacao = models.CharField(max_length=255, blank=True, null=True, verbose_name="Área de Atuação")
+    area_atuacao = models.ForeignKey(Group, on_delete=models.SET_NULL, blank=True, null=True, verbose_name="Área de Atuação")
     ativo = models.BooleanField(default=True, verbose_name="Ativo")
 
     class Meta:
@@ -143,6 +143,7 @@ class Solicitacao(models.Model):
         ]
         permissions = [
             ('sync_calendar', 'Can sync with Google Calendar'),
+            ('view_own_solicitacoes', 'Can view own solicitações (Coordenador)'),
         ]
 
     def __str__(self):

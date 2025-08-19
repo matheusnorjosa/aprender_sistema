@@ -24,12 +24,21 @@ class SolicitacaoForm(forms.ModelForm):
             "formadores",
         ]
         widgets = {
-            "projeto": forms.Select(attrs={"class": "form-select"}),
-            "municipio": forms.Select(attrs={"class": "form-select"}),
-            "tipo_evento": forms.Select(attrs={"class": "form-select"}),
+            "projeto": forms.Select(attrs={
+                "class": "form-select modern-select",
+                "style": "background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" fill=\"%23007bff\" viewBox=\"0 0 16 16\"><path d=\"M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z\"/></svg>'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 16px 12px; padding-right: 2.5rem;"
+            }),
+            "municipio": forms.Select(attrs={
+                "class": "form-select modern-select",
+                "style": "background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" fill=\"%23007bff\" viewBox=\"0 0 16 16\"><path d=\"M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z\"/></svg>'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 16px 12px; padding-right: 2.5rem;"
+            }),
+            "tipo_evento": forms.Select(attrs={
+                "class": "form-select modern-select",
+                "style": "background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" fill=\"%23007bff\" viewBox=\"0 0 16 16\"><path d=\"M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z\"/></svg>'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 16px 12px; padding-right: 2.5rem;"
+            }),
             "titulo_evento": forms.TextInput(attrs={
                 "class": "form-control",
-                "placeholder": "Digite o título do evento",
+                "placeholder": "Ex: 1º e 2º anos",
                 "maxlength": "255"
             }),
             "data_inicio": forms.DateTimeInput(attrs={
@@ -55,7 +64,7 @@ class SolicitacaoForm(forms.ModelForm):
             "projeto": "Projeto",
             "municipio": "Município",
             "tipo_evento": "Tipo de Evento",
-            "titulo_evento": "Título do Evento",
+            "titulo_evento": "Segmento",
             "data_inicio": "Data/Hora de Início",
             "data_fim": "Data/Hora de Fim",
             "numero_encontro_formativo": "Número do Encontro Formativo",
@@ -69,6 +78,11 @@ class SolicitacaoForm(forms.ModelForm):
             "coordenador_acompanha": "Marque se o coordenador participará do evento",
             "observacoes": "Informações adicionais relevantes para o evento",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Customizar a exibição dos formadores para mostrar apenas o nome
+        self.fields['formadores'].label_from_instance = lambda obj: obj.nome
 
     def clean(self):
         cleaned = super().clean()
@@ -177,17 +191,39 @@ class BloqueioAgendaForm(forms.Form):
         queryset=Formador.objects.filter(ativo=True).order_by("nome"),
         label="Formador",
         required=True,
-        widget=forms.Select(attrs={"class": "campo"})
+        widget=forms.Select(attrs={
+            "class": "form-select", 
+            "style": "font-size: 1rem; padding: 0.75rem;"
+        })
     )
-    inicio = forms.DateField(label="Início", widget=forms.DateInput(attrs={"type": "date"}))
-    fim = forms.DateField(label="Fim", widget=forms.DateInput(attrs={"type": "date"}))
-    TIPO_CHOICES = (("Total","Total"), ("Parcial","Parcial"))
-    tipo = forms.ChoiceField(choices=TIPO_CHOICES, label="Tipo")
+    inicio = forms.DateField(
+        label="Data de Início", 
+        widget=forms.DateInput(attrs={
+            "type": "date", 
+            "class": "form-control",
+            "style": "font-size: 1rem; padding: 0.75rem;"
+        })
+    )
+    fim = forms.DateField(
+        label="Data de Fim", 
+        widget=forms.DateInput(attrs={
+            "type": "date", 
+            "class": "form-control",
+            "style": "font-size: 1rem; padding: 0.75rem;"
+        })
+    )
+    TIPO_CHOICES = (
+        ("Total", "Total"),
+        ("Parcial", "Parcial")
+    )
+    tipo = forms.ChoiceField(
+        choices=TIPO_CHOICES, 
+        label="Tipo de Bloqueio",
+        widget=forms.RadioSelect(attrs={"class": "form-check-input"})
+    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Customizar a exibição do formador para mostrar apenas o nome
+        self.fields['formador'].label_from_instance = lambda obj: obj.nome
 
-    def clean(self):
-        cleaned = super().clean()
-        di = cleaned.get("inicio")
-        df = cleaned.get("fim")
-        if di and df and df < di:
-            raise ValidationError(_("A data final não pode ser menor que a inicial."))
-        return cleaned

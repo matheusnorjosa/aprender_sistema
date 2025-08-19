@@ -22,23 +22,156 @@ Registre uma nova solicitação de evento com verificação automática de confl
 
 {% block extra_css %}
 <style>
-  .form-section {
-    border-left: 4px solid var(--accent);
-    padding-left: 1.5rem;
-    margin-bottom: 2rem;
-    background: #f8f9fa;
-    padding: 1.5rem;
-    border-radius: 0.5rem;
+  :root {
+    --primary-color: #3498db;
+    --primary-hover: #2980b9;
+    --success-color: #27ae60;
+    --danger-color: #e74c3c;
+    --accent: var(--primary-color);
+    --border-radius: 0.75rem;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow: 0 4px 15px rgba(0,0,0,0.08);
+    --shadow-hover: 0 8px 25px rgba(0,0,0,0.15);
   }
+
+  .form-section {
+    border-left: 5px solid var(--accent);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+  }
+  
+  .form-section:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+  
   .form-section h5 {
     color: var(--accent);
-    margin-bottom: 1rem;
-    font-weight: 600;
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
   }
+  
   .required-field::after {
     content: " *";
-    color: var(--danger);
+    color: var(--danger-color);
     font-weight: bold;
+  }
+
+  /* Modernização das caixas de seleção */
+  .modern-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-color: #ffffff;
+    background-image: linear-gradient(45deg, transparent 50%, var(--primary-color) 50%), 
+                      linear-gradient(135deg, var(--primary-color) 50%, transparent 50%);
+    background-position: calc(100% - 20px) calc(1em + 2px), 
+                         calc(100% - 15px) calc(1em + 2px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    border: 2px solid #e9ecef;
+    border-radius: var(--border-radius);
+    padding: 1rem 2.5rem 1rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #2c3e50;
+    transition: var(--transition);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    cursor: pointer;
+    position: relative;
+  }
+
+  .modern-select:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+    transform: translateY(-1px);
+  }
+
+  .modern-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1);
+    outline: none;
+    transform: translateY(-1px);
+  }
+
+  .modern-select:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+  /* Estilo para option selecionada */
+  .modern-select option {
+    padding: 0.75rem;
+    background-color: #ffffff;
+    color: #2c3e50;
+    font-weight: 500;
+  }
+
+  .modern-select option:checked {
+    background-color: var(--primary-color);
+    color: white;
+  }
+
+  /* Efeito de loading/seleção */
+  .modern-select.loading {
+    background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23007bff" viewBox="0 0 16 16"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM7 4a1 1 0 1 0 2 0 1 1 0 0 0-2 0zm2 6a1 1 0 1 0-2 0v2a1 1 0 1 0 2 0V10z"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 16px;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* Container dos selects com ícones */
+  .select-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .select-container::before {
+    content: '';
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.25rem;
+    height: 1.25rem;
+    background-size: contain;
+    background-repeat: no-repeat;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* Ícones específicos para cada tipo de select */
+  .select-container.projeto::before {
+    background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%233498db" viewBox="0 0 16 16"><path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z"/></svg>');
+  }
+
+  .select-container.municipio::before {
+    background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%233498db" viewBox="0 0 16 16"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>');
+  }
+
+  .select-container.tipo-evento::before {
+    background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%233498db" viewBox="0 0 16 16"><path d="M4 .5a.5.5 0 0 0-1 0V1H2a2 2 0 0 0-2 2v1h16V3a2 2 0 0 0-2-2h-1V.5a.5.5 0 0 0-1 0V1H4V.5zM16 14V5H0v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2zm-3.5-7h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5z"/></svg>');
+  }
+
+  .select-container.projeto .modern-select,
+  .select-container.municipio .modern-select,
+  .select-container.tipo-evento .modern-select {
+    padding-left: 3rem;
   }
   .formador-grid {
     display: grid;
@@ -107,7 +240,9 @@ Registre uma nova solicitação de evento com verificação automática de confl
             <label for="{{ form.projeto.id_for_label }}" class="form-label required-field">
               {{ form.projeto.label }}
             </label>
-            {{ form.projeto }}
+            <div class="select-container projeto">
+              {{ form.projeto }}
+            </div>
             {% if form.projeto.help_text %}
               <div class="form-text">{{ form.projeto.help_text }}</div>
             {% endif %}
@@ -121,7 +256,9 @@ Registre uma nova solicitação de evento com verificação automática de confl
             <label for="{{ form.municipio.id_for_label }}" class="form-label required-field">
               {{ form.municipio.label }}
             </label>
-            {{ form.municipio }}
+            <div class="select-container municipio">
+              {{ form.municipio }}
+            </div>
             {% if form.municipio.help_text %}
               <div class="form-text">{{ form.municipio.help_text }}</div>
             {% endif %}
@@ -137,7 +274,9 @@ Registre uma nova solicitação de evento com verificação automática de confl
             <label for="{{ form.tipo_evento.id_for_label }}" class="form-label required-field">
               {{ form.tipo_evento.label }}
             </label>
-            {{ form.tipo_evento }}
+            <div class="select-container tipo-evento">
+              {{ form.tipo_evento }}
+            </div>
             {% if form.tipo_evento.help_text %}
               <div class="form-text">{{ form.tipo_evento.help_text }}</div>
             {% endif %}

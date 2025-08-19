@@ -5,7 +5,12 @@
       "Bash(docker-compose exec web python manage.py test:*)",
       "Bash(git checkout:*)",
       "Bash(mkdir:*)",
-      "Bash(docker-compose exec:*)"
+      "Bash(docker-compose exec:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker logs:*)",
+      "Bash(curl:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker-compose restart:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

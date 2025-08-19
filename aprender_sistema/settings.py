@@ -150,6 +150,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'core.Usuario' # Informa ao Django para usar o nosso modelo de usuário
 
+# URLs de autenticação customizadas
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/login/'
+
 # Emails de desenvolvimento (escreve no console)
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "nao-responda@aprender.local"

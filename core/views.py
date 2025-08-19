@@ -13,7 +13,7 @@ from django.conf import settings
 
 from core.forms import SolicitacaoForm, AprovacaoDecisionForm, BloqueioAgendaForm
 from core.models import (
-    Solicitacao, SolicitacaoStatus, Aprovacao, AprovacaoStatus, LogAuditoria,
+    Solicitacao, SolicitacaoStatus, Aprovacao, AprovacaoStatus, LogAuditoria, Formador,
 )
 
 
@@ -237,6 +237,108 @@ class BloqueioCreateView(LoginRequiredMixin, FormView):
 
         messages.success(self.request, "Bloqueio registrado e e‑mail enviado (console em dev).")
         return super().form_valid(form)
+
+
+# ----- Página do Formador -----
+class IsFormadorMixin(UserPassesTestMixin):
+    def test_func(self):
+        u = self.request.user
+        return u.is_authenticated and getattr(u, "papel", "") == "formador"
+
+
+class FormadorEventosView(LoginRequiredMixin, IsFormadorMixin, TemplateView):
+    template_name = "core/formador_eventos.html"
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        
+        # Encontrar o formador associado ao usuário logado
+        # Apenas o email do usuário logado é usado - sem bypass para outros formadores
+        try:
+            formador = Formador.objects.get(email=user.email, ativo=True)
+        except Formador.DoesNotExist:
+            formador = None
+        
+        if formador:
+            # Buscar solicitações onde o formador está participando
+            agora = timezone.now()
+            
+            # Eventos futuros (aprovados)
+            eventos_futuros = (
+                Solicitacao.objects
+                .filter(
+                    formadores=formador,
+                    status=SolicitacaoStatus.APROVADO,
+                    data_inicio__gt=agora
+                )
+                .select_related("projeto", "municipio", "tipo_evento", "usuario_solicitante")
+                .order_by("data_inicio")
+            )
+            
+            # Eventos em andamento (aprovados e dentro do período)
+            eventos_andamento = (
+                Solicitacao.objects
+                .filter(
+                    formadores=formador,
+                    status=SolicitacaoStatus.APROVADO,
+                    data_inicio__lte=agora,
+                    data_fim__gte=agora
+                )
+                .select_related("projeto", "municipio", "tipo_evento", "usuario_solicitante")
+                .order_by("data_inicio")
+            )
+            
+            # Eventos passados (últimos 30 dias)
+            ultimos_30_dias = agora - timedelta(days=30)
+            eventos_passados = (
+                Solicitacao.objects
+                .filter(
+                    formadores=formador,
+                    status=SolicitacaoStatus.APROVADO,
+                    data_fim__lt=agora,
+                    data_fim__gte=ultimos_30_dias
+                )
+                .select_related("projeto", "municipio", "tipo_evento", "usuario_solicitante")
+                .order_by("-data_inicio")
+            )
+            
+            # Eventos pendentes (ainda não aprovados/reprovados)
+            eventos_pendentes = (
+                Solicitacao.objects
+                .filter(
+                    formadores=formador,
+                    status=SolicitacaoStatus.PENDENTE
+                )
+                .select_related("projeto", "municipio", "tipo_evento", "usuario_solicitante")
+                .order_by("data_inicio")
+            )
+            
+            # Criar uma lista única com todos os eventos para a tabela
+            todos_eventos = list(eventos_andamento) + list(eventos_futuros) + list(eventos_pendentes) + list(eventos_passados)
+            
+            context.update({
+                'formador': formador,
+                'eventos_futuros': eventos_futuros,
+                'eventos_andamento': eventos_andamento,
+                'eventos_passados': eventos_passados,
+                'eventos_pendentes': eventos_pendentes,
+                'todos_eventos': todos_eventos,
+                'total_eventos': len(todos_eventos),
+            })
+        else:
+            context.update({
+                'formador': None,
+                'eventos_futuros': [],
+                'eventos_andamento': [],
+                'eventos_passados': [],
+                'eventos_pendentes': [],
+                'todos_eventos': [],
+                'total_eventos': 0,
+                'erro': 'Formador não encontrado. Verifique se seu email está registrado no sistema.',
+            })
+            
+        return context
 
 
 # ----- Autenticação customizada -----

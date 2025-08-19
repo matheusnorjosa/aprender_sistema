@@ -164,10 +164,22 @@
         </div>
         {% endif %}
 
-        {% if user.papel == 'formador' or user.papel == 'coordenador' or user.is_superuser %}
+        {% if user.papel == 'formador' %}
         <div class="nav-section">
           <div class="nav-section-title">Formador</div>
+          <a href="{% url 'core:formador_eventos' %}" class="nav-item {% block nav_formador %}{% endblock %}">
+            <i class="bi bi-person-workspace"></i> Meus Eventos
+          </a>
           <a href="/bloqueios/novo/" class="nav-item {% block nav_bloqueio %}{% endblock %}">
+            <i class="bi bi-calendar-x"></i> Bloqueio de Agenda
+          </a>
+        </div>
+        {% endif %}
+        
+        {% if user.papel == 'coordenador' or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Administração</div>
+          <a href="/bloqueios/novo/" class="nav-item {% block nav_bloqueio_admin %}{% endblock %}">
             <i class="bi bi-calendar-x"></i> Bloqueio de Agenda
           </a>
         </div>

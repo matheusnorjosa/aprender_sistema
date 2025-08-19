@@ -594,9 +594,9 @@ class DiretoriaExecutiveDashboardView(LoginRequiredMixin, IsDiretoriaMixin, Temp
         # === MÉTRICAS ESTRATÉGICAS ===
         
         # 1. Visão geral de solicitações no ano
-        total_solicitacoes_ano = Solicitacao.objects.filter(data_criacao__gte=data_inicio_ano).count()
+        total_solicitacoes_ano = Solicitacao.objects.filter(data_solicitacao__gte=data_inicio_ano).count()
         solicitacoes_aprovadas_ano = Solicitacao.objects.filter(
-            data_criacao__gte=data_inicio_ano,
+            data_solicitacao__gte=data_inicio_ano,
             status=SolicitacaoStatus.APROVADO
         ).count()
         taxa_aprovacao_ano = round(
@@ -741,7 +741,7 @@ class DiretoriaRelatoriosView(LoginRequiredMixin, IsDiretoriaMixin, TemplateView
         
         # Query base
         qs = Solicitacao.objects.filter(
-            data_criacao__gte=data_limite,
+            data_solicitacao__gte=data_limite,
             status=SolicitacaoStatus.APROVADO
         )
         
@@ -811,23 +811,23 @@ class DiretoriaAPIMetricsView(LoginRequiredMixin, IsDiretoriaMixin, View):
         
         # Métricas anuais
         eventos_aprovados_ano = Solicitacao.objects.filter(
-            data_criacao__gte=data_inicio_ano,
+            data_solicitacao__gte=data_inicio_ano,
             status=SolicitacaoStatus.APROVADO
         ).count()
         
         total_solicitacoes_ano = Solicitacao.objects.filter(
-            data_criacao__gte=data_inicio_ano
+            data_solicitacao__gte=data_inicio_ano
         ).count()
         
         # Formadores ativos no ano
         formadores_utilizados = Solicitacao.objects.filter(
-            data_criacao__gte=data_inicio_ano,
+            data_solicitacao__gte=data_inicio_ano,
             status=SolicitacaoStatus.APROVADO
         ).values('formadores').distinct().count()
         
         # Municípios atendidos no ano
         municipios_atendidos = Solicitacao.objects.filter(
-            data_criacao__gte=data_inicio_ano,
+            data_solicitacao__gte=data_inicio_ano,
             status=SolicitacaoStatus.APROVADO
         ).values('municipio').distinct().count()
         

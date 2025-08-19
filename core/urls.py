@@ -6,6 +6,7 @@ from .views import (
     AprovacoesPendentesView, AprovacaoDetailView,
     BloqueioCreateView, CustomLoginView, FormadorEventosView,
     GoogleCalendarMonitorView, AuditoriaLogView, ControleAPIStatusView,
+    DiretoriaExecutiveDashboardView, DiretoriaRelatoriosView, DiretoriaAPIMetricsView,
     home  # Mantendo a função home também (opcional)
 )
 from .views_calendar import MapaMensalView, MapaMensalPageView
@@ -46,4 +47,9 @@ urlpatterns = [
     path("controle/google-calendar/", GoogleCalendarMonitorView.as_view(), name="controle_google_calendar"),
     path("controle/auditoria/", AuditoriaLogView.as_view(), name="controle_auditoria"),
     path("controle/api/status/", ControleAPIStatusView.as_view(), name="controle_api_status"),
+    
+    # Perfil Diretoria - Visão Estratégica e Relatórios Executivos
+    path("diretoria/dashboard/", DiretoriaExecutiveDashboardView.as_view(), name="diretoria_dashboard"),
+    path("diretoria/relatorios/", DiretoriaRelatoriosView.as_view(), name="diretoria_relatorios"),
+    path("diretoria/api/metrics/", DiretoriaAPIMetricsView.as_view(), name="diretoria_api_metrics"),
 ]

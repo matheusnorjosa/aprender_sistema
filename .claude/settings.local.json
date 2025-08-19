@@ -10,7 +10,9 @@
       "Bash(docker logs:*)",
       "Bash(curl:*)",
       "Bash(docker exec:*)",
-      "Bash(docker-compose restart:*)"
+      "Bash(docker-compose restart:*)",
+      "Bash(source:*)",
+      "Bash(python:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

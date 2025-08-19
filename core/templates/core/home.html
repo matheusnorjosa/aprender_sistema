@@ -405,6 +405,24 @@
         </div>
         {% endif %}
 
+        {% if user.papel == 'diretoria' or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Diretoria</div>
+          <a href="{% url 'core:diretoria_dashboard' %}" class="nav-item">
+            <i class="bi bi-graph-up"></i> Dashboard Executivo
+          </a>
+          <a href="{% url 'core:diretoria_relatorios' %}" class="nav-item">
+            <i class="bi bi-file-earmark-bar-graph"></i> Relatórios Consolidados
+          </a>
+          <a href="/disponibilidade/" class="nav-item">
+            <i class="bi bi-calendar-month"></i> Visão Mensal
+          </a>
+          <a href="{% url 'core:diretoria_api_metrics' %}" class="nav-item">
+            <i class="bi bi-file-earmark-code"></i> Métricas API
+          </a>
+        </div>
+        {% endif %}
+
         <!-- Cadastros -->
         <div class="nav-section">
           <div class="nav-section-title">Cadastros</div>
@@ -544,6 +562,35 @@
             <div class="actions">
               <a class="btn btn-primary" href="{% url 'core:controle_auditoria' %}">
                 <i class="bi bi-shield-lock"></i> Ver Logs
+              </a>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Perfil Diretoria - Visão Estratégica -->
+          {% if user.papel == 'diretoria' or user.is_superuser %}
+          <div class="card">
+            <h3><i class="bi bi-graph-up-arrow" style="color:#17a2b8;"></i> Dashboard Executivo</h3>
+            <p>Acesse métricas estratégicas, indicadores de performance e análises executivas com visão consolidada de todos os projetos e formadores.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="{% url 'core:diretoria_dashboard' %}">
+                <i class="bi bi-speedometer"></i> Ver Dashboard
+              </a>
+              <a class="btn" href="{% url 'core:diretoria_api_metrics' %}">
+                <i class="bi bi-file-earmark-code"></i> API Métricas
+              </a>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3><i class="bi bi-file-earmark-bar-graph-fill" style="color:#28a745;"></i> Relatórios Consolidados</h3>
+            <p>Gere relatórios detalhados por período, projeto ou município com análises de performance dos formadores e distribuição geográfica.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="{% url 'core:diretoria_relatorios' %}">
+                <i class="bi bi-table"></i> Ver Relatórios
+              </a>
+              <a class="btn" href="/disponibilidade/">
+                <i class="bi bi-calendar-month"></i> Visão Mensal
               </a>
             </div>
           </div>

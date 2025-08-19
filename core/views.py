@@ -17,7 +17,7 @@ from django.views import View
 from core.forms import SolicitacaoForm, AprovacaoDecisionForm, BloqueioAgendaForm
 from core.models import (
     Solicitacao, SolicitacaoStatus, Aprovacao, AprovacaoStatus, LogAuditoria, Formador,
-    EventoGoogleCalendar
+    EventoGoogleCalendar, Municipio, Projeto, TipoEvento
 )
 
 
@@ -79,6 +79,13 @@ class IsControleMixin(UserPassesTestMixin):
     def test_func(self):
         u = self.request.user
         return u.is_authenticated and (getattr(u, "papel", "") == "controle" or u.is_superuser)
+
+
+class IsDiretoriaMixin(UserPassesTestMixin):
+    """Permite acesso ao perfil Diretoria - visão estratégica e relatórios executivos"""
+    def test_func(self):
+        u = self.request.user
+        return u.is_authenticated and (getattr(u, "papel", "") == "diretoria" or u.is_superuser)
 
 
 # ----- RF02 -----
@@ -564,6 +571,309 @@ class ControleAPIStatusView(LoginRequiredMixin, IsControleMixin, View):
                     "logs_7d": logs_7d
                 },
                 "formadores_ativos": formadores_ativos
+            }
+        }
+        
+        return JsonResponse(payload)
+
+
+# ----- Perfil Diretoria: Visão Estratégica e Relatórios Executivos -----
+class DiretoriaExecutiveDashboardView(LoginRequiredMixin, IsDiretoriaMixin, TemplateView):
+    """Dashboard executivo para perfil Diretoria com métricas estratégicas"""
+    template_name = "core/diretoria/executive_dashboard.html"
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Período de análise (últimos 12 meses)
+        agora = timezone.now()
+        data_inicio_ano = agora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        data_limite_trimestre = agora - timedelta(days=90)
+        data_limite_mes = agora - timedelta(days=30)
+        
+        # === MÉTRICAS ESTRATÉGICAS ===
+        
+        # 1. Visão geral de solicitações no ano
+        total_solicitacoes_ano = Solicitacao.objects.filter(data_criacao__gte=data_inicio_ano).count()
+        solicitacoes_aprovadas_ano = Solicitacao.objects.filter(
+            data_criacao__gte=data_inicio_ano,
+            status=SolicitacaoStatus.APROVADO
+        ).count()
+        taxa_aprovacao_ano = round(
+            (solicitacoes_aprovadas_ano / total_solicitacoes_ano * 100) 
+            if total_solicitacoes_ano > 0 else 0, 1
+        )
+        
+        # 2. Eventos por mês (últimos 12 meses)
+        eventos_por_mes = []
+        for i in range(12):
+            data_ref = agora - timedelta(days=30*i)
+            inicio_mes = data_ref.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            if i == 11:
+                fim_mes = data_inicio_ano
+            else:
+                proximo_mes = data_ref.replace(day=1) + timedelta(days=32)
+                fim_mes = proximo_mes.replace(day=1)
+            
+            eventos_mes = Solicitacao.objects.filter(
+                data_inicio__gte=inicio_mes,
+                data_inicio__lt=fim_mes,
+                status=SolicitacaoStatus.APROVADO
+            ).count()
+            
+            eventos_por_mes.append({
+                'mes': inicio_mes.strftime('%b/%Y'),
+                'eventos': eventos_mes
+            })
+        eventos_por_mes.reverse()  # Ordem cronológica
+        
+        # 3. Performance dos formadores (top 10)
+        formadores_performance = []
+        for formador in Formador.objects.filter(ativo=True):
+            eventos_participou = Solicitacao.objects.filter(
+                formadores=formador,
+                status=SolicitacaoStatus.APROVADO,
+                data_inicio__gte=data_limite_trimestre
+            ).count()
+            
+            if eventos_participou > 0:
+                formadores_performance.append({
+                    'nome': formador.nome,
+                    'eventos': eventos_participou,
+                    'area': formador.area_atuacao
+                })
+        
+        formadores_performance.sort(key=lambda x: x['eventos'], reverse=True)
+        top_formadores = formadores_performance[:10]
+        
+        # 4. Distribuição geográfica (municípios atendidos)
+        municipios_atendidos = (
+            Solicitacao.objects
+            .filter(
+                status=SolicitacaoStatus.APROVADO,
+                data_inicio__gte=data_limite_trimestre
+            )
+            .values('municipio__nome', 'municipio__uf')
+            .annotate(eventos=models.Count('id'))
+            .order_by('-eventos')[:15]
+        )
+        
+        # 5. Tipos de evento mais solicitados
+        tipos_evento_stats = (
+            Solicitacao.objects
+            .filter(
+                status=SolicitacaoStatus.APROVADO,
+                data_inicio__gte=data_limite_trimestre
+            )
+            .values('tipo_evento__nome')
+            .annotate(quantidade=models.Count('id'))
+            .order_by('-quantidade')[:10]
+        )
+        
+        # 6. Projetos com maior atividade
+        projetos_stats = (
+            Solicitacao.objects
+            .filter(
+                status=SolicitacaoStatus.APROVADO,
+                data_inicio__gte=data_limite_trimestre
+            )
+            .values('projeto__nome')
+            .annotate(eventos=models.Count('id'))
+            .order_by('-eventos')[:10]
+        )
+        
+        # 7. Métricas de sincronização Google Calendar
+        total_sync = EventoGoogleCalendar.objects.count()
+        sync_ok = EventoGoogleCalendar.objects.filter(status_sincronizacao="OK").count()
+        taxa_sync_sucesso = round((sync_ok / total_sync * 100) if total_sync > 0 else 0, 1)
+        
+        # 8. Atividade recente do sistema (logs)
+        atividade_recente = LogAuditoria.objects.filter(
+            data_hora__gte=data_limite_mes
+        ).count()
+        
+        context.update({
+            # Métricas principais
+            'total_solicitacoes_ano': total_solicitacoes_ano,
+            'solicitacoes_aprovadas_ano': solicitacoes_aprovadas_ano,
+            'taxa_aprovacao_ano': taxa_aprovacao_ano,
+            'formadores_ativos': Formador.objects.filter(ativo=True).count(),
+            'municipios_total': Municipio.objects.filter(ativo=True).count(),
+            'projetos_ativos': Projeto.objects.filter(ativo=True).count(),
+            
+            # Dados para gráficos
+            'eventos_por_mes': eventos_por_mes,
+            'top_formadores': top_formadores,
+            'municipios_atendidos': municipios_atendidos,
+            'tipos_evento_stats': tipos_evento_stats,
+            'projetos_stats': projetos_stats,
+            
+            # Métricas de sistema
+            'taxa_sync_sucesso': taxa_sync_sucesso,
+            'atividade_recente': atividade_recente,
+            
+            # Períodos para display
+            'ano_atual': agora.year,
+            'trimestre_atual': f"Q{((agora.month-1)//3)+1}/{agora.year}",
+        })
+        
+        return context
+
+
+class DiretoriaRelatoriosView(LoginRequiredMixin, IsDiretoriaMixin, TemplateView):
+    """Relatórios consolidados para perfil Diretoria"""
+    template_name = "core/diretoria/relatorios.html"
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Filtros da request
+        periodo = self.request.GET.get('periodo', '30')  # dias
+        projeto_id = self.request.GET.get('projeto')
+        municipio_id = self.request.GET.get('municipio')
+        
+        try:
+            dias = int(periodo)
+        except (ValueError, TypeError):
+            dias = 30
+            
+        data_limite = timezone.now() - timedelta(days=dias)
+        
+        # Query base
+        qs = Solicitacao.objects.filter(
+            data_criacao__gte=data_limite,
+            status=SolicitacaoStatus.APROVADO
+        )
+        
+        # Aplicar filtros
+        if projeto_id:
+            qs = qs.filter(projeto_id=projeto_id)
+        if municipio_id:
+            qs = qs.filter(municipio_id=municipio_id)
+        
+        # Estatísticas do período
+        total_eventos = qs.count()
+        total_formadores_envolvidos = qs.values('formadores').distinct().count()
+        
+        # Relatório por formador
+        relatorio_formadores = []
+        formadores_com_eventos = qs.values('formadores__nome', 'formadores__area_atuacao').annotate(
+            eventos=models.Count('id')
+        ).order_by('-eventos')
+        
+        for item in formadores_com_eventos:
+            if item['formadores__nome']:  # Só se tem formador associado
+                relatorio_formadores.append({
+                    'nome': item['formadores__nome'],
+                    'area': item['formadores__area_atuacao'],
+                    'eventos': item['eventos']
+                })
+        
+        # Relatório por município
+        relatorio_municipios = list(
+            qs.values('municipio__nome', 'municipio__uf')
+            .annotate(eventos=models.Count('id'))
+            .order_by('-eventos')
+        )
+        
+        # Relatório por projeto  
+        relatorio_projetos = list(
+            qs.values('projeto__nome')
+            .annotate(eventos=models.Count('id'))
+            .order_by('-eventos')
+        )
+        
+        # Opções para filtros
+        projetos_opcoes = Projeto.objects.filter(ativo=True).order_by('nome')
+        municipios_opcoes = Municipio.objects.filter(ativo=True).order_by('nome')
+        
+        context.update({
+            'periodo_dias': dias,
+            'projeto_selecionado': projeto_id,
+            'municipio_selecionado': municipio_id,
+            'total_eventos': total_eventos,
+            'total_formadores_envolvidos': total_formadores_envolvidos,
+            'relatorio_formadores': relatorio_formadores,
+            'relatorio_municipios': relatorio_municipios,
+            'relatorio_projetos': relatorio_projetos,
+            'projetos_opcoes': projetos_opcoes,
+            'municipios_opcoes': municipios_opcoes,
+        })
+        
+        return context
+
+
+class DiretoriaAPIMetricsView(LoginRequiredMixin, IsDiretoriaMixin, View):
+    """API endpoint para métricas executivas da Diretoria"""
+    def get(self, request):
+        agora = timezone.now()
+        data_inicio_ano = agora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        # Métricas anuais
+        eventos_aprovados_ano = Solicitacao.objects.filter(
+            data_criacao__gte=data_inicio_ano,
+            status=SolicitacaoStatus.APROVADO
+        ).count()
+        
+        total_solicitacoes_ano = Solicitacao.objects.filter(
+            data_criacao__gte=data_inicio_ano
+        ).count()
+        
+        # Formadores ativos no ano
+        formadores_utilizados = Solicitacao.objects.filter(
+            data_criacao__gte=data_inicio_ano,
+            status=SolicitacaoStatus.APROVADO
+        ).values('formadores').distinct().count()
+        
+        # Municípios atendidos no ano
+        municipios_atendidos = Solicitacao.objects.filter(
+            data_criacao__gte=data_inicio_ano,
+            status=SolicitacaoStatus.APROVADO
+        ).values('municipio').distinct().count()
+        
+        # Crescimento mensal (últimos 6 meses)
+        crescimento_mensal = []
+        for i in range(6):
+            data_ref = agora - timedelta(days=30*i)
+            inicio_mes = data_ref.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            if i == 5:
+                fim_mes = data_inicio_ano
+            else:
+                proximo_mes = data_ref.replace(day=1) + timedelta(days=32)
+                fim_mes = proximo_mes.replace(day=1)
+            
+            eventos = Solicitacao.objects.filter(
+                data_inicio__gte=inicio_mes,
+                data_inicio__lt=fim_mes,
+                status=SolicitacaoStatus.APROVADO
+            ).count()
+            
+            crescimento_mensal.append({
+                'mes': inicio_mes.strftime('%Y-%m'),
+                'eventos': eventos
+            })
+        
+        crescimento_mensal.reverse()
+        
+        payload = {
+            "timestamp": agora.isoformat(),
+            "periodo": f"Ano {agora.year}",
+            "metricas_executivas": {
+                "eventos_realizados": eventos_aprovados_ano,
+                "total_solicitacoes": total_solicitacoes_ano,
+                "taxa_aprovacao": round(
+                    (eventos_aprovados_ano / total_solicitacoes_ano * 100) 
+                    if total_solicitacoes_ano > 0 else 0, 1
+                ),
+                "formadores_utilizados": formadores_utilizados,
+                "municipios_atendidos": municipios_atendidos,
+                "crescimento_mensal": crescimento_mensal
+            },
+            "recursos_sistema": {
+                "formadores_cadastrados": Formador.objects.filter(ativo=True).count(),
+                "municipios_cadastrados": Municipio.objects.filter(ativo=True).count(),
+                "projetos_ativos": Projeto.objects.filter(ativo=True).count(),
+                "tipos_evento": TipoEvento.objects.filter(ativo=True).count()
             }
         }
         

@@ -348,7 +348,7 @@
         </div>
 
         <!-- Operações por papel -->
-        {% if user.papel == 'coordenador' or user.is_superuser %}
+        {% if perms.core.add_solicitacao or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Coordenação</div>
           <a href="/solicitar/" class="nav-item">
@@ -360,7 +360,7 @@
         </div>
         {% endif %}
 
-        {% if user.papel == 'formador' or user.is_superuser %}
+        {% if perms.core.add_disponibilidadeformadores or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Formador</div>
           <a href="{% url 'core:formador_eventos' %}" class="nav-item">
@@ -373,7 +373,7 @@
         {% endif %}
         
 
-        {% if user.papel == 'superintendencia' or user.is_superuser %}
+        {% if perms.core.view_aprovacao or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Superintendência</div>
           <a href="/aprovacoes/pendentes/" class="nav-item">
@@ -385,7 +385,7 @@
         </div>
         {% endif %}
 
-        {% if user.papel == 'controle' or user.is_superuser %}
+        {% if perms.core.sync_calendar or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Controle</div>
           <a href="{% url 'core:controle_google_calendar' %}" class="nav-item">
@@ -400,7 +400,7 @@
         </div>
         {% endif %}
 
-        {% if user.papel == 'diretoria' or user.is_superuser %}
+        {% if perms.core.view_relatorios or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Diretoria</div>
           <a href="{% url 'core:diretoria_dashboard' %}" class="nav-item">
@@ -419,7 +419,7 @@
         {% endif %}
 
         <!-- Cadastros - apenas para administradores e superintendência -->
-        {% if user.papel == 'superintendencia' or user.is_superuser %}
+        {% if perms.core.view_aprovacao or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Cadastros</div>
           <a href="/admin/core/formador/" class="nav-item">
@@ -488,7 +488,7 @@
         
         <div class="cards-grid">
           <!-- PA-06: Solicitar Evento - apenas coordenadores e admins -->
-          {% if user.papel == 'coordenador' or user.is_superuser %}
+          {% if perms.core.add_solicitacao or user.is_superuser %}
           <div class="card">
             <h3><i class="bi bi-calendar-plus-fill" style="color:var(--accent);"></i> Solicitar Evento</h3>
             <p>Crie uma nova solicitação de evento educacional com verificação automática de conflitos de agenda e disponibilidade de formadores em tempo real.</p>
@@ -501,7 +501,7 @@
           {% endif %}
 
           <!-- COMMIT 4: Meus Eventos - apenas coordenadores -->
-          {% if user.papel == 'coordenador' or user.is_superuser %}
+          {% if perms.core.add_solicitacao or user.is_superuser %}
           <div class="card">
             <h3><i class="bi bi-calendar-check-fill" style="color:var(--success);"></i> Meus Eventos</h3>
             <p>Visualize e gerencie todos os eventos que você solicitou. Acompanhe status, aprovações e histórico completo das suas solicitações.</p>
@@ -514,7 +514,7 @@
           {% endif %}
 
           <!-- PA-06: Bloqueio de Agenda -->
-          {% if user.papel == 'formador' or user.papel == 'coordenador' or user.is_superuser %}
+          {% if perms.core.add_disponibilidadeformadores or user.is_superuser %}
           <div class="card">
             <h3><i class="bi bi-calendar-x-fill" style="color:var(--warning);"></i> Bloqueio de Agenda</h3>
             <p>Registre períodos de indisponibilidade na sua agenda. Configure bloqueios totais (dia inteiro) ou parciais (horários específicos) para evitar conflitos.</p>
@@ -527,7 +527,7 @@
           {% endif %}
 
           <!-- Mapa Mensal - visível para superintendência, diretoria, controle e admin -->
-          {% if user.papel == 'superintendencia' or user.papel == 'diretoria' or user.papel == 'controle' or user.is_superuser %}
+          {% if perms.core.view_aprovacao or perms.core.view_relatorios or perms.core.sync_calendar or user.is_superuser %}
           <div class="card">
             <h3><i class="bi bi-calendar-week-fill" style="color:var(--success);"></i> Mapa de Disponibilidade</h3>
             <p>Visualize graficamente a disponibilidade dos formadores, eventos programados e bloqueios de agenda em uma interface mensal intuitiva.</p>
@@ -535,7 +535,7 @@
               <a class="btn btn-primary" href="/disponibilidade/">
                 <i class="bi bi-calendar4-week"></i> Visualizar Mapa
               </a>
-              {% if user.papel == 'controle' or user.is_superuser %}
+              {% if perms.core.sync_calendar or user.is_superuser %}
               <a class="btn" href="/mapa-mensal/?ano=2025&mes=9">
                 <i class="bi bi-file-earmark-code"></i> Dados JSON
               </a>
@@ -545,7 +545,7 @@
           {% endif %}
 
           <!-- PA-06: Aprovações - apenas superintendência -->
-          {% if user.papel == 'superintendencia' or user.is_superuser %}
+          {% if perms.core.view_aprovacao or user.is_superuser %}
           <div class="card">
             <h3><i class="bi bi-clipboard-check-fill" style="color:#17a2b8;"></i> Central de Aprovações</h3>
             <p>Analise solicitações de eventos pendentes, verifique detalhes dos formadores e tome decisões de aprovação ou reprovação com justificativas detalhadas.</p>
@@ -558,7 +558,7 @@
           {% endif %}
 
           <!-- Perfil Controle - Monitoramento -->
-          {% if user.papel == 'controle' or user.is_superuser %}
+          {% if perms.core.sync_calendar or user.is_superuser %}
           <div class="card">
             <h3><i class="bi bi-cloud-check-fill" style="color:#28a745;"></i> Monitor Google Calendar</h3>
             <p>Monitore a sincronização de eventos com Google Calendar, visualize estatísticas de sucesso e identifique problemas de integração em tempo real.</p>
@@ -584,7 +584,7 @@
           {% endif %}
 
           <!-- Perfil Diretoria - Visão Estratégica -->
-          {% if user.papel == 'diretoria' or user.is_superuser %}
+          {% if perms.core.view_relatorios or user.is_superuser %}
           <div class="card">
             <h3><i class="bi bi-graph-up-arrow" style="color:#17a2b8;"></i> Dashboard Executivo</h3>
             <p>Acesse métricas estratégicas, indicadores de performance e análises executivas com visão consolidada de todos os projetos e formadores.</p>

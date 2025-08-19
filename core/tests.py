@@ -2911,3 +2911,199 @@ class ControleProfileTest(TestCase):
         response = self.client.get(self.api_status_url)
         self.assertEqual(response.status_code, 302)
         self.assertIn('/login/', response.url)
+
+
+class DiretoriaProfileTest(TestCase):
+    """Testes específicos para funcionalidades do perfil Diretoria"""
+    
+    def setUp(self):
+        """Configuração inicial para testes do perfil Diretoria"""
+        # Criar usuários
+        self.user_diretoria = User.objects.create_user(
+            username='diretoria_test',
+            email='diretoria@test.com',
+            password='testpass123',
+            papel='diretoria'
+        )
+        
+        self.user_formador = User.objects.create_user(
+            username='formador_test',
+            email='formador@test.com',
+            password='testpass123',
+            papel='formador'
+        )
+        
+        self.user_admin = User.objects.create_superuser(
+            username='admin_test',
+            email='admin@test.com',
+            password='testpass123'
+        )
+        
+        # Criar dados de teste
+        self.projeto = Projeto.objects.create(nome="Projeto Teste", ativo=True)
+        self.municipio = Municipio.objects.create(nome="Cidade Teste", uf="SP", ativo=True)
+        self.tipo_evento = TipoEvento.objects.create(nome="Evento Teste", ativo=True)
+        self.formador = Formador.objects.create(nome="Formador Teste", email="formador@test.com", ativo=True)
+        
+        # URLs do perfil Diretoria
+        self.dashboard_url = reverse('core:diretoria_dashboard')
+        self.relatorios_url = reverse('core:diretoria_relatorios')
+        self.api_metrics_url = reverse('core:diretoria_api_metrics')
+    
+    def test_diretoria_acesso_dashboard_executivo(self):
+        """Teste: Apenas perfil Diretoria e admin podem acessar dashboard executivo"""
+        # Diretoria deve conseguir acessar
+        self.client.login(username='diretoria_test', password='testpass123')
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Admin deve conseguir acessar
+        self.client.login(username='admin_test', password='testpass123')
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Formador NÃO deve conseguir acessar
+        self.client.login(username='formador_test', password='testpass123')
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.status_code, 403)
+    
+    def test_diretoria_acesso_relatorios(self):
+        """Teste: Apenas perfil Diretoria e admin podem acessar relatórios"""
+        # Diretoria deve conseguir acessar
+        self.client.login(username='diretoria_test', password='testpass123')
+        response = self.client.get(self.relatorios_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Admin deve conseguir acessar
+        self.client.login(username='admin_test', password='testpass123')
+        response = self.client.get(self.relatorios_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Formador NÃO deve conseguir acessar
+        self.client.login(username='formador_test', password='testpass123')
+        response = self.client.get(self.relatorios_url)
+        self.assertEqual(response.status_code, 403)
+    
+    def test_diretoria_api_metrics_endpoint(self):
+        """Teste: API de métricas deve retornar dados estruturados para perfil Diretoria"""
+        self.client.login(username='diretoria_test', password='testpass123')
+        response = self.client.get(self.api_metrics_url)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/json')
+        
+        # Verificar estrutura da resposta JSON
+        import json
+        data = json.loads(response.content)
+        
+        # Verificar campos obrigatórios
+        self.assertIn('timestamp', data)
+        self.assertIn('periodo', data)
+        self.assertIn('metricas_executivas', data)
+        self.assertIn('recursos_sistema', data)
+        
+        # Verificar métricas executivas
+        metricas = data['metricas_executivas']
+        self.assertIn('eventos_realizados', metricas)
+        self.assertIn('total_solicitacoes', metricas)
+        self.assertIn('taxa_aprovacao', metricas)
+        self.assertIn('formadores_utilizados', metricas)
+        self.assertIn('municipios_atendidos', metricas)
+        self.assertIn('crescimento_mensal', metricas)
+        
+        # Verificar recursos do sistema
+        recursos = data['recursos_sistema']
+        self.assertIn('formadores_cadastrados', recursos)
+        self.assertIn('municipios_cadastrados', recursos)
+        self.assertIn('projetos_ativos', recursos)
+        self.assertIn('tipos_evento', recursos)
+        
+        # Verificar tipos de dados
+        self.assertIsInstance(metricas['eventos_realizados'], int)
+        self.assertIsInstance(metricas['taxa_aprovacao'], (int, float))
+        self.assertIsInstance(metricas['crescimento_mensal'], list)
+        self.assertIsInstance(recursos['formadores_cadastrados'], int)
+    
+    def test_diretoria_dashboard_context_data(self):
+        """Teste: Dashboard deve fornecer dados contextuais corretos"""
+        # Criar uma solicitação aprovada para teste
+        solicitacao = Solicitacao.objects.create(
+            titulo_evento="Evento Teste Dashboard",
+            data_inicio=timezone.now(),
+            data_fim=timezone.now() + timedelta(hours=2),
+            usuario_solicitante=self.user_diretoria,
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            status=SolicitacaoStatus.APROVADO
+        )
+        solicitacao.formadores.add(self.formador)
+        
+        self.client.login(username='diretoria_test', password='testpass123')
+        response = self.client.get(self.dashboard_url)
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Verificar que context contém dados esperados
+        context = response.context
+        self.assertIn('total_solicitacoes_ano', context)
+        self.assertIn('solicitacoes_aprovadas_ano', context)
+        self.assertIn('taxa_aprovacao_ano', context)
+        self.assertIn('formadores_ativos', context)
+        self.assertIn('eventos_por_mes', context)
+        self.assertIn('top_formadores', context)
+        self.assertIn('municipios_atendidos', context)
+        
+        # Verificar que dados fazem sentido
+        self.assertIsInstance(context['total_solicitacoes_ano'], int)
+        self.assertIsInstance(context['eventos_por_mes'], list)
+        self.assertIsInstance(context['top_formadores'], list)
+    
+    def test_diretoria_relatorios_filtros(self):
+        """Teste: Relatórios devem suportar filtros por período e projeto"""
+        # Criar solicitação aprovada para teste
+        solicitacao = Solicitacao.objects.create(
+            titulo_evento="Evento Teste Filtros",
+            data_inicio=timezone.now(),
+            data_fim=timezone.now() + timedelta(hours=2),
+            usuario_solicitante=self.user_diretoria,
+            projeto=self.projeto,
+            municipio=self.municipio,
+            tipo_evento=self.tipo_evento,
+            status=SolicitacaoStatus.APROVADO
+        )
+        solicitacao.formadores.add(self.formador)
+        
+        self.client.login(username='diretoria_test', password='testpass123')
+        
+        # Teste filtro por período
+        response = self.client.get(self.relatorios_url + '?periodo=30')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['periodo_dias'], 30)
+        
+        # Teste filtro por projeto
+        response = self.client.get(self.relatorios_url + f'?projeto={self.projeto.id}')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['projeto_selecionado'], str(self.projeto.id))
+        
+        # Teste filtro por município
+        response = self.client.get(self.relatorios_url + f'?municipio={self.municipio.id}')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['municipio_selecionado'], str(self.municipio.id))
+    
+    def test_diretoria_usuario_nao_autenticado_negado(self):
+        """Teste: Usuários não autenticados devem ser redirecionados"""
+        # Dashboard
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+        
+        # Relatórios
+        response = self.client.get(self.relatorios_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+        
+        # API Métricas
+        response = self.client.get(self.api_metrics_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)

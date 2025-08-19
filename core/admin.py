@@ -1,10 +1,29 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
 from .models import (
-    Projeto, Municipio, TipoEvento,
+    Usuario, Projeto, Municipio, TipoEvento,
     Formador, Solicitacao, FormadoresSolicitacao,
     Aprovacao, EventoGoogleCalendar,
     DisponibilidadeFormadores, LogAuditoria, Deslocamento
 )
+
+# Customizar o admin do Usuario para incluir o campo 'papel'
+@admin.register(Usuario)
+class UsuarioAdmin(UserAdmin):
+    list_display = ('username', 'email', 'first_name', 'last_name', 'papel', 'is_staff', 'is_active', 'date_joined')
+    list_filter = ('papel', 'is_staff', 'is_superuser', 'is_active', 'date_joined')
+    search_fields = ('username', 'first_name', 'last_name', 'email')
+    ordering = ('username',)
+    
+    # Adicionar o campo 'papel' aos fieldsets
+    fieldsets = UserAdmin.fieldsets + (
+        ('Perfil do Sistema', {'fields': ('papel',)}),
+    )
+    
+    # Adicionar o campo 'papel' ao formulário de criação
+    add_fieldsets = UserAdmin.add_fieldsets + (
+        ('Perfil do Sistema', {'fields': ('papel',)}),
+    )
 
 @admin.register(Projeto)
 class ProjetoAdmin(admin.ModelAdmin):

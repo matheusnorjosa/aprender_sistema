@@ -354,10 +354,13 @@
           <a href="/solicitar/" class="nav-item">
             <i class="bi bi-plus-circle"></i> Solicitar Evento
           </a>
+          <a href="{% url 'core:coordenador_meus_eventos' %}" class="nav-item">
+            <i class="bi bi-calendar-check"></i> Meus Eventos
+          </a>
         </div>
         {% endif %}
 
-        {% if user.papel == 'formador' %}
+        {% if user.papel == 'formador' or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Formador</div>
           <a href="{% url 'core:formador_eventos' %}" class="nav-item">
@@ -369,14 +372,6 @@
         </div>
         {% endif %}
         
-        {% if user.papel == 'coordenador' or user.is_superuser %}
-        <div class="nav-section">
-          <div class="nav-section-title">Administração</div>
-          <a href="/bloqueios/novo/" class="nav-item">
-            <i class="bi bi-calendar-x"></i> Bloqueio de Agenda
-          </a>
-        </div>
-        {% endif %}
 
         {% if user.papel == 'superintendencia' or user.is_superuser %}
         <div class="nav-section">
@@ -423,7 +418,8 @@
         </div>
         {% endif %}
 
-        <!-- Cadastros -->
+        <!-- Cadastros - apenas para administradores e superintendência -->
+        {% if user.papel == 'superintendencia' or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Cadastros</div>
           <a href="/admin/core/formador/" class="nav-item">
@@ -439,14 +435,17 @@
             <i class="bi bi-tag"></i> Tipos de Evento
           </a>
         </div>
+        {% endif %}
 
-        <!-- Administração -->
+        <!-- Administração do Sistema - apenas para administradores -->
+        {% if user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Sistema</div>
           <a href="/admin/" class="nav-item">
             <i class="bi bi-gear"></i> Administração
           </a>
         </div>
+        {% endif %}
       </nav>
     </div>
 
@@ -501,6 +500,19 @@
           </div>
           {% endif %}
 
+          <!-- COMMIT 4: Meus Eventos - apenas coordenadores -->
+          {% if user.papel == 'coordenador' or user.is_superuser %}
+          <div class="card">
+            <h3><i class="bi bi-calendar-check-fill" style="color:var(--success);"></i> Meus Eventos</h3>
+            <p>Visualize e gerencie todos os eventos que você solicitou. Acompanhe status, aprovações e histórico completo das suas solicitações.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="{% url 'core:coordenador_meus_eventos' %}">
+                <i class="bi bi-list-check"></i> Ver Meus Eventos
+              </a>
+            </div>
+          </div>
+          {% endif %}
+
           <!-- PA-06: Bloqueio de Agenda -->
           {% if user.papel == 'formador' or user.papel == 'coordenador' or user.is_superuser %}
           <div class="card">
@@ -514,7 +526,8 @@
           </div>
           {% endif %}
 
-          <!-- Mapa Mensal -->
+          <!-- Mapa Mensal - visível para superintendência, diretoria, controle e admin -->
+          {% if user.papel == 'superintendencia' or user.papel == 'diretoria' or user.papel == 'controle' or user.is_superuser %}
           <div class="card">
             <h3><i class="bi bi-calendar-week-fill" style="color:var(--success);"></i> Mapa de Disponibilidade</h3>
             <p>Visualize graficamente a disponibilidade dos formadores, eventos programados e bloqueios de agenda em uma interface mensal intuitiva.</p>
@@ -522,11 +535,14 @@
               <a class="btn btn-primary" href="/disponibilidade/">
                 <i class="bi bi-calendar4-week"></i> Visualizar Mapa
               </a>
+              {% if user.papel == 'controle' or user.is_superuser %}
               <a class="btn" href="/mapa-mensal/?ano=2025&mes=9">
                 <i class="bi bi-file-earmark-code"></i> Dados JSON
               </a>
+              {% endif %}
             </div>
           </div>
+          {% endif %}
 
           <!-- PA-06: Aprovações - apenas superintendência -->
           {% if user.papel == 'superintendencia' or user.is_superuser %}

@@ -2574,3 +2574,166 @@ class FormadorEventosViewTest(TestCase):
         self.assertNotContains(response, 'Meus Eventos')
         # Mas deve ter seção de Coordenação
         self.assertContains(response, 'Solicitar Evento')
+
+
+class SecurityCriticalTest(TestCase):
+    """Testes críticos de segurança para as correções implementadas"""
+    
+    def setUp(self):
+        """Configuração inicial para os testes de segurança"""
+        # Criar usuários com diferentes papéis
+        self.user_formador = User.objects.create_user(
+            username='formador_test',
+            email='formador@test.com',
+            password='testpass123',
+            papel='formador'
+        )
+        
+        self.user_coordenador = User.objects.create_user(
+            username='coord_test',
+            email='coord@test.com',
+            password='testpass123',
+            papel='coordenador'
+        )
+        
+        self.user_superintendencia = User.objects.create_user(
+            username='super_test',
+            email='super@test.com',
+            password='testpass123',
+            papel='superintendencia'
+        )
+        
+        self.user_controle = User.objects.create_user(
+            username='controle_test',
+            email='controle@test.com',
+            password='testpass123',
+            papel='controle'
+        )
+        
+        self.user_diretoria = User.objects.create_user(
+            username='diretoria_test',
+            email='diretoria@test.com',
+            password='testpass123',
+            papel='diretoria'
+        )
+        
+        self.user_admin = User.objects.create_superuser(
+            username='admin_test',
+            email='admin@test.com',
+            password='testpass123'
+        )
+        
+        # URLs críticas
+        self.bloqueio_url = reverse('core:bloqueio_novo')
+        self.mapa_mensal_url = reverse('core:mapa_mensal') + '?ano=2025&mes=1'
+        self.mapa_page_url = reverse('core:mapa_mensal_page')
+    
+    def test_bloqueio_agenda_restrito_formador_admin(self):
+        """Teste crítico: Apenas formadores e admins podem criar bloqueios"""
+        # Formador deve conseguir acessar
+        self.client.login(username='formador_test', password='testpass123')
+        response = self.client.get(self.bloqueio_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Admin deve conseguir acessar
+        self.client.login(username='admin_test', password='testpass123')
+        response = self.client.get(self.bloqueio_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Coordenador NÃO deve conseguir acessar
+        self.client.login(username='coord_test', password='testpass123')
+        response = self.client.get(self.bloqueio_url)
+        self.assertEqual(response.status_code, 403)
+        
+        # Superintendência NÃO deve conseguir acessar
+        self.client.login(username='super_test', password='testpass123')
+        response = self.client.get(self.bloqueio_url)
+        self.assertEqual(response.status_code, 403)
+    
+    def test_mapa_mensal_restrito_hierarquia_superior(self):
+        """Teste crítico: Apenas superintendência, controle, diretoria e admin podem ver calendário"""
+        # Superintendência deve conseguir acessar
+        self.client.login(username='super_test', password='testpass123')
+        response = self.client.get(self.mapa_mensal_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Controle deve conseguir acessar
+        self.client.login(username='controle_test', password='testpass123')
+        response = self.client.get(self.mapa_mensal_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Diretoria deve conseguir acessar
+        self.client.login(username='diretoria_test', password='testpass123')
+        response = self.client.get(self.mapa_mensal_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Admin deve conseguir acessar
+        self.client.login(username='admin_test', password='testpass123')
+        response = self.client.get(self.mapa_mensal_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Formador NÃO deve conseguir acessar
+        self.client.login(username='formador_test', password='testpass123')
+        response = self.client.get(self.mapa_mensal_url)
+        self.assertEqual(response.status_code, 403)
+        
+        # Coordenador NÃO deve conseguir acessar
+        self.client.login(username='coord_test', password='testpass123')
+        response = self.client.get(self.mapa_mensal_url)
+        self.assertEqual(response.status_code, 403)
+    
+    def test_mapa_mensal_page_restrito(self):
+        """Teste crítico: Página HTML do mapa também deve ser restrita"""
+        # Superintendência deve conseguir acessar
+        self.client.login(username='super_test', password='testpass123')
+        response = self.client.get(self.mapa_page_url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Formador NÃO deve conseguir acessar
+        self.client.login(username='formador_test', password='testpass123')
+        response = self.client.get(self.mapa_page_url)
+        self.assertEqual(response.status_code, 403)
+        
+        # Coordenador NÃO deve conseguir acessar
+        self.client.login(username='coord_test', password='testpass123')
+        response = self.client.get(self.mapa_page_url)
+        self.assertEqual(response.status_code, 403)
+    
+    def test_usuario_nao_autenticado_negado(self):
+        """Teste crítico: Usuários não autenticados são redirecionados"""
+        # Bloqueio
+        response = self.client.get(self.bloqueio_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+        
+        # Mapa mensal
+        response = self.client.get(self.mapa_mensal_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+        
+        # Página do mapa
+        response = self.client.get(self.mapa_page_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+    
+    def test_validacao_de_dados_sensiveis_mapa(self):
+        """Teste crítico: Mapa mensal contém dados sensíveis que devem ser protegidos"""
+        # Login com perfil autorizado
+        self.client.login(username='super_test', password='testpass123')
+        response = self.client.get(self.mapa_mensal_url)
+        
+        # Verificar que a resposta contém dados estruturados
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/json')
+        
+        # Verificar estrutura da resposta JSON
+        import json
+        data = json.loads(response.content)
+        self.assertIn('ano', data)
+        self.assertIn('mes', data)
+        self.assertIn('linhas', data)
+        
+        # Dados sensíveis que precisam proteção
+        if data['linhas']:  # Se há formadores
+            self.assertIn('formador', data['linhas'][0])
+            self.assertIn('celulas', data['linhas'][0])

@@ -34,11 +34,43 @@ class HomeView(LoginRequiredMixin, TemplateView):
         return context
 
 
-# ----- RF02 -----
+# ----- Mixins de Segurança -----
 class IsCoordenadorMixin(UserPassesTestMixin):
     def test_func(self):
         u = self.request.user
         return u.is_authenticated and (getattr(u, "papel", "") == "coordenador" or u.is_superuser)
+
+
+class IsSuperintendenciaMixin(UserPassesTestMixin):
+    def test_func(self):
+        u = self.request.user
+        return u.is_authenticated and (getattr(u, "papel", "") == "superintendencia" or u.is_superuser)
+
+
+class IsFormadorMixin(UserPassesTestMixin):
+    def test_func(self):
+        u = self.request.user
+        return u.is_authenticated and getattr(u, "papel", "") == "formador"
+
+
+class IsFormadorOrAdminMixin(UserPassesTestMixin):
+    """Permite acesso a formadores e administradores apenas"""
+    def test_func(self):
+        u = self.request.user
+        return u.is_authenticated and (getattr(u, "papel", "") in ["formador", "admin"] or u.is_superuser)
+
+
+class CanViewCalendarMixin(UserPassesTestMixin):
+    """Permite visualizar calendário: superintendência, diretoria, controle e admin"""
+    def test_func(self):
+        u = self.request.user
+        return u.is_authenticated and (
+            getattr(u, "papel", "") in ["superintendencia", "diretoria", "controle", "admin"] 
+            or u.is_superuser
+        )
+
+
+# ----- RF02 -----
 
 
 class SolicitacaoCreateView(LoginRequiredMixin, IsCoordenadorMixin, CreateView):
@@ -58,10 +90,6 @@ class SolicitacaoOKView(LoginRequiredMixin, TemplateView):
 
 
 # ----- RF04 -----
-class IsSuperintendenciaMixin(UserPassesTestMixin):
-    def test_func(self):
-        u = self.request.user
-        return u.is_authenticated and (getattr(u, "papel", "") == "superintendencia" or u.is_superuser)
 
 
 class AprovacoesPendentesView(LoginRequiredMixin, IsSuperintendenciaMixin, ListView):
@@ -184,7 +212,7 @@ class AprovacaoDetailView(LoginRequiredMixin, IsSuperintendenciaMixin, FormView)
 
 
 # ----- Bloqueio de agenda (Apps Script -> Django) -----
-class BloqueioCreateView(LoginRequiredMixin, FormView):
+class BloqueioCreateView(LoginRequiredMixin, IsFormadorOrAdminMixin, FormView):
     template_name = "core/bloqueio_form.html"
     form_class = BloqueioAgendaForm
     success_url = reverse_lazy("bloqueio_ok")
@@ -239,11 +267,6 @@ class BloqueioCreateView(LoginRequiredMixin, FormView):
         return super().form_valid(form)
 
 
-# ----- Página do Formador -----
-class IsFormadorMixin(UserPassesTestMixin):
-    def test_func(self):
-        u = self.request.user
-        return u.is_authenticated and getattr(u, "papel", "") == "formador"
 
 
 class FormadorEventosView(LoginRequiredMixin, IsFormadorMixin, TemplateView):

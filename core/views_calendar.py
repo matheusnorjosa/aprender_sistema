@@ -2,11 +2,22 @@
 from datetime import date, timedelta
 from django.http import JsonResponse, Http404
 from django.views import View
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from core.models import Formador
 from core.services.calendar_codes import marcador_do_dia, gerar_mapa_mensal_otimizado
 from django.views.generic import TemplateView
 
-class MapaMensalView(View):
+
+class CanViewCalendarMixin(UserPassesTestMixin):
+    """Permite visualizar calendário: superintendência, diretoria, controle e admin"""
+    def test_func(self):
+        u = self.request.user
+        return u.is_authenticated and (
+            getattr(u, "papel", "") in ["superintendencia", "diretoria", "controle", "admin"] 
+            or u.is_superuser
+        )
+
+class MapaMensalView(LoginRequiredMixin, CanViewCalendarMixin, View):
     def get(self, request):
         try:
             ano = int(request.GET.get("ano"))
@@ -48,9 +59,11 @@ class MapaMensalView(View):
 # --- Página HTML que consome o endpoint JSON ---
 from django.views.generic import TemplateView
 
-class MapaMensalPageView(TemplateView):
+class MapaMensalPageView(LoginRequiredMixin, CanViewCalendarMixin, TemplateView):
     template_name = "core/mapa_mensal.html"
-class MapaMensalHTMLView(TemplateView):
+
+
+class MapaMensalHTMLView(LoginRequiredMixin, CanViewCalendarMixin, TemplateView):
     """
     Página estática que consome a API /mapa-mensal/?ano=YYYY&mes=M
     e renderiza o grid no navegador (HTML+JS).

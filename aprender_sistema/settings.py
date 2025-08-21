@@ -174,3 +174,27 @@ GOOGLE_CALENDAR_CALENDAR_ID = os.getenv("GOOGLE_CALENDAR_CALENDAR_ID", "primary"
 
 # Quando ligarmos "de verdade", usaremos:
 # GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_SERVICE_ACCOUNT_JSON, etc.
+
+# Cache configuration - Redis com fallback para LocMem
+REDIS_URL = os.getenv("REDIS_URL")
+
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
+            'TIMEOUT': 300,  # 5 minutos padrão
+        }
+    }
+else:
+    # Fallback para desenvolvimento sem Redis
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'dashboard-cache',
+            'TIMEOUT': 300,
+        }
+    }

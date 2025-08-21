@@ -40,54 +40,13 @@ class HomeView(LoginRequiredMixin, TemplateView):
         return context
 
 
-# ----- Mixins de Segurança -----
-class IsCoordenadorMixin(UserPassesTestMixin):
-    def test_func(self):
-        u = self.request.user
-        return u.is_authenticated and (getattr(u, "papel", "") == "coordenador" or u.is_superuser)
-
-
-class IsSuperintendenciaMixin(UserPassesTestMixin):
-    def test_func(self):
-        u = self.request.user
-        return u.is_authenticated and (getattr(u, "papel", "") == "superintendencia" or u.is_superuser)
-
-
-class IsFormadorMixin(UserPassesTestMixin):
-    def test_func(self):
-        u = self.request.user
-        return u.is_authenticated and getattr(u, "papel", "") == "formador"
-
-
-class IsFormadorOrAdminMixin(UserPassesTestMixin):
-    """Permite acesso a formadores e administradores apenas"""
-    def test_func(self):
-        u = self.request.user
-        return u.is_authenticated and (getattr(u, "papel", "") in ["formador", "admin"] or u.is_superuser)
-
-
-class CanViewCalendarMixin(UserPassesTestMixin):
-    """Permite visualizar calendário: superintendência, diretoria, controle e admin"""
-    def test_func(self):
-        u = self.request.user
-        return u.is_authenticated and (
-            getattr(u, "papel", "") in ["superintendencia", "diretoria", "controle", "admin"] 
-            or u.is_superuser
-        )
-
-
-class IsControleMixin(UserPassesTestMixin):
-    """Permite acesso ao perfil Controle - monitoramento e auditoria"""
-    def test_func(self):
-        u = self.request.user
-        return u.is_authenticated and (getattr(u, "papel", "") == "controle" or u.is_superuser)
-
-
-class IsDiretoriaMixin(UserPassesTestMixin):
-    """Permite acesso ao perfil Diretoria - visão estratégica e relatórios executivos"""
-    def test_func(self):
-        u = self.request.user
-        return u.is_authenticated and (getattr(u, "papel", "") == "diretoria" or u.is_superuser)
+# ----- Group-based mixins for role authorization -----
+from core.mixins import (
+    IsCoordenadorMixin, IsSuperintendenciaMixin, IsFormadorMixin,
+    IsFormadorOrAdminMixin, CanViewCalendarMixin, IsControleMixin, 
+    IsDiretoriaMixin, CanCreateSolicitacaoMixin, CanViewSolicitacaoMixin,
+    CanApproveSolicitacaoMixin, CanViewCalendarPermissionMixin
+)
 
 
 # ----- RF02 -----

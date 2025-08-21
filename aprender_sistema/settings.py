@@ -90,16 +90,13 @@ WSGI_APPLICATION = 'aprender_sistema.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Temporarily use SQLite for local development
 DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',  # OK
-            'NAME': os.getenv("DB_NAME", "aprender_sistema_db"),              # OK
-            'USER': os.getenv("DB_USER", "adm_aprender"),                     # OK
-            'PASSWORD': os.getenv("DB_PASSWORD", "aprender123456"),               # OK
-            'HOST': os.getenv("DB_HOST", "db"),                               # OK: 'db' é o nome do serviço do Docker
-            'PORT': os.getenv("DB_PORT", "5432"),                             # OK
-        }
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
+}
 
 
 # Password validation

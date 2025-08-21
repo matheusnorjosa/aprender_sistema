@@ -484,7 +484,7 @@
         <h1><i class="bi bi-speedometer2"></i> Dashboard</h1>
         <div class="breadcrumb">
           <i class="bi bi-person-circle"></i> Bem-vindo, <strong>{{ user.get_full_name|default:user.username }}</strong>
-          {% if user.papel %} • <span style="color: var(--accent); font-weight: 600;">{{ user.get_papel_display|default:user.papel|title }}</span>{% endif %}
+          {% if user.primary_role %} • <span style="color: var(--accent); font-weight: 600;">{{ user.primary_role|title }}</span>{% endif %}
           • <i class="bi bi-clock"></i> {% now "d/m/Y - H:i" %}
         </div>
       </div>

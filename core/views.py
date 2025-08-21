@@ -974,6 +974,122 @@ class DiretoriaRelatoriosView(LoginRequiredMixin, PermissionRequiredMixin, Templ
         return context
 
 
+class DashboardStatsAPIView(LoginRequiredMixin, View):
+    """API endpoint para estatísticas do dashboard principal"""
+    def get(self, request):
+        agora = timezone.now()
+        
+        # Filtros da request
+        periodo_dias = request.GET.get('periodo', '30')  # padrão: 30 dias
+        projeto_id = request.GET.get('projeto')
+        municipio_id = request.GET.get('municipio')
+        
+        try:
+            dias = int(periodo_dias)
+            if dias <= 0:
+                dias = 30
+        except (ValueError, TypeError):
+            dias = 30
+            
+        # Calcular período baseado no filtro
+        if dias == 30:
+            # Mês atual
+            data_limite = agora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            periodo_label = agora.strftime('%m/%Y')
+        else:
+            # Últimos N dias
+            data_limite = agora - timedelta(days=dias)
+            periodo_label = f"últimos {dias} dias"
+        
+        # Query base para eventos
+        eventos_query = Solicitacao.objects.filter(
+            data_inicio__gte=data_limite,
+            status=SolicitacaoStatus.APROVADO
+        )
+        
+        # Aplicar filtros opcionais
+        if projeto_id:
+            try:
+                eventos_query = eventos_query.filter(projeto_id=projeto_id)
+            except (ValueError, TypeError):
+                pass
+                
+        if municipio_id:
+            try:
+                eventos_query = eventos_query.filter(municipio_id=municipio_id)
+            except (ValueError, TypeError):
+                pass
+        
+        # 1. Eventos no período (com filtros aplicados)
+        eventos_periodo = eventos_query.count()
+        
+        # 2. Formadores ativos (sempre global)
+        formadores_ativos = Formador.objects.filter(ativo=True).count()
+        
+        # 3. Solicitações pendentes (sempre global)
+        solicitacoes_pendentes = Solicitacao.objects.filter(
+            status=SolicitacaoStatus.PENDENTE
+        ).count()
+        
+        # 4. Municípios atendidos no período (com filtros de projeto)
+        municipios_query = Solicitacao.objects.filter(
+            data_inicio__gte=data_limite,
+            status=SolicitacaoStatus.APROVADO
+        )
+        if projeto_id:
+            try:
+                municipios_query = municipios_query.filter(projeto_id=projeto_id)
+            except (ValueError, TypeError):
+                pass
+        
+        municipios_atendidos = municipios_query.values('municipio').distinct().count()
+        
+        # Metadados dos filtros aplicados
+        filtros_aplicados = []
+        if projeto_id:
+            try:
+                projeto = Projeto.objects.get(id=projeto_id)
+                filtros_aplicados.append(f"Projeto: {projeto.nome}")
+            except Projeto.DoesNotExist:
+                pass
+                
+        if municipio_id:
+            try:
+                municipio = Municipio.objects.get(id=municipio_id)
+                filtros_aplicados.append(f"Município: {municipio.nome}")
+            except Municipio.DoesNotExist:
+                pass
+        
+        payload = {
+            "timestamp": agora.isoformat(),
+            "periodo_referencia": {
+                "eventos_periodo": periodo_label,
+                "municipios_periodo": periodo_label,
+                "dias_filtro": dias
+            },
+            "filtros": {
+                "periodo_dias": dias,
+                "projeto_id": projeto_id,
+                "municipio_id": municipio_id,
+                "filtros_aplicados": filtros_aplicados
+            },
+            "estatisticas": {
+                "eventos_periodo": eventos_periodo,
+                "formadores_ativos": formadores_ativos,
+                "solicitacoes_pendentes": solicitacoes_pendentes,
+                "municipios_atendidos": municipios_atendidos
+            },
+            "meta": {
+                "fonte": "dados_reais_banco",
+                "cache_ttl": 300,  # 5 minutos
+                "usuario": request.user.username,
+                "com_filtros": bool(projeto_id or municipio_id or dias != 30)
+            }
+        }
+        
+        return JsonResponse(payload)
+
+
 class DiretoriaAPIMetricsView(LoginRequiredMixin, PermissionRequiredMixin, View):
     permission_required = 'core.view_relatorios'
     """API endpoint para métricas executivas da Diretoria"""

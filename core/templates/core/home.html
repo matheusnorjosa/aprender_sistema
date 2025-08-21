@@ -319,6 +319,35 @@
     }
     
     footer{margin-top:3rem; padding:1.5rem 0; border-top:1px solid var(--line); color:var(--muted); font-size:0.8rem; text-align:center}
+    
+    /* Animação para indicadores de dados reais */
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.2); opacity: 0.7; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    
+    /* Loading spinner para cards */
+    .stat-card.loading {
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .stat-card.loading::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      animation: loading-shimmer 1.5s infinite;
+    }
+    
+    @keyframes loading-shimmer {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -461,11 +490,51 @@
       </div>
       
       <div class="content-wrap">
+        <!-- Filtros Dashboard -->
+        <div style="background: var(--card); border-radius: 1rem; padding: 1.5rem; margin-bottom: 2rem; box-shadow: var(--shadow);">
+          <h3 style="margin: 0 0 1rem 0; font-size: 1.2rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+            <i class="bi bi-funnel"></i> Filtros do Dashboard
+          </h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: end;">
+            <div>
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text);">Período</label>
+              <select id="periodo-filter" style="width: 100%; padding: 0.75rem; border: 2px solid var(--line); border-radius: 0.5rem; background: var(--card);">
+                <option value="30">Este Mês</option>
+                <option value="7">Últimos 7 dias</option>
+                <option value="90">Últimos 3 meses</option>
+                <option value="365">Último ano</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text);">Projeto</label>
+              <select id="projeto-filter" style="width: 100%; padding: 0.75rem; border: 2px solid var(--line); border-radius: 0.5rem; background: var(--card);">
+                <option value="">Todos os projetos</option>
+                <!-- Será preenchido dinamicamente -->
+              </select>
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text);">Município</label>
+              <select id="municipio-filter" style="width: 100%; padding: 0.75rem; border: 2px solid var(--line); border-radius: 0.5rem; background: var(--card);">
+                <option value="">Todos os municípios</option>
+                <!-- Será preenchido dinamicamente -->
+              </select>
+            </div>
+            <div>
+              <button onclick="aplicarFiltros()" style="width: 100%; padding: 0.75rem 1.5rem; background: var(--accent); color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">
+                <i class="bi bi-arrow-clockwise"></i> Atualizar
+              </button>
+            </div>
+          </div>
+          <div id="filtros-ativos" style="margin-top: 1rem; min-height: 1.5rem;">
+            <!-- Badges dos filtros ativos serão mostrados aqui -->
+          </div>
+        </div>
+
         <!-- Stats cards -->
         <div class="stats-grid">
           <div class="stat-card">
             <h4><i class="bi bi-calendar-event"></i> <span id="eventos-count">-</span></h4>
-            <p>Eventos Este Mês</p>
+            <p id="eventos-label">Eventos Este Mês</p>
           </div>
           <div class="stat-card" style="background: linear-gradient(135deg, var(--success) 0%, #1e7e34 100%);">
             <h4><i class="bi bi-people-fill"></i> <span id="formadores-count">-</span></h4>
@@ -477,7 +546,7 @@
           </div>
           <div class="stat-card" style="background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);">
             <h4><i class="bi bi-geo-alt-fill"></i> <span id="municipios-count">-</span></h4>
-            <p>Municípios Atendidos</p>
+            <p id="municipios-label">Municípios Atendidos</p>
           </div>
         </div>
 
@@ -677,52 +746,157 @@
       requestAnimationFrame(updateCounter);
     }
 
-    // Carregar estatísticas dinâmicas
-    async function loadDashboardStats() {
+    // Carregar estatísticas dinâmicas da API real
+    async function loadDashboardStats(periodo = null, projeto = null, municipio = null) {
+      // Adicionar loading state aos cards
+      const statCards = document.querySelectorAll('.stat-card');
+      statCards.forEach(card => card.classList.add('loading'));
+      
       try {
-        // Simular carregamento de dados (em produção, seria uma API call)
-        // Aqui você pode fazer fetch para endpoints que retornem as estatísticas reais
+        // Construir URL com parâmetros de filtro
+        let url = '{% url "core:dashboard_stats_api" %}';
+        const params = new URLSearchParams();
         
-        // Por enquanto, vamos simular com dados fictícios
-        const stats = {
-          eventos: Math.floor(Math.random() * 25) + 5,
-          formadores: Math.floor(Math.random() * 50) + 15,
-          pendentes: Math.floor(Math.random() * 8) + 1,
-          municipios: Math.floor(Math.random() * 30) + 10
-        };
+        if (periodo) params.append('periodo', periodo);
+        if (projeto) params.append('projeto', projeto);
+        if (municipio) params.append('municipio', municipio);
         
-        // Animar os contadores
+        if (params.toString()) {
+          url += '?' + params.toString();
+        }
+        
+        // Fazer requisição para a API real
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}',
+          },
+          credentials: 'same-origin'
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        const stats = data.estatisticas;
+        
+        // Logging para debug (remover em produção)
+        console.log('📊 Dashboard stats carregadas:', {
+          fonte: data.meta.fonte,
+          usuario: data.meta.usuario,
+          periodo: data.periodo_referencia,
+          filtros: data.filtros,
+          stats: stats
+        });
+        
+        // Atualizar labels dos cards baseado no período
+        const eventoLabel = document.getElementById('eventos-label');
+        const municipioLabel = document.getElementById('municipios-label');
+        
+        if (eventoLabel) {
+          eventoLabel.textContent = `Eventos ${data.periodo_referencia.eventos_periodo}`;
+        }
+        if (municipioLabel) {
+          municipioLabel.textContent = `Municípios Atendidos ${data.periodo_referencia.municipios_periodo}`;
+        }
+        
+        // Mostrar filtros ativos
+        mostrarFiltrosAtivos(data.filtros.filtros_aplicados);
+        
+        // Animar os contadores com dados reais
         setTimeout(() => {
-          animateCounter(document.getElementById('eventos-count'), stats.eventos);
+          animateCounter(document.getElementById('eventos-count'), stats.eventos_periodo);
         }, 200);
         
         setTimeout(() => {
-          animateCounter(document.getElementById('formadores-count'), stats.formadores);
+          animateCounter(document.getElementById('formadores-count'), stats.formadores_ativos);
         }, 400);
         
         setTimeout(() => {
-          animateCounter(document.getElementById('pendentes-count'), stats.pendentes);
+          animateCounter(document.getElementById('pendentes-count'), stats.solicitacoes_pendentes);
         }, 600);
         
         setTimeout(() => {
-          animateCounter(document.getElementById('municipios-count'), stats.municipios);
+          animateCounter(document.getElementById('municipios-count'), stats.municipios_atendidos);
         }, 800);
 
         // Atualizar badge de aprovações se existir
         const aprovacoesBadge = document.getElementById('aprovacoes-badge');
         if (aprovacoesBadge) {
           setTimeout(() => {
-            animateCounter(aprovacoesBadge, stats.pendentes);
+            animateCounter(aprovacoesBadge, stats.solicitacoes_pendentes);
           }, 1000);
         }
         
+        // Remover loading state e adicionar indicador de dados reais
+        const indicators = document.querySelectorAll('.stat-card');
+        indicators.forEach(card => {
+          // Remover loading
+          card.classList.remove('loading');
+          
+          if (!card.querySelector('.real-data-indicator')) {
+            const indicator = document.createElement('div');
+            indicator.className = 'real-data-indicator';
+            indicator.style.cssText = `
+              position: absolute; 
+              top: 8px; 
+              right: 8px; 
+              width: 8px; 
+              height: 8px; 
+              background: #27ae60; 
+              border-radius: 50%; 
+              box-shadow: 0 0 0 2px rgba(39, 174, 96, 0.3);
+              animation: pulse 2s infinite;
+            `;
+            indicator.title = 'Dados reais do banco de dados';
+            card.style.position = 'relative';
+            card.appendChild(indicator);
+          }
+        });
+        
       } catch (error) {
-        console.error('Erro ao carregar estatísticas:', error);
-        // Em caso de erro, mostrar valores padrão
-        document.getElementById('eventos-count').textContent = '0';
-        document.getElementById('formadores-count').textContent = '0';
-        document.getElementById('pendentes-count').textContent = '0';
-        document.getElementById('municipios-count').textContent = '0';
+        console.error('❌ Erro ao carregar estatísticas da API:', error);
+        
+        // Em caso de erro, usar fallback com valores seguros
+        const fallbackStats = {
+          eventos_periodo: 0,
+          formadores_ativos: 0,
+          solicitacoes_pendentes: 0,
+          municipios_atendidos: 0
+        };
+        
+        // Remover loading state e mostrar indicador de erro
+        const errorCards = document.querySelectorAll('.stat-card');
+        errorCards.forEach(card => {
+          // Remover loading
+          card.classList.remove('loading');
+          
+          if (!card.querySelector('.error-indicator')) {
+            const indicator = document.createElement('div');
+            indicator.className = 'error-indicator';
+            indicator.style.cssText = `
+              position: absolute; 
+              top: 8px; 
+              right: 8px; 
+              width: 8px; 
+              height: 8px; 
+              background: #e74c3c; 
+              border-radius: 50%; 
+              box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.3);
+            `;
+            indicator.title = 'Erro ao carregar dados da API';
+            card.style.position = 'relative';
+            card.appendChild(indicator);
+          }
+        });
+        
+        // Animar com fallback
+        document.getElementById('eventos-count').textContent = fallbackStats.eventos_periodo;
+        document.getElementById('formadores-count').textContent = fallbackStats.formadores_ativos;
+        document.getElementById('pendentes-count').textContent = fallbackStats.solicitacoes_pendentes;
+        document.getElementById('municipios-count').textContent = fallbackStats.municipios_atendidos;
       }
     }
 
@@ -732,8 +906,64 @@
       setTimeout(loadDashboardStats, 500);
     });
 
+    // Função para aplicar filtros
+    function aplicarFiltros() {
+      const periodo = document.getElementById('periodo-filter').value;
+      const projeto = document.getElementById('projeto-filter').value;
+      const municipio = document.getElementById('municipio-filter').value;
+      
+      loadDashboardStats(periodo || null, projeto || null, municipio || null);
+    }
+    
+    // Função para mostrar filtros ativos
+    function mostrarFiltrosAtivos(filtros) {
+      const container = document.getElementById('filtros-ativos');
+      if (!container) return;
+      
+      if (filtros && filtros.length > 0) {
+        container.innerHTML = filtros.map(filtro => 
+          `<span style="display: inline-block; padding: 0.25rem 0.75rem; background: var(--accent); color: white; border-radius: 1rem; font-size: 0.8rem; margin-right: 0.5rem; margin-bottom: 0.5rem;">
+            <i class="bi bi-funnel-fill"></i> ${filtro}
+          </span>`
+        ).join('');
+      } else {
+        container.innerHTML = '<span style="color: var(--muted); font-size: 0.9rem;">Nenhum filtro aplicado</span>';
+      }
+    }
+    
+    // Carregar opções de projetos e municípios
+    async function carregarOpcoesFiltros() {
+      try {
+        // Esta é uma implementação simplificada
+        // Em produção, você criaria endpoints específicos para obter listas de projetos e municípios
+        
+        // Por enquanto, vamos usar dados estáticos (você pode implementar endpoints dedicados)
+        console.log('ℹ️ Carregamento de opções de filtros seria implementado aqui');
+        
+      } catch (error) {
+        console.warn('⚠️ Erro ao carregar opções de filtros:', error);
+      }
+    }
+    
+    // Auto-aplicar filtros quando seleções mudarem
+    document.addEventListener('DOMContentLoaded', function() {
+      // Carregar opções de filtros
+      carregarOpcoesFiltros();
+      
+      // Auto-aplicar ao mudar período
+      const periodoSelect = document.getElementById('periodo-filter');
+      if (periodoSelect) {
+        periodoSelect.addEventListener('change', function() {
+          aplicarFiltros();
+        });
+      }
+    });
+    
     // Recarregar estatísticas a cada 5 minutos
-    setInterval(loadDashboardStats, 300000);
+    setInterval(() => {
+      // Reaplicar com filtros atuais
+      aplicarFiltros();
+    }, 300000);
   </script>
 </body>
 </html>

@@ -7,7 +7,7 @@ from .views import (
     BloqueioCreateView, CustomLoginView, FormadorEventosView,
     GoogleCalendarMonitorView, AuditoriaLogView, ControleAPIStatusView,
     DiretoriaExecutiveDashboardView, DiretoriaRelatoriosView, DiretoriaAPIMetricsView,
-    CoordenadorMeusEventosView,
+    CoordenadorMeusEventosView, DashboardStatsAPIView,
     home  # Mantendo a função home também (opcional)
 )
 from .views_calendar import MapaMensalView, MapaMensalPageView
@@ -56,4 +56,7 @@ urlpatterns = [
     path("diretoria/dashboard/", DiretoriaExecutiveDashboardView.as_view(), name="diretoria_dashboard"),
     path("diretoria/relatorios/", DiretoriaRelatoriosView.as_view(), name="diretoria_relatorios"),
     path("diretoria/api/metrics/", DiretoriaAPIMetricsView.as_view(), name="diretoria_api_metrics"),
+    
+    # API para Dashboard Principal
+    path("api/dashboard-stats/", DashboardStatsAPIView.as_view(), name="dashboard_stats_api"),
 ]

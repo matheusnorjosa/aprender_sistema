@@ -548,6 +548,51 @@
             <h4><i class="bi bi-geo-alt-fill"></i> <span id="municipios-count">-</span></h4>
             <p id="municipios-label">Municípios Atendidos</p>
           </div>
+          <div class="stat-card" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
+            <h4><i class="bi bi-check-circle-fill"></i> <span id="taxa-aprovacao">-</span>%</h4>
+            <p>Taxa de Aprovação</p>
+          </div>
+        </div>
+
+        <!-- Métricas Avançadas -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2rem;">
+          
+          <!-- Top Formadores -->
+          <div style="background: var(--card); border-radius: 1rem; padding: 1.5rem; box-shadow: var(--shadow);">
+            <h3 style="margin: 0 0 1rem 0; font-size: 1.2rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+              <i class="bi bi-trophy-fill" style="color: #ffd700;"></i> Top Formadores (Horas)
+            </h3>
+            <div id="top-formadores" style="min-height: 120px;">
+              <div style="text-align: center; color: var(--muted); padding: 2rem;">
+                <i class="bi bi-hourglass-split"></i> Carregando...
+              </div>
+            </div>
+          </div>
+
+          <!-- Top Municípios -->
+          <div style="background: var(--card); border-radius: 1rem; padding: 1.5rem; box-shadow: var(--shadow);">
+            <h3 style="margin: 0 0 1rem 0; font-size: 1.2rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+              <i class="bi bi-geo-alt-fill" style="color: #28a745;"></i> Top Municípios (Volume)
+            </h3>
+            <div id="top-municipios" style="min-height: 120px;">
+              <div style="text-align: center; color: var(--muted); padding: 2rem;">
+                <i class="bi bi-hourglass-split"></i> Carregando...
+              </div>
+            </div>
+          </div>
+
+          <!-- Tendência Semanal -->
+          <div style="background: var(--card); border-radius: 1rem; padding: 1.5rem; box-shadow: var(--shadow); grid-column: span 2;">
+            <h3 style="margin: 0 0 1rem 0; font-size: 1.2rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+              <i class="bi bi-graph-up" style="color: #17a2b8;"></i> Tendência Semanal (Últimas 4 semanas)
+            </h3>
+            <div id="tendencia-chart" style="min-height: 200px;">
+              <div style="text-align: center; color: var(--muted); padding: 3rem;">
+                <i class="bi bi-hourglass-split"></i> Carregando gráfico...
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <!-- Quick actions -->
@@ -822,12 +867,28 @@
           animateCounter(document.getElementById('municipios-count'), stats.municipios_atendidos);
         }, 800);
 
+        // Taxa de aprovação
+        setTimeout(() => {
+          if (data.metricas_avancadas && data.metricas_avancadas.taxa_aprovacao) {
+            animateCounter(document.getElementById('taxa-aprovacao'), data.metricas_avancadas.taxa_aprovacao.percentual);
+          } else {
+            document.getElementById('taxa-aprovacao').textContent = '0';
+          }
+        }, 1000);
+
         // Atualizar badge de aprovações se existir
         const aprovacoesBadge = document.getElementById('aprovacoes-badge');
         if (aprovacoesBadge) {
           setTimeout(() => {
             animateCounter(aprovacoesBadge, stats.solicitacoes_pendentes);
-          }, 1000);
+          }, 1200);
+        }
+        
+        // Processar métricas avançadas
+        if (data.metricas_avancadas) {
+          setTimeout(() => {
+            processarMetricasAvancadas(data.metricas_avancadas);
+          }, 1400);
         }
         
         // Remover loading state e adicionar indicador de dados reais
@@ -906,6 +967,76 @@
       setTimeout(loadDashboardStats, 500);
     });
 
+    // Função para processar métricas avançadas
+    function processarMetricasAvancadas(metricas) {
+      // 1. Top Formadores
+      const topFormadoresEl = document.getElementById('top-formadores');
+      if (metricas.top_formadores && metricas.top_formadores.length > 0) {
+        topFormadoresEl.innerHTML = metricas.top_formadores.map((formador, index) => `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--line);">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="background: ${index === 0 ? '#ffd700' : index === 1 ? '#c0c0c0' : index === 2 ? '#cd7f32' : 'var(--accent)'}; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold;">
+                ${index + 1}
+              </span>
+              <span style="font-weight: 600;">${formador.nome}</span>
+            </div>
+            <span style="background: var(--accent); color: white; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.8rem;">
+              ${formador.total_horas}h
+            </span>
+          </div>
+        `).join('');
+      } else {
+        topFormadoresEl.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 2rem;">Nenhum formador encontrado</div>';
+      }
+      
+      // 2. Top Municípios
+      const topMunicipiosEl = document.getElementById('top-municipios');
+      if (metricas.top_municipios && metricas.top_municipios.length > 0) {
+        topMunicipiosEl.innerHTML = metricas.top_municipios.map((municipio, index) => `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--line);">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="background: ${index === 0 ? '#28a745' : index === 1 ? '#17a2b8' : index === 2 ? '#ffc107' : 'var(--muted)'}; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold;">
+                ${index + 1}
+              </span>
+              <span style="font-weight: 600;">${municipio.nome}/${municipio.uf}</span>
+            </div>
+            <span style="background: var(--success); color: white; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.8rem;">
+              ${municipio.total_eventos} eventos
+            </span>
+          </div>
+        `).join('');
+      } else {
+        topMunicipiosEl.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 2rem;">Nenhum município encontrado</div>';
+      }
+      
+      // 3. Gráfico de Tendência (versão simplificada com barras)
+      const tendenciaEl = document.getElementById('tendencia-chart');
+      if (metricas.tendencia_semanal && metricas.tendencia_semanal.length > 0) {
+        const maxEventos = Math.max(...metricas.tendencia_semanal.map(item => item.eventos));
+        
+        tendenciaEl.innerHTML = `
+          <div style="display: flex; align-items: end; gap: 1rem; height: 150px; padding: 1rem 0;">
+            ${metricas.tendencia_semanal.map(item => {
+              const altura = maxEventos > 0 ? (item.eventos / maxEventos) * 100 : 0;
+              const dataFormatada = new Date(item.semana + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+              return `
+                <div style="display: flex; flex-direction: column; align-items: center; flex: 1;">
+                  <div style="background: var(--accent); width: 100%; height: ${altura}%; border-radius: 4px 4px 0 0; min-height: 4px; position: relative;">
+                    <span style="position: absolute; top: -1.5rem; left: 50%; transform: translateX(-50%); font-size: 0.8rem; font-weight: bold; color: var(--text);">
+                      ${item.eventos}
+                    </span>
+                  </div>
+                  <span style="font-size: 0.7rem; margin-top: 0.5rem; color: var(--muted);">${dataFormatada}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } else {
+        tendenciaEl.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 3rem;">Nenhum dado de tendência disponível</div>';
+      }
+    }
+    
     // Função para aplicar filtros
     function aplicarFiltros() {
       const periodo = document.getElementById('periodo-filter').value;

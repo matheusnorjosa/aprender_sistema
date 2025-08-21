@@ -13,6 +13,8 @@ from django.conf import settings
 from django.db import models
 from django.http import JsonResponse
 from django.views import View
+from django.core.cache import cache
+import hashlib
 
 from core.forms import SolicitacaoForm, AprovacaoDecisionForm, BloqueioAgendaForm
 from core.models import (
@@ -977,12 +979,24 @@ class DiretoriaRelatoriosView(LoginRequiredMixin, PermissionRequiredMixin, Templ
 class DashboardStatsAPIView(LoginRequiredMixin, View):
     """API endpoint para estatísticas do dashboard principal"""
     def get(self, request):
-        agora = timezone.now()
+        # Filtros da request para construir chave de cache
+        periodo_dias = request.GET.get('periodo', '30')
+        projeto_id = request.GET.get('projeto', '')
+        municipio_id = request.GET.get('municipio', '')
+        user_id = str(request.user.id)
         
-        # Filtros da request
-        periodo_dias = request.GET.get('periodo', '30')  # padrão: 30 dias
-        projeto_id = request.GET.get('projeto')
-        municipio_id = request.GET.get('municipio')
+        # Criar chave de cache única
+        cache_key_data = f"dashboard_stats_{periodo_dias}_{projeto_id}_{municipio_id}_{user_id}"
+        cache_key = hashlib.md5(cache_key_data.encode()).hexdigest()
+        
+        # Tentar buscar no cache primeiro
+        cached_response = cache.get(cache_key)
+        if cached_response:
+            # Marcar como cache hit
+            cached_response["meta"]["cache_hit"] = True
+            return JsonResponse(cached_response)
+        
+        agora = timezone.now()
         
         try:
             dias = int(periodo_dias)
@@ -1001,8 +1015,8 @@ class DashboardStatsAPIView(LoginRequiredMixin, View):
             data_limite = agora - timedelta(days=dias)
             periodo_label = f"últimos {dias} dias"
         
-        # Query base para eventos
-        eventos_query = Solicitacao.objects.filter(
+        # Query base otimizada com select_related para evitar N+1
+        base_query = Solicitacao.objects.select_related('projeto', 'municipio').filter(
             data_inicio__gte=data_limite,
             status=SolicitacaoStatus.APROVADO
         )
@@ -1010,39 +1024,91 @@ class DashboardStatsAPIView(LoginRequiredMixin, View):
         # Aplicar filtros opcionais
         if projeto_id:
             try:
-                eventos_query = eventos_query.filter(projeto_id=projeto_id)
+                base_query = base_query.filter(projeto_id=projeto_id)
             except (ValueError, TypeError):
                 pass
                 
         if municipio_id:
             try:
-                eventos_query = eventos_query.filter(municipio_id=municipio_id)
+                base_query = base_query.filter(municipio_id=municipio_id)
             except (ValueError, TypeError):
                 pass
         
-        # 1. Eventos no período (com filtros aplicados)
-        eventos_periodo = eventos_query.count()
-        
-        # 2. Formadores ativos (sempre global)
-        formadores_ativos = Formador.objects.filter(ativo=True).count()
-        
-        # 3. Solicitações pendentes (sempre global)
-        solicitacoes_pendentes = Solicitacao.objects.filter(
-            status=SolicitacaoStatus.PENDENTE
-        ).count()
-        
-        # 4. Municípios atendidos no período (com filtros de projeto)
-        municipios_query = Solicitacao.objects.filter(
-            data_inicio__gte=data_limite,
-            status=SolicitacaoStatus.APROVADO
+        # Query única agregada para obter eventos e municípios
+        stats_principais = base_query.aggregate(
+            total_eventos=models.Count('id'),
+            municipios_distintos=models.Count('municipio', distinct=True)
         )
-        if projeto_id:
-            try:
-                municipios_query = municipios_query.filter(projeto_id=projeto_id)
-            except (ValueError, TypeError):
-                pass
         
-        municipios_atendidos = municipios_query.values('municipio').distinct().count()
+        eventos_periodo = stats_principais['total_eventos'] or 0
+        municipios_atendidos = stats_principais['municipios_distintos'] or 0
+        
+        # Queries globais otimizadas (não dependem de filtros de período)
+        stats_globais = {
+            'formadores_ativos': Formador.objects.filter(ativo=True).count(),
+            'solicitacoes_pendentes': Solicitacao.objects.filter(
+                status=SolicitacaoStatus.PENDENTE
+            ).count()
+        }
+        
+        formadores_ativos = stats_globais['formadores_ativos']
+        solicitacoes_pendentes = stats_globais['solicitacoes_pendentes']
+        
+        # MÉTRICAS AVANÇADAS
+        
+        # 1. Taxa de aprovação no período
+        solicitacoes_periodo = Solicitacao.objects.filter(
+            data_solicitacao__gte=data_limite,
+        ).aggregate(
+            total=models.Count('id'),
+            aprovadas=models.Count('id', filter=models.Q(status=SolicitacaoStatus.APROVADO)),
+            reprovadas=models.Count('id', filter=models.Q(status=SolicitacaoStatus.REPROVADO)),
+        )
+        
+        total_solicitacoes_periodo = solicitacoes_periodo['total'] or 0
+        aprovadas_periodo = solicitacoes_periodo['aprovadas'] or 0
+        reprovadas_periodo = solicitacoes_periodo['reprovadas'] or 0
+        
+        if total_solicitacoes_periodo > 0:
+            taxa_aprovacao = round((aprovadas_periodo / total_solicitacoes_periodo) * 100, 1)
+        else:
+            taxa_aprovacao = 0.0
+        
+        # 2. Horas totais agendadas por formador (top 5)
+        from django.db.models import F, ExpressionWrapper, Sum
+        from django.db.models.functions import Extract
+        
+        # Query via modelo intermediário para M2M
+        horas_por_formador = FormadoresSolicitacao.objects.filter(
+            solicitacao__data_inicio__gte=data_limite,
+            solicitacao__status=SolicitacaoStatus.APROVADO
+        ).select_related('formador', 'solicitacao').annotate(
+            duracao_horas=ExpressionWrapper(
+                Extract(F('solicitacao__data_fim') - F('solicitacao__data_inicio'), 'epoch') / 3600.0,
+                output_field=models.FloatField()
+            )
+        ).values('formador__nome', 'formador__id').annotate(
+            total_horas=Sum('duracao_horas')
+        ).order_by('-total_horas')[:5]
+        
+        # 3. Top 5 municípios por volume de eventos
+        top_municipios = base_query.values(
+            'municipio__nome', 'municipio__uf'
+        ).annotate(
+            total_eventos=models.Count('id')
+        ).order_by('-total_eventos')[:5]
+        
+        # 4. Tendência semanal (últimas 4 semanas)
+        from django.db.models.functions import TruncWeek
+        
+        tendencia_semanal = Solicitacao.objects.filter(
+            data_inicio__gte=agora - timedelta(weeks=4),
+            status=SolicitacaoStatus.APROVADO
+        ).annotate(
+            semana=TruncWeek('data_inicio')
+        ).values('semana').annotate(
+            eventos=models.Count('id')
+        ).order_by('semana')
         
         # Metadados dos filtros aplicados
         filtros_aplicados = []
@@ -1079,13 +1145,46 @@ class DashboardStatsAPIView(LoginRequiredMixin, View):
                 "solicitacoes_pendentes": solicitacoes_pendentes,
                 "municipios_atendidos": municipios_atendidos
             },
+            "metricas_avancadas": {
+                "taxa_aprovacao": {
+                    "percentual": taxa_aprovacao,
+                    "total_solicitacoes": total_solicitacoes_periodo,
+                    "aprovadas": aprovadas_periodo,
+                    "reprovadas": reprovadas_periodo
+                },
+                "top_formadores": [
+                    {
+                        "nome": item['formador__nome'],
+                        "id": item['formador__id'],
+                        "total_horas": round(item['total_horas'] or 0, 1)
+                    } for item in horas_por_formador
+                ],
+                "top_municipios": [
+                    {
+                        "nome": item['municipio__nome'],
+                        "uf": item['municipio__uf'],
+                        "total_eventos": item['total_eventos']
+                    } for item in top_municipios
+                ],
+                "tendencia_semanal": [
+                    {
+                        "semana": item['semana'].strftime('%Y-%m-%d') if item['semana'] else None,
+                        "eventos": item['eventos']
+                    } for item in tendencia_semanal
+                ]
+            },
             "meta": {
                 "fonte": "dados_reais_banco",
                 "cache_ttl": 300,  # 5 minutos
                 "usuario": request.user.username,
-                "com_filtros": bool(projeto_id or municipio_id or dias != 30)
+                "com_filtros": bool(projeto_id or municipio_id or dias != 30),
+                "cache_hit": False,  # Indica que foi gerado, não do cache
+                "metricas_avancadas": True  # Indica que inclui métricas avançadas
             }
         }
+        
+        # Armazenar no cache por 5 minutos
+        cache.set(cache_key, payload, 300)
         
         return JsonResponse(payload)
 

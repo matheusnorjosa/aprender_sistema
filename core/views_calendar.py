@@ -7,15 +7,8 @@ from core.models import Formador
 from core.services.calendar_codes import marcador_do_dia, gerar_mapa_mensal_otimizado
 from django.views.generic import TemplateView
 
-
-class CanViewCalendarMixin(UserPassesTestMixin):
-    """Permite visualizar calendário: superintendência, diretoria, controle e admin"""
-    def test_func(self):
-        u = self.request.user
-        return u.is_authenticated and (
-            getattr(u, "papel", "") in ["superintendencia", "diretoria", "controle", "admin"] 
-            or u.is_superuser
-        )
+# Import Group-based mixin for calendar access
+from core.mixins import CanViewCalendarMixin
 
 class MapaMensalView(LoginRequiredMixin, CanViewCalendarMixin, View):
     def get(self, request):

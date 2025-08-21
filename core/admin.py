@@ -7,23 +7,22 @@ from .models import (
     DisponibilidadeFormadores, LogAuditoria, Deslocamento
 )
 
-# Customizar o admin do Usuario para incluir o campo 'papel'
+# Customizar o admin do Usuario para mostrar grupos (roles)
 @admin.register(Usuario)
 class UsuarioAdmin(UserAdmin):
-    list_display = ('username', 'email', 'first_name', 'last_name', 'papel', 'is_staff', 'is_active', 'date_joined')
-    list_filter = ('papel', 'is_staff', 'is_superuser', 'is_active', 'date_joined')
+    list_display = ('username', 'email', 'first_name', 'last_name', 'get_roles', 'is_staff', 'is_active', 'date_joined')
+    list_filter = ('groups', 'is_staff', 'is_superuser', 'is_active', 'date_joined')
     search_fields = ('username', 'first_name', 'last_name', 'email')
     ordering = ('username',)
     
-    # Adicionar o campo 'papel' aos fieldsets
-    fieldsets = UserAdmin.fieldsets + (
-        ('Perfil do Sistema', {'fields': ('papel',)}),
-    )
+    def get_roles(self, obj):
+        """Display user's roles (groups) in list view"""
+        return ', '.join([group.name for group in obj.groups.all()]) or 'Nenhum'
+    get_roles.short_description = 'Papéis'
     
-    # Adicionar o campo 'papel' ao formulário de criação
-    add_fieldsets = UserAdmin.add_fieldsets + (
-        ('Perfil do Sistema', {'fields': ('papel',)}),
-    )
+    # Use default UserAdmin fieldsets (includes groups)
+    fieldsets = UserAdmin.fieldsets
+    add_fieldsets = UserAdmin.add_fieldsets
 
 @admin.register(Projeto)
 class ProjetoAdmin(admin.ModelAdmin):
@@ -45,9 +44,9 @@ class TipoEventoAdmin(admin.ModelAdmin):
 
 @admin.register(Formador)
 class FormadorAdmin(admin.ModelAdmin):
-    list_display = ("nome", "email", "area_atuacao", "ativo")
-    list_filter = ("ativo",)
-    search_fields = ("nome", "email", "area_atuacao")
+    list_display = ("nome", "email", "usuario", "area_atuacao", "ativo")
+    list_filter = ("ativo", "area_atuacao")
+    search_fields = ("nome", "email", "usuario__username")
 
 class FormadoresSolicitacaoInline(admin.TabularInline):
     model = FormadoresSolicitacao

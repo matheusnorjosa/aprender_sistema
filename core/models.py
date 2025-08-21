@@ -8,22 +8,36 @@ from django.conf import settings
 # 1) USUÁRIO CUSTOMIZADO
 # =========================
 class Usuario(AbstractUser):
-    ROLES = (
-        ('coordenador', 'Coordenador'),
-        ('superintendencia', 'Superintendência'),
-        ('controle', 'Controle'),
-        ('formador', 'Formador'),
-        ('admin', 'Admin do Sistema'),
-        ('diretoria', 'Diretoria'),
-    )
-    papel = models.CharField(max_length=50, choices=ROLES, default='coordenador')
-
+    """
+    User model using Django Groups for role-based permissions
+    Roles are now managed through Django Groups instead of papel field
+    """
+    
     class Meta:
         verbose_name = "Usuário"
         verbose_name_plural = "Usuários"
 
     def __str__(self):
         return self.username
+    
+    @property
+    def role_names(self):
+        """Get user's role names from groups"""
+        return list(self.groups.values_list('name', flat=True))
+    
+    @property
+    def primary_role(self):
+        """Get primary role (first group) for display purposes"""
+        groups = self.role_names
+        return groups[0] if groups else None
+    
+    def has_role(self, role_name):
+        """Check if user has specific role"""
+        return self.groups.filter(name=role_name).exists()
+    
+    def has_any_role(self, role_names):
+        """Check if user has any of the specified roles"""
+        return self.groups.filter(name__in=role_names).exists()
 
 
 # =========================
@@ -67,15 +81,41 @@ class Formador(models.Model):
     email = models.EmailField(max_length=255, unique=True, verbose_name="E-mail")
     area_atuacao = models.ForeignKey(Group, on_delete=models.SET_NULL, blank=True, null=True, verbose_name="Área de Atuação")
     ativo = models.BooleanField(default=True, verbose_name="Ativo")
+    # Connection to User model for authentication/authorization
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        blank=True, 
+        null=True,
+        related_name='formador_profile',
+        verbose_name="Usuário"
+    )
 
     class Meta:
         verbose_name = "Formador"
         verbose_name_plural = "Formadores"
         ordering = ["nome"]
         indexes = [models.Index(fields=["email"])]
+        permissions = [
+            ('view_own_events', 'Can view own events (Formador)'),
+        ]
 
     def __str__(self):
         return f"{self.nome} <{self.email}>"
+
+    @property
+    def user_groups(self):
+        """Return user groups if usuario is connected"""
+        if self.usuario:
+            return self.usuario.groups.all()
+        return []
+
+    @property
+    def has_formador_role(self):
+        """Check if connected user has formador role"""
+        if self.usuario:
+            return self.usuario.groups.filter(name='formador').exists()
+        return False
 
 
 class TipoEvento(models.Model):

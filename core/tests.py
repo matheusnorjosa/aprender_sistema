@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import timedelta, datetime, time
 from unittest.mock import patch
+import json
 from core.models import (
     Solicitacao, SolicitacaoStatus, Projeto, Municipio, TipoEvento, 
     Formador, DisponibilidadeFormadores, Aprovacao, AprovacaoStatus, LogAuditoria,

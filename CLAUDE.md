@@ -41,6 +41,25 @@
 - **Script de apoio:** `scripts/git-flow.py` (facilita criação de branches)
 - **Template de PR:** `.github/PULL_REQUEST_TEMPLATE.md`
 
+## Automação e Melhores Práticas Preparadas ⚙️
+**Status:** Arquivos criados, aguardando commit/push para ativar
+
+### Arquivos de Automação Criados:
+- **CI/CD Pipeline:** `.github/workflows/ci.yml` (testes automáticos, análise código)
+- **Proteção Branches:** `.github/workflows/branch-protection.yml` 
+- **Conventional Commits:** `.gitmessage` (template configurado)
+- **Code Ownership:** `CODEOWNERS` (responsabilidades definidas)
+- **Issue Templates:** `.github/ISSUE_TEMPLATE/` (bug reports, features)
+- **Documentação:** `docs/REFINAMENTOS_MELHORES_PRATICAS.md`
+
+### Funcionalidades que serão ativadas após commit:
+- ✅ Testes automáticos por módulo
+- ✅ Análise de código (Black, Flake8, Bandit)
+- ✅ Validação nomenclatura de branches  
+- ✅ Deploy automático para homologação
+- ✅ Proteção automática branches main/develop
+- ✅ Templates estruturados para PRs e Issues
+
 ## Próximas Tarefas - Deploy Online
 - [ ] Configurar deploy no Render (recomendação principal)
 - [ ] Configurar variáveis de ambiente

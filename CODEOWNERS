@@ -1,0 +1,38 @@
+# CODEOWNERS - Sistema Aprender
+# Define quem deve revisar mudanças em cada módulo
+
+# Configurações globais
+* @matheusnorjosa
+
+# Módulo Core (sistema base)
+/core/ @matheusnorjosa
+/core/models.py @matheusnorjosa
+/core/views.py @matheusnorjosa
+/core/forms.py @matheusnorjosa
+
+# Módulo Planilhas (importações)
+/planilhas/ @matheusnorjosa
+/planilhas/management/commands/ @matheusnorjosa
+/planilhas/services/ @matheusnorjosa
+
+# Módulo Relatórios
+/relatorios/ @matheusnorjosa
+
+# API e Integrações  
+/api/ @matheusnorjosa
+/core/api_*.py @matheusnorjosa
+
+# Configurações críticas
+/aprender_sistema/settings*.py @matheusnorjosa
+/requirements*.txt @matheusnorjosa
+/Dockerfile* @matheusnorjosa
+/docker-compose*.yml @matheusnorjosa
+
+# CI/CD e Scripts
+/.github/ @matheusnorjosa
+/scripts/ @matheusnorjosa
+
+# Documentação
+/docs/ @matheusnorjosa
+/README.md @matheusnorjosa
+/CLAUDE.md @matheusnorjosa

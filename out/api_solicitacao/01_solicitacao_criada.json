@@ -1,0 +1,13 @@
+{
+  "id": "d18ad9df-05a7-4de2-b54f-0b51a8c05acd",
+  "titulo_evento": "Formação Online – Piloto Auditoria",
+  "projeto": "Projeto Piloto 2025",
+  "municipio": "Aurora do Norte/AN",
+  "tipo_evento": "Formação Online",
+  "data_inicio": "2025-08-30T17:00:00+00:00",
+  "data_fim": "2025-08-30T19:00:00+00:00",
+  "status": "Pendente",
+  "observacoes": "Evento online para teste de auditoria funcional - deve gerar link de Meet automaticamente",
+  "criado_via": "GUI - admin_teste",
+  "timestamp_teste": "2025-08-29T23:40:00Z"
+}

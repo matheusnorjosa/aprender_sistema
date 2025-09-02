@@ -26,6 +26,7 @@ services:
       DB_HOST: db
       DB_PORT: "5432"
       DJANGO_ENV: development
+      FEATURE_GOOGLE_SYNC: "1"
     volumes:
       - .:/app
     ports:

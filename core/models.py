@@ -1,8 +1,10 @@
 # aprender_sistema/core/models.py
 import uuid
+from datetime import timedelta
 from django.db import models
 from django.contrib.auth.models import AbstractUser, Group
 from django.conf import settings
+from django.utils import timezone
 
 # =========================
 # 1) USUÁRIO CUSTOMIZADO
@@ -11,7 +13,38 @@ class Usuario(AbstractUser):
     """
     User model using Django Groups for role-based permissions
     Roles are now managed through Django Groups instead of papel field
+    
+    Campos adicionais para migração das planilhas:
+    - cpf: CPF único do usuário
+    - telefone: Telefone de contato
+    - municipio: Município de atuação
     """
+    
+    # Campos extras para dados das planilhas
+    cpf = models.CharField(
+        max_length=11, 
+        unique=True, 
+        blank=True,
+        null=True,
+        verbose_name="CPF",
+        help_text="CPF sem formatação (apenas números)"
+    )
+    
+    telefone = models.CharField(
+        max_length=15, 
+        blank=True,
+        verbose_name="Telefone",
+        help_text="Telefone de contato"
+    )
+    
+    municipio = models.ForeignKey(
+        'Municipio',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Município",
+        help_text="Município de atuação do usuário"
+    )
     
     class Meta:
         verbose_name = "Usuário"
@@ -19,6 +52,11 @@ class Usuario(AbstractUser):
 
     def __str__(self):
         return self.username
+    
+    @property
+    def nome_completo(self):
+        """Compatibilidade com planilhas - Nome completo"""
+        return f"{self.first_name} {self.last_name}".strip() or self.username
     
     @property
     def role_names(self):
@@ -48,6 +86,11 @@ class Projeto(models.Model):
     nome = models.CharField(max_length=255, unique=True, verbose_name="Nome do Projeto")
     descricao = models.TextField(blank=True, null=True, verbose_name="Descrição")
     ativo = models.BooleanField(default=True, verbose_name="Ativo")
+    vinculado_superintendencia = models.BooleanField(
+        default=False, 
+        verbose_name="Vinculado à Superintendência",
+        help_text="Projetos vinculados à superintendência requerem aprovação para eventos"
+    )
 
     class Meta:
         verbose_name = "Projeto"
@@ -138,6 +181,7 @@ class TipoEvento(models.Model):
 # =========================
 class SolicitacaoStatus(models.TextChoices):
     PENDENTE = "Pendente", "Pendente"
+    PRE_AGENDA = "PreAgenda", "Pré-Agenda"
     APROVADO = "Aprovado", "Aprovado"
     REPROVADO = "Reprovado", "Reprovado"
 
@@ -180,6 +224,28 @@ class Solicitacao(models.Model):
             models.Index(fields=["data_inicio"]),
             models.Index(fields=["data_fim"]),
             models.Index(fields=["status"]),
+            models.Index(fields=["municipio", "data_inicio"]),
+            models.Index(fields=["tipo_evento", "data_inicio"]),
+        ]
+        constraints = [
+            # Evitar títulos duplicados no mesmo dia
+            models.UniqueConstraint(
+                fields=["titulo_evento", "data_inicio"],
+                name="unique_titulo_evento_data",
+                violation_error_message="Já existe uma solicitação com o mesmo título nesta data."
+            ),
+            # Validar que data_fim > data_inicio
+            models.CheckConstraint(
+                check=models.Q(data_fim__gt=models.F('data_inicio')),
+                name="data_fim_after_inicio",
+                violation_error_message="Data de fim deve ser posterior à data de início."
+            ),
+            # Evitar solicitações muito longas (mais de 12 horas)
+            models.CheckConstraint(
+                check=models.Q(data_fim__lte=models.F('data_inicio') + timedelta(hours=12)),
+                name="max_duracao_12_horas",
+                violation_error_message="Duração máxima de evento é 12 horas."
+            ),
         ]
         permissions = [
             ('sync_calendar', 'Can sync with Google Calendar'),

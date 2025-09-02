@@ -8,3 +8,10 @@ urlpatterns = [
     path("accounts/", include("django.contrib.auth.urls")), # Inclui as URLs de autenticação
     path("", include("core.urls")),
 ]
+
+# TODO: Reativar quando instalar djangorestframework
+# try:
+#     import rest_framework
+#     urlpatterns.insert(2, path("api/", include("api.urls")))
+# except ImportError:
+#     pass

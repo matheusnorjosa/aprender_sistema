@@ -1,0 +1,94 @@
+---
+# Pre-commit hooks configuration for Aprender Sistema
+# Install: pip install pre-commit && pre-commit install
+
+repos:
+  # Python code formatting
+  - repo: https://github.com/psf/black
+    rev: 24.1.1
+    hooks:
+      - id: black
+        language_version: python3
+        args: [--line-length=88, --target-version=py313]
+
+  # Import sorting
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: [--profile=black, --line-length=88]
+
+  # Python linting
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: [--config=.flake8]
+
+  # Security linting
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: [-r, ., -f, json, -o, bandit-report.json]
+        exclude: ^(tests/|migrations/|venv/|manage\.py)
+
+  # Django-specific checks
+  - repo: local
+    hooks:
+      - id: django-check
+        name: Django Check
+        entry: python manage.py check
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: django-migrations
+        name: Django Migration Check
+        entry: python manage.py makemigrations --check --dry-run
+        language: system
+        pass_filenames: false
+        always_run: true
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # File formatting
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+      # JSON/YAML validation
+      - id: check-json
+      - id: check-yaml
+        args: [--unsafe]  # Allow Django templates in YAML
+
+      # Security checks
+      - id: detect-private-key
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+
+      # Python-specific
+      - id: check-ast
+      - id: debug-statements
+      - id: requirements-txt-fixer
+
+# Global exclusions
+exclude: |
+  (?x)(
+    migrations/|
+    __pycache__/|
+    \.pyc$|
+    \.pyo$|
+    \.sqlite3$|
+    staticfiles/|
+    media/|
+    logs/|
+    venv/|
+    \.venv/|
+    node_modules/|
+    \.git/
+  )

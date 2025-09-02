@@ -1,0 +1,164 @@
+AMBIENTE: DEVELOPMENT
+DEBUG: True
+MODO DESENVOLVIMENTO - Para producao defina ENVIRONMENT=production
+Ambiente: development
+Debug: True
+Database: django.db.backends.sqlite3
+Cache: django.core.cache.backends.locmem.LocMemCache
+Email: django.core.mail.backends.console.EmailBackend
+17 objects imported automatically (use -v 2 for details).
+
+{
+  "grupos": [
+    {
+      "nome": "coordenador",
+      "permissoes": [
+        "core.add_solicitacao",
+        "core.view_own_solicitacoes",
+        "core.view_solicitacao"
+      ],
+      "total_permissoes": 3
+    },
+    {
+      "nome": "superintendencia",
+      "permissoes": [
+        "core.add_aprovacao",
+        "core.view_aprovacao",
+        "core.view_logauditoria",
+        "core.change_solicitacao",
+        "core.view_solicitacao"
+      ],
+      "total_permissoes": 5
+    },
+    {
+      "nome": "controle",
+      "permissoes": [
+        "core.view_aprovacao",
+        "core.sync_calendar",
+        "core.view_solicitacao"
+      ],
+      "total_permissoes": 3
+    },
+    {
+      "nome": "formador",
+      "permissoes": [
+        "core.add_disponibilidadeformadores",
+        "core.change_disponibilidadeformadores",
+        "core.view_solicitacao"
+      ],
+      "total_permissoes": 3
+    },
+    {
+      "nome": "diretoria",
+      "permissoes": [
+        "core.view_disponibilidadeformadores",
+        "core.view_relatorios",
+        "core.view_solicitacao"
+      ],
+      "total_permissoes": 3
+    },
+    {
+      "nome": "admin",
+      "permissoes": [
+        "core.view_relatorios",
+        "core.add_solicitacao",
+        "core.change_solicitacao",
+        "core.sync_calendar",
+        "core.view_own_solicitacoes",
+        "core.view_solicitacao"
+      ],
+      "total_permissoes": 6
+    }
+  ],
+  "usuarios": [
+    {
+      "username": "matheusadm",
+      "email": "matheusnorjosa@gmail.com",
+      "grupos": [],
+      "is_superuser": true,
+      "is_staff": true,
+      "is_active": true
+    },
+    {
+      "username": "coord_test",
+      "email": "coord@test.com",
+      "grupos": [
+        "coordenador"
+      ],
+      "is_superuser": false,
+      "is_staff": false,
+      "is_active": true
+    },
+    {
+      "username": "super_test",
+      "email": "super@test.com",
+      "grupos": [
+        "superintendencia"
+      ],
+      "is_superuser": false,
+      "is_staff": false,
+      "is_active": true
+    },
+    {
+      "username": "admin_teste",
+      "email": "",
+      "grupos": [
+        "admin"
+      ],
+      "is_superuser": true,
+      "is_staff": true,
+      "is_active": true
+    },
+    {
+      "username": "controle_teste",
+      "email": "",
+      "grupos": [
+        "controle"
+      ],
+      "is_superuser": false,
+      "is_staff": true,
+      "is_active": true
+    },
+    {
+      "username": "coordenador_teste",
+      "email": "",
+      "grupos": [
+        "coordenador"
+      ],
+      "is_superuser": false,
+      "is_staff": false,
+      "is_active": true
+    },
+    {
+      "username": "formador_teste",
+      "email": "",
+      "grupos": [
+        "formador"
+      ],
+      "is_superuser": false,
+      "is_staff": false,
+      "is_active": true
+    },
+    {
+      "username": "super_teste",
+      "email": "",
+      "grupos": [
+        "superintendencia"
+      ],
+      "is_superuser": false,
+      "is_staff": true,
+      "is_active": true
+    },
+    {
+      "username": "diretoria_teste",
+      "email": "",
+      "grupos": [
+        "diretoria"
+      ],
+      "is_superuser": false,
+      "is_staff": false,
+      "is_active": true
+    }
+  ],
+  "timestamp": "Sun, Aug 31, 2025 12:55:03 PM"
+}

@@ -57,11 +57,12 @@ Analise os detalhes e tome uma decisão sobre a solicitação de evento
   .decision-card {
     border: 2px solid var(--line);
     border-radius: 0.5rem;
-    padding: 1.5rem;
+    padding: 1rem;
     text-align: center;
     transition: all 0.2s ease;
     cursor: pointer;
     background: #fff;
+    position: relative;
   }
   .decision-card:hover {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -75,8 +76,13 @@ Analise os detalhes e tome uma decisão sobre a solicitação de evento
     background: #fff5f5;
   }
   .decision-card i {
-    font-size: 3rem;
+    font-size: 2rem;
     margin-bottom: 0.5rem;
+  }
+  .decision-card input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
   }
   .decision-card h6 {
     margin: 0.5rem 0;
@@ -284,39 +290,24 @@ Analise os detalhes e tome uma decisão sobre a solicitação de evento
     <div class="form-group">
       <label class="form-label">{{ form.decisao.label }}</label>
       <div class="decision-cards">
-        {% for choice in form.decisao %}
-          <div class="decision-card" data-value="{{ choice.choice_value }}">
-            {{ choice.tag }}
-            {% if choice.choice_value == "Aprovado" %}
-              <i class="bi bi-check-circle-fill text-success"></i>
-              <h6 class="text-success">Aprovar</h6>
-              <p>Confirmar a realização do evento</p>
-            {% else %}
-              <i class="bi bi-x-circle-fill text-danger"></i>
-              <h6 class="text-danger">Reprovar</h6>
-              <p>Negar a realização do evento</p>
-            {% endif %}
-          </div>
-        {% endfor %}
+        <div class="decision-card" data-value="Aprovado">
+          <input type="radio" name="decisao" value="Aprovado" id="id_decisao_0" required>
+          <i class="bi bi-check-circle-fill text-success"></i>
+          <h6 class="text-success">Aprovar</h6>
+          <p>Confirmar a realização do evento</p>
+        </div>
+        <div class="decision-card" data-value="Reprovado">
+          <input type="radio" name="decisao" value="Reprovado" id="id_decisao_1" required>
+          <i class="bi bi-x-circle-fill text-danger"></i>
+          <h6 class="text-danger">Reprovar</h6>
+          <p>Negar a realização do evento</p>
+        </div>
       </div>
       {% if form.decisao.errors %}
         <div class="invalid-feedback" style="display: block;">{{ form.decisao.errors.0 }}</div>
       {% endif %}
     </div>
 
-    <!-- Justification -->
-    <div class="form-group">
-      <label for="{{ form.justificativa.id_for_label }}" class="form-label">
-        {{ form.justificativa.label }}
-      </label>
-      {{ form.justificativa }}
-      <div class="form-text">
-        A justificativa é obrigatória para reprovações e opcional para aprovações.
-      </div>
-      {% if form.justificativa.errors %}
-        <div class="invalid-feedback">{{ form.justificativa.errors.0 }}</div>
-      {% endif %}
-    </div>
 
     <!-- Action Buttons -->
     <div class="btn-group-submit d-flex justify-content-between">

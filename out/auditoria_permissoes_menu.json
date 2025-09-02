@@ -1,0 +1,43 @@
+{
+  "audit_status": "✅ APROVADO - PERMISSÕES E MENUS FUNCIONANDO CORRETAMENTE",
+  "test_date": "2025-08-30T03:55:00Z",
+  "usuarios_testados": {
+    "coordenador_teste": {
+      "menu_sections": ["Principal", "Coordenação"],
+      "menu_items": ["Início", "Mapa Mensal", "Solicitar Evento", "Meus Eventos"],
+      "acoes_rapidas": ["Solicitar Evento", "Meus Eventos"],
+      "status": "✅ APROVADO"
+    },
+    "super_teste": {
+      "menu_sections": ["Principal", "Superintendência", "Cadastros"],
+      "menu_items": ["Início", "Mapa Mensal", "Aprovações Pendentes", "Deslocamentos", "Formadores", "Municípios", "Projetos", "Tipos de Evento"],
+      "acoes_rapidas": ["Mapa de Disponibilidade", "Central de Aprovações"],
+      "status": "✅ APROVADO"
+    },
+    "formador_teste": {
+      "menu_sections": ["Principal", "Formador"],
+      "menu_items": ["Início", "Mapa Mensal", "Meus Eventos", "Bloqueio de Agenda"],
+      "acoes_rapidas": ["Bloqueio de Agenda"],
+      "status": "✅ APROVADO"
+    },
+    "diretoria_teste": {
+      "menu_sections": ["Principal", "Diretoria"],
+      "menu_items": ["Início", "Mapa Mensal", "Dashboard Executivo", "Relatórios Consolidados", "Visão Mensal", "Métricas API"],
+      "acoes_rapidas": ["Mapa de Disponibilidade", "Dashboard Executivo", "Relatórios Consolidados"],
+      "status": "✅ APROVADO"
+    }
+  },
+  "validacoes_realizadas": {
+    "segregacao_menus": "✅ APROVADO - Cada papel vê apenas suas funcionalidades",
+    "acoes_rapidas_contextuais": "✅ APROVADO - Ações apropriadas para cada papel",
+    "navegacao_funcional": "✅ APROVADO - Links funcionando corretamente",
+    "responsividade_layout": "✅ APROVADO - Interface responsiva",
+    "branding_consistente": "✅ APROVADO - Sistema Aprender em todas as páginas"
+  },
+  "evidencias_coletadas": [
+    "out/gui_audit/formador_menu.png",
+    "out/gui_audit/diretoria_menu.png",
+    "out/gui_solicitacao/01_coordenador_dashboard.png",
+    "out/gui_aprovacao/01_super_dashboard.png"
+  ]
+}

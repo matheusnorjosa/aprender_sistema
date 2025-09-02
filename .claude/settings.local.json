@@ -16,7 +16,19 @@
       "Bash(rm:*)",
       "Bash(mv:*)",
       "Bash(.venvScriptsactivate)",
-      "Bash(.venvScriptspython.exe manage.py setup_groups)"
+      "Bash(.venvScriptspython.exe manage.py setup_groups)",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_fill_form",
+      "mcp__playwright__browser_select_option",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_snapshot",
+      "Bash(ENVIRONMENT=production SECRET_KEY=W-v_WINGbGjP9E7v_Q0mKIKKKKm7oB7ptmQb3NsIWT3li5VERj4OEjK1FKX65Qnd3IQ ALLOWED_HOSTS=localhost,127.0.0.1 DB_PASSWORD=test python manage.py check --deploy --settings=aprender_sistema.settings_production)",
+      "Bash(pip install:*)",
+      "Read(C:\\Users\\datsu\\OneDrive\\Documentos\\Projeto Oraculo Aprender/**)",
+      "Read(C:\\Users\\datsu\\OneDrive\\Documentos\\Projeto Oraculo Aprender/**)"
     ]
   },
   "enableAllProjectMcpServers": true,

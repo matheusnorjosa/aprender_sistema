@@ -1,0 +1,133 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aprender-sistema"
+version = "1.0.0"
+description = "Sistema de Gestão de Aprendizagem"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Sistema Aprender", email = "noreply@aprender.local"}
+]
+keywords = ["django", "education", "management", "calendar"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: Django :: 5.2",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+]
+requires-python = ">=3.13"
+
+[tool.black]
+line-length = 88
+target-version = ['py313']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    migrations
+    | __pycache__
+    | staticfiles
+    | media
+    | logs  
+    | out
+    | temp
+    | venv
+    | \.venv
+    | node_modules
+    | \.git
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+known_django = "django"
+known_first_party = ["core", "api", "relatorios", "aprender_sistema"]
+sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+skip_glob = ["*/migrations/*.py", "*/__pycache__/*", "*/venv/*", "*/.venv/*"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "migrations", "venv", ".venv", "staticfiles", "media"]
+skips = ["B101", "B601"]  # Skip assert_used and shell_injection for Django
+
+[tool.coverage.run]
+source = ["core", "api", "relatorios"]
+branch = true
+omit = [
+    "*/migrations/*",
+    "*/venv/*",
+    "*/.venv/*",
+    "*/tests/*",
+    "manage.py",
+    "*/settings/*",
+    "*/asgi.py",
+    "*/wsgi.py",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.mypy]
+python_version = "3.13"
+check_untyped_defs = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_unreachable = true
+exclude = [
+    "migrations/",
+    "venv/",
+    ".venv/",
+    "staticfiles/",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "aprender_sistema.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--tb=short",
+    "--cov=core",
+    "--cov=api",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-fail-under=80",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+testpaths = ["core/tests", "api/tests"]

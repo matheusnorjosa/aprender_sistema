@@ -26,11 +26,13 @@ class SolicitacaoForm(forms.ModelForm):
         widgets = {
             "projeto": forms.Select(attrs={
                 "class": "form-select modern-select",
-                "style": "background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" fill=\"%23007bff\" viewBox=\"0 0 16 16\"><path d=\"M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z\"/></svg>'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 16px 12px; padding-right: 2.5rem;"
+                "style": "background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" fill=\"%23007bff\" viewBox=\"0 0 16 16\"><path d=\"M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z\"/></svg>'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 16px 12px; padding-right: 2.5rem;",
+                "autocomplete": "organization"
             }),
             "municipio": forms.Select(attrs={
                 "class": "form-select modern-select",
-                "style": "background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" fill=\"%23007bff\" viewBox=\"0 0 16 16\"><path d=\"M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z\"/></svg>'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 16px 12px; padding-right: 2.5rem;"
+                "style": "background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" fill=\"%23007bff\" viewBox=\"0 0 16 16\"><path d=\"M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z\"/></svg>'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 16px 12px; padding-right: 2.5rem;",
+                "autocomplete": "address-level2"
             }),
             "tipo_evento": forms.Select(attrs={
                 "class": "form-select modern-select",
@@ -39,7 +41,8 @@ class SolicitacaoForm(forms.ModelForm):
             "titulo_evento": forms.TextInput(attrs={
                 "class": "form-control",
                 "placeholder": "Ex: 1º e 2º anos",
-                "maxlength": "255"
+                "maxlength": "255",
+                "autocomplete": "off"
             }),
             "data_inicio": forms.DateTimeInput(attrs={
                 "type": "datetime-local",
@@ -170,19 +173,6 @@ class AprovacaoDecisionForm(forms.Form):
         label="Decisão",
         widget=forms.RadioSelect,
     )
-    justificativa = forms.CharField(
-        label="Justificativa",
-        widget=forms.Textarea(attrs={"rows": 4}),
-        required=False,
-    )
-
-    def clean(self):
-        cleaned = super().clean()
-        decisao = cleaned.get("decisao")
-        justificativa = cleaned.get("justificativa", "").strip()
-        if decisao == AprovacaoStatus.REPROVADO and not justificativa:
-            raise ValidationError("Justificativa é obrigatória para reprovar.")
-        return cleaned
 
 
 # -------- Bloqueio de Agenda (Apps Script -> Django) --------

@@ -1,0 +1,46 @@
+AMBIENTE: DEVELOPMENT
+DEBUG: True
+MODO DESENVOLVIMENTO - Para producao defina ENVIRONMENT=production
+Ambiente: development
+Debug: True
+Database: django.db.backends.sqlite3
+Cache: django.core.cache.backends.locmem.LocMemCache
+Email: django.core.mail.backends.console.EmailBackend
+17 objects imported automatically (use -v 2 for details).
+
+=== GRUPOS E PERMISSÕES ===
+
+Grupo: coordenador
+  - core.add_solicitacao (Can add solicitacao)
+  - core.view_own_solicitacoes (Can view own solicitações (Coordenador))
+  - core.view_solicitacao (Can view solicitacao)
+
+Grupo: superintendencia
+  - core.add_aprovacao (Can add aprovacao)
+  - core.view_aprovacao (Can view aprovacao)
+  - core.view_logauditoria (Can view Log de Auditoria)
+  - core.change_solicitacao (Can change solicitacao)
+  - core.view_solicitacao (Can view solicitacao)
+
+Grupo: controle
+  - core.view_aprovacao (Can view aprovacao)
+  - core.sync_calendar (Can sync with Google Calendar)
+  - core.view_solicitacao (Can view solicitacao)
+
+Grupo: formador
+  - core.add_disponibilidadeformadores (Can add Disponibilidade de Formador)
+  - core.change_disponibilidadeformadores (Can change Disponibilidade de Formador)
+  - core.view_solicitacao (Can view solicitacao)
+
+Grupo: diretoria
+  - core.view_disponibilidadeformadores (Can view Disponibilidade de Formador)
+  - core.view_relatorios (Can view consolidated reports)
+  - core.view_solicitacao (Can view solicitacao)
+
+Grupo: admin
+  - core.view_relatorios (Can view consolidated reports)
+  - core.add_solicitacao (Can add solicitacao)
+  - core.change_solicitacao (Can change solicitacao)
+  - core.sync_calendar (Can sync with Google Calendar)
+  - core.view_own_solicitacoes (Can view own solicitações (Coordenador))
+  - core.view_solicitacao (Can view solicitacao)

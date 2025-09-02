@@ -1,0 +1,73 @@
+{
+  "audit_status": "✅ AUTENTICAÇÃO ADEQUADA",
+  "test_date": "2025-08-30T05:15:00Z",
+  "test_type": "Authentication & Authorization Security",
+  "authentication_bypass": [
+    {
+      "url": "/solicitacao/",
+      "status": "INDEFINIDO",
+      "code": 404,
+      "description": "Status não esperado",
+      "security_level": "INFO"
+    },
+    {
+      "url": "/aprovacoes/pendentes/",
+      "status": "PROTEGIDO",
+      "code": 302,
+      "description": "Redirecionamento para login",
+      "security_level": "SECURE"
+    },
+    {
+      "url": "/admin/",
+      "status": "PROTEGIDO", 
+      "code": 302,
+      "description": "Redirecionamento para login",
+      "security_level": "SECURE"
+    },
+    {
+      "url": "/disponibilidade/",
+      "status": "PROTEGIDO",
+      "code": 302,
+      "description": "Redirecionamento para login",
+      "security_level": "SECURE"
+    }
+  ],
+  "csrf_protection": {
+    "status": "✅ ATIVO",
+    "description": "Proteção CSRF funcionando corretamente",
+    "security_level": "SECURE"
+  },
+  "user_enumeration": {
+    "status": "⚠️ NÃO TESTADO",
+    "description": "Modelo customizado Usuario detectado", 
+    "security_level": "INFO",
+    "note": "Sistema usa modelo customizado core.Usuario em vez de auth.User"
+  },
+  "session_security": {
+    "status": "✅ ADEQUADO",
+    "active_sessions": 1,
+    "session_framework": "Django default",
+    "security_level": "SECURE",
+    "description": "Sistema de sessões Django padrão funcionando"
+  },
+  "security_assessment": {
+    "overall_status": "✅ BOM",
+    "protected_endpoints": 3,
+    "vulnerable_endpoints": 0,
+    "undefined_endpoints": 1,
+    "csrf_enabled": true,
+    "session_management": "Django standard"
+  },
+  "recommendations": [
+    {
+      "priority": "LOW",
+      "item": "Verificar rota /solicitacao/ (404 encontrado)",
+      "description": "Confirmar se esta URL deveria existir"
+    },
+    {
+      "priority": "INFO",
+      "item": "Modelo customizado Usuario",
+      "description": "Sistema usa core.Usuario - arquitetura adequada"
+    }
+  ]
+}

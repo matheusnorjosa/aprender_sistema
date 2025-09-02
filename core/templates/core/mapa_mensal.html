@@ -4,15 +4,20 @@
   <meta charset="utf-8">
   <title>Disponibilidade | Mapa Mensal</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root{
       --bg:#f6f7fb; --card:#fff; --text:#222; --muted:#6b7280; --grid-border:#e5e7eb;
       --evento:#3b82f6; --multi:#b91c1c; --desloc:#f59e0b; --bloq-total:#111827; --bloq-parc:#9ca3af; --conflito:#dc2626;
       --badge-bg:#b91c1c; --badge:#fff; --hover:#eff6ff; --head:#fafafa; --sticky:#f3f4f6;
+      --primary: #3b82f6; --primary-hover: #2563eb;
     }
     body{background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:0; padding:24px;}
     .wrap{max-width:1200px; margin:0 auto;}
     .card{background:var(--card); border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:16px;}
+    .header{display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid var(--grid-border);}
+    .back-btn{display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:var(--primary); color:#fff; text-decoration:none; border-radius:8px; font-weight:500; transition:background 0.2s;}
+    .back-btn:hover{background:var(--primary-hover); color:#fff;}
     .toolbar{display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap}
     .toolbar h1{font-size:18px; margin:0; font-weight:700}
     .spacer{flex:1}
@@ -42,8 +47,14 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="toolbar">
+    <div class="header">
       <h1>Mapa Mensal de Disponibilidade</h1>
+      <a href="/" class="back-btn">
+        <i class="bi bi-arrow-left"></i> Voltar ao Sistema
+      </a>
+    </div>
+
+    <div class="toolbar">
       <div class="spacer"></div>
       <select id="selMes" class="sel"></select>
       <select id="selAno" class="sel"></select>

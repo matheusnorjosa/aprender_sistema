@@ -1,0 +1,1485 @@
+{
+  "planilha_nome": "Usuários",
+  "planilha_id": "1Zj_I7sqYAJ9uaYbVoBfskl0LqxGM3SAFzwm4Zpph1RI",
+  "data_extracao": "2025-09-01T19:43:50.131490",
+  "total_abas": 3,
+  "worksheets": {
+    "Ativos": {
+      "headers": [
+        "Nome",
+        "Nome Completo",
+        "CPF",
+        "Telefone",
+        "Email",
+        "Cargo",
+        "Gerência",
+        "Coluna 1"
+      ],
+      "data": [
+        [
+          "Alisson Mendonça",
+          "Alison Mendonça de Almeida",
+          "05759216333",
+          "85 99107-4898",
+          "alisonalmeida2012@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Alysson Macedo",
+          "Alysson Araujo de Macedo",
+          "67153887334",
+          "85 99936-1920",
+          "alysson.macedo@gmail.com\t",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Amanda Arruda",
+          "Amanda Arruda da Costa Rodrigues",
+          "04944374305",
+          "85 98313-6888",
+          "coordenacao80@aprendereditora.com.br",
+          "Coordenadores",
+          "Outros",
+          ""
+        ],
+        [
+          "Amanda Sales",
+          "Amanda Sales Rodrigues Melo",
+          "05884229321",
+          "85 99661-8310",
+          "amandasalesr@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Ana Claudia",
+          "Ana Claudia Lima de Almeida",
+          "61716405300",
+          "",
+          "claudiaprofmatt@gmail.com",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Ana Claúdia Almeida",
+          "Ana Cláudia Lima de Almeida",
+          "61716405300",
+          "85 98210-1229",
+          "claudiaprofmatt@gmail.com",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Ana Kariny",
+          "Ana Kariny Santos Silva",
+          "06512633369",
+          "85 99113-3170",
+          "anakarinyak2021@gmail.com",
+          "Formadores",
+          "Vidas M",
+          ""
+        ],
+        [
+          "Ana Paula",
+          "Ana Paula Castelo Branco Fontenele",
+          "37045652372",
+          "85 99859-0177",
+          "coordenacao9@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Analine Parente",
+          "Analine Maria Martins Parente",
+          "62996177304",
+          "88 981432053",
+          "coordenacao100@aprendereditora.com.br",
+          "Coordenadores",
+          "IDEB 10",
+          ""
+        ],
+        [
+          "Anna Lúcia",
+          "Anna Lúcia Schneider de Andrade",
+          "04789802809",
+          "11 99440-9399",
+          "annaluaprender@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Anna Patrícia",
+          "Anna Patrícia de Souza Silva Martins",
+          "01075125480",
+          "87 98803-8022",
+          "annapatricia.ssmartins@gmail.com",
+          "Formadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Antonio Edson",
+          "Antonio Edson Alves da Silva",
+          "02972511395",
+          "88 99377-0450",
+          "edson.crat@gmail.com",
+          "Formadores",
+          "Vidas L",
+          ""
+        ],
+        [
+          "Antonio Furtado",
+          "Antonio Furtado Landim Neto",
+          "00927639360",
+          "85 98868-7818",
+          "landimneto@gmail.com",
+          "Formadores",
+          "Vidas M",
+          ""
+        ],
+        [
+          "Ariana Coelho",
+          "Ariana Coelho Rodrigues Rocha",
+          "34473530663",
+          "11 98278-7662",
+          "arianarochaaprender@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Aurea Lucia",
+          "Aurea Lucia Cruz dos Santos",
+          "47769262372",
+          "85 99230-8784",
+          "coordenacao5@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Ayla Maria",
+          "Ayla Maria Custódio Mota Paraguassú",
+          "22987622368",
+          "85 98107-6262",
+          "aylaparaguassu@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Beatriz Helena",
+          "Beatriz Helena Castelo de Andrade Furtado",
+          "63493071353",
+          "85 99276-2905",
+          "coordenacao40@aprendereditora.com.br",
+          "Coordenadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Bruno Teles",
+          "Bruno Teles dos Santos Nery",
+          "82320608591",
+          "85 99602-8249",
+          "coordenacao10@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Claudiana Maria",
+          "Claudiana Maria Guilherme Batista",
+          "00391703307",
+          "85 98742-2744",
+          "claudianagb34@gmail.com",
+          "Formadores",
+          "Vidas L",
+          ""
+        ],
+        [
+          "Daniel Gomes",
+          "Daniel Gomes",
+          "00487477340",
+          "85 99711-7154",
+          "coordenacao30@aprendereditora.com.br",
+          "Coordenadores",
+          "Fluir",
+          ""
+        ],
+        [
+          "Daniele Cristina",
+          "Daniele Cristina Moreira Cruz",
+          "01779383312",
+          "85 99959-2657",
+          "coordenacao70@aprendereditora.com.br",
+          "Coordenadores",
+          "Outros",
+          ""
+        ],
+        [
+          "Danielle Fernandes",
+          "Danielle Holanda Nunes Fernandes",
+          "00799156396",
+          "85 98828-7891",
+          "dhnfernandes@gmail.com",
+          "Formadores",
+          "Avançando Juntos",
+          ""
+        ],
+        [
+          "Danielle Fernandes",
+          "Danielle Holanda Nunes Fernandes",
+          "00799156396",
+          "85 98828-7891",
+          "dhnfernandes@gmail.com",
+          "Formadores",
+          "Avançando Juntos",
+          ""
+        ],
+        [
+          "David Ribeiro",
+          "David Ribeiro Mourão",
+          "00955654343",
+          "08 59918-3295",
+          "david.ojesed@gmail.com",
+          "Formadores",
+          "Vidas M",
+          ""
+        ],
+        [
+          "Denise Carlos",
+          "Denise Carlos de Col",
+          "08919725870",
+          "11 99757-5862",
+          "denisecol36@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Deuzirane Nunes",
+          "Deuzirane Nunes Silva",
+          "74034243368",
+          "85 99130-2495",
+          "deuziraneaprender@gmail.com",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Diego Tavares",
+          "Diego Tavares de Sousa",
+          "02483867359",
+          "85 99292-3087",
+          "professordiegotavares@gmail.com",
+          "Formadores",
+          "Vidas M",
+          ""
+        ],
+        [
+          "Douglas Wígner",
+          "Douglas Wígner Brasil Maia Coutinho",
+          "06474565322",
+          "85 99766-5766",
+          "douglaswignerbrasil@gmail.com",
+          "Formadores",
+          "Vidas L",
+          ""
+        ],
+        [
+          "Elaine Mendes",
+          "Elaine Mendes Machado",
+          "05355748350",
+          "85 98187-3999",
+          "ellainneediaprender23@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Elienai Oliveira",
+          "Elienai Oliveira Góes",
+          "04245157330",
+          "85 99964-0350",
+          "coordenacao21@aprendereditora.com.br",
+          "Coordenadores",
+          "Vidas",
+          ""
+        ],
+        [
+          "Elisângela Soares",
+          "Elisângela Soares dos Santos",
+          "83849742334",
+          "85 99638-8251",
+          "zangelasoares14@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Elizabete Lima",
+          "Elizabete Lima da Silva",
+          "00026317338",
+          "85 98884-2583",
+          "elizabetelima.aprender@gmail.com",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Ellen Damares",
+          "Ellen Damares",
+          "87521105320",
+          "85 99272-7891",
+          "coordenacao41@aprendereditora.com.br",
+          "Coordenadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Estela Maria",
+          "Estela Maria Souza da Silva",
+          "06322825330",
+          "85 98642-6838",
+          "estelamariasouza@gmail.com",
+          "Formadores",
+          "Vidas L",
+          ""
+        ],
+        [
+          "Eulina Carmem",
+          "Eulina Carmem Santiago de Oliveira",
+          "81829205315",
+          "85 99612-6991",
+          "coordenacao1@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Fabíola Martins",
+          "Fabíola Martins Bezerra",
+          "41692128353",
+          "85 99417-5679",
+          "fabilbm06@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Fabíola Morais",
+          "Antônia Fabiola Agostinho de Morais",
+          "02723518302",
+          "85 98783-3939",
+          "coordenacao14@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Fabrícia Santos",
+          "Fabrícia Santos Macedo",
+          "09561166470",
+          "81 99929-4871",
+          "fabriciasmacedo@gmail.com",
+          "Formadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Fernanda Ramos",
+          "Fernanda Ramos Lopes",
+          "00564395390",
+          "85 99421-1940",
+          "gerencia1.projetos1@aprendereditora.com.br",
+          "Gerente",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Gabriel Oliveira",
+          "José Gabriel Souto Oliveira",
+          "07923793301",
+          "",
+          "profgabrielsouto@gmail.com",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Gabriela Duarte",
+          "Gabriela Foeppel Duarte\r",
+          "86987585334",
+          "85 986506081",
+          "apoio.coordenacao7@aprendereditora.com.br",
+          "Coordenadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Germana Mirla",
+          "Germana Mirla Veras Santana",
+          "82774854334",
+          "85 98707-0312",
+          "mirlaeducacao@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Gilcilene Pinheiro",
+          "Gilcilene Pinheiro Machado",
+          "02049351305",
+          "85 98139-7222",
+          "coordenacao3@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Glaubia Pinheiro",
+          "Glaubia Pinheiro do Nascimento Silva",
+          "01238022375",
+          "85 99959-4237",
+          "glaubiapinheiro@gmail.com",
+          "Formadores",
+          "Vidas L",
+          ""
+        ],
+        [
+          "Gleice Anne",
+          "Gleice Anne Lima de Sousa",
+          "76255735320",
+          "85 99258-3761",
+          "gerencia.projetos5@aprendereditora.com.br",
+          "Gerente",
+          "Brincando",
+          ""
+        ],
+        [
+          "Gleiciane Sousa",
+          "Gleiciane de Sousa Marques",
+          "01253367302",
+          "85 98808-3241",
+          "gleicianeeditoraaprender@gmail.com",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Hugo Ribeiro",
+          "Hugo Ribeiro Reinaldo",
+          "60362932328",
+          "85 99672-9941",
+          "hugoaprendereditora@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Humberto Luciano",
+          "Humberto Luciano Zirpolli",
+          "28677590803",
+          "85 98166-7154",
+          "betozirpolli.aprender@gmail.com",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Iago Oliveira",
+          "Iago de Oliveira Vasconcelos",
+          "03031196325",
+          "08 59854-5602",
+          "iagoprofparticular@gmail.com",
+          "Formadores",
+          "Vidas C",
+          ""
+        ],
+        [
+          "Icaro Maciel",
+          "Francisco Icaro Maciel Forte Chaves",
+          "05465904380",
+          "85 99106-1653",
+          "icarochaves.aprender@gmail.com",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Isabel Kerssia",
+          "Isabel Kerssia Maia de Oliveira",
+          "62688901320",
+          "",
+          "isabel15kerssia@gmail.com",
+          "Formadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Janieri Martins",
+          "Janieri Scipião",
+          "00377938378",
+          "88 98849-4900",
+          "janieriaajj@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Jarbas Marcelino",
+          "Jarbas Marcelino Nogueira de Oliveira",
+          "01140417339",
+          "85 99766-4889",
+          "jarbasnogueiraoliveira@gmail.com",
+          "Formadores",
+          "Vidas M",
+          ""
+        ],
+        [
+          "Jeane Félix",
+          "Jeane Félix de Andrade Breier",
+          "95462384300",
+          "85 99968-6766",
+          "coordenacao2@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "João Carvalho",
+          "João de Carvalho Lima Júnior",
+          "89255933434",
+          "85 99154-3991",
+          "joaojunioreditoraaprender@gmail.com",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "João Marcos",
+          "João Marcos de Sousa dos Santos",
+          "60378057332",
+          "",
+          "jmmarcos825@gmail.com",
+          "Formadores",
+          "Vidas L",
+          ""
+        ],
+        [
+          "Jonathan Araújo",
+          "Jonathan Araújo Cavalcante",
+          "04680230380",
+          "85 98856-6870",
+          "apoio.coordenacao4@aprendereditora.com.br",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Jonathan Araújo",
+          "Jonathan Araújo Cavalcante",
+          "04680230380",
+          "85 98856-6870",
+          "apoio.coordenacao4@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Júlia Rodrigues",
+          "Júlia Rodrigues Mouta",
+          "06827662322",
+          "88 99455-1510",
+          "juliarmouta@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Juliana Guerreiro",
+          "Juliana Guerreiro Lichy Cardoso",
+          "31949102807",
+          "11 98282-4791",
+          "julianalichyaprender@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Katy Araújo",
+          "Katy Araújo e Silva",
+          "44092717334",
+          "85 99859-0169",
+          "gerencia.projetos4@aprendereditora.com.br",
+          "Gerente",
+          "ACerta",
+          ""
+        ],
+        [
+          "Laís Aline",
+          "Lais Aline Nascimento Fahel Evangelista",
+          "67188940363",
+          "85 98557-7776",
+          "coordenacao42@aprendereditora.com.br",
+          "Coordenadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Lázaro Teixeira",
+          "\tLázaro de Oliveira Teixeira Júnior",
+          "04632565300",
+          "85 98662-4438",
+          "apoio.coordenacao8@aprendereditora.com.br",
+          "Coordenadores",
+          "Fluir",
+          ""
+        ],
+        [
+          "Leidiane Sousa",
+          "Leidiane de Sousa da Silva",
+          "02393721312",
+          "85 99162-5138",
+          "coordenacao50@aprendereditora.com.br",
+          "Coordenadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Lidiane Oliveira",
+          "Lidiane Oliveira da Silva Moraes",
+          "80257879315",
+          "85 99404-9529",
+          "psicopedagogalidianemoraes@gmail.com",
+          "Formadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Lívia Mara",
+          "Lívia Mara da Silva",
+          "07033045344",
+          "85 99171-1327",
+          "apoio.coordenacao2@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Lourene Pinheiro",
+          "Lourene Pinheiro da Silva",
+          "71843582368",
+          "",
+          "coordenacao90@aprendereditora.com.br",
+          "Coordenadores",
+          "Outros",
+          ""
+        ],
+        [
+          "Lyziane Maria",
+          "Lyziane Maria Costa Setubal",
+          "00417566301",
+          "85 98859-5509",
+          "lyzaprender@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Manuela Fonseca",
+          "Manuela Fonseca Grangeiro",
+          "41926145372",
+          "85 99657-7600",
+          "coordenacao4@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Marcela Sousa",
+          "Marcela Sousa Costa",
+          "95863834315",
+          "85 99637-4693",
+          "marcelatia.ms@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Marcos Randall",
+          "Marcos Randall Oliveira de Freitas",
+          "01809797365",
+          "85 99146-7477",
+          "randall.ufc@gmail.com",
+          "Formadores",
+          "Vidas L",
+          ""
+        ],
+        [
+          "Maria Auxiliadora",
+          "Maria Auxiliadora da Silva",
+          "69683735304",
+          "85 98700-8790",
+          "professoraauxiliadora.uece@gmail.com",
+          "Formadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Maria Cristina",
+          "Maria Cristina Meaney",
+          "12972082850",
+          "11 99410-6708",
+          "gerencia.projetos1@aprendereditora.com.br",
+          "Gerente",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Maria Joelma",
+          "Maria Joelma Alves Pimentel",
+          "91382238304",
+          "",
+          "mariajoelma.alves40@gmail.com",
+          "Formadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Maria Leidiane",
+          "Maria Leidiane de Sousa Silva",
+          "02720941379",
+          "85 99204-1713",
+          "leidianesousa554@gmail.com",
+          "Formadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Maria Nadir",
+          "Maria Nadir de Almeida Sales",
+          "00370502302",
+          "85 99642-3208",
+          "coordenacao12@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Maria Solange",
+          "Maria Solange de Almeida Cavalcante",
+          "86324020304",
+          "85 98804-8560",
+          "gerencia3.projetos1@aprendereditora.com.br",
+          "Gerente",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Mazuk Eeves",
+          "Mazuk Eeves Ricardo dos Anjos",
+          "00688637302",
+          "85 99128-7779",
+          "apoio.coordenacao3@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Michele Macedo",
+          "Alessandra Michele Macedo Rondon",
+          "09841910896",
+          "85 99668-6817",
+          "michelerondonaprender@gmail.com",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Michella Rita",
+          "Michella Rita Santos Fonseca",
+          "73875589300",
+          "85 98808-0501",
+          "michellatrue@gmail.com",
+          "Formadores",
+          "Vidas M",
+          ""
+        ],
+        [
+          "Milena Barbosa",
+          "Milena Teixeira de Lima Barbosa",
+          "48036552353",
+          "85992571350",
+          "profa.millenateixeira@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Mônica Maria",
+          "Mônica Maria Cosmo Vieira Uchôa",
+          "05443752383",
+          "85986007628",
+          "monykauchoa@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Mônica Silva",
+          "Mônica da Silva Miranda",
+          "01798182360",
+          "",
+          "monica2803miranda@gmail.com",
+          "Formadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Nadyelle Carvalho",
+          "Nadyelle Carvalho Pinheiro",
+          "02360880330",
+          "85 99766-7437",
+          "nadyellecpsi@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Natália Gomes",
+          "Natália Gomes Macedo",
+          "03974725369",
+          "85 98704-3139",
+          "nataliagomesmacedo22@gmail.com",
+          "Formadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Nivia Vieira",
+          "Nivia Joana Darc de Oliveira Vieira",
+          "07859912392",
+          "85 99133-8413",
+          "apoio.coordenacao5@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Noilma Costa",
+          "Noilma Costa Silva",
+          "93465874587",
+          "75 98878-4924",
+          "noisilva40@gmail.com",
+          "Formadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Patrícia Lemos",
+          "Patrícia Lemos de Paiva",
+          "69165246349",
+          "85 99737-5972",
+          "gerencia.projetos2@aprendereditora.com.br",
+          "Gerente",
+          "Vidas",
+          ""
+        ],
+        [
+          "Patrycia Lanne",
+          "Patrycia Lanne da Silveira",
+          "66524326334",
+          "85 98523-0108",
+          "patyinsty@gmail.com",
+          "Formadores",
+          "Vidas L",
+          ""
+        ],
+        [
+          "Paula Freire",
+          "Paula Ferreira Freire",
+          "68214227372",
+          "",
+          "gerencia2.projetos1@aprendereditora.com.br",
+          "Gerente",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Penélope Alberto",
+          "Penélope Alberto Rodrigues",
+          "16497802819",
+          "11 99355-3704",
+          "pel.aprender@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Poliane Lima",
+          "Francisca Poliane Lima de Oliveira",
+          "88134903304",
+          "85 99686-6647",
+          "meuemaildaaprender@gmail.com",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Rafael Rabelo",
+          "Rafael Rabelo",
+          "96288795372",
+          "",
+          "coordenacao60@aprendereditora.com.br",
+          "Coordenadores",
+          "Outros",
+          ""
+        ],
+        [
+          "Raul Vasconcelos",
+          "Raul Vasconcelos Rodrigues",
+          "04173202300",
+          "85 98873-0216",
+          "raulrodrigues25@gmail.com",
+          "Formadores",
+          "Vidas C",
+          ""
+        ],
+        [
+          "Rayane Maria",
+          "Rayane Maria Laurentino Silva",
+          "04088714318",
+          "08 58956-8287",
+          "rayanelaurentino.aprender@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Regianio Lima",
+          "Regianio Daniel Lima",
+          "62231863391",
+          "85 992573516",
+          "danielregianio@gmail.com",
+          "Formadores",
+          "Vidas M",
+          ""
+        ],
+        [
+          "Renata Lapena",
+          "Renata Lapena Fernandes Lima",
+          "08937668874",
+          "85 99642-9553",
+          "coordenacao7@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Renata Nojoza",
+          "Renata Nojoza Dos Santos",
+          "53825756300",
+          "85 99859-0170",
+          "coordenacao13@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Ricardo Ítalo",
+          "Ricardo Ítalo Maciel Forte Chaves",
+          "01894010361",
+          "",
+          "ricardocodu@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Rochelly Alinne",
+          "Rochelly Alinne Azevedo Stedile",
+          "58038213300",
+          "85 99859-0170",
+          "rochellystedile@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Rodolfo Penha",
+          "Rodolfo Sena da Penha",
+          "89661559368",
+          "88 981521213",
+          "rodolfo.sena25@gmail.com",
+          "Formadores",
+          "Avançando Juntos",
+          ""
+        ],
+        [
+          "Rodrigo Lima",
+          "Rodrigo Lima Mota",
+          "00919084346",
+          "85 99165-1991",
+          "rodrigolmota2013@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Rosilene Barbosa",
+          "Rosilene Barbosa da Silva",
+          "07030397339",
+          "85 99138-3977",
+          "rosilene.barbosa0411@gmail.com",
+          "Formadores",
+          "Vidas L",
+          ""
+        ],
+        [
+          "Sandra Dias",
+          "Sandra Maria Soeiro Dias",
+          "3937779361",
+          "85 987452267",
+          "sandra_soeiro@uvanet.br",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Silvia Jesus",
+          "Silvia de Jesus Sacramento",
+          "83077146568",
+          "71 99370-0558",
+          "sacramentosilvia.editora@gmail.com",
+          "Formadores",
+          "Brincando",
+          ""
+        ],
+        [
+          "Silvio Carlos",
+          "Silvio Carlos de Almeida",
+          "02386280357",
+          "85 98151-4556",
+          "coordenacao20@aprendereditora.com.br",
+          "Coordenadores",
+          "Vidas M",
+          ""
+        ],
+        [
+          "Simone Maria",
+          "Simone Maria Garcia",
+          "14416977808",
+          "11 99101-1600",
+          "simonegarcia147@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Socorro Aclécia",
+          "Socorro Aclécia Araújo Pereira Medeiros",
+          "00054555370",
+          "85 98668-0284",
+          "coordenacao22@aprendereditora.com.br",
+          "Coordenadores",
+          "Vidas L",
+          ""
+        ],
+        [
+          "Thaís Borges",
+          "Thaís Borges Moreira",
+          "06204097385",
+          "85 99743-8223",
+          "thais.ufc.93@gmail.com",
+          "Formadores",
+          "Vidas C",
+          ""
+        ],
+        [
+          "Thomas Sousa",
+          "Thomas Sousa dos Santos",
+          "38128909843",
+          "85 99919-3932",
+          "matematica.thomas@gmail.com",
+          "Formadores",
+          "Vidas M",
+          ""
+        ],
+        [
+          "Tiago Joananta",
+          "Tiago Joananta de Sousa",
+          "02839158388",
+          "85 99268-6546",
+          "coordenacao8@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Valdemir Silva",
+          "Valdemir Silva Santos",
+          "92673023372",
+          "85 99217-4041",
+          "coordenacao15@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Valdiana Santos",
+          "Valdiana dos Santos Sobreira",
+          "97162132391",
+          "85 98114-1436",
+          "val.aprender19@gmail.com",
+          "Formadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Vanessa Angélica",
+          "Vanessa Angélica Ferreira",
+          "02461570388",
+          "85 8528-6237",
+          "coordenacao11@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          ""
+        ],
+        [
+          "Vinicius Albuquerque",
+          "Marcos Vinicius Albuquerque Da Costa",
+          "04437801377",
+          "85 9 8968-4266",
+          "apoio.coordenacao6@aprendereditora.com.br",
+          "Coordenadores",
+          "IDEB 10",
+          ""
+        ],
+        [
+          "Viviane Aquino",
+          "Viviane de Aquino Queiroz Nunes",
+          "62219634353",
+          "88 99741-4430",
+          "vivianeaquino.aprender@gmail.com",
+          "Formadores",
+          "ACerta",
+          ""
+        ],
+        [
+          "Yuri Furtado",
+          "Yuri Furtado Siqueira",
+          "04621474367",
+          "85 98700-8790",
+          "coordenacao23@aprendereditora.com.br",
+          "Coordenadores",
+          "Vidas",
+          ""
+        ]
+      ],
+      "total_rows": 118,
+      "total_cols": 8
+    },
+    "Inativos": {
+      "headers": [
+        "Nome",
+        "Nome Completo",
+        "CPF",
+        "Telefone",
+        "Email",
+        "Cargo",
+        "Projeto"
+      ],
+      "data": [
+        [
+          "Mikaelly Correia",
+          "Mikaelly Correia Araripe Cavalcante",
+          "06721593335",
+          "",
+          "mikaidim12@gmail.com",
+          "Formadores",
+          "Superintendência"
+        ],
+        [
+          "Bruno Pereira",
+          "Bruno Pereira dos Santos",
+          "04052224329",
+          "85 99420-8507",
+          "brunosantos.prof23@gmail.com",
+          "Formadores",
+          ""
+        ]
+      ],
+      "total_rows": 3,
+      "total_cols": 7
+    },
+    "Pendentes": {
+      "headers": [
+        "Nome",
+        "Nome Completo",
+        "CPF",
+        "Telefone",
+        "Email",
+        "Cargo",
+        "Projeto",
+        "OBS",
+        "Cadastro Plataformas",
+        "Atualização Agenda"
+      ],
+      "data": [
+        [
+          "Rodrigo",
+          "Rodrigo Lima Mota",
+          "00919084346",
+          "(85)991651991",
+          "rodrigolmota2013@gmail.com",
+          "Formadores",
+          "Superintendência",
+          "",
+          "Criado",
+          "Atualizado"
+        ],
+        [
+          "Mônica",
+          "Mônica Maria Cosmo Vieira Uchôa",
+          "05443752383",
+          "(85) 986007628",
+          "monykauchoa@gmail.com",
+          "Formadores",
+          "Superintendência",
+          "Já possuía cadastro, foi efetuada atualização. ",
+          "Criado",
+          "Atualizado"
+        ],
+        [
+          "Fabíola",
+          "Fabíola Martins Bezerra",
+          "41692128353",
+          "85 994175679",
+          "fabilbm06@gmail.com",
+          "Formadores",
+          "Superintendência",
+          "",
+          "Criado",
+          "Atualizado"
+        ],
+        [
+          "Jocilania",
+          "Jocilania Souza da Silva",
+          "88772101334",
+          "",
+          "coordenacao6@aprendereditora.com.br",
+          "Coordenadores",
+          "-",
+          "Remoção",
+          "Atualizado",
+          ""
+        ],
+        [
+          "Analine",
+          "Analine Maria Martins Parente",
+          "62996177304",
+          "88 981432053",
+          "coordenacao100@aprendereditora.com.br",
+          "Coordenadores",
+          "IDEB 10",
+          "",
+          "Criado",
+          ""
+        ],
+        [
+          "Nivia Vieira",
+          "Nivia Joana Darc de Oliveira Vieira",
+          "07859912392",
+          "85 99133-8413",
+          "apoio.coordenacao5@aprendereditora.com.br",
+          "Apoio de Coordenação",
+          "Superintendência",
+          "22/04: Esta pendente incluir na Avaliar",
+          "Criado",
+          ""
+        ],
+        [
+          "Ana Claúdia Almeida",
+          "Ana Cláudia Lima de Almeida",
+          "61716405300",
+          "85 98210-1229",
+          "claudiaprofmatt@gmail.com",
+          "Formadores",
+          "Acerta",
+          "22/04: Esta pendente incluir na Avaliar",
+          "Criado",
+          ""
+        ],
+        [
+          "Gabriel Oliveira",
+          "José Gabriel Souto Oliveira",
+          "07923793301",
+          "85 98112-3156",
+          "profgabrielsouto@gmail.com",
+          "Formadores",
+          "ACerta",
+          "",
+          "Criado",
+          ""
+        ],
+        [
+          "Vinicius Albuquerque",
+          "Marcos Vinicius Albuquerque Da Costa",
+          "04437801377",
+          "85 9 8968-4266",
+          "apoio.coordenacao6@aprendereditora.com.br",
+          "Apoio de Coordenação",
+          "IDEB10",
+          "&BK74>L*R48T6mW=",
+          "Criado",
+          ""
+        ],
+        [
+          "Francisco Vasconcelos",
+          "Francisco Vilar Vasconcelos",
+          "03598076312",
+          "88 99658-1193",
+          "vilarmestreifce@gmail.com",
+          "Formadores",
+          "IDEB10",
+          "",
+          "Criado",
+          ""
+        ],
+        [
+          "Daniel Menezes",
+          "Daniel Brandão Menezes",
+          "00203557344",
+          "85 99683-7173",
+          "brandaomenezes@hotmail.com",
+          "Formadores",
+          "IDEB10",
+          "",
+          "Criado",
+          ""
+        ],
+        [
+          "Danielle Fernandes",
+          "Danielle Holanda Nunes Fernandes",
+          "00799156396",
+          "85 98828-7891",
+          "dhnfernandes@gmail.com",
+          "Formadores",
+          "Avançando Juntos",
+          "",
+          "Criado",
+          ""
+        ],
+        [
+          "Rodolfo Penha",
+          "Rodolfo Sena da Penha",
+          "89661559368",
+          "88 981521213",
+          "rodolfo.sena25@gmail.com",
+          "Formadores",
+          "Avançando Juntos",
+          "",
+          "Criado",
+          ""
+        ],
+        [
+          "Milena Barbosa",
+          "Milena Teixeira de Lima Barbosa",
+          "48036552353",
+          "85992571350",
+          "profa.millenateixeira@gmail.com",
+          "Formadores",
+          "Superintendência",
+          "",
+          "Criado",
+          ""
+        ],
+        [
+          "Sandra Dias",
+          "Sandra Maria Soeiro Dias",
+          "3937779361",
+          "85 987452267",
+          "sandra_soeiro@uvanet.br",
+          "Formadores",
+          "Superintendência",
+          "",
+          "Criado",
+          "Atualizado"
+        ],
+        [
+          "Alysson Macedo",
+          "Alysson Araujo de Macedo",
+          "67153887334",
+          "85 99936-1920",
+          "alysson.macedo@gmail.com\t",
+          "Formadores",
+          "ACerta",
+          "",
+          "Criado",
+          "Atualizado"
+        ],
+        [
+          "REGIANIO LIMA",
+          "REGIANIO DANIEL LIMA",
+          "62231863391",
+          "85 992573516",
+          "danielregianio@gmail.com",
+          "Formadores",
+          "Vidas",
+          "",
+          "Criado",
+          "Atualizado"
+        ],
+        [
+          "Vanessa Ferreira",
+          "Vanessa Angélica Ferreira",
+          "02461570388",
+          "85 8528-6237",
+          "coordenacao11@aprendereditora.com.br",
+          "Coordenadores",
+          "Superintendência",
+          "",
+          "Criado",
+          "Atualizado"
+        ],
+        [
+          "Gabriela Praxedes",
+          "Gabriela Foeppel Duarte Praxedes",
+          "86987585334",
+          "85 986506081",
+          "apoio.coordenacao7@aprendereditora.com.br",
+          "Apoio de Coordenação",
+          "Brincando e Aprendendo",
+          "",
+          "Criado",
+          ""
+        ],
+        [
+          "Lázaro Teixeira",
+          "Lázaro de Oliveira Teixeira Júnior",
+          "04632565300",
+          "85 8662-4438",
+          "apoio.coordenacao8@aprendereditora.com.br",
+          "Apoio de Coordenação",
+          "Fluir",
+          "",
+          "Criado",
+          "Atualizado"
+        ]
+      ],
+      "total_rows": 21,
+      "total_cols": 10
+    }
+  }
+}

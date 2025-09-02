@@ -6,6 +6,7 @@ from .views import (
     AprovacoesPendentesView, AprovacaoDetailView,
     BloqueioCreateView, CustomLoginView, FormadorEventosView,
     GoogleCalendarMonitorView, AuditoriaLogView, ControleAPIStatusView,
+    ControlePreAgendaView, CriarEventoGoogleCalendarView, RemoverEventoPreAgendaView,
     DiretoriaExecutiveDashboardView, DiretoriaRelatoriosView, DiretoriaAPIMetricsView,
     CoordenadorMeusEventosView, DashboardStatsAPIView,
     home  # Mantendo a função home também (opcional)
@@ -22,6 +23,7 @@ urlpatterns = [
     
     # Autenticação
     path("login/", CustomLoginView.as_view(), name="login"),
+    path("logout/", TemplateView.as_view(template_name="core/logout.html"), name="logout"),
     
     # RF02
     path("solicitar/", SolicitacaoCreateView.as_view(), name="solicitar_evento"),
@@ -51,6 +53,11 @@ urlpatterns = [
     path("controle/google-calendar/", GoogleCalendarMonitorView.as_view(), name="controle_google_calendar"),
     path("controle/auditoria/", AuditoriaLogView.as_view(), name="controle_auditoria"),
     path("controle/api/status/", ControleAPIStatusView.as_view(), name="controle_api_status"),
+    
+    # Perfil Controle - Pré-Agenda
+    path("controle/pre-agenda/", ControlePreAgendaView.as_view(), name="controle_pre_agenda"),
+    path("controle/pre-agenda/criar/<uuid:solicitacao_id>/", CriarEventoGoogleCalendarView.as_view(), name="controle_criar_evento"),
+    path("controle/pre-agenda/remover/<uuid:solicitacao_id>/", RemoverEventoPreAgendaView.as_view(), name="controle_remover_evento"),
     
     # Perfil Diretoria - Visão Estratégica e Relatórios Executivos
     path("diretoria/dashboard/", DiretoriaExecutiveDashboardView.as_view(), name="diretoria_dashboard"),

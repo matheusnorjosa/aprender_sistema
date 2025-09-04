@@ -24,7 +24,7 @@ gspread==6.1.4
 
 # Data migration libraries
 django-import-export==4.0.7
-pandas==2.2.0
+pandas>=2.2.3
 openpyxl==3.1.2
 
 # Async processing

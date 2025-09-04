@@ -28,18 +28,18 @@ pandas==2.2.0
 openpyxl==3.1.2
 
 # Async processing
-celery==5.4.0
-redis==5.2.0
-django-celery-beat==2.5.0
-django-celery-results==2.5.0
+celery>=5.4.0
+redis>=5.2.0
+django-celery-beat
+django-celery-results
 
 # Performance optimization
 django-bulk-update==2.2.0
 
 # Development and code quality tools
-flake8==7.0.0
+flake8==7.3.0
 black==24.1.0
-isort==5.13.0
+isort==6.0.1
 pre-commit==3.5.0
 
 # Testing and monitoring

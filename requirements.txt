@@ -52,6 +52,7 @@ flower==2.0.1
 # Production server
 gunicorn==21.2.0
 dj-database-url==2.1.0
+whitenoise==6.6.0
 
 # MCP integration
 django-mcp-server==0.5.6

@@ -8,7 +8,7 @@ from .base import *
 
 class AprovacoesPendentesView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     permission_required = 'core.view_aprovacao'
-    template_name = "core/aprovacoes_pendentes.html"
+    template_name = "core/aprovacoes_pendentes_enhanced.html"
     model = Solicitacao
     context_object_name = "pendentes"
     paginate_by = 20
@@ -17,13 +17,31 @@ class AprovacoesPendentesView(LoginRequiredMixin, PermissionRequiredMixin, ListV
         qs = (
             Solicitacao.objects
             .filter(status=SolicitacaoStatus.PENDENTE)
-            .select_related("projeto", "municipio", "tipo_evento", "usuario_solicitante")
+            .select_related("projeto", "municipio", "tipo_evento", "usuario_solicitante", "projeto__setor")
             .prefetch_related("formadores")
             .order_by("data_inicio")
         )
+        
+        # FILTRO POR SETOR - baseado no usuário logado
+        if not self.request.user.is_superuser:
+            user_setor = self.request.user.setor
+            
+            if user_setor:
+                if user_setor.vinculado_superintendencia:
+                    # Gerentes da Superintendência: veem apenas solicitações de projetos da superintendência
+                    qs = qs.filter(projeto__setor__vinculado_superintendencia=True)
+                else:
+                    # Gerentes de outros setores: veem apenas solicitações do seu próprio setor
+                    qs = qs.filter(projeto__setor=user_setor)
+            else:
+                # Usuário sem setor definido - não vê nenhuma solicitação
+                qs = qs.none()
+        
+        # Filtro de busca por termo
         termo = self.request.GET.get("q")
         if termo:
             qs = qs.filter(titulo_evento__icontains=termo)
+            
         return qs
 
 

@@ -16,7 +16,7 @@
         Sua sessão será encerrada com segurança. Clique no botão abaixo para confirmar o logout.
       </p>
       
-      <form method="post" action="{% url 'admin:logout' %}" class="logout-form">
+      <form method="post" action="{% url 'core:logout' %}" class="logout-form">
         {% csrf_token %}
         <div class="logout-buttons">
           <button type="submit" class="btn btn-danger btn-lg logout-btn">

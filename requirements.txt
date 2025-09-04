@@ -24,6 +24,8 @@ gspread==6.1.4
 
 # Data migration libraries
 django-import-export==4.0.7
+pandas==2.2.0
+openpyxl==3.1.2
 
 # Async processing
 celery==5.4.0
@@ -40,5 +42,15 @@ black==24.0.0
 isort==5.13.0
 pre-commit==3.5.0
 
+# Testing and monitoring
+pytest-django==4.5.2
+factory-boy==3.3.0
+coverage==7.3.2
+django-debug-toolbar==4.2.0
+flower==2.0.1
+
 # Production server
 gunicorn==21.2.0
+
+# MCP integration
+django-mcp-server==0.5.6

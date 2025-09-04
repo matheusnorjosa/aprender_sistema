@@ -387,10 +387,19 @@
           </div>
           <div style="display: flex; gap: 1rem; align-items: center;">
             {% block page_actions %}{% endblock %}
+            
+            <!-- Widget de Notificações -->
+            {% if user.is_authenticated %}
+              {% include 'core/components/notifications_widget.html' %}
+            {% endif %}
+            
             <span style="font-weight: 500; color: var(--text);">{{ user.get_full_name|default:user.username }}</span>
-            <a href="{% url 'core:logout' %}" class="btn btn-sm" style="color: var(--danger);" title="Sair do sistema" aria-label="Sair do sistema">
-              <i class="bi bi-box-arrow-right" aria-hidden="true"></i> Sair
-            </a>
+            <form method="post" action="{% url 'core:logout' %}" style="display: inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm" style="color: var(--danger); background: none; border: none;" title="Sair do sistema" aria-label="Sair do sistema">
+                <i class="bi bi-box-arrow-right" aria-hidden="true"></i> Sair
+              </button>
+            </form>
           </div>
         </div>
       </header>

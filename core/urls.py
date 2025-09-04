@@ -11,8 +11,16 @@ from .views import (
     CoordenadorMeusEventosView, DashboardStatsAPIView,
     home  # Mantendo a função home também (opcional)
 )
+from .views.api_availability import CheckAvailabilityAPI, FormadorDetailsAPI
+from .views.api_approval import BulkApprovalAPI, SolicitacoesPendentesAPI, SolicitacaoConflictsAPI
+from .views.api_notifications import (
+    UserNotificationsAPI, MarkNotificationReadAPI, MarkAllNotificationsReadAPI, 
+    NotificationCountAPI, RealtimeNotificationsAPI, CommunicationLogsAPI, CommunicationStatsAPI
+)
+from .views.admin_views import CommunicationLogsView
 from .views_calendar import MapaMensalView, MapaMensalPageView
 from django.views.generic import TemplateView
+from django.contrib.auth.views import LogoutView
 
 app_name = "core"
 
@@ -23,7 +31,7 @@ urlpatterns = [
     
     # Autenticação
     path("login/", CustomLoginView.as_view(), name="login"),
-    path("logout/", TemplateView.as_view(template_name="core/logout.html"), name="logout"),
+    path("logout/", LogoutView.as_view(), name="logout"),
     
     # RF02
     path("solicitar/", SolicitacaoCreateView.as_view(), name="solicitar_evento"),
@@ -66,4 +74,27 @@ urlpatterns = [
     
     # API para Dashboard Principal
     path("api/dashboard-stats/", DashboardStatsAPIView.as_view(), name="dashboard_stats_api"),
+    
+    # APIs para verificação de disponibilidade em tempo real
+    path("api/check-availability/", CheckAvailabilityAPI.as_view(), name="check_availability_api"),
+    path("api/formador-details/", FormadorDetailsAPI.as_view(), name="formador_details_api"),
+    
+    # APIs para sistema de aprovação avançado
+    path("api/bulk-approval/", BulkApprovalAPI.as_view(), name="bulk_approval_api"),
+    path("api/solicitacoes-pendentes/", SolicitacoesPendentesAPI.as_view(), name="solicitacoes_pendentes_api"),
+    path("api/solicitacao-conflicts/<uuid:solicitacao_id>/", SolicitacaoConflictsAPI.as_view(), name="solicitacao_conflicts_api"),
+    
+    # APIs para sistema de notificações em tempo real  
+    path("api/notifications/user/", UserNotificationsAPI.as_view(), name="user_notifications_api"),
+    path("api/notifications/mark-read/", MarkNotificationReadAPI.as_view(), name="mark_notification_read_api"),
+    path("api/notifications/mark-all-read/", MarkAllNotificationsReadAPI.as_view(), name="mark_all_notifications_read_api"),
+    path("api/notifications/count/", NotificationCountAPI.as_view(), name="notification_count_api"),
+    path("api/notifications/realtime/", RealtimeNotificationsAPI.as_view(), name="realtime_notifications_api"),
+    
+    # APIs para logs de comunicação (apenas admin)
+    path("api/communications/logs/", CommunicationLogsAPI.as_view(), name="communication_logs_api"),
+    path("api/communications/stats/", CommunicationStatsAPI.as_view(), name="communication_stats_api"),
+    
+    # Páginas de administração
+    path("admin/communication-logs/", CommunicationLogsView.as_view(), name="admin_communication_logs"),
 ]

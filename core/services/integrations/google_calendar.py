@@ -33,6 +33,8 @@ class GoogleCalendarService:
     """
     
     def __init__(self, calendar_id: Optional[str] = None):
+        # Por padrão, usar o calendário "Formações" ou o configurado nas settings
+        # Se não especificado, usa 'primary'
         self.calendar_id = calendar_id or getattr(settings, 'GOOGLE_CALENDAR_CALENDAR_ID', 'primary')
         self._service = None
         
@@ -110,7 +112,7 @@ class GoogleCalendarService:
             
             # Construir evento no formato esperado pela API
             event_data = {
-                'summary': gevent.title,
+                'summary': gevent.summary,  # Corrigido: usar summary em vez de title
                 'description': gevent.description or '',
                 'start': {
                     'dateTime': gevent.start_iso,
@@ -191,7 +193,7 @@ class GoogleCalendarService:
             
             # Atualizar campos
             current_event.update({
-                'summary': gevent.title,
+                'summary': gevent.summary,  # Corrigido: usar summary em vez de title
                 'description': gevent.description or '',
                 'start': {
                     'dateTime': gevent.start_iso,

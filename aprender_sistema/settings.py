@@ -61,7 +61,9 @@ if IS_PRODUCTION:
     if not ALLOWED_HOSTS or ALLOWED_HOSTS == [""]:
         raise ValueError("ALLOWED_HOSTS é obrigatório em produção!")
 else:
-    ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0").split(",")
+    # Desenvolvimento + Self-hosting via tunneling
+    default_hosts = "localhost,127.0.0.1,0.0.0.0,10.0.230.13,.localtunnel.me,.ngrok.io,.pinggy.io,.trycloudflare.com"
+    ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", default_hosts).split(",")
 
 # ======================
 # CONFIGURAÇÕES SSL/HTTPS (PRODUÇÃO)
@@ -166,6 +168,13 @@ try:
 except ImportError:
     pass
 
+# MCP Server integration
+try:
+    import django_mcp_server
+    INSTALLED_APPS.append('django_mcp_server')
+except ImportError:
+    pass
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -194,6 +203,7 @@ TEMPLATES = [
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
+                'django.contrib.auth.context_processors.perms',
                 'django.contrib.messages.context_processors.messages',
             ],
         },
@@ -604,8 +614,16 @@ if IS_PRODUCTION and 'LOGGING' in locals():
 # ======================
 
 # Celery Configuration
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+# Celery Broker Configuration
+# Em desenvolvimento: usar database como broker
+# Em produção: usar Redis (configurar CELERY_BROKER_URL no environment)
+if os.getenv('ENVIRONMENT', 'development') == 'production':
+    CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+    CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+else:
+    # Para desenvolvimento: usar database como broker (mais simples)
+    CELERY_BROKER_URL = 'django-db://'
+    CELERY_RESULT_BACKEND = 'django-db://'
 
 # Celery Settings
 CELERY_ACCEPT_CONTENT = ['json']
@@ -641,3 +659,29 @@ IMPORT_EXPORT_TMP_STORAGE_CLASS = 'import_export.tmp_storages.TempFolderStorage'
 BULK_CREATE_BATCH_SIZE = 1000  # Para bulk_create otimizado
 MIGRATION_BATCH_SIZE = 500     # Para processamento em lotes
 MIGRATION_TIMEOUT = 300        # Timeout em segundos para operações longas
+
+# ======================
+# CONFIGURAÇÕES DJANGO MCP SERVER
+# ======================
+
+# django-mcp-server settings
+MCP_SERVERS = {
+    'default': {
+        'name': 'Aprender Sistema MCP Server',
+        'description': 'MCP Server para o sistema de gestão educacional Aprender',
+        'toolsets': [
+            'core.mcp.toolsets.CoreModelToolset',
+            'core.mcp.toolsets.SolicitacaoToolset',
+            'core.mcp.toolsets.FormadorToolset',
+        ],
+        'auth': {
+            'required': True,
+            'type': 'django_session',  # Usar autenticação Django existente
+        }
+    }
+}
+
+# Configurações específicas para desenvolvimento
+if IS_DEVELOPMENT:
+    MCP_SERVERS['default']['debug'] = True
+    MCP_SERVERS['default']['auth']['required'] = False  # Facilitar desenvolvimento

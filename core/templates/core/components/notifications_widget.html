@@ -1,0 +1,380 @@
+<!-- 
+Widget de Notificações em Tempo Real
+SEMANA 3 - DIA 4: Sistema de notificações e comunicações
+
+Componente que exibe:
+1. ✅ Badge com contagem de não lidas
+2. ✅ Dropdown com notificações recentes  
+3. ✅ Atualização em tempo real via polling
+4. ✅ Ações para marcar como lida
+-->
+
+<div class="dropdown" id="notificationsWidget">
+  <!-- Botão de notificações com badge -->
+  <button class="btn btn-outline-secondary position-relative" type="button" 
+          id="notificationsDropdown" 
+          data-bs-toggle="dropdown" 
+          aria-expanded="false"
+          title="Notificações">
+    <i class="bi bi-bell"></i>
+    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
+          id="notificationsBadge" 
+          style="display: none;">
+      0
+    </span>
+  </button>
+  
+  <!-- Dropdown de notificações -->
+  <div class="dropdown-menu dropdown-menu-end shadow" style="width: 350px;" 
+       aria-labelledby="notificationsDropdown">
+    
+    <!-- Cabeçalho -->
+    <div class="dropdown-header d-flex justify-content-between align-items-center">
+      <span>Notificações</span>
+      <button class="btn btn-sm btn-outline-secondary" 
+              id="markAllReadBtn" 
+              title="Marcar todas como lidas">
+        <i class="bi bi-check-all"></i>
+      </button>
+    </div>
+    
+    <div class="dropdown-divider"></div>
+    
+    <!-- Loading -->
+    <div class="text-center py-3" id="notificationsLoading">
+      <div class="spinner-border spinner-border-sm text-primary" role="status">
+        <span class="visually-hidden">Carregando...</span>
+      </div>
+    </div>
+    
+    <!-- Lista de notificações -->
+    <div id="notificationsList" style="max-height: 400px; overflow-y: auto;">
+      <!-- Notificações serão carregadas via JavaScript -->
+    </div>
+    
+    <!-- Mensagem vazia -->
+    <div class="text-center py-3 text-muted" id="noNotificationsMsg" style="display: none;">
+      <i class="bi bi-bell-slash"></i><br>
+      Nenhuma notificação
+    </div>
+    
+    <!-- Rodapé -->
+    <div class="dropdown-divider"></div>
+    <div class="dropdown-item-text text-center">
+      <small class="text-muted">
+        Última atualização: <span id="lastUpdateTime">-</span>
+      </small>
+    </div>
+    
+  </div>
+</div>
+
+<style>
+.notification-item {
+  transition: background-color 0.2s;
+}
+
+.notification-item:hover {
+  background-color: #f8f9fa;
+}
+
+.notification-item.unread {
+  border-left: 3px solid #0d6efd;
+}
+
+.notification-item.read {
+  opacity: 0.7;
+}
+
+.notification-content {
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.notification-time {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+#notificationsBadge.pulse {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.1); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+</style>
+
+<script>
+class NotificationsWidget {
+  constructor() {
+    this.pollingInterval = null;
+    this.lastTimestamp = null;
+    this.isPolling = false;
+    this.init();
+  }
+  
+  init() {
+    // Carregar notificações iniciais
+    this.loadNotifications();
+    
+    // Configurar polling em tempo real
+    this.startPolling();
+    
+    // Event listeners
+    document.getElementById('markAllReadBtn').addEventListener('click', () => {
+      this.markAllAsRead();
+    });
+    
+    // Pausar polling quando dropdown está fechado
+    document.getElementById('notificationsDropdown').addEventListener('hidden.bs.dropdown', () => {
+      this.pausePolling();
+    });
+    
+    document.getElementById('notificationsDropdown').addEventListener('shown.bs.dropdown', () => {
+      this.resumePolling();
+      this.loadNotifications();
+    });
+  }
+  
+  async loadNotifications() {
+    try {
+      const response = await fetch('/api/notifications/user/', {
+        headers: {
+          'X-CSRFToken': this.getCSRFToken()
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.updateBadge(data.unread_count);
+        this.renderNotifications(data.notifications);
+        this.updateLastUpdateTime();
+      }
+      
+    } catch (error) {
+      console.error('Erro ao carregar notificações:', error);
+    } finally {
+      document.getElementById('notificationsLoading').style.display = 'none';
+    }
+  }
+  
+  async checkForNewNotifications() {
+    if (this.isPolling) return;
+    
+    this.isPolling = true;
+    
+    try {
+      let url = '/api/notifications/realtime/';
+      if (this.lastTimestamp) {
+        url += `?since=${encodeURIComponent(this.lastTimestamp)}`;
+      }
+      
+      const response = await fetch(url, {
+        headers: {
+          'X-CSRFToken': this.getCSRFToken()
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.updateBadge(data.unread_count);
+        
+        if (data.has_new) {
+          // Animar badge para indicar novas notificações
+          this.animateBadge();
+          
+          // Se dropdown estiver aberto, recarregar notificações
+          if (this.isDropdownOpen()) {
+            this.loadNotifications();
+          }
+        }
+        
+        this.lastTimestamp = data.server_timestamp;
+      }
+      
+    } catch (error) {
+      console.error('Erro no polling de notificações:', error);
+    } finally {
+      this.isPolling = false;
+    }
+  }
+  
+  renderNotifications(notifications) {
+    const container = document.getElementById('notificationsList');
+    const noNotificationsMsg = document.getElementById('noNotificationsMsg');
+    
+    if (notifications.length === 0) {
+      container.innerHTML = '';
+      noNotificationsMsg.style.display = 'block';
+      return;
+    }
+    
+    noNotificationsMsg.style.display = 'none';
+    
+    const html = notifications.map(notification => `
+      <div class="notification-item dropdown-item ${notification.lida ? 'read' : 'unread'}" 
+           data-id="${notification.id}">
+        <div class="d-flex">
+          <div class="me-2">
+            <i class="${notification.icon}"></i>
+          </div>
+          <div class="flex-grow-1 notification-content">
+            <div class="fw-bold">${notification.titulo}</div>
+            <div class="text-muted small">${notification.mensagem}</div>
+            <div class="notification-time">${notification.tempo_relativo}</div>
+          </div>
+          <div class="ms-2">
+            ${!notification.lida ? `
+              <button class="btn btn-sm btn-outline-secondary mark-read-btn" 
+                      data-id="${notification.id}" 
+                      title="Marcar como lida">
+                <i class="bi bi-check"></i>
+              </button>
+            ` : ''}
+            ${notification.link_acao ? `
+              <a href="${notification.link_acao}" 
+                 class="btn btn-sm btn-outline-primary" 
+                 title="Ver detalhes">
+                <i class="bi bi-arrow-right"></i>
+              </a>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('');
+    
+    container.innerHTML = html;
+    
+    // Event listeners para botões de marcar como lida
+    container.querySelectorAll('.mark-read-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.markAsRead(btn.dataset.id);
+      });
+    });
+  }
+  
+  async markAsRead(notificationId) {
+    try {
+      const response = await fetch('/api/notifications/mark-read/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': this.getCSRFToken()
+        },
+        body: JSON.stringify({
+          notification_id: notificationId
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.updateBadge(data.unread_count);
+        
+        // Atualizar visualmente o item
+        const item = document.querySelector(`[data-id="${notificationId}"]`);
+        if (item) {
+          item.classList.remove('unread');
+          item.classList.add('read');
+          item.querySelector('.mark-read-btn')?.remove();
+        }
+      }
+      
+    } catch (error) {
+      console.error('Erro ao marcar como lida:', error);
+    }
+  }
+  
+  async markAllAsRead() {
+    try {
+      const response = await fetch('/api/notifications/mark-all-read/', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': this.getCSRFToken()
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.updateBadge(0);
+        this.loadNotifications();
+      }
+      
+    } catch (error) {
+      console.error('Erro ao marcar todas como lidas:', error);
+    }
+  }
+  
+  updateBadge(count) {
+    const badge = document.getElementById('notificationsBadge');
+    
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  
+  animateBadge() {
+    const badge = document.getElementById('notificationsBadge');
+    badge.classList.add('pulse');
+    setTimeout(() => {
+      badge.classList.remove('pulse');
+    }, 2000);
+  }
+  
+  updateLastUpdateTime() {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('pt-BR', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    document.getElementById('lastUpdateTime').textContent = timeStr;
+  }
+  
+  startPolling() {
+    // Verificar a cada 30 segundos
+    this.pollingInterval = setInterval(() => {
+      this.checkForNewNotifications();
+    }, 30000);
+  }
+  
+  pausePolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
+  }
+  
+  resumePolling() {
+    if (!this.pollingInterval) {
+      this.startPolling();
+    }
+  }
+  
+  isDropdownOpen() {
+    const dropdown = document.getElementById('notificationsDropdown');
+    return dropdown.getAttribute('aria-expanded') === 'true';
+  }
+  
+  getCSRFToken() {
+    const token = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                  document.querySelector('meta[name=csrf-token]')?.getAttribute('content');
+    return token || '';
+  }
+}
+
+// Inicializar widget quando DOM estiver pronto
+document.addEventListener('DOMContentLoaded', () => {
+  new NotificationsWidget();
+});
+</script>

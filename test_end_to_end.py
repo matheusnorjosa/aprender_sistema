@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 """
-Teste End-to-End do fluxo principal do sistema
-Simula o fluxo completo: Coordenador cria → Superintendência aprova
+SEMANA 3 - DIA 5: Testes end-to-end do fluxo completo
+Script de teste automatizado que simula todo o fluxo do sistema.
 """
 
 import os
 import sys
 import django
+import json
+from datetime import datetime, timedelta
 
 # Configurar Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
@@ -16,163 +18,355 @@ django.setup()
 from django.test import Client
 from django.urls import reverse
 from django.contrib.auth.models import Group
-from core.models import Usuario, Projeto, Municipio, TipoEvento, Solicitacao, SolicitacaoStatus
 from django.utils import timezone
+from core.models import (
+    Usuario, Projeto, Municipio, TipoEvento, Solicitacao, SolicitacaoStatus,
+    AprovacaoStatus, Formador, Notificacao, LogComunicacao
+)
 
 
-def test_end_to_end_flow():
-    """Teste completo do fluxo principal"""
-    print("=== TESTE END-TO-END DO SISTEMA ===\n")
+class EndToEndFlowTester:
+    """Testa o fluxo completo do sistema do início ao fim"""
     
-    # Limpar dados de teste
-    Usuario.objects.filter(username__in=['coord_test', 'super_test']).delete()
-    
-    # 1. Criar usuários com grupos
-    print("1. Criando usuários de teste...")
-    
-    # Coordenador
-    coord_user = Usuario.objects.create_user(
-        username='coord_test',
-        email='coord@test.com',
-        password='test123'
-    )
-    coord_group = Group.objects.get(name='coordenador')
-    coord_user.groups.add(coord_group)
-    
-    # Superintendência
-    super_user = Usuario.objects.create_user(
-        username='super_test', 
-        email='super@test.com',
-        password='test123'
-    )
-    super_group = Group.objects.get(name='superintendencia')
-    super_user.groups.add(super_group)
-    
-    print(f"   + Coordenador criado: {coord_user.username} -> {coord_user.primary_role}")
-    print(f"   + Superintendência criado: {super_user.username} -> {super_user.primary_role}")
-    
-    # 2. Criar dados básicos necessários
-    print("\n2. Criando dados básicos...")
-    
-    projeto, _ = Projeto.objects.get_or_create(nome='Projeto Teste E2E')
-    municipio, _ = Municipio.objects.get_or_create(nome='Cidade Teste', uf='SP')
-    tipo_evento, _ = TipoEvento.objects.get_or_create(nome='Workshop E2E')
-    
-    print(f"   + Projeto: {projeto.nome}")
-    print(f"   + Município: {municipio}")
-    print(f"   + Tipo Evento: {tipo_evento.nome}")
-    
-    # 3. Teste de permissões de acesso
-    print("\n3. Testando permissões de acesso...")
-    
-    client = Client()
-    
-    # Testar acesso coordenador
-    client.login(username='coord_test', password='test123')
-    
-    # Verificar se coordenador pode acessar home
-    response = client.get(reverse('core:home'))
-    coord_home_ok = response.status_code == 200
-    print(f"   + Coordenador acessa home: {'✓' if coord_home_ok else '✗'}")
-    
-    # Verificar se coordenador pode criar solicitação
-    if hasattr(reverse, 'core:solicitar_evento'):
+    def __init__(self):
+        self.client = Client()
+        self.coordenador = None
+        self.superintendente = None
+        self.controle = None
+        self.formador = None
+        self.solicitacao_id = None
+        self.results = []
+        
+    def log_result(self, test_name, success, message=""):
+        """Log dos resultados dos testes"""
+        status = "✅ PASSOU" if success else "❌ FALHOU"
+        self.results.append({
+            'test': test_name,
+            'status': status,
+            'success': success,
+            'message': message
+        })
+        print(f"{status}: {test_name} {message}")
+        
+    def setup_users(self):
+        """Configurar usuários de teste"""
         try:
-            response = client.get(reverse('core:solicitar_evento'))
-            coord_create_ok = response.status_code == 200
-            print(f"   + Coordenador acessa criar solicitação: {'✓' if coord_create_ok else '✗'}")
-        except:
-            print("   ! URL solicitar_evento não encontrada")
-    
-    # Testar acesso superintendência
-    client.login(username='super_test', password='test123')
-    
-    # Verificar se superintendência pode acessar aprovações
-    if hasattr(reverse, 'core:aprovacoes_pendentes'):
+            # Limpar usuários de teste existentes
+            Usuario.objects.filter(username__in=[
+                'coord_teste', 'super_teste', 'controle_teste', 'admin_teste'
+            ]).delete()
+            
+            # Coordenador
+            self.coordenador = Usuario.objects.create_user(
+                username='coord_teste',
+                email='coord@teste.com',
+                password='teste123'
+            )
+            coord_group = Group.objects.get(name='coordenador')
+            self.coordenador.groups.add(coord_group)
+            
+            # Superintendente
+            self.superintendente = Usuario.objects.create_user(
+                username='super_teste',
+                email='super@teste.com',
+                password='teste123'
+            )
+            super_group = Group.objects.get(name='superintendencia')
+            self.superintendente.groups.add(super_group)
+                
+            # Controle
+            self.controle = Usuario.objects.create_user(
+                username='controle_teste',
+                email='controle@teste.com',
+                password='teste123'
+            )
+            controle_group, _ = Group.objects.get_or_create(name='controle')
+            self.controle.groups.add(controle_group)
+                
+            # Formador  
+            self.formador = Formador.objects.first()
+            
+            self.log_result("Setup de Usuários", True, "- Usuários configurados")
+            return True
+            
+        except Exception as e:
+            self.log_result("Setup de Usuários", False, f"- Erro: {str(e)}")
+            return False
+
+    def test_01_home_page(self):
+        """Teste 1: Página inicial carrega corretamente"""
         try:
-            response = client.get(reverse('core:aprovacoes_pendentes'))
-            super_approve_ok = response.status_code == 200
-            print(f"   + Superintendência acessa aprovações: {'✓' if super_approve_ok else '✗'}")
-        except:
-            print("   ! URL aprovacoes_pendentes não encontrada")
+            self.client.force_login(self.coordenador)
+            response = self.client.get('/')
+            
+            success = response.status_code == 200
+            message = f"- Status: {response.status_code}"
+            
+            self.log_result("01. Página Inicial", success, message)
+            return success
+            
+        except Exception as e:
+            self.log_result("01. Página Inicial", False, f"- Erro: {str(e)}")
+            return False
     
-    # 4. Criar solicitação programaticamente (simular fluxo)
-    print("\n4. Simulando criação de solicitação...")
+    def test_02_criar_solicitacao(self):
+        """Teste 2: Coordenador cria nova solicitação"""
+        try:
+            self.client.force_login(self.coordenador)
+            
+            # Buscar ou criar dados necessários
+            projeto, _ = Projeto.objects.get_or_create(nome='Projeto Teste E2E')
+            municipio, _ = Municipio.objects.get_or_create(nome='Cidade Teste', uf='SP')
+            tipo_evento, _ = TipoEvento.objects.get_or_create(nome='Workshop E2E')
+            
+            if not self.formador:
+                self.log_result("02. Criar Solicitação", False, "- Nenhum formador disponível")
+                return False
+            
+            # Criar solicitação via POST
+            data_inicio = timezone.now() + timedelta(days=30)
+            data_fim = data_inicio + timedelta(hours=8)
+            
+            form_data = {
+                'titulo_evento': 'Teste End-to-End - Evento de Teste',
+                'projeto': projeto.id,
+                'municipio': municipio.id,
+                'tipo_evento': tipo_evento.id,
+                'data_inicio': data_inicio.strftime('%Y-%m-%d %H:%M:%S'),
+                'data_fim': data_fim.strftime('%Y-%m-%d %H:%M:%S'),
+                'formadores': [self.formador.id],
+                'coordenador_acompanha': False,
+                'observacoes': 'Teste automatizado do fluxo completo',
+            }
+            
+            response = self.client.post('/solicitar/', form_data)
+            
+            # Verificar se foi criada
+            if response.status_code == 302:  # Redirect após sucesso
+                solicitacao = Solicitacao.objects.filter(
+                    titulo_evento='Teste End-to-End - Evento de Teste'
+                ).first()
+                
+                if solicitacao:
+                    self.solicitacao_id = solicitacao.id
+                    success = True
+                    message = f"- Solicitação criada: {solicitacao.id}"
+                else:
+                    success = False
+                    message = "- Solicitação não encontrada"
+            else:
+                success = False
+                message = f"- Status: {response.status_code}"
+            
+            self.log_result("02. Criar Solicitação", success, message)
+            return success
+            
+        except Exception as e:
+            self.log_result("02. Criar Solicitação", False, f"- Erro: {str(e)}")
+            return False
     
-    solicitacao = Solicitacao.objects.create(
-        usuario_solicitante=coord_user,
-        projeto=projeto,
-        municipio=municipio,
-        tipo_evento=tipo_evento,
-        titulo_evento='Evento Teste E2E',
-        data_inicio=timezone.now() + timezone.timedelta(days=7),
-        data_fim=timezone.now() + timezone.timedelta(days=7, hours=4),
-        status=SolicitacaoStatus.PENDENTE
-    )
+    def test_03_listar_pendentes(self):
+        """Teste 3: Superintendência visualiza solicitações pendentes"""
+        try:
+            self.client.force_login(self.superintendente)
+            
+            # Testar página HTML
+            response = self.client.get('/aprovacoes/pendentes/')
+            html_success = response.status_code == 200
+            
+            # Testar API
+            api_response = self.client.get('/api/solicitacoes-pendentes/')
+            api_success = api_response.status_code == 200
+            
+            success = html_success and api_success
+            message = f"- HTML: {response.status_code}, API: {api_response.status_code}"
+            
+            self.log_result("03. Listar Pendentes", success, message)
+            return success
+            
+        except Exception as e:
+            self.log_result("03. Listar Pendentes", False, f"- Erro: {str(e)}")
+            return False
     
-    print(f"   + Solicitação criada: {solicitacao.titulo_evento}")
-    print(f"   + Status: {solicitacao.status}")
-    print(f"   + Solicitante: {solicitacao.usuario_solicitante.username}")
+    def test_04_aprovar_solicitacao(self):
+        """Teste 4: Superintendência aprova solicitação"""
+        try:
+            if not self.solicitacao_id:
+                self.log_result("04. Aprovar Solicitação", False, "- Sem solicitação para testar")
+                return False
+            
+            self.client.force_login(self.superintendente)
+            
+            # Aprovar via API de lote
+            response = self.client.post('/api/bulk-approval/', 
+                json.dumps({
+                    'solicitacao_ids': [str(self.solicitacao_id)],
+                    'acao': 'aprovar',
+                    'justificativa': 'Aprovação automática - teste end-to-end'
+                }),
+                content_type='application/json'
+            )
+            
+            success = response.status_code == 200
+            if success:
+                data = response.json()
+                if data.get('success'):
+                    # Verificar se mudou para PRE_AGENDA
+                    solicitacao = Solicitacao.objects.get(id=self.solicitacao_id)
+                    if solicitacao.status == SolicitacaoStatus.PRE_AGENDA:
+                        message = "- Aprovada e status PRE_AGENDA ✓"
+                    else:
+                        success = False
+                        message = f"- Status incorreto: {solicitacao.status}"
+                else:
+                    success = False
+                    message = f"- API retornou erro"
+            else:
+                message = f"- Status: {response.status_code}"
+            
+            self.log_result("04. Aprovar Solicitação", success, message)
+            return success
+            
+        except Exception as e:
+            self.log_result("04. Aprovar Solicitação", False, f"- Erro: {str(e)}")
+            return False
     
-    # 5. Verificar permissões específicas
-    print("\n5. Verificando permissões específicas...")
+    def test_05_pre_agenda_controle(self):
+        """Teste 5: Controle visualiza pré-agenda"""
+        try:
+            self.client.force_login(self.controle)
+            
+            response = self.client.get('/controle/pre-agenda/')
+            success = response.status_code == 200
+            message = f"- Status: {response.status_code}"
+            
+            self.log_result("05. Pré-Agenda Controle", success, message)
+            return success
+            
+        except Exception as e:
+            self.log_result("05. Pré-Agenda Controle", False, f"- Erro: {str(e)}")
+            return False
     
-    # Coordenador
-    coord_perms = {
-        'core.add_solicitacao': coord_user.has_perm('core.add_solicitacao'),
-        'core.view_own_solicitacoes': coord_user.has_perm('core.view_own_solicitacoes'),
-        'core.add_aprovacao': coord_user.has_perm('core.add_aprovacao'),  # Não deve ter
-    }
+    def test_06_api_notificacoes(self):
+        """Teste 6: APIs de notificações funcionando"""
+        try:
+            self.client.force_login(self.coordenador)
+            
+            # Testar API de notificações
+            response = self.client.get('/api/notifications/user/')
+            success = response.status_code == 200
+            
+            message = f"- Status: {response.status_code}"
+            if success:
+                data = response.json()
+                count = len(data.get('notifications', []))
+                message += f", {count} notificações"
+            
+            self.log_result("06. API Notificações", success, message)
+            return success
+            
+        except Exception as e:
+            self.log_result("06. API Notificações", False, f"- Erro: {str(e)}")
+            return False
     
-    # Superintendência  
-    super_perms = {
-        'core.add_solicitacao': super_user.has_perm('core.add_solicitacao'),
-        'core.add_aprovacao': super_user.has_perm('core.add_aprovacao'),  # Deve ter
-        'core.view_all_solicitacoes': super_user.has_perm('core.view_all_solicitacoes'),
-    }
+    def test_07_logs_admin(self):
+        """Teste 7: Admin visualiza logs de comunicação"""
+        try:
+            # Criar usuário admin
+            admin_user = Usuario.objects.filter(is_superuser=True).first()
+            if not admin_user:
+                admin_user = Usuario.objects.create_superuser(
+                    username='admin_teste',
+                    email='admin@teste.com',
+                    password='teste123'
+                )
+            
+            self.client.force_login(admin_user)
+            
+            # Testar página de logs
+            response = self.client.get('/admin/communication-logs/')
+            success = response.status_code == 200
+            message = f"- Status: {response.status_code}"
+            
+            self.log_result("07. Logs Admin", success, message)
+            return success
+            
+        except Exception as e:
+            self.log_result("07. Logs Admin", False, f"- Erro: {str(e)}")
+            return False
     
-    print("   Coordenador:")
-    for perm, has in coord_perms.items():
-        status = "✓" if has else "✗"
-        print(f"     {status} {perm}: {has}")
+    def cleanup(self):
+        """Limpar dados de teste"""
+        try:
+            # Remover solicitação de teste
+            if self.solicitacao_id:
+                Solicitacao.objects.filter(id=self.solicitacao_id).delete()
+            
+            # Remover usuários de teste
+            Usuario.objects.filter(username__in=[
+                'coord_teste', 'super_teste', 'controle_teste', 'admin_teste'
+            ]).delete()
+            
+            print("\n🧹 Dados de teste limpos")
+            
+        except Exception as e:
+            print(f"⚠️ Erro na limpeza: {str(e)}")
     
-    print("   Superintendência:")
-    for perm, has in super_perms.items():
-        status = "✓" if has else "✗"
-        print(f"     {status} {perm}: {has}")
-    
-    # 6. Limpeza
-    print("\n6. Limpando dados de teste...")
-    solicitacao.delete()
-    coord_user.delete()
-    super_user.delete()
-    print("   + Dados limpos")
-    
-    # 7. Resultado final
-    print("\n=== RESULTADO DO TESTE E2E ===")
-    
-    success_checks = [
-        coord_home_ok,
-        coord_perms['core.add_solicitacao'],
-        not coord_perms['core.add_aprovacao'],  # Coordenador NÃO deve ter
-        super_perms['core.add_aprovacao'],      # Super DEVE ter
-        solicitacao.id is not None,
-    ]
-    
-    total_checks = len(success_checks)
-    passed_checks = sum(success_checks)
-    
-    print(f"Testes passaram: {passed_checks}/{total_checks}")
-    
-    if passed_checks == total_checks:
-        print("✅ TODOS OS TESTES E2E PASSARAM!")
-        print("Sistema está funcionando corretamente.")
-        return True
-    else:
-        print("❌ ALGUNS TESTES FALHARAM!")
-        return False
+    def run_all_tests(self):
+        """Executar todos os testes em sequência"""
+        print("🚀 SEMANA 3 - DIA 5: TESTES END-TO-END DO FLUXO COMPLETO")
+        print("=" * 65)
+        
+        # Setup
+        if not self.setup_users():
+            print("❌ Falha no setup - interrompendo testes")
+            return False
+        
+        # Executar testes em sequência
+        tests = [
+            self.test_01_home_page,
+            self.test_02_criar_solicitacao,
+            self.test_03_listar_pendentes,
+            self.test_04_aprovar_solicitacao,
+            self.test_05_pre_agenda_controle,
+            self.test_06_api_notificacoes,
+            self.test_07_logs_admin,
+        ]
+        
+        total_tests = len(tests)
+        passed_tests = 0
+        
+        for test in tests:
+            if test():
+                passed_tests += 1
+        
+        # Limpeza
+        self.cleanup()
+        
+        print("\n" + "=" * 65)
+        print("📊 RESUMO DOS TESTES END-TO-END")
+        print(f"✅ Testes aprovados: {passed_tests}/{total_tests}")
+        print(f"❌ Testes falharam: {total_tests - passed_tests}/{total_tests}")
+        print(f"🎯 Taxa de sucesso: {(passed_tests/total_tests)*100:.1f}%")
+        
+        if passed_tests == total_tests:
+            print("\n🎉 TODOS OS TESTES END-TO-END PASSARAM!")
+            print("✅ Sistema Aprender funcionando corretamente.")
+            print("✅ Fluxo completo: Coordenador → Superintendência → Controle")
+        else:
+            print(f"\n⚠️ {total_tests - passed_tests} testes falharam.")
+            print("📝 Verificar logs acima para detalhes dos erros.")
+        
+        return passed_tests == total_tests
+
+
+def main():
+    """Função principal para executar os testes"""
+    tester = EndToEndFlowTester()
+    success = tester.run_all_tests()
+    return success
 
 
 if __name__ == '__main__':
-    success = test_end_to_end_flow()
+    success = main()
     sys.exit(0 if success else 1)

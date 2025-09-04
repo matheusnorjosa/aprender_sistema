@@ -602,7 +602,12 @@ if IS_DEVELOPMENT:
     CORS_ALLOW_CREDENTIALS = True
 else:
     # CORS para produção - configurar origins específicas
-    CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    cors_origins = os.getenv("CORS_ALLOWED_ORIGINS", "")
+    if cors_origins:
+        CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+    else:
+        # Se não configurado, permitir apenas o domínio do Render
+        CORS_ALLOWED_ORIGINS = ["https://aprender-sistema.onrender.com"]
     CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_HEADERS = [

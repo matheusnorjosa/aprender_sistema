@@ -1,6 +1,8 @@
-from django.utils import timezone
-from core.models import Solicitacao, Formador, Municipio, Projeto, TipoEvento
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+
+from core.models import Formador, Municipio, Projeto, Solicitacao, TipoEvento
+
 
 def run():
     User = get_user_model()
@@ -13,7 +15,7 @@ def run():
             email="admin@example.com",
             password="admin123",
             is_superuser=True,
-            is_staff=True
+            is_staff=True,
         )
 
     # Busca dados existentes
@@ -23,7 +25,9 @@ def run():
     tipos_evento = list(TipoEvento.objects.all())
 
     if not formadores or not municipios or not projetos or not tipos_evento:
-        print("⚠️ É necessário ter pelo menos 1 Formador, 1 Município, 1 Projeto e 1 Tipo de Evento cadastrados.")
+        print(
+            "⚠️ É necessário ter pelo menos 1 Formador, 1 Município, 1 Projeto e 1 Tipo de Evento cadastrados."
+        )
         return
 
     agora = timezone.now()
@@ -36,12 +40,13 @@ def run():
             municipio=municipios[i % len(municipios)],
             tipo_evento=tipos_evento[i % len(tipos_evento)],
             titulo_evento=f"Evento de Teste {i}",
-            data_inicio=agora + timezone.timedelta(days=i*7),  # Uma semana de intervalo
-            data_fim=agora + timezone.timedelta(days=i*7, hours=2),
+            data_inicio=agora
+            + timezone.timedelta(days=i * 7),  # Uma semana de intervalo
+            data_fim=agora + timezone.timedelta(days=i * 7, hours=2),
             observacoes=f"Observações do evento de teste {i}",
-            numero_encontro_formativo=f"Encontro {i}"
+            numero_encontro_formativo=f"Encontro {i}",
         )
-        
+
         # Associar formadores
         solicitacao.formadores.set([formadores[i % len(formadores)]])
         print(f"✅ Solicitação criada: {solicitacao.titulo_evento}")

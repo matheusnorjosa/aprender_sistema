@@ -7,8 +7,8 @@ No automatic synchronization signals needed
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import Usuario
 
+from .models import Usuario
 
 # Future signals can be added here as needed
 # Example:

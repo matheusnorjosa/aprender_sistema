@@ -1,11 +1,13 @@
 # aprender_sistema/core/scripts/import_municipios.py
 import csv
 import os
+
 from core.models import Municipio
+
 
 def run():
     # Caminho corrigido para o arquivo CSV dentro do container Docker
-    csv_file_path = os.path.join('/app', 'aprender_sistema', 'data', 'Municipios.csv')
+    csv_file_path = os.path.join("/app", "aprender_sistema", "data", "Municipios.csv")
 
     if not os.path.exists(csv_file_path):
         print(f"❌ Arquivo não encontrado: {csv_file_path}")
@@ -14,7 +16,7 @@ def run():
     criados = 0
     existentes = 0
 
-    with open(csv_file_path, 'r', encoding='utf-8') as file:
+    with open(csv_file_path, "r", encoding="utf-8") as file:
         reader = csv.reader(file)
         next(reader)  # Pular o cabeçalho
 

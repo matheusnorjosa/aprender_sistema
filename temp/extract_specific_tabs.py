@@ -3,13 +3,14 @@
 Script para extrair dados específicos das abas da planilha Acompanhamento de Agenda 2025
 Focando nas abas: Super, ACerta, Vidas, Brincando, Outros
 """
-import os
 import json
+import os
 import pathlib
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
 from dotenv import load_dotenv
-from googleapiclient.discovery import build
 from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 
 load_dotenv()
 

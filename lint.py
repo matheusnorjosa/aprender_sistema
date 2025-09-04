@@ -11,7 +11,9 @@ def run_command(command, description):
     """Executa um comando e retorna True se bem-sucedido."""
     print(f"\n🔍 {description}...")
     try:
-        result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
+        result = subprocess.run(
+            command, shell=True, check=True, capture_output=True, text=True
+        )
         print(f"✅ {description} concluído com sucesso")
         return True
     except subprocess.CalledProcessError as e:
@@ -24,21 +26,21 @@ def run_command(command, description):
 def main():
     """Executa todas as verificações de linting."""
     project_root = Path(__file__).parent
-    
+
     print("🚀 Iniciando verificações de código...")
-    
+
     commands = [
         ("isort . --check-only --diff", "Verificando ordenação de imports"),
         ("black . --check --diff", "Verificando formatação do código"),
         ("flake8 .", "Verificando estilo de código (flake8)"),
     ]
-    
+
     all_passed = True
-    
+
     for command, description in commands:
         if not run_command(command, description):
             all_passed = False
-    
+
     if all_passed:
         print("\n🎉 Todas as verificações passaram!")
         return 0

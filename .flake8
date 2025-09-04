@@ -18,10 +18,10 @@ exclude =
 
 # Black compatibility ignores
 ignore = 
-    E203,  # whitespace before ':' (black format)
-    W503,  # line break before binary operator (black format)
-    E501,  # line too long (black handles this)
-    W391,  # blank line at end of file (black format)
+    E203,
+    W503,
+    E501,
+    W391
 
 # Django and project specific ignores
 per-file-ignores =
@@ -42,10 +42,10 @@ docstring-convention = google
 
 # Security and quality checks
 enable-extensions = 
-    G,  # logging format
-    B,  # bandit security
-    S,  # bandit security
-    DUO,  # security
+    G,
+    B,
+    S,
+    DUO
 
 # Line counting
 count = True

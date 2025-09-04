@@ -1,6 +1,7 @@
 # aprender_sistema/core/management/commands/setup_roles.py
+from django.contrib.auth.models import ContentType, Group, Permission
 from django.core.management.base import BaseCommand
-from django.contrib.auth.models import Group, Permission, ContentType
+
 from core import models
 
 ROLES = [
@@ -11,6 +12,7 @@ ROLES = [
     "Admin do Sistema",
     "Formador",
 ]
+
 
 class Command(BaseCommand):
     help = "Cria grupos/papéis padrão e associa permissões básicas."
@@ -57,11 +59,15 @@ class Command(BaseCommand):
                     perm = Permission.objects.get(content_type=ct, codename=codename)
                     group.permissions.add(perm)
                 except Permission.DoesNotExist:
-                    self.stdout.write(self.style.WARNING(f"Permissão não achada: {codename}"))
+                    self.stdout.write(
+                        self.style.WARNING(f"Permissão não achada: {codename}")
+                    )
 
         for gname, items in perms_by_group.items():
             g = groups[gname]
             for model, actions in items:
                 grant(model, actions, g)
 
-        self.stdout.write(self.style.SUCCESS("Grupos/perfis criados e permissões básicas atribuídas."))
+        self.stdout.write(
+            self.style.SUCCESS("Grupos/perfis criados e permissões básicas atribuídas.")
+        )

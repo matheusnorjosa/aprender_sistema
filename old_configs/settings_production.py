@@ -5,8 +5,9 @@ Este arquivo sobrescreve as configurações de development para uso em produçã
 Para usar em produção, defina: DJANGO_SETTINGS_MODULE=aprender_sistema.settings_production
 """
 
-from .settings import *
 import secrets
+
+from .settings import *
 
 # ======================
 # CONFIGURAÇÕES CRÍTICAS DE SEGURANÇA
@@ -19,13 +20,12 @@ DEBUG = False
 # Gerar nova chave: python -c "import secrets; print(secrets.token_urlsafe(50))"
 SECRET_KEY = os.getenv(
     "SECRET_KEY_PRODUCTION",
-    secrets.token_urlsafe(50)  # Gera automaticamente uma chave segura
+    secrets.token_urlsafe(50),  # Gera automaticamente uma chave segura
 )
 
 # Hosts permitidos em produção - DEVE ser configurado com domínios reais
 ALLOWED_HOSTS = os.getenv(
-    "ALLOWED_HOSTS_PRODUCTION", 
-    "yourdomain.com,www.yourdomain.com,your-server-ip"
+    "ALLOWED_HOSTS_PRODUCTION", "yourdomain.com,www.yourdomain.com,your-server-ip"
 ).split(",")
 
 # ======================
@@ -47,10 +47,10 @@ CSRF_COOKIE_SECURE = True
 # Headers de segurança adicionais
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
-X_FRAME_OPTIONS = 'DENY'
+X_FRAME_OPTIONS = "DENY"
 
 # Content Security Policy básica
-SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 # ======================
 # CONFIGURAÇÕES DE DATABASE PRODUÇÃO
@@ -58,15 +58,15 @@ SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
 # PostgreSQL para produção (recomendado)
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME_PRODUCTION', 'aprender_sistema_prod'),
-        'USER': os.getenv('DB_USER_PRODUCTION', 'aprender_user'),
-        'PASSWORD': os.getenv('DB_PASSWORD_PRODUCTION', 'change-this-password'),
-        'HOST': os.getenv('DB_HOST_PRODUCTION', 'localhost'),
-        'PORT': os.getenv('DB_PORT_PRODUCTION', '5432'),
-        'OPTIONS': {
-            'sslmode': 'require',  # SSL obrigatório para produção
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("DB_NAME_PRODUCTION", "aprender_sistema_prod"),
+        "USER": os.getenv("DB_USER_PRODUCTION", "aprender_user"),
+        "PASSWORD": os.getenv("DB_PASSWORD_PRODUCTION", "change-this-password"),
+        "HOST": os.getenv("DB_HOST_PRODUCTION", "localhost"),
+        "PORT": os.getenv("DB_PORT_PRODUCTION", "5432"),
+        "OPTIONS": {
+            "sslmode": "require",  # SSL obrigatório para produção
         },
     }
 }
@@ -76,92 +76,94 @@ DATABASES = {
 # ======================
 
 CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
-        'OPTIONS': {
-            'CONNECTION_POOL_KWARGS': {
-                'ssl_cert_reqs': None,
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1"),
+        "OPTIONS": {
+            "CONNECTION_POOL_KWARGS": {
+                "ssl_cert_reqs": None,
             },
-        }
+        },
     }
 }
 
 # Session storage usando cache
-SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-SESSION_CACHE_ALIAS = 'default'
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"
 
 # ======================
 # CONFIGURAÇÕES DE EMAIL (PRODUÇÃO)
 # ======================
 
 # Configurações SMTP para produção
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'your-email@domain.com')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'your-app-password')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Sistema Aprender <noreply@yourdomain.com>')
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "your-email@domain.com")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "your-app-password")
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL", "Sistema Aprender <noreply@yourdomain.com>"
+)
 
 # ======================
 # CONFIGURAÇÕES DE ARQUIVOS ESTÁTICOS
 # ======================
 
 # Configurações para servir arquivos estáticos em produção
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 # Configurações de media files
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 # ======================
 # CONFIGURAÇÕES DE LOGGING (PRODUÇÃO)
 # ======================
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
         },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'file_error': {
-            'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'error.log'),
-            'formatter': 'verbose',
-        },
-        'file_info': {
-            'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'info.log'),
-            'formatter': 'verbose',
-        },
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
         },
     },
-    'loggers': {
-        'django': {
-            'handlers': ['file_error', 'file_info', 'console'],
-            'level': 'INFO',
-            'propagate': True,
+    "handlers": {
+        "file_error": {
+            "level": "ERROR",
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "logs", "error.log"),
+            "formatter": "verbose",
         },
-        'core': {
-            'handlers': ['file_error', 'file_info', 'console'],
-            'level': 'INFO',
-            'propagate': True,
+        "file_info": {
+            "level": "INFO",
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "logs", "info.log"),
+            "formatter": "verbose",
+        },
+        "console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["file_error", "file_info", "console"],
+            "level": "INFO",
+            "propagate": True,
+        },
+        "core": {
+            "handlers": ["file_error", "file_info", "console"],
+            "level": "INFO",
+            "propagate": True,
         },
     },
 }
@@ -171,12 +173,12 @@ LOGGING = {
 # ======================
 
 # Feature flags para produção
-FEATURE_GOOGLE_SYNC = os.getenv('FEATURE_GOOGLE_SYNC_PROD', '1') == '1'
+FEATURE_GOOGLE_SYNC = os.getenv("FEATURE_GOOGLE_SYNC_PROD", "1") == "1"
 
 # CSRF trusted origins para produção
 CSRF_TRUSTED_ORIGINS = [
-    'https://yourdomain.com',
-    'https://www.yourdomain.com',
+    "https://yourdomain.com",
+    "https://www.yourdomain.com",
     # Adicionar seus domínios reais aqui
 ]
 
@@ -195,8 +197,8 @@ SESSION_COOKIE_AGE = 1800
 # ======================
 
 # Configurações para backup automático
-DBBACKUP_STORAGE = 'django.core.files.storage.FileSystemStorage'
-DBBACKUP_STORAGE_OPTIONS = {'location': '/var/backups/aprender-sistema/'}
+DBBACKUP_STORAGE = "django.core.files.storage.FileSystemStorage"
+DBBACKUP_STORAGE_OPTIONS = {"location": "/var/backups/aprender-sistema/"}
 
 # ======================
 # VALIDAÇÕES FINAIS
@@ -204,14 +206,16 @@ DBBACKUP_STORAGE_OPTIONS = {'location': '/var/backups/aprender-sistema/'}
 
 # Verificar se variáveis críticas estão configuradas
 required_env_vars = [
-    'SECRET_KEY_PRODUCTION',
-    'ALLOWED_HOSTS_PRODUCTION', 
-    'DB_PASSWORD_PRODUCTION',
+    "SECRET_KEY_PRODUCTION",
+    "ALLOWED_HOSTS_PRODUCTION",
+    "DB_PASSWORD_PRODUCTION",
 ]
 
 missing_vars = [var for var in required_env_vars if not os.getenv(var)]
 if missing_vars:
-    raise ValueError(f"Variáveis de ambiente obrigatórias não configuradas: {missing_vars}")
+    raise ValueError(
+        f"Variáveis de ambiente obrigatórias não configuradas: {missing_vars}"
+    )
 
 print("✅ Configurações de produção carregadas com sucesso!")
 print(f"✅ DEBUG: {DEBUG}")

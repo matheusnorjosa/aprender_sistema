@@ -24,6 +24,7 @@ DATABASES = {
 
 # Importar Django
 import django
+
 django.setup()
 
 from django.contrib.auth.models import Group, Permission
@@ -37,7 +38,14 @@ try:
 except:
     print("⚠️  Aviso: Migração pode ter falhado, continuando...")
 
-from core.models import Solicitacao, LogAuditoria, DisponibilidadeFormadores, Aprovacao, Usuario
+from core.models import (
+    Aprovacao,
+    DisponibilidadeFormadores,
+    LogAuditoria,
+    Solicitacao,
+    Usuario,
+)
+
 
 def create_groups():
     print("=== CRIANDO GRUPOS E PERMISSÕES ===\n")

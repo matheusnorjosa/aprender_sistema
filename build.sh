@@ -15,4 +15,7 @@ python manage.py migrate
 echo "Setting up production data..."
 python manage.py setup_production --with-sample-data
 
+echo "Setting up Django superuser if needed..."
+echo "from core.models import Usuario; Usuario.objects.filter(is_superuser=True).exists() or Usuario.objects.create_superuser('admin', 'admin@aprender.local', 'admin123456')" | python manage.py shell
+
 echo "Build completed successfully!"

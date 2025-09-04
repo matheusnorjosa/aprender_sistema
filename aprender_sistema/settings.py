@@ -275,9 +275,9 @@ elif IS_PRODUCTION or IS_STAGING:
     if IS_PRODUCTION:
         DATABASES["default"]["OPTIONS"] = {"sslmode": "require"}
 
-    # Validar senha obrigatória
+    # Validar senha obrigatória apenas quando DATABASE_URL não está disponível
     if not os.getenv("DB_PASSWORD"):
-        raise ValueError(f"DB_PASSWORD é obrigatória em ambiente {ENVIRONMENT}!")
+        raise ValueError(f"DB_PASSWORD é obrigatória em ambiente {ENVIRONMENT} quando DATABASE_URL não está configurado!")
 
 else:
     # SQLite para desenvolvimento
@@ -515,8 +515,11 @@ if IS_PRODUCTION:
     required_env_vars = [
         "SECRET_KEY",
         "ALLOWED_HOSTS",
-        "DB_PASSWORD",
     ]
+    
+    # DB_PASSWORD só é obrigatório se DATABASE_URL não estiver disponível
+    if not os.getenv("DATABASE_URL"):
+        required_env_vars.append("DB_PASSWORD")
 
     missing_vars = [var for var in required_env_vars if not os.getenv(var)]
     if missing_vars:

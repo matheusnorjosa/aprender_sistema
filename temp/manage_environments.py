@@ -3,10 +3,10 @@
 Script para gerenciar ambientes de desenvolvimento, homologação e produção
 """
 
+import json
 import os
 import subprocess
 import sys
-import json
 from datetime import datetime
 
 

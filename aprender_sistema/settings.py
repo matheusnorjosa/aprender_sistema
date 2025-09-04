@@ -240,8 +240,24 @@ WSGI_APPLICATION = "aprender_sistema.wsgi.application"
 # CONFIGURAÇÃO DE DATABASE
 # ======================
 
-if IS_PRODUCTION or IS_STAGING:
-    # PostgreSQL para produção/staging
+# Primeiro, tentar usar DATABASE_URL (padrão Render/Heroku)
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    # Parse DATABASE_URL usando dj-database-url
+    try:
+        import dj_database_url
+        DATABASES = {
+            "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+        }
+        # SSL obrigatório em produção
+        if IS_PRODUCTION:
+            DATABASES["default"].setdefault("OPTIONS", {})["sslmode"] = "require"
+    except ImportError:
+        raise ImportError("dj-database-url é necessário quando DATABASE_URL está definida")
+
+elif IS_PRODUCTION or IS_STAGING:
+    # Fallback: PostgreSQL com variáveis individuais
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",

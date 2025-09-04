@@ -25,24 +25,63 @@ class Command(BaseCommand):
         )
     
     def handle(self, *args, **options):
-        # Grupos baseados na análise das planilhas
+        # Grupos baseados na nova estrutura organizacional
         grupos_sistema = [
+            # Grupos operacionais por cargo
             {
-                'name': 'superintendencia',
-                'description': 'Superintendência - Aprova solicitações, resolve conflitos'
+                'name': 'gerente',
+                'description': 'Gerentes - Aprovam eventos se forem da superintendência'
             },
             {
                 'name': 'coordenador',
-                'description': 'Coordenadores - Podem solicitar eventos'
+                'description': 'Coordenadores - Criam solicitações de eventos'
+            },
+            {
+                'name': 'apoio_coordenacao',
+                'description': 'Apoios de Coordenação - Criam solicitações de eventos'
             },
             {
                 'name': 'formador',
-                'description': 'Formadores - Podem bloquear agenda, executam eventos'
+                'description': 'Formadores - Bloqueiam agenda, executam eventos'
+            },
+            {
+                'name': 'controle',
+                'description': 'Controle - Criam eventos no Google Calendar'
             },
             {
                 'name': 'admin',
                 'description': 'Administradores - Acesso completo ao sistema'
-            }
+            },
+            # Grupos futuros para outras áreas
+            {
+                'name': 'rh',
+                'description': 'Recursos Humanos - Para desenvolvimento futuro'
+            },
+            {
+                'name': 'logistica',
+                'description': 'Logística - Para desenvolvimento futuro'
+            },
+            {
+                'name': 'financeiro',
+                'description': 'Financeiro - Para desenvolvimento futuro'
+            },
+            {
+                'name': 'editorial',
+                'description': 'Editorial - Para desenvolvimento futuro'
+            },
+            # Mantendo grupos legados para compatibilidade
+            {
+                'name': 'superintendencia',
+                'description': 'LEGADO - Superintendência (usar cargo gerente + setor)'
+            },
+            {
+                'name': 'diretoria',
+                'description': 'LEGADO - Diretoria'
+            },
+            {
+                'name': 'gerente_aprender',
+                'description': 'LEGADO - Gerente Aprender'
+            },
         ]
         
         try:

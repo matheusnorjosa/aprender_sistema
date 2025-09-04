@@ -10,7 +10,7 @@ class SolicitacaoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateV
     permission_required = 'core.add_solicitacao'
     model = Solicitacao
     form_class = SolicitacaoForm
-    template_name = "core/solicitacao_form.html"
+    template_name = "core/solicitacao_form_enhanced.html"
     success_url = reverse_lazy("core:solicitar_evento")
 
     @transaction.atomic
@@ -49,6 +49,35 @@ class SolicitacaoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateV
                              f"— Requer aprovação: {'Sim' if requer_aprovacao else 'Não'}"
                 )
                 
+                # 6. Enviar notificações (SEMANA 3 - DIA 4)
+                from core.services.notifications_simplified import notify_new_solicitacao
+                try:
+                    notify_result = notify_new_solicitacao(self.object)
+                    if notify_result['success']:
+                        # Log de sucesso das notificações
+                        LogAuditoria.objects.create(
+                            usuario=self.request.user,
+                            acao="RF07: Notificações enviadas",
+                            entidade_afetada_id=self.object.id,
+                            detalhes=f"Notificações enviadas com sucesso: {notify_result['notifications_sent']}"
+                        )
+                    else:
+                        # Log de erro das notificações (não interrompe o fluxo)
+                        LogAuditoria.objects.create(
+                            usuario=self.request.user,
+                            acao="RF07: Erro ao enviar notificações",
+                            entidade_afetada_id=self.object.id,
+                            detalhes=f"Erro: {notify_result.get('error', 'Erro desconhecido')}"
+                        )
+                except Exception as e:
+                    # Erro nas notificações não deve interromper o processo principal
+                    LogAuditoria.objects.create(
+                        usuario=self.request.user,
+                        acao="RF07: Erro crítico em notificações",
+                        entidade_afetada_id=self.object.id,
+                        detalhes=f"Erro crítico ao enviar notificações: {str(e)}"
+                    )
+                
                 # 6. Validar dados salvos
                 if not self.object.pk:
                     raise ValueError("Falha ao salvar solicitação")
@@ -72,9 +101,17 @@ class SolicitacaoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateV
     def _requer_aprovacao_superintendencia(self, solicitacao):
         """
         Determina se uma solicitação requer aprovação da superintendência.
-        Critério: Projetos vinculados à superintendência
+        Nova lógica: Projetos do setor Superintendência requerem aprovação.
         """
-        return solicitacao.projeto and solicitacao.projeto.vinculado_superintendencia
+        if not solicitacao.projeto:
+            return False
+            
+        # Nova lógica: usar setor.vinculado_superintendencia
+        if solicitacao.projeto.setor:
+            return solicitacao.projeto.setor.vinculado_superintendencia
+        
+        # Fallback para compatibilidade durante transição
+        return solicitacao.projeto.vinculado_superintendencia
 
 
 class SolicitacaoOKView(LoginRequiredMixin, TemplateView):

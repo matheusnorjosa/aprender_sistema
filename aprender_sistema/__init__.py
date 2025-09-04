@@ -1,7 +1,8 @@
-# Configuração do Celery
+# ConfiguraÃ§Ã£o do Celery
 from __future__ import absolute_import, unicode_literals
 
 # Importar Celery app para que seja carregado quando Django iniciar
-from .celery import app as celery_app
+# Temporariamente comentado para resolver problema de dependÃªncia no Docker
+# from .celery import app as celery_app
 
-__all__ = ('celery_app',)
+# __all__ = ('celery_app',)

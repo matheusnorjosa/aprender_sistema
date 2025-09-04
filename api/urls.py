@@ -3,38 +3,44 @@ URLs da API RESTful do Aprender Sistema.
 Configura roteamento automático para todas as ViewSets DRF.
 """
 
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import include, path
+
 from rest_framework.authtoken.views import obtain_auth_token
+from rest_framework.routers import DefaultRouter
+
 from . import views
 
 # Router principal da API
 router = DefaultRouter()
 
 # Registrar ViewSets
-router.register(r'usuarios', views.UsuarioViewSet, basename='usuario')
-router.register(r'projetos', views.ProjetoViewSet, basename='projeto')
-router.register(r'municipios', views.MunicipioViewSet, basename='municipio')
-router.register(r'tipos-evento', views.TipoEventoViewSet, basename='tipo-evento')
-router.register(r'formadores', views.FormadorViewSet, basename='formador')
-router.register(r'solicitacoes', views.SolicitacaoViewSet, basename='solicitacao')
-router.register(r'aprovacoes', views.AprovacaoViewSet, basename='aprovacao')
-router.register(r'eventos-google', views.EventoGoogleCalendarViewSet, basename='evento-google')
-router.register(r'disponibilidade', views.DisponibilidadeFormadoresViewSet, basename='disponibilidade')
-router.register(r'logs-auditoria', views.LogAuditoriaViewSet, basename='log-auditoria')
-router.register(r'estatisticas', views.EstatisticasViewSet, basename='estatisticas')
+router.register(r"usuarios", views.UsuarioViewSet, basename="usuario")
+router.register(r"projetos", views.ProjetoViewSet, basename="projeto")
+router.register(r"municipios", views.MunicipioViewSet, basename="municipio")
+router.register(r"tipos-evento", views.TipoEventoViewSet, basename="tipo-evento")
+router.register(r"formadores", views.FormadorViewSet, basename="formador")
+router.register(r"solicitacoes", views.SolicitacaoViewSet, basename="solicitacao")
+router.register(r"aprovacoes", views.AprovacaoViewSet, basename="aprovacao")
+router.register(
+    r"eventos-google", views.EventoGoogleCalendarViewSet, basename="evento-google"
+)
+router.register(
+    r"disponibilidade",
+    views.DisponibilidadeFormadoresViewSet,
+    basename="disponibilidade",
+)
+router.register(r"logs-auditoria", views.LogAuditoriaViewSet, basename="log-auditoria")
+router.register(r"estatisticas", views.EstatisticasViewSet, basename="estatisticas")
 
-app_name = 'api'
+app_name = "api"
 
 urlpatterns = [
     # Roteamento automático da API
-    path('v1/', include(router.urls)),
-    
+    path("v1/", include(router.urls)),
     # Autenticação por token
-    path('auth/token/', obtain_auth_token, name='api_token_auth'),
-    
+    path("auth/token/", obtain_auth_token, name="api_token_auth"),
     # Endpoint de API browsable (desenvolvimento)
-    path('auth/', include('rest_framework.urls', namespace='rest_framework')),
+    path("auth/", include("rest_framework.urls", namespace="rest_framework")),
 ]
 
 """

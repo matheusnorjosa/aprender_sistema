@@ -1,12 +1,16 @@
 from typing import Optional
+
 from django.conf import settings
+
 from core.services.integrations.calendar_types import GoogleEvent
+
 
 class GoogleCalendarServiceStub:
     """
     Stub do RF05. Quando FEATURE_GOOGLE_SYNC=0, só registra intenção.
     Quando ligarmos a integração real, substituiremos esse stub.
     """
+
     def __init__(self, calendar_id: Optional[str] = None):
         self.calendar_id = calendar_id or settings.GOOGLE_CALENDAR_CALENDAR_ID
 

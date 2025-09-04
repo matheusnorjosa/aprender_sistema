@@ -1,12 +1,17 @@
 # aprender_sistema/core/scripts/import_formadores.py
 import csv
 import os
+
 from django.conf import settings
+
 from core.models import Formador
+
 
 def run():
     # Caminho para o arquivo CSV baseado no BASE_DIR do projeto
-    csv_file_path = os.path.join(settings.BASE_DIR, 'aprender_sistema', 'data', 'Formadores.csv')
+    csv_file_path = os.path.join(
+        settings.BASE_DIR, "aprender_sistema", "data", "Formadores.csv"
+    )
 
     if not os.path.exists(csv_file_path):
         print(f"❌ Arquivo não encontrado: {csv_file_path}")
@@ -15,8 +20,8 @@ def run():
     criados = 0
     existentes = 0
 
-    with open(csv_file_path, 'r', encoding='utf-8') as file:
-        reader = csv.reader(file, delimiter=';')
+    with open(csv_file_path, "r", encoding="utf-8") as file:
+        reader = csv.reader(file, delimiter=";")
         # Pular cabeçalho
         next(reader)
 
@@ -28,8 +33,7 @@ def run():
             nome, email, area_atuacao = row[0], row[1], row[2]
 
             formador, created = Formador.objects.get_or_create(
-                email=email,
-                defaults={'nome': nome, 'area_atuacao': area_atuacao}
+                email=email, defaults={"nome": nome, "area_atuacao": area_atuacao}
             )
 
             if created:

@@ -5,7 +5,14 @@ Copie e cole este código no Django shell: python manage.py shell
 
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
-from core.models import Solicitacao, LogAuditoria, DisponibilidadeFormadores, Aprovacao, Usuario
+
+from core.models import (
+    Aprovacao,
+    DisponibilidadeFormadores,
+    LogAuditoria,
+    Solicitacao,
+    Usuario,
+)
 
 # Criar permissões customizadas
 solicitacao_ct = ContentType.objects.get_for_model(Solicitacao)

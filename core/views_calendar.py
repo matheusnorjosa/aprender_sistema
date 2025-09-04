@@ -1,14 +1,16 @@
 # aprender_sistema/core/views_calendar.py
 from datetime import date, timedelta
-from django.http import JsonResponse, Http404
-from django.views import View
+
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from core.models import Formador
-from core.services.calendar_codes import marcador_do_dia, gerar_mapa_mensal_otimizado
+from django.http import Http404, JsonResponse
+from django.views import View
 from django.views.generic import TemplateView
 
 # Import Group-based mixin for calendar access
 from core.mixins import CanViewCalendarMixin
+from core.models import Formador
+from core.services.calendar_codes import gerar_mapa_mensal_otimizado, marcador_do_dia
+
 
 class MapaMensalView(LoginRequiredMixin, CanViewCalendarMixin, View):
     def get(self, request):
@@ -28,10 +30,10 @@ class MapaMensalView(LoginRequiredMixin, CanViewCalendarMixin, View):
 
         # Buscar formadores ativos
         formadores = list(Formador.objects.filter(ativo=True).order_by("nome"))
-        
+
         # Usar função otimizada para gerar todo o mapa de uma vez
         mapa_otimizado = gerar_mapa_mensal_otimizado(formadores, dias)
-        
+
         linhas = []
         for f in formadores:
             linha = {
@@ -45,12 +47,14 @@ class MapaMensalView(LoginRequiredMixin, CanViewCalendarMixin, View):
             "ano": ano,
             "mes": mes,
             "dias": [x.day for x in dias],
-            "linhas": linhas
+            "linhas": linhas,
         }
         return JsonResponse(payload)
-    
+
+
 # --- Página HTML que consome o endpoint JSON ---
 from django.views.generic import TemplateView
+
 
 class MapaMensalPageView(LoginRequiredMixin, CanViewCalendarMixin, TemplateView):
     template_name = "core/mapa_mensal.html"
@@ -61,4 +65,5 @@ class MapaMensalHTMLView(LoginRequiredMixin, CanViewCalendarMixin, TemplateView)
     Página estática que consome a API /mapa-mensal/?ano=YYYY&mes=M
     e renderiza o grid no navegador (HTML+JS).
     """
+
     template_name = "core/mapa_mensal_view.html"

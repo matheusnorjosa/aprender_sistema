@@ -7,7 +7,7 @@ from .solicitacao_toolset import SolicitacaoToolset
 FormadorToolset = CoreModelToolset
 
 __all__ = [
-    'CoreModelToolset',
-    'SolicitacaoToolset', 
-    'FormadorToolset',
+    "CoreModelToolset",
+    "SolicitacaoToolset",
+    "FormadorToolset",
 ]

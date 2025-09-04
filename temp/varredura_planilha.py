@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import os
-import sys
-import django
 import json
+import os
 import re
+import sys
 from datetime import datetime
+
+import django
 
 # Configurar Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
 django.setup()
 
 from planilhas.services.google_sheets import sheets_service
+
 
 def clean_text(text):
     """Remove caracteres especiais para exibição"""

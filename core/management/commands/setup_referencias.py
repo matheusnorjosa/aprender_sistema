@@ -1,10 +1,12 @@
 # aprender_sistema/core/management/commands/setup_referencias.py
 from django.core.management.base import BaseCommand
-from core.models import Projeto, TipoEvento, Municipio
+
+from core.models import Municipio, Projeto, TipoEvento
 
 PROJETOS = ["Alfabetização", "Formação Continuada", "Projeto X"]
 TIPOS = ["Presencial", "Online", "Híbrido"]
-MUNICIPIOS = [("Fortaleza","CE"), ("Caucaia","CE"), ("Sobral","CE")]
+MUNICIPIOS = [("Fortaleza", "CE"), ("Caucaia", "CE"), ("Sobral", "CE")]
+
 
 class Command(BaseCommand):
     help = "Cria dados mínimos de referência (Projetos, Tipos de Evento, Municípios)."

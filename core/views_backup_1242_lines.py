@@ -8,7 +8,7 @@ Para encontrar uma view específica, veja:
 - home_views.py: HomeView, home
 - auth_views.py: CustomLoginView
 - solicitacao_views.py: SolicitacaoCreateView, SolicitacaoOKView
-- aprovacao_views.py: AprovacoesPendentesView, AprovacaoDetailView  
+- aprovacao_views.py: AprovacoesPendentesView, AprovacaoDetailView
 - formador_views.py: BloqueioCreateView, FormadorEventosView
 - controle_views.py: GoogleCalendarMonitorView, AuditoriaLogView, ControleAPIStatusView
 - coordenador_views.py: CoordenadorMeusEventosView

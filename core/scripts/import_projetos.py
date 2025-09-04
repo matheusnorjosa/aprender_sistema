@@ -1,10 +1,12 @@
 # aprender_sistema/core/scripts/import_projetos.py
 import csv
 import os
+
 from core.models import Projeto
 
+
 def run():
-    csv_file_path = os.path.join('/app', 'aprender_sistema', 'data', 'Projetos.csv')
+    csv_file_path = os.path.join("/app", "aprender_sistema", "data", "Projetos.csv")
 
     if not os.path.exists(csv_file_path):
         print(f"❌ Arquivo não encontrado: {csv_file_path}")
@@ -13,8 +15,8 @@ def run():
     criados = 0
     existentes = 0
 
-    with open(csv_file_path, 'r', encoding='utf-8') as file:
-        reader = csv.reader(file, delimiter=';')
+    with open(csv_file_path, "r", encoding="utf-8") as file:
+        reader = csv.reader(file, delimiter=";")
         next(reader)  # Pular o cabeçalho
 
         for row in reader:
@@ -26,7 +28,7 @@ def run():
 
             projeto, created = Projeto.objects.get_or_create(
                 nome=nome,
-                defaults={'descricao': descricao, 'ativo': ativo.lower() == 'true'}
+                defaults={"descricao": descricao, "ativo": ativo.lower() == "true"},
             )
 
             if created:
@@ -39,4 +41,3 @@ def run():
     print("\n📊 Resumo da importação:")
     print(f"   Criados: {criados}")
     print(f"   Já existentes: {existentes}")
-

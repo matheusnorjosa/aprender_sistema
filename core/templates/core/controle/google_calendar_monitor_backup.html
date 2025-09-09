@@ -1,0 +1,296 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Monitor Google Calendar — Controle</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --content-bg: #f8f9fa;
+      --card: #ffffff; 
+      --text: #2c3e50; 
+      --muted: #6c757d; 
+      --line: #e9ecef; 
+      --accent: #3498db;
+      --success: #27ae60; 
+      --warning: #f39c12; 
+      --danger: #e74c3c; 
+      --shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    
+    *{box-sizing:border-box; margin:0; padding:0;}
+    
+    body{
+      background: var(--bg);
+      color: var(--text); 
+      font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    .header {
+      background: var(--card);
+      border-radius: 1rem;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow);
+    }
+    
+    .header h1 {
+      margin: 0;
+      font-size: 2rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+      background: var(--card);
+      padding: 1.5rem;
+      border-radius: 1rem;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    
+    .stat-card h3 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 0.5rem 0;
+    }
+    
+    .stat-card.success h3 { color: var(--success); }
+    .stat-card.warning h3 { color: var(--warning); }
+    .stat-card.danger h3 { color: var(--danger); }
+    .stat-card.info h3 { color: var(--accent); }
+    
+    .filters {
+      background: var(--card);
+      padding: 1.5rem;
+      border-radius: 1rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow);
+    }
+    
+    .filters form {
+      display: flex;
+      gap: 1rem;
+      align-items: end;
+      flex-wrap: wrap;
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .form-group label {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .form-group select, .form-group input {
+      padding: 0.5rem;
+      border: 1px solid var(--line);
+      border-radius: 0.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .btn {
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .btn:hover {
+      background: #2980b9;
+    }
+    
+    .events-table {
+      background: var(--card);
+      border-radius: 1rem;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    
+    .table-header {
+      background: var(--accent);
+      color: white;
+      padding: 1rem;
+    }
+    
+    .table-content {
+      padding: 1rem;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    th, td {
+      text-align: left;
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--line);
+    }
+    
+    th {
+      font-weight: 600;
+      background: var(--content-bg);
+    }
+    
+    .status-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    
+    .status-ok { background: #d4edda; color: #155724; }
+    .status-erro { background: #f8d7da; color: #721c24; }
+    .status-pendente { background: #fff3cd; color: #856404; }
+    
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent);
+      text-decoration: none;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+    
+    .back-link:hover {
+      color: #2980b9;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="{% url 'core:home' %}" class="back-link">
+      <i class="bi bi-arrow-left"></i> Voltar ao Dashboard
+    </a>
+    
+    <div class="header">
+      <h1><i class="bi bi-cloud-check-fill"></i> Monitor Google Calendar</h1>
+      <p>Monitore a sincronização de eventos com Google Calendar em tempo real</p>
+    </div>
+    
+    <div class="stats-grid">
+      <div class="stat-card info">
+        <h3>{{ total_eventos }}</h3>
+        <p>Total de Eventos</p>
+      </div>
+      <div class="stat-card success">
+        <h3>{{ eventos_ok }}</h3>
+        <p>Sincronizados</p>
+      </div>
+      <div class="stat-card danger">
+        <h3>{{ eventos_erro }}</h3>
+        <p>Com Erro</p>
+      </div>
+      <div class="stat-card warning">
+        <h3>{{ eventos_pendentes }}</h3>
+        <p>Pendentes</p>
+      </div>
+      <div class="stat-card info">
+        <h3>{{ taxa_sucesso }}%</h3>
+        <p>Taxa de Sucesso</p>
+      </div>
+    </div>
+    
+    <div class="filters">
+      <form method="get">
+        <div class="form-group">
+          <label for="status">Status:</label>
+          <select name="status" id="status">
+            <option value="">Todos</option>
+            <option value="OK" {% if status_filter == 'OK' %}selected{% endif %}>OK</option>
+            <option value="Erro" {% if status_filter == 'Erro' %}selected{% endif %}>Erro</option>
+            <option value="Pendente" {% if status_filter == 'Pendente' %}selected{% endif %}>Pendente</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="periodo">Período:</label>
+          <select name="periodo" id="periodo">
+            <option value="1" {% if periodo_filter == '1' %}selected{% endif %}>Último dia</option>
+            <option value="7" {% if periodo_filter == '7' %}selected{% endif %}>Últimos 7 dias</option>
+            <option value="30" {% if periodo_filter == '30' %}selected{% endif %}>Últimos 30 dias</option>
+            <option value="90" {% if periodo_filter == '90' %}selected{% endif %}>Últimos 90 dias</option>
+          </select>
+        </div>
+        <button type="submit" class="btn">
+          <i class="bi bi-search"></i> Filtrar
+        </button>
+      </form>
+    </div>
+    
+    <div class="events-table">
+      <div class="table-header">
+        <h3><i class="bi bi-list-task"></i> Eventos Sincronizados</h3>
+      </div>
+      <div class="table-content">
+        {% if eventos_sync %}
+        <table>
+          <thead>
+            <tr>
+              <th>Evento</th>
+              <th>ID Google</th>
+              <th>Status</th>
+              <th>Data Criação</th>
+              <th>Usuário</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for evento in eventos_sync %}
+            <tr>
+              <td>{{ evento.solicitacao.titulo_evento }}</td>
+              <td>{{ evento.provider_event_id }}</td>
+              <td>
+                <span class="status-badge status-{% if evento.status_sincronizacao == 'OK' %}ok{% elif evento.status_sincronizacao == 'Erro' %}erro{% else %}pendente{% endif %}">
+                  {{ evento.status_sincronizacao }}
+                </span>
+              </td>
+              <td>{{ evento.data_criacao|date:"d/m/Y H:i" }}</td>
+              <td>{{ evento.usuario_criador.username }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p style="text-align: center; padding: 2rem; color: var(--muted);">
+          <i class="bi bi-inbox"></i><br>
+          Nenhum evento encontrado para os filtros selecionados.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -408,7 +408,7 @@
           <a href="/aprovacoes/pendentes/" class="nav-item">
             <i class="bi bi-clipboard-check"></i> Aprovações Pendentes
           </a>
-          <a href="/admin/core/deslocamento/" class="nav-item">
+          <a href="{% url 'core:deslocamentos_list' %}" class="nav-item">
             <i class="bi bi-geo-alt"></i> Deslocamentos
           </a>
         </div>
@@ -417,6 +417,9 @@
         {% if perms.core.sync_calendar or user.is_superuser %}
         <div class="nav-section">
           <div class="nav-section-title">Controle</div>
+          <a href="{% url 'core:controle_pre_agenda' %}" class="nav-item">
+            <i class="bi bi-calendar-plus"></i> Pré-Agenda
+          </a>
           <a href="{% url 'core:controle_google_calendar' %}" class="nav-item">
             <i class="bi bi-cloud-check"></i> Monitor Google Calendar
           </a>

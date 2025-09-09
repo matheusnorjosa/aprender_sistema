@@ -6,6 +6,16 @@
         "@playwright/mcp@latest"
       ],
       "env": {}
+    },
+    "django-aprender": {
+      "command": "venv/Scripts/python",
+      "args": [
+        "manage.py",
+        "stdio_server"
+      ],
+      "env": {
+        "DJANGO_SETTINGS_MODULE": "aprender_sistema.settings"
+      }
     }
   }
 }

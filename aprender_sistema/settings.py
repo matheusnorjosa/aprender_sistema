@@ -132,6 +132,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # Third-party apps
+    # "mcp_server",  # Django MCP Server - Disabled for Docker compatibility
     # Local apps
     "core",
     "relatorios",
@@ -191,13 +193,13 @@ try:
 except ImportError:
     pass
 
-# MCP Server integration
-try:
-    import django_mcp_server
-
-    INSTALLED_APPS.append("django_mcp_server")
-except ImportError:
-    pass
+# MCP Server integration - Disabled for Docker compatibility
+# try:
+#     import django_mcp_server
+# 
+#     INSTALLED_APPS.append("django_mcp_server")
+# except ImportError:
+#     pass
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -293,31 +295,65 @@ else:
 
 REDIS_URL = os.getenv("REDIS_URL")
 
+# Cache configuration - Enhanced Redis with django-redis
 if REDIS_URL and (IS_PRODUCTION or IS_STAGING):
-    # Redis para produção/staging
+    # Redis com django-redis para produção/staging
     CACHES = {
         "default": {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "BACKEND": "django_redis.cache.RedisCache",
             "LOCATION": REDIS_URL,
             "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "PARSER_CLASS": "redis.connection.HiredisParser",
                 "CONNECTION_POOL_KWARGS": {
+                    "max_connections": 50,
+                    "retry_on_timeout": True,
                     "ssl_cert_reqs": None if not IS_PRODUCTION else "required",
                 },
+                "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
+                "IGNORE_EXCEPTIONS": True,
+                "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
             },
+            "KEY_PREFIX": "aprender" if IS_PRODUCTION else "aprender_staging",
+            "VERSION": 1,
+            "TIMEOUT": 300,
         }
     }
     # Session usando cache em produção
     SESSION_ENGINE = "django.contrib.sessions.backends.cache"
     SESSION_CACHE_ALIAS = "default"
 else:
-    # Fallback para desenvolvimento
-    CACHES = {
-        "default": {
-            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-            "LOCATION": "unified-cache",
-            "TIMEOUT": 300,
+    # Desenvolvimento: Tenta Redis local, senão usa LocMem
+    try:
+        import redis
+        redis_client = redis.Redis(host='127.0.0.1', port=6379, db=1, socket_timeout=1)
+        redis_client.ping()
+        
+        CACHES = {
+            "default": {
+                "BACKEND": "django_redis.cache.RedisCache",
+                "LOCATION": "redis://127.0.0.1:6379/1",
+                "OPTIONS": {
+                    "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                    "IGNORE_EXCEPTIONS": True,
+                },
+                "KEY_PREFIX": "aprender_dev",
+                "TIMEOUT": 300,
+            }
         }
-    }
+        print("[OK] Redis cache configurado para desenvolvimento")
+    except:
+        CACHES = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "unified-cache",
+                "TIMEOUT": 300,
+                "OPTIONS": {
+                    "MAX_ENTRIES": 2000,
+                }
+            }
+        }
+        print("[WARNING] Redis indisponivel - usando LocMem cache")
 
 # ======================
 # CONFIGURAÇÃO DE EMAIL
@@ -713,24 +749,9 @@ MIGRATION_TIMEOUT = 300  # Timeout em segundos para operações longas
 # CONFIGURAÇÕES DJANGO MCP SERVER
 # ======================
 
-# django-mcp-server settings
-MCP_SERVERS = {
-    "default": {
-        "name": "Aprender Sistema MCP Server",
-        "description": "MCP Server para o sistema de gestão educacional Aprender",
-        "toolsets": [
-            "core.mcp.toolsets.CoreModelToolset",
-            "core.mcp.toolsets.SolicitacaoToolset",
-            "core.mcp.toolsets.FormadorToolset",
-        ],
-        "auth": {
-            "required": True,
-            "type": "django_session",  # Usar autenticação Django existente
-        },
-    }
+# django-mcp-server global configuration
+DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
+    "name": "Aprender Sistema MCP Server",
+    "instructions": "MCP Server para interação AI com o sistema de gestão educacional Aprender",
+    "stateless": False  # Manter estado da sessão
 }
-
-# Configurações específicas para desenvolvimento
-if IS_DEVELOPMENT:
-    MCP_SERVERS["default"]["debug"] = True
-    MCP_SERVERS["default"]["auth"]["required"] = False  # Facilitar desenvolvimento

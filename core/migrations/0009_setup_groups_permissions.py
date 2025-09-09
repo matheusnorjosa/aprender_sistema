@@ -124,6 +124,7 @@ def sync_users_to_groups(apps, schema_editor):
     Sync existing users from papel field to Django Groups
     """
     Usuario = apps.get_model('core', 'Usuario')
+    Group = apps.get_model('auth', 'Group')
     
     # Mapping papel -> group name
     papel_to_group = {
@@ -135,36 +136,9 @@ def sync_users_to_groups(apps, schema_editor):
         'diretoria': 'diretoria',
     }
     
-    print("\n=== Sincronizando usuarios existentes ===")
-    
-    users_synced = 0
-    users_skipped = 0
-    
-    for user in Usuario.objects.all():
-        if user.papel and user.papel in papel_to_group:
-            group_name = papel_to_group[user.papel]
-            try:
-                group = Group.objects.get(name=group_name)
-                
-                # Remove from all role groups first
-                current_groups = Group.objects.filter(name__in=papel_to_group.values())
-                user.groups.remove(*current_groups)
-                
-                # Add to correct group
-                user.groups.add(group)
-                users_synced += 1
-                print(f"  + {user.username} -> {group_name}")
-                
-            except Group.DoesNotExist:
-                print(f"  X Grupo '{group_name}' nao encontrado para {user.username}")
-                users_skipped += 1
-        else:
-            print(f"  ! {user.username}: papel '{user.papel}' invalido ou vazio")
-            users_skipped += 1
-    
-    print(f"\n=== Sincronizacao ===")
-    print(f"  - Usuarios sincronizados: {users_synced}")
-    print(f"  - Usuarios ignorados: {users_skipped}")
+    print("\n=== Sincronizacao de usuarios TEMPORARIAMENTE DESABILITADA ===")
+    print("  - Esta funcionalidade sera implementada via management command")
+    print("  - Para sincronizar manualmente use: python manage.py sync_users_to_groups")
 
 
 def reverse_migration(apps, schema_editor):

@@ -1,0 +1,14 @@
+Papel Funcional,Grupo Django,Usuários Ativos,Permissões Específicas,Descrição
+Gerente,gerente,10,"add_aprovacao, change_aprovacao, view_aprovacao, change_disponibilidadeformadores, view_disponibilidadeformadores, view_all_solicitacoes",Supervisiona disponibilidade e todas as solicitações
+Coordenador,coordenador,37,"add_solicitacao, change_solicitacao, view_own_solicitacoes, view_solicitacao",Cria e gerencia suas próprias solicitações de eventos
+Apoio de Coordenação,apoio_coordenacao,0,Nenhuma,Papel funcional sem permissões específicas definidas
+Formador,formador,73,"add_disponibilidadeformadores, view_disponibilidadeformadores, view_own_events",Visualiza eventos próprios e gerencia sua disponibilidade
+Superintendência,superintendencia,10,"add_aprovacao, view_aprovacao, view_logauditoria, change_solicitacao, view_solicitacao",Aprova/reprova solicitações e visualiza auditoria
+Controle,controle,1,"view_aprovacao, sync_calendar, view_calendar, view_solicitacao",Gerencia pré-agenda e integração Google Calendar
+Diretoria,diretoria,1,"view_disponibilidadeformadores, view_relatorios, view_solicitacao",Visualiza relatórios e disponibilidades
+Administrador,admin,1,"view_relatorios, add_solicitacao, change_solicitacao, sync_calendar, view_own_solicitacoes, view_solicitacao",Acesso administrativo completo ao sistema
+Gerente Aprender,gerente_aprender,0,Nenhuma,Papel específico sem permissões definidas
+Recursos Humanos,rh,0,Nenhuma,Grupo organizacional preparado para expansão
+Logística,logistica,0,Nenhuma,Grupo organizacional preparado para expansão
+Financeiro,financeiro,0,Nenhuma,Grupo organizacional preparado para expansão  
+Editorial,editorial,0,Nenhuma,Grupo organizacional preparado para expansão

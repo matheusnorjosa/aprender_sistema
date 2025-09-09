@@ -43,7 +43,11 @@ def _conta_eventos_no_dia(formador_id, dia: date) -> int:
 
 def _tem_desloc_no_dia(formador_id, dia: date) -> bool:
     """Verifica deslocamentos de forma otimizada"""
-    return Deslocamento.objects.filter(formadores=formador_id, data=dia).exists()
+    return Deslocamento.objects.filter(
+        Q(pessoa_1_id=formador_id) | Q(pessoa_2_id=formador_id) | Q(pessoa_3_id=formador_id) |
+        Q(pessoa_4_id=formador_id) | Q(pessoa_5_id=formador_id) | Q(pessoa_6_id=formador_id),
+        data=dia
+    ).exists()
 
 
 def gerar_mapa_mensal_otimizado(formadores, dias):
@@ -73,9 +77,17 @@ def gerar_mapa_mensal_otimizado(formadores, dias):
     ).select_related("formador")
 
     # 2. Todos os deslocamentos do período
+    from django.db.models import Q
+    desloc_query = Q()
+    for fid in formador_ids:
+        desloc_query |= (
+            Q(pessoa_1_id=fid) | Q(pessoa_2_id=fid) | Q(pessoa_3_id=fid) |
+            Q(pessoa_4_id=fid) | Q(pessoa_5_id=fid) | Q(pessoa_6_id=fid)
+        )
+    
     deslocamentos = Deslocamento.objects.filter(
-        formadores__in=formador_ids, data__gte=dia_inicio, data__lte=dia_fim
-    ).prefetch_related("formadores")
+        desloc_query, data__gte=dia_inicio, data__lte=dia_fim
+    ).select_related("pessoa_1", "pessoa_2", "pessoa_3", "pessoa_4", "pessoa_5", "pessoa_6")
 
     # 3. Todos os eventos aprovados que intersectam o período
     eventos = Solicitacao.objects.filter(
@@ -95,8 +107,9 @@ def gerar_mapa_mensal_otimizado(formadores, dias):
     # Deslocamentos: {formador_id: {data: True}}
     desloc_map = defaultdict(set)
     for desloc in deslocamentos:
-        for formador in desloc.formadores.all():
-            desloc_map[formador.id].add(desloc.data)
+        for formador in desloc.pessoas:
+            if formador:  # Verificar se não é None
+                desloc_map[formador.id].add(desloc.data)
 
     # Eventos: {formador_id: {data: count}}
     eventos_map = defaultdict(lambda: defaultdict(int))

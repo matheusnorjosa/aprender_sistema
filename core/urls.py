@@ -31,7 +31,7 @@ from .views.api_approval import (
     SolicitacaoConflictsAPI,
     SolicitacoesPendentesAPI,
 )
-from .views.api_availability import CheckAvailabilityAPI, FormadorDetailsAPI
+from .views.api_availability import CheckAvailabilityAPI, FormadorDetailsAPI, FormadoresSuperintendenciaAPI
 from .views.api_notifications import (
     CommunicationLogsAPI,
     CommunicationStatsAPI,
@@ -42,6 +42,13 @@ from .views.api_notifications import (
     UserNotificationsAPI,
 )
 from .views_calendar import MapaMensalPageView, MapaMensalView
+from .views.deslocamento_views import (
+    DeslocamentoListView,
+    DeslocamentoCreateView,
+    DeslocamentoUpdateView,
+    DeslocamentoDeleteView,
+    DeslocamentoAPI,
+)
 
 app_name = "core"
 
@@ -144,6 +151,11 @@ urlpatterns = [
         FormadorDetailsAPI.as_view(),
         name="formador_details_api",
     ),
+    path(
+        "api/formadores-superintendencia/",
+        FormadoresSuperintendenciaAPI.as_view(),
+        name="formadores_superintendencia_api",
+    ),
     # APIs para sistema de aprovação avançado
     path("api/bulk-approval/", BulkApprovalAPI.as_view(), name="bulk_approval_api"),
     path(
@@ -199,4 +211,11 @@ urlpatterns = [
         CommunicationLogsView.as_view(),
         name="admin_communication_logs",
     ),
+    
+    # Sistema CRUD para Deslocamentos
+    path("deslocamentos/", DeslocamentoListView.as_view(), name="deslocamentos_list"),
+    path("deslocamentos/novo/", DeslocamentoCreateView.as_view(), name="deslocamentos_create"),
+    path("deslocamentos/<uuid:pk>/editar/", DeslocamentoUpdateView.as_view(), name="deslocamentos_update"),
+    path("deslocamentos/<uuid:pk>/excluir/", DeslocamentoDeleteView.as_view(), name="deslocamentos_delete"),
+    path("api/deslocamentos/", DeslocamentoAPI.as_view(), name="deslocamentos_api"),
 ]

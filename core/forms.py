@@ -106,6 +106,10 @@ class SolicitacaoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Customizar a exibição dos formadores para mostrar apenas o nome
         self.fields["formadores"].label_from_instance = lambda obj: obj.nome
+        
+        # 1.2 UI/UX: Tornar campos opcionais (mantém obrigatório formadores, data, projeto, município, tipo)
+        self.fields["numero_encontro_formativo"].required = False
+        self.fields["titulo_evento"].required = False  # "Segmento" conforme solicitado
 
     def clean(self):
         cleaned = super().clean()
@@ -136,8 +140,8 @@ class SolicitacaoForm(forms.ModelForm):
             if di <= now:
                 raise ValidationError(_("A data de início deve ser no futuro."))
 
-        # Validação de título
-        if titulo and len(titulo.strip()) < 3:
+        # Validação de título (apenas se informado, já que é opcional)
+        if titulo and titulo.strip() and len(titulo.strip()) < 3:
             raise ValidationError(
                 _("O título do evento deve ter pelo menos 3 caracteres.")
             )

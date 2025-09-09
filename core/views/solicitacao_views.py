@@ -3,6 +3,7 @@ Views relacionadas às solicitações de eventos.
 """
 
 from django.db import transaction
+from django.http import JsonResponse
 
 from .base import *
 
@@ -86,10 +87,19 @@ class SolicitacaoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateV
                 if not self.object.pk:
                     raise ValueError("Falha ao salvar solicitação")
 
-                # 7. Mensagem de sucesso
+                # 7. Resposta: Toast notification ao invés de redirect (1.1 UI/UX)
+                if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    # Resposta AJAX para toast notification
+                    return JsonResponse({
+                        'success': True, 
+                        'message': message,
+                        'solicitacao_id': str(self.object.pk),
+                        'titulo': self.object.titulo_evento or 'Evento sem título'
+                    })
+                
+                # Para requests não-AJAX, mostrar mensagem e renderizar o mesmo template
                 messages.success(self.request, message)
-
-                return response
+                return self.render_to_response(self.get_context_data(form=SolicitacaoForm()))
 
         except Exception as e:
             # Log do erro
@@ -99,6 +109,14 @@ class SolicitacaoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateV
                 entidade_afetada_id=None,
                 detalhes=f"ERRO ao criar solicitação: {str(e)}",
             )
+            
+            # Resposta de erro: JSON para AJAX ou mensagem normal
+            if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False, 
+                    'message': f"Erro ao criar solicitação: {str(e)}"
+                })
+            
             messages.error(self.request, f"Erro ao criar solicitação: {str(e)}")
             return self.form_invalid(form)
 

@@ -25,6 +25,7 @@ services:
       DB_PASSWORD: aprender123456
       DB_HOST: db
       DB_PORT: "5432"
+      ENVIRONMENT: staging
       DJANGO_ENV: development
       FEATURE_GOOGLE_SYNC: "1"
     volumes:

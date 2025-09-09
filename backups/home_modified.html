@@ -1,0 +1,275 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Sistema Aprender — Dashboard{% endblock %}
+{% block description %}Dashboard principal do Sistema Aprender com ações rápidas e visão geral do sistema{% endblock %}
+
+{% block nav_home %}active{% endblock %}
+{% block page_title %}Sistema Aprender{% endblock %}
+{% block breadcrumb %}Dashboard Principal{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Estilos específicos da home */
+  .welcome-section {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.05) 100%);
+    border-radius: 1rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border: 1px solid rgba(102, 126, 234, 0.1);
+  }
+  
+  .welcome-section h2 {
+    color: var(--accent);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+  
+  .action-card {
+    background: var(--card);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+    border: 1px solid var(--line);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .action-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--success));
+  }
+  
+  .action-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+  }
+  
+  .action-card h3 {
+    color: var(--accent);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+  }
+  
+  .action-card p {
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+    font-size: 0.9rem;
+  }
+  
+  .action-buttons {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  
+  .stats-footer {
+    background: linear-gradient(135deg, var(--sidebar-bg) 0%, var(--sidebar-hover) 100%);
+    color: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    margin-top: 2rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    align-items: center;
+  }
+  
+  .stats-item {
+    text-align: center;
+  }
+  
+  .stats-item .icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.8;
+  }
+  
+  .stats-item .label {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin-bottom: 0.25rem;
+  }
+  
+  .stats-item .value {
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+  
+  @media (max-width: 768px) {
+    .actions-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .stats-footer {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="welcome-section">
+  <h2><i class="bi bi-house-heart" aria-hidden="true"></i> Bem-vindo ao Sistema Aprender!</h2>
+  <p>Use o menu lateral para acessar as funcionalidades disponíveis para seu perfil.</p>
+</div>
+
+<h2><i class="bi bi-lightning-charge" aria-hidden="true"></i> Ações Rápidas</h2>
+
+<div class="actions-grid">
+  <!-- Solicitar Evento -->
+  <div class="action-card">
+    <h3><i class="bi bi-plus-circle" aria-hidden="true"></i> Solicitar Evento</h3>
+    <p>Crie uma nova solicitação de evento educacional com verificação automática de conflitos de agenda e disponibilidade de formadores em tempo real.</p>
+    <div class="action-buttons">
+      <a href="/solicitar/" class="btn btn-primary">
+        <i class="bi bi-plus" aria-hidden="true"></i> Criar Solicitação
+      </a>
+    </div>
+  </div>
+
+  <!-- Meus Eventos -->
+  <div class="action-card">
+    <h3><i class="bi bi-calendar-check" aria-hidden="true"></i> Meus Eventos</h3>
+    <p>Visualize e gerencie todos os eventos que você solicitou. Acompanhe status, aprovações e histórico completo das suas solicitações.</p>
+    <div class="action-buttons">
+      <a href="{% url 'core:coordenador_meus_eventos' %}" class="btn btn-primary">
+        <i class="bi bi-eye" aria-hidden="true"></i> Ver Meus Eventos
+      </a>
+    </div>
+  </div>
+
+  <!-- Bloqueio de Agenda -->
+  <div class="action-card">
+    <h3><i class="bi bi-calendar-x" aria-hidden="true"></i> Bloqueio de Agenda</h3>
+    <p>Registre períodos de indisponibilidade na sua agenda. Configure bloqueios totais (dia inteiro) ou parciais (horários específicos) para evitar conflitos.</p>
+    <div class="action-buttons">
+      <a href="/bloqueios/novo/" class="btn btn-warning">
+        <i class="bi bi-plus" aria-hidden="true"></i> Registrar Bloqueio
+      </a>
+    </div>
+  </div>
+
+  <!-- Mapa de Disponibilidade -->
+  <div class="action-card">
+    <h3><i class="bi bi-calendar2-month" aria-hidden="true"></i> Mapa de Disponibilidade</h3>
+    <p>Visualize graficamente a disponibilidade dos formadores, eventos programados e bloqueios de agenda em uma interface mensal intuitiva.</p>
+    <div class="action-buttons">
+      <a href="/disponibilidade/" class="btn btn-success">
+        <i class="bi bi-eye" aria-hidden="true"></i> Visualizar Mapa
+      </a>
+      <a href="/mapa-mensal/?ano=2025&mes=9" class="btn btn-sm">
+        <i class="bi bi-code-square" aria-hidden="true"></i> Dados JSON
+      </a>
+    </div>
+  </div>
+
+  <!-- Central de Aprovações -->
+  <div class="action-card">
+    <h3><i class="bi bi-clipboard-check" aria-hidden="true"></i> Central de Aprovações</h3>
+    <p>Analise solicitações de eventos pendentes, verifique detalhes dos formadores e tome decisões de aprovação ou reprovação com justificativas detalhadas.</p>
+    <div class="action-buttons">
+      <a href="/aprovacoes/pendentes/" class="btn btn-warning">
+        <i class="bi bi-clock" aria-hidden="true"></i> Pendentes ( - )
+      </a>
+    </div>
+  </div>
+
+  <!-- Monitor Google Calendar -->
+  <div class="action-card">
+    <h3><i class="bi bi-cloud-check" aria-hidden="true"></i> Monitor Google Calendar</h3>
+    <p>Monitore a sincronização de eventos com Google Calendar, visualize estatísticas de sucesso e identifique problemas de integração em tempo real.</p>
+    <div class="action-buttons">
+      <a href="{% url 'core:controle_google_calendar' %}" class="btn btn-primary">
+        <i class="bi bi-eye" aria-hidden="true"></i> Ver Sincronizações
+      </a>
+      <a href="{% url 'core:controle_api_status' %}" class="btn btn-sm">
+        <i class="bi bi-speedometer2" aria-hidden="true"></i> API Status
+      </a>
+    </div>
+  </div>
+
+  <!-- Auditoria do Sistema -->
+  <div class="action-card">
+    <h3>Auditoria do Sistema</h3>
+    <p>Acesse logs completos de auditoria, monitore atividades dos usuários e analise padrões de uso do sistema com ferramentas avançadas de filtragem.</p>
+    <div class="action-buttons">
+      <a href="{% url 'core:controle_auditoria' %}" class="btn btn-primary">
+        <i class="bi bi-shield-check" aria-hidden="true"></i> Ver Logs
+      </a>
+    </div>
+  </div>
+
+  <!-- Dashboard Executivo -->
+  <div class="action-card">
+    <h3><i class="bi bi-graph-up" aria-hidden="true"></i> Dashboard Executivo</h3>
+    <p>Acesse métricas estratégicas, indicadores de performance e análises executivas com visão consolidada de todos os projetos e formadores.</p>
+    <div class="action-buttons">
+      <a href="{% url 'core:diretoria_dashboard' %}" class="btn btn-success">
+        <i class="bi bi-eye" aria-hidden="true"></i> Ver Dashboard
+      </a>
+      <a href="{% url 'core:diretoria_api_metrics' %}" class="btn btn-sm">
+        <i class="bi bi-bar-chart" aria-hidden="true"></i> API Métricas
+      </a>
+    </div>
+  </div>
+
+  <!-- Relatórios Consolidados -->
+  <div class="action-card">
+    <h3><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i> Relatórios Consolidados</h3>
+    <p>Gere relatórios detalhados por período, projeto ou município com análises de performance dos formadores e distribuição geográfica.</p>
+    <div class="action-buttons">
+      <a href="{% url 'core:diretoria_relatorios' %}" class="btn btn-success">
+        <i class="bi bi-file-text" aria-hidden="true"></i> Ver Relatórios
+      </a>
+      <a href="/disponibilidade/" class="btn btn-sm">
+        <i class="bi bi-calendar-month" aria-hidden="true"></i> Visão Mensal
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="stats-footer">
+  <div class="stats-item">
+    <div class="icon"><i class="bi bi-gear" aria-hidden="true"></i></div>
+    <div class="label">Desenvolvido por</div>
+    <div class="value"><strong>DAT</strong> • Desenvolvimento e Apoio Tecnológico</div>
+  </div>
+  <div class="stats-item">
+    <div class="icon"><i class="bi bi-person-circle" aria-hidden="true"></i></div>
+    <div class="label">Usuário:</div>
+    <div class="value"><strong>{{ user.username }}</strong></div>
+  </div>
+  <div class="stats-item">
+    <div class="icon"><i class="bi bi-code-square" aria-hidden="true"></i></div>
+    <div class="label">Versão</div>
+    <div class="value">Sistema v1.0 • Django 5.2</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+console.log('✅ Home page carregada - versão simplificada');
+</script>
+{% endblock %}

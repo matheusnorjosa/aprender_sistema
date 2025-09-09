@@ -6,6 +6,7 @@ SEMANA 3 - DIA 1: Interface de solicitação aprimorada
 import json
 
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import Group
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -220,4 +221,51 @@ class FormadorDetailsAPI(View):
         except Exception as e:
             return JsonResponse(
                 {"success": False, "error": f"Erro ao buscar formadores: {str(e)}"}
+            )
+
+
+@method_decorator(login_required, name="dispatch")
+class FormadoresSuperintendenciaAPI(View):
+    """
+    API para obter lista de formadores vinculados à superintendência.
+    Usado no dropdown da interface de disponibilidade.
+    """
+
+    def get(self, request):
+        try:
+            # Buscar grupo superintendencia
+            try:
+                grupo_super = Group.objects.get(name="superintendencia")
+            except Group.DoesNotExist:
+                return JsonResponse({
+                    "success": False, 
+                    "error": "Grupo superintendência não encontrado"
+                })
+
+            # Buscar formadores vinculados ao grupo superintendencia via usuario
+            formadores = Formador.objects.filter(
+                usuario__groups=grupo_super,
+                ativo=True
+            ).select_related('usuario').order_by('nome')
+
+            # Preparar dados de resposta
+            formadores_data = []
+            for formador in formadores:
+                formadores_data.append({
+                    "id": str(formador.id),
+                    "nome": formador.nome,
+                    "email": formador.email,
+                    "area_atuacao": formador.area_atuacao.name if formador.area_atuacao else None,
+                    "usuario_ativo": formador.usuario.is_active if formador.usuario else False
+                })
+
+            return JsonResponse({
+                "success": True,
+                "formadores": formadores_data,
+                "total": len(formadores_data)
+            })
+
+        except Exception as e:
+            return JsonResponse(
+                {"success": False, "error": f"Erro interno: {str(e)}"}
             )

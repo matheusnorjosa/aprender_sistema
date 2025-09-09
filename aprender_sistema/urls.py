@@ -8,6 +8,7 @@ urlpatterns = [
     path(
         "accounts/", include("django.contrib.auth.urls")
     ),  # Inclui as URLs de autenticação
+    path("mcp/", include("mcp_server.urls")),  # Django MCP Server
     path("", include("core.urls")),
 ]
 

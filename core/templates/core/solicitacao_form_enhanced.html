@@ -280,6 +280,44 @@ Registre uma nova solicitação de evento com verificação automática de confl
     color: var(--accent);
   }
 
+  /* Toast notifications */
+  .toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1055;
+  }
+
+  .toast {
+    min-width: 350px;
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-hover);
+    backdrop-filter: blur(10px);
+  }
+
+  .toast.success {
+    background: linear-gradient(135deg, rgba(39, 174, 96, 0.95) 0%, rgba(46, 204, 113, 0.95) 100%);
+    color: white;
+  }
+
+  .toast.error {
+    background: linear-gradient(135deg, rgba(231, 76, 60, 0.95) 0%, rgba(192, 57, 43, 0.95) 100%);
+    color: white;
+  }
+
+  .toast-header {
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    color: inherit;
+  }
+
+  .toast-body {
+    color: inherit;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
   /* Responsive design */
   @media (max-width: 768px) {
     .availability-checker {
@@ -294,6 +332,16 @@ Registre uma nova solicitação de evento com verificação automática de confl
     .btn-group-submit {
       position: relative;
       bottom: auto;
+    }
+
+    .toast-container {
+      top: 10px;
+      right: 10px;
+      left: 10px;
+    }
+
+    .toast {
+      min-width: auto;
     }
   }
 
@@ -327,6 +375,9 @@ Registre uma nova solicitação de evento com verificação automática de confl
 {% endblock %}
 
 {% block content %}
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
 <div class="row">
   <!-- Main Form Column -->
   <div class="col-lg-8">
@@ -391,8 +442,8 @@ Registre uma nova solicitação de evento com verificação automática de confl
           </div>
           <div class="col-md-6">
             <div class="form-group">
-              <label for="{{ form.titulo_evento.id_for_label }}" class="form-label required-field">
-                {{ form.titulo_evento.label }}
+              <label for="{{ form.titulo_evento.id_for_label }}" class="form-label">
+                {{ form.titulo_evento.label }} <small class="text-muted">(opcional)</small>
               </label>
               {{ form.titulo_evento }}
               {% if form.titulo_evento.help_text %}
@@ -409,7 +460,7 @@ Registre uma nova solicitação de evento com verificação automática de confl
           <div class="col-md-6">
             <div class="form-group">
               <label for="{{ form.numero_encontro_formativo.id_for_label }}" class="form-label">
-                {{ form.numero_encontro_formativo.label }}
+                {{ form.numero_encontro_formativo.label }} <small class="text-muted">(opcional)</small>
               </label>
               {{ form.numero_encontro_formativo }}
               {% if form.numero_encontro_formativo.help_text %}
@@ -670,28 +721,28 @@ document.addEventListener('DOMContentLoaded', function() {
         dataInicio.addEventListener('change', validateDates);
         dataFim.addEventListener('change', validateDates);
         
-        // Title validation
+        // Title validation (1.2 UI/UX: opcional, mas se informado deve ter mín. 3 chars)
         tituloEvento.addEventListener('input', function() {
             const value = this.value.trim();
             if (value.length > 0 && value.length < 3) {
-                setFieldError(this, 'O título deve ter pelo menos 3 caracteres.');
+                setFieldError(this, 'Se informado, o título deve ter pelo menos 3 caracteres.');
             } else {
                 clearFieldError(this);
             }
             updateFormState();
         });
         
-        // Form submission
+        // Form submission with AJAX (1.1 UI/UX)
         form.addEventListener('submit', function(e) {
+            e.preventDefault(); // Always prevent default to handle via AJAX
+            
             if (!isFormValid()) {
-                e.preventDefault();
-                showError('Por favor, corrija os erros do formulário antes de continuar.');
+                showToast('error', 'Por favor, corrija os erros do formulário antes de continuar.');
                 return false;
             }
             
             if (!lastAvailabilityResult || !lastAvailabilityResult.available) {
-                e.preventDefault();
-                showError('Verifique a disponibilidade dos formadores antes de enviar.');
+                showToast('error', 'Verifique a disponibilidade dos formadores antes de enviar.');
                 return false;
             }
             
@@ -699,6 +750,43 @@ document.addEventListener('DOMContentLoaded', function() {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Enviando...';
             form.classList.add('submit-loading');
+            
+            // Submit via AJAX
+            const formData = new FormData(form);
+            
+            fetch(form.action || window.location.href, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Success: show toast and reset form
+                    showToast('success', data.message);
+                    form.reset();
+                    resetAvailabilityStatus();
+                    setupFormadorSelection(); // Re-initialize formador selection
+                    updateFormState();
+                } else {
+                    // Error: show toast with error message
+                    showToast('error', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erro no envio:', error);
+                showToast('error', 'Erro ao enviar solicitação. Tente novamente.');
+            })
+            .finally(() => {
+                // Reset loading state
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-send"></i> Enviar Solicitação';
+                form.classList.remove('submit-loading');
+                updateFormState();
+            });
         });
     }
 
@@ -924,9 +1012,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function isFormComplete() {
         const selectedFormadores = Array.from(formadorCheckboxes).some(cb => cb.checked);
+        // 1.2 UI/UX: titulo_evento é opcional, não exigir
         return projeto.value && municipio.value && tipoEvento.value && 
-               tituloEvento.value.trim() && dataInicio.value && 
-               dataFim.value && selectedFormadores;
+               dataInicio.value && dataFim.value && selectedFormadores;
     }
 
     function isFormValid() {
@@ -957,9 +1045,42 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function showToast(type, message, duration = 5000) {
+        const toastContainer = document.getElementById('toast-container');
+        const toastId = 'toast-' + Date.now();
+        
+        const toastHTML = `
+            <div class="toast ${type}" id="${toastId}" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header">
+                    <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
+                    <strong class="ms-2 me-auto">${type === 'success' ? 'Sucesso' : 'Erro'}</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            </div>
+        `;
+        
+        toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+        
+        const toastElement = document.getElementById(toastId);
+        const toast = new bootstrap.Toast(toastElement, {
+            delay: duration
+        });
+        
+        toast.show();
+        
+        // Remove from DOM after hide
+        toastElement.addEventListener('hidden.bs.toast', () => {
+            toastElement.remove();
+        });
+        
+        return toast;
+    }
+
     function showError(message) {
-        // You could implement a toast notification here
-        alert(message);
+        showToast('error', message);
     }
 
     // Initial form state update

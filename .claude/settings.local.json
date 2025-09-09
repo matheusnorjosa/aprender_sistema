@@ -1,35 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(venvScripts:*)",
-      "Bash(docker-compose exec web python manage.py test:*)",
-      "Bash(git checkout:*)",
-      "Bash(mkdir:*)",
-      "Bash(docker-compose exec:*)",
-      "Bash(docker-compose up:*)",
-      "Bash(docker logs:*)",
-      "Bash(curl:*)",
-      "Bash(docker exec:*)",
-      "Bash(docker-compose restart:*)",
-      "Bash(source:*)",
-      "Bash(python:*)",
-      "Bash(rm:*)",
-      "Bash(mv:*)",
-      "Bash(.venvScriptsactivate)",
-      "Bash(.venvScriptspython.exe manage.py setup_groups)",
-      "mcp__playwright__browser_take_screenshot",
-      "mcp__playwright__browser_type",
-      "mcp__playwright__browser_click",
-      "mcp__playwright__browser_navigate",
-      "mcp__playwright__browser_fill_form",
-      "mcp__playwright__browser_select_option",
-      "mcp__playwright__browser_evaluate",
-      "mcp__playwright__browser_snapshot",
-      "Bash(ENVIRONMENT=production SECRET_KEY=W-v_WINGbGjP9E7v_Q0mKIKKKKm7oB7ptmQb3NsIWT3li5VERj4OEjK1FKX65Qnd3IQ ALLOWED_HOSTS=localhost,127.0.0.1 DB_PASSWORD=test python manage.py check --deploy --settings=aprender_sistema.settings_production)",
-      "Bash(pip install:*)",
-      "Read(C:\\Users\\datsu\\OneDrive\\Documentos\\Projeto Oraculo Aprender/**)",
-      "Read(C:\\Users\\datsu\\OneDrive\\Documentos\\Projeto Oraculo Aprender/**)"
-    ]
+      "Bash(venv/Scripts/python manage.py runserver:*)",
+      "Bash(venv/Scripts/python:*)",
+      "Bash(DJANGO_SETTINGS_MODULE=aprender_sistema.settings venv/Scripts/python manage.py help)",
+      "Bash(DJANGO_SETTINGS_MODULE=aprender_sistema.settings venv/Scripts/python manage.py stdio_server:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(venv/Scripts/playwright install:*)",
+      "Bash(docker-compose:*)"
+    ],
+    "deny": [],
+    "ask": []
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [

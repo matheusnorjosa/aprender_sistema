@@ -150,15 +150,15 @@ class ControleAPIStatusView(LoginRequiredMixin, PermissionRequiredMixin, View):
             status=SolicitacaoStatus.PENDENTE
         ).count()
         solicitacoes_24h = Solicitacao.objects.filter(
-            data_criacao__gte=data_limite_24h
+            data_solicitacao__gte=data_limite_24h
         ).count()
 
         # Métricas de sincronização Google Calendar
         sync_ok_24h = EventoGoogleCalendar.objects.filter(
-            status_sincronizacao="OK", data_criacao__gte=data_limite_24h
+            status_sincronizacao="OK", data_solicitacao__gte=data_limite_24h
         ).count()
         sync_erro_24h = EventoGoogleCalendar.objects.filter(
-            status_sincronizacao="Erro", data_criacao__gte=data_limite_24h
+            status_sincronizacao="Erro", data_solicitacao__gte=data_limite_24h
         ).count()
 
         # Métricas de auditoria

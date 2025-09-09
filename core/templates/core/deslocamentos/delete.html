@@ -1,0 +1,187 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Excluir Deslocamento{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Confirmar Exclusão
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Atenção:</strong> Esta ação não pode ser desfeita!
+                </div>
+
+                <p class="mb-3">Tem certeza que deseja excluir este deslocamento?</p>
+
+                <!-- Detalhes do deslocamento -->
+                <div class="bg-light p-3 rounded mb-4">
+                    <h6 class="text-primary mb-3">Dados do Deslocamento:</h6>
+                    
+                    <div class="row">
+                        <div class="col-sm-4"><strong>Data:</strong></div>
+                        <div class="col-sm-8">{{ object.data|date:"d/m/Y (l)" }}</div>
+                    </div>
+                    <hr class="my-2">
+                    
+                    <div class="row">
+                        <div class="col-sm-4"><strong>Tipo:</strong></div>
+                        <div class="col-sm-8">
+                            {% if object.tipo == 'deslocamento' %}
+                                <span class="badge bg-warning">
+                                    <i class="bi bi-arrow-right me-1"></i>Deslocamento
+                                </span>
+                            {% else %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-arrow-left me-1"></i>Retorno
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <hr class="my-2">
+                    
+                    <div class="row">
+                        <div class="col-sm-4"><strong>Rota:</strong></div>
+                        <div class="col-sm-8">
+                            <strong>{{ object.origem }}</strong>
+                            <i class="bi bi-arrow-right mx-2 text-muted"></i>
+                            <strong>{{ object.destino }}</strong>
+                        </div>
+                    </div>
+                    <hr class="my-2">
+                    
+                    <div class="row">
+                        <div class="col-sm-4"><strong>Formadores:</strong></div>
+                        <div class="col-sm-8">
+                            {% if object.pessoas %}
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for pessoa in object.pessoas %}
+                                        <span class="badge bg-primary">{{ pessoa.nome }}</span>
+                                    {% endfor %}
+                                </div>
+                                <small class="text-muted">{{ object.pessoas_count }} pessoa{{ object.pessoas_count|pluralize }}</small>
+                            {% else %}
+                                <span class="text-muted">Nenhum formador atribuído</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Impacto da exclusão -->
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-info-circle me-2"></i>Impacto da Exclusão:
+                    </h6>
+                    <ul class="mb-0">
+                        <li>Este deslocamento será removido permanentemente</li>
+                        <li>O histórico de disponibilidade dos formadores será atualizado</li>
+                        <li>Esta ação será registrada no log de auditoria</li>
+                        {% if object.pessoas_count > 0 %}
+                            <li>{{ object.pessoas_count }} formador{{ object.pessoas_count|pluralize:"es" }} será{{ object.pessoas_count|pluralize:"ão,ão" }} liberado{{ object.pessoas_count|pluralize }} nesta data</li>
+                        {% endif %}
+                    </ul>
+                </div>
+
+                <!-- Formulário de confirmação -->
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="d-flex justify-content-between gap-3">
+                        <div class="flex-grow-1">
+                            <button type="submit" class="btn btn-danger w-100">
+                                <i class="bi bi-trash me-2"></i>
+                                Sim, Excluir Deslocamento
+                            </button>
+                        </div>
+                        <div class="flex-grow-1">
+                            <a href="{% url 'core:deslocamentos_list' %}" class="btn btn-outline-secondary w-100">
+                                <i class="bi bi-x-circle me-2"></i>
+                                Cancelar
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="card-footer text-muted small">
+                <i class="bi bi-shield-check me-1"></i>
+                Esta ação será registrada no sistema de auditoria para controle de segurança.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Adicionar confirmação extra por JavaScript
+    const form = document.querySelector('form');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    
+    submitBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        // Double confirmation
+        const confirmed = confirm(
+            'CONFIRMAÇÃO FINAL:\n\n' +
+            'Deseja realmente excluir este deslocamento?\n' +
+            'Esta ação NÃO pode ser desfeita.\n\n' +
+            'Clique "OK" para confirmar a exclusão ou "Cancelar" para manter o registro.'
+        );
+        
+        if (confirmed) {
+            // Mostrar loading
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Excluindo...';
+            submitBtn.disabled = true;
+            
+            // Submeter formulário
+            form.submit();
+        }
+    });
+});
+</script>
+
+<style>
+.card-header {
+    font-weight: 600;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.alert {
+    border: none;
+    border-left: 4px solid;
+}
+
+.alert-warning {
+    border-left-color: #ffc107;
+    background-color: #fff3cd;
+}
+
+.alert-info {
+    border-left-color: #0dcaf0;
+    background-color: #d1ecf1;
+}
+
+.bg-light {
+    background-color: #f8f9fa !important;
+}
+
+.btn-danger:disabled {
+    opacity: 0.65;
+}
+
+hr {
+    margin: 0.5rem 0;
+    opacity: 0.3;
+}
+</style>
+{% endblock %}

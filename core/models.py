@@ -69,8 +69,9 @@ class Usuario(AbstractUser):
         unique=True,
         blank=True,
         null=True,
-        verbose_name="CPF",
-        help_text="CPF sem formatação (apenas números)",
+        verbose_name="CPF (Login)",
+        help_text="CPF sem formatação (apenas números) - usado como login no sistema",
+        validators=[],  # Validação será feita no formulário
     )
 
     telefone = models.CharField(

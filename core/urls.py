@@ -5,6 +5,7 @@ from django.views.generic import TemplateView
 
 from .views import HomeView  # Nova importação
 from .views import home  # Mantendo a função home também (opcional)
+from .views.health import health_check, health_detailed, health_ready, health_live, health_metrics
 from .views import (
     AprovacaoDetailView,
     AprovacoesPendentesView,
@@ -25,7 +26,15 @@ from .views import (
     SolicitacaoCreateView,
     SolicitacaoOKView,
 )
+from .views.diretoria_views import DashboardChartsAPIView
 from .views.admin_views import CommunicationLogsView
+from .views.gestao_views import (
+    GestaoDashboardView,
+    FormadorListView, FormadorCreateView, FormadorUpdateView, FormadorDeleteView,
+    MunicipioListView, MunicipioCreateView, MunicipioUpdateView, MunicipioDeleteView,
+    ProjetoListView, ProjetoCreateView, ProjetoUpdateView, ProjetoDeleteView,
+    TipoEventoListView, TipoEventoCreateView, TipoEventoUpdateView, TipoEventoDeleteView
+)
 from .views.api_approval import (
     BulkApprovalAPI,
     SolicitacaoConflictsAPI,
@@ -53,6 +62,12 @@ from .views.deslocamento_views import (
 app_name = "core"
 
 urlpatterns = [
+    # Health check endpoints
+    path("health/", health_check, name="health_check"),
+    path("health/detailed/", health_detailed, name="health_detailed"),
+    path("health/ready/", health_ready, name="health_ready"),
+    path("health/live/", health_live, name="health_live"),
+    path("health/metrics/", health_metrics, name="health_metrics"),
     # Home - ambas as versões (você pode escolher uma ou manter ambas)
     path("", HomeView.as_view(), name="home"),  # Versão class-based
     # path("", home, name="home"),  # Versão function-based (mantenha se precisar)
@@ -134,6 +149,39 @@ urlpatterns = [
         DiretoriaAPIMetricsView.as_view(),
         name="diretoria_api_metrics",
     ),
+    path(
+        "diretoria/api/charts/",
+        DashboardChartsAPIView.as_view(),
+        name="diretoria_api_charts",
+    ),
+    
+    # Gestão Administrativa - CRUD para entidades principais
+    path("gestao/", GestaoDashboardView.as_view(), name="gestao_dashboard"),
+    
+    # Gestão de Formadores
+    path("gestao/formadores/", FormadorListView.as_view(), name="gestao_formadores"),
+    path("gestao/formadores/novo/", FormadorCreateView.as_view(), name="gestao_formadores_create"),
+    path("gestao/formadores/<uuid:pk>/editar/", FormadorUpdateView.as_view(), name="gestao_formadores_update"),
+    path("gestao/formadores/<uuid:pk>/excluir/", FormadorDeleteView.as_view(), name="gestao_formadores_delete"),
+    
+    # Gestão de Municípios
+    path("gestao/municipios/", MunicipioListView.as_view(), name="gestao_municipios"),
+    path("gestao/municipios/novo/", MunicipioCreateView.as_view(), name="gestao_municipios_create"),
+    path("gestao/municipios/<uuid:pk>/editar/", MunicipioUpdateView.as_view(), name="gestao_municipios_update"),
+    path("gestao/municipios/<uuid:pk>/excluir/", MunicipioDeleteView.as_view(), name="gestao_municipios_delete"),
+    
+    # Gestão de Projetos
+    path("gestao/projetos/", ProjetoListView.as_view(), name="gestao_projetos"),
+    path("gestao/projetos/novo/", ProjetoCreateView.as_view(), name="gestao_projetos_create"),
+    path("gestao/projetos/<uuid:pk>/editar/", ProjetoUpdateView.as_view(), name="gestao_projetos_update"),
+    path("gestao/projetos/<uuid:pk>/excluir/", ProjetoDeleteView.as_view(), name="gestao_projetos_delete"),
+    
+    # Gestão de Tipos de Evento
+    path("gestao/tipos-evento/", TipoEventoListView.as_view(), name="gestao_tipos_evento"),
+    path("gestao/tipos-evento/novo/", TipoEventoCreateView.as_view(), name="gestao_tipos_evento_create"),
+    path("gestao/tipos-evento/<uuid:pk>/editar/", TipoEventoUpdateView.as_view(), name="gestao_tipos_evento_update"),
+    path("gestao/tipos-evento/<uuid:pk>/excluir/", TipoEventoDeleteView.as_view(), name="gestao_tipos_evento_delete"),
+    
     # API para Dashboard Principal
     path(
         "api/dashboard-stats/",

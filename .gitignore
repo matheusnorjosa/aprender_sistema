@@ -21,6 +21,11 @@ wheels/
 *.egg
 MANIFEST
 
+# Virtual Environment (para otimizar tokens)
+venv/
+env/
+.venv/
+
 # Django
 *.log
 local_settings.py
@@ -47,11 +52,59 @@ db.sqlite3-journal
 ehthumbs.db
 Thumbs.db
 
-# Security
+# Security & Credentials
 *.pem
 *.key
+*.p12
 api_keys.txt
+credentials.json
+google_*.json
+!google_*.json.example
+token.pickle
+service-account.json
+*.env
+*.env.*
+!.env.example
+secrets/
+
+# Cache & Build
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+.tox/
+.nox/
+htmlcov/
+.cache
+nosetests.xml
+*.cover
+.hypothesis/
+
+# Data files (temporary/extracted)
+*.xlsx
+*.xls
+extracted_*.json
+dumps/
+backups/*.sql
+backup_*.json
+temp/
+out/
+out_apps_script/
+logs/*.log
+
+# Arquivos de memória antigos (consolidados em docs/memoria/)
+docs/memoria/
+lighthouse-*.json
 
 # Static files
 /static/
+/staticfiles/
 /media/
+
+# Docker
+*.log
+docker-compose.override.yml
+
+# Editor
+.vscode/settings.json
+.vscode/launch.json

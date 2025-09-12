@@ -34,4 +34,7 @@
   },
   "enableAllProjectMcpServers": true,
   "verbose": false
+  ,
+
+"includeCoAuthoredBy": false
 }

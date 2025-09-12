@@ -450,21 +450,24 @@
         </div>
         {% endif %}
 
-        <!-- Cadastros - apenas para administradores e superintendência -->
-        {% if perms.core.view_aprovacao or user.is_superuser %}
+        <!-- Gestão Administrativa - apenas para administradores -->
+        {% if user.is_staff %}
         <div class="nav-section">
-          <div class="nav-section-title">Cadastros</div>
-          <a href="/admin/core/formador/" class="nav-item">
-            <i class="bi bi-people"></i> Formadores
+          <div class="nav-section-title">Gestão</div>
+          <a href="{% url 'core:gestao_dashboard' %}" class="nav-item">
+            <i class="bi bi-gear-fill"></i> Dashboard Administrativo
           </a>
-          <a href="/admin/core/municipio/" class="nav-item">
-            <i class="bi bi-geo"></i> Municípios
+          <a href="{% url 'core:gestao_formadores' %}" class="nav-item">
+            <i class="bi bi-people-fill"></i> Formadores
           </a>
-          <a href="/admin/core/projeto/" class="nav-item">
-            <i class="bi bi-folder"></i> Projetos
+          <a href="{% url 'core:gestao_municipios' %}" class="nav-item">
+            <i class="bi bi-geo-alt-fill"></i> Municípios
           </a>
-          <a href="/admin/core/tipoevento/" class="nav-item">
-            <i class="bi bi-tag"></i> Tipos de Evento
+          <a href="{% url 'core:gestao_projetos' %}" class="nav-item">
+            <i class="bi bi-briefcase-fill"></i> Projetos
+          </a>
+          <a href="{% url 'core:gestao_tipos_evento' %}" class="nav-item">
+            <i class="bi bi-calendar-event-fill"></i> Tipos de Evento
           </a>
         </div>
         {% endif %}

@@ -1,60 +1,17 @@
-{% load static %}
-<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8" />
-  <title>Dashboard Executivo — Diretoria</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    :root{
-      --bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      --content-bg: #f8f9fa;
-      --card: #ffffff; 
-      --text: #2c3e50; 
-      --muted: #6c757d; 
-      --line: #e9ecef; 
-      --accent: #3498db;
-      --success: #27ae60; 
-      --warning: #f39c12; 
-      --danger: #e74c3c; 
-      --shadow: 0 4px 15px rgba(0,0,0,0.08);
-    }
-    
-    *{box-sizing:border-box; margin:0; padding:0;}
-    
-    body{
-      background: var(--bg);
-      color: var(--text); 
-      font-family: 'Inter', system-ui, -apple-system, sans-serif; 
-      line-height: 1.6;
-      min-height: 100vh;
-    }
-    
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
-    
-    .header {
-      background: var(--card);
-      border-radius: 1rem;
-      padding: 2rem;
-      margin-bottom: 2rem;
-      box-shadow: var(--shadow);
-    }
-    
-    .header h1 {
-      margin: 0;
-      font-size: 2rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
+{% extends 'core/base.html' %}
+
+{% block title %}Dashboard Executivo - Sistema Aprender{% endblock %}
+
+{% block nav_diretoria %}active{% endblock %}
+
+{% block page_title %}
+<i class="bi bi-graph-up-arrow"></i> Dashboard Executivo
+{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    /* CSS específico para dashboard executivo */
     
     .stats-grid {
       display: grid;
@@ -191,17 +148,12 @@
       font-weight: 600;
     }
   </style>
-</head>
-<body>
-  <div class="container">
-    <a href="{% url 'core:home' %}" class="back-link">
-      <i class="bi bi-arrow-left"></i> Voltar ao Dashboard
-    </a>
-    
-    <div class="header">
-      <h1><i class="bi bi-graph-up-arrow"></i> Dashboard Executivo</h1>
-      <p>Visão estratégica e métricas executivas para {{ ano_atual }} • {{ trimestre_atual }}</p>
-    </div>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <small class="text-muted">Visão estratégica e métricas executivas para {{ ano_atual }} • {{ trimestre_atual }}</small>
+</div>
     
     <div class="stats-grid">
       <div class="stat-card">
@@ -250,70 +202,42 @@
       </div>
     </div>
     
-    <div class="info-cards">
-      <div class="info-card">
-        <div class="info-card-header">
-          <i class="bi bi-trophy"></i> Top Formadores (Trimestre)
+    <div class="charts-grid" style="margin-top: 2rem;">
+      <div class="chart-card">
+        <div class="chart-header" style="background: #27ae60;">
+          <i class="bi bi-trophy"></i> Top Formadores (Últimos 3 Meses)
         </div>
-        <div class="info-card-content">
-          <ul class="top-list">
-            {% for formador in top_formadores %}
-            <li>
-              <span>
-                <strong>{{ formador.nome }}</strong><br>
-                <small>{{ formador.area }}</small>
-              </span>
-              <span class="badge">{{ formador.eventos }} eventos</span>
-            </li>
-            {% empty %}
-            <li style="text-align: center; color: var(--muted);">
-              Nenhum dado disponível
-            </li>
-            {% endfor %}
-          </ul>
+        <div class="chart-content">
+          <canvas id="formadoresChart" width="400" height="250"></canvas>
         </div>
       </div>
       
-      <div class="info-card">
-        <div class="info-card-header" style="background: var(--warning);">
-          <i class="bi bi-geo-alt"></i> Municípios Atendidos
+      <div class="chart-card">
+        <div class="chart-header" style="background: #f39c12;">
+          <i class="bi bi-geo-alt"></i> Municípios Mais Atendidos
         </div>
-        <div class="info-card-content">
-          <ul class="top-list">
-            {% for municipio in municipios_atendidos %}
-            <li>
-              <span>
-                <strong>{{ municipio.municipio__nome }}</strong><br>
-                <small>{{ municipio.municipio__uf }}</small>
-              </span>
-              <span class="badge">{{ municipio.eventos }} eventos</span>
-            </li>
-            {% empty %}
-            <li style="text-align: center; color: var(--muted);">
-              Nenhum dado disponível
-            </li>
-            {% endfor %}
-          </ul>
+        <div class="chart-content">
+          <canvas id="municipiosChart" width="400" height="250"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <div class="charts-grid" style="margin-top: 2rem;">
+      <div class="chart-card">
+        <div class="chart-header" style="background: #9b59b6;">
+          <i class="bi bi-building"></i> Distribuição por Setor
+        </div>
+        <div class="chart-content">
+          <canvas id="setoresChart" width="400" height="250"></canvas>
         </div>
       </div>
       
-      <div class="info-card">
-        <div class="info-card-header" style="background: #6f42c1;">
+      <div class="chart-card">
+        <div class="chart-header" style="background: #1abc9c;">
           <i class="bi bi-folder"></i> Projetos Mais Ativos
         </div>
-        <div class="info-card-content">
-          <ul class="top-list">
-            {% for projeto in projetos_stats %}
-            <li>
-              <span><strong>{{ projeto.projeto__nome }}</strong></span>
-              <span class="badge">{{ projeto.eventos }} eventos</span>
-            </li>
-            {% empty %}
-            <li style="text-align: center; color: var(--muted);">
-              Nenhum dado disponível
-            </li>
-            {% endfor %}
-          </ul>
+        <div class="chart-content">
+          <canvas id="projetosChart" width="400" height="250"></canvas>
         </div>
       </div>
     </div>
@@ -333,70 +257,340 @@
         </div>
       </div>
     </div>
-  </div>
-  
+{% endblock %}
+
+{% block extra_js %}
   <script>
-    // Gráfico de evolução mensal
-    const eventosCtx = document.getElementById('eventosChart').getContext('2d');
-    new Chart(eventosCtx, {
-      type: 'line',
-      data: {
-        labels: [{% for item in eventos_por_mes %}'{{ item.mes }}'{% if not forloop.last %},{% endif %}{% endfor %}],
-        datasets: [{
-          label: 'Eventos Realizados',
-          data: [{% for item in eventos_por_mes %}{{ item.eventos }}{% if not forloop.last %},{% endif %}{% endfor %}],
-          borderColor: '#3498db',
-          backgroundColor: 'rgba(52, 152, 219, 0.1)',
-          tension: 0.4,
-          fill: true
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            display: false
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true
-          }
-        }
-      }
-    });
+    // Configuração global dos gráficos
+    Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+    Chart.defaults.color = '#2c3e50';
     
-    // Gráfico de tipos de evento
-    const tiposCtx = document.getElementById('tiposChart').getContext('2d');
-    new Chart(tiposCtx, {
-      type: 'doughnut',
-      data: {
-        labels: [{% for tipo in tipos_evento_stats %}'{{ tipo.tipo_evento__nome }}'{% if not forloop.last %},{% endif %}{% endfor %}],
-        datasets: [{
-          data: [{% for tipo in tipos_evento_stats %}{{ tipo.quantidade }}{% if not forloop.last %},{% endif %}{% endfor %}],
-          backgroundColor: [
-            '#3498db',
-            '#27ae60',
-            '#f39c12',
-            '#e74c3c',
-            '#9b59b6',
-            '#1abc9c',
-            '#34495e',
-            '#e67e22',
-            '#95a5a6',
-            '#16a085'
+    // Paleta de cores consistente
+    const colors = {
+      primary: '#3498db',
+      success: '#27ae60',
+      warning: '#f39c12',
+      danger: '#e74c3c',
+      purple: '#9b59b6',
+      teal: '#1abc9c',
+      dark: '#34495e',
+      orange: '#e67e22',
+      gray: '#95a5a6',
+      darkTeal: '#16a085'
+    };
+    
+    const colorsPalette = [
+      colors.primary, colors.success, colors.warning, colors.danger,
+      colors.purple, colors.teal, colors.dark, colors.orange,
+      colors.gray, colors.darkTeal
+    ];
+
+    // Função para buscar dados das APIs
+    async function fetchChartData(chartType) {
+      try {
+        const response = await fetch(`{% url 'core:diretoria_api_charts' %}?chart=${chartType}`);
+        if (!response.ok) throw new Error('API Error');
+        return await response.json();
+      } catch (error) {
+        console.error('Erro ao buscar dados:', error);
+        return { data: [] };
+      }
+    }
+
+    // Gráfico de evolução mensal (dinâmico)
+    async function initMonthlyEvolutionChart() {
+      const ctx = document.getElementById('eventosChart').getContext('2d');
+      const chartData = await fetchChartData('monthly_evolution');
+      
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: chartData.data.map(item => item.mes),
+          datasets: [
+            {
+              label: 'Total',
+              data: chartData.data.map(item => item.total),
+              borderColor: colors.dark,
+              backgroundColor: 'rgba(52, 73, 94, 0.1)',
+              tension: 0.4,
+              fill: false
+            },
+            {
+              label: 'Aprovados',
+              data: chartData.data.map(item => item.aprovados),
+              borderColor: colors.success,
+              backgroundColor: 'rgba(39, 174, 96, 0.1)',
+              tension: 0.4,
+              fill: true
+            },
+            {
+              label: 'Pendentes',
+              data: chartData.data.map(item => item.pendentes),
+              borderColor: colors.warning,
+              backgroundColor: 'rgba(243, 156, 18, 0.1)',
+              tension: 0.4,
+              fill: false
+            }
           ]
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            position: 'bottom'
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'top',
+              align: 'end'
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                precision: 0
+              }
+            }
           }
         }
-      }
+      });
+    }
+
+    // Gráfico de tipos de evento (dinâmico)
+    async function initEventTypesChart() {
+      const ctx = document.getElementById('tiposChart').getContext('2d');
+      const chartData = await fetchChartData('tipos_evento');
+      
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: chartData.data.map(item => item.tipo),
+          datasets: [{
+            data: chartData.data.map(item => item.quantidade),
+            backgroundColor: colorsPalette,
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                padding: 15,
+                usePointStyle: true
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = Math.round((context.parsed * 100) / total);
+                  return `${context.label}: ${context.parsed} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Gráfico de top formadores
+    async function initTopFormadoresChart() {
+      const ctx = document.getElementById('formadoresChart').getContext('2d');
+      const chartData = await fetchChartData('top_formadores');
+      
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: chartData.data.map(item => item.nome),
+          datasets: [{
+            label: 'Eventos Realizados',
+            data: chartData.data.map(item => item.eventos),
+            backgroundColor: colors.success,
+            borderColor: colors.success,
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          indexAxis: 'y',
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                title: function(context) {
+                  return context[0].label;
+                },
+                afterTitle: function(context) {
+                  const index = context[0].dataIndex;
+                  return chartData.data[index].area;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: {
+                precision: 0
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Gráfico de municípios atendidos
+    async function initMunicipiosChart() {
+      const ctx = document.getElementById('municipiosChart').getContext('2d');
+      const chartData = await fetchChartData('municipios_atendidos');
+      
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: chartData.data.map(item => `${item.nome}/${item.uf}`),
+          datasets: [{
+            label: 'Eventos',
+            data: chartData.data.map(item => item.eventos),
+            backgroundColor: colors.warning,
+            borderColor: colors.warning,
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              display: false
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                maxRotation: 45
+              }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                precision: 0
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Gráfico de distribuição por setores
+    async function initSetoresChart() {
+      const ctx = document.getElementById('setoresChart').getContext('2d');
+      const chartData = await fetchChartData('distribuicao_setores');
+      
+      new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: chartData.data.map(item => item.sigla),
+          datasets: [{
+            data: chartData.data.map(item => item.eventos),
+            backgroundColor: colorsPalette,
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: {
+                usePointStyle: true,
+                generateLabels: function(chart) {
+                  const data = chart.data;
+                  return data.labels.map((label, index) => ({
+                    text: `${label} (${chartData.data[index].nome})`,
+                    fillStyle: data.datasets[0].backgroundColor[index]
+                  }));
+                }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = Math.round((context.parsed * 100) / total);
+                  return `${chartData.data[context.dataIndex].nome}: ${context.parsed} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Gráfico de projetos mais ativos
+    async function initProjetosChart() {
+      const ctx = document.getElementById('projetosChart').getContext('2d');
+      const chartData = await fetchChartData('projetos_stats');
+      
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: chartData.data.map(item => item.nome.substring(0, 20) + (item.nome.length > 20 ? '...' : '')),
+          datasets: [{
+            data: chartData.data.map(item => item.eventos),
+            backgroundColor: colorsPalette,
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                usePointStyle: true,
+                padding: 15
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = Math.round((context.parsed * 100) / total);
+                  return `${chartData.data[context.dataIndex].nome}: ${context.parsed} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Inicializar todos os gráficos
+    document.addEventListener('DOMContentLoaded', function() {
+      initMonthlyEvolutionChart();
+      initEventTypesChart();
+      initTopFormadoresChart();
+      initMunicipiosChart();
+      initSetoresChart();
+      initProjetosChart();
     });
+
+    // Atualizar gráficos a cada 5 minutos
+    setInterval(() => {
+      initMonthlyEvolutionChart();
+      initEventTypesChart();
+      initTopFormadoresChart();
+      initMunicipiosChart();
+      initSetoresChart();
+      initProjetosChart();
+    }, 300000);
   </script>
-</body>
-</html>
+{% endblock %}

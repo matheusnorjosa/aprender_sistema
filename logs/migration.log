@@ -135,3 +135,8 @@
 2025-09-01 20:05:01,057 - migration.Command - ERROR - ERRO: CPF inválido: 3937779361 | Contexto: {'Nome': 'Sandra Dias', 'CPF': '3937779361', 'Email': 'sandra_soeiro@uvanet.br'}
 2025-09-01 20:05:01,257 - migration.Command - INFO - Criados 115 usuários
 2025-09-01 20:05:01,259 - migration.Command - INFO - Migração concluída: {'total_records': 116, 'processed': 116, 'created': 115, 'updated': 0, 'skipped': 1, 'errors': 1, 'start_time': datetime.datetime(2025, 9, 1, 20, 5, 0, 900688), 'end_time': datetime.datetime(2025, 9, 1, 20, 5, 1, 259266)}
+2025-09-11 17:01:22,190 - migration.Command - INFO - Iniciando Command
+2025-09-11 17:01:22,208 - migration.Command - INFO - Opções: {'verbosity': 1, 'settings': None, 'pythonpath': None, 'traceback': False, 'no_color': False, 'force_color': False, 'skip_checks': False, 'source': 'extracted_usuarios.json', 'worksheet': 'Ativos', 'batch_size': 500, 'dry_run': False, 'validate_only': False, 'force': False, 'verbose': False, 'create_django_users': True, 'update_existing': True}
+2025-09-11 17:01:22,536 - migration.Command - ERROR - ERRO: CPF inválido: 3937779361 | Contexto: {'Nome': 'Sandra Dias', 'CPF': '3937779361', 'Email': 'sandra_soeiro@uvanet.br'}
+2025-09-11 17:01:22,682 - migration.Command - INFO - Atualizados 115 usuários
+2025-09-11 17:01:22,690 - migration.Command - INFO - Migração concluída: {'total_records': 116, 'processed': 116, 'created': 0, 'updated': 115, 'skipped': 1, 'errors': 1, 'start_time': datetime.datetime(2025, 9, 11, 17, 1, 22, 190484), 'end_time': datetime.datetime(2025, 9, 11, 17, 1, 22, 690423)}

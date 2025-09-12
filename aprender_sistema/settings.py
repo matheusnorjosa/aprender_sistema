@@ -120,6 +120,7 @@ else:
     ]
     CSRF_COOKIE_SECURE = False
     CSRF_COOKIE_HTTPONLY = True  # Sempre HTTP-only por segurança
+    CSRF_COOKIE_SAMESITE = "Lax"  # Mais flexível em desenvolvimento
 
 # ======================
 # APPLICATION DEFINITION
@@ -401,21 +402,10 @@ else:
 # VALIDAÇÃO DE SENHAS
 # ======================
 
+# Validadores de senha simplificados (CPF + senha alfanumérica mín 4 chars)
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-        "OPTIONS": {
-            "min_length": 8 if IS_DEVELOPMENT else 12,  # Mais rigoroso em produção
-        },
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+        "NAME": "core.validators.SimplifiedPasswordValidator",
     },
 ]
 
@@ -448,6 +438,12 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "core.Usuario"
+
+# Backend de autenticação customizado (CPF como login)
+AUTHENTICATION_BACKENDS = [
+    'core.backends.CPFAuthenticationBackend',  # Login via CPF
+    'django.contrib.auth.backends.ModelBackend',  # Fallback padrão
+]
 
 # URLs de autenticação
 LOGIN_URL = "/login/"

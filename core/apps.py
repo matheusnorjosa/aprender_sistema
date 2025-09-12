@@ -15,12 +15,12 @@ class CoreConfig(AppConfig):
         except ImportError:
             pass
         
-        # Registrar MCP tools
-        try:
-            self.register_mcp_tools()
-        except ImportError:
-            # django-mcp-server não instalado ou não disponível
-            pass
+        # Registrar MCP tools - DISABLED for Docker compatibility
+        # try:
+        #     self.register_mcp_tools()
+        # except ImportError:
+        #     # django-mcp-server não instalado ou não disponível
+        #     pass
     
     def register_mcp_tools(self):
         """Registra ferramentas MCP do projeto"""

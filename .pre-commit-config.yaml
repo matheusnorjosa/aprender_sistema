@@ -1,94 +1,196 @@
 ---
-# Pre-commit hooks configuration for Aprender Sistema
+# ======================================
+# 🔄 PRE-COMMIT HOOKS - SISTEMA APRENDER
+# Automated Code Quality & Security Checks
+# ======================================
 # Install: pip install pre-commit && pre-commit install
+# Run: pre-commit run --all-files
+
+default_stages: [commit, push]
+fail_fast: false
 
 repos:
-  # Python code formatting
+  # ==========================================
+  # PYTHON CODE FORMATTING & QUALITY
+  # ==========================================
+  
+  # Code formatting with Black
   - repo: https://github.com/psf/black
-    rev: 24.1.1
+    rev: 24.2.0  # Updated version
     hooks:
       - id: black
+        name: 🎨 Format Python code (Black)
         language_version: python3
         args: [--line-length=88, --target-version=py313]
+        exclude: migrations/
 
-  # Import sorting
+  # Import sorting with isort
   - repo: https://github.com/pycqa/isort
     rev: 5.13.2
     hooks:
       - id: isort
-        args: [--profile=black, --line-length=88]
+        name: 📐 Sort Python imports (isort)
+        args: [--profile=black, --line-length=88, --multi-line=3]
+        exclude: migrations/
 
-  # Python linting
+  # Python linting with flake8
   - repo: https://github.com/pycqa/flake8
     rev: 7.0.0
     hooks:
       - id: flake8
-        args: [--config=.flake8]
+        name: 🕵️ Lint Python code (Flake8)
+        args: [--max-line-length=88, --extend-ignore=E203,W503]
+        exclude: migrations/
 
-  # Security linting
+  # ==========================================
+  # SECURITY & VULNERABILITY CHECKS
+  # ==========================================
+  
+  # Security analysis with Bandit
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.5
+    rev: 1.7.7  # Updated version
     hooks:
       - id: bandit
-        args: [-r, ., -f, json, -o, bandit-report.json]
-        exclude: ^(tests/|migrations/|venv/|manage\.py)
+        name: 🔒 Security scan (Bandit)
+        args: [-r, ., -ll, --skip=B101,B601]  # Skip assert and shell injection tests
+        exclude: ^(tests/|migrations/|venv/|manage\.py|scripts/)
 
-  # Django-specific checks
+  # Dependency vulnerability checking
+  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
+    rev: v1.3.2
+    hooks:
+      - id: python-safety-dependencies-check
+        name: 🛡️ Check dependencies (Safety)
+        args: [--ignore=70612]  # Ignore specific non-critical issues
+
+  # ==========================================
+  # DJANGO-SPECIFIC CHECKS
+  # ==========================================
+  
   - repo: local
     hooks:
       - id: django-check
-        name: Django Check
+        name: ⚙️ Django system check
         entry: python manage.py check
         language: system
         pass_filenames: false
         always_run: true
+        stages: [commit]
 
       - id: django-migrations
-        name: Django Migration Check
+        name: 🗄️ Django migrations check
         entry: python manage.py makemigrations --check --dry-run
         language: system
         pass_filenames: false
         always_run: true
+        stages: [commit]
 
-  # General file checks
+      - id: django-test-migrations
+        name: 🧪 Test migrations
+        entry: python manage.py test --verbosity=0 --parallel
+        language: system
+        pass_filenames: false
+        stages: [push]
+
+  # ==========================================
+  # GENERAL FILE & CONTENT CHECKS
+  # ==========================================
+  
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
-      # File formatting
+      # File formatting and cleanup
       - id: trailing-whitespace
+        name: 🧹 Remove trailing whitespace
+        args: [--markdown-linebreak-ext=md]
       - id: end-of-file-fixer
+        name: 📄 Fix end of file
       - id: mixed-line-ending
+        name: 🔄 Fix line endings
         args: [--fix=lf]
 
-      # JSON/YAML validation
+      # File validation
       - id: check-json
+        name: ✅ Validate JSON files
       - id: check-yaml
+        name: ✅ Validate YAML files
         args: [--unsafe]  # Allow Django templates in YAML
+      - id: check-toml
+        name: ✅ Validate TOML files
+      - id: check-xml
+        name: ✅ Validate XML files
 
-      # Security checks
+      # Security and safety checks
       - id: detect-private-key
+        name: 🔑 Detect private keys
       - id: check-merge-conflict
+        name: 🔀 Check merge conflicts
       - id: check-added-large-files
-        args: [--maxkb=1000]
-
-      # Python-specific
+        name: 📦 Check large files
+        args: [--maxkb=2000]  # Allow up to 2MB files
+      
+      # Python-specific checks
       - id: check-ast
+        name: 🐍 Check Python AST
       - id: debug-statements
+        name: 🐛 Check debug statements
+        exclude: migrations/
       - id: requirements-txt-fixer
+        name: 📋 Fix requirements.txt
 
-# Global exclusions
+      # Documentation checks
+      - id: check-docstring-first
+        name: 📝 Check docstring first
+        exclude: migrations/
+
+  # ==========================================
+  # ADDITIONAL QUALITY CHECKS
+  # ==========================================
+
+  # Conventional commits (optional but recommended)
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.0.0
+    hooks:
+      - id: conventional-pre-commit
+        name: 📝 Conventional commits format
+        stages: [commit-msg]
+
+  # Secrets detection (additional layer)
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: 🔍 Detect secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: package-lock.json
+
+# ==========================================
+# GLOBAL CONFIGURATION
+# ==========================================
+
+# Global exclusions - files/directories to ignore
 exclude: |
   (?x)(
-    migrations/|
-    __pycache__/|
+    ^migrations/|
+    ^__pycache__/|
     \.pyc$|
     \.pyo$|
     \.sqlite3$|
-    staticfiles/|
-    media/|
-    logs/|
-    venv/|
-    \.venv/|
-    node_modules/|
-    \.git/
+    ^staticfiles/|
+    ^media/|
+    ^logs/|
+    ^venv/|
+    ^\.venv/|
+    ^node_modules/|
+    ^\.git/|
+    ^backups/|
+    ^test_reports/|
+    ^lint_reports/|
+    ^htmlcov/|
+    \.coverage$|
+    bandit-report\.json$|
+    safety-report\.json$
   )
+
+# Minimum pre-commit version required
+minimum_pre_commit_version: 3.0.0

@@ -1,0 +1,102 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Gestão de Projetos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-0">
+            <i class="bi bi-briefcase-fill text-success me-2"></i>
+            Gestão de Projetos
+        </h1>
+        <p class="text-muted mb-0">Sistema de gerenciamento de projetos</p>
+    </div>
+    <div>
+        <a href="{% url 'core:gestao_dashboard' %}" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-arrow-left me-2"></i>Dashboard
+        </a>
+        <a href="{% url 'core:gestao_projetos_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Novo Projeto
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h6 class="mb-0">
+            <i class="bi bi-list me-2"></i>Lista de Projetos
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        {% if projetos %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Setor</th>
+                            <th>Código</th>
+                            <th>Status</th>
+                            <th width="120">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for projeto in projetos %}
+                        <tr>
+                            <td>
+                                <strong>{{ projeto.nome }}</strong>
+                                {% if projeto.descricao %}
+                                    <br><small class="text-muted">{{ projeto.descricao|truncatechars:50 }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if projeto.setor %}
+                                    <span class="badge bg-info">{{ projeto.setor.nome }}</span>
+                                {% else %}
+                                    <span class="text-muted">Sem setor</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if projeto.codigo_produto %}
+                                    <code>{{ projeto.codigo_produto }}</code>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if projeto.ativo %}
+                                    <span class="badge bg-success">Ativo</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inativo</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'core:gestao_projetos_update' projeto.pk %}" 
+                                       class="btn btn-outline-primary" title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'core:gestao_projetos_delete' projeto.pk %}" 
+                                       class="btn btn-outline-danger" title="Excluir">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-briefcase text-muted" style="font-size: 4rem;"></i>
+                <h5 class="text-muted mt-3">Nenhum projeto encontrado</h5>
+                <a href="{% url 'core:gestao_projetos_create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle me-2"></i>Adicionar Projeto
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

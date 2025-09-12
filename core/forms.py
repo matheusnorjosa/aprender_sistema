@@ -1,10 +1,14 @@
 # aprender_sistema/core/forms.py
 from django import forms
+from django.contrib.auth import authenticate
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from core.models import AprovacaoStatus, Formador, Solicitacao
+from core.models import AprovacaoStatus, Formador, Municipio, Projeto, Setor, TipoEvento, Solicitacao, Usuario
 from core.services.conflicts import check_conflicts
+from core.validators import CPFValidator
 
 
 # -------- RF02: Solicitação --------
@@ -267,3 +271,306 @@ class BloqueioAgendaForm(forms.Form):
         super().__init__(*args, **kwargs)
         # Customizar a exibição do formador para mostrar apenas o nome
         self.fields["formador"].label_from_instance = lambda obj: obj.nome
+
+
+# -------- AUTENTICAÇÃO CUSTOMIZADA (CPF + SENHA SIMPLES) --------
+
+class CPFAuthenticationForm(AuthenticationForm):
+    """
+    Formulário de login customizado usando CPF como username
+    """
+    username = forms.CharField(
+        max_length=11,
+        label="CPF",
+        help_text="Digite apenas os números do CPF (sem pontos ou traço)",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '12345678901',
+            'autocomplete': 'username',
+        })
+    )
+    
+    password = forms.CharField(
+        label="Senha",
+        help_text="Mínimo 4 caracteres (apenas letras e números)",
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Digite sua senha',
+            'autocomplete': 'current-password',
+        })
+    )
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        # Limpar CPF (remover qualquer formatação)
+        cpf_limpo = ''.join(filter(str.isdigit, username))
+        
+        if len(cpf_limpo) != 11:
+            raise ValidationError("CPF deve conter exatamente 11 dígitos.")
+        
+        return cpf_limpo
+
+    def clean(self):
+        username = self.cleaned_data.get('username')
+        password = self.cleaned_data.get('password')
+
+        if username is not None and password:
+            self.user_cache = authenticate(
+                self.request,
+                username=username,
+                password=password
+            )
+            if self.user_cache is None:
+                raise self.get_invalid_login_error()
+            else:
+                self.confirm_login_allowed(self.user_cache)
+
+        return self.cleaned_data
+
+    def get_invalid_login_error(self):
+        return ValidationError(
+            "CPF ou senha incorretos. Verifique se o CPF está correto e tem 11 dígitos.",
+            code='invalid_login',
+        )
+
+
+class CPFUserCreationForm(UserCreationForm):
+    """
+    Formulário de criação de usuário com CPF obrigatório e senha simples
+    """
+    cpf = forms.CharField(
+        max_length=11,
+        label="CPF",
+        help_text="Digite apenas os números do CPF (sem pontos ou traço)",
+        validators=[CPFValidator()],
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '12345678901',
+        })
+    )
+    
+    first_name = forms.CharField(
+        max_length=30,
+        label="Nome",
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    
+    last_name = forms.CharField(
+        max_length=30,
+        label="Sobrenome", 
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={'class': 'form-control'})
+    )
+
+    class Meta:
+        model = Usuario
+        fields = ('username', 'cpf', 'first_name', 'last_name', 'email', 'password1', 'password2')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Remover help text complexo das senhas
+        self.fields['password1'].help_text = "Mínimo 4 caracteres (apenas letras e números)"
+        self.fields['password2'].help_text = "Digite a mesma senha novamente"
+        
+        # Estilizar campos
+        for field in self.fields:
+            self.fields[field].widget.attrs.update({'class': 'form-control'})
+
+    def clean_cpf(self):
+        cpf = self.cleaned_data.get('cpf')
+        # Limpar CPF
+        cpf_limpo = ''.join(filter(str.isdigit, cpf))
+        
+        # Verificar se já existe
+        if Usuario.objects.filter(cpf=cpf_limpo).exists():
+            raise ValidationError("Este CPF já está cadastrado no sistema.")
+        
+        return cpf_limpo
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.cpf = self.cleaned_data['cpf']
+        if commit:
+            user.save()
+        return user
+
+
+# -------- GESTÃO ADMINISTRATIVA --------
+
+class FormadorForm(forms.ModelForm):
+    """Formulário para gestão de formadores"""
+    
+    class Meta:
+        model = Formador
+        fields = ['nome', 'email', 'area_atuacao', 'ativo', 'usuario']
+        widgets = {
+            'nome': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome completo do formador'
+            }),
+            'email': forms.EmailInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'email@exemplo.com'
+            }),
+            'area_atuacao': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'usuario': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'ativo': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+        }
+        labels = {
+            'nome': 'Nome do Formador',
+            'email': 'E-mail',
+            'area_atuacao': 'Área de Atuação',
+            'usuario': 'Usuário do Sistema',
+            'ativo': 'Ativo'
+        }
+        help_texts = {
+            'nome': 'Nome completo do formador',
+            'email': 'E-mail único para contato e notificações',
+            'area_atuacao': 'Grupo/área de atuação do formador',
+            'usuario': 'Usuário do sistema vinculado (opcional)',
+            'ativo': 'Desmarque para desativar o formador'
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Customizar queryset para área de atuação
+        self.fields['area_atuacao'].queryset = Group.objects.all().order_by('name')
+        # Customizar queryset para usuário
+        self.fields['usuario'].queryset = Usuario.objects.filter(is_active=True).order_by('first_name', 'last_name')
+        # Tornar campos opcionais
+        self.fields['area_atuacao'].required = False
+        self.fields['usuario'].required = False
+
+
+class MunicipioForm(forms.ModelForm):
+    """Formulário para gestão de municípios"""
+    
+    UF_CHOICES = [
+        ('AC', 'Acre'), ('AL', 'Alagoas'), ('AP', 'Amapá'), ('AM', 'Amazonas'),
+        ('BA', 'Bahia'), ('CE', 'Ceará'), ('DF', 'Distrito Federal'), ('ES', 'Espírito Santo'),
+        ('GO', 'Goiás'), ('MA', 'Maranhão'), ('MT', 'Mato Grosso'), ('MS', 'Mato Grosso do Sul'),
+        ('MG', 'Minas Gerais'), ('PA', 'Pará'), ('PB', 'Paraíba'), ('PR', 'Paraná'),
+        ('PE', 'Pernambuco'), ('PI', 'Piauí'), ('RJ', 'Rio de Janeiro'), ('RN', 'Rio Grande do Norte'),
+        ('RS', 'Rio Grande do Sul'), ('RO', 'Rondônia'), ('RR', 'Roraima'), ('SC', 'Santa Catarina'),
+        ('SP', 'São Paulo'), ('SE', 'Sergipe'), ('TO', 'Tocantins')
+    ]
+    
+    uf = forms.ChoiceField(
+        choices=[('', 'Selecione...')] + UF_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='UF',
+        help_text='Estado do município'
+    )
+    
+    class Meta:
+        model = Municipio
+        fields = ['nome', 'uf', 'ativo']
+        widgets = {
+            'nome': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome do município'
+            }),
+            'ativo': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+        }
+        labels = {
+            'nome': 'Nome do Município',
+            'ativo': 'Ativo'
+        }
+        help_texts = {
+            'nome': 'Nome oficial do município',
+            'ativo': 'Desmarque para desativar o município'
+        }
+
+
+class ProjetoForm(forms.ModelForm):
+    """Formulário para gestão de projetos"""
+    
+    class Meta:
+        model = Projeto
+        fields = ['nome', 'descricao', 'setor', 'codigo_produto', 'ativo']
+        widgets = {
+            'nome': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome do projeto'
+            }),
+            'descricao': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': 'Descrição detalhada do projeto'
+            }),
+            'setor': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'codigo_produto': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Código do produto (opcional)'
+            }),
+            'ativo': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+        }
+        labels = {
+            'nome': 'Nome do Projeto',
+            'descricao': 'Descrição',
+            'setor': 'Setor Responsável',
+            'codigo_produto': 'Código do Produto',
+            'ativo': 'Ativo'
+        }
+        help_texts = {
+            'nome': 'Nome único do projeto',
+            'descricao': 'Descrição detalhada do projeto (opcional)',
+            'setor': 'Setor organizacional responsável',
+            'codigo_produto': 'Código do produto da planilha (opcional)',
+            'ativo': 'Desmarque para desativar o projeto'
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Customizar queryset para setor
+        self.fields['setor'].queryset = Setor.objects.filter(ativo=True).order_by('nome')
+        # Tornar campos opcionais
+        self.fields['setor'].required = False
+        self.fields['descricao'].required = False
+        self.fields['codigo_produto'].required = False
+
+
+class TipoEventoForm(forms.ModelForm):
+    """Formulário para gestão de tipos de evento"""
+    
+    class Meta:
+        model = TipoEvento
+        fields = ['nome', 'online', 'ativo']
+        widgets = {
+            'nome': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome do tipo de evento'
+            }),
+            'online': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            }),
+            'ativo': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+        }
+        labels = {
+            'nome': 'Nome do Tipo de Evento',
+            'online': 'É um evento online?',
+            'ativo': 'Ativo'
+        }
+        help_texts = {
+            'nome': 'Nome único do tipo de evento',
+            'online': 'Marque se este tipo de evento é realizado online',
+            'ativo': 'Desmarque para desativar este tipo de evento'
+        }

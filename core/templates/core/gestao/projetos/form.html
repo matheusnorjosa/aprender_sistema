@@ -1,0 +1,80 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}{{ object|yesno:"Editar,Novo" }} Projeto{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-0">
+            <i class="bi bi-briefcase-fill text-success me-2"></i>
+            {{ object|yesno:"Editar,Novo" }} Projeto
+        </h1>
+    </div>
+    <a href="{% url 'core:gestao_projetos' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-2"></i>Voltar
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.nome.label }}</label>
+                        {{ form.nome }}
+                        {% if form.nome.errors %}
+                            <div class="text-danger small">{{ form.nome.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.setor.label }}</label>
+                        {{ form.setor }}
+                        {% if form.setor.errors %}
+                            <div class="text-danger small">{{ form.setor.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">{{ form.descricao.label }}</label>
+                {{ form.descricao }}
+                {% if form.descricao.errors %}
+                    <div class="text-danger small">{{ form.descricao.errors.0 }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.codigo_produto.label }}</label>
+                        {{ form.codigo_produto }}
+                        {% if form.codigo_produto.errors %}
+                            <div class="text-danger small">{{ form.codigo_produto.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form.ativo }}
+                            <label class="form-check-label">{{ form.ativo.label }}</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2">
+                <a href="{% url 'core:gestao_projetos' %}" class="btn btn-outline-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary">{{ object|yesno:"Atualizar,Salvar" }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

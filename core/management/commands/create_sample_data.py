@@ -1,300 +1,286 @@
 """
-Command para criar dados de exemplo para testar o sistema completo
+Comando para criar dados de exemplo para demonstração do sistema
 """
 
 import random
-from datetime import date, datetime, timedelta
-
+from datetime import datetime, timedelta
 from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
 from core.models import (
-    Aprovacao,
-    AprovacaoStatus,
-    Deslocamento,
-    DisponibilidadeFormadores,
-    Formador,
-    LogAuditoria,
-    Municipio,
-    Projeto,
-    Solicitacao,
-    SolicitacaoStatus,
-    TipoEvento,
-    Usuario,
+    Usuario, Formador, Solicitacao, SolicitacaoStatus, 
+    Municipio, Projeto, TipoEvento, Setor
 )
 
 
 class Command(BaseCommand):
-    help = "Cria dados de exemplo para testar o sistema"
+    help = "Cria dados de exemplo para demonstração do sistema"
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--quantidade",
-            type=int,
-            default=20,
-            help="Quantidade de registros de exemplo a criar",
-        )
-        parser.add_argument(
-            "--limpar",
+            "--dry-run",
             action="store_true",
-            help="Limpar dados existentes antes de criar novos",
+            help="Apenas simula a criação sem salvar no banco",
         )
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.SUCCESS("=== CRIANDO DADOS DE EXEMPLO ==="))
+        self.dry_run = options["dry_run"]
 
-        quantidade = options["quantidade"]
-        limpar = options["limpar"]
+        if self.dry_run:
+            self.stdout.write(self.style.WARNING("=== MODO DRY-RUN ==="))
 
         try:
             with transaction.atomic():
-                if limpar:
-                    self.limpar_dados()
-
-                self.criar_dados_basicos()
-                self.criar_solicitacoes(quantidade)
-                self.criar_bloqueios(quantidade // 2)
-                self.criar_deslocamentos(quantidade // 3)
-
-                self.stdout.write(
-                    self.style.SUCCESS("Dados de exemplo criados com sucesso!")
-                )
-                self.exibir_estatisticas()
+                # Criar usuários de exemplo
+                self.create_demo_users()
+                
+                # Criar solicitações de exemplo
+                self.create_sample_solicitacoes()
+                
+                if self.dry_run:
+                    self.stdout.write(
+                        self.style.WARNING("DRY-RUN: Transação revertida")
+                    )
+                    transaction.set_rollback(True)
+                else:
+                    self.stdout.write(
+                        self.style.SUCCESS("Dados de exemplo criados com sucesso!")
+                    )
 
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Erro ao criar dados: {str(e)}"))
-
-    def limpar_dados(self):
-        """Limpa dados de exemplo existentes"""
-        self.stdout.write("Limpando dados existentes...")
-
-        # Limpar em ordem inversa das dependências
-        Aprovacao.objects.all().delete()
-        Solicitacao.objects.all().delete()
-        DisponibilidadeFormadores.objects.all().delete()
-        Deslocamento.objects.all().delete()
-
-        self.stdout.write("Dados anteriores removidos.")
-
-    def criar_dados_basicos(self):
-        """Cria dados básicos se não existirem"""
-        self.stdout.write("Verificando dados básicos...")
-
-        # Criar municípios adicionais
-        municipios_exemplo = [
-            ("Fortaleza", "CE"),
-            ("São Paulo", "SP"),
-            ("Rio de Janeiro", "RJ"),
-            ("Belo Horizonte", "MG"),
-            ("Salvador", "BA"),
-            ("Recife", "PE"),
-            ("Brasília", "DF"),
-            ("Curitiba", "PR"),
-            ("Porto Alegre", "RS"),
-            ("Manaus", "AM"),
-        ]
-
-        for nome, uf in municipios_exemplo:
-            Municipio.objects.get_or_create(nome=nome, defaults={"uf": uf})
-
-        # Criar projetos adicionais
-        projetos_exemplo = [
-            ("Projeto Alpha", "Formação em tecnologia"),
-            ("Projeto Beta", "Desenvolvimento de liderança"),
-            ("Projeto Gamma", "Capacitação técnica"),
-            ("Projeto Delta", "Educação continuada"),
-            ("Projeto Omega", "Inovação e criatividade"),
-        ]
-
-        for nome, desc in projetos_exemplo:
-            Projeto.objects.get_or_create(nome=nome, defaults={"descricao": desc})
-
-        # Criar tipos de evento adicionais
-        tipos_exemplo = [
-            ("Workshop", True),
-            ("Palestra", True),
-            ("Curso Intensivo", False),
-            ("Seminário", True),
-            ("Treinamento", False),
-            ("Mesa Redonda", True),
-        ]
-
-        for nome, online in tipos_exemplo:
-            TipoEvento.objects.get_or_create(
-                nome=nome, defaults={"online": online, "ativo": True}
-            )
-
-    def criar_solicitacoes(self, quantidade):
-        """Cria solicitações de exemplo"""
-        self.stdout.write(f"Criando {quantidade} solicitações...")
-
-        municipios = list(Municipio.objects.all())
-        projetos = list(Projeto.objects.all())
-        tipos_evento = list(TipoEvento.objects.all())
-        coordenadores = list(Usuario.objects.filter(groups__name="coordenador"))
-
-        if not coordenadores:
-            # Criar um coordenador de exemplo
-            coord_group = Group.objects.get(name="coordenador")
-            coordenador = Usuario.objects.create_user(
-                username="coord_exemplo",
-                email="coordenador@exemplo.com",
-                first_name="João",
-                last_name="Coordenador",
-            )
-            coordenador.groups.add(coord_group)
-            coordenadores = [coordenador]
-
-        status_opcoes = [
-            SolicitacaoStatus.PENDENTE,
-            SolicitacaoStatus.APROVADO,
-            SolicitacaoStatus.REPROVADO,
-            SolicitacaoStatus.PRE_AGENDA,
-        ]
-
-        for i in range(quantidade):
-            # Gerar data aleatória nos próximos 90 dias
-            data_base = date.today()
-            dias_futuros = random.randint(1, 90)
-            data_evento = data_base + timedelta(days=dias_futuros)
-
-            # Criar datetime completo com timezone
-            from datetime import datetime, time
-
-            horario_inicio = time(random.randint(8, 14), 0)
-            horario_fim = time(random.randint(15, 18), 0)
-            data_inicio = timezone.make_aware(
-                datetime.combine(data_evento, horario_inicio)
-            )
-            data_fim = timezone.make_aware(datetime.combine(data_evento, horario_fim))
-
-            solicitacao = Solicitacao.objects.create(
-                titulo_evento=f"Evento de Exemplo {i+1:03d}",
-                municipio=random.choice(municipios),
-                projeto=random.choice(projetos),
-                tipo_evento=random.choice(tipos_evento),
-                data_inicio=data_inicio,
-                data_fim=data_fim,
-                observacoes=f"Solicitação de exemplo criada automaticamente - {i+1}",
-                status=random.choice(status_opcoes),
-                usuario_solicitante=random.choice(coordenadores),
-            )
-
-            # Criar aprovação se status não for pendente
-            if solicitacao.status != SolicitacaoStatus.PENDENTE:
-                superintendentes = Usuario.objects.filter(
-                    groups__name="superintendencia"
-                )
-                if superintendentes.exists():
-                    # Mapear status da solicitação para status de aprovação
-                    status_aprovacao = (
-                        AprovacaoStatus.APROVADO
-                        if solicitacao.status == SolicitacaoStatus.APROVADO
-                        else AprovacaoStatus.REPROVADO
-                    )
-
-                    Aprovacao.objects.create(
-                        solicitacao=solicitacao,
-                        status_decisao=status_aprovacao,
-                        usuario_aprovador=superintendentes.first(),
-                        justificativa=f"Decisão automática de exemplo para teste",
-                    )
-
-    def criar_bloqueios(self, quantidade):
-        """Cria bloqueios de disponibilidade"""
-        self.stdout.write(f"Criando {quantidade} bloqueios...")
-
-        formadores = list(Formador.objects.all())
-        if not formadores:
             self.stdout.write(
-                "Nenhum formador encontrado, pulando criação de bloqueios."
+                self.style.ERROR(f"Erro na criação de dados: {str(e)}")
             )
-            return
+            raise
 
-        tipos_bloqueio = [
-            "Férias",
-            "Licença",
-            "Compromisso pessoal",
-            "Viagem",
-            "Outros",
+    def create_demo_users(self):
+        """Cria usuários de demonstração"""
+        self.stdout.write("Criando usuarios de demonstracao...")
+        
+        # Verificar se grupos existem
+        groups_needed = ['coordenador', 'formador', 'superintendencia', 'controle']
+        for group_name in groups_needed:
+            group, created = Group.objects.get_or_create(name=group_name)
+            if created and not self.dry_run:
+                self.stdout.write(f"  Grupo criado: {group_name}")
+
+        # Obter setor padrão
+        setor_default = Setor.objects.first()
+
+        demo_users = [
+            {
+                'username': 'coord_demo',
+                'password': 'demo123',
+                'first_name': 'Maria',
+                'last_name': 'Coordenadora Demo',
+                'email': 'coord.demo@aprender.local',
+                'cpf': '12345678901',
+                'groups': ['coordenador'],
+            },
+            {
+                'username': 'formador_demo',
+                'password': 'demo123',
+                'first_name': 'João',
+                'last_name': 'Formador Demo',
+                'email': 'formador.demo@aprender.local',
+                'cpf': '12345678902',
+                'groups': ['formador'],
+            },
+            {
+                'username': 'formador_demo2',
+                'password': 'demo123',
+                'first_name': 'Ana',
+                'last_name': 'Silva Demo',
+                'email': 'ana.demo@aprender.local',
+                'cpf': '12345678903',
+                'groups': ['formador'],
+            },
+            {
+                'username': 'super_demo',
+                'password': 'demo123',
+                'first_name': 'Carlos',
+                'last_name': 'Superintendente Demo',
+                'email': 'super.demo@aprender.local',
+                'cpf': '12345678904',
+                'groups': ['superintendencia'],
+                'is_staff': True,
+            },
         ]
+        
+        created_count = 0
+        for user_data in demo_users:
+            if not self.dry_run:
+                # Verificar se já existe
+                if Usuario.objects.filter(username=user_data['username']).exists():
+                    continue
+                
+                try:
+                    # Criar usuário
+                    usuario = Usuario.objects.create(
+                        username=user_data['username'],
+                        first_name=user_data['first_name'],
+                        last_name=user_data['last_name'],
+                        email=user_data['email'],
+                        cpf=user_data['cpf'],
+                        telefone='85 99999-0000',
+                        setor=setor_default,
+                        is_active=True,
+                        is_staff=user_data.get('is_staff', False),
+                    )
+                    
+                    # Definir senha
+                    usuario.set_password(user_data['password'])
+                    usuario.save()
+                    
+                    # Adicionar a grupos
+                    for group_name in user_data['groups']:
+                        try:
+                            group = Group.objects.get(name=group_name)
+                            usuario.groups.add(group)
+                        except Group.DoesNotExist:
+                            self.stdout.write(
+                                self.style.WARNING(f"Grupo não encontrado: {group_name}")
+                            )
+                    
+                    # Criar formador se necessário
+                    if 'formador' in user_data['groups']:
+                        # Verificar se já existe formador com mesmo email
+                        if not Formador.objects.filter(email=usuario.email).exists():
+                            Formador.objects.create(
+                                usuario=usuario,
+                                nome=usuario.get_full_name(),
+                                email=usuario.email,
+                                ativo=True,
+                            )
+                    
+                    created_count += 1
+                    self.stdout.write(f"  Usuario criado: {user_data['username']}")
+                    
+                except Exception as e:
+                    self.stdout.write(
+                        self.style.WARNING(f"Erro ao criar usuario {user_data['username']}: {str(e)}")
+                    )
+            else:
+                created_count += 1  # Simular para dry-run
+        
+        self.stdout.write(f"Usuarios de demonstracao criados: {created_count}")
 
-        for i in range(quantidade):
-            # Gerar data aleatória
-            data_base = date.today()
-            dias_offset = random.randint(-30, 60)  # 30 dias atrás até 60 dias à frente
-            data_bloqueio = data_base + timedelta(days=dias_offset)
-
-            # Gerar horários
-            hora_inicio_int = random.randint(8, 16)
-            hora_fim_int = random.randint(hora_inicio_int + 1, 18)
-
-            DisponibilidadeFormadores.objects.create(
-                formador=random.choice(formadores),
-                data_bloqueio=data_bloqueio,
-                hora_inicio=f"{hora_inicio_int:02d}:00",
-                hora_fim=f"{hora_fim_int:02d}:00",
-                tipo_bloqueio=random.choice(tipos_bloqueio),
-                motivo=f"Bloqueio de exemplo {i+1} - teste do sistema",
+    def create_sample_solicitacoes(self):
+        """Cria solicitações de exemplo"""
+        self.stdout.write("Criando solicitacoes de exemplo...")
+        
+        # Obter dados necessários
+        coordenadores = Usuario.objects.filter(groups__name='coordenador')
+        formadores = Formador.objects.filter(ativo=True)
+        municipios = list(Municipio.objects.filter(ativo=True)[:10])
+        projetos = list(Projeto.objects.filter(ativo=True)[:10])
+        tipos_evento = list(TipoEvento.objects.filter(ativo=True))
+        
+        if not all([coordenadores.exists(), formadores.exists(), municipios, projetos, tipos_evento]):
+            self.stdout.write(
+                self.style.WARNING("Dados insuficientes para criar solicitações de exemplo")
             )
-
-    def criar_deslocamentos(self, quantidade):
-        """Cria registros de deslocamento"""
-        self.stdout.write(f"Criando {quantidade} deslocamentos...")
-
-        usuarios = list(
-            Usuario.objects.filter(groups__name__in=["formador", "coordenador"])
-        )
-        municipios = list(Municipio.objects.all())
-
-        if len(municipios) < 2:
-            self.stdout.write("Poucos municípios, pulando criação de deslocamentos.")
             return
-
-        for i in range(quantidade):
-            # Escolher origem e destino diferentes
-            origem = random.choice(municipios)
-            destino = random.choice([m for m in municipios if m != origem])
-
-            # Gerar data aleatória
-            data_base = date.today()
-            dias_offset = random.randint(-15, 45)
-            data_deslocamento = data_base + timedelta(days=dias_offset)
-
-            # Criar deslocamento e associar formadores
-            deslocamento = Deslocamento.objects.create(
-                data=data_deslocamento, origem=origem.nome, destino=destino.nome
-            )
-
-            # Associar formadores ao deslocamento
-            formadores_disponiveis = Formador.objects.all()
-            if formadores_disponiveis.exists():
-                # Selecionar 1-3 formadores aleatórios
-                num_formadores = random.randint(
-                    1, min(3, formadores_disponiveis.count())
-                )
-                formadores_selecionados = random.sample(
-                    list(formadores_disponiveis), num_formadores
-                )
-                deslocamento.formadores.set(formadores_selecionados)
-
-    def exibir_estatisticas(self):
-        """Exibe estatísticas dos dados criados"""
-        self.stdout.write("\n=== ESTATÍSTICAS FINAIS ===")
-        self.stdout.write(f"Usuários: {Usuario.objects.count()}")
-        self.stdout.write(f"Municípios: {Municipio.objects.count()}")
-        self.stdout.write(f"Projetos: {Projeto.objects.count()}")
-        self.stdout.write(f"Tipos de Evento: {TipoEvento.objects.count()}")
-        self.stdout.write(f"Formadores: {Formador.objects.count()}")
-        self.stdout.write(f"Solicitações: {Solicitacao.objects.count()}")
-        self.stdout.write(f"Aprovações: {Aprovacao.objects.count()}")
-        self.stdout.write(f"Bloqueios: {DisponibilidadeFormadores.objects.count()}")
-        self.stdout.write(f"Deslocamentos: {Deslocamento.objects.count()}")
-
-        # Status das solicitações
-        self.stdout.write("\nSTATUS DAS SOLICITAÇÕES:")
-        for status_choice in SolicitacaoStatus.choices:
-            count = Solicitacao.objects.filter(status=status_choice[0]).count()
-            self.stdout.write(f"- {status_choice[1]}: {count}")
+        
+        # Criar solicitações variadas
+        sample_solicitacoes = []
+        
+        # Solicitação pendente
+        sample_solicitacoes.append({
+            'titulo': 'Formação em Alfabetização - Turma Janeiro',
+            'descricao': 'Formação inicial para professores do 1º ano do ensino fundamental, focando em métodos de alfabetização.',
+            'data_inicio': timezone.now() + timedelta(days=15),
+            'data_fim': timezone.now() + timedelta(days=15, hours=4),
+            'municipio': random.choice(municipios),
+            'projeto': random.choice(projetos),
+            'tipo_evento': random.choice(tipos_evento),
+            'status': SolicitacaoStatus.PENDENTE,
+            'observacoes': 'Primeira turma do ano, priorizar formadores experientes.',
+        })
+        
+        # Solicitação aprovada
+        sample_solicitacoes.append({
+            'titulo': 'Workshop de Matemática Lúdica',
+            'descricao': 'Workshop prático sobre uso de jogos e atividades lúdicas no ensino de matemática.',
+            'data_inicio': timezone.now() + timedelta(days=25),
+            'data_fim': timezone.now() + timedelta(days=25, hours=6),
+            'municipio': random.choice(municipios),
+            'projeto': random.choice(projetos),
+            'tipo_evento': random.choice(tipos_evento),
+            'status': SolicitacaoStatus.APROVADO,
+            'observacoes': 'Incluir materiais práticos para as atividades.',
+        })
+        
+        # Solicitação em pré-agenda
+        sample_solicitacoes.append({
+            'titulo': 'Seminário de Competências Socioemocionais',
+            'descricao': 'Seminário sobre desenvolvimento de competências socioemocionais em ambiente escolar.',
+            'data_inicio': timezone.now() + timedelta(days=30),
+            'data_fim': timezone.now() + timedelta(days=30, hours=8),
+            'municipio': random.choice(municipios),
+            'projeto': random.choice(projetos),
+            'tipo_evento': random.choice(tipos_evento),
+            'status': SolicitacaoStatus.PRE_AGENDA,
+            'observacoes': 'Aguardando confirmação de disponibilidade do auditório.',
+        })
+        
+        # Solicitação para próxima semana
+        sample_solicitacoes.append({
+            'titulo': 'Formação Continuada - IDEB e Avaliações',
+            'descricao': 'Formação sobre interpretação de dados do IDEB e preparação para avaliações externas.',
+            'data_inicio': timezone.now() + timedelta(days=7),
+            'data_fim': timezone.now() + timedelta(days=7, hours=5),
+            'municipio': random.choice(municipios),
+            'projeto': random.choice(projetos),
+            'tipo_evento': random.choice(tipos_evento),
+            'status': SolicitacaoStatus.PENDENTE,
+            'observacoes': 'Solicitação urgente para preparação das escolas.',
+        })
+        
+        created_count = 0
+        for sol_data in sample_solicitacoes:
+            if not self.dry_run:
+                try:
+                    coordenador = random.choice(coordenadores)
+                    
+                    solicitacao = Solicitacao.objects.create(
+                        solicitante=coordenador,
+                        titulo=sol_data['titulo'],
+                        descricao=sol_data['descricao'],
+                        data_inicio=sol_data['data_inicio'],
+                        data_fim=sol_data['data_fim'],
+                        municipio=sol_data['municipio'],
+                        projeto=sol_data['projeto'],
+                        tipo_evento=sol_data['tipo_evento'],
+                        status=sol_data['status'],
+                        observacoes=sol_data['observacoes'],
+                        publico_estimado=random.randint(20, 80),
+                        necessita_transporte=random.choice([True, False]),
+                        necessita_lanche=random.choice([True, False]),
+                        necessita_almoco=random.choice([True, False]),
+                    )
+                    
+                    # Adicionar formadores à solicitação
+                    num_formadores = random.randint(1, min(3, formadores.count()))
+                    formadores_selecionados = random.sample(list(formadores), num_formadores)
+                    
+                    for formador in formadores_selecionados:
+                        from core.models import FormadoresSolicitacao
+                        FormadoresSolicitacao.objects.get_or_create(
+                            solicitacao=solicitacao,
+                            formador=formador
+                        )
+                    
+                    created_count += 1
+                    self.stdout.write(f"  Solicitacao criada: {sol_data['titulo'][:50]}...")
+                    
+                except Exception as e:
+                    self.stdout.write(
+                        self.style.WARNING(f"Erro ao criar solicitacao: {str(e)}")
+                    )
+            else:
+                created_count += 1  # Simular para dry-run
+        
+        self.stdout.write(f"Solicitacoes de exemplo criadas: {created_count}")

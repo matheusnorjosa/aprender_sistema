@@ -15,6 +15,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - aprender_network
 
   web:
     build: .
@@ -38,6 +40,72 @@ services:
     command: >
       sh -c "python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8000"
+    networks:
+      - aprender_network
+
+  streamlit:
+    build: 
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: aprender_streamlit
+    environment:
+      DB_NAME: aprender_sistema_db
+      DB_USER: adm_aprender
+      DB_PASSWORD: aprender123456
+      DB_HOST: db
+      DB_PORT: "5432"
+      ENVIRONMENT: staging
+    volumes:
+      - .:/app
+    ports:
+      - "8501:8501"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "streamlit run dashboard_streamlit.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --server.enableXsrfProtection false --server.enableCORS false"
+    networks:
+      - aprender_network
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: aprender_mcp
+    environment:
+      DB_NAME: aprender_sistema_db
+      DB_USER: adm_aprender
+      DB_PASSWORD: aprender123456
+      DB_HOST: db
+      DB_PORT: "5432"
+      ENVIRONMENT: staging
+      DJANGO_SETTINGS_MODULE: aprender_sistema.settings
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "3001"
+      MCP_LOG_LEVEL: INFO
+    volumes:
+      - .:/app
+      - mcp_logs:/app/logs
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - aprender_network
 
 volumes:
   postgres_data:
+  mcp_logs:
+
+networks:
+  aprender_network:
+    driver: bridge

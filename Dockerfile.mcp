@@ -1,0 +1,52 @@
+# Dockerfile para Servidor MCP - Sistema Aprender
+# Container dedicado para Model Context Protocol services
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# Instalar dependências do sistema necessárias para MCP
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar requirements básicos para MCP
+COPY requirements.txt .
+
+# Instalar dependências Python básicas
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Instalar dependências específicas do MCP
+RUN pip install --no-cache-dir \
+    fastmcp>=0.1.0 \
+    mcp-server>=0.1.0 \
+    claude-code-sdk \
+    pydantic>=2.0.0 \
+    asyncio-mqtt \
+    websockets
+
+# Copiar código da aplicação
+COPY . .
+
+# Criar diretórios necessários
+RUN mkdir -p /app/logs /app/mcp_data
+
+# Configurar variáveis de ambiente para MCP
+ENV PYTHONPATH=/app
+ENV DJANGO_SETTINGS_MODULE=aprender_sistema.settings
+ENV MCP_HOST=0.0.0.0
+ENV MCP_PORT=3001
+ENV MCP_LOG_LEVEL=INFO
+
+# Script de inicialização do servidor MCP
+COPY mcp_server_entrypoint.py /app/
+
+# Health check para verificar se o servidor MCP está rodando
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:3001/health || exit 1
+
+# Expor porta para comunicação MCP
+EXPOSE 3001
+
+# Comando padrão para iniciar servidor MCP
+CMD ["python", "mcp_server_entrypoint.py"]

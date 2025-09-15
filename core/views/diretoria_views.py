@@ -3,6 +3,11 @@ Views relacionadas ao perfil de Diretoria (visão executiva e relatórios).
 """
 
 from django.core.cache import cache
+from django.db.models import Count, Q
+from django.db.models.functions import TruncMonth
+from django.http import HttpResponse
+from django.conf import settings
+import os
 from .base import *
 
 
@@ -10,7 +15,181 @@ class DiretoriaExecutiveDashboardView(
     LoginRequiredMixin, PermissionRequiredMixin, TemplateView
 ):
     permission_required = "core.view_relatorios"
-    template_name = "core/diretoria/executive_dashboard.html"
+    template_name = "core/diretoria/dashboard_working_original.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        agora = timezone.now()
+        
+        # Filtros da request
+        municipio_filtro = self.request.GET.get('municipio', '')
+        periodo_filtro = int(self.request.GET.get('periodo', 12))  # Default 12 meses
+        
+        # Calcular data de início baseada no período
+        data_inicio = agora - timedelta(days=30 * periodo_filtro)
+        data_inicio_ano = agora.replace(
+            month=1, day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        data_limite_trimestre = agora - timedelta(days=90)
+        
+        # Query base com filtros
+        query_base = Solicitacao.objects.filter(data_solicitacao__gte=data_inicio)
+        if municipio_filtro:
+            query_base = query_base.filter(municipio__nome=municipio_filtro)
+
+        # Métricas principais com filtros aplicados
+        total_solicitacoes_periodo = query_base.count()
+        solicitacoes_aprovadas_periodo = query_base.filter(status=SolicitacaoStatus.APROVADO).count()
+        taxa_aprovacao_periodo = round(
+            (
+                (solicitacoes_aprovadas_periodo / total_solicitacoes_periodo * 100)
+                if total_solicitacoes_periodo > 0
+                else 0
+            ),
+            1,
+        )
+
+        # Dados para os gráficos com filtros aplicados
+        # Eventos por mês
+        eventos_por_mes = (
+            query_base
+            .filter(status=SolicitacaoStatus.APROVADO)
+            .annotate(mes=TruncMonth('data_solicitacao'))
+            .values('mes')
+            .annotate(eventos=Count('id'))
+            .order_by('mes')
+        )
+        
+        # Formatar dados dos meses
+        eventos_mes_formatados = []
+        for item in eventos_por_mes:
+            eventos_mes_formatados.append({
+                'mes': item['mes'].strftime('%b'),
+                'eventos': item['eventos']
+            })
+
+        # Top formadores com filtros
+        formadores_query = FormadoresSolicitacao.objects.select_related('formador')
+        if municipio_filtro:
+            formadores_query = formadores_query.filter(solicitacao__municipio__nome=municipio_filtro)
+        
+        top_formadores = (
+            formadores_query
+            .filter(
+                solicitacao__data_solicitacao__gte=data_inicio,
+                solicitacao__status=SolicitacaoStatus.APROVADO
+            )
+            .values('formador__nome')
+            .annotate(eventos=Count('id'))
+            .order_by('-eventos')[:5]
+        )
+        
+        formadores_formatados = []
+        for formador in top_formadores:
+            formadores_formatados.append({
+                'nome': formador['formador__nome'],
+                'area': 'Formação',  # Você pode ajustar se tiver campo de área
+                'eventos': formador['eventos']
+            })
+
+        # Municípios atendidos
+        municipios_atendidos = (
+            Solicitacao.objects
+            .select_related('municipio')
+            .filter(
+                data_solicitacao__gte=data_limite_trimestre,
+                status=SolicitacaoStatus.APROVADO
+            )
+            .values('municipio__nome', 'municipio__uf')
+            .annotate(eventos=Count('id'))
+            .order_by('-eventos')[:5]
+        )
+
+        # Tipos de evento stats
+        tipos_evento_stats = (
+            Solicitacao.objects
+            .select_related('tipo_evento')
+            .filter(
+                data_solicitacao__gte=data_inicio_ano,
+                status=SolicitacaoStatus.APROVADO
+            )
+            .values('tipo_evento__nome')
+            .annotate(quantidade=Count('id'))
+            .order_by('-quantidade')
+        )
+
+        # Projetos stats
+        projetos_stats = (
+            Solicitacao.objects
+            .select_related('projeto')
+            .filter(
+                data_solicitacao__gte=data_limite_trimestre,
+                status=SolicitacaoStatus.APROVADO
+            )
+            .values('projeto__nome')
+            .annotate(eventos=Count('id'))
+            .order_by('-eventos')[:5]
+        )
+
+        # Novo: Top 10 municípios para gráfico de barras
+        top_municipios = (
+            Solicitacao.objects
+            .select_related('municipio')
+            .filter(
+                data_solicitacao__gte=data_inicio,
+                status=SolicitacaoStatus.APROVADO
+            )
+            .values('municipio__nome', 'municipio__uf')
+            .annotate(eventos=Count('id'))
+            .order_by('-eventos')[:10]
+        )
+        
+        # Lista de todos os municípios para o filtro
+        todos_municipios = (
+            Municipio.objects.filter(ativo=True)
+            .values_list('nome', flat=True)
+            .order_by('nome')
+        )
+
+        context.update(
+            {
+                "total_solicitacoes_ano": total_solicitacoes_periodo,
+                "solicitacoes_aprovadas_ano": solicitacoes_aprovadas_periodo,
+                "taxa_aprovacao_ano": taxa_aprovacao_periodo,
+                "formadores_ativos": Formador.objects.filter(ativo=True).count(),
+                "municipios_total": Municipio.objects.filter(ativo=True).count(),
+                "projetos_ativos": Projeto.objects.filter(ativo=True).count(),
+                "ano_atual": agora.year,
+                "trimestre_atual": f"Q{((agora.month-1)//3)+1}",
+                "eventos_por_mes": eventos_mes_formatados,
+                "top_formadores": formadores_formatados,
+                "municipios_atendidos": municipios_atendidos,
+                "tipos_evento_stats": tipos_evento_stats,
+                "projetos_stats": projetos_stats,
+                "top_municipios": list(top_municipios),  # Novo gráfico
+                "todos_municipios": list(todos_municipios),  # Para filtros
+                "municipio_selecionado": municipio_filtro,  # Filtro atual
+                "periodo_selecionado": periodo_filtro,  # Filtro atual
+                "taxa_sync_sucesso": 95,  # Placeholder
+                "atividade_recente": query_base.count(),
+            }
+        )
+        return context
+
+
+class DiretoriaRelatoriosView(
+    LoginRequiredMixin, PermissionRequiredMixin, TemplateView
+):
+    permission_required = "core.view_relatorios"
+    template_name = "core/diretoria/relatorios.html"
+
+
+class DiretoriaIntegratedDashboardView(
+    LoginRequiredMixin, PermissionRequiredMixin, TemplateView
+):
+    """Dashboard integrado com Streamlit"""
+    permission_required = "core.view_relatorios"
+    template_name = "core/diretoria/dashboard_integrated.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -18,9 +197,8 @@ class DiretoriaExecutiveDashboardView(
         data_inicio_ano = agora.replace(
             month=1, day=1, hour=0, minute=0, second=0, microsecond=0
         )
-        data_limite_trimestre = agora - timedelta(days=90)
 
-        # Métricas principais
+        # Métricas principais (mesmo código da view original)
         total_solicitacoes_ano = Solicitacao.objects.filter(
             data_solicitacao__gte=data_inicio_ano
         ).count()
@@ -50,11 +228,9 @@ class DiretoriaExecutiveDashboardView(
         return context
 
 
-class DiretoriaRelatoriosView(
-    LoginRequiredMixin, PermissionRequiredMixin, TemplateView
-):
-    permission_required = "core.view_relatorios"
-    template_name = "core/diretoria/relatorios.html"
+class DiretoriaDebugView(LoginRequiredMixin, TemplateView):
+    """View de debug temporária para testar gráficos"""
+    template_name = "core/diretoria/debug_dashboard.html"
 
 
 class DashboardStatsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
@@ -134,8 +310,8 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
             .values('mes')
             .annotate(
                 total=Count('id'),
-                aprovados=Count('id', filter=models.Q(status=SolicitacaoStatus.APROVADO)),
-                pendentes=Count('id', filter=models.Q(status=SolicitacaoStatus.PENDENTE))
+                aprovados=Count('id', filter=Q(status=SolicitacaoStatus.APROVADO)),
+                pendentes=Count('id', filter=Q(status=SolicitacaoStatus.PENDENTE))
             )
             .order_by('mes')
         )
@@ -155,7 +331,6 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
     
     def get_top_formadores(self):
         """Top 10 formadores por eventos realizados"""
-        from django.db.models import Count
         
         # Cache por 5 minutos
         cache_key = 'top_formadores_data'
@@ -191,7 +366,6 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
     
     def get_distribuicao_setores(self):
         """Distribuição de eventos por setor"""
-        from django.db.models import Count
         
         agora = timezone.now()
         inicio_ano = agora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -220,7 +394,6 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
     
     def get_municipios_atendidos(self):
         """Top municípios atendidos"""
-        from django.db.models import Count
         
         agora = timezone.now()
         tres_meses_atras = agora - timedelta(days=90)
@@ -249,7 +422,6 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
     
     def get_tipos_evento(self):
         """Distribuição por tipos de evento"""
-        from django.db.models import Count
         
         agora = timezone.now()
         inicio_ano = agora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -277,7 +449,6 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
     
     def get_projetos_stats(self):
         """Estatísticas de projetos mais ativos"""
-        from django.db.models import Count
         
         agora = timezone.now()
         tres_meses_atras = agora - timedelta(days=90)
@@ -302,3 +473,20 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
             })
             
         return JsonResponse({'data': data})
+
+
+class ChartJSServeView(View):
+    """Serve Chart.js file directly"""
+    
+    def get(self, request):
+        chart_path = os.path.join(settings.BASE_DIR, 'core', 'static', 'core', 'js', 'chart.min.js')
+        
+        try:
+            with open(chart_path, 'rb') as f:  # Modo binário
+                content = f.read()
+            
+            response = HttpResponse(content, content_type='application/javascript; charset=utf-8')
+            response['Cache-Control'] = 'max-age=3600'  # Cache por 1 hora
+            return response
+        except FileNotFoundError:
+            return HttpResponse('Chart.js not found', status=404)

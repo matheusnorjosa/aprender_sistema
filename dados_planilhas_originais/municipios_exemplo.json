@@ -1,0 +1,15 @@
+{
+  "municipios": [
+    {"nome": "Vitória", "uf": "ES", "ativo": true},
+    {"nome": "São Caetano do Sul", "uf": "SP", "ativo": true},
+    {"nome": "Diadema", "uf": "SP", "ativo": true},
+    {"nome": "Carapicuíba", "uf": "SP", "ativo": true},
+    {"nome": "Piracicaba", "uf": "SP", "ativo": true},
+    {"nome": "Cariacica", "uf": "ES", "ativo": true},
+    {"nome": "Taubaté", "uf": "SP", "ativo": true},
+    {"nome": "Sumaré", "uf": "SP", "ativo": true},
+    {"nome": "Bauru", "uf": "SP", "ativo": true},
+    {"nome": "São Vicente", "uf": "SP", "ativo": true},
+    {"nome": "Município Teste Inativo", "uf": "XX", "ativo": false}
+  ]
+}

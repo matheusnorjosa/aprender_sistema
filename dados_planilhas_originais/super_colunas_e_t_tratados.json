@@ -1,0 +1,250 @@
+[
+  {
+    "linha": 1,
+    "data_evento": "16/01/2025",
+    "municipio": "Caucaia",
+    "projeto": "Matemática nos Anos Iniciais",
+    "tipo_evento": "Híbrido - Workshop",
+    "formadores": [
+      "Maria Silva 1"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Matemática nos Anos Iniciais (SEM SETOR)",
+      "municipio": "Caucaia/CE",
+      "tipo_evento": "Híbrido - Workshop",
+      "titulo_evento": "Matemática nos Anos Iniciais - Caucaia",
+      "data_inicio": "2025-01-16 09:00:00-03:00",
+      "data_fim": "2025-01-16 12:00:00-03:00",
+      "observacoes": "Segmento: Fundamental I | Coordenador Acompanha: Coordenador 1 | Coordenador Responsável: Supervisor 1",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Fundamental I | Coordenador Acompanha: Coordenador 1 | Coordenador Responsável: Supervisor 1"
+  },
+  {
+    "linha": 2,
+    "data_evento": "17/01/2025",
+    "municipio": "Sobral",
+    "projeto": "Ciências da Natureza",
+    "tipo_evento": "Online - Seminário",
+    "formadores": [
+      "Maria Silva 2",
+      "João Santos 2"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Ciências da Natureza (SEM SETOR)",
+      "municipio": "Sobral/CE",
+      "tipo_evento": "Online - Seminário",
+      "titulo_evento": "Ciências da Natureza - Sobral",
+      "data_inicio": "2025-01-17 14:00:00-03:00",
+      "data_fim": "2025-01-17 18:00:00-03:00",
+      "observacoes": "Segmento: Fundamental II | Coordenador Acompanha: Coordenador 2 | Coordenador Responsável: Supervisor 2",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Fundamental II | Coordenador Acompanha: Coordenador 2 | Coordenador Responsável: Supervisor 2"
+  },
+  {
+    "linha": 3,
+    "data_evento": "18/01/2025",
+    "municipio": "Maracanaú",
+    "projeto": "Alfabetização Baseada na Ciência",
+    "tipo_evento": "Presencial - Formação Continuada",
+    "formadores": [
+      "Maria Silva 3",
+      "Ana Oliveira 3"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Alfabetização Baseada na Ciência (SEM SETOR)",
+      "municipio": "Maracanaú/CE",
+      "tipo_evento": "Presencial - Formação Continuada",
+      "titulo_evento": "Alfabetização Baseada na Ciência - Maracanaú",
+      "data_inicio": "2025-01-18 08:00:00-03:00",
+      "data_fim": "2025-01-18 17:00:00-03:00",
+      "observacoes": "Segmento: Infantil | Coordenador Acompanha: Coordenador 3 | Coordenador Responsável: Supervisor 3",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Infantil | Coordenador Acompanha: Coordenador 3 | Coordenador Responsável: Supervisor 3"
+  },
+  {
+    "linha": 4,
+    "data_evento": "19/01/2025",
+    "municipio": "Juazeiro do Norte",
+    "projeto": "Matemática nos Anos Iniciais",
+    "tipo_evento": "Híbrido - Workshop",
+    "formadores": [
+      "Maria Silva 4",
+      "João Santos 4"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Matemática nos Anos Iniciais (SEM SETOR)",
+      "municipio": "Juazeiro do Norte/CE",
+      "tipo_evento": "Híbrido - Workshop",
+      "titulo_evento": "Matemática nos Anos Iniciais - Juazeiro do Norte",
+      "data_inicio": "2025-01-19 09:00:00-03:00",
+      "data_fim": "2025-01-19 12:00:00-03:00",
+      "observacoes": "Segmento: Fundamental I | Coordenador Acompanha: Coordenador 4 | Coordenador Responsável: Supervisor 4 | Convidados: Convidado 4",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Fundamental I | Coordenador Acompanha: Coordenador 4 | Coordenador Responsável: Supervisor 4 | Convidados: Convidado 4"
+  },
+  {
+    "linha": 5,
+    "data_evento": "20/01/2025",
+    "municipio": "Fortaleza",
+    "projeto": "Ciências da Natureza",
+    "tipo_evento": "Online - Seminário",
+    "formadores": [
+      "Maria Silva 5"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Ciências da Natureza (SEM SETOR)",
+      "municipio": "Fortaleza/CE",
+      "tipo_evento": "Online - Seminário",
+      "titulo_evento": "Ciências da Natureza - Fortaleza",
+      "data_inicio": "2025-01-20 14:00:00-03:00",
+      "data_fim": "2025-01-20 18:00:00-03:00",
+      "observacoes": "Segmento: Fundamental II | Coordenador Acompanha: Coordenador 5 | Coordenador Responsável: Supervisor 5",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Fundamental II | Coordenador Acompanha: Coordenador 5 | Coordenador Responsável: Supervisor 5"
+  },
+  {
+    "linha": 6,
+    "data_evento": "21/01/2025",
+    "municipio": "Caucaia",
+    "projeto": "Alfabetização Baseada na Ciência",
+    "tipo_evento": "Presencial - Formação Continuada",
+    "formadores": [
+      "Maria Silva 6",
+      "João Santos 6",
+      "Ana Oliveira 6"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Alfabetização Baseada na Ciência (SEM SETOR)",
+      "municipio": "Caucaia/CE",
+      "tipo_evento": "Presencial - Formação Continuada",
+      "titulo_evento": "Alfabetização Baseada na Ciência - Caucaia",
+      "data_inicio": "2025-01-21 08:00:00-03:00",
+      "data_fim": "2025-01-21 17:00:00-03:00",
+      "observacoes": "Segmento: Infantil | Coordenador Acompanha: Coordenador 6 | Coordenador Responsável: Supervisor 6",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Infantil | Coordenador Acompanha: Coordenador 6 | Coordenador Responsável: Supervisor 6"
+  },
+  {
+    "linha": 7,
+    "data_evento": "22/01/2025",
+    "municipio": "Sobral",
+    "projeto": "Matemática nos Anos Iniciais",
+    "tipo_evento": "Híbrido - Workshop",
+    "formadores": [
+      "Maria Silva 7"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Matemática nos Anos Iniciais (SEM SETOR)",
+      "municipio": "Sobral/CE",
+      "tipo_evento": "Híbrido - Workshop",
+      "titulo_evento": "Matemática nos Anos Iniciais - Sobral",
+      "data_inicio": "2025-01-22 09:00:00-03:00",
+      "data_fim": "2025-01-22 12:00:00-03:00",
+      "observacoes": "Segmento: Fundamental I | Coordenador Acompanha: Coordenador 7 | Coordenador Responsável: Supervisor 7",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Fundamental I | Coordenador Acompanha: Coordenador 7 | Coordenador Responsável: Supervisor 7"
+  },
+  {
+    "linha": 8,
+    "data_evento": "23/01/2025",
+    "municipio": "Maracanaú",
+    "projeto": "Ciências da Natureza",
+    "tipo_evento": "Online - Seminário",
+    "formadores": [
+      "Maria Silva 8",
+      "João Santos 8"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Ciências da Natureza (SEM SETOR)",
+      "municipio": "Maracanaú/CE",
+      "tipo_evento": "Online - Seminário",
+      "titulo_evento": "Ciências da Natureza - Maracanaú",
+      "data_inicio": "2025-01-23 14:00:00-03:00",
+      "data_fim": "2025-01-23 18:00:00-03:00",
+      "observacoes": "Segmento: Fundamental II | Coordenador Acompanha: Coordenador 8 | Coordenador Responsável: Supervisor 8 | Convidados: Convidado 8",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Fundamental II | Coordenador Acompanha: Coordenador 8 | Coordenador Responsável: Supervisor 8 | Convidados: Convidado 8"
+  },
+  {
+    "linha": 9,
+    "data_evento": "24/01/2025",
+    "municipio": "Juazeiro do Norte",
+    "projeto": "Alfabetização Baseada na Ciência",
+    "tipo_evento": "Presencial - Formação Continuada",
+    "formadores": [
+      "Maria Silva 9",
+      "Ana Oliveira 9"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Alfabetização Baseada na Ciência (SEM SETOR)",
+      "municipio": "Juazeiro do Norte/CE",
+      "tipo_evento": "Presencial - Formação Continuada",
+      "titulo_evento": "Alfabetização Baseada na Ciência - Juazeiro do Norte",
+      "data_inicio": "2025-01-24 08:00:00-03:00",
+      "data_fim": "2025-01-24 17:00:00-03:00",
+      "observacoes": "Segmento: Infantil | Coordenador Acompanha: Coordenador 9 | Coordenador Responsável: Supervisor 9",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Infantil | Coordenador Acompanha: Coordenador 9 | Coordenador Responsável: Supervisor 9"
+  },
+  {
+    "linha": 10,
+    "data_evento": "25/01/2025",
+    "municipio": "Fortaleza",
+    "projeto": "Matemática nos Anos Iniciais",
+    "tipo_evento": "Híbrido - Workshop",
+    "formadores": [
+      "Maria Silva 10",
+      "João Santos 10"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Matemática nos Anos Iniciais (SEM SETOR)",
+      "municipio": "Fortaleza/CE",
+      "tipo_evento": "Híbrido - Workshop",
+      "titulo_evento": "Matemática nos Anos Iniciais - Fortaleza",
+      "data_inicio": "2025-01-25 09:00:00-03:00",
+      "data_fim": "2025-01-25 12:00:00-03:00",
+      "observacoes": "Segmento: Fundamental I | Coordenador Acompanha: Coordenador 10 | Coordenador Responsável: Supervisor 10",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Fundamental I | Coordenador Acompanha: Coordenador 10 | Coordenador Responsável: Supervisor 10"
+  }
+]

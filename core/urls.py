@@ -26,7 +26,7 @@ from .views import (
     SolicitacaoCreateView,
     SolicitacaoOKView,
 )
-from .views.diretoria_views import DashboardChartsAPIView
+from .views.diretoria_views import DashboardChartsAPIView, DiretoriaDebugView, DiretoriaIntegratedDashboardView
 from .views.admin_views import CommunicationLogsView
 from .views.gestao_views import (
     GestaoDashboardView,
@@ -140,6 +140,11 @@ urlpatterns = [
         name="diretoria_dashboard",
     ),
     path(
+        "diretoria/dashboard/integrado/",
+        DiretoriaIntegratedDashboardView.as_view(),
+        name="diretoria_dashboard_integrado",
+    ),
+    path(
         "diretoria/relatorios/",
         DiretoriaRelatoriosView.as_view(),
         name="diretoria_relatorios",
@@ -154,6 +159,19 @@ urlpatterns = [
         DashboardChartsAPIView.as_view(),
         name="diretoria_api_charts",
     ),
+    # Página de debug temporária
+    path(
+        "diretoria/debug/",
+        DiretoriaDebugView.as_view(),
+        name="diretoria_debug",
+    ),
+    # Teste standalone do dashboard
+    path(
+        "diretoria/test/",
+        TemplateView.as_view(template_name="core/diretoria/dashboard_test.html"),
+        name="diretoria_test",
+    ),
+    # Serve Chart.js directly (removido - usar sistema padrão de static files)
     
     # Gestão Administrativa - CRUD para entidades principais
     path("gestao/", GestaoDashboardView.as_view(), name="gestao_dashboard"),

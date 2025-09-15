@@ -1,0 +1,537 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Dashboard Executivo — Diretoria</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --content-bg: #f8f9fa;
+      --card: #ffffff; 
+      --text: #2c3e50; 
+      --muted: #6c757d; 
+      --line: #e9ecef; 
+      --accent: #3498db;
+      --success: #27ae60; 
+      --warning: #f39c12; 
+      --danger: #e74c3c; 
+      --shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    
+    *{box-sizing:border-box; margin:0; padding:0;}
+    
+    body{
+      background: var(--bg);
+      color: var(--text); 
+      font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    .header {
+      background: var(--card);
+      border-radius: 1rem;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow);
+    }
+    
+    .header h1 {
+      margin: 0;
+      font-size: 2rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+      background: var(--card);
+      padding: 2rem;
+      border-radius: 1rem;
+      box-shadow: var(--shadow);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+    }
+    
+    .stat-card h3 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin: 0 0 0.5rem 0;
+      color: var(--accent);
+    }
+    
+    .stat-card.success h3 { color: var(--success); }
+    .stat-card.warning h3 { color: var(--warning); }
+    .stat-card.danger h3 { color: var(--danger); }
+    
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+    
+    @media (max-width: 1024px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .chart-card {
+      background: var(--card);
+      border-radius: 1rem;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    
+    .chart-header {
+      background: var(--accent);
+      color: white;
+      padding: 1rem;
+      font-weight: 600;
+    }
+    
+    .chart-content {
+      padding: 1rem;
+    }
+    
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent);
+      text-decoration: none;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+    
+    .back-link:hover {
+      color: #2980b9;
+    }
+    
+    .info-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+    
+    .info-card {
+      background: var(--card);
+      border-radius: 1rem;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    
+    .info-card-header {
+      background: var(--success);
+      color: white;
+      padding: 1rem;
+      font-weight: 600;
+    }
+    
+    .info-card-content {
+      padding: 1rem;
+    }
+    
+    .top-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .top-list li {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .top-list li:last-child {
+      border-bottom: none;
+    }
+    
+    .badge {
+      background: var(--accent);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="{% url 'core:home' %}" class="back-link">
+      <i class="bi bi-arrow-left"></i> Voltar ao Dashboard
+    </a>
+    
+    <div class="header">
+      <h1><i class="bi bi-graph-up-arrow"></i> Dashboard Executivo</h1>
+      <p>Visão estratégica e métricas executivas para {{ ano_atual }} • {{ trimestre_atual }}</p>
+    </div>
+    
+    <!-- Filtros Inteligentes -->
+    <div style="background: var(--card); border-radius: 1rem; padding: 1.5rem; margin-bottom: 2rem; box-shadow: var(--shadow);">
+      <h3 style="margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
+        <i class="bi bi-funnel"></i> Filtros Inteligentes
+      </h3>
+      
+      <form method="get" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
+        <div>
+          <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text);">
+            <i class="bi bi-geo-alt"></i> Município
+          </label>
+          <select name="municipio" style="width: 100%; padding: 0.75rem; border: 2px solid var(--line); border-radius: 0.5rem; font-size: 1rem;">
+            <option value="">Todos os municípios</option>
+            {% for municipio in todos_municipios %}
+            <option value="{{ municipio }}" {% if municipio == municipio_selecionado %}selected{% endif %}>
+              {{ municipio }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div>
+          <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text);">
+            <i class="bi bi-calendar-range"></i> Período
+          </label>
+          <select name="periodo" style="width: 100%; padding: 0.75rem; border: 2px solid var(--line); border-radius: 0.5rem; font-size: 1rem;">
+            <option value="6" {% if periodo_selecionado == 6 %}selected{% endif %}>Últimos 6 meses</option>
+            <option value="12" {% if periodo_selecionado == 12 %}selected{% endif %}>Últimos 12 meses</option>
+            <option value="24" {% if periodo_selecionado == 24 %}selected{% endif %}>Últimos 24 meses</option>
+          </select>
+        </div>
+        
+        <button type="submit" style="background: var(--accent); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+          <i class="bi bi-search"></i> Aplicar
+        </button>
+      </form>
+    </div>
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>{{ total_solicitacoes_ano }}</h3>
+        <p><strong>Total de Solicitações</strong><br>no ano {{ ano_atual }}</p>
+      </div>
+      <div class="stat-card success">
+        <h3>{{ solicitacoes_aprovadas_ano }}</h3>
+        <p><strong>Eventos Realizados</strong><br>status aprovado</p>
+      </div>
+      <div class="stat-card warning">
+        <h3>{{ taxa_aprovacao_ano }}%</h3>
+        <p><strong>Taxa de Aprovação</strong><br>eficiência do processo</p>
+      </div>
+      <div class="stat-card">
+        <h3>{{ formadores_ativos }}</h3>
+        <p><strong>Formadores Ativos</strong><br>disponíveis no sistema</p>
+      </div>
+      <div class="stat-card success">
+        <h3>{{ municipios_total }}</h3>
+        <p><strong>Municípios Cadastrados</strong><br>cobertura geográfica</p>
+      </div>
+      <div class="stat-card">
+        <h3>{{ projetos_ativos }}</h3>
+        <p><strong>Projetos Ativos</strong><br>em execução</p>
+      </div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+      <div class="chart-card">
+        <div class="chart-header">
+          <i class="bi bi-graph-up"></i> Evolução Mensal de Eventos
+        </div>
+        <div class="chart-content">
+          <canvas id="eventosChart" width="400" height="200"></canvas>
+        </div>
+      </div>
+      
+      <div class="chart-card">
+        <div class="chart-header">
+          <i class="bi bi-pie-chart"></i> Distribuição por Tipo
+        </div>
+        <div class="chart-content">
+          <canvas id="tiposChart" width="300" height="300"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Novo Gráfico de Barras de Municípios -->
+    <div style="display: grid; grid-template-columns: 1fr; gap: 2rem; margin-bottom: 2rem;">
+      <div class="chart-card">
+        <div class="chart-header">
+          <i class="bi bi-bar-chart"></i> Top 10 Municípios por Eventos
+        </div>
+        <div class="chart-content">
+          <canvas id="municipiosChart" width="800" height="400"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <div class="info-cards">
+      <div class="info-card">
+        <div class="info-card-header">
+          <i class="bi bi-trophy"></i> Top Formadores (Trimestre)
+        </div>
+        <div class="info-card-content">
+          <ul class="top-list">
+            {% for formador in top_formadores %}
+            <li>
+              <span>
+                <strong>{{ formador.nome }}</strong><br>
+                <small>{{ formador.area }}</small>
+              </span>
+              <span class="badge">{{ formador.eventos }} eventos</span>
+            </li>
+            {% empty %}
+            <li style="text-align: center; color: var(--muted);">
+              Nenhum dado disponível
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      
+      <div class="info-card">
+        <div class="info-card-header" style="background: var(--warning);">
+          <i class="bi bi-geo-alt"></i> Municípios Atendidos
+        </div>
+        <div class="info-card-content">
+          <ul class="top-list">
+            {% for municipio in municipios_atendidos %}
+            <li>
+              <span>
+                <strong>{{ municipio.municipio__nome }}</strong><br>
+                <small>{{ municipio.municipio__uf }}</small>
+              </span>
+              <span class="badge">{{ municipio.eventos }} eventos</span>
+            </li>
+            {% empty %}
+            <li style="text-align: center; color: var(--muted);">
+              Nenhum dado disponível
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      
+      <div class="info-card">
+        <div class="info-card-header" style="background: #6f42c1;">
+          <i class="bi bi-folder"></i> Projetos Mais Ativos
+        </div>
+        <div class="info-card-content">
+          <ul class="top-list">
+            {% for projeto in projetos_stats %}
+            <li>
+              <span><strong>{{ projeto.projeto__nome }}</strong></span>
+              <span class="badge">{{ projeto.eventos }} eventos</span>
+            </li>
+            {% empty %}
+            <li style="text-align: center; color: var(--muted);">
+              Nenhum dado disponível
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    
+    <div style="background: var(--card); border-radius: 1rem; padding: 2rem; margin-top: 2rem; box-shadow: var(--shadow);">
+      <h3 style="margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
+        <i class="bi bi-speedometer2"></i> Indicadores do Sistema
+      </h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div style="text-align: center; padding: 1rem; background: var(--content-bg); border-radius: 0.5rem;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);">{{ taxa_sync_sucesso }}%</div>
+          <div style="font-size: 0.9rem;">Sync Google Calendar</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: var(--content-bg); border-radius: 0.5rem;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent);">{{ atividade_recente }}</div>
+          <div style="font-size: 0.9rem;">Atividades (30 dias)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Submissão automática dos filtros
+    document.addEventListener('DOMContentLoaded', function() {
+      const municipioSelect = document.querySelector('select[name="municipio"]');
+      const periodoSelect = document.querySelector('select[name="periodo"]');
+      
+      function autoSubmit() {
+        const form = document.querySelector('form');
+        form.submit();
+      }
+      
+      municipioSelect.addEventListener('change', autoSubmit);
+      periodoSelect.addEventListener('change', autoSubmit);
+    });
+    
+    // Gráfico de evolução mensal
+    const eventosCtx = document.getElementById('eventosChart').getContext('2d');
+    new Chart(eventosCtx, {
+      type: 'line',
+      data: {
+        labels: [{% for item in eventos_por_mes %}'{{ item.mes }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+        datasets: [{
+          label: 'Eventos Realizados',
+          data: [{% for item in eventos_por_mes %}{{ item.eventos }}{% if not forloop.last %},{% endif %}{% endfor %}],
+          borderColor: '#3498db',
+          backgroundColor: 'rgba(52, 152, 219, 0.1)',
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+    
+    // Gráfico de tipos de evento
+    const tiposCtx = document.getElementById('tiposChart').getContext('2d');
+    new Chart(tiposCtx, {
+      type: 'doughnut',
+      data: {
+        labels: [{% for tipo in tipos_evento_stats %}'{{ tipo.tipo_evento__nome }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+        datasets: [{
+          data: [{% for tipo in tipos_evento_stats %}{{ tipo.quantidade }}{% if not forloop.last %},{% endif %}{% endfor %}],
+          backgroundColor: [
+            '#3498db',
+            '#27ae60',
+            '#f39c12',
+            '#e74c3c',
+            '#9b59b6',
+            '#1abc9c',
+            '#34495e',
+            '#e67e22',
+            '#95a5a6',
+            '#16a085'
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+    
+    // Novo: Gráfico de barras dos municípios
+    const municipiosCtx = document.getElementById('municipiosChart').getContext('2d');
+    new Chart(municipiosCtx, {
+      type: 'bar',
+      data: {
+        labels: [{% for municipio in top_municipios %}'{{ municipio.municipio__nome }}/{{ municipio.municipio__uf }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+        datasets: [{
+          label: 'Eventos por Município',
+          data: [{% for municipio in top_municipios %}{{ municipio.eventos }}{% if not forloop.last %},{% endif %}{% endfor %}],
+          backgroundColor: [
+            '#3498db',
+            '#27ae60', 
+            '#f39c12',
+            '#e74c3c',
+            '#9b59b6',
+            '#1abc9c',
+            '#34495e',
+            '#e67e22',
+            '#95a5a6',
+            '#16a085'
+          ],
+          borderColor: [
+            '#2980b9',
+            '#229954',
+            '#d68910',
+            '#c0392b',
+            '#8e44ad',
+            '#17a2b8',
+            '#2c3e50',
+            '#d35400',
+            '#7f8c8d',
+            '#138d75'
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            callbacks: {
+              title: function(context) {
+                return context[0].label;
+              },
+              label: function(context) {
+                return context.parsed.y + ' eventos realizados';
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1
+            }
+          },
+          x: {
+            ticks: {
+              maxRotation: 45,
+              minRotation: 45
+            }
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>

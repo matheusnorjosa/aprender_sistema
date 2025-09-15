@@ -22,6 +22,90 @@
 - `python manage.py import_google_sheets_compras` - Importar dados de compras
 - `python manage.py analyze_google_sheets` - Analisar planilhas Google
 
+## ✅ SESSÃO ATUAL: Análise e Importação Completa de Dados Reais (Janeiro 2025)
+
+### 🎯 ANÁLISE COMPLETA DA PLANILHA "ACOMPANHAMENTO DE AGENDA | 2025":
+- **6.008 registros** identificados e catalogados em 6 abas principais
+- **84 formadores únicos** identificados com dados reais
+- **24 projetos únicos** identificados (ACerta, Brincando e Aprendendo, Vida & Linguagem, etc.)
+- **51 bloqueios** de agenda estruturados
+- **3 tipos de evento** (Presencial, Online, Acompanhamento)
+
+### 📊 DADOS CONSOLIDADOS IDENTIFICADOS:
+**Abas Processadas com Sucesso:**
+1. **Super** (1.985 registros) - PRIORIDADE ALTA - Aprovações da Superintendência
+2. **ACerta** (1.001 registros) - Projeto ACerta
+3. **Outros** (1.022 registros) - Projetos diversos (SOU DA PAZ, LEIO ESCREVO E CALCULO)
+4. **Brincando** (1.000 registros) - Projeto Brincando e Aprendendo
+5. **Vidas** (1.000 registros) - Projeto Vida & Linguagem
+6. **Bloqueios** (51 registros) - Bloqueios Total/Parcial de agenda
+
+**Total Consolidado**: **79.176 registros** (incluindo planilhas anteriores)
+
+### 🔧 COMANDOS CRIADOS NESTA SESSÃO:
+1. **`import_agenda_completa.py`** - Comando Django completo para importação:
+   - Importação por aba específica (`--aba Super`)
+   - Modo simulação (`--dry-run`)
+   - Logs detalhados (`--verbose`)
+   - Força reimportação (`--force`)
+   - Tratamento de dados inconsistentes
+   - Criação automática de formadores, projetos, municípios
+
+2. **Comandos auxiliares**:
+   - `analyze_agenda_sheet.py` - Análise detalhada
+   - `map_google_calendar_events.py` - Mapeamento calendário Google
+   - `renew_google_calendar_auth.py` - Correção OAuth2
+
+### 🚀 GOOGLE CALENDAR MAPEAMENTO:
+- **Calendar ID**: `c_3381579109915e33c06be465adfbd9a31aaf4205c0bd45aa050c5a18be99fe15@group.calendar.google.com`
+- **Status**: Bloqueio OAuth2 identificado (escopo calendar não autorizado)
+- **Solução**: Script de renovação OAuth2 criado
+
+### 📁 ARQUIVOS DOCUMENTADOS CRIADOS:
+- `ANALISE_COMPLETA_PLANILHA_AGENDA_2025.md` (514 linhas)
+- `RELATORIO_CONSOLIDACAO_DADOS.md` (relatório executivo completo)
+- `analise_agenda.json` (dados estruturados da planilha)
+- Organização em `dados_planilhas_originais/` mantida
+
+### ⚠️ PROBLEMAS IDENTIFICADOS E SOLUÇÕES:
+1. **Headers duplicados** em 3 abas (Configurações, Disponibilidade, Deslocamento)
+2. **Dados inconsistentes**: "?Regianio Lima?", "SOLICITADO" como formador
+3. **OAuth2 Google Calendar**: Script de correção criado
+4. **Formatos múltiplos**: Parser flexível implementado
+
+### 🎯 ESTRATÉGIA DE MIGRAÇÃO DEFINIDA:
+**FASE 1 - PRIORIDADE ALTA:**
+- Bloqueios (51 registros - estrutura simples)
+- Aba "Super" (1.985 registros - aprovações explícitas)
+
+**FASE 2 - PRIORIDADE MÉDIA:**
+- Demais abas de eventos (ACerta, Outros, Brincando, Vidas)
+
+**FASE 3 - INTEGRAÇÃO:**
+- Google Calendar (após correção OAuth2)
+- Validação cruzada de dados
+
+### 💡 DESCOBERTAS IMPORTANTES:
+- **Aba "Super" é crítica**: Contém aprovações da superintendência
+- **Múltiplos coordenadores/gerentes**: Ellen Damares, Maria Nadir, Rafael Rabelo
+- **Municípios com UF**: Dias d'Avila-BA, Petrolina-PE, Serra do Salitre-MG
+- **"Amigos do Bem"**: Aparece frequentemente (possível instituição)
+
+### 📊 COMANDOS PRONTOS PARA USO:
+```bash
+# Importação completa
+python manage.py import_agenda_completa --verbose
+
+# Por aba específica
+python manage.py import_agenda_completa --aba Super --verbose
+
+# Simulação
+python manage.py import_agenda_completa --dry-run --verbose
+
+# Renovar OAuth2 Google
+python scripts/renew_google_calendar_auth.py
+```
+
 ## ✅ SESSÃO ATUAL: Sistema de Pré-Agenda e Unificação de Ambientes (Janeiro 2025)
 
 ### 🎯 Sistema de Pré-Agenda COMPLETO:
@@ -51,6 +135,7 @@
 - Arquivos de teste organizados na pasta `/tests`
 - Documentação movida para `/docs`
 - **NOVO**: `old_configs/` - Backup de configurações antigas
+- **NOVO**: `dados_planilhas_originais/` - Dados extraídos organizados
 
 ## Opções de Deploy Gratuito Analisadas
 - **RENDER** (Recomendado): PostgreSQL gratuito, deploy automático, 30 dias
@@ -90,14 +175,11 @@
 - [ ] Permitir acesso da equipe para testes
 
 ## Arquivos Importantes Criados/Modificados Nesta Sessão
-- `core/models.py` - Status PRE_AGENDA adicionado
-- `core/migrations/0015_add_pre_agenda_status.py` - Migração do novo status
-- `core/views/controle_pre_agenda_views.py` - Views completas da pré-agenda
-- `core/templates/core/controle/pre_agenda.html` - Interface da pré-agenda
-- `core/templates/core/base.html` - Menu lateral atualizado, CSS para accessibility
-- `core/urls.py` - URLs da pré-agenda
-- `aprender_sistema/settings.py` - Versão unificada
-- `ENVIRONMENT_UNIFICATION.md` - Documentação da unificação
+- `core/management/commands/import_agenda_completa.py` - Comando completo de importação
+- `dados_planilhas_originais/ANALISE_COMPLETA_PLANILHA_AGENDA_2025.md` - Análise detalhada
+- `dados_planilhas_originais/RELATORIO_CONSOLIDACAO_DADOS.md` - Relatório consolidado
+- `analise_agenda.json` - Dados estruturados da planilha
+- Scripts auxiliares: `analyze_agenda_sheet.py`, `map_google_calendar_events.py`, `renew_google_calendar_auth.py`
 
 ## ✅ SESSÃO 12/09/2025 - Centralização Docker e Otimização Completa
 
@@ -148,15 +230,34 @@ DB_PASSWORD=aprender123456 python manage.py runserver
 - **8 arquivos** de memória consolidados
 - **0 erros** MCP nos comandos Django
 
-## ✅ SESSÃO 09/09/2025 - Configuração Docker Completa
+## ✅ SESSÃO 13/09/2025 - Sistema Totalmente Unificado em Docker
 
-### 🐳 Sistema Docker Funcionando Perfeitamente:
-- **Containers**: PostgreSQL 15 + Django 5.2.4 rodando
-- **Database**: PostgreSQL configurado e funcional (`ENVIRONMENT=staging`)
-- **Migrations**: Aplicadas com sucesso (migration 0009 corrigida)
-- **Dados**: Criados dados iniciais de teste (municípios, formadores, projetos, tipos evento)
-- **Superuser**: admin/admin123 criado para Django Admin
-- **Grupos**: 6 grupos Django configurados (coordenador, superintendencia, controle, formador, diretoria, admin)
+### 🎯 **WORKFLOW 100% DOCKER** - Conforme Solicitado pelo Usuário:
+**IMPORTANTE**: "lembrando que tudo deve ser feito no docker, ok? TUDO DEVE SER UNIFICADO NO DOCKER"
+
+### 🐳 **COMANDOS DOCKER UNIFICADOS** - Interface Única:
+- **Script Criado**: `docker-commands.sh` - Interface unificada para TODOS os comandos
+- **Containers**: PostgreSQL 15 + Django 5.2.4 rodando na porta 8000
+- **Database**: PostgreSQL configurado (`ENVIRONMENT=staging`, porta 5433)
+- **Estado Atual**: Sistema limpo (apenas 1 admin, 0 dados de teste)
+- **Pronto para**: Importar dados reais da aba 'Super' via Docker
+
+### 🔧 **Como Usar o Sistema Docker Unificado**:
+```bash
+# Todos os comandos devem usar o script Docker:
+./docker-commands.sh status          # Ver estado do sistema
+./docker-commands.sh import-super    # Importar dados da aba Super  
+./docker-commands.sh shell           # Django shell via Docker
+./docker-commands.sh migrate         # Migrações via Docker
+./docker-commands.sh logs [web|db]   # Ver logs dos containers
+```
+
+### 📊 **Dados Limpos e Prontos**:
+- **Usuários**: 1 (apenas admin com CPF: 04215498317)
+- **Formadores**: 0 (todos os dados de teste removidos)
+- **Projetos**: 0 (todos os dados de teste removidos)
+- **Solicitações**: 0 (sistema completamente limpo)
+- **Pronto para**: Importar 10 registros reais da aba 'Super'
 
 ### 🔧 Problemas Resolvidos:
 1. **Container `aprender_web` não iniciava**:
@@ -258,8 +359,14 @@ ENVIRONMENT=production SECRET_KEY=xxx ALLOWED_HOSTS=xxx DB_PASSWORD=xxx python m
 ENVIRONMENT=staging DB_PASSWORD=xxx python manage.py runserver
 ```
 
+## Status dos Arquivos CLAUDE.md
+- **CLAUDE.md** (pasta principal): Histórico cronológico das sessões
+- **.claude/CLAUDE.md**: Diretrizes técnicas para o Claude Code
+- **Função**: Ambos têm propósitos diferentes e devem ser mantidos
+
 ## Notas de Desenvolvimento
 - Preferir edição de arquivos existentes ao invés de criar novos
 - Sempre verificar convenções do código antes de fazer alterações
 - Executar testes após mudanças significativas
 - **Para ver menu pré-agenda**: Limpar cache do navegador (Ctrl+Shift+R)
+- **Dados agora são reais**: Sistema pronto para importação de 6.008 registros reais das planilhas

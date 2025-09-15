@@ -2,17 +2,7 @@
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
-      "Bash(venv/Scripts/python manage.py runserver:*)",
-      "Bash(venv/Scripts/python:*)",
-      "Bash(DJANGO_SETTINGS_MODULE=aprender_sistema.settings venv/Scripts/python manage.py help)",
-      "Bash(DJANGO_SETTINGS_MODULE=aprender_sistema.settings venv/Scripts/python manage.py stdio_server:*)",
-      "WebSearch",
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(venv/Scripts/playwright install:*)",
-      "Bash(docker-compose:*)",
-      "Bash(curl:*)",
-      "Bash(docker exec:*)"
+      "Bash(ENVIRONMENT=staging DB_HOST=localhost DB_PORT=5433 DB_NAME=aprender_sistema_db DB_USER=adm_aprender DB_PASSWORD=aprender123456 python test_dashboard_final.py)"
     ],
     "deny": [],
     "ask": []

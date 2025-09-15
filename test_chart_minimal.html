@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Chart.js Minimal</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+</head>
+<body>
+    <h1>Teste Chart.js</h1>
+    <canvas id="myChart" width="400" height="200"></canvas>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Chart disponível:', typeof Chart !== 'undefined');
+        
+        if (typeof Chart !== 'undefined') {
+            console.log('Chart.js versão:', Chart.version);
+            
+            const ctx = document.getElementById('myChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['A', 'B', 'C'],
+                    datasets: [{
+                        data: [10, 20, 15],
+                        backgroundColor: '#667eea'
+                    }]
+                }
+            });
+            
+            document.getElementById('status').innerHTML = 'SUCESSO: Chart.js funcionando!';
+        } else {
+            document.getElementById('status').innerHTML = 'ERRO: Chart.js não carregou';
+        }
+    });
+    </script>
+    
+    <div id="status">Aguardando...</div>
+</body>
+</html>

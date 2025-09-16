@@ -25,6 +25,7 @@ python manage.py import_super_colunas_e_t [--dry-run] [--verbose]
 """
 
 import logging
+import re
 from datetime import datetime, date
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -32,7 +33,7 @@ from django.contrib.auth import get_user_model
 from django.utils.dateparse import parse_date, parse_datetime
 from core.models import (
     Formador, Municipio, Projeto, TipoEvento, Solicitacao, 
-    Usuario, Setor, SolicitacaoStatus
+    Usuario, Setor, SolicitacaoStatus, FormadoresSolicitacao
 )
 from core.services.google_sheets_service import google_sheets_service
 
@@ -42,6 +43,12 @@ class Command(BaseCommand):
     help = 'Importa colunas E-T da aba Super (linhas 1-1260)'
 
     def add_arguments(self, parser):
+        parser.add_argument(
+            '--spreadsheet-key',
+            type=str,
+            required=True,
+            help='ID da planilha Google (extraído da URL)'
+        )
         parser.add_argument(
             '--dry-run',
             action='store_true',
@@ -96,6 +103,26 @@ class Command(BaseCommand):
         self.logger.info(f"Novo formador criado: {nome_limpo}")
         return formador
 
+    def extrair_uf_do_nome(self, nome_municipio):
+        """
+        Extrai a UF do nome do município
+        Exemplos:
+        - "Antônio Gonçalves - BA" → "BA"
+        - "Araranguá - SC" → "SC"
+        - "Atibaia - SP" → "SP"
+        - "Chorozinho - CE" → "CE"
+        - "Amigos do Bem" → "CE" (padrão quando não tem UF no nome)
+        """
+        # Padrão para capturar UF no final do nome: " - XX"
+        padrao_uf = r'\s*-\s*([A-Z]{2})$'
+        match = re.search(padrao_uf, nome_municipio)
+        
+        if match:
+            return match.group(1)
+        else:
+            # Se não encontrar UF no nome, manter CE como padrão
+            return 'CE'
+
     def get_or_create_municipio(self, nome_municipio):
         """Busca ou cria um município pelo nome"""
         if not nome_municipio or nome_municipio.strip() == '' or nome_municipio.strip() == '-':
@@ -106,11 +133,12 @@ class Command(BaseCommand):
         try:
             return Municipio.objects.get(nome__iexact=nome_limpo)
         except Municipio.DoesNotExist:
+            uf_extraida = self.extrair_uf_do_nome(nome_limpo)
             municipio = Municipio.objects.create(
                 nome=nome_limpo,
-                uf='CE'  # Padrão Ceará
+                uf=uf_extraida
             )
-            self.logger.info(f"Novo município criado: {nome_limpo}")
+            self.logger.info(f"Novo município criado: {nome_limpo} (UF: {uf_extraida})")
             return municipio
 
     def get_or_create_projeto(self, nome_projeto):
@@ -185,7 +213,15 @@ class Command(BaseCommand):
         
         for formato in formatos:
             try:
-                return datetime.strptime(str(data_str).strip(), formato).date()
+                data_convertida = datetime.strptime(str(data_str).strip(), formato).date()
+                
+                # Validar se a data está no ano de 2025 (aceita datas futuras)
+                if data_convertida.year == 2025:
+                    return data_convertida
+                else:
+                    self.logger.debug(f"Data fora do ano 2025 ignorada: {data_str}")
+                    return None
+                    
             except ValueError:
                 continue
         
@@ -324,50 +360,68 @@ class Command(BaseCommand):
             self.logger.error(f"Erro processando linha {linha_num}: {e}")
             return None
 
-    def simular_dados_planilha(self):
-        """Simula dados da planilha para teste (substitui conexão real)"""
-        # Dados simulados baseados na estrutura real das colunas E-T
-        dados_exemplo = []
-        
-        # Simular algumas linhas de exemplo
-        for i in range(1, 11):  # Simular 10 linhas
-            linha = {
-                'E': ['Fortaleza', 'Caucaia', 'Sobral', 'Maracanaú', 'Juazeiro do Norte'][i % 5],
-                'F': ['Presencial', 'Híbrido', 'Online'][i % 3],
-                'G': ['Formação Continuada', 'Workshop', 'Seminário'][i % 3],
-                'H': f"{15+i}/01/2025",
-                'I': ['08:00', '09:00', '14:00'][i % 3],
-                'J': ['17:00', '12:00', '18:00'][i % 3],
-                'K': ['Alfabetização Baseada na Ciência', 'Matemática nos Anos Iniciais', 'Ciências da Natureza'][i % 3],
-                'L': ['Infantil', 'Fundamental I', 'Fundamental II'][i % 3],
-                'M': f'Coordenador {i}',
-                'N': f'Supervisor {i}',
-                'O': f'Maria Silva {i}',
-                'P': f'João Santos {i}' if i % 2 == 0 else '',
-                'Q': f'Ana Oliveira {i}' if i % 3 == 0 else '',
-                'R': '',
-                'S': '',
-                'T': f'Convidado {i}' if i % 4 == 0 else ''
-            }
-            dados_exemplo.append(linha)
-        
-        return dados_exemplo
+    def extrair_dados_google_sheets(self, spreadsheet_key):
+        """Extrai dados reais das colunas E-T da aba Super do Google Sheets"""
+        try:
+            self.logger.info(f"Conectando com Google Sheets: {spreadsheet_key}")
+            self.logger.info("Extraindo colunas E-T da aba 'Super' (linhas 1-1260)")
+            
+            # Usar o serviço real do Google Sheets
+            valores_raw = google_sheets_service.get_worksheet_range(
+                spreadsheet_key=spreadsheet_key,
+                range_name='E1:T1260',
+                worksheet_name='Super'
+            )
+            
+            if not valores_raw:
+                self.logger.error("Nenhum dado encontrado no range especificado")
+                return []
+            
+            self.logger.info(f"Dados extraídos: {len(valores_raw)} linhas")
+            
+            # Converter para formato de dicionário usando colunas como chaves
+            colunas = ['E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T']
+            dados_formatados = []
+            
+            for i, linha_raw in enumerate(valores_raw):
+                # Pular linha de cabeçalho se for a primeira linha
+                if i == 0:
+                    continue
+                    
+                # Garantir que a linha tenha 16 colunas (E até T)
+                linha_padded = linha_raw + [''] * (16 - len(linha_raw))
+                
+                # Criar dicionário da linha
+                linha_dict = {}
+                for j, coluna in enumerate(colunas):
+                    if j < len(linha_padded):
+                        linha_dict[coluna] = linha_padded[j]
+                    else:
+                        linha_dict[coluna] = ''
+                
+                dados_formatados.append(linha_dict)
+            
+            self.logger.info(f"Dados formatados: {len(dados_formatados)} registros válidos")
+            return dados_formatados
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao extrair dados do Google Sheets: {e}")
+            raise
 
-    def importar_aba_super_colunas_e_t(self, dry_run=False):
+    def importar_aba_super_colunas_e_t(self, spreadsheet_key, dry_run=False):
         """Importa dados das colunas E-T da aba Super"""
         try:
-            self.logger.info("Simulando conexão com Google Sheets (aba Super)...")
+            self.logger.info("Conectando com Google Sheets real (aba Super)...")
             self.logger.info("Foco: Colunas E-T, Linhas 1-1260")
             
-            # Por enquanto usar dados simulados devido ao problema de credenciais
-            # TODO: Substituir por conexão real quando credenciais estiverem funcionando
-            dados = self.simular_dados_planilha()
+            # Extrair dados reais do Google Sheets
+            dados = self.extrair_dados_google_sheets(spreadsheet_key)
             
             if not dados:
                 self.logger.error("Nenhum dado encontrado")
                 return
             
-            self.logger.info(f"Processando {len(dados)} registros da simulação")
+            self.logger.info(f"Processando {len(dados)} registros extraídos do Google Sheets")
             
             # Processar dados
             solicitacoes_criadas = 0
@@ -396,9 +450,12 @@ class Command(BaseCommand):
                             # Criar solicitação
                             solicitacao = Solicitacao.objects.create(**resultado['dados_solicitacao'])
                             
-                            # Adicionar formadores à solicitação
+                            # Criar relacionamentos FormadoresSolicitacao
                             for formador in resultado['formadores']:
-                                solicitacao.formadores.add(formador)
+                                FormadoresSolicitacao.objects.create(
+                                    solicitacao=solicitacao,
+                                    formador=formador
+                                )
                             
                             solicitacoes_criadas += 1
                             
@@ -452,8 +509,10 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.setup_logging(options['verbose'])
         
+        spreadsheet_key = options['spreadsheet_key']
+        
         self.logger.info("Iniciando importação das colunas E-T da aba Super")
-        self.logger.info("Planilha: Acompanhamento de Agenda | 2025")
+        self.logger.info(f"Planilha Google Sheets: {spreadsheet_key}")
         self.logger.info("Foco: Colunas E (Municípios) até T (Convidados)")
         self.logger.info("Intervalo: Linhas 1 até 1260")
         
@@ -461,7 +520,10 @@ class Command(BaseCommand):
             self.logger.info("MODO DRY-RUN: Apenas simulação, nada será salvo")
         
         try:
-            self.importar_aba_super_colunas_e_t(dry_run=options['dry_run'])
+            self.importar_aba_super_colunas_e_t(
+                spreadsheet_key=spreadsheet_key,
+                dry_run=options['dry_run']
+            )
             self.logger.info("Importação das colunas E-T concluída com sucesso!")
             
         except Exception as e:

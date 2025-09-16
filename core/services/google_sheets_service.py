@@ -255,6 +255,47 @@ class GoogleSheetsService:
             logger.error(f"Error listing spreadsheets: {e}")
             return []
     
+    def get_worksheet_range(
+        self, 
+        spreadsheet_key: str, 
+        range_name: str,
+        worksheet_name: str = None
+    ) -> List[List[str]]:
+        """
+        Obtém dados de um range específico da planilha
+        
+        Args:
+            spreadsheet_key: ID da planilha (da URL)
+            range_name: Range no formato A1 (ex: 'E1:T1260')
+            worksheet_name: Nome da aba (opcional)
+            
+        Returns:
+            Lista de listas com os dados do range
+        """
+        try:
+            client = self._get_client()
+            spreadsheet = client.open_by_key(spreadsheet_key)
+            
+            # Selecionar worksheet
+            if worksheet_name:
+                worksheet = spreadsheet.worksheet(worksheet_name)
+            else:
+                worksheet = spreadsheet.get_worksheet(0)
+            
+            # Obter valores do range especificado
+            values = worksheet.get(range_name)
+            
+            logger.info(
+                f"Retrieved range {range_name} from {spreadsheet.title} / "
+                f"{worksheet.title}: {len(values)} rows"
+            )
+            
+            return values
+            
+        except Exception as e:
+            logger.error(f"Error retrieving range {range_name}: {e}")
+            raise
+
     def get_spreadsheet_info(self, spreadsheet_key: str) -> Dict[str, Any]:
         """Obtém informações sobre uma planilha"""
         try:

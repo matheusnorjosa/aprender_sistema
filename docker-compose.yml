@@ -102,9 +102,27 @@ services:
     networks:
       - aprender_network
 
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: aprender_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "8080:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - aprender_network
+
 volumes:
   postgres_data:
   mcp_logs:
+  pgadmin_data:
 
 networks:
   aprender_network:

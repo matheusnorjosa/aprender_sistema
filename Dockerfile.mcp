@@ -8,6 +8,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     postgresql-client \
     curl \
+    gcc \
+    python3-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar requirements básicos para MCP
@@ -23,7 +26,8 @@ RUN pip install --no-cache-dir \
     claude-code-sdk \
     pydantic>=2.0.0 \
     asyncio-mqtt \
-    websockets
+    websockets \
+    aiohttp==3.8.6
 
 # Copiar código da aplicação
 COPY . .

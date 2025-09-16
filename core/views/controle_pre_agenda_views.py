@@ -7,6 +7,7 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from core.mixins import SuperintendenciaSetorRequiredMixin
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
@@ -24,7 +25,7 @@ from core.models import (
 )
 
 
-class ControlePreAgendaView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+class ControlePreAgendaView(LoginRequiredMixin, SuperintendenciaSetorRequiredMixin, ListView):
     """
     Página principal de pré-agenda para o grupo Controle.
     Lista todos os eventos com status PRE_AGENDA para criação manual no Google Calendar.

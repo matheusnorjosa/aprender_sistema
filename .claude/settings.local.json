@@ -2,7 +2,10 @@
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
-      "Bash(ENVIRONMENT=staging DB_HOST=localhost DB_PORT=5433 DB_NAME=aprender_sistema_db DB_USER=adm_aprender DB_PASSWORD=aprender123456 python test_dashboard_final.py)"
+      "Bash(ENVIRONMENT=staging DB_HOST=localhost DB_PORT=5433 DB_NAME=aprender_sistema_db DB_USER=adm_aprender DB_PASSWORD=aprender123456 python test_dashboard_final.py)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm install:*)",
+      "Bash(codex login)"
     ],
     "deny": [],
     "ask": []

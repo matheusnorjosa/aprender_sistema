@@ -33,7 +33,7 @@ class DiretoriaExecutiveDashboardView(
         data_limite_trimestre = agora - timedelta(days=90)
         
         # Query base com filtros
-        query_base = Solicitacao.objects.filter(data_solicitacao__gte=data_inicio)
+        query_base = Solicitacao.objects.filter(data_inicio__gte=data_inicio)
         if municipio_filtro:
             query_base = query_base.filter(municipio__nome=municipio_filtro)
 
@@ -54,7 +54,7 @@ class DiretoriaExecutiveDashboardView(
         eventos_por_mes = (
             query_base
             .filter(status=SolicitacaoStatus.APROVADO)
-            .annotate(mes=TruncMonth('data_solicitacao'))
+            .annotate(mes=TruncMonth('data_inicio'))
             .values('mes')
             .annotate(eventos=Count('id'))
             .order_by('mes')
@@ -76,7 +76,7 @@ class DiretoriaExecutiveDashboardView(
         top_formadores = (
             formadores_query
             .filter(
-                solicitacao__data_solicitacao__gte=data_inicio,
+                solicitacao__data_inicio__gte=data_inicio,
                 solicitacao__status=SolicitacaoStatus.APROVADO
             )
             .values('formador__nome')
@@ -88,7 +88,7 @@ class DiretoriaExecutiveDashboardView(
         for formador in top_formadores:
             formadores_formatados.append({
                 'nome': formador['formador__nome'],
-                'area': 'Formação',  # Você pode ajustar se tiver campo de área
+                'area': formador.get('formador__area_atuacao__name', 'Formação'),
                 'eventos': formador['eventos']
             })
 
@@ -97,7 +97,7 @@ class DiretoriaExecutiveDashboardView(
             Solicitacao.objects
             .select_related('municipio')
             .filter(
-                data_solicitacao__gte=data_limite_trimestre,
+                data_inicio__gte=data_limite_trimestre,
                 status=SolicitacaoStatus.APROVADO
             )
             .values('municipio__nome', 'municipio__uf')
@@ -110,7 +110,7 @@ class DiretoriaExecutiveDashboardView(
             Solicitacao.objects
             .select_related('tipo_evento')
             .filter(
-                data_solicitacao__gte=data_inicio_ano,
+                data_inicio__gte=data_inicio_ano,
                 status=SolicitacaoStatus.APROVADO
             )
             .values('tipo_evento__nome')
@@ -123,7 +123,7 @@ class DiretoriaExecutiveDashboardView(
             Solicitacao.objects
             .select_related('projeto')
             .filter(
-                data_solicitacao__gte=data_limite_trimestre,
+                data_inicio__gte=data_limite_trimestre,
                 status=SolicitacaoStatus.APROVADO
             )
             .values('projeto__nome')
@@ -136,7 +136,7 @@ class DiretoriaExecutiveDashboardView(
             Solicitacao.objects
             .select_related('municipio')
             .filter(
-                data_solicitacao__gte=data_inicio,
+                data_inicio__gte=data_inicio,
                 status=SolicitacaoStatus.APROVADO
             )
             .values('municipio__nome', 'municipio__uf')
@@ -200,10 +200,10 @@ class DiretoriaIntegratedDashboardView(
 
         # Métricas principais (mesmo código da view original)
         total_solicitacoes_ano = Solicitacao.objects.filter(
-            data_solicitacao__gte=data_inicio_ano
+            data_inicio__gte=data_inicio_ano
         ).count()
         solicitacoes_aprovadas_ano = Solicitacao.objects.filter(
-            data_solicitacao__gte=data_inicio_ano, status=SolicitacaoStatus.APROVADO
+            data_inicio__gte=data_inicio_ano, status=SolicitacaoStatus.APROVADO
         ).count()
         taxa_aprovacao_ano = round(
             (
@@ -258,10 +258,10 @@ class DiretoriaAPIMetricsView(LoginRequiredMixin, PermissionRequiredMixin, View)
 
         metrics = {
             "solicitacoes_mes": Solicitacao.objects.filter(
-                data_solicitacao__gte=data_limite
+                data_inicio__gte=data_limite
             ).count(),
             "aprovacoes_mes": Solicitacao.objects.filter(
-                data_solicitacao__gte=data_limite, status=SolicitacaoStatus.APROVADO
+                data_inicio__gte=data_limite, status=SolicitacaoStatus.APROVADO
             ).count(),
         }
         return JsonResponse(metrics)
@@ -305,8 +305,8 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
         
         eventos_por_mes = (
             Solicitacao.objects
-            .filter(data_solicitacao__gte=inicio_ano)
-            .annotate(mes=TruncMonth('data_solicitacao'))
+            .filter(data_inicio__gte=inicio_ano)
+            .annotate(mes=TruncMonth('data_inicio'))
             .values('mes')
             .annotate(
                 total=Count('id'),
@@ -345,7 +345,7 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
             FormadoresSolicitacao.objects
             .select_related('formador', 'formador__area_atuacao', 'solicitacao')
             .filter(
-                solicitacao__data_solicitacao__gte=tres_meses_atras,
+                solicitacao__data_inicio__gte=tres_meses_atras,
                 solicitacao__status=SolicitacaoStatus.APROVADO
             )
             .values('formador__nome', 'formador__area_atuacao__name')
@@ -357,7 +357,7 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
         for formador in formadores:
             data.append({
                 'nome': formador['formador__nome'],
-                'area': formador['formador__area_atuacao__name'] or 'Sem área',
+                'area': formador.get('formador__area_atuacao__name', 'Formação'),
                 'eventos': formador['eventos']
             })
         
@@ -374,7 +374,7 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
             Solicitacao.objects
             .select_related('projeto__setor')
             .filter(
-                data_solicitacao__gte=inicio_ano,
+                data_inicio__gte=inicio_ano,
                 status=SolicitacaoStatus.APROVADO
             )
             .values('projeto__setor__nome', 'projeto__setor__sigla')
@@ -402,7 +402,7 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
             Solicitacao.objects
             .select_related('municipio')
             .filter(
-                data_solicitacao__gte=tres_meses_atras,
+                data_inicio__gte=tres_meses_atras,
                 status=SolicitacaoStatus.APROVADO
             )
             .values('municipio__nome', 'municipio__uf')
@@ -430,7 +430,7 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
             Solicitacao.objects
             .select_related('tipo_evento')
             .filter(
-                data_solicitacao__gte=inicio_ano,
+                data_inicio__gte=inicio_ano,
                 status=SolicitacaoStatus.APROVADO
             )
             .values('tipo_evento__nome')
@@ -457,7 +457,7 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
             Solicitacao.objects
             .select_related('projeto')
             .filter(
-                data_solicitacao__gte=tres_meses_atras,
+                data_inicio__gte=tres_meses_atras,
                 status=SolicitacaoStatus.APROVADO
             )
             .values('projeto__nome')

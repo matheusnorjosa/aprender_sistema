@@ -50,7 +50,7 @@ from .views.api_notifications import (
     RealtimeNotificationsAPI,
     UserNotificationsAPI,
 )
-from .views_calendar import MapaMensalPageView, MapaMensalView
+from .views_calendar import MapaMensalPageView, MapaMensalView, FormadoresSuperintendenciaView
 from .views.deslocamento_views import (
     DeslocamentoListView,
     DeslocamentoCreateView,
@@ -219,7 +219,7 @@ urlpatterns = [
     ),
     path(
         "api/formadores-superintendencia/",
-        FormadoresSuperintendenciaAPI.as_view(),
+        FormadoresSuperintendenciaView.as_view(),
         name="formadores_superintendencia_api",
     ),
     # APIs para sistema de aprovação avançado

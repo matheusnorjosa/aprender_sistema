@@ -286,7 +286,12 @@
       try {
         selectFormador.innerHTML = '<option value="">Carregando...</option>';
         
-        const res = await fetch('/api/formadores-superintendencia/');
+        const res = await fetch('/api/formadores-superintendencia/', {
+          credentials: 'same-origin',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        });
         if (!res.ok) throw new Error('Erro ao carregar formadores');
         
         const data = await res.json();
@@ -305,7 +310,7 @@
             option.dataset.id = formador.id;
             option.dataset.email = formador.email;
             option.dataset.area = formador.area_atuacao || 'Não informado';
-            option.dataset.ativo = formador.usuario_ativo ? 'Ativo' : 'Inativo';
+            option.dataset.ativo = formador.status;
             selectFormador.appendChild(option);
           });
         } else {

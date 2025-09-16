@@ -419,9 +419,11 @@
           <a href="{% url 'core:home' %}" class="nav-item {% block nav_home %}{% endblock %}">
             <i class="bi bi-house"></i> Início
           </a>
+          {% if user.is_superuser or user.setor.vinculado_superintendencia|default:False %}
           <a href="/disponibilidade/" class="nav-item {% block nav_mapa %}{% endblock %}">
             <i class="bi bi-calendar-check"></i> Mapa Mensal
           </a>
+          {% endif %}
         </div>
 
         <!-- Operações por papel -->
@@ -450,7 +452,7 @@
         {% endif %}
         
 
-        {% if perms.core.view_aprovacao or user.is_superuser %}
+        {% if user.is_superuser or user.setor.vinculado_superintendencia|default:False %}
         <div class="nav-section">
           <div class="nav-section-title">Superintendência</div>
           <a href="/aprovacoes/pendentes/" class="nav-item {% block nav_aprovacoes %}{% endblock %}">
@@ -462,7 +464,7 @@
         </div>
         {% endif %}
 
-        {% if perms.core.sync_calendar or user.is_superuser %}
+        {% if user.is_superuser or user.setor.vinculado_superintendencia|default:False %}
         <div class="nav-section">
           <div class="nav-section-title">Controle</div>
           <a href="{% url 'core:controle_pre_agenda' %}" class="nav-item {% block nav_controle_pre_agenda %}{% endblock %}">
@@ -492,9 +494,11 @@
           <a href="{% url 'core:diretoria_relatorios' %}" class="nav-item {% block nav_diretoria_relatorios %}{% endblock %}">
             <i class="bi bi-file-earmark-bar-graph"></i> Relatórios Consolidados
           </a>
+          {% if user.is_superuser or user.setor.vinculado_superintendencia|default:False %}
           <a href="/disponibilidade/" class="nav-item {% block nav_diretoria_calendar %}{% endblock %}">
             <i class="bi bi-calendar-month"></i> Visão Mensal
           </a>
+          {% endif %}
           <a href="{% url 'core:diretoria_api_metrics' %}" class="nav-item {% block nav_diretoria_api %}{% endblock %}">
             <i class="bi bi-file-earmark-code"></i> Métricas API
           </a>

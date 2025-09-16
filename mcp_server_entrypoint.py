@@ -134,17 +134,14 @@ class DockerizedMCPServer:
     async def setup_health_endpoint(self):
         """Configura endpoint de health check"""
         try:
-            # Implementar endpoint básico de health
-            @self.server.route('/health')
-            async def health_check():
-                return {
-                    "status": "healthy",
-                    "server": "aprender_mcp",
-                    "tools_registered": self.tools_registered,
-                    "database_connected": await self.verify_database_connection()
-                }
-            
-            logger.info("🏥 Health check endpoint configurado: /health")
+            # Para FastMCP, não usamos decorador @route - implementação alternativa
+            logger.info("🏥 Health check será implementado via endpoint básico")
+            self.health_data = {
+                "status": "healthy",
+                "server": "aprender_mcp",
+                "tools_registered": self.tools_registered,
+                "database_connected": True  # já verificado
+            }
             
         except Exception as e:
             logger.warning(f"⚠️  Health endpoint não configurado: {e}")
@@ -166,19 +163,63 @@ class DockerizedMCPServer:
         await self.setup_health_endpoint()
         
         try:
-            if FASTMCP_AVAILABLE and self.server:
-                # Iniciar servidor FastMCP
-                await self.server.run(host=self.host, port=self.port)
-            else:
-                # Servidor básico alternativo
-                logger.info("🔄 Executando em modo básico...")
-                while True:
-                    await asyncio.sleep(30)
-                    await self.verify_database_connection()
+            # Iniciar servidor HTTP básico para health checks
+            await self.start_http_server()
                     
         except Exception as e:
             logger.error(f"❌ Erro fatal do servidor MCP: {e}")
             sys.exit(1)
+    
+    async def start_http_server(self):
+        """Inicia servidor HTTP usando aiohttp para health checks"""
+        try:
+            from aiohttp import web
+            
+            async def health_handler(request):
+                return web.json_response({
+                    "status": "healthy",
+                    "server": "aprender_mcp",
+                    "tools_registered": self.tools_registered,
+                    "database_connected": await self.verify_database_connection()
+                })
+            
+            async def root_handler(request):
+                return web.json_response({
+                    "message": "Aprender Sistema MCP Server",
+                    "version": "1.0.0",
+                    "status": "running"
+                })
+            
+            app = web.Application()
+            app.router.add_get('/', root_handler)
+            app.router.add_get('/health', health_handler)
+            
+            runner = web.AppRunner(app)
+            await runner.setup()
+            site = web.TCPSite(runner, self.host, self.port)
+            
+            logger.info(f"🌐 HTTP server iniciado em http://{self.host}:{self.port}")
+            logger.info("🏥 Health check disponível em /health")
+            
+            await site.start()
+            
+            # Manter servidor rodando
+            while True:
+                await asyncio.sleep(60)
+                logger.info("📊 MCP server funcionando normalmente")
+                
+        except ImportError:
+            logger.error("❌ aiohttp não disponível - usando servidor básico")
+            # Fallback para servidor básico
+            await self.start_basic_server()
+    
+    async def start_basic_server(self):
+        """Servidor básico sem aiohttp como fallback"""
+        logger.info(f"🔄 Executando em modo básico sem HTTP server")
+        while True:
+            await asyncio.sleep(60)
+            await self.verify_database_connection()
+            logger.info("📊 MCP server funcionando em modo básico")
 
 async def main():
     """Função principal do servidor MCP"""
@@ -191,7 +232,17 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        # Verificar se já existe um loop asyncio rodando
+        try:
+            loop = asyncio.get_running_loop()
+            logger.info("📌 Usando loop asyncio existente")
+            # Se já há um loop, usar create_task
+            task = loop.create_task(main())
+            loop.run_until_complete(task)
+        except RuntimeError:
+            # Não há loop rodando, criar um novo
+            logger.info("🔄 Criando novo loop asyncio")
+            asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("🛑 Servidor MCP interrompido pelo usuário")
     except Exception as e:

@@ -1,8 +1,8 @@
 """
-Comando Django para importar especificamente as colunas E-T da aba 'Super'
+Comando Django para importar especificamente as colunas E-T da aba 'Outros'
 da planilha Acompanhamento de Agenda | 2025 (linhas 1-1260)
 
-Estrutura das colunas baseada na imagem fornecida:
+Estrutura das colunas baseada na mesma estrutura da aba Super:
 E: Municípios
 F: encontro (tipo de encontro)
 G: tipo (tipo de evento)
@@ -21,7 +21,7 @@ S: Formador 5
 T: Convidados
 
 Uso:
-python manage.py import_super_colunas_e_t [--dry-run] [--verbose]
+python manage.py import_outros_colunas_e_t --spreadsheet-key=<ID> [--dry-run] [--verbose]
 """
 
 import logging
@@ -40,7 +40,7 @@ from core.services.google_sheets_service import google_sheets_service
 User = get_user_model()
 
 class Command(BaseCommand):
-    help = 'Importa colunas E-T da aba Super (linhas 1-1260)'
+    help = 'Importa colunas E-T da aba Outros (linhas 1-1260)'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -94,7 +94,7 @@ class Command(BaseCommand):
         # Buscar ou criar grupo padrão para formadores importados
         grupo_formador, created = Group.objects.get_or_create(name='formador')
         
-        email_formador = f"{nome_limpo.lower().replace(' ', '.').replace('ã', 'a').replace('ç', 'c')}@planilha.super"
+        email_formador = f"{nome_limpo.lower().replace(' ', '.').replace('ã', 'a').replace('ç', 'c')}@planilha.outros"
         formador = Formador.objects.create(
             nome=nome_limpo,
             email=email_formador,
@@ -164,9 +164,9 @@ class Command(BaseCommand):
             
             projeto = Projeto.objects.create(
                 nome=nome_limpo,
-                descricao=f'Projeto importado da aba Super: {nome_limpo}',
+                descricao=f'Projeto importado da aba Outros: {nome_limpo}',
                 setor=setor_default,
-                vinculado_superintendencia=True,  # Aba Super são eventos aprovados
+                vinculado_superintendencia=True,  # Aba Outros são eventos aprovados
                 ativo=True,
                 codigo_produto="SEM_COD",
                 tipo_produto="FORMACAO"
@@ -228,10 +228,10 @@ class Command(BaseCommand):
         self.logger.warning(f"Não foi possível converter data: {data_str}")
         return None
 
-    def processar_linha_super(self, linha, linha_num):
-        """Processa uma linha da aba Super focando nas colunas E-T"""
+    def processar_linha_outros(self, linha, linha_num):
+        """Processa uma linha da aba Outros focando nas colunas E-T"""
         try:
-            # Mapear colunas E-T baseado na imagem
+            # Mapear colunas E-T baseado na mesma estrutura da aba Super
             municipio_nome = linha.get('E', '').strip() if linha.get('E') else ''
             tipo_encontro = linha.get('F', '').strip() if linha.get('F') else ''
             tipo_evento = linha.get('G', '').strip() if linha.get('G') else ''
@@ -254,13 +254,28 @@ class Command(BaseCommand):
                 self.logger.debug(f"Linha {linha_num}: Data inválida ou vazia, pulando")
                 return None
                 
-            if not any([formador1_nome, formador2_nome, formador3_nome, formador4_nome, formador5_nome]):
-                self.logger.debug(f"Linha {linha_num}: Nenhum formador especificado, pulando")
-                return None
-
+            # Para aba Outros, aceitar se tiver pelo menos município OU projeto
             if not municipio_nome and not projeto_nome:
                 self.logger.debug(f"Linha {linha_num}: Sem município nem projeto, pulando")
                 return None
+                
+            # REGRA DE NEGÓCIO DA ABA OUTROS:
+            # 1. Se projeto é IDEB10 ou IDEB10 - ESQUENTA SAEB → Formadora: "Analine Parente"
+            # 2. Caso contrário → Coordenador (coluna N) é o formador
+            
+            tem_formadores_especificos = any([formador1_nome, formador2_nome, formador3_nome, formador4_nome, formador5_nome])
+            
+            if not tem_formadores_especificos:
+                # Aplicar regra de negócio da aba Outros
+                if projeto_nome and ('IDEB10' in projeto_nome.upper()):
+                    formador1_nome = "Analine Parente"
+                    self.logger.debug(f"Linha {linha_num}: Projeto IDEB10 detectado, usando Analine Parente como formadora")
+                elif coordenador:
+                    formador1_nome = coordenador
+                    self.logger.debug(f"Linha {linha_num}: Usando coordenador '{coordenador}' como formador")
+                else:
+                    self.logger.debug(f"Linha {linha_num}: Sem coordenador nem projeto IDEB10, pulando")
+                    return None
 
             # Buscar/criar entidades relacionadas
             municipio = self.get_or_create_municipio(municipio_nome)
@@ -275,6 +290,7 @@ class Command(BaseCommand):
                     if formador:
                         formadores.append(formador)
 
+            # Validar se conseguimos obter pelo menos um formador
             if not formadores:
                 self.logger.debug(f"Linha {linha_num}: Não foi possível criar/encontrar formadores")
                 return None
@@ -300,9 +316,9 @@ class Command(BaseCommand):
             if convidados:
                 observacoes_partes.append(f"Convidados: {convidados}")
             
-            observacoes_completas = " | ".join(observacoes_partes) if observacoes_partes else "Importado da aba Super (colunas E-T)"
+            observacoes_completas = " | ".join(observacoes_partes) if observacoes_partes else "Importado da aba Outros (colunas E-T)"
 
-            # Status como aprovado (aba Super contém eventos aprovados)
+            # Status como aprovado (aba Outros contém eventos aprovados)
             status = SolicitacaoStatus.APROVADO
 
             # Converter data e horários para o formato correto do modelo
@@ -361,16 +377,16 @@ class Command(BaseCommand):
             return None
 
     def extrair_dados_google_sheets(self, spreadsheet_key):
-        """Extrai dados reais das colunas E-T da aba Super do Google Sheets"""
+        """Extrai dados reais das colunas E-T da aba Outros do Google Sheets"""
         try:
             self.logger.info(f"Conectando com Google Sheets: {spreadsheet_key}")
-            self.logger.info("Extraindo colunas E-T da aba 'Super' (linhas 1-1260)")
+            self.logger.info("Extraindo colunas E-T da aba 'Outros' (linhas 1-1260)")
             
             # Usar o serviço real do Google Sheets
             valores_raw = google_sheets_service.get_worksheet_range(
                 spreadsheet_key=spreadsheet_key,
                 range_name='E1:T1260',
-                worksheet_name='Super'
+                worksheet_name='Outros'
             )
             
             if not valores_raw:
@@ -408,10 +424,10 @@ class Command(BaseCommand):
             self.logger.error(f"Erro ao extrair dados do Google Sheets: {e}")
             raise
 
-    def importar_aba_super_colunas_e_t(self, spreadsheet_key, dry_run=False):
-        """Importa dados das colunas E-T da aba Super"""
+    def importar_aba_outros_colunas_e_t(self, spreadsheet_key, dry_run=False):
+        """Importa dados das colunas E-T da aba Outros"""
         try:
-            self.logger.info("Conectando com Google Sheets real (aba Super)...")
+            self.logger.info("Conectando com Google Sheets real (aba Outros)...")
             self.logger.info("Foco: Colunas E-T, Linhas 1-1260")
             
             # Extrair dados reais do Google Sheets
@@ -431,7 +447,7 @@ class Command(BaseCommand):
             projetos_criados = 0
             
             for i, linha in enumerate(dados, start=1):
-                resultado = self.processar_linha_super(linha, i)
+                resultado = self.processar_linha_outros(linha, i)
                 
                 if not resultado:
                     erros += 1
@@ -467,7 +483,7 @@ class Command(BaseCommand):
 
             # Relatório final
             self.logger.info("=" * 70)
-            self.logger.info("RELATÓRIO FINAL - IMPORTAÇÃO ABA SUPER (COLUNAS E-T)")
+            self.logger.info("RELATÓRIO FINAL - IMPORTAÇÃO ABA OUTROS (COLUNAS E-T)")
             self.logger.info("=" * 70)
             self.logger.info(f"Total de registros processados: {len(dados)}")
             self.logger.info(f"Solicitações criadas: {solicitacoes_criadas}")
@@ -481,7 +497,7 @@ class Command(BaseCommand):
             # Salvar dados tratados em arquivo JSON para análise
             dados_tratados = []
             for i, linha in enumerate(dados, start=1):
-                resultado = self.processar_linha_super(linha, i)
+                resultado = self.processar_linha_outros(linha, i)
                 if resultado:
                     dados_tratados.append({
                         'linha': i,
@@ -495,7 +511,7 @@ class Command(BaseCommand):
                     })
             
             import json
-            arquivo_saida = 'dados_planilhas_originais/super_colunas_e_t_tratados.json'
+            arquivo_saida = 'dados_planilhas_originais/outros_colunas_e_t_tratados.json'
             with open(arquivo_saida, 'w', encoding='utf-8') as f:
                 json.dump(dados_tratados, f, indent=2, ensure_ascii=False, default=str)
             
@@ -511,7 +527,7 @@ class Command(BaseCommand):
         
         spreadsheet_key = options['spreadsheet_key']
         
-        self.logger.info("Iniciando importação das colunas E-T da aba Super")
+        self.logger.info("Iniciando importação das colunas E-T da aba Outros")
         self.logger.info(f"Planilha Google Sheets: {spreadsheet_key}")
         self.logger.info("Foco: Colunas E (Municípios) até T (Convidados)")
         self.logger.info("Intervalo: Linhas 1 até 1260")
@@ -520,11 +536,11 @@ class Command(BaseCommand):
             self.logger.info("MODO DRY-RUN: Apenas simulação, nada será salvo")
         
         try:
-            self.importar_aba_super_colunas_e_t(
+            self.importar_aba_outros_colunas_e_t(
                 spreadsheet_key=spreadsheet_key,
                 dry_run=options['dry_run']
             )
-            self.logger.info("Importação das colunas E-T concluída com sucesso!")
+            self.logger.info("Importação das colunas E-T da aba Outros concluída com sucesso!")
             
         except Exception as e:
             raise CommandError(f"Erro durante a importação: {e}")

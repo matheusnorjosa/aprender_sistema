@@ -1,0 +1,3780 @@
+[
+  {
+    "linha": 1,
+    "data_evento": "22/02/2025",
+    "municipio": "Serra do Salitre - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Fabrícia Santos",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Serra do Salitre - MG/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Serra do Salitre - MG",
+      "data_inicio": "2025-02-22 07:00:00-03:00",
+      "data_fim": "2025-02-22 17:00:00-03:00",
+      "observacoes": "Segmento: Gleice Anne | Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Gleice Anne | Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 2,
+    "data_evento": "13/03/2025",
+    "municipio": "Tarrafas - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Tarrafas - CE/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Tarrafas - CE",
+      "data_inicio": "2025-03-13 08:00:00-03:00",
+      "data_fim": "2025-03-13 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 3,
+    "data_evento": "28/02/2025",
+    "municipio": "Florestal - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Florestal - MG/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Florestal - MG",
+      "data_inicio": "2025-02-28 08:00:00-03:00",
+      "data_fim": "2025-02-28 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 4,
+    "data_evento": "21/02/2025",
+    "municipio": "Uiraúna - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Auxiliadora"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Uiraúna - PB/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Uiraúna - PB",
+      "data_inicio": "2025-02-21 08:00:00-03:00",
+      "data_fim": "2025-02-21 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 5,
+    "data_evento": "18/03/2025",
+    "municipio": "Catolé do Rocha - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Joelma"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Catolé do Rocha - PB/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Catolé do Rocha - PB",
+      "data_inicio": "2025-03-18 16:00:00-03:00",
+      "data_fim": "2025-03-18 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 6,
+    "data_evento": "26/03/2025",
+    "municipio": "Mucambo - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Maria Joelma"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mucambo - CE/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Mucambo - CE",
+      "data_inicio": "2025-03-26 08:00:00-03:00",
+      "data_fim": "2025-03-26 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 7,
+    "data_evento": "27/03/2025",
+    "municipio": "Mucambo - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Maria Joelma"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mucambo - CE/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Mucambo - CE",
+      "data_inicio": "2025-03-27 08:00:00-03:00",
+      "data_fim": "2025-03-27 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 8,
+    "data_evento": "01/04/2025",
+    "municipio": "Petrolina - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Petrolina - PE/CE",
+      "tipo_evento": "1 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Petrolina - PE",
+      "data_inicio": "2025-04-01 08:00:00-03:00",
+      "data_fim": "2025-04-01 12:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 9,
+    "data_evento": "02/04/2025",
+    "municipio": "Petrolina - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Petrolina - PE/CE",
+      "tipo_evento": "1 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Petrolina - PE",
+      "data_inicio": "2025-04-02 09:00:00-03:00",
+      "data_fim": "2025-04-02 13:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 10,
+    "data_evento": "09/04/2025",
+    "municipio": "Petrolina - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Leidiane",
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Petrolina - PE/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Petrolina - PE",
+      "data_inicio": "2025-04-09 08:00:00-03:00",
+      "data_fim": "2025-04-09 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,leidianesousa554@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,leidianesousa554@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 11,
+    "data_evento": "10/04/2025",
+    "municipio": "Petrolina - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Leidiane",
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Petrolina - PE/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Petrolina - PE",
+      "data_inicio": "2025-04-10 08:00:00-03:00",
+      "data_fim": "2025-04-10 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,leidianesousa554@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,leidianesousa554@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 12,
+    "data_evento": "09/04/2025",
+    "municipio": "Florestal - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Anna Patrícia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Florestal - MG/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Florestal - MG",
+      "data_inicio": "2025-04-09 17:00:00-03:00",
+      "data_fim": "2025-04-09 20:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 13,
+    "data_evento": "15/04/2025",
+    "municipio": "Serra do Salitre - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Serra do Salitre - MG/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Serra do Salitre - MG",
+      "data_inicio": "2025-04-15 18:00:00-03:00",
+      "data_fim": "2025-04-15 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 14,
+    "data_evento": "25/04/2025",
+    "municipio": "Uiraúna - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Presencial",
+    "formadores": [
+      "Maria Auxiliadora",
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Uiraúna - PB/CE",
+      "tipo_evento": "2 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Uiraúna - PB",
+      "data_inicio": "2025-04-25 08:00:00-03:00",
+      "data_fim": "2025-04-25 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: professoraauxiliadora.uece@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: professoraauxiliadora.uece@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 15,
+    "data_evento": "25/04/2025",
+    "municipio": "Tarrafas - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Tarrafas - CE/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Tarrafas - CE",
+      "data_inicio": "2025-04-25 13:00:00-03:00",
+      "data_fim": "2025-04-25 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 16,
+    "data_evento": "24/04/2025",
+    "municipio": "Lagoa Grande - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Anna Patrícia",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Lagoa Grande - PE/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Lagoa Grande - PE",
+      "data_inicio": "2025-04-24 08:00:00-03:00",
+      "data_fim": "2025-04-24 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,annapatricia.ssmartins@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,annapatricia.ssmartins@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 17,
+    "data_evento": "03/04/2025",
+    "municipio": "Canavieiras - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Fabrícia Santos",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Canavieiras - BA/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Canavieiras - BA",
+      "data_inicio": "2025-04-03 08:00:00-03:00",
+      "data_fim": "2025-04-03 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 18,
+    "data_evento": "15/04/2025",
+    "municipio": "Catolé do Rocha - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Anna Patrícia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Catolé do Rocha - PB/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Catolé do Rocha - PB",
+      "data_inicio": "2025-04-15 17:00:00-03:00",
+      "data_fim": "2025-04-15 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 19,
+    "data_evento": "06/05/2025",
+    "municipio": "Catolé do Rocha - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Presencial",
+    "formadores": [
+      "Maria Joelma",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Catolé do Rocha - PB/CE",
+      "tipo_evento": "2 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Catolé do Rocha - PB",
+      "data_inicio": "2025-05-06 16:30:00-03:00",
+      "data_fim": "2025-05-06 20:30:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 20,
+    "data_evento": "08/05/2025",
+    "municipio": "Canavieiras - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Anna Patrícia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Canavieiras - BA/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Canavieiras - BA",
+      "data_inicio": "2025-05-08 13:00:00-03:00",
+      "data_fim": "2025-05-08 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 21,
+    "data_evento": "26/05/2025",
+    "municipio": "Uiraúna - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Isabel Kerssia",
+      "Maria Auxiliadora"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Uiraúna - PB/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Uiraúna - PB",
+      "data_inicio": "2025-05-26 08:00:00-03:00",
+      "data_fim": "2025-05-26 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: isabel15kerssia@gmail.com,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: isabel15kerssia@gmail.com,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 22,
+    "data_evento": "27/05/2025",
+    "municipio": "Uiraúna - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Isabel Kerssia",
+      "Maria Auxiliadora"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Uiraúna - PB/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Uiraúna - PB",
+      "data_inicio": "2025-05-27 08:00:00-03:00",
+      "data_fim": "2025-05-27 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: isabel15kerssia@gmail.com,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: isabel15kerssia@gmail.com,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 23,
+    "data_evento": "29/05/2025",
+    "municipio": "Serra do Salitre - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Serra do Salitre - MG/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Serra do Salitre - MG",
+      "data_inicio": "2025-05-29 18:00:00-03:00",
+      "data_fim": "2025-05-29 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 24,
+    "data_evento": "17/05/2025",
+    "municipio": "Florestal - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Anna Patrícia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Florestal - MG/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Florestal - MG",
+      "data_inicio": "2025-05-17 08:00:00-03:00",
+      "data_fim": "2025-05-17 12:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 25,
+    "data_evento": "15/05/2025",
+    "municipio": "Florestal - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Florestal - MG/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Florestal - MG",
+      "data_inicio": "2025-05-15 08:00:00-03:00",
+      "data_fim": "2025-05-15 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 26,
+    "data_evento": "16/05/2025",
+    "municipio": "Florestal - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Florestal - MG/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Florestal - MG",
+      "data_inicio": "2025-05-16 08:00:00-03:00",
+      "data_fim": "2025-05-16 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 27,
+    "data_evento": "23/05/2025",
+    "municipio": "Tarrafas - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Tarrafas - CE/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Tarrafas - CE",
+      "data_inicio": "2025-05-23 13:00:00-03:00",
+      "data_fim": "2025-05-23 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 28,
+    "data_evento": "26/05/2025",
+    "municipio": "Mucambo - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Leidiane",
+      "Maria Joelma"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mucambo - CE/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Mucambo - CE",
+      "data_inicio": "2025-05-26 08:00:00-03:00",
+      "data_fim": "2025-05-26 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 29,
+    "data_evento": "27/05/2025",
+    "municipio": "Mucambo - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Maria Joelma"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mucambo - CE/CE",
+      "tipo_evento": "2 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Mucambo - CE",
+      "data_inicio": "2025-05-27 08:00:00-03:00",
+      "data_fim": "2025-05-27 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 30,
+    "data_evento": "28/05/2025",
+    "municipio": "Mucambo - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Maria Joelma"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mucambo - CE/CE",
+      "tipo_evento": "2 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Mucambo - CE",
+      "data_inicio": "2025-05-28 08:00:00-03:00",
+      "data_fim": "2025-05-28 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 31,
+    "data_evento": "23/04/2025",
+    "municipio": "São Desidério - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Desidério - BA/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - São Desidério - BA",
+      "data_inicio": "2025-04-23 08:00:00-03:00",
+      "data_fim": "2025-04-23 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 32,
+    "data_evento": "13/05/2025",
+    "municipio": "Mirabela - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mirabela - MG/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Mirabela - MG",
+      "data_inicio": "2025-05-13 08:00:00-03:00",
+      "data_fim": "2025-05-13 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 33,
+    "data_evento": "17/05/2025",
+    "municipio": "São João da Ponte - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Auxiliadora",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São João da Ponte - MG/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - São João da Ponte - MG",
+      "data_inicio": "2025-05-17 08:00:00-03:00",
+      "data_fim": "2025-05-17 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,professoraauxiliadora.uece@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,professoraauxiliadora.uece@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 34,
+    "data_evento": "24/05/2025",
+    "municipio": "Rio Paranaíba - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Fabrícia Santos",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Rio Paranaíba - MG/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Rio Paranaíba - MG",
+      "data_inicio": "2025-05-24 08:00:00-03:00",
+      "data_fim": "2025-05-24 17:00:00-03:00",
+      "observacoes": "Segmento: CANCELADO | Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: CANCELADO | Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 35,
+    "data_evento": "21/05/2025",
+    "municipio": "Itaparica - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Maria Joelma"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Itaparica - BA/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Itaparica - BA",
+      "data_inicio": "2025-05-21 08:00:00-03:00",
+      "data_fim": "2025-05-21 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 36,
+    "data_evento": "22/05/2025",
+    "municipio": "Itaparica - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Maria Joelma"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Itaparica - BA/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Itaparica - BA",
+      "data_inicio": "2025-05-22 08:00:00-03:00",
+      "data_fim": "2025-05-22 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 37,
+    "data_evento": "29/05/2025",
+    "municipio": "Pacujá - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Pacujá - CE/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Pacujá - CE",
+      "data_inicio": "2025-05-29 13:00:00-03:00",
+      "data_fim": "2025-05-29 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 38,
+    "data_evento": "30/05/2025",
+    "municipio": "Pacujá - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Pacujá - CE/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Pacujá - CE",
+      "data_inicio": "2025-05-30 13:00:00-03:00",
+      "data_fim": "2025-05-30 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 39,
+    "data_evento": "21/05/2025",
+    "municipio": "Lagoa Grande - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Anna Patrícia",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Lagoa Grande - PE/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Lagoa Grande - PE",
+      "data_inicio": "2025-05-21 08:00:00-03:00",
+      "data_fim": "2025-05-21 12:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 40,
+    "data_evento": "21/05/2025",
+    "municipio": "Lagoa Grande - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Anna Patrícia",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Lagoa Grande - PE/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Lagoa Grande - PE",
+      "data_inicio": "2025-05-21 13:00:00-03:00",
+      "data_fim": "2025-05-21 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 41,
+    "data_evento": "16/05/2025",
+    "municipio": "São José do Calçado - ES",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Online",
+    "formadores": [
+      "Anna Patrícia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São José do Calçado - ES/CE",
+      "tipo_evento": "1 - Online",
+      "titulo_evento": "Brincando e Aprendendo - São José do Calçado - ES",
+      "data_inicio": "2025-05-16 08:00:00-03:00",
+      "data_fim": "2025-05-16 12:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 42,
+    "data_evento": "02/06/2025",
+    "municipio": "Mirabela - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Anna Patrícia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mirabela - MG/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Mirabela - MG",
+      "data_inicio": "2025-06-02 18:00:00-03:00",
+      "data_fim": "2025-06-02 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 43,
+    "data_evento": "11/06/2025",
+    "municipio": "Petrolina - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Petrolina - PE/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Petrolina - PE",
+      "data_inicio": "2025-06-11 08:00:00-03:00",
+      "data_fim": "2025-06-11 12:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 44,
+    "data_evento": "12/06/2025",
+    "municipio": "Petrolina - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Petrolina - PE/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Petrolina - PE",
+      "data_inicio": "2025-06-12 08:00:00-03:00",
+      "data_fim": "2025-06-12 12:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 45,
+    "data_evento": "05/06/2025",
+    "municipio": "Canavieiras - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Anna Patrícia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Canavieiras - BA/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Canavieiras - BA",
+      "data_inicio": "2025-06-05 13:00:00-03:00",
+      "data_fim": "2025-06-05 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 46,
+    "data_evento": "14/06/2025",
+    "municipio": "Serra do Salitre - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Presencial",
+    "formadores": [
+      "Fabrícia Santos",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Serra do Salitre - MG/CE",
+      "tipo_evento": "4 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Serra do Salitre - MG",
+      "data_inicio": "2025-06-14 08:00:00-03:00",
+      "data_fim": "2025-06-14 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 47,
+    "data_evento": "16/06/2025",
+    "municipio": "Serra do Salitre - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Fabrícia Santos",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Serra do Salitre - MG/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Serra do Salitre - MG",
+      "data_inicio": "2025-06-16 08:00:00-03:00",
+      "data_fim": "2025-06-16 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 48,
+    "data_evento": "17/06/2025",
+    "municipio": "Serra do Salitre - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Fabrícia Santos",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Serra do Salitre - MG/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Serra do Salitre - MG",
+      "data_inicio": "2025-06-17 08:00:00-03:00",
+      "data_fim": "2025-06-17 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 49,
+    "data_evento": "20/06/2025",
+    "municipio": "Uiraúna - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Presencial",
+    "formadores": [
+      "Isabel Kerssia",
+      "Maria Auxiliadora"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Uiraúna - PB/CE",
+      "tipo_evento": "3 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Uiraúna - PB",
+      "data_inicio": "2025-06-20 08:00:00-03:00",
+      "data_fim": "2025-06-20 17:00:00-03:00",
+      "observacoes": "Segmento: CANCELADO | Coordenador Acompanha: Não | Convidados: isabel15kerssia@gmail.com,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: CANCELADO | Coordenador Acompanha: Não | Convidados: isabel15kerssia@gmail.com,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 50,
+    "data_evento": "24/06/2025",
+    "municipio": "Tarrafas - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Leidiane",
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Tarrafas - CE/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Tarrafas - CE",
+      "data_inicio": "2025-06-24 08:00:00-03:00",
+      "data_fim": "2025-06-24 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 51,
+    "data_evento": "25/06/2025",
+    "municipio": "Tarrafas - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Leidiane",
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Tarrafas - CE/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Tarrafas - CE",
+      "data_inicio": "2025-06-25 08:00:00-03:00",
+      "data_fim": "2025-06-25 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 52,
+    "data_evento": "26/06/2025",
+    "municipio": "Tarrafas - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Tarrafas - CE/CE",
+      "tipo_evento": "4 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Tarrafas - CE",
+      "data_inicio": "2025-06-26 08:00:00-03:00",
+      "data_fim": "2025-06-26 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 53,
+    "data_evento": "25/06/2025",
+    "municipio": "Lagoa Grande - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Presencial",
+    "formadores": [
+      "Anna Patrícia",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Lagoa Grande - PE/CE",
+      "tipo_evento": "2 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Lagoa Grande - PE",
+      "data_inicio": "2025-06-25 16:00:00-03:00",
+      "data_fim": "2025-06-25 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 54,
+    "data_evento": "26/06/2025",
+    "municipio": "Lagoa Grande - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Anna Patrícia",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Lagoa Grande - PE/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Lagoa Grande - PE",
+      "data_inicio": "2025-06-26 08:00:00-03:00",
+      "data_fim": "2025-06-26 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 55,
+    "data_evento": "27/06/2025",
+    "municipio": "Lagoa Grande - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Anna Patrícia",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Lagoa Grande - PE/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Lagoa Grande - PE",
+      "data_inicio": "2025-06-27 08:00:00-03:00",
+      "data_fim": "2025-06-27 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 56,
+    "data_evento": "02/06/2025",
+    "municipio": "São Fidélis - RJ",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Auxiliadora"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Fidélis - RJ/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - São Fidélis - RJ",
+      "data_inicio": "2025-06-02 08:00:00-03:00",
+      "data_fim": "2025-06-02 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 57,
+    "data_evento": "17/06/2025",
+    "municipio": "São João da Ponte - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Anna Patrícia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São João da Ponte - MG/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - São João da Ponte - MG",
+      "data_inicio": "2025-06-17 18:00:00-03:00",
+      "data_fim": "2025-06-17 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 58,
+    "data_evento": "02/06/2025",
+    "municipio": "Mirabela - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mirabela - MG/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Mirabela - MG",
+      "data_inicio": "2025-06-02 18:00:00-03:00",
+      "data_fim": "2025-06-02 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 59,
+    "data_evento": "03/07/2025",
+    "municipio": "São Fidélis - RJ",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Anna Patrícia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Fidélis - RJ/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - São Fidélis - RJ",
+      "data_inicio": "2025-07-03 18:00:00-03:00",
+      "data_fim": "2025-07-03 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 60,
+    "data_evento": "02/07/2025",
+    "municipio": "Mirabela - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Fabrícia Santos",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mirabela - MG/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Mirabela - MG",
+      "data_inicio": "2025-07-02 08:00:00-03:00",
+      "data_fim": "2025-07-02 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 61,
+    "data_evento": "03/07/2025",
+    "municipio": "Mirabela - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Fabrícia Santos",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mirabela - MG/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Mirabela - MG",
+      "data_inicio": "2025-07-03 08:00:00-03:00",
+      "data_fim": "2025-07-03 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 62,
+    "data_evento": "04/07/2025",
+    "municipio": "Mirabela - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Presencial",
+    "formadores": [
+      "Fabrícia Santos",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mirabela - MG/CE",
+      "tipo_evento": "3 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Mirabela - MG",
+      "data_inicio": "2025-07-04 08:00:00-03:00",
+      "data_fim": "2025-07-04 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 63,
+    "data_evento": "11/07/2025",
+    "municipio": "Uiraúna - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Presencial",
+    "formadores": [
+      "Isabel Kerssia",
+      "Maria Auxiliadora"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Uiraúna - PB/CE",
+      "tipo_evento": "3 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Uiraúna - PB",
+      "data_inicio": "2025-07-11 08:00:00-03:00",
+      "data_fim": "2025-07-11 17:00:00-03:00",
+      "observacoes": "Segmento: Gabriela | Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,isabel15kerssia@gmail.com,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Gabriela | Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,isabel15kerssia@gmail.com,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 64,
+    "data_evento": "14/07/2025",
+    "municipio": "São Desidério - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Desidério - BA/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - São Desidério - BA",
+      "data_inicio": "2025-07-14 08:00:00-03:00",
+      "data_fim": "2025-07-14 12:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 65,
+    "data_evento": "14/07/2025",
+    "municipio": "Itaparica - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Presencial",
+    "formadores": [
+      "Maria Joelma",
+      "Maria Leidiane",
+      "Natália Gomes"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Itaparica - BA/CE",
+      "tipo_evento": "2 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Itaparica - BA",
+      "data_inicio": "2025-07-14 08:00:00-03:00",
+      "data_fim": "2025-07-14 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,nataliagomesmacedo22@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,nataliagomesmacedo22@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 66,
+    "data_evento": "15/07/2025",
+    "municipio": "Itaparica - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Presencial",
+    "formadores": [
+      "Maria Joelma",
+      "Maria Leidiane",
+      "Natália Gomes"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Itaparica - BA/CE",
+      "tipo_evento": "2 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Itaparica - BA",
+      "data_inicio": "2025-07-15 08:00:00-03:00",
+      "data_fim": "2025-07-15 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,nataliagomesmacedo22@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,nataliagomesmacedo22@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 67,
+    "data_evento": "16/07/2025",
+    "municipio": "Itaparica - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Joelma",
+      "Maria Leidiane",
+      "Natália Gomes"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Itaparica - BA/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Itaparica - BA",
+      "data_inicio": "2025-07-16 08:00:00-03:00",
+      "data_fim": "2025-07-16 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,nataliagomesmacedo22@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,nataliagomesmacedo22@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 68,
+    "data_evento": "17/07/2025",
+    "municipio": "Itaparica - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Joelma",
+      "Maria Leidiane",
+      "Natália Gomes"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Itaparica - BA/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Itaparica - BA",
+      "data_inicio": "2025-07-17 08:00:00-03:00",
+      "data_fim": "2025-07-17 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,nataliagomesmacedo22@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,nataliagomesmacedo22@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 69,
+    "data_evento": "16/07/2025",
+    "municipio": "São João da Ponte - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Auxiliadora",
+      "Isabel Kerssia",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São João da Ponte - MG/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - São João da Ponte - MG",
+      "data_inicio": "2025-07-16 08:00:00-03:00",
+      "data_fim": "2025-07-16 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: professoraauxiliadora.uece@gmail.com,isabel15kerssia@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: professoraauxiliadora.uece@gmail.com,isabel15kerssia@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 70,
+    "data_evento": "17/07/2025",
+    "municipio": "São João da Ponte - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Auxiliadora",
+      "Isabel Kerssia",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São João da Ponte - MG/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - São João da Ponte - MG",
+      "data_inicio": "2025-07-17 08:00:00-03:00",
+      "data_fim": "2025-07-17 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: professoraauxiliadora.uece@gmail.com,isabel15kerssia@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: professoraauxiliadora.uece@gmail.com,isabel15kerssia@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 71,
+    "data_evento": "17/07/2025",
+    "municipio": "São João da Ponte - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Anna Patrícia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São João da Ponte - MG/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - São João da Ponte - MG",
+      "data_inicio": "2025-07-17 18:00:00-03:00",
+      "data_fim": "2025-07-17 21:00:00-03:00",
+      "observacoes": "Segmento: CANCELADO | Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: CANCELADO | Coordenador Acompanha: Não | Convidados: annapatricia.ssmartins@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 72,
+    "data_evento": "21/07/2025",
+    "municipio": "Rio Paranaíba - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Rio Paranaíba - MG/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Rio Paranaíba - MG",
+      "data_inicio": "2025-07-21 08:00:00-03:00",
+      "data_fim": "2025-07-21 17:00:00-03:00",
+      "observacoes": "Segmento: CANCELADO | Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: CANCELADO | Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 73,
+    "data_evento": "21/07/2025",
+    "municipio": "Catolé do Rocha - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Joelma",
+      "Natália Gomes"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Catolé do Rocha - PB/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Catolé do Rocha - PB",
+      "data_inicio": "2025-07-21 08:00:00-03:00",
+      "data_fim": "2025-07-21 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,nataliagomesmacedo22@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,nataliagomesmacedo22@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 74,
+    "data_evento": "22/07/2025",
+    "municipio": "Catolé do Rocha - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Joelma",
+      "Natália Gomes"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Catolé do Rocha - PB/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Catolé do Rocha - PB",
+      "data_inicio": "2025-07-22 08:00:00-03:00",
+      "data_fim": "2025-07-22 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,nataliagomesmacedo22@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,nataliagomesmacedo22@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 75,
+    "data_evento": "22/07/2025",
+    "municipio": "Catolé do Rocha - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Catolé do Rocha - PB/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Catolé do Rocha - PB",
+      "data_inicio": "2025-07-22 16:30:00-03:00",
+      "data_fim": "2025-07-22 20:30:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 76,
+    "data_evento": "24/07/2025",
+    "municipio": "São José do Calçado - ES",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São José do Calçado - ES/CE",
+      "tipo_evento": "2 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - São José do Calçado - ES",
+      "data_inicio": "2025-07-24 08:00:00-03:00",
+      "data_fim": "2025-07-24 17:00:00-03:00",
+      "observacoes": "Segmento: Anna Patrícia | Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: Anna Patrícia | Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 77,
+    "data_evento": "28/07/2025",
+    "municipio": "Antônio Gonçalves - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Antônio Gonçalves - BA/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Antônio Gonçalves - BA",
+      "data_inicio": "2025-07-28 08:00:00-03:00",
+      "data_fim": "2025-07-28 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 78,
+    "data_evento": "31/07/2025",
+    "municipio": "Ereré - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Mônica Silva",
+      "Maria Joelma",
+      "Isabel Kerssia",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Ereré - CE/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Ereré - CE",
+      "data_inicio": "2025-07-31 08:00:00-03:00",
+      "data_fim": "2025-07-31 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,monica2803miranda@gmail.com,mariajoelma.alves40@gmail.com,isabel15kerssia@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,monica2803miranda@gmail.com,mariajoelma.alves40@gmail.com,isabel15kerssia@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 79,
+    "data_evento": "31/07/2025",
+    "municipio": "Canavieiras - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Canavieiras - BA/CE",
+      "tipo_evento": "4 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Canavieiras - BA",
+      "data_inicio": "2025-07-31 08:00:00-03:00",
+      "data_fim": "2025-07-31 17:00:00-03:00",
+      "observacoes": "Segmento: CANCELADO | Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: CANCELADO | Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 80,
+    "data_evento": "25/07/2025",
+    "municipio": "Balsa Nova - PR",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Fabrícia Santos",
+      "Maria Auxiliadora",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Balsa Nova - PR/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Balsa Nova - PR",
+      "data_inicio": "2025-07-25 08:00:00-03:00",
+      "data_fim": "2025-07-25 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,fabriciasmacedo@gmail.com,professoraauxiliadora.uece@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice Anne | Convidados: gerencia.projetos5@aprendereditora.com.br,fabriciasmacedo@gmail.com,professoraauxiliadora.uece@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 81,
+    "data_evento": "12/07/2025",
+    "municipio": "Canarana - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Fabrícia Santos",
+      "Mônica Silva",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Canarana - BA/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Canarana - BA",
+      "data_inicio": "2025-07-12 08:00:00-03:00",
+      "data_fim": "2025-07-12 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,monica2803miranda@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,monica2803miranda@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 82,
+    "data_evento": "01/08/2025",
+    "municipio": "Florestal - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Maria Auxiliadora"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Florestal - MG/CE",
+      "tipo_evento": "4 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Florestal - MG",
+      "data_inicio": "2025-08-01 08:00:00-03:00",
+      "data_fim": "2025-08-01 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,professoraauxiliadora.uece@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 83,
+    "data_evento": "05/08/2025",
+    "municipio": "Canavieiras - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Fabrícia Santos",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Canavieiras - BA/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Canavieiras - BA",
+      "data_inicio": "2025-08-05 08:00:00-03:00",
+      "data_fim": "2025-08-05 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 84,
+    "data_evento": "06/08/2025",
+    "municipio": "Canavieiras - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Fabrícia Santos",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Canavieiras - BA/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Canavieiras - BA",
+      "data_inicio": "2025-08-06 08:00:00-03:00",
+      "data_fim": "2025-08-06 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 85,
+    "data_evento": "07/08/2025",
+    "municipio": "Canavieiras - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Presencial",
+    "formadores": [
+      "Fabrícia Santos",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Canavieiras - BA/CE",
+      "tipo_evento": "4 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Canavieiras - BA",
+      "data_inicio": "2025-08-07 08:00:00-03:00",
+      "data_fim": "2025-08-07 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 86,
+    "data_evento": "25/08/2025",
+    "municipio": "Petrolina - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Petrolina - PE/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Petrolina - PE",
+      "data_inicio": "2025-08-25 13:00:00-03:00",
+      "data_fim": "2025-08-25 17:00:00-03:00",
+      "observacoes": "Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 87,
+    "data_evento": "26/08/2025",
+    "municipio": "Petrolina - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Petrolina - PE/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Petrolina - PE",
+      "data_inicio": "2025-08-26 08:00:00-03:00",
+      "data_fim": "2025-08-26 12:00:00-03:00",
+      "observacoes": "Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 88,
+    "data_evento": "01/08/2025",
+    "municipio": "Ereré - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Presencial",
+    "formadores": [
+      "Isabel Kerssia",
+      "Lidiane Oliveira",
+      "Mônica Silva",
+      "Maria Joelma"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Ereré - CE/CE",
+      "tipo_evento": "2 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Ereré - CE",
+      "data_inicio": "2025-08-01 08:00:00-03:00",
+      "data_fim": "2025-08-01 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: GLEICE ANNE | Convidados: gerencia.projetos5@aprendereditora.com.br,isabel15kerssia@gmail.com,psicopedagogalidianemoraes@gmail.com,monica2803miranda@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: GLEICE ANNE | Convidados: gerencia.projetos5@aprendereditora.com.br,isabel15kerssia@gmail.com,psicopedagogalidianemoraes@gmail.com,monica2803miranda@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 89,
+    "data_evento": "19/08/2025",
+    "municipio": "Itaparica - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Itaparica - BA/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Itaparica - BA",
+      "data_inicio": "2025-08-19 13:00:00-03:00",
+      "data_fim": "2025-08-19 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 90,
+    "data_evento": "07/08/2025",
+    "municipio": "São Desidério - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Desidério - BA/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - São Desidério - BA",
+      "data_inicio": "2025-08-07 08:00:00-03:00",
+      "data_fim": "2025-08-07 12:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 91,
+    "data_evento": "12/08/2025",
+    "municipio": "São Fidélis - RJ",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Presencial",
+    "formadores": [
+      "Fabrícia Santos",
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Fidélis - RJ/CE",
+      "tipo_evento": "3 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - São Fidélis - RJ",
+      "data_inicio": "2025-08-12 08:00:00-03:00",
+      "data_fim": "2025-08-12 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 92,
+    "data_evento": "13/08/2025",
+    "municipio": "São Fidélis - RJ",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Fabrícia Santos",
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Fidélis - RJ/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - São Fidélis - RJ",
+      "data_inicio": "2025-08-13 08:00:00-03:00",
+      "data_fim": "2025-08-13 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 93,
+    "data_evento": "14/08/2025",
+    "municipio": "São Fidélis - RJ",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Fabrícia Santos",
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Fidélis - RJ/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - São Fidélis - RJ",
+      "data_inicio": "2025-08-14 08:00:00-03:00",
+      "data_fim": "2025-08-14 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 94,
+    "data_evento": "14/08/2025",
+    "municipio": "Canarana - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Canarana - BA/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Canarana - BA",
+      "data_inicio": "2025-08-14 18:00:00-03:00",
+      "data_fim": "2025-08-14 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 95,
+    "data_evento": "26/08/2025",
+    "municipio": "Mucambo - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Presencial",
+    "formadores": [
+      "Maria Joelma",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mucambo - CE/CE",
+      "tipo_evento": "3 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Mucambo - CE",
+      "data_inicio": "2025-08-26 08:00:00-03:00",
+      "data_fim": "2025-08-26 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 96,
+    "data_evento": "27/08/2025",
+    "municipio": "Mucambo - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Presencial",
+    "formadores": [
+      "Maria Joelma",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mucambo - CE/CE",
+      "tipo_evento": "3 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Mucambo - CE",
+      "data_inicio": "2025-08-27 08:00:00-03:00",
+      "data_fim": "2025-08-27 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 97,
+    "data_evento": "05/09/2025",
+    "municipio": "Tarrafas - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "5 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Tarrafas - CE/CE",
+      "tipo_evento": "5 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Tarrafas - CE",
+      "data_inicio": "2025-09-05 13:00:00-03:00",
+      "data_fim": "2025-09-05 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 98,
+    "data_evento": "21/08/2025",
+    "municipio": "Mirabela - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Online",
+    "formadores": [
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mirabela - MG/CE",
+      "tipo_evento": "4 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Mirabela - MG",
+      "data_inicio": "2025-08-21 18:00:00-03:00",
+      "data_fim": "2025-08-21 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: CRECHE | Convidados: fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: CRECHE | Convidados: fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 99,
+    "data_evento": "28/08/2025",
+    "municipio": "São João da Ponte - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Lidiane Oliveira",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São João da Ponte - MG/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - São João da Ponte - MG",
+      "data_inicio": "2025-08-28 08:00:00-03:00",
+      "data_fim": "2025-08-28 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: psicopedagogalidianemoraes@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: psicopedagogalidianemoraes@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 100,
+    "data_evento": "29/08/2025",
+    "municipio": "São João da Ponte - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Lidiane Oliveira",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São João da Ponte - MG/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - São João da Ponte - MG",
+      "data_inicio": "2025-08-29 08:00:00-03:00",
+      "data_fim": "2025-08-29 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: psicopedagogalidianemoraes@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: psicopedagogalidianemoraes@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 101,
+    "data_evento": "30/08/2025",
+    "municipio": "São João da Ponte - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Presencial",
+    "formadores": [
+      "Lidiane Oliveira",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São João da Ponte - MG/CE",
+      "tipo_evento": "4 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - São João da Ponte - MG",
+      "data_inicio": "2025-08-30 08:00:00-03:00",
+      "data_fim": "2025-08-30 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: psicopedagogalidianemoraes@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: psicopedagogalidianemoraes@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 102,
+    "data_evento": "23/08/2025",
+    "municipio": "Rio Paranaíba - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Rio Paranaíba - MG/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Rio Paranaíba - MG",
+      "data_inicio": "2025-08-23 08:00:00-03:00",
+      "data_fim": "2025-08-23 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice | Convidados: leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gleice | Convidados: leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 103,
+    "data_evento": "13/08/2025",
+    "municipio": "São João da Ponte - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São João da Ponte - MG/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - São João da Ponte - MG",
+      "data_inicio": "2025-08-13 18:00:00-03:00",
+      "data_fim": "2025-08-13 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 104,
+    "data_evento": "23/08/2025",
+    "municipio": "Serra do Salitre - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "5 - Presencial",
+    "formadores": [
+      "Lidiane Oliveira",
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Serra do Salitre - MG/CE",
+      "tipo_evento": "5 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Serra do Salitre - MG",
+      "data_inicio": "2025-08-23 08:00:00-03:00",
+      "data_fim": "2025-08-23 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gabriela | Convidados: psicopedagogalidianemoraes@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gabriela | Convidados: psicopedagogalidianemoraes@gmail.com,fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 105,
+    "data_evento": "19/08/2025",
+    "municipio": "Catolé do Rocha - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Catolé do Rocha - PB/CE",
+      "tipo_evento": "4 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Catolé do Rocha - PB",
+      "data_inicio": "2025-08-19 16:30:00-03:00",
+      "data_fim": "2025-08-19 20:30:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 106,
+    "data_evento": "15/08/2025",
+    "municipio": "Antônio Gonçalves - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Antônio Gonçalves - BA/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Antônio Gonçalves - BA",
+      "data_inicio": "2025-08-15 18:00:00-03:00",
+      "data_fim": "2025-08-15 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 107,
+    "data_evento": "28/08/2025",
+    "municipio": "Pacujá - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Presencial",
+    "formadores": [
+      "Maria Joelma",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Pacujá - CE/CE",
+      "tipo_evento": "2 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Pacujá - CE",
+      "data_inicio": "2025-08-28 13:00:00-03:00",
+      "data_fim": "2025-08-28 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 108,
+    "data_evento": "29/08/2025",
+    "municipio": "Pacujá - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Presencial",
+    "formadores": [
+      "Maria Joelma",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Pacujá - CE/CE",
+      "tipo_evento": "2 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Pacujá - CE",
+      "data_inicio": "2025-08-29 13:00:00-03:00",
+      "data_fim": "2025-08-29 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 109,
+    "data_evento": "18/08/2025",
+    "municipio": "Lagoa Grande - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Online",
+    "formadores": [
+      "Fabrícia Santos",
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Lagoa Grande - PE/CE",
+      "tipo_evento": "4 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Lagoa Grande - PE",
+      "data_inicio": "2025-08-18 18:00:00-03:00",
+      "data_fim": "2025-08-18 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: fabriciasmacedo@gmail.com,monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: fabriciasmacedo@gmail.com,monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 110,
+    "data_evento": "21/08/2025",
+    "municipio": "Uiraúna - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Maria Auxiliadora",
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Uiraúna - PB/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Uiraúna - PB",
+      "data_inicio": "2025-08-21 08:00:00-03:00",
+      "data_fim": "2025-08-21 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gabriela | Convidados: professoraauxiliadora.uece@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Coordenador Responsável: Gabriela | Convidados: professoraauxiliadora.uece@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 111,
+    "data_evento": "22/08/2025",
+    "municipio": "Uiraúna - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Maria Auxiliadora",
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Uiraúna - PB/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Uiraúna - PB",
+      "data_inicio": "2025-08-22 08:00:00-03:00",
+      "data_fim": "2025-08-22 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: professoraauxiliadora.uece@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: professoraauxiliadora.uece@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 112,
+    "data_evento": "20/08/2025",
+    "municipio": "Balsa Nova - PR",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Fabrícia Santos"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Balsa Nova - PR/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Balsa Nova - PR",
+      "data_inicio": "2025-08-20 18:00:00-03:00",
+      "data_fim": "2025-08-20 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: fabriciasmacedo@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 113,
+    "data_evento": "01/09/2025",
+    "municipio": "Antônio Gonçalves - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Gabriela Duarte"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Antônio Gonçalves - BA/CE",
+      "tipo_evento": "3 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Antônio Gonçalves - BA",
+      "data_inicio": "2025-09-01 08:00:00-03:00",
+      "data_fim": "2025-09-01 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 114,
+    "data_evento": "02/09/2025",
+    "municipio": "Antônio Gonçalves - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Maria Leidiane",
+      "Gabriela Duarte"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Antônio Gonçalves - BA/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Antônio Gonçalves - BA",
+      "data_inicio": "2025-09-02 08:00:00-03:00",
+      "data_fim": "2025-09-02 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 115,
+    "data_evento": "23/09/2025",
+    "municipio": "São João da Ponte - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "5 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São João da Ponte - MG/CE",
+      "tipo_evento": "5 - Online",
+      "titulo_evento": "Brincando e Aprendendo - São João da Ponte - MG",
+      "data_inicio": "2025-09-23 18:00:00-03:00",
+      "data_fim": "2025-09-23 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 116,
+    "data_evento": "02/09/2025",
+    "municipio": "Iracema - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Presencial",
+    "formadores": [
+      "Isabel Kerssia",
+      "Maria Joelma",
+      "Gleice Anne"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Iracema - CE/CE",
+      "tipo_evento": "1 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Iracema - CE",
+      "data_inicio": "2025-09-02 08:00:00-03:00",
+      "data_fim": "2025-09-02 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: isabel15kerssia@gmail.com,mariajoelma.alves40@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: isabel15kerssia@gmail.com,mariajoelma.alves40@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 117,
+    "data_evento": "03/09/2025",
+    "municipio": "Florestal - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "5 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Florestal - MG/CE",
+      "tipo_evento": "5 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Florestal - MG",
+      "data_inicio": "2025-09-03 17:00:00-03:00",
+      "data_fim": "2025-09-03 20:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 118,
+    "data_evento": "04/09/2025",
+    "municipio": "Lagoa Grande - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Fabrícia Santos",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Lagoa Grande - PE/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Lagoa Grande - PE",
+      "data_inicio": "2025-09-04 08:00:00-03:00",
+      "data_fim": "2025-09-04 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 119,
+    "data_evento": "05/09/2025",
+    "municipio": "Lagoa Grande - PE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Fabrícia Santos",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Lagoa Grande - PE/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Lagoa Grande - PE",
+      "data_inicio": "2025-09-05 08:00:00-03:00",
+      "data_fim": "2025-09-05 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 120,
+    "data_evento": "03/09/2025",
+    "municipio": "Ereré - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Marilene Lima"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Ereré - CE/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Ereré - CE",
+      "data_inicio": "2025-09-03 18:00:00-03:00",
+      "data_fim": "2025-09-03 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: nerilimamarilene@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: nerilimamarilene@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 121,
+    "data_evento": "10/09/2025",
+    "municipio": "Mirabela - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Maria Leidiane",
+      "Fabrícia Santos",
+      "Natália Gomes",
+      "Gleice Anne"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mirabela - MG/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Mirabela - MG",
+      "data_inicio": "2025-09-10 08:00:00-03:00",
+      "data_fim": "2025-09-10 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,fabriciasmacedo@gmail.com,nataliagomesmacedo22@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,fabriciasmacedo@gmail.com,nataliagomesmacedo22@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 122,
+    "data_evento": "11/09/2025",
+    "municipio": "Mirabela - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Maria Leidiane",
+      "Fabrícia Santos",
+      "Natália Gomes",
+      "Gleice Anne"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mirabela - MG/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Mirabela - MG",
+      "data_inicio": "2025-09-11 08:00:00-03:00",
+      "data_fim": "2025-09-11 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,fabriciasmacedo@gmail.com,nataliagomesmacedo22@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,fabriciasmacedo@gmail.com,nataliagomesmacedo22@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 123,
+    "data_evento": "12/09/2025",
+    "municipio": "Mirabela - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "5 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Fabrícia Santos",
+      "Natália Gomes",
+      "Gleice Anne"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mirabela - MG/CE",
+      "tipo_evento": "5 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Mirabela - MG",
+      "data_inicio": "2025-09-12 08:00:00-03:00",
+      "data_fim": "2025-09-12 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,fabriciasmacedo@gmail.com,nataliagomesmacedo22@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,fabriciasmacedo@gmail.com,nataliagomesmacedo22@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 124,
+    "data_evento": "15/09/2025",
+    "municipio": "Itaparica - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Maria Joelma",
+      "Gabriela Duarte"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Itaparica - BA/CE",
+      "tipo_evento": "4 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Itaparica - BA",
+      "data_inicio": "2025-09-15 08:00:00-03:00",
+      "data_fim": "2025-09-15 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 125,
+    "data_evento": "16/09/2025",
+    "municipio": "Itaparica - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Presencial",
+    "formadores": [
+      "Maria Leidiane",
+      "Maria Joelma",
+      "Gabriela Duarte"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Itaparica - BA/CE",
+      "tipo_evento": "4 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Itaparica - BA",
+      "data_inicio": "2025-09-16 08:00:00-03:00",
+      "data_fim": "2025-09-16 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 126,
+    "data_evento": "17/09/2025",
+    "municipio": "Itaparica - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Maria Leidiane",
+      "Maria Joelma",
+      "Gabriela Duarte"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Itaparica - BA/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Itaparica - BA",
+      "data_inicio": "2025-09-17 08:00:00-03:00",
+      "data_fim": "2025-09-17 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 127,
+    "data_evento": "18/09/2025",
+    "municipio": "Itaparica - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Maria Leidiane",
+      "Maria Joelma",
+      "Gabriela Duarte"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Itaparica - BA/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Itaparica - BA",
+      "data_inicio": "2025-09-18 08:00:00-03:00",
+      "data_fim": "2025-09-18 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: leidianesousa554@gmail.com,mariajoelma.alves40@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 128,
+    "data_evento": "19/09/2025",
+    "municipio": "Uiraúna - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Presencial",
+    "formadores": [
+      "Maria Auxiliadora",
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Uiraúna - PB/CE",
+      "tipo_evento": "4 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Uiraúna - PB",
+      "data_inicio": "2025-09-19 08:00:00-03:00",
+      "data_fim": "2025-09-19 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: professoraauxiliadora.uece@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: professoraauxiliadora.uece@gmail.com,isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 129,
+    "data_evento": "22/09/2025",
+    "municipio": "Canarana - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Presencial",
+    "formadores": [
+      "Fabrícia Santos",
+      "Maria Auxiliadora",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Canarana - BA/CE",
+      "tipo_evento": "3 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Canarana - BA",
+      "data_inicio": "2025-09-22 08:00:00-03:00",
+      "data_fim": "2025-09-22 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,professoraauxiliadora.uece@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,professoraauxiliadora.uece@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 130,
+    "data_evento": "24/09/2025",
+    "municipio": "Canarana - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Fabrícia Santos",
+      "Maria Auxiliadora",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Canarana - BA/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Canarana - BA",
+      "data_inicio": "2025-09-24 08:00:00-03:00",
+      "data_fim": "2025-09-24 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,professoraauxiliadora.uece@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,professoraauxiliadora.uece@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 131,
+    "data_evento": "25/09/2025",
+    "municipio": "Canarana - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Fabrícia Santos",
+      "Maria Auxiliadora",
+      "Lidiane Oliveira"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Canarana - BA/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Canarana - BA",
+      "data_inicio": "2025-09-25 08:00:00-03:00",
+      "data_fim": "2025-09-25 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,professoraauxiliadora.uece@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: fabriciasmacedo@gmail.com,professoraauxiliadora.uece@gmail.com,psicopedagogalidianemoraes@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 132,
+    "data_evento": "23/09/2025",
+    "municipio": "Catolé do Rocha - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Presencial",
+    "formadores": [
+      "Maria Joelma",
+      "Maria Leidiane",
+      "Gleice Anne"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Catolé do Rocha - PB/CE",
+      "tipo_evento": "4 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Catolé do Rocha - PB",
+      "data_inicio": "2025-09-23 08:00:00-03:00",
+      "data_fim": "2025-09-23 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 133,
+    "data_evento": "24/09/2025",
+    "municipio": "Catolé do Rocha - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Maria Joelma",
+      "Maria Leidiane",
+      "Gleice Anne"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Catolé do Rocha - PB/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Catolé do Rocha - PB",
+      "data_inicio": "2025-09-24 08:00:00-03:00",
+      "data_fim": "2025-09-24 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 134,
+    "data_evento": "25/09/2025",
+    "municipio": "Catolé do Rocha - PB",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Maria Joelma",
+      "Maria Leidiane",
+      "Gleice Anne"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Catolé do Rocha - PB/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Catolé do Rocha - PB",
+      "data_inicio": "2025-09-25 08:00:00-03:00",
+      "data_fim": "2025-09-25 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,gerencia.projetos5@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 135,
+    "data_evento": "25/09/2025",
+    "municipio": "Tarrafas - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "6 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Tarrafas - CE/CE",
+      "tipo_evento": "6 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Tarrafas - CE",
+      "data_inicio": "2025-09-25 13:00:00-03:00",
+      "data_fim": "2025-09-25 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 136,
+    "data_evento": "25/09/2025",
+    "municipio": "Tarrafas - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Natália Gomes",
+      "Isabel Kerssia",
+      "Gabriela Duarte"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Tarrafas - CE/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Tarrafas - CE",
+      "data_inicio": "2025-09-25 08:00:00-03:00",
+      "data_fim": "2025-09-25 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: nataliagomesmacedo22@gmail.com,isabel15kerssia@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: nataliagomesmacedo22@gmail.com,isabel15kerssia@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 137,
+    "data_evento": "26/09/2025",
+    "municipio": "Tarrafas - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Natália Gomes",
+      "Isabel Kerssia",
+      "Gabriela Duarte"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Tarrafas - CE/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Tarrafas - CE",
+      "data_inicio": "2025-09-26 08:00:00-03:00",
+      "data_fim": "2025-09-26 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: nataliagomesmacedo22@gmail.com,isabel15kerssia@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: nataliagomesmacedo22@gmail.com,isabel15kerssia@gmail.com,apoio.coordenacao7@aprendereditora.com.br,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 138,
+    "data_evento": "16/09/2025",
+    "municipio": "São Fidélis - RJ",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Fidélis - RJ/CE",
+      "tipo_evento": "4 - Online",
+      "titulo_evento": "Brincando e Aprendendo - São Fidélis - RJ",
+      "data_inicio": "2025-09-16 18:00:00-03:00",
+      "data_fim": "2025-09-16 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 139,
+    "data_evento": "19/09/2025",
+    "municipio": "Balsa Nova - PR",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Marilene Lima"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Balsa Nova - PR/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Balsa Nova - PR",
+      "data_inicio": "2025-09-19 18:00:00-03:00",
+      "data_fim": "2025-09-19 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: nerilimamarilene@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: nerilimamarilene@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 140,
+    "data_evento": "29/09/2025",
+    "municipio": "São Desidério - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Presencial",
+    "formadores": [
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Desidério - BA/CE",
+      "tipo_evento": "3 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - São Desidério - BA",
+      "data_inicio": "2025-09-29 08:00:00-03:00",
+      "data_fim": "2025-09-29 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 141,
+    "data_evento": "30/09/2025",
+    "municipio": "São Desidério - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Desidério - BA/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - São Desidério - BA",
+      "data_inicio": "2025-09-30 08:00:00-03:00",
+      "data_fim": "2025-09-30 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 142,
+    "data_evento": "01/10/2025",
+    "municipio": "São Desidério - BA",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "1 - Acompanhamento",
+    "formadores": [
+      "Isabel Kerssia"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Desidério - BA/CE",
+      "tipo_evento": "1 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - São Desidério - BA",
+      "data_inicio": "2025-10-01 08:00:00-03:00",
+      "data_fim": "2025-10-01 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: isabel15kerssia@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 143,
+    "data_evento": "21/08/2025",
+    "municipio": "Mirabela - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mirabela - MG/CE",
+      "tipo_evento": "4 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Mirabela - MG",
+      "data_inicio": "2025-08-21 18:00:00-03:00",
+      "data_fim": "2025-08-21 21:00:00-03:00",
+      "observacoes": "Segmento: PRÉ-ESCOLA | Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Segmento: PRÉ-ESCOLA | Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 144,
+    "data_evento": "29/09/2025",
+    "municipio": "Pacujá - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Presencial",
+    "formadores": [
+      "Lidiane Oliveira",
+      "Maria Joelma"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Pacujá - CE/CE",
+      "tipo_evento": "3 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Pacujá - CE",
+      "data_inicio": "2025-09-29 13:00:00-03:00",
+      "data_fim": "2025-09-29 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: psicopedagogalidianemoraes@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: psicopedagogalidianemoraes@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 145,
+    "data_evento": "30/09/2025",
+    "municipio": "Pacujá - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Presencial",
+    "formadores": [
+      "Lidiane Oliveira",
+      "Maria Joelma"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Pacujá - CE/CE",
+      "tipo_evento": "3 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Pacujá - CE",
+      "data_inicio": "2025-09-30 13:00:00-03:00",
+      "data_fim": "2025-09-30 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Sim | Convidados: psicopedagogalidianemoraes@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": true,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Sim | Convidados: psicopedagogalidianemoraes@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 146,
+    "data_evento": "12/09/2025",
+    "municipio": "Rio Paranaíba - MG",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Rio Paranaíba - MG/CE",
+      "tipo_evento": "2 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Rio Paranaíba - MG",
+      "data_inicio": "2025-09-12 19:00:00-03:00",
+      "data_fim": "2025-09-12 22:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 147,
+    "data_evento": "30/09/2025",
+    "municipio": "São Fidélis - RJ",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "5 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São Fidélis - RJ/CE",
+      "tipo_evento": "5 - Online",
+      "titulo_evento": "Brincando e Aprendendo - São Fidélis - RJ",
+      "data_inicio": "2025-09-30 18:00:00-03:00",
+      "data_fim": "2025-09-30 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 148,
+    "data_evento": "22/09/2025",
+    "municipio": "Ereré - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Online",
+    "formadores": [
+      "Marilene Lima"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Ereré - CE/CE",
+      "tipo_evento": "4 - Online",
+      "titulo_evento": "Brincando e Aprendendo - Ereré - CE",
+      "data_inicio": "2025-09-22 18:00:00-03:00",
+      "data_fim": "2025-09-22 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: nerilimamarilene@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: nerilimamarilene@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 149,
+    "data_evento": "24/09/2025",
+    "municipio": "São José do Calçado - ES",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "3 - Online",
+    "formadores": [
+      "Mônica Silva"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "São José do Calçado - ES/CE",
+      "tipo_evento": "3 - Online",
+      "titulo_evento": "Brincando e Aprendendo - São José do Calçado - ES",
+      "data_inicio": "2025-09-24 18:00:00-03:00",
+      "data_fim": "2025-09-24 21:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: monica2803miranda@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 150,
+    "data_evento": "01/10/2025",
+    "municipio": "Mucambo - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "2 - Acompanhamento",
+    "formadores": [
+      "Lidiane Oliveira",
+      "Maria Joelma"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mucambo - CE/CE",
+      "tipo_evento": "2 - Acompanhamento",
+      "titulo_evento": "Brincando e Aprendendo - Mucambo - CE",
+      "data_inicio": "2025-10-01 08:00:00-03:00",
+      "data_fim": "2025-10-01 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: psicopedagogalidianemoraes@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: psicopedagogalidianemoraes@gmail.com,mariajoelma.alves40@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 151,
+    "data_evento": "02/10/2025",
+    "municipio": "Mucambo - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Presencial",
+    "formadores": [
+      "Lidiane Oliveira",
+      "Maria Joelma",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mucambo - CE/CE",
+      "tipo_evento": "4 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Mucambo - CE",
+      "data_inicio": "2025-10-02 08:00:00-03:00",
+      "data_fim": "2025-10-02 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: psicopedagogalidianemoraes@gmail.com,mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: psicopedagogalidianemoraes@gmail.com,mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  },
+  {
+    "linha": 152,
+    "data_evento": "03/10/2025",
+    "municipio": "Mucambo - CE",
+    "projeto": "Brincando e Aprendendo",
+    "tipo_evento": "4 - Presencial",
+    "formadores": [
+      "Lidiane Oliveira",
+      "Maria Joelma",
+      "Maria Leidiane"
+    ],
+    "dados_completos": {
+      "usuario_solicitante": "admin",
+      "projeto": "Brincando e Aprendendo (SS)",
+      "municipio": "Mucambo - CE/CE",
+      "tipo_evento": "4 - Presencial",
+      "titulo_evento": "Brincando e Aprendendo - Mucambo - CE",
+      "data_inicio": "2025-10-03 08:00:00-03:00",
+      "data_fim": "2025-10-03 17:00:00-03:00",
+      "observacoes": "Coordenador Acompanha: Não | Convidados: psicopedagogalidianemoraes@gmail.com,mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br",
+      "status": "Aprovado",
+      "coordenador_acompanha": false,
+      "numero_encontro_formativo": "1"
+    },
+    "observacoes": "Coordenador Acompanha: Não | Convidados: psicopedagogalidianemoraes@gmail.com,mariajoelma.alves40@gmail.com,leidianesousa554@gmail.com,coordenacao50@aprendereditora.com.br"
+  }
+]

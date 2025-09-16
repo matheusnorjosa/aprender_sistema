@@ -252,7 +252,11 @@ class Municipio(models.Model):
         ordering = ["nome", "uf"]
 
     def __str__(self):
-        return f"{self.nome}/{self.uf}" if self.uf else self.nome
+        # Se o nome já contém a UF (formato "Nome - UF"), não duplicar
+        if self.uf and f"- {self.uf}" in self.nome:
+            return self.nome
+        else:
+            return f"{self.nome}/{self.uf}" if self.uf else self.nome
 
 
 class Formador(models.Model):

@@ -4,11 +4,11 @@ Views relacionadas ao sistema de aprovações de solicitações.
 
 from django.db import transaction
 
+from core.mixins import SuperintendenciaSetorRequiredMixin
 from .base import *
 
 
-class AprovacoesPendentesView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    permission_required = "core.view_aprovacao"
+class AprovacoesPendentesView(LoginRequiredMixin, SuperintendenciaSetorRequiredMixin, ListView):
     template_name = "core/aprovacoes_pendentes_enhanced.html"
     model = Solicitacao
     context_object_name = "pendentes"

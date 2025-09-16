@@ -213,6 +213,64 @@ class BackwardCompatibleFormadorMixin(UserPassesTestMixin):
         return getattr(user, "papel", "") == "formador"
 
 
+# === Setor-based mixins ===
+
+
+class SuperintendenciaSetorRequiredMixin(UserPassesTestMixin):
+    """
+    Mixin para restringir acesso apenas a usuários cujo setor é vinculado à superintendência
+    Usado para mapa de disponibilidade, aprovações pendentes, pré-agenda, deslocamentos
+    """
+
+    def test_func(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return False
+
+        # Superuser sempre tem acesso
+        if user.is_superuser:
+            return True
+
+        # Verificar se o usuário tem setor vinculado à superintendência
+        return (
+            hasattr(user, 'setor') 
+            and user.setor 
+            and getattr(user.setor, 'vinculado_superintendencia', False)
+        )
+
+
+class FormadorOwnerMixin(UserPassesTestMixin):
+    """
+    Mixin para restringir acesso a formadores apenas aos seus próprios dados
+    Usado para bloqueios de agenda própria
+    """
+
+    def test_func(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return False
+
+        # Superuser sempre tem acesso
+        if user.is_superuser:
+            return True
+
+        # Superintendência tem acesso a tudo
+        if (
+            hasattr(user, 'setor') 
+            and user.setor 
+            and getattr(user.setor, 'vinculado_superintendencia', False)
+        ):
+            return True
+
+        # Formador só pode acessar seus próprios dados
+        if user.groups.filter(name="formador").exists():
+            # Verificar se o objeto sendo acessado pertence ao formador
+            # Será implementado nas views específicas
+            return True
+
+        return False
+
+
 # === Utility functions ===
 
 

@@ -20,158 +20,49 @@ class DiretoriaExecutiveDashboardView(
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         agora = timezone.now()
-        
-        # Filtros da request
-        municipio_filtro = self.request.GET.get('municipio', '')
-        periodo_filtro = int(self.request.GET.get('periodo', 12))  # Default 12 meses
-        
-        # Calcular data de início baseada no período
-        data_inicio = agora - timedelta(days=30 * periodo_filtro)
-        data_inicio_ano = agora.replace(
-            month=1, day=1, hour=0, minute=0, second=0, microsecond=0
-        )
-        data_limite_trimestre = agora - timedelta(days=90)
-        
-        # Query base com filtros
-        query_base = Solicitacao.objects.filter(data_inicio__gte=data_inicio)
-        if municipio_filtro:
-            query_base = query_base.filter(municipio__nome=municipio_filtro)
 
-        # Métricas principais com filtros aplicados
-        total_solicitacoes_periodo = query_base.count()
-        solicitacoes_aprovadas_periodo = query_base.filter(status=SolicitacaoStatus.APROVADO).count()
-        taxa_aprovacao_periodo = round(
-            (
-                (solicitacoes_aprovadas_periodo / total_solicitacoes_periodo * 100)
-                if total_solicitacoes_periodo > 0
-                else 0
-            ),
-            1,
-        )
+        # Filtros selecionados (utilizamos IDs para evitar ambiguidades)
+        municipio_id = self.request.GET.get("municipio_id")
+        municipio_nome_param = self.request.GET.get("municipio", "")
+        uf_param = self.request.GET.get("uf", "")
+        regiao_param = self.request.GET.get("regiao", "")
 
-        # Dados para os gráficos com filtros aplicados
-        # Eventos por mês
-        eventos_por_mes = (
-            query_base
-            .filter(status=SolicitacaoStatus.APROVADO)
-            .annotate(mes=TruncMonth('data_inicio'))
-            .values('mes')
-            .annotate(eventos=Count('id'))
-            .order_by('mes')
-        )
-        
-        # Formatar dados dos meses
-        eventos_mes_formatados = []
-        for item in eventos_por_mes:
-            eventos_mes_formatados.append({
-                'mes': item['mes'].strftime('%b'),
-                'eventos': item['eventos']
-            })
+        try:
+            periodo_filtro = int(self.request.GET.get("periodo", 12))
+        except (TypeError, ValueError):
+            periodo_filtro = 12
 
-        # Top formadores com filtros
-        formadores_query = FormadoresSolicitacao.objects.select_related('formador')
-        if municipio_filtro:
-            formadores_query = formadores_query.filter(solicitacao__municipio__nome=municipio_filtro)
-        
-        top_formadores = (
-            formadores_query
-            .filter(
-                solicitacao__data_inicio__gte=data_inicio,
-                solicitacao__status=SolicitacaoStatus.APROVADO
+        municipio_obj = None
+        if municipio_id:
+            municipio_obj = Municipio.objects.filter(id=municipio_id).first()
+        elif municipio_nome_param:
+            municipio_obj = (
+                Municipio.objects.filter(nome__iexact=municipio_nome_param).order_by("uf").first()
             )
-            .values('formador__nome')
-            .annotate(eventos=Count('id'))
-            .order_by('-eventos')[:5]
-        )
-        
-        formadores_formatados = []
-        for formador in top_formadores:
-            formadores_formatados.append({
-                'nome': formador['formador__nome'],
-                'area': formador.get('formador__area_atuacao__name', 'Formação'),
-                'eventos': formador['eventos']
-            })
 
-        # Municípios atendidos
-        municipios_atendidos = (
-            Solicitacao.objects
-            .select_related('municipio')
-            .filter(
-                data_inicio__gte=data_limite_trimestre,
-                status=SolicitacaoStatus.APROVADO
-            )
-            .values('municipio__nome', 'municipio__uf')
-            .annotate(eventos=Count('id'))
-            .order_by('-eventos')[:5]
-        )
-
-        # Tipos de evento stats
-        tipos_evento_stats = (
-            Solicitacao.objects
-            .select_related('tipo_evento')
-            .filter(
-                data_inicio__gte=data_inicio_ano,
-                status=SolicitacaoStatus.APROVADO
-            )
-            .values('tipo_evento__nome')
-            .annotate(quantidade=Count('id'))
-            .order_by('-quantidade')
-        )
-
-        # Projetos stats
-        projetos_stats = (
-            Solicitacao.objects
-            .select_related('projeto')
-            .filter(
-                data_inicio__gte=data_limite_trimestre,
-                status=SolicitacaoStatus.APROVADO
-            )
-            .values('projeto__nome')
-            .annotate(eventos=Count('id'))
-            .order_by('-eventos')[:5]
-        )
-
-        # Novo: Top 10 municípios para gráfico de barras
-        top_municipios = (
-            Solicitacao.objects
-            .select_related('municipio')
-            .filter(
-                data_inicio__gte=data_inicio,
-                status=SolicitacaoStatus.APROVADO
-            )
-            .values('municipio__nome', 'municipio__uf')
-            .annotate(eventos=Count('id'))
-            .order_by('-eventos')[:10]
-        )
-        
-        # Lista de todos os municípios para o filtro
-        todos_municipios = (
+        municipios_queryset = (
             Municipio.objects.filter(ativo=True)
-            .values_list('nome', flat=True)
-            .order_by('nome')
+            .values("id", "nome", "uf")
+            .order_by("nome", "uf")
         )
 
         context.update(
             {
-                "total_solicitacoes_ano": total_solicitacoes_periodo,
-                "solicitacoes_aprovadas_ano": solicitacoes_aprovadas_periodo,
-                "taxa_aprovacao_ano": taxa_aprovacao_periodo,
-                "formadores_ativos": Formador.objects.filter(ativo=True).count(),
-                "municipios_total": Municipio.objects.filter(ativo=True).count(),
-                "projetos_ativos": Projeto.objects.filter(ativo=True).count(),
                 "ano_atual": agora.year,
-                "trimestre_atual": f"Q{((agora.month-1)//3)+1}",
-                "eventos_por_mes": eventos_mes_formatados,
-                "top_formadores": formadores_formatados,
-                "municipios_atendidos": municipios_atendidos,
-                "tipos_evento_stats": tipos_evento_stats,
-                "projetos_stats": projetos_stats,
-                "top_municipios": list(top_municipios),  # Novo gráfico
-                "todos_municipios": list(todos_municipios),  # Para filtros
-                "municipio_selecionado": municipio_filtro,  # Filtro atual
-                "periodo_selecionado": periodo_filtro,  # Filtro atual
-                "taxa_sync_sucesso": 95,  # Placeholder
-                "atividade_recente": query_base.count(),
+                "trimestre_atual": f"Q{((agora.month - 1) // 3) + 1}",
+                "periodo_selecionado": periodo_filtro,
+                "municipio_id_selecionado": str(municipio_obj.id) if municipio_obj else "",
+                "municipio_nome_selecionado": municipio_obj.nome if municipio_obj else municipio_nome_param,
+                "uf_selecionada": uf_param or (municipio_obj.uf if municipio_obj else ""),
+                "regiao_selecionada": regiao_param,
+                "municipios_opcoes": [
+                    {
+                        "id": str(item["id"]),
+                        "nome": item["nome"],
+                        "uf": item["uf"],
+                    }
+                    for item in municipios_queryset
+                ],
             }
         )
         return context
@@ -490,3 +381,20 @@ class ChartJSServeView(View):
             return response
         except FileNotFoundError:
             return HttpResponse('Chart.js not found', status=404)
+
+
+class TestMapView(TemplateView):
+    """View para testar o carregamento do mapa do Brasil"""
+    template_name = "core/test_map.html"
+
+class TestMapSimpleView(TemplateView):
+    """View para testar o carregamento do mapa do Brasil com GeoJSON simples"""
+    template_name = "core/test_map_simple.html"
+
+class TestMapFinalView(TemplateView):
+    """View para testar o carregamento do mapa do Brasil com GeoJSON real"""
+    template_name = "core/test_map_final.html"
+
+class TestMapAdvancedView(TemplateView):
+    """View para o mapa avançado com dados de projetos e animações"""
+    template_name = "core/test_map_advanced.html"

@@ -102,6 +102,17 @@ services:
     networks:
       - aprender_network
 
+  redis:
+    image: redis:7-alpine
+    container_name: aprender_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - aprender_network
+
   pgadmin:
     image: dpage/pgadmin4
     container_name: aprender_pgadmin
@@ -123,6 +134,7 @@ volumes:
   postgres_data:
   mcp_logs:
   pgadmin_data:
+  redis_data:
 
 networks:
   aprender_network:

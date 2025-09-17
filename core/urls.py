@@ -6,6 +6,11 @@ from django.views.generic import TemplateView
 from .views import HomeView  # Nova importação
 from .views import home  # Mantendo a função home também (opcional)
 from .views.health import health_check, health_detailed, health_ready, health_live, health_metrics
+from core.api.dashboard.views import (
+    DashboardCoordenadoresAPIView,
+    DashboardCursosAPIView,
+    DashboardGeoAPIView,
+)
 from .views import (
     AprovacaoDetailView,
     AprovacoesPendentesView,
@@ -25,7 +30,13 @@ from .views import (
     RemoverEventoPreAgendaView,
     SolicitacaoCreateView,
     SolicitacaoOKView,
+    TestMapView,
+    TestMapSimpleView,
+    TestMapFinalView,
+    TestMapAdvancedView,
 )
+from .views.mapa_views import MapaDadosAPIView, MapaEstatisticasAPIView
+from .views.mapa_realtime_views import MapaRealtimeAPIView, MapaStatusAPIView, MapaWebhookView
 from .views.diretoria_views import DashboardChartsAPIView, DiretoriaDebugView, DiretoriaIntegratedDashboardView
 from .views.admin_views import CommunicationLogsView
 from .views.gestao_views import (
@@ -145,6 +156,53 @@ urlpatterns = [
         name="diretoria_dashboard_integrado",
     ),
     path(
+        "diretoria/test-map/",
+        TestMapView.as_view(),
+        name="diretoria_test_map",
+    ),
+    path(
+        "diretoria/test-map-simple/",
+        TestMapSimpleView.as_view(),
+        name="diretoria_test_map_simple",
+    ),
+    path(
+        "diretoria/test-map-final/",
+        TestMapFinalView.as_view(),
+        name="diretoria_test_map_final",
+    ),
+    path(
+        "diretoria/mapa-avancado/",
+        TestMapAdvancedView.as_view(),
+        name="diretoria_mapa_avancado",
+    ),
+    # APIs para dados do mapa
+    path(
+        "api/mapa/dados/",
+        MapaDadosAPIView.as_view(),
+        name="api_mapa_dados",
+    ),
+    path(
+        "api/mapa/estatisticas/",
+        MapaEstatisticasAPIView.as_view(),
+        name="api_mapa_estatisticas",
+    ),
+    # APIs para atualizações em tempo real
+    path(
+        "api/mapa/realtime/",
+        MapaRealtimeAPIView.as_view(),
+        name="api_mapa_realtime",
+    ),
+    path(
+        "api/mapa/status/",
+        MapaStatusAPIView.as_view(),
+        name="api_mapa_status",
+    ),
+    path(
+        "api/mapa/webhook/",
+        MapaWebhookView.as_view(),
+        name="api_mapa_webhook",
+    ),
+    path(
         "diretoria/relatorios/",
         DiretoriaRelatoriosView.as_view(),
         name="diretoria_relatorios",
@@ -158,6 +216,21 @@ urlpatterns = [
         "diretoria/api/charts/",
         DashboardChartsAPIView.as_view(),
         name="diretoria_api_charts",
+    ),
+    path(
+        "diretoria/api/dashboard/geo/",
+        DashboardGeoAPIView.as_view(),
+        name="diretoria_dashboard_geo",
+    ),
+    path(
+        "diretoria/api/dashboard/cursos/",
+        DashboardCursosAPIView.as_view(),
+        name="diretoria_dashboard_cursos",
+    ),
+    path(
+        "diretoria/api/dashboard/coordenadores/",
+        DashboardCoordenadoresAPIView.as_view(),
+        name="diretoria_dashboard_coordenadores",
     ),
     # Página de debug temporária
     path(

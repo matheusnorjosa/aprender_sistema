@@ -21,6 +21,10 @@ from .diretoria_views import (
     DiretoriaAPIMetricsView,
     DiretoriaExecutiveDashboardView,
     DiretoriaRelatoriosView,
+    TestMapView,
+    TestMapSimpleView,
+    TestMapFinalView,
+    TestMapAdvancedView,
 )
 from .formador_views import BloqueioCreateView, FormadorEventosView
 
@@ -50,4 +54,8 @@ __all__ = [
     "DiretoriaRelatoriosView",
     "DashboardStatsAPIView",
     "DiretoriaAPIMetricsView",
+    "TestMapView",
+    "TestMapSimpleView",
+    "TestMapFinalView",
+    "TestMapAdvancedView",
 ]

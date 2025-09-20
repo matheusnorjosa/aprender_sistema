@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "aprender-context": {
+      "command": "docker-compose",
+      "args": [
+        "exec",
+        "mcp",
+        "python",
+        "/app/neural_system/mcp_server_aprender.py"
+      ],
+      "env": {
+        "DOCS_DIR": "/app",
+        "PYTHONPATH": "/app",
+        "ENVIRONMENT": "staging"
+      }
+    }
+  },
+  "mcpServerSettings": {
+    "aprender-context": {
+      "enabled": true,
+      "description": "Sistema neural de contexto para o Sistema APRENDER (Docker) - Fornece arquitetura, padrões, segurança e validação de código"
+    }
+  }
+}

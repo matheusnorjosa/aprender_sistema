@@ -1,0 +1,1431 @@
+{
+  "Amigos do Bem": {
+    "uf": "PE",
+    "total_eventos": 81,
+    "projetos": [
+      "Tema",
+      "Projeto Amma",
+      "Vida & Linguagem",
+      "Lendo E Escrevendo",
+      "Vida & Matemática",
+      "Escrever Comunicar E Ser",
+      "Acerta",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Jonathan Araújo",
+      "Rodrigo Lima",
+      "Bruno Teles",
+      "Glaubia Pinheiro",
+      "Elizabete Lima",
+      "Michele Macedo",
+      "Júlia Rodrigues",
+      "Hugo Ribeiro",
+      "Gabriel Oliveira",
+      "Marcela Sousa",
+      "Penélope Alberto",
+      "Nadyelle Carvalho",
+      "Janieri Martins",
+      "Anna Lúcia",
+      "Poliane Lima",
+      "Lyziane Maria",
+      "Fabíola Martins",
+      "Juliana Guerreiro",
+      "David Ribeiro"
+    ]
+  },
+  "Araranguá": {
+    "uf": "PE",
+    "total_eventos": 33,
+    "projetos": [
+      "Tema",
+      "Vida & Linguagem",
+      "Vida & Matemática",
+      "Novo Lendo",
+      "Ler, Ouvir E Contar"
+    ],
+    "formadores": [
+      "Jonathan Araújo",
+      "Lourene Pinheiro",
+      "Elienai Oliveira",
+      "Penélope Alberto",
+      "Valdiana Santos",
+      "Michella Rita",
+      "Douglas Wígner",
+      "Germana Mirla"
+    ]
+  },
+  "Bocaiúva do Sul": {
+    "uf": "PE",
+    "total_eventos": 24,
+    "projetos": [
+      "Tema",
+      "Acerta"
+    ],
+    "formadores": [
+      "Elizabete Lima",
+      "Rochelly Alinne",
+      "Poliane Lima",
+      "Michele Macedo",
+      "Simone Maria",
+      "Humberto Luciano",
+      "Janieri Martins"
+    ]
+  },
+  "Brejo do Cruz": {
+    "uf": "PE",
+    "total_eventos": 33,
+    "projetos": [
+      "Projeto Amma",
+      "Vida & Linguagem",
+      "Vida & Matemática",
+      "Acerta",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Glaubia Pinheiro",
+      "Ricardo Ítalo",
+      "Elizabete Lima",
+      "Michele Macedo",
+      "Gabriel Oliveira",
+      "David Ribeiro",
+      "Socorro Aclécia",
+      "Elienai Oliveira",
+      "Bruno Teles",
+      "Deuzirane Nunes",
+      "Fabíola Martins",
+      "Amanda Sales",
+      "Valdiana Santos",
+      "Icaro Maciel",
+      "Humberto Luciano",
+      "Mônica Maria"
+    ]
+  },
+  "Capivari": {
+    "uf": "PE",
+    "total_eventos": 31,
+    "projetos": [
+      "Tema",
+      "Acerta",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Poliane Lima",
+      "Michele Macedo",
+      "Amanda Sales",
+      "Juliana Guerreiro",
+      "Penélope Alberto",
+      "Ariana Coelho",
+      "Janieri Martins",
+      "Germana Mirla"
+    ]
+  },
+  "Catolé do Rocha": {
+    "uf": "PE",
+    "total_eventos": 44,
+    "projetos": [
+      "Tema",
+      "Vida & Linguagem",
+      "Lendo E Escrevendo",
+      "Vida & Matemática",
+      "Novo Lendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Glaubia Pinheiro",
+      "Elienai Góes",
+      "Ricardo Ítalo",
+      "Anna Patrícia",
+      "Maria Leidiane",
+      "Solicitado",
+      "Maria Joelma",
+      "Silvio Almeida",
+      "Bruno Teles",
+      "Elaine Mendes",
+      "Natália Gomes",
+      "Hugo Ribeiro",
+      "Gleice Anne",
+      "David Ribeiro",
+      "Michella Rita",
+      "Mônica Silva"
+    ]
+  },
+  "Centenário do Sul": {
+    "uf": "PE",
+    "total_eventos": 22,
+    "projetos": [
+      "Tema",
+      "Acerta"
+    ],
+    "formadores": [
+      "Michele Macedo",
+      "Gabriel Oliveira",
+      "Rayane Maria",
+      "Simone Maria",
+      "Amanda Sales",
+      "Juliana Guerreiro",
+      "Ariana Coelho",
+      "Alisson Mendonça"
+    ]
+  },
+  "Chorozinho": {
+    "uf": "PE",
+    "total_eventos": 21,
+    "projetos": [
+      "Projeto Amma",
+      "Acerta",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Poliane Lima",
+      "Rodrigo Lima",
+      "Michele Macedo",
+      "Solicitado",
+      "Mônica Maria"
+    ]
+  },
+  "Craíbas": {
+    "uf": "PE",
+    "total_eventos": 30,
+    "projetos": [
+      "Vida & Matemática",
+      "Acerta",
+      "Vida & Linguagem",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Elizabete Lima",
+      "Ricardo Ítalo",
+      "Michele Macedo",
+      "Gabriel Oliveira",
+      "Marcela Sousa",
+      "João Marcos",
+      "David Ribeiro",
+      "Michella Rita"
+    ]
+  },
+  "Curvelo": {
+    "uf": "PE",
+    "total_eventos": 46,
+    "projetos": [
+      "Lendo E Escrevendo",
+      "Acerta",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Anna Lúcia",
+      "Ricardo Ítalo",
+      "Jonathan Araújo",
+      "Poliane Lima",
+      "Michele Macedo",
+      "Gabriel Oliveira",
+      "Solicitado",
+      "Elaine Mendes",
+      "Simone Maria",
+      "Hugo Ribeiro",
+      "Valdiana Santos",
+      "Penélope Alberto",
+      "Ariana Coelho",
+      "Icaro Maciel",
+      "Humberto Luciano",
+      "Germana Mirla"
+    ]
+  },
+  "Florestal": {
+    "uf": "PE",
+    "total_eventos": 45,
+    "projetos": [
+      "Tema",
+      "Lendo E Escrevendo",
+      "Acerta",
+      "Novo Lendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Denise Carlos",
+      "Anna Lúcia",
+      "Rochelly Alinne",
+      "Elizabete Lima",
+      "Anna Patrícia",
+      "Michele Macedo",
+      "Gabriel Oliveira",
+      "Maria Leidiane",
+      "Marcela Sousa",
+      "Maria Auxiliadora",
+      "Penélope Alberto",
+      "Hugo Ribeiro",
+      "Juliana Guerreiro",
+      "Mônica Silva",
+      "Ariana Coelho",
+      "Janieri Martins",
+      "Humberto Luciano"
+    ]
+  },
+  "Fortim": {
+    "uf": "PE",
+    "total_eventos": 29,
+    "projetos": [
+      "Vida & Matemática",
+      "Acerta",
+      "Vida & Linguagem",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Marcos Randall",
+      "Poliane Lima",
+      "Michele Macedo",
+      "David Ribeiro",
+      "Michella Rita"
+    ]
+  },
+  "Holambra": {
+    "uf": "PE",
+    "total_eventos": 16,
+    "projetos": [
+      "Tema",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Jonathan Araújo",
+      "Marcela Sousa",
+      "Elaine Mendes",
+      "Juliana Guerreiro",
+      "Ariana Coelho"
+    ]
+  },
+  "Indaial": {
+    "uf": "PE",
+    "total_eventos": 20,
+    "projetos": [
+      "Tema",
+      "Ler, Ouvir E Contar",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Denise Carlos",
+      "Anna Lúcia",
+      "Jonathan Araújo",
+      "Lourene Pinheiro",
+      "Simone Maria",
+      "Penélope Alberto"
+    ]
+  },
+  "Lagoa Grande": {
+    "uf": "PE",
+    "total_eventos": 65,
+    "projetos": [
+      "Tema",
+      "Projeto Amma",
+      "Vida & Linguagem",
+      "A Cor Da Gente",
+      "Vida & Matemática",
+      "Sou Da Paz",
+      "Novo Lendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Rafael Rabelo",
+      "Jonathan Araújo",
+      "Fabrícia Santos",
+      "Elaine Mendes",
+      "Amanda Sales",
+      "Daniele Cristina",
+      "Mônica Maria",
+      "Anna Patrícia",
+      "Lidiane Oliveira",
+      "Júlia Rodrigues",
+      "João Marcos",
+      "Elienai Oliveira",
+      "Diego Tavares",
+      "Regianio Lima",
+      "Germana Mirla",
+      "Ricardo Ítalo",
+      "Lyziane Maria",
+      "Fabíola Martins",
+      "Mônica Silva"
+    ]
+  },
+  "Macuco": {
+    "uf": "PE",
+    "total_eventos": 29,
+    "projetos": [
+      "Tema",
+      "Acerta",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Denise Carlos",
+      "Michele Macedo",
+      "Gabriel Oliveira",
+      "Rayane Maria",
+      "Simone Maria",
+      "Valdiana Santos",
+      "Humberto Luciano"
+    ]
+  },
+  "Mandaguari": {
+    "uf": "PE",
+    "total_eventos": 12,
+    "projetos": [
+      "Tema"
+    ],
+    "formadores": [
+      "Anna Lúcia",
+      "Simone Maria",
+      "Juliana Guerreiro",
+      "Ariana Coelho",
+      "Germana Mirla"
+    ]
+  },
+  "Maracanaú": {
+    "uf": "PE",
+    "total_eventos": 97,
+    "projetos": [
+      "Projeto Amma",
+      "Vida & Linguagem",
+      "Lendo E Escrevendo",
+      "Vida & Matemática",
+      "Avançando Juntos Língua Portuguesa",
+      "Acerta",
+      "Avançando Juntos Matemática",
+      "Novo Lendo",
+      "Ler, Ouvir E Contar",
+      "Superativar"
+    ],
+    "formadores": [
+      "Ana Kariny",
+      "Rodrigo Lima",
+      "Elaine Mendes",
+      "Amanda Sales",
+      "Danielle Fernandes",
+      "Icaro Maciel",
+      "Katy Silva",
+      "Humberto Luciano",
+      "Mônica Maria",
+      "Jarbas Marcelino",
+      "Laís Aline",
+      "Glaubia Pinheiro",
+      "Elizabete Lima",
+      "Michele Macedo",
+      "Lourene Pinheiro",
+      "Claudiana Maria",
+      "João Marcos",
+      "Hugo Ribeiro",
+      "Douglas Wígner",
+      "Diego Tavares",
+      "Regianio Lima",
+      "Rodolfo Penha",
+      "Lívia Mara",
+      "Gabriel Oliveira",
+      "Nadyelle Carvalho",
+      "Poliane Lima",
+      "Lyziane Maria",
+      "Fabíola Martins",
+      "David Ribeiro",
+      "Alysson Macedo",
+      "Alisson Mendonça"
+    ]
+  },
+  "Matias Cardoso": {
+    "uf": "PE",
+    "total_eventos": 46,
+    "projetos": [
+      "Tema",
+      "Vida & Linguagem",
+      "Lendo E Escrevendo",
+      "Vida & Matemática",
+      "Acerta",
+      "Novo Lendo",
+      "Vida & Ciências"
+    ],
+    "formadores": [
+      "Denise Carlos",
+      "Anna Lúcia",
+      "Iago Oliveira",
+      "Elizabete Lima",
+      "Jonathan Araújo",
+      "Thaís Borges",
+      "Gabriel Oliveira",
+      "David Ribeiro",
+      "Yuri Furtado",
+      "João Marcos",
+      "Bruno Teles",
+      "Rayane Maria",
+      "Valdiana Santos",
+      "Humberto Luciano",
+      "Nadyelle Carvalho",
+      "Ariana Coelho",
+      "Icaro Maciel"
+    ]
+  },
+  "Mirabela": {
+    "uf": "PE",
+    "total_eventos": 51,
+    "projetos": [
+      "Tema",
+      "Vida & Linguagem",
+      "Vida & Matemática",
+      "Acerta",
+      "Vida & Ciências",
+      "Novo Lendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Iago Oliveira",
+      "Jonathan Araújo",
+      "Fabrícia Santos",
+      "Gleice Anne",
+      "Humberto Luciano",
+      "Elienai Góes",
+      "Elizabete Lima",
+      "Anna Patrícia",
+      "Michele Macedo",
+      "João Marcos",
+      "Thaís Borges",
+      "Gabriel Oliveira",
+      "Anna Lúcia",
+      "Maria Leidiane",
+      "Socorro Aclécia",
+      "Yuri Furtado",
+      "Natália Gomes",
+      "David Ribeiro",
+      "Mônica Silva"
+    ]
+  },
+  "Mucambo": {
+    "uf": "PE",
+    "total_eventos": 42,
+    "projetos": [
+      "Tema",
+      "Vida & Linguagem",
+      "Vida & Matemática",
+      "Acerta",
+      "Novo Lendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Elizabete Lima",
+      "Jonathan Araújo",
+      "Rochelly Alinne",
+      "Lidiane Oliveira",
+      "Michele Macedo",
+      "Maria Leidiane",
+      "Maria Joelma",
+      "Hugo Ribeiro",
+      "Michella Rita",
+      "Douglas Wígner"
+    ]
+  },
+  "Pereiro": {
+    "uf": "PE",
+    "total_eventos": 51,
+    "projetos": [
+      "Tema",
+      "Projeto Amma",
+      "Vida & Linguagem",
+      "Lendo E Escrevendo",
+      "Vida & Matemática",
+      "Acerta",
+      "Novo Lendo",
+      "Vida & Ciências",
+      "Superativar"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Jarbas Marcelino",
+      "Iago Oliveira",
+      "Ricardo Ítalo",
+      "Poliane Lima",
+      "Michele Macedo",
+      "Rodrigo Lima",
+      "Humberto Luciano",
+      "Alysson Macedo",
+      "Douglas Wígner",
+      "Germana Mirla"
+    ]
+  },
+  "Petrolina": {
+    "uf": "PE",
+    "total_eventos": 87,
+    "projetos": [
+      "Leio Escrevo E Calculo",
+      "Tema",
+      "Projeto Amma",
+      "Vida & Linguagem",
+      "Lendo E Escrevendo",
+      "Vida & Matemática",
+      "Acerta",
+      "Novo Lendo",
+      "Brincando E Aprendendo",
+      "Cirandar"
+    ],
+    "formadores": [
+      "Jonathan Araújo",
+      "Rodrigo Lima",
+      "Bruno Teles",
+      "Elaine Mendes",
+      "Simone Maria",
+      "Humberto Luciano",
+      "Mônica Maria",
+      "Isabel Kerssia",
+      "Elizabete Lima",
+      "Ayla Maria",
+      "Michele Macedo",
+      "Hugo Ribeiro",
+      "Douglas Wígner",
+      "Paula Freire",
+      "Gabriel Oliveira",
+      "Marcela Sousa",
+      "Penélope Alberto",
+      "Valdiana Santos",
+      "Valdemir Silva",
+      "Anna Lúcia",
+      "Poliane Lima",
+      "Antonio Furtado",
+      "Maria Leidiane",
+      "Lyziane Maria",
+      "Fabíola Martins",
+      "Juliana Guerreiro",
+      "Ellen Damares",
+      "Alysson Macedo",
+      "Mônica Silva"
+    ]
+  },
+  "Poço de José de Moura": {
+    "uf": "PE",
+    "total_eventos": 40,
+    "projetos": [
+      "Tema",
+      "A Cor Da Gente",
+      "Lendo E Escrevendo",
+      "Novo Lendo",
+      "Ler, Ouvir E Contar"
+    ],
+    "formadores": [
+      "Anna Lúcia",
+      "Ayla Maria",
+      "Jonathan Araújo",
+      "Lourene Pinheiro",
+      "Júlia Rodrigues",
+      "Elaine Mendes",
+      "Hugo Ribeiro",
+      "Valdiana Santos",
+      "Daniele Cristina"
+    ]
+  },
+  "Pomerode": {
+    "uf": "PE",
+    "total_eventos": 33,
+    "projetos": [
+      "Vida & Matemática",
+      "Acerta",
+      "Vida & Linguagem",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Regianio Lima",
+      "Glaubia Pinheiro",
+      "Elizabete Lima",
+      "Jonathan Araújo",
+      "Ricardo Ítalo",
+      "Michele Macedo",
+      "João Marcos",
+      "David Ribeiro"
+    ]
+  },
+  "Rondonópolis": {
+    "uf": "PE",
+    "total_eventos": 214,
+    "projetos": [
+      "Tema",
+      "Lendo E Escrevendo",
+      "Acerta",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Nivia Vieira",
+      "Paula Freire",
+      "Rochelly Alinne",
+      "Elizabete Lima",
+      "Michele Macedo",
+      "Júlia Rodrigues",
+      "Solicitado",
+      "Gerente Katy Silva",
+      "Rayane Maria",
+      "Elaine Mendes",
+      "Amanda Sales",
+      "Hugo Ribeiro",
+      "Nadyelle Carvalho",
+      "Humberto Luciano",
+      "Mazuk Eeves",
+      "Alisson Mendonça"
+    ]
+  },
+  "Santa Quitéria": {
+    "uf": "PE",
+    "total_eventos": 14,
+    "projetos": [
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Lyziane Maria"
+    ]
+  },
+  "Santo Inácio": {
+    "uf": "PE",
+    "total_eventos": 18,
+    "projetos": [
+      "Tema",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Denise Carlos",
+      "Jonathan Araújo",
+      "Simone Maria",
+      "Amanda Sales",
+      "Nadyelle Carvalho",
+      "Alisson Mendonça"
+    ]
+  },
+  "São Desidério": {
+    "uf": "PE",
+    "total_eventos": 21,
+    "projetos": [
+      "Lendo E Escrevendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Isabel Kerssia",
+      "Maria Leidiane",
+      "Marcela Sousa",
+      "Rayane Maria",
+      "Mônica Silva",
+      "Germana Mirla"
+    ]
+  },
+  "São João da Ponte": {
+    "uf": "PE",
+    "total_eventos": 22,
+    "projetos": [
+      "Lendo E Escrevendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Anna Lúcia",
+      "Isabel Kerssia",
+      "Anna Patrícia",
+      "Lidiane Oliveira",
+      "Fabrícia Santos",
+      "Lyziane Maria",
+      "Maria Auxiliadora",
+      "Amanda Sales",
+      "Ariana Coelho",
+      "Mônica Silva"
+    ]
+  },
+  "São Sebastião da Amoreira": {
+    "uf": "PE",
+    "total_eventos": 15,
+    "projetos": [
+      "Tema",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Simone Maria",
+      "Juliana Guerreiro"
+    ]
+  },
+  "Sobral": {
+    "uf": "PE",
+    "total_eventos": 45,
+    "projetos": [
+      "Uni Duni Tê",
+      "Cataventos",
+      "Miudezas"
+    ],
+    "formadores": [
+      "Rochelly Alinne",
+      "Maria Nadir",
+      "Júlia Rodrigues",
+      "Solicitado",
+      "Rayane Maria",
+      "Mazuk Eeves",
+      "Janieri Martins"
+    ]
+  },
+  "Tarrafas": {
+    "uf": "PE",
+    "total_eventos": 16,
+    "projetos": [
+      "Lendo E Escrevendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Gabriela Duarte",
+      "Isabel Kerssia",
+      "Maria Leidiane",
+      "Marcela Sousa",
+      "Júlia Rodrigues",
+      "Rayane Maria",
+      "Natália Gomes",
+      "Mônica Silva",
+      "Germana Mirla"
+    ]
+  },
+  "Uiraúna": {
+    "uf": "PE",
+    "total_eventos": 80,
+    "projetos": [
+      "Tema",
+      "Projeto Amma",
+      "Vida & Linguagem",
+      "Lendo E Escrevendo",
+      "Vida & Matemática",
+      "Acerta",
+      "Vida & Ciências",
+      "Novo Lendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Viviane Aquino",
+      "Isabel Kerssia",
+      "Thaís Borges",
+      "Ayla Maria",
+      "Gabriel Oliveira",
+      "David Ribeiro",
+      "Claudiana Maria",
+      "Yuri Furtado",
+      "Maria Auxiliadora",
+      "Elaine Mendes",
+      "Raul Vasconcelos",
+      "Valdiana Santos",
+      "Icaro Maciel",
+      "Humberto Luciano",
+      "Mônica Maria"
+    ]
+  },
+  "Itaparica": {
+    "uf": "PE",
+    "total_eventos": 39,
+    "projetos": [
+      "Tema",
+      "Brincando E Aprendendo",
+      "Acerta",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Gabriela Duarte",
+      "Elizabete Lima",
+      "Maria Leidiane",
+      "Gabriel Oliveira",
+      "Fabrícia Santos",
+      "Maria Joelma",
+      "Natália Gomes",
+      "Valdiana Santos",
+      "Humberto Luciano"
+    ]
+  },
+  "Itapipoca": {
+    "uf": "PE",
+    "total_eventos": 6,
+    "projetos": [
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Marcela Sousa"
+    ]
+  },
+  "Pacujá": {
+    "uf": "PE",
+    "total_eventos": 28,
+    "projetos": [
+      "Tema",
+      "Projeto Amma",
+      "Vida & Linguagem",
+      "Vida & Matemática",
+      "Novo Lendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Marcos Randall",
+      "Ayla Maria",
+      "Lidiane Oliveira",
+      "Rodrigo Lima",
+      "Maria Leidiane",
+      "Maria Joelma",
+      "Diego Tavares",
+      "Germana Mirla"
+    ]
+  },
+  "Criciúma": {
+    "uf": "PE",
+    "total_eventos": 21,
+    "projetos": [
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Jonathan Araújo",
+      "Germana Mirla"
+    ]
+  },
+  "Itaquiraí": {
+    "uf": "PE",
+    "total_eventos": 18,
+    "projetos": [
+      "Tema",
+      "Acerta"
+    ],
+    "formadores": [
+      "Elizabete Lima",
+      "Jonathan Araújo",
+      "Gabriel Oliveira",
+      "Hugo Ribeiro",
+      "Humberto Luciano",
+      "Alisson Mendonça"
+    ]
+  },
+  "Russas": {
+    "uf": "PE",
+    "total_eventos": 22,
+    "projetos": [
+      "Projeto Amma",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Rodrigo Lima",
+      "Marcela Sousa"
+    ]
+  },
+  "Indianopolis": {
+    "uf": "PE",
+    "total_eventos": 1,
+    "projetos": [
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Marcela Sousa"
+    ]
+  },
+  "Indianópolis": {
+    "uf": "PE",
+    "total_eventos": 1,
+    "projetos": [
+      "Lendo E Escrevendo"
+    ],
+    "formadores": [
+      "Marcela Sousa"
+    ]
+  },
+  "São Fidélis": {
+    "uf": "PE",
+    "total_eventos": 17,
+    "projetos": [
+      "Lendo E Escrevendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Anna Lúcia",
+      "Isabel Kerssia",
+      "Ricardo Ítalo",
+      "Anna Patrícia",
+      "Fabrícia Santos",
+      "Júlia Rodrigues",
+      "Lyziane Maria",
+      "Maria Auxiliadora",
+      "Elaine Mendes",
+      "Amanda Sales",
+      "Juliana Guerreiro",
+      "Penélope Alberto",
+      "Ariana Coelho",
+      "Mônica Silva"
+    ]
+  },
+  "Barreira": {
+    "uf": "PE",
+    "total_eventos": 25,
+    "projetos": [
+      "Vida & Matemática",
+      "Acerta",
+      "Vida & Linguagem",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Elizabete Lima",
+      "Poliane Lima",
+      "Michele Macedo",
+      "Marcela Sousa",
+      "Alysson Macedo",
+      "Michella Rita",
+      "Humberto Luciano",
+      "Douglas Wígner"
+    ]
+  },
+  "Maranguape": {
+    "uf": "PE",
+    "total_eventos": 25,
+    "projetos": [
+      "Projeto Amma",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Sandra Dias",
+      "Rodrigo Lima",
+      "Fabíola Martins",
+      "Hugo Ribeiro",
+      "Vanessa Angélica",
+      "Mônica Maria"
+    ]
+  },
+  "Carandaí": {
+    "uf": "PE",
+    "total_eventos": 6,
+    "projetos": [
+      "Lendo E Escrevendo"
+    ],
+    "formadores": [
+      "Ayla Maria",
+      "Solicitado",
+      "Valdiana Santos"
+    ]
+  },
+  "Balneário Rincão": {
+    "uf": "PE",
+    "total_eventos": 10,
+    "projetos": [
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Germana Mirla"
+    ]
+  },
+  "Canarana": {
+    "uf": "PE",
+    "total_eventos": 29,
+    "projetos": [
+      "Tema",
+      "Vida & Linguagem",
+      "Vida & Matemática",
+      "Acerta",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Regianio Lima",
+      "Glaubia Pinheiro",
+      "Elizabete Lima",
+      "Jonathan Araújo",
+      "Lidiane Oliveira",
+      "Michele Macedo",
+      "Fabrícia Santos",
+      "Maria Auxiliadora",
+      "Humberto Luciano",
+      "Mônica Silva"
+    ]
+  },
+  "Antônio Gonçalves": {
+    "uf": "PE",
+    "total_eventos": 32,
+    "projetos": [
+      "Tema",
+      "Vida & Linguagem",
+      "A Cor Da Gente",
+      "Vida & Matemática",
+      "Novo Lendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Gabriela Duarte",
+      "Jonathan Araújo",
+      "Maria Leidiane",
+      "Lyziane Maria",
+      "Amanda Sales",
+      "Daniele Cristina",
+      "Estela Maria",
+      "Janieri Martins",
+      "Mônica Silva",
+      "Diego Tavares"
+    ]
+  },
+  "Iracema": {
+    "uf": "PE",
+    "total_eventos": 29,
+    "projetos": [
+      "Tema",
+      "Projeto Amma",
+      "Vida & Linguagem",
+      "Vida & Matemática",
+      "Acerta",
+      "Novo Lendo",
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Marcos Randall",
+      "Isabel Kerssia",
+      "Poliane Lima",
+      "Marcela Sousa",
+      "Maria Joelma",
+      "Gleice Anne",
+      "Michella Rita",
+      "Alysson Macedo",
+      "Mônica Maria"
+    ]
+  },
+  "Filadélfia": {
+    "uf": "PE",
+    "total_eventos": 16,
+    "projetos": [
+      "Vida & Matemática",
+      "Tema",
+      "Acerta",
+      "Vida & Linguagem"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Regianio Lima",
+      "Glaubia Pinheiro",
+      "Poliane Lima",
+      "Elizabete Lima",
+      "Elaine Mendes",
+      "Humberto Luciano",
+      "Alysson Macedo"
+    ]
+  },
+  "Ibaretama": {
+    "uf": "PE",
+    "total_eventos": 18,
+    "projetos": [
+      "Projeto Amma",
+      "Acerta",
+      "Novo Lendo"
+    ],
+    "formadores": [
+      "Elisângela Soares",
+      "Poliane Lima",
+      "Ayla Maria",
+      "Gabriel Oliveira",
+      "Fabíola Martins",
+      "Icaro Maciel",
+      "Alysson Macedo"
+    ]
+  },
+  "Araguari": {
+    "uf": "PE",
+    "total_eventos": 80,
+    "projetos": [
+      "Acerta"
+    ],
+    "formadores": [
+      "Icaro Maciel",
+      "Laís Aline",
+      "Alysson Macedo",
+      "Gabriel Oliveira"
+    ]
+  },
+  "Atibaia": {
+    "uf": "PE",
+    "total_eventos": 25,
+    "projetos": [
+      "Acerta",
+      "Ideb10"
+    ],
+    "formadores": [
+      "Icaro Maciel",
+      "Michele Macedo",
+      "Analine Parente",
+      "Poliane Lima"
+    ]
+  },
+  "Campo Alegre": {
+    "uf": "PE",
+    "total_eventos": 20,
+    "projetos": [
+      "Vida & Matemática",
+      "Vida & Ciências",
+      "Acerta",
+      "Vida & Linguagem"
+    ],
+    "formadores": [
+      "Iago Oliveira",
+      "Ana Kariny",
+      "Elizabete Lima",
+      "Michele Macedo",
+      "Gabriel Oliveira",
+      "Raul Vasconcelos",
+      "Douglas Wígner"
+    ]
+  },
+  "Campo Largo": {
+    "uf": "PE",
+    "total_eventos": 26,
+    "projetos": [
+      "Acerta",
+      "Ideb10 - Esquenta Saeb"
+    ],
+    "formadores": [
+      "Analine Parente",
+      "Michele Macedo",
+      "Poliane Lima"
+    ]
+  },
+  "Cianorte": {
+    "uf": "PE",
+    "total_eventos": 13,
+    "projetos": [
+      "Acerta"
+    ],
+    "formadores": [
+      "Humberto Luciano",
+      "Elizabete Lima"
+    ]
+  },
+  "Itagi": {
+    "uf": "PE",
+    "total_eventos": 8,
+    "projetos": [
+      "Acerta"
+    ],
+    "formadores": [
+      "Alysson Macedo",
+      "Humberto Luciano",
+      "Gabriel Oliveira",
+      "Rayane Maria"
+    ]
+  },
+  "Piên": {
+    "uf": "PE",
+    "total_eventos": 8,
+    "projetos": [
+      "Acerta"
+    ],
+    "formadores": [
+      "Viviane Aquino",
+      "Elizabete Lima",
+      "Michele Macedo",
+      "Humberto Luciano",
+      "Alysson Macedo"
+    ]
+  },
+  "Ponta Grossa": {
+    "uf": "PE",
+    "total_eventos": 16,
+    "projetos": [
+      "Acerta"
+    ],
+    "formadores": [
+      "Michele Macedo",
+      "Humberto Luciano",
+      "Poliane Lima",
+      "Elizabete Lima"
+    ]
+  },
+  "Serra do Salitre": {
+    "uf": "PE",
+    "total_eventos": 13,
+    "projetos": [
+      "Brincando E Aprendendo",
+      "Acerta"
+    ],
+    "formadores": [
+      "Viviane Aquino",
+      "Elizabete Lima",
+      "Lidiane Oliveira",
+      "Michele Macedo",
+      "Fabrícia Santos",
+      "Humberto Luciano",
+      "Mônica Silva"
+    ]
+  },
+  "Teotônio Vilela": {
+    "uf": "PE",
+    "total_eventos": 20,
+    "projetos": [
+      "Vida & Matemática",
+      "Vida & Ciências",
+      "Acerta",
+      "Vida & Linguagem"
+    ],
+    "formadores": [
+      "Elizabete Lima",
+      "Antonio Furtado",
+      "Michele Macedo",
+      "Raul Vasconcelos",
+      "Humberto Luciano",
+      "Douglas Wígner"
+    ]
+  },
+  "São Mateus do Sul": {
+    "uf": "PE",
+    "total_eventos": 8,
+    "projetos": [
+      "Acerta"
+    ],
+    "formadores": [
+      "Humberto Luciano",
+      "Michele Macedo",
+      "Gabriel Oliveira"
+    ]
+  },
+  "Balsa Nova": {
+    "uf": "PE",
+    "total_eventos": 11,
+    "projetos": [
+      "Brincando E Aprendendo",
+      "Acerta"
+    ],
+    "formadores": [
+      "Lidiane Oliveira",
+      "Michele Macedo",
+      "Fabrícia Santos",
+      "Gabriel Oliveira",
+      "Alysson Macedo",
+      "Maria Auxiliadora",
+      "Humberto Luciano",
+      "Marilene Lima"
+    ]
+  },
+  "Tupã": {
+    "uf": "PE",
+    "total_eventos": 8,
+    "projetos": [
+      "Acerta"
+    ],
+    "formadores": [
+      "Icaro Maciel",
+      "Alysson Macedo",
+      "Poliane Lima"
+    ]
+  },
+  "Santana do Ipanema": {
+    "uf": "PE",
+    "total_eventos": 16,
+    "projetos": [
+      "Vida & Matemática",
+      "Vida & Ciências",
+      "Acerta",
+      "Vida & Linguagem"
+    ],
+    "formadores": [
+      "Viviane Aquino",
+      "Regianio Lima",
+      "Glaubia Pinheiro",
+      "Iago Oliveira",
+      "Thaís Borges",
+      "Gabriel Oliveira",
+      "Alysson Macedo",
+      "Humberto Luciano"
+    ]
+  },
+  "Canavieiras": {
+    "uf": "PE",
+    "total_eventos": 7,
+    "projetos": [
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Maria Leidiane",
+      "Anna Patrícia",
+      "Fabrícia Santos"
+    ]
+  },
+  "Rio Paranaíba": {
+    "uf": "PE",
+    "total_eventos": 4,
+    "projetos": [
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Maria Leidiane",
+      "Lidiane Oliveira",
+      "Fabrícia Santos",
+      "Mônica Silva"
+    ]
+  },
+  "São José do Calçado": {
+    "uf": "PE",
+    "total_eventos": 3,
+    "projetos": [
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Anna Patrícia",
+      "Maria Leidiane",
+      "Mônica Silva"
+    ]
+  },
+  "Ereré": {
+    "uf": "PE",
+    "total_eventos": 4,
+    "projetos": [
+      "Brincando E Aprendendo"
+    ],
+    "formadores": [
+      "Isabel Kerssia",
+      "Lidiane Oliveira",
+      "Maria Joelma",
+      "Marilene Lima",
+      "Mônica Silva"
+    ]
+  },
+  "Dias Davila": {
+    "uf": "PE",
+    "total_eventos": 25,
+    "projetos": [
+      "Vida & Matemática",
+      "Sou Da Paz",
+      "Vida & Linguagem"
+    ],
+    "formadores": [
+      "Marcos Randall",
+      "Michella Rita",
+      "Rafael Rabelo"
+    ]
+  },
+  "São João do Rio do Peixe": {
+    "uf": "PE",
+    "total_eventos": 4,
+    "projetos": [
+      "A Cor Da Gente"
+    ],
+    "formadores": [
+      "Daniele Cristina"
+    ]
+  },
+  "Murici": {
+    "uf": "PE",
+    "total_eventos": 15,
+    "projetos": [
+      "Ed Financeira",
+      "Vida & Ciências",
+      "Sou Da Paz",
+      "A Cor Da Gente"
+    ],
+    "formadores": [
+      "Daniele Cristina",
+      "Iago Oliveira",
+      "Amanda Sales",
+      "Rafael Rabelo"
+    ]
+  },
+  "Cabedelo": {
+    "uf": "PE",
+    "total_eventos": 8,
+    "projetos": [
+      "Vida & Matemática",
+      "Vida & Linguagem"
+    ],
+    "formadores": [
+      "Douglas Wígner",
+      "Diego Tavares"
+    ]
+  }
+}

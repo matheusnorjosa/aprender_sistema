@@ -22,7 +22,7 @@ def _dia_range(dt: date):
 def _tem_bloqueio(formador_id, dia: date, tipo: str):
     """Verifica bloqueios de forma case-insensitive"""
     return DisponibilidadeFormadores.objects.filter(
-        formador_id=formador_id, data_bloqueio=dia, tipo_bloqueio__iexact=tipo
+        usuario_id=formador_id, data_bloqueio=dia, tipo_bloqueio__iexact=tipo
     ).exists()
 
 
@@ -70,11 +70,13 @@ def gerar_mapa_mensal_otimizado(formadores, dias):
     # === BUSCAR TODOS OS DADOS DE UMA VEZ ===
 
     # 1. Todos os bloqueios do período
+    # Mapear formador_ids para usuario_ids
+    usuario_ids = [f.usuario.id for f in formadores if f.usuario]
     bloqueios = DisponibilidadeFormadores.objects.filter(
-        formador_id__in=formador_ids,
+        usuario_id__in=usuario_ids,
         data_bloqueio__gte=dia_inicio,
         data_bloqueio__lte=dia_fim,
-    ).select_related("formador")
+    ).select_related("usuario")
 
     # 2. Todos os deslocamentos do período
     from django.db.models import Q
@@ -102,7 +104,10 @@ def gerar_mapa_mensal_otimizado(formadores, dias):
     # Bloqueios: {formador_id: {data: tipo}}
     bloqueios_map = defaultdict(dict)
     for bloq in bloqueios:
-        bloqueios_map[bloq.formador_id][bloq.data_bloqueio] = bloq.tipo_bloqueio.lower()
+        # Mapear usuario_id para formador_id
+        if hasattr(bloq.usuario, 'formador_profile') and bloq.usuario.formador_profile:
+            formador_id = bloq.usuario.formador_profile.id
+            bloqueios_map[formador_id][bloq.data_bloqueio] = bloq.tipo_bloqueio.lower()
 
     # Deslocamentos: {formador_id: {data: True}}
     desloc_map = defaultdict(set)
@@ -141,15 +146,51 @@ def gerar_mapa_mensal_otimizado(formadores, dias):
 
 
 def _marcador_otimizado(formador_id, dia, tipo_bloqueio, tem_desloc, qtd_eventos):
-    """Lógica de marcador usando dados pré-carregados"""
-    # Hierarquia de decisão
+    """Lógica de marcador usando dados pré-carregados - baseado na planilha"""
+    # Hierarquia de decisão baseada nos códigos da planilha
     if tipo_bloqueio == "total":
         return "X" if (qtd_eventos or tem_desloc) else "T"
     if tipo_bloqueio == "parcial":
         return "X" if (qtd_eventos or tem_desloc) else "P"
-    if tem_desloc:
-        return f"D{qtd_eventos}" if qtd_eventos else "D"
-    return str(qtd_eventos) if qtd_eventos else "-"
+    if tipo_bloqueio == "conflito":
+        return "X"  # Conflito com bloqueio
+    if tipo_bloqueio == "evento":
+        return "1" if qtd_eventos == 1 else str(qtd_eventos) if qtd_eventos > 1 else "1"
+    if tipo_bloqueio == "multi_evento":
+        return "2" if qtd_eventos >= 2 else str(qtd_eventos) if qtd_eventos > 0 else "2"
+    if tipo_bloqueio == "desloc_evento":
+        if tem_desloc and qtd_eventos > 0:
+            return "D1"  # Deslocamento e evento
+        elif tem_desloc:
+            return "D"  # Apenas deslocamento
+        elif qtd_eventos > 0:
+            return str(qtd_eventos)  # Apenas evento
+        else:
+            return "D1"  # Fallback
+    if tipo_bloqueio == "disponível":
+        # Para disponível, mostrar eventos ou deslocamentos se existirem
+        if tem_desloc and qtd_eventos > 0:
+            return "D1"  # Deslocamento e evento
+        elif tem_desloc:
+            return "D"  # Apenas deslocamento
+        elif qtd_eventos > 1:
+            return "2"  # Mais de um evento
+        elif qtd_eventos == 1:
+            return "1"  # Um evento
+        else:
+            return "V"  # Disponível (célula vazia na planilha)
+    
+    # Fallback para casos não mapeados
+    if tem_desloc and qtd_eventos > 0:
+        return "D1"
+    elif tem_desloc:
+        return "D"
+    elif qtd_eventos > 1:
+        return "2"
+    elif qtd_eventos == 1:
+        return "1"
+    else:
+        return "-"
 
 
 # === MANTER FUNÇÃO ORIGINAL PARA COMPATIBILIDADE ===

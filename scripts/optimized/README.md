@@ -1,0 +1,3 @@
+# Optimized
+
+Scripts otimizados

@@ -1,0 +1,261 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Dashboard Executivo Integrado - Sistema Aprender{% endblock %}
+
+{% block nav_diretoria_integrado %}active{% endblock %}
+
+{% block page_title %}
+<i class="bi bi-graph-up-arrow"></i> Dashboard Executivo Integrado
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .dashboard-tabs {
+        margin-bottom: 2rem;
+    }
+    
+    .tab-content {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        min-height: 800px;
+    }
+    
+    .streamlit-container {
+        width: 100%;
+        height: 800px;
+        border: none;
+        border-radius: 12px;
+    }
+    
+    .stats-overview {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid #667eea;
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #667eea;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .integration-info {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+    
+    .loading-indicator {
+        text-align: center;
+        padding: 2rem;
+        color: #6c757d;
+    }
+    
+    .nav-tabs .nav-link {
+        border-radius: 12px 12px 0 0;
+        margin-right: 0.5rem;
+        border: none;
+        background: #f8f9fa;
+        color: #495057;
+        font-weight: 500;
+    }
+    
+    .nav-tabs .nav-link.active {
+        background: #667eea;
+        color: white;
+        border: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <small class="text-muted">Dashboard executivo integrado com Streamlit • Dados em tempo real</small>
+</div>
+
+<!-- Informação sobre integração -->
+<div class="integration-info">
+    <h5><i class="bi bi-cpu"></i> Dashboard Integrado</h5>
+    <p class="mb-0">Streamlit executando dentro da plataforma Django • Gráficos interativos e análises avançadas</p>
+</div>
+
+<!-- Estatísticas Resumo -->
+<div class="stats-overview">
+    <div class="stat-card">
+        <div class="stat-number">{{ total_solicitacoes_ano|default:"0" }}</div>
+        <div class="stat-label">Total Solicitações</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ solicitacoes_aprovadas_ano|default:"0" }}</div>
+        <div class="stat-label">Eventos Aprovados</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ taxa_aprovacao_ano|default:"0" }}%</div>
+        <div class="stat-label">Taxa Aprovação</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ formadores_ativos|default:"0" }}</div>
+        <div class="stat-label">Formadores Ativos</div>
+    </div>
+</div>
+
+<!-- Tabs para diferentes visualizações -->
+<ul class="nav nav-tabs dashboard-tabs" id="dashboardTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="streamlit-tab" data-bs-toggle="tab" data-bs-target="#streamlit" type="button" role="tab">
+            <i class="bi bi-graph-up"></i> Dashboard Interativo
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="info-tab" data-bs-toggle="tab" data-bs-target="#info" type="button" role="tab">
+            <i class="bi bi-info-circle"></i> Informações
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="dashboardTabContent">
+    <!-- Tab do Streamlit -->
+    <div class="tab-pane fade show active" id="streamlit" role="tabpanel">
+        <div class="loading-indicator" id="streamlit-loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p class="mt-2">Carregando dashboard Streamlit...</p>
+        </div>
+        
+        <iframe 
+            id="streamlit-iframe"
+            src="http://localhost:8501?embed=true"
+            class="streamlit-container"
+            style="display: none;"
+            onload="hideLoading()"
+            onerror="showError()"
+            allow="camera; microphone"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms">
+        </iframe>
+        
+        <div id="streamlit-error" style="display: none;" class="text-center p-4">
+            <div class="alert alert-warning">
+                <h5><i class="bi bi-exclamation-triangle"></i> Streamlit não está rodando</h5>
+                <p>Para usar o dashboard interativo, execute:</p>
+                <code>streamlit run dashboard_streamlit.py --server.port 8501</code>
+                <br><br>
+                <a href="http://localhost:8501" target="_blank" class="btn btn-primary">
+                    <i class="bi bi-box-arrow-up-right"></i> Abrir em nova aba
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tab de informações -->
+    <div class="tab-pane fade" id="info" role="tabpanel">
+        <div class="p-4">
+            <h5><i class="bi bi-info-circle"></i> Como usar o Dashboard Integrado</h5>
+            
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h6><i class="bi bi-play"></i> Iniciar Streamlit</h6>
+                        </div>
+                        <div class="card-body">
+                            <p>Para ativar o dashboard interativo:</p>
+                            <ol>
+                                <li>Abra um terminal</li>
+                                <li>Execute: <code>streamlit run dashboard_streamlit.py</code></li>
+                                <li>Aguarde aparecer: <em>"You can now view your Streamlit app"</em></li>
+                                <li>Recarregue esta página</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-success text-white">
+                            <h6><i class="bi bi-graph-up"></i> Recursos Disponíveis</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul>
+                                <li><strong>Gráficos interativos</strong> - Zoom, filtros, hover</li>
+                                <li><strong>Dados em tempo real</strong> - Conectado ao Django</li>
+                                <li><strong>Filtros dinâmicos</strong> - Por ano, período</li>
+                                <li><strong>Múltiplos tipos</strong> - Barras, pizza, linha</li>
+                                <li><strong>Exportação</strong> - PNG, HTML, dados</li>
+                                <li><strong>Responsivo</strong> - Mobile e desktop</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-4">
+                <h6><i class="bi bi-lightbulb"></i> Dica</h6>
+                <p class="mb-0">O Streamlit roda em paralelo ao Django, oferecendo capacidades de análise avançada sem afetar a performance da aplicação principal.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function hideLoading() {
+    document.getElementById('streamlit-loading').style.display = 'none';
+    document.getElementById('streamlit-iframe').style.display = 'block';
+    console.log('Dashboard Streamlit carregado com sucesso!');
+}
+
+function showError() {
+    document.getElementById('streamlit-loading').style.display = 'none';
+    document.getElementById('streamlit-error').style.display = 'block';
+    console.log('Streamlit não está rodando');
+}
+
+// Verificar se Streamlit está rodando
+fetch('http://localhost:8501')
+    .then(response => {
+        if (response.ok) {
+            console.log('Streamlit detectado!');
+        } else {
+            showError();
+        }
+    })
+    .catch(error => {
+        console.log('Streamlit não detectado:', error);
+        showError();
+    });
+
+// Auto-refresh do iframe a cada 5 minutos para dados atualizados
+setInterval(function() {
+    const iframe = document.getElementById('streamlit-iframe');
+    if (iframe && iframe.style.display !== 'none') {
+        iframe.src = iframe.src;
+        console.log('Dashboard atualizado automaticamente');
+    }
+}, 300000); // 5 minutos
+</script>
+{% endblock %}

@@ -232,7 +232,7 @@ class DeslocamentoAPI(LoginRequiredMixin, View):
                     'tipo_display': desloc.get_tipo_display(),
                     'origem': desloc.origem,
                     'destino': desloc.destino,
-                    'pessoas': [p.nome for p in desloc.pessoas],
+                    'pessoas': [getattr(p, 'nome_completo', p.nome if hasattr(p, 'nome') else str(p)) for p in desloc.pessoas],
                     'pessoas_count': len(desloc.pessoas),
                 })
             
@@ -295,7 +295,7 @@ class DeslocamentoAPI(LoginRequiredMixin, View):
                     'tipo': desloc.get_tipo_display(),
                     'origem': desloc.origem,
                     'destino': desloc.destino,
-                    'pessoas': [p.nome for p in desloc.pessoas],
+                    'pessoas': [getattr(p, 'nome_completo', p.nome if hasattr(p, 'nome') else str(p)) for p in desloc.pessoas],
                 }
             })
             

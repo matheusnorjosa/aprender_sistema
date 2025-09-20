@@ -1,0 +1,1090 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Solicitar Evento - Sistema Aprender{% endblock %}
+
+{% block nav_solicitar %}active{% endblock %}
+
+{% block page_title %}
+<i class="bi bi-calendar-plus"></i> Solicitar Evento
+{% endblock %}
+
+{% block breadcrumb %}
+Registre uma nova solicitação de evento com verificação automática de conflitos
+{% endblock %}
+
+{% block page_actions %}
+<div class="actions">
+  <a href="{% url 'core:home' %}" class="btn">
+    <i class="bi bi-arrow-left"></i> Voltar ao Início
+  </a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --primary-color: #3498db;
+    --primary-hover: #2980b9;
+    --success-color: #27ae60;
+    --danger-color: #e74c3c;
+    --warning-color: #f39c12;
+    --info-color: #17a2b8;
+    --accent: var(--primary-color);
+    --border-radius: 0.75rem;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow: 0 4px 15px rgba(0,0,0,0.08);
+    --shadow-hover: 0 8px 25px rgba(0,0,0,0.15);
+  }
+
+  /* Enhanced form sections */
+  .form-section {
+    border-left: 5px solid var(--accent);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+  }
+  
+  .form-section:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .form-section h5 {
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 0.5rem;
+  }
+
+  .form-section h5 i {
+    margin-right: 0.5rem;
+  }
+
+  /* Enhanced form controls */
+  .form-control, .form-select {
+    border: 2px solid #e9ecef;
+    border-radius: var(--border-radius);
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    transition: var(--transition);
+    background-color: #fff;
+  }
+  
+  .form-control:focus, .form-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .required-field::after {
+    content: " *";
+    color: var(--danger-color);
+    font-weight: bold;
+  }
+
+  /* Real-time availability checker */
+  .availability-checker {
+    position: sticky;
+    top: 20px;
+    background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+    border: 2px solid #e9ecef;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    margin-top: 2rem;
+    box-shadow: var(--shadow);
+  }
+
+  .availability-status {
+    padding: 1rem;
+    border-radius: calc(var(--border-radius) * 0.7);
+    margin-bottom: 1rem;
+    transition: var(--transition);
+    border: 1px solid transparent;
+  }
+
+  .availability-status.loading {
+    background: linear-gradient(270deg, #f8f9fa, #e9ecef, #f8f9fa);
+    background-size: 400% 400%;
+    animation: loadingGradient 1.5s ease infinite;
+  }
+
+  .availability-status.available {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: var(--success-color);
+  }
+
+  .availability-status.conflicts {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-color: var(--danger-color);
+  }
+
+  .availability-status.partial-conflicts {
+    background-color: #fff3cd;
+    color: #856404;
+    border-color: var(--warning-color);
+  }
+
+  @keyframes loadingGradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .conflict-item {
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+    border-radius: 0.5rem;
+    border-left: 4px solid;
+    background-color: rgba(255, 255, 255, 0.7);
+  }
+
+  .conflict-error {
+    border-left-color: var(--danger-color);
+    background-color: #fff5f5;
+  }
+
+  .conflict-warning {
+    border-left-color: var(--warning-color);
+    background-color: #fffbf0;
+  }
+
+  .conflict-code {
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  /* Formadores selection enhancement */
+  .formadores-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .formador-option {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    border: 2px solid #e9ecef;
+    border-radius: var(--border-radius);
+    background-color: #fff;
+    transition: var(--transition);
+    cursor: pointer;
+  }
+
+  .formador-option:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+  }
+
+  .formador-option.selected {
+    border-color: var(--accent);
+    background-color: rgba(52, 152, 219, 0.1);
+  }
+
+  .formador-option input[type="checkbox"] {
+    margin-right: 0.75rem;
+    transform: scale(1.2);
+  }
+
+  /* Submit section */
+  .btn-group-submit {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 2px solid #e9ecef;
+    position: sticky;
+    bottom: 0;
+    background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    padding: 1.5rem 2rem;
+  }
+
+  .submit-loading {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    transition: var(--transition);
+    box-shadow: var(--shadow);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .btn-primary:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* Preview section */
+  .event-preview {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 2px dashed var(--accent);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    margin-top: 1rem;
+    display: none;
+  }
+
+  .event-preview.show {
+    display: block;
+    animation: fadeInUp 0.5s ease-out;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .preview-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  .preview-item:last-child {
+    border-bottom: none;
+  }
+
+  .preview-label {
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  /* Toast notifications */
+  .toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1055;
+  }
+
+  .toast {
+    min-width: 350px;
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-hover);
+    backdrop-filter: blur(10px);
+  }
+
+  .toast.success {
+    background: linear-gradient(135deg, rgba(39, 174, 96, 0.95) 0%, rgba(46, 204, 113, 0.95) 100%);
+    color: white;
+  }
+
+  .toast.error {
+    background: linear-gradient(135deg, rgba(231, 76, 60, 0.95) 0%, rgba(192, 57, 43, 0.95) 100%);
+    color: white;
+  }
+
+  .toast-header {
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    color: inherit;
+  }
+
+  .toast-body {
+    color: inherit;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .availability-checker {
+      position: relative;
+      top: auto;
+    }
+    
+    .formadores-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .btn-group-submit {
+      position: relative;
+      bottom: auto;
+    }
+
+    .toast-container {
+      top: 10px;
+      right: 10px;
+      left: 10px;
+    }
+
+    .toast {
+      min-width: auto;
+    }
+  }
+
+  /* Error and success states */
+  .form-control.is-invalid,
+  .form-select.is-invalid {
+    border-color: var(--danger-color);
+    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
+  }
+
+  .form-control.is-valid,
+  .form-select.is-valid {
+    border-color: var(--success-color);
+    box-shadow: 0 0 0 3px rgba(39, 174, 96, 0.1);
+  }
+
+  .invalid-feedback {
+    display: block;
+    color: var(--danger-color);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+  }
+
+  .valid-feedback {
+    display: block;
+    color: var(--success-color);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<div class="row">
+  <!-- Main Form Column -->
+  <div class="col-lg-8">
+    <form method="post" id="solicitacao-form" novalidate>
+      {% csrf_token %}
+      
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          <h6><i class="bi bi-exclamation-triangle"></i> Erros de Validação:</h6>
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <!-- Seção 1: Informações Básicas -->
+      <div class="form-section">
+        <h5><i class="bi bi-info-circle"></i> Informações Básicas</h5>
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.projeto.id_for_label }}" class="form-label required-field">
+                {{ form.projeto.label }}
+              </label>
+              {{ form.projeto }}
+              {% if form.projeto.help_text %}
+                <div class="form-text">{{ form.projeto.help_text }}</div>
+              {% endif %}
+              {% if form.projeto.errors %}
+                <div class="invalid-feedback">{{ form.projeto.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.municipio.id_for_label }}" class="form-label required-field">
+                {{ form.municipio.label }}
+              </label>
+              {{ form.municipio }}
+              {% if form.municipio.help_text %}
+                <div class="form-text">{{ form.municipio.help_text }}</div>
+              {% endif %}
+              {% if form.municipio.errors %}
+                <div class="invalid-feedback">{{ form.municipio.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.tipo_evento.id_for_label }}" class="form-label required-field">
+                {{ form.tipo_evento.label }}
+              </label>
+              {{ form.tipo_evento }}
+              {% if form.tipo_evento.help_text %}
+                <div class="form-text">{{ form.tipo_evento.help_text }}</div>
+              {% endif %}
+              {% if form.tipo_evento.errors %}
+                <div class="invalid-feedback">{{ form.tipo_evento.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.titulo_evento.id_for_label }}" class="form-label">
+                {{ form.titulo_evento.label }} <small class="text-muted">(opcional)</small>
+              </label>
+              {{ form.titulo_evento }}
+              {% if form.titulo_evento.help_text %}
+                <div class="form-text">{{ form.titulo_evento.help_text }}</div>
+              {% endif %}
+              {% if form.titulo_evento.errors %}
+                <div class="invalid-feedback">{{ form.titulo_evento.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.numero_encontro_formativo.id_for_label }}" class="form-label">
+                {{ form.numero_encontro_formativo.label }} <small class="text-muted">(opcional)</small>
+              </label>
+              {{ form.numero_encontro_formativo }}
+              {% if form.numero_encontro_formativo.help_text %}
+                <div class="form-text">{{ form.numero_encontro_formativo.help_text }}</div>
+              {% endif %}
+              {% if form.numero_encontro_formativo.errors %}
+                <div class="invalid-feedback">{{ form.numero_encontro_formativo.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group form-check">
+              {{ form.coordenador_acompanha }}
+              <label for="{{ form.coordenador_acompanha.id_for_label }}" class="form-check-label">
+                {{ form.coordenador_acompanha.label }}
+              </label>
+              {% if form.coordenador_acompanha.help_text %}
+                <div class="form-text">{{ form.coordenador_acompanha.help_text }}</div>
+              {% endif %}
+              {% if form.coordenador_acompanha.errors %}
+                <div class="invalid-feedback">{{ form.coordenador_acompanha.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção 2: Datas e Horários -->
+      <div class="form-section">
+        <h5><i class="bi bi-calendar-range"></i> Datas e Horários</h5>
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.data_inicio.id_for_label }}" class="form-label required-field">
+                {{ form.data_inicio.label }}
+              </label>
+              {{ form.data_inicio }}
+              {% if form.data_inicio.help_text %}
+                <div class="form-text">{{ form.data_inicio.help_text }}</div>
+              {% endif %}
+              {% if form.data_inicio.errors %}
+                <div class="invalid-feedback">{{ form.data_inicio.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="{{ form.data_fim.id_for_label }}" class="form-label required-field">
+                {{ form.data_fim.label }}
+              </label>
+              {{ form.data_fim }}
+              {% if form.data_fim.help_text %}
+                <div class="form-text">{{ form.data_fim.help_text }}</div>
+              {% endif %}
+              {% if form.data_fim.errors %}
+                <div class="invalid-feedback">{{ form.data_fim.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção 3: Formadores -->
+      <div class="form-section">
+        <h5><i class="bi bi-people"></i> Formadores</h5>
+        <p class="text-muted mb-3">Selecione os formadores que participarão do evento</p>
+        
+        <div id="formadores-container">
+          <div class="formadores-grid">
+            {% for choice in form.formadores %}
+              <div class="formador-option" data-formador-id="{{ choice.data.value }}">
+                {{ choice.tag }}
+                <label for="{{ choice.id_for_label }}" class="formador-label">
+                  {{ choice.choice_label }}
+                </label>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        
+        {% if form.formadores.help_text %}
+          <div class="form-text mt-3">{{ form.formadores.help_text }}</div>
+        {% endif %}
+        {% if form.formadores.errors %}
+          <div class="invalid-feedback">{{ form.formadores.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Seção 4: Informações Adicionais -->
+      <div class="form-section">
+        <h5><i class="bi bi-card-text"></i> Informações Adicionais</h5>
+        <div class="form-group">
+          <label for="{{ form.observacoes.id_for_label }}" class="form-label">
+            {{ form.observacoes.label }}
+          </label>
+          {{ form.observacoes }}
+          {% if form.observacoes.help_text %}
+            <div class="form-text">{{ form.observacoes.help_text }}</div>
+          {% endif %}
+          {% if form.observacoes.errors %}
+            <div class="invalid-feedback">{{ form.observacoes.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Preview do Evento -->
+      <div class="event-preview" id="event-preview">
+        <h6><i class="bi bi-eye"></i> Preview da Solicitação</h6>
+        <div id="preview-content"></div>
+      </div>
+
+      <!-- Botões de Ação -->
+      <div class="btn-group-submit d-flex justify-content-between align-items-center">
+        <a href="{% url 'core:home' %}" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left"></i> Cancelar
+        </a>
+        <div>
+          <button type="button" class="btn btn-info me-3" id="preview-btn">
+            <i class="bi bi-eye"></i> Visualizar Preview
+          </button>
+          <button type="submit" class="btn btn-primary" id="submit-btn" disabled>
+            <i class="bi bi-send"></i> Enviar Solicitação
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Availability Checker Column -->
+  <div class="col-lg-4">
+    <div class="availability-checker">
+      <h6><i class="bi bi-shield-check"></i> Verificação de Disponibilidade</h6>
+      <div id="availability-status" class="availability-status">
+        <p class="mb-0">
+          <i class="bi bi-info-circle"></i> 
+          Preencha os campos para verificar a disponibilidade dos formadores
+        </p>
+      </div>
+      <div id="conflicts-list"></div>
+      
+      <div class="mt-3">
+        <button type="button" class="btn btn-outline-primary btn-sm w-100" id="check-availability-btn" disabled>
+          <i class="bi bi-search"></i> Verificar Disponibilidade
+        </button>
+      </div>
+      
+      <div class="mt-3 small">
+        <h6>Códigos de Conflito:</h6>
+        <ul class="list-unstyled">
+          <li><span class="conflict-code">E</span> Evento confirmado</li>
+          <li><span class="conflict-code">T</span> Bloqueio total</li>
+          <li><span class="conflict-code">P</span> Bloqueio parcial</li>
+          <li><span class="conflict-code">D</span> Conflito deslocamento</li>
+          <li><span class="conflict-code">M</span> Capacidade diária excedida</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Enhanced JavaScript for real-time availability checking
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('solicitacao-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const previewBtn = document.getElementById('preview-btn');
+    const checkAvailabilityBtn = document.getElementById('check-availability-btn');
+    const availabilityStatus = document.getElementById('availability-status');
+    const conflictsList = document.getElementById('conflicts-list');
+    const eventPreview = document.getElementById('event-preview');
+    const previewContent = document.getElementById('preview-content');
+    
+    // Form fields
+    const formadorCheckboxes = form.querySelectorAll('input[name="formadores"]');
+    const dataInicio = form.querySelector('#{{ form.data_inicio.id_for_label }}');
+    const dataFim = form.querySelector('#{{ form.data_fim.id_for_label }}');
+    const municipio = form.querySelector('#{{ form.municipio.id_for_label }}');
+    const projeto = form.querySelector('#{{ form.projeto.id_for_label }}');
+    const tipoEvento = form.querySelector('#{{ form.tipo_evento.id_for_label }}');
+    const tituloEvento = form.querySelector('#{{ form.titulo_evento.id_for_label }}');
+    
+    let availabilityCheckTimeout;
+    let lastAvailabilityResult = null;
+
+    // Initialize form
+    initializeForm();
+    
+    function initializeForm() {
+        // Add error classes to fields with validation errors
+        const formControls = form.querySelectorAll('.form-control, .form-select');
+        formControls.forEach(function(control) {
+            const feedback = control.parentNode.querySelector('.invalid-feedback');
+            if (feedback && feedback.textContent.trim()) {
+                control.classList.add('is-invalid');
+            }
+        });
+
+        // Setup formador selection
+        setupFormadorSelection();
+        
+        // Setup form validation
+        setupFormValidation();
+        
+        // Setup availability checking
+        setupAvailabilityChecking();
+        
+        // Setup preview functionality
+        setupPreview();
+    }
+
+    function setupFormadorSelection() {
+        const formadorOptions = document.querySelectorAll('.formador-option');
+        
+        formadorOptions.forEach(option => {
+            const checkbox = option.querySelector('input[type="checkbox"]');
+            const label = option.querySelector('label');
+            
+            // Update visual state
+            function updateSelection() {
+                if (checkbox.checked) {
+                    option.classList.add('selected');
+                } else {
+                    option.classList.remove('selected');
+                }
+                updateFormState();
+            }
+            
+            // Event listeners
+            checkbox.addEventListener('change', updateSelection);
+            label.addEventListener('click', function() {
+                checkbox.checked = !checkbox.checked;
+                updateSelection();
+            });
+            
+            // Initial state
+            updateSelection();
+        });
+    }
+
+    function setupFormValidation() {
+        // Date validation
+        function validateDates() {
+            if (dataInicio.value && dataFim.value) {
+                const inicio = new Date(dataInicio.value);
+                const fim = new Date(dataFim.value);
+                
+                if (fim <= inicio) {
+                    setFieldError(dataFim, 'A data/hora de término deve ser maior que a de início.');
+                } else {
+                    clearFieldError(dataFim);
+                }
+            }
+            updateFormState();
+        }
+
+        dataInicio.addEventListener('change', validateDates);
+        dataFim.addEventListener('change', validateDates);
+        
+        // Title validation (1.2 UI/UX: opcional, mas se informado deve ter mín. 3 chars)
+        tituloEvento.addEventListener('input', function() {
+            const value = this.value.trim();
+            if (value.length > 0 && value.length < 3) {
+                setFieldError(this, 'Se informado, o título deve ter pelo menos 3 caracteres.');
+            } else {
+                clearFieldError(this);
+            }
+            updateFormState();
+        });
+        
+        // Form submission with AJAX (1.1 UI/UX)
+        form.addEventListener('submit', function(e) {
+            e.preventDefault(); // Always prevent default to handle via AJAX
+            
+            if (!isFormValid()) {
+                showToast('error', 'Por favor, corrija os erros do formulário antes de continuar.');
+                return false;
+            }
+            
+            if (!lastAvailabilityResult || !lastAvailabilityResult.available) {
+                showToast('error', 'Verifique a disponibilidade dos formadores antes de enviar.');
+                return false;
+            }
+            
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Enviando...';
+            form.classList.add('submit-loading');
+            
+            // Submit via AJAX
+            const formData = new FormData(form);
+            
+            fetch(form.action || window.location.href, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Success: show toast and reset form
+                    showToast('success', data.message);
+                    form.reset();
+                    resetAvailabilityStatus();
+                    setupFormadorSelection(); // Re-initialize formador selection
+                    updateFormState();
+                } else {
+                    // Error: show toast with error message
+                    showToast('error', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erro no envio:', error);
+                showToast('error', 'Erro ao enviar solicitação. Tente novamente.');
+            })
+            .finally(() => {
+                // Reset loading state
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-send"></i> Enviar Solicitação';
+                form.classList.remove('submit-loading');
+                updateFormState();
+            });
+        });
+    }
+
+    function setupAvailabilityChecking() {
+        // Auto-check when relevant fields change
+        const triggerFields = [dataInicio, dataFim, municipio];
+        triggerFields.forEach(field => {
+            field.addEventListener('change', scheduleAvailabilityCheck);
+        });
+        
+        formadorCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', scheduleAvailabilityCheck);
+        });
+        
+        // Manual check button
+        checkAvailabilityBtn.addEventListener('click', checkAvailability);
+    }
+
+    function setupPreview() {
+        previewBtn.addEventListener('click', function() {
+            updatePreview();
+            eventPreview.classList.toggle('show');
+            
+            if (eventPreview.classList.contains('show')) {
+                this.innerHTML = '<i class="bi bi-eye-slash"></i> Ocultar Preview';
+            } else {
+                this.innerHTML = '<i class="bi bi-eye"></i> Visualizar Preview';
+            }
+        });
+    }
+
+    function scheduleAvailabilityCheck() {
+        clearTimeout(availabilityCheckTimeout);
+        availabilityCheckTimeout = setTimeout(() => {
+            if (canCheckAvailability()) {
+                checkAvailability();
+            } else {
+                resetAvailabilityStatus();
+            }
+        }, 1000); // Wait 1 second after last change
+    }
+
+    function canCheckAvailability() {
+        const selectedFormadores = Array.from(formadorCheckboxes).filter(cb => cb.checked);
+        return dataInicio.value && dataFim.value && selectedFormadores.length > 0;
+    }
+
+    function checkAvailability() {
+        if (!canCheckAvailability()) {
+            showError('Selecione formadores, data de início e fim para verificar disponibilidade.');
+            return;
+        }
+
+        const selectedFormadores = Array.from(formadorCheckboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+
+        const requestData = {
+            formadores: selectedFormadores,
+            data_inicio: dataInicio.value,
+            data_fim: dataFim.value,
+            municipio: municipio.value || null
+        };
+
+        // Show loading state
+        setAvailabilityStatus('loading', 'Verificando disponibilidade...');
+        checkAvailabilityBtn.disabled = true;
+        checkAvailabilityBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Verificando...';
+
+        // Make API request
+        fetch('{% url "core:check_availability_api" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            lastAvailabilityResult = data;
+            displayAvailabilityResult(data);
+        })
+        .catch(error => {
+            console.error('Erro na verificação de disponibilidade:', error);
+            setAvailabilityStatus('error', 'Erro ao verificar disponibilidade. Tente novamente.');
+        })
+        .finally(() => {
+            checkAvailabilityBtn.disabled = false;
+            checkAvailabilityBtn.innerHTML = '<i class="bi bi-search"></i> Verificar Disponibilidade';
+        });
+    }
+
+    function displayAvailabilityResult(data) {
+        conflictsList.innerHTML = '';
+        
+        if (!data.success) {
+            setAvailabilityStatus('error', data.error || 'Erro na verificação');
+            return;
+        }
+
+        if (data.available) {
+            setAvailabilityStatus('available', `✓ Formadores disponíveis no período selecionado`);
+        } else {
+            const hasErrors = data.conflicts.some(c => c.severity === 'error');
+            const statusClass = hasErrors ? 'conflicts' : 'partial-conflicts';
+            const statusText = hasErrors ? 
+                '⚠ Conflitos impedem o agendamento' : 
+                '⚠ Conflitos com restrições';
+            
+            setAvailabilityStatus(statusClass, statusText);
+            
+            // Display conflicts
+            const conflictsByType = {};
+            data.conflicts.forEach(conflict => {
+                if (!conflictsByType[conflict.type]) {
+                    conflictsByType[conflict.type] = [];
+                }
+                conflictsByType[conflict.type].push(conflict);
+            });
+            
+            Object.keys(conflictsByType).forEach(type => {
+                const typeDiv = document.createElement('div');
+                typeDiv.className = 'conflict-category';
+                
+                const typeTitle = document.createElement('h6');
+                typeTitle.innerHTML = getConflictTypeTitle(type);
+                typeTitle.className = 'mt-3 mb-2';
+                typeDiv.appendChild(typeTitle);
+                
+                conflictsByType[type].forEach(conflict => {
+                    const conflictDiv = document.createElement('div');
+                    conflictDiv.className = `conflict-item conflict-${conflict.severity}`;
+                    conflictDiv.innerHTML = `
+                        <small class="d-block">
+                            <span class="conflict-code">${conflict.code}</span>
+                            ${conflict.message}
+                        </small>
+                    `;
+                    typeDiv.appendChild(conflictDiv);
+                });
+                
+                conflictsList.appendChild(typeDiv);
+            });
+        }
+        
+        updateFormState();
+    }
+
+    function getConflictTypeTitle(type) {
+        const titles = {
+            'bloqueio': '<i class="bi bi-lock"></i> Bloqueios de Agenda',
+            'evento': '<i class="bi bi-calendar-event"></i> Eventos Confirmados',
+            'deslocamento': '<i class="bi bi-geo-alt"></i> Conflitos de Deslocamento',
+            'capacidade': '<i class="bi bi-clock"></i> Capacidade Diária'
+        };
+        return titles[type] || type;
+    }
+
+    function setAvailabilityStatus(className, message) {
+        availabilityStatus.className = `availability-status ${className}`;
+        availabilityStatus.innerHTML = `<p class="mb-0">${message}</p>`;
+    }
+
+    function resetAvailabilityStatus() {
+        setAvailabilityStatus('', '<i class="bi bi-info-circle"></i> Preencha os campos para verificar disponibilidade');
+        conflictsList.innerHTML = '';
+        lastAvailabilityResult = null;
+        updateFormState();
+    }
+
+    function updatePreview() {
+        const selectedFormadores = Array.from(formadorCheckboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.nextElementSibling.textContent.trim());
+
+        const projetoText = projeto.options[projeto.selectedIndex]?.text || '';
+        const municipioText = municipio.options[municipio.selectedIndex]?.text || '';
+        const tipoEventoText = tipoEvento.options[tipoEvento.selectedIndex]?.text || '';
+
+        const previewData = [
+            { label: 'Projeto', value: projetoText },
+            { label: 'Município', value: municipioText },
+            { label: 'Tipo de Evento', value: tipoEventoText },
+            { label: 'Título/Segmento', value: tituloEvento.value },
+            { label: 'Data/Hora Início', value: formatDateTime(dataInicio.value) },
+            { label: 'Data/Hora Fim', value: formatDateTime(dataFim.value) },
+            { label: 'Formadores', value: selectedFormadores.join(', ') || 'Nenhum selecionado' }
+        ];
+
+        previewContent.innerHTML = previewData
+            .filter(item => item.value)
+            .map(item => `
+                <div class="preview-item">
+                    <span class="preview-label">${item.label}:</span>
+                    <span>${item.value}</span>
+                </div>
+            `).join('');
+    }
+
+    function formatDateTime(dateTimeString) {
+        if (!dateTimeString) return '';
+        const date = new Date(dateTimeString);
+        return date.toLocaleString('pt-BR');
+    }
+
+    function updateFormState() {
+        const formComplete = isFormComplete();
+        const hasAvailabilityCheck = lastAvailabilityResult && lastAvailabilityResult.success;
+        const isAvailable = hasAvailabilityCheck && lastAvailabilityResult.available;
+        
+        checkAvailabilityBtn.disabled = !canCheckAvailability();
+        submitBtn.disabled = !formComplete || !isAvailable;
+        
+        if (formComplete && !hasAvailabilityCheck) {
+            submitBtn.title = 'Verifique a disponibilidade antes de enviar';
+        } else if (hasAvailabilityCheck && !isAvailable) {
+            submitBtn.title = 'Resolva os conflitos de disponibilidade primeiro';
+        } else {
+            submitBtn.title = '';
+        }
+    }
+
+    function isFormComplete() {
+        const selectedFormadores = Array.from(formadorCheckboxes).some(cb => cb.checked);
+        // 1.2 UI/UX: titulo_evento é opcional, não exigir
+        return projeto.value && municipio.value && tipoEvento.value && 
+               dataInicio.value && dataFim.value && selectedFormadores;
+    }
+
+    function isFormValid() {
+        const invalidFields = form.querySelectorAll('.is-invalid');
+        return invalidFields.length === 0 && isFormComplete();
+    }
+
+    function setFieldError(field, message) {
+        field.classList.add('is-invalid');
+        field.classList.remove('is-valid');
+        
+        let feedback = field.parentNode.querySelector('.invalid-feedback');
+        if (!feedback) {
+            feedback = document.createElement('div');
+            feedback.className = 'invalid-feedback';
+            field.parentNode.appendChild(feedback);
+        }
+        feedback.textContent = message;
+    }
+
+    function clearFieldError(field) {
+        field.classList.remove('is-invalid');
+        field.classList.add('is-valid');
+        
+        const feedback = field.parentNode.querySelector('.invalid-feedback');
+        if (feedback) {
+            feedback.textContent = '';
+        }
+    }
+
+    function showToast(type, message, duration = 5000) {
+        const toastContainer = document.getElementById('toast-container');
+        const toastId = 'toast-' + Date.now();
+        
+        const toastHTML = `
+            <div class="toast ${type}" id="${toastId}" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header">
+                    <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
+                    <strong class="ms-2 me-auto">${type === 'success' ? 'Sucesso' : 'Erro'}</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            </div>
+        `;
+        
+        toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+        
+        const toastElement = document.getElementById(toastId);
+        const toast = new bootstrap.Toast(toastElement, {
+            delay: duration
+        });
+        
+        toast.show();
+        
+        // Remove from DOM after hide
+        toastElement.addEventListener('hidden.bs.toast', () => {
+            toastElement.remove();
+        });
+        
+        return toast;
+    }
+
+    function showError(message) {
+        showToast('error', message);
+    }
+
+    // Initial form state update
+    updateFormState();
+});
+</script>
+{% endblock %}

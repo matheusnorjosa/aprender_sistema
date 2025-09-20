@@ -1,0 +1,643 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Relatórios Consolidados - Sistema Aprender{% endblock %}
+
+{% block nav_diretoria %}active{% endblock %}
+
+{% block page_title %}
+<i class="bi bi-file-earmark-bar-graph"></i> Relatórios Consolidados
+{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    /* CSS específico para relatórios */
+    .filters-card {
+      background: var(--bs-white);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    
+    .filters-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: end;
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .form-group label {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .form-group select, .form-group input {
+      padding: 0.5rem;
+      border: 1px solid #e9ecef;
+      border-radius: 0.5rem;
+      font-size: 0.9rem;
+      min-width: 150px;
+    }
+    
+    .reports-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .report-card {
+      background: var(--bs-white);
+      border-radius: 1rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      overflow: hidden;
+      transition: transform 0.2s ease;
+    }
+    
+    .report-card:hover {
+      transform: translateY(-2px);
+    }
+    
+    .report-header {
+      background: linear-gradient(135deg, #3498db, #2980b9);
+      color: white;
+      padding: 1.5rem;
+      position: relative;
+    }
+    
+    .report-header.success {
+      background: linear-gradient(135deg, #27ae60, #229954);
+    }
+    
+    .report-header.warning {
+      background: linear-gradient(135deg, #f39c12, #e67e22);
+    }
+    
+    .report-header.danger {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+    }
+    
+    .report-header h3 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    
+    .report-content {
+      padding: 1.5rem;
+    }
+    
+    .quick-stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .stat-item {
+      text-align: center;
+      padding: 1rem;
+      background: #f8f9fa;
+      border-radius: 0.5rem;
+    }
+    
+    .stat-number {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #3498db;
+    }
+    
+    .stat-label {
+      font-size: 0.8rem;
+      color: #6c757d;
+      margin-top: 0.25rem;
+    }
+    
+    .btn-report {
+      width: 100%;
+      padding: 0.75rem;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: background 0.2s ease;
+    }
+    
+    .btn-report:hover {
+      background: #2980b9;
+      color: white;
+      transform: translateY(-2px);
+    }
+    
+    /* Modal styles */
+    .modal {
+      animation: fadeIn 0.3s;
+    }
+    
+    @keyframes fadeIn {
+      from {opacity: 0;}
+      to {opacity: 1;}
+    }
+    
+    .modal-content {
+      animation: slideIn 0.3s;
+    }
+    
+    @keyframes slideIn {
+      from {transform: translateY(-50px); opacity: 0;}
+      to {transform: translateY(0); opacity: 1;}
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <small class="text-muted">Central de relatórios e análises estratégicas do sistema</small>
+</div>
+
+<div class="filters-card">
+  <h5 class="mb-3"><i class="bi bi-funnel"></i> Filtros</h5>
+  <form class="filters-form" method="get">
+    <div class="form-group">
+      <label for="periodo">Período</label>
+      <select id="periodo" name="periodo" class="form-select">
+        <option value="atual">Mês Atual</option>
+        <option value="trimestre">Trimestre</option>
+        <option value="semestre">Semestre</option>
+        <option value="ano">Ano</option>
+        <option value="personalizado">Personalizado</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label for="setor">Setor</label>
+      <select id="setor" name="setor" class="form-select">
+        <option value="">Todos os setores</option>
+        {% for setor in setores %}
+        <option value="{{ setor.id }}">{{ setor.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label for="projeto">Projeto</label>
+      <select id="projeto" name="projeto" class="form-select">
+        <option value="">Todos os projetos</option>
+        {% for projeto in projetos %}
+        <option value="{{ projeto.id }}">{{ projeto.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label>&nbsp;</label>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-search"></i> Filtrar
+      </button>
+    </div>
+  </form>
+</div>
+
+<div class="reports-grid">
+  <div class="report-card">
+    <div class="report-header">
+      <h3><i class="bi bi-graph-up"></i> Relatório de Performance</h3>
+    </div>
+    <div class="report-content">
+      <div class="quick-stats">
+        <div class="stat-item">
+          <div class="stat-number">{{ total_eventos }}</div>
+          <div class="stat-label">Eventos</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">{{ taxa_aprovacao }}%</div>
+          <div class="stat-label">Aprovação</div>
+        </div>
+      </div>
+      <p class="text-muted mb-3">Análise detalhada de performance e métricas de eventos realizados.</p>
+      <a href="#" class="btn-report">
+        <i class="bi bi-download"></i> Gerar Relatório
+      </a>
+    </div>
+  </div>
+  
+  <div class="report-card">
+    <div class="report-header success">
+      <h3><i class="bi bi-people"></i> Relatório de Formadores</h3>
+    </div>
+    <div class="report-content">
+      <div class="quick-stats">
+        <div class="stat-item">
+          <div class="stat-number">{{ formadores_ativos }}</div>
+          <div class="stat-label">Ativos</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">{{ media_eventos_formador }}</div>
+          <div class="stat-label">Média/Formador</div>
+        </div>
+      </div>
+      <p class="text-muted mb-3">Desempenho individual e estatísticas dos formadores.</p>
+      <a href="#" class="btn-report">
+        <i class="bi bi-download"></i> Gerar Relatório
+      </a>
+    </div>
+  </div>
+  
+  <div class="report-card">
+    <div class="report-header warning">
+      <h3><i class="bi bi-geo-alt"></i> Relatório Geográfico</h3>
+    </div>
+    <div class="report-content">
+      <div class="quick-stats">
+        <div class="stat-item">
+          <div class="stat-number">{{ municipios_atendidos }}</div>
+          <div class="stat-label">Municípios</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">{{ cobertura_geografica }}%</div>
+          <div class="stat-label">Cobertura</div>
+        </div>
+      </div>
+      <p class="text-muted mb-3">Distribuição geográfica e cobertura territorial.</p>
+      <a href="#" class="btn-report">
+        <i class="bi bi-download"></i> Gerar Relatório
+      </a>
+    </div>
+  </div>
+  
+  <div class="report-card">
+    <div class="report-header danger">
+      <h3><i class="bi bi-exclamation-triangle"></i> Relatório de Conflitos</h3>
+    </div>
+    <div class="report-content">
+      <div class="quick-stats">
+        <div class="stat-item">
+          <div class="stat-number">{{ conflitos_mes }}</div>
+          <div class="stat-label">Este Mês</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">{{ taxa_resolucao }}%</div>
+          <div class="stat-label">Resolvidos</div>
+        </div>
+      </div>
+      <p class="text-muted mb-3">Análise de conflitos de agenda e disponibilidade.</p>
+      <a href="#" class="btn-report">
+        <i class="bi bi-download"></i> Gerar Relatório
+      </a>
+    </div>
+  </div>
+  
+  <div class="report-card">
+    <div class="report-header" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+      <h3><i class="bi bi-folder"></i> Relatório de Projetos</h3>
+    </div>
+    <div class="report-content">
+      <div class="quick-stats">
+        <div class="stat-item">
+          <div class="stat-number">{{ projetos_ativos }}</div>
+          <div class="stat-label">Ativos</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">{{ projetos_concluidos }}</div>
+          <div class="stat-label">Concluídos</div>
+        </div>
+      </div>
+      <p class="text-muted mb-3">Status e andamento dos projetos educacionais.</p>
+      <a href="#" class="btn-report">
+        <i class="bi bi-download"></i> Gerar Relatório
+      </a>
+    </div>
+  </div>
+  
+  <div class="report-card">
+    <div class="report-header" style="background: linear-gradient(135deg, #1abc9c, #16a085);">
+      <h3><i class="bi bi-calendar-check"></i> Relatório Temporal</h3>
+    </div>
+    <div class="report-content">
+      <div class="quick-stats">
+        <div class="stat-item">
+          <div class="stat-number">{{ eventos_semana }}</div>
+          <div class="stat-label">Esta Semana</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">{{ agendamentos_futuros }}</div>
+          <div class="stat-label">Agendados</div>
+        </div>
+      </div>
+      <p class="text-muted mb-3">Análise temporal e sazonalidade dos eventos.</p>
+      <a href="#" class="btn-report">
+        <i class="bi bi-download"></i> Gerar Relatório
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Informações Importantes</h5>
+  </div>
+  <div class="card-body">
+    <ul class="list-unstyled mb-0">
+      <li class="mb-2"><i class="bi bi-check-circle text-success"></i> Os relatórios são gerados em tempo real com base nos dados mais atuais</li>
+      <li class="mb-2"><i class="bi bi-check-circle text-success"></i> Filtros podem ser combinados para análises mais específicas</li>
+      <li class="mb-2"><i class="bi bi-check-circle text-success"></i> Relatórios são exportados em formato PDF e Excel</li>
+      <li><i class="bi bi-check-circle text-success"></i> Dados sensíveis são protegidos conforme LGPD</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Modal para Gráficos -->
+<div id="chartModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+  <div class="modal-content" style="background-color: #fefefe; margin: 5% auto; padding: 20px; border-radius: 1rem; width: 90%; max-width: 1000px; height: 80vh; position: relative;">
+    <span class="close" style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+    <div id="modalHeader">
+      <h2 id="modalTitle">Gráfico</h2>
+      <p id="modalSubtitle" class="text-muted"></p>
+    </div>
+    <div id="modalChart" style="height: 500px; margin-top: 20px;">
+      <canvas id="dynamicChart"></canvas>
+    </div>
+    <div class="d-flex justify-content-between mt-3">
+      <button onclick="exportChart()" class="btn btn-success">
+        <i class="bi bi-download"></i> Exportar PNG
+      </button>
+      <button onclick="closeModal()" class="btn btn-secondary">Fechar</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Configuração global dos gráficos
+  Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+  Chart.defaults.color = '#2c3e50';
+  
+  // Variável global para o gráfico atual
+  let currentChart = null;
+  
+  // Paleta de cores
+  const colors = {
+    primary: '#3498db',
+    success: '#27ae60',
+    warning: '#f39c12',
+    danger: '#e74c3c',
+    purple: '#9b59b6',
+    teal: '#1abc9c'
+  };
+  
+  // Função para buscar dados das APIs
+  async function fetchChartData(chartType) {
+    try {
+      const response = await fetch(`{% url 'core:diretoria_api_charts' %}?chart=${chartType}`);
+      if (!response.ok) throw new Error('API Error');
+      return await response.json();
+    } catch (error) {
+      console.error('Erro ao buscar dados:', error);
+      return { data: [] };
+    }
+  }
+  
+  // Função para mostrar gráfico no modal
+  async function showChart(reportType) {
+    const modal = document.getElementById('chartModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalSubtitle = document.getElementById('modalSubtitle');
+    const ctx = document.getElementById('dynamicChart').getContext('2d');
+    
+    // Destruir gráfico anterior se existir
+    if (currentChart) {
+      currentChart.destroy();
+    }
+    
+    // Configurar o modal baseado no tipo de relatório
+    switch(reportType) {
+      case 'performance':
+        modalTitle.textContent = 'Relatório de Performance';
+        modalSubtitle.textContent = 'Evolução mensal de eventos e taxa de aprovação';
+        currentChart = await createPerformanceChart(ctx);
+        break;
+        
+      case 'formadores':
+        modalTitle.textContent = 'Relatório de Formadores';
+        modalSubtitle.textContent = 'Top 10 formadores por eventos realizados';
+        currentChart = await createFormadoresChart(ctx);
+        break;
+        
+      case 'geografico':
+        modalTitle.textContent = 'Relatório Geográfico';
+        modalSubtitle.textContent = 'Distribuição de eventos por município';
+        currentChart = await createGeograficoChart(ctx);
+        break;
+        
+      case 'conflitos':
+        modalTitle.textContent = 'Relatório de Conflitos';
+        modalSubtitle.textContent = 'Análise temporal de conflitos de agenda';
+        currentChart = await createConflitosChart(ctx);
+        break;
+        
+      case 'projetos':
+        modalTitle.textContent = 'Relatório de Projetos';
+        modalSubtitle.textContent = 'Projetos mais ativos e distribuição por setor';
+        currentChart = await createProjetosChart(ctx);
+        break;
+        
+      case 'temporal':
+        modalTitle.textContent = 'Relatório Temporal';
+        modalSubtitle.textContent = 'Análise de sazonalidade e tendências';
+        currentChart = await createTemporalChart(ctx);
+        break;
+    }
+    
+    modal.style.display = 'block';
+  }
+  
+  // Função para criar gráfico de performance
+  async function createPerformanceChart(ctx) {
+    const data = await fetchChartData('monthly_evolution');
+    
+    return new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.data.map(item => item.mes),
+        datasets: [
+          {
+            label: 'Total de Solicitações',
+            data: data.data.map(item => item.total),
+            borderColor: colors.primary,
+            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: 'Eventos Aprovados',
+            data: data.data.map(item => item.aprovados),
+            borderColor: colors.success,
+            backgroundColor: 'rgba(39, 174, 96, 0.1)',
+            tension: 0.4,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top'
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+  }
+  
+  // Função para criar outros gráficos (simplificadas)
+  async function createFormadoresChart(ctx) {
+    const data = await fetchChartData('top_formadores');
+    return new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.data.map(item => item.nome.substring(0, 15) + '...'),
+        datasets: [{
+          label: 'Eventos',
+          data: data.data.map(item => item.eventos),
+          backgroundColor: colors.success
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y'
+      }
+    });
+  }
+  
+  async function createGeograficoChart(ctx) {
+    const data = await fetchChartData('municipios_atendidos');
+    return new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.data.map(item => `${item.nome}/${item.uf}`),
+        datasets: [{
+          data: data.data.map(item => item.eventos),
+          backgroundColor: colors.warning
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  }
+  
+  async function createProjetosChart(ctx) {
+    const data = await fetchChartData('projetos_stats');
+    return new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: data.data.map(item => item.nome.substring(0, 20) + '...'),
+        datasets: [{ data: data.data.map(item => item.eventos), backgroundColor: [colors.primary, colors.success, colors.warning, colors.danger, colors.purple, colors.teal] }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  }
+  
+  // Funções placeholder
+  async function createConflitosChart(ctx) {
+    return new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+        datasets: [{ label: 'Conflitos', data: [5, 3, 8, 2, 7, 4], borderColor: colors.danger, backgroundColor: 'rgba(231, 76, 60, 0.1)', fill: true }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  }
+  
+  async function createTemporalChart(ctx) {
+    return new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
+        datasets: [{ data: [45, 52, 48, 61, 55, 23, 12], backgroundColor: colors.teal }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  }
+  
+  // Função para fechar modal
+  function closeModal() {
+    document.getElementById('chartModal').style.display = 'none';
+    if (currentChart) {
+      currentChart.destroy();
+      currentChart = null;
+    }
+  }
+  
+  // Função para exportar gráfico
+  function exportChart() {
+    if (currentChart) {
+      const url = currentChart.toBase64Image();
+      const link = document.createElement('a');
+      link.download = 'relatorio-grafico.png';
+      link.href = url;
+      link.click();
+    }
+  }
+  
+  // Inicialização
+  document.addEventListener('DOMContentLoaded', function() {
+    // Fechar modal
+    document.querySelector('.close').addEventListener('click', closeModal);
+    window.addEventListener('click', function(event) {
+      const modal = document.getElementById('chartModal');
+      if (event.target === modal) closeModal();
+    });
+    
+    // Adicionar botões "Ver Gráfico" aos cards
+    const reportCards = document.querySelectorAll('.report-card');
+    const reportTypes = ['performance', 'formadores', 'geografico', 'conflitos', 'projetos', 'temporal'];
+    
+    reportCards.forEach((card, index) => {
+      if (index < reportTypes.length) {
+        const btnReport = card.querySelector('.btn-report');
+        if (btnReport) {
+          const container = document.createElement('div');
+          container.style.display = 'flex';
+          container.style.gap = '0.5rem';
+          
+          const chartBtn = document.createElement('button');
+          chartBtn.className = 'btn-report';
+          chartBtn.style.flex = '1';
+          chartBtn.innerHTML = '<i class="bi bi-bar-chart"></i> Ver Gráfico';
+          chartBtn.onclick = () => showChart(reportTypes[index]);
+          
+          btnReport.style.flex = '1';
+          btnReport.style.background = '#27ae60';
+          btnReport.innerHTML = '<i class="bi bi-download"></i> Exportar';
+          
+          btnReport.parentNode.replaceChild(container, btnReport);
+          container.appendChild(chartBtn);
+          container.appendChild(btnReport);
+        }
+      }
+    });
+  });
+</script>
+{% endblock %}

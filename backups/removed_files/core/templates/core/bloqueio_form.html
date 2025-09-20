@@ -1,0 +1,522 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Bloqueio de Agenda - Sistema Aprender{% endblock %}
+
+{% block nav_bloqueios %}active{% endblock %}
+
+{% block page_title %}
+<i class="bi bi-calendar-x-fill"></i> Bloqueio de Agenda
+{% endblock %}
+
+{% block breadcrumb %}
+Registre um bloqueio na agenda do formador
+{% endblock %}
+
+{% block page_actions %}
+<div class="actions">
+  <a href="{% url 'core:home' %}" class="btn">
+    <i class="bi bi-arrow-left"></i> Voltar ao Início
+  </a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --primary-color: #3498db;
+    --primary-hover: #2980b9;
+    --success-color: #27ae60;
+    --danger-color: #e74c3c;
+    --accent: var(--primary-color);
+    --border-radius: 0.75rem;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow: 0 4px 15px rgba(0,0,0,0.08);
+    --shadow-hover: 0 8px 25px rgba(0,0,0,0.15);
+  }
+
+  .form-section {
+    border-left: 5px solid var(--accent);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+  }
+  
+  .form-section:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+  
+  .form-section h5 {
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .required-field::after {
+    content: " *";
+    color: var(--danger-color);
+    font-weight: bold;
+  }
+
+  .tipo-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 0.75rem;
+  }
+
+  .tipo-card {
+    border: 2px solid #dee2e6;
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    background: white;
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: center;
+    position: relative;
+  }
+
+  .tipo-card:hover {
+    border-color: var(--accent);
+    box-shadow: var(--shadow);
+    transform: translateY(-2px);
+  }
+
+  .tipo-card.selected {
+    border-color: var(--accent);
+    background: rgba(52, 152, 219, 0.05);
+    box-shadow: var(--shadow);
+  }
+
+  .tipo-card input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .tipo-card h5 {
+    margin: 0;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 1rem;
+  }
+
+  .date-summary {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+    padding: 1rem;
+    border-radius: var(--border-radius);
+    margin-top: 1rem;
+    text-align: center;
+    display: none;
+  }
+
+  .date-summary.show {
+    display: block;
+    animation: fadeInUp 0.3s ease;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .btn-group-submit {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--line, #dee2e6);
+  }
+
+  .submit-loading {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .required::after {
+    content: " *";
+    color: var(--danger-color);
+    font-weight: bold;
+  }
+
+  /* Modernização das caixas de seleção */
+  .modern-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-color: #ffffff;
+    background-image: linear-gradient(45deg, transparent 50%, var(--primary-color) 50%), 
+                      linear-gradient(135deg, var(--primary-color) 50%, transparent 50%);
+    background-position: calc(100% - 20px) calc(1em + 2px), 
+                         calc(100% - 15px) calc(1em + 2px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    border: 2px solid #e9ecef;
+    border-radius: var(--border-radius);
+    padding: 1rem 2.5rem 1rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #2c3e50;
+    transition: var(--transition);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    cursor: pointer;
+    position: relative;
+  }
+
+  .modern-select:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+    transform: translateY(-1px);
+  }
+
+  .modern-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1);
+    outline: none;
+    transform: translateY(-1px);
+  }
+
+  .modern-select:focus-visible {
+    outline: none;
+  }
+  
+  .modern-select:focus {
+    outline: none;
+  }
+
+  /* Container dos selects com ícones */
+  .select-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .select-container::before {
+    content: '';
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.25rem;
+    height: 1.25rem;
+    background-size: contain;
+    background-repeat: no-repeat;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* Ícone específico para formador */
+  .select-container.formador::before {
+    background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%233498db" viewBox="0 0 16 16"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/></svg>');
+  }
+
+  .select-container.formador .modern-select {
+    padding-left: 3rem;
+  }
+
+  .invalid-feedback {
+    display: block;
+  }
+  
+  .form-control.is-invalid,
+  .form-select.is-invalid {
+    border-color: var(--danger-color);
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+  }
+
+  /* Consistencia com a pagina solicitar */
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-label {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  @media (max-width: 768px) {
+    .tipo-options {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* CSS conflitante da .page-container removido */
+
+  /* Remove linha pontilhada do select */
+  .select-container,
+  .select-container:focus,
+  .select-container:focus-within {
+    outline: none !important;
+  }
+
+  .modern-select,
+  .modern-select:focus,
+  .modern-select:focus-visible {
+    outline: none !important;
+    text-decoration: none !important;
+  }
+
+  .form-select:focus {
+    outline: none !important;
+    box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.10);
+  }
+
+  .select-container::before {
+    image-rendering: crisp-edges;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .modern-select {
+    background-image: none;
+    padding-right: 1.25rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1600px; margin: 0 auto;">
+  <form method="post" id="bloqueio-form" novalidate>
+    {% csrf_token %}
+    
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        <h6><i class="bi bi-exclamation-triangle"></i> Erros de Validação:</h6>
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <!-- Seção 1: Formador -->
+    <div class="form-section">
+      <h5><i class="bi bi-person-fill"></i> Formador</h5>
+      <div class="form-group">
+        <label for="{{ form.formador.id_for_label }}" class="form-label required-field">
+          {{ form.formador.label }}
+        </label>
+        <div class="select-container formador">
+          {{ form.formador }}
+        </div>
+        {% if form.formador.help_text %}
+          <div class="form-text">{{ form.formador.help_text }}</div>
+        {% endif %}
+        {% if form.formador.errors %}
+          <div class="invalid-feedback">{{ form.formador.errors.0 }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Seção 2: Período -->
+    <div class="form-section">
+      <h5><i class="bi bi-calendar-range-fill"></i> Período</h5>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="form-group">
+            <label for="{{ form.inicio.id_for_label }}" class="form-label required-field">
+              {{ form.inicio.label }}
+            </label>
+            {{ form.inicio }}
+            {% if form.inicio.help_text %}
+              <div class="form-text">{{ form.inicio.help_text }}</div>
+            {% endif %}
+            {% if form.inicio.errors %}
+              <div class="invalid-feedback">{{ form.inicio.errors.0 }}</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="form-group">
+            <label for="{{ form.fim.id_for_label }}" class="form-label required-field">
+              {{ form.fim.label }}
+            </label>
+            {{ form.fim }}
+            {% if form.fim.help_text %}
+              <div class="form-text">{{ form.fim.help_text }}</div>
+            {% endif %}
+            {% if form.fim.errors %}
+              <div class="invalid-feedback">{{ form.fim.errors.0 }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      
+      <div class="date-summary" id="date-summary">
+        <p id="summary-text"></p>
+      </div>
+    </div>
+
+    <!-- Seção 3: Tipo de Bloqueio -->
+    <div class="form-section">
+      <h5><i class="bi bi-shield-exclamation-fill"></i> Tipo</h5>
+      <div class="form-group">
+        <label class="form-label required-field">{{ form.tipo.label }}</label>
+        {% if form.tipo.help_text %}
+          <div class="form-text">{{ form.tipo.help_text }}</div>
+        {% endif %}
+        <div class="tipo-options">
+          {% for choice in form.tipo %}
+            <div class="tipo-card {% if choice.choice_value == 'Total' %}total{% else %}parcial{% endif %}" 
+                 data-value="{{ choice.choice_value }}">
+              {{ choice.tag }}
+              <h5>{{ choice.choice_label }}</h5>
+            </div>
+          {% endfor %}
+        </div>
+        
+        {% if form.tipo.errors %}
+          <div class="invalid-feedback">{{ form.tipo.errors.0 }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Botões de Ação -->
+    <div class="btn-group-submit d-flex justify-content-between">
+      <a href="{% url 'core:home' %}" class="btn">
+        <i class="bi bi-arrow-left"></i> Cancelar
+      </a>
+      <button type="submit" class="btn btn-primary" id="submit-btn">
+        <i class="bi bi-calendar-x"></i> Registrar Bloqueio
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+// Adicionar classes de validação aos campos com erro
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('bloqueio-form');
+  const tipoCards = document.querySelectorAll('.tipo-card');
+  const dateSummary = document.getElementById('date-summary');
+  const summaryText = document.getElementById('summary-text');
+  const inicioField = document.getElementById('{{ form.inicio.id_for_label }}');
+  const fimField = document.getElementById('{{ form.fim.id_for_label }}');
+  const submitBtn = document.getElementById('submit-btn');
+
+  // Adicionar classes is-invalid para campos com erro
+  const formControls = form.querySelectorAll('.form-control, .form-select, .form-check-input');
+  formControls.forEach(function(control) {
+    const feedback = control.parentNode.querySelector('.invalid-feedback');
+    if (feedback && feedback.textContent.trim()) {
+      control.classList.add('is-invalid');
+    }
+  });
+
+  // Aplicar classe modern-select aos campos de formulário
+  const selectFields = form.querySelectorAll('.form-select');
+  selectFields.forEach(function(select) {
+    select.classList.add('modern-select');
+  });
+
+  // Gerenciar seleção de tipo de bloqueio
+  tipoCards.forEach(card => {
+    card.addEventListener('click', function() {
+      // Remove seleção anterior
+      tipoCards.forEach(c => c.classList.remove('selected'));
+      
+      // Adiciona seleção atual
+      this.classList.add('selected');
+      
+      // Marca o radio button correspondente
+      const radio = this.querySelector('input[type="radio"]');
+      if (radio) {
+        radio.checked = true;
+      }
+    });
+  });
+
+  // Marcar card se radio já estiver selecionado
+  tipoCards.forEach(card => {
+    const radio = card.querySelector('input[type="radio"]');
+    if (radio && radio.checked) {
+      card.classList.add('selected');
+    }
+  });
+
+  // Atualizar resumo de datas
+  function updateDateSummary() {
+    if (inicioField.value && fimField.value) {
+      const inicio = new Date(inicioField.value);
+      const fim = new Date(fimField.value);
+      
+      if (fim >= inicio) {
+        const diffTime = Math.abs(fim - inicio);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        
+        let message = `<strong>${diffDays} dia${diffDays > 1 ? 's' : ''}</strong> de bloqueio`;
+        if (diffDays === 1) {
+          message += ' <span style="color: rgba(255,255,255,0.8);">(mesmo dia)</span>';
+        } else {
+          const inicioFormatted = inicio.toLocaleDateString('pt-BR');
+          const fimFormatted = fim.toLocaleDateString('pt-BR');
+          message += `<br><span style="color: rgba(255,255,255,0.8);">De ${inicioFormatted} até ${fimFormatted}</span>`;
+        }
+        
+        summaryText.innerHTML = message;
+        dateSummary.classList.add('show');
+      } else {
+        dateSummary.classList.remove('show');
+      }
+    } else {
+      dateSummary.classList.remove('show');
+    }
+  }
+
+  inicioField.addEventListener('change', updateDateSummary);
+  fimField.addEventListener('change', updateDateSummary);
+
+  // Validação de datas
+  function validateDates() {
+    if (inicioField.value && fimField.value) {
+      const inicio = new Date(inicioField.value);
+      const fim = new Date(fimField.value);
+      
+      if (fim < inicio) {
+        fimField.setCustomValidity('A data de fim deve ser maior ou igual à data de início.');
+        fimField.classList.add('is-invalid');
+      } else {
+        fimField.setCustomValidity('');
+        fimField.classList.remove('is-invalid');
+      }
+    }
+  }
+
+  inicioField.addEventListener('change', validateDates);
+  fimField.addEventListener('change', validateDates);
+
+  // Atualizar na carga da página
+  updateDateSummary();
+
+  // Prevenir submit múltiplo
+  form.addEventListener('submit', function(e) {
+    // Validar se um tipo foi selecionado
+    const selectedTipo = form.querySelector('input[name="tipo"]:checked');
+    if (!selectedTipo) {
+      e.preventDefault();
+      alert('Por favor, selecione um tipo de bloqueio.');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Registrando bloqueio...';
+    form.classList.add('submit-loading');
+  });
+
+  // Auto-selecionar o primeiro formador se houver apenas um
+  const formadorSelect = document.getElementById('{{ form.formador.id_for_label }}');
+  if (formadorSelect.options.length === 2) { // Uma opção vazia + uma opção de formador
+    formadorSelect.selectedIndex = 1;
+  }
+});
+{% endblock %}

@@ -1,0 +1,139 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Excluir Projeto{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-0">
+            <i class="bi bi-exclamation-triangle text-warning me-2"></i>
+            Excluir Projeto
+        </h1>
+        <p class="text-muted mb-0">Confirmar exclusão do projeto do sistema</p>
+    </div>
+    <a href="{% url 'core:gestao_projetos' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-2"></i>Voltar à Lista
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Confirmação de Exclusão -->
+        <div class="card border-warning">
+            <div class="card-header bg-warning bg-opacity-10">
+                <h6 class="mb-0 text-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Atenção: Ação Irreversível
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <h6><i class="bi bi-info-circle me-2"></i>Importante</h6>
+                    <p class="mb-0">
+                        Esta ação irá <strong>desativar</strong> o projeto no sistema. 
+                        O projeto ficará inativo e não aparecerá nas listas de seleção.
+                    </p>
+                </div>
+
+                <h5 class="mb-3">Dados do Projeto a ser Excluído:</h5>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless table-sm">
+                            <tr>
+                                <th width="120">Nome:</th>
+                                <td><strong>{{ object.nome }}</strong></td>
+                            </tr>
+                            <tr>
+                                <th>Setor:</th>
+                                <td>
+                                    {% if object.setor %}
+                                        <span class="badge bg-info">{{ object.setor.nome }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Sem setor</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Código:</th>
+                                <td>
+                                    {% if object.codigo_produto %}
+                                        <code>{{ object.codigo_produto }}</code>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Status:</th>
+                                <td>
+                                    {% if object.ativo %}
+                                        <span class="badge bg-success">Ativo</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inativo</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    {% if object.descricao %}
+                    <div class="col-md-6">
+                        <h6>Descrição:</h6>
+                        <p class="text-muted">{{ object.descricao }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <form method="post" class="mt-4">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'core:gestao_projetos' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle me-2"></i>Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i>Confirmar Exclusão
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações sobre a Exclusão -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-info-circle me-2"></i>Sobre a Exclusão
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6>O que acontece:</h6>
+                    <ul class="small text-muted mb-0">
+                        <li>O projeto será marcado como <strong>inativo</strong></li>
+                        <li>Não aparecerá nas listas de seleção</li>
+                        <li>Dados históricos serão preservados</li>
+                        <li>Pode ser reativado posteriormente</li>
+                    </ul>
+                </div>
+
+                <div class="mb-3">
+                    <h6>Não afetará:</h6>
+                    <ul class="small text-muted mb-0">
+                        <li>Eventos já realizados deste projeto</li>
+                        <li>Histórico de solicitações</li>
+                        <li>Dados de usuários vinculados</li>
+                        <li>Relatórios históricos</li>
+                    </ul>
+                </div>
+
+                <div class="alert alert-info small">
+                    <i class="bi bi-lightbulb me-2"></i>
+                    <strong>Dica:</strong> Para reativar um projeto, edite-o e marque como "Ativo" novamente.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

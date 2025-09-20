@@ -23,10 +23,13 @@ from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from core.models import (
-    Formador, Municipio, Projeto, TipoEvento, Solicitacao, 
+    Formador, Municipio, Projeto, TipoEvento, Solicitacao,
     SolicitacaoStatus, Usuario, Setor, FormadoresSolicitacao
 )
-# Usar serviço existente do projeto
+
+# Importações para Google Sheets
+import gspread
+from google.oauth2.credentials import Credentials
 
 User = get_user_model()
 
@@ -39,6 +42,12 @@ class Command(BaseCommand):
             type=str,
             help='Importar apenas uma aba específica (Super, ACerta, Outros, Brincando, Vidas)',
             choices=['Super', 'ACerta', 'Outros', 'Brincando', 'Vidas']
+        )
+        parser.add_argument(
+            '--filter-quality',
+            action='store_true',
+            default=True,
+            help='Aplicar filtro de qualidade (apenas registros com município + data)'
         )
         parser.add_argument(
             '--dry-run',
@@ -69,15 +78,16 @@ class Command(BaseCommand):
     def setup_google_sheets(self):
         """Configura conexão com Google Sheets"""
         try:
-            # Usar OAuth2 via gspread (método padrão do projeto)
-            self.gc = gspread.oauth()
-            
-            # URL da planilha
-            PLANILHA_URL = "https://docs.google.com/spreadsheets/d/16ul8qvHb-1CRs5Z7zYcVP9Rh2munCefWWNsAiJfZYYU"
-            self.sheet = self.gc.open_by_url(PLANILHA_URL)
-            
-            self.logger.info("✅ Conexão com Google Sheets estabelecida")
-            
+            # Usar credenciais OAuth configuradas
+            creds = Credentials.from_authorized_user_file('google_authorized_user.json')
+            self.gc = gspread.authorize(creds)
+
+            # ID da planilha
+            PLANILHA_ID = '16ul8qvHb-1CRs5Z7zYcVP9Rh2munCefWWNsAiJfZYYU'
+            self.sheet = self.gc.open_by_key(PLANILHA_ID)
+
+            self.logger.info(f"✅ Conexão com Google Sheets estabelecida: {self.sheet.title}")
+
         except Exception as e:
             raise CommandError(f"❌ Erro ao conectar com Google Sheets: {e}")
 
@@ -293,46 +303,99 @@ class Command(BaseCommand):
         self.logger.warning(f"⚠️ Formato de hora não reconhecido: {hora_str}")
         return None
 
-    def determinar_status_solicitacao(self, aprovacao_str):
-        """Determina status da solicitação baseado no campo aprovação"""
-        if not aprovacao_str:
-            return SolicitacaoStatus.PENDENTE
-        
-        aprovacao_str = str(aprovacao_str).upper().strip()
-        
-        if aprovacao_str in ['SIM', 'APROVADO', 'OK', 'TRUE']:
+    def determinar_status_solicitacao(self, aprovacao_str, nome_aba):
+        """Determina status da solicitação baseado no campo aprovação e aba"""
+
+        # Para abas que não passam pela superintendência, sempre aprovado
+        if nome_aba in ['ACerta', 'Outros', 'Brincando', 'Vidas']:
             return SolicitacaoStatus.APROVADO
-        elif aprovacao_str in ['NÃO', 'NAO', 'NEGADO', 'REJEITADO', 'FALSE']:
-            return SolicitacaoStatus.REPROVADO
+
+        # Para aba Super, verificar aprovação explícita
+        if nome_aba == 'Super':
+            if not aprovacao_str:
+                return SolicitacaoStatus.PENDENTE
+
+            aprovacao_str = str(aprovacao_str).upper().strip()
+
+            if aprovacao_str == 'SIM':
+                return SolicitacaoStatus.APROVADO
+            elif aprovacao_str == 'NÃO':
+                return SolicitacaoStatus.REPROVADO
+            else:
+                return SolicitacaoStatus.PENDENTE
+
+        # Fallback
+        return SolicitacaoStatus.PENDENTE
+
+    def get_column_mapping(self, nome_aba):
+        """Retorna mapeamento de colunas por aba"""
+        if nome_aba == 'Super':
+            return {
+                'municipio': 'Municípios',
+                'data': 'data',
+                'hora_inicio': 'hora início',
+                'hora_fim': 'hora fim',
+                'projeto': 'projeto',
+                'tipo': 'tipo',
+                'aprovacao': 'Aprovação',
+                'coordenador': 'Coordenador',
+                'formador1': 'Formador 1',
+                'formador2': 'Formador 2',
+                'formador3': 'Formador 3',
+                'formador4': 'Formador 4',
+                'formador5': 'Formador 5',
+                'convidados': 'Convidados'
+            }
         else:
-            return SolicitacaoStatus.PENDENTE
+            # Para outras abas, usar nomes padrão
+            return {
+                'municipio': 'município',
+                'data': 'data',
+                'hora_inicio': 'hora início',
+                'hora_fim': 'hora fim',
+                'projeto': 'projeto',
+                'tipo': 'tipo',
+                'aprovacao': None,  # Outras abas não têm aprovação
+                'coordenador': 'coordenador',
+                'formador1': 'formador',
+                'formador2': 'formador2',
+                'formador3': 'formador3'
+            }
 
     def importar_eventos_aba(self, nome_aba):
         """Importa eventos de uma aba específica"""
         self.logger.info(f"📋 Importando eventos da aba: {nome_aba}")
-        
+
         try:
             worksheet = self.sheet.worksheet(nome_aba)
             dados = worksheet.get_all_records()
-            
+
             eventos_criados = 0
             eventos_pulados = 0
-            
+            eventos_filtrados = 0
+
+            # Obter mapeamento de colunas
+            cols = self.get_column_mapping(nome_aba)
+
             for i, row in enumerate(dados, 1):
                 try:
-                    # Extrair dados básicos - usando nomes exatos das colunas das planilhas
-                    municipio_nome = (row.get('município') or 
-                                    row.get('Município') or 
-                                    row.get('Municípios') or '').strip()
-                    
-                    data_evento = self.parse_data(row.get('data', ''))
-                    hora_inicio = self.parse_hora(row.get('hora início', ''))
-                    hora_fim = self.parse_hora(row.get('hora fim', ''))
-                    projeto_nome = (row.get('projeto') or '').strip()
-                    tipo_evento = (row.get('tipo') or 'Presencial').strip()
-                    
-                    # Validar dados obrigatórios
-                    if not all([municipio_nome, data_evento, hora_inicio, projeto_nome]):
+                    # Extrair dados básicos usando mapeamento correto
+                    municipio_nome = (row.get(cols['municipio']) or '').strip()
+                    data_evento = self.parse_data(row.get(cols['data'], ''))
+                    hora_inicio = self.parse_hora(row.get(cols['hora_inicio'], ''))
+                    hora_fim = self.parse_hora(row.get(cols['hora_fim'], ''))
+                    projeto_nome = (row.get(cols['projeto']) or '').strip()
+                    tipo_evento = (row.get(cols['tipo']) or 'Presencial').strip()
+
+                    # FILTRO DE QUALIDADE (como aplicado pelo Cursor)
+                    if self.options['filter_quality']:
+                        if not municipio_nome or not data_evento:
+                            self.logger.debug(f"⚡ Linha {i} filtrada: falta município ou data")
+                            eventos_filtrados += 1
+                            continue
+
+                    # Validar dados obrigatórios básicos
+                    if not municipio_nome or not data_evento:
                         self.logger.debug(f"⏭️ Linha {i} pulada: dados obrigatórios faltando")
                         eventos_pulados += 1
                         continue
@@ -346,9 +409,11 @@ class Command(BaseCommand):
                         eventos_pulados += 1
                         continue
                     
-                    # Determinar status
-                    aprovacao = row.get('Aprovação') or row.get('Aprovacao') or ''
-                    status = self.determinar_status_solicitacao(aprovacao)
+                    # Determinar status com base na aba e aprovação
+                    aprovacao = ''
+                    if cols['aprovacao']:
+                        aprovacao = row.get(cols['aprovacao']) or ''
+                    status = self.determinar_status_solicitacao(aprovacao, nome_aba)
                     
                     # Preparar dados da solicitação
                     encontro = row.get('encontro') or row.get('Encontro') or '1'
@@ -384,7 +449,7 @@ class Command(BaseCommand):
                     
                     data_inicio = datetime.combine(data_evento, hora_inicio)
                     
-                    if not self.dry_run:
+                    if not self.options['dry_run']:
                         # Verificar se solicitação já existe
                         existing = Solicitacao.objects.filter(
                             titulo_evento=titulo,
@@ -433,7 +498,18 @@ class Command(BaseCommand):
                     eventos_pulados += 1
                     continue
             
-            self.logger.info(f"✅ Aba {nome_aba}: {eventos_criados} eventos importados, {eventos_pulados} pulados")
+            # Relatório final da aba
+            total_processado = len(dados)
+            total_valido = total_processado - eventos_filtrados - eventos_pulados
+
+            self.logger.info(f"🎆 Aba {nome_aba} importada:")
+            self.logger.info(f"  📋 Total de linhas: {total_processado}")
+            if self.options['filter_quality']:
+                self.logger.info(f"  ⚡ Filtradas (sem município/data): {eventos_filtrados}")
+            self.logger.info(f"  ⏭️ Puladas (outros motivos): {eventos_pulados}")
+            self.logger.info(f"  ✅ Válidas processadas: {total_valido}")
+            self.logger.info(f"  🎆 Eventos criados: {eventos_criados}")
+
             return eventos_criados
             
         except Exception as e:

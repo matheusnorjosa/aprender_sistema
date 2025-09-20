@@ -1,0 +1,714 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Aprender Sistema — Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --content-bg: #f8f9fa;
+      --sidebar-bg: #2c3e50;
+      --sidebar-hover: #34495e; 
+      --card: #ffffff; 
+      --text: #2c3e50; 
+      --muted: #6c757d; 
+      --line: #e9ecef; 
+      --accent: #3498db;
+      --accent-hover: #2980b9;
+      --success: #27ae60; 
+      --warning: #f39c12; 
+      --danger: #e74c3c; 
+      --sidebar-width: 280px;
+      --header-height: 80px;
+      --shadow: 0 4px 15px rgba(0,0,0,0.08);
+      --shadow-hover: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    
+    *{box-sizing:border-box; margin:0; padding:0;}
+    
+    body{
+      background: var(--bg);
+      color: var(--text); 
+      font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+    
+    /* Layout principal */
+    .layout{display:flex; min-height:100vh}
+    .sidebar{
+      width:var(--sidebar-width); 
+      background:var(--sidebar-bg); 
+      color:#fff; 
+      position:fixed; 
+      height:100vh; 
+      overflow-y:auto; 
+      z-index:1000; 
+      transition:all 0.3s ease;
+      box-shadow: var(--shadow);
+    }
+    .main-content{
+      flex:1; 
+      margin-left:var(--sidebar-width); 
+      transition:margin-left 0.3s ease;
+      background: var(--content-bg);
+      min-height: 100vh;
+    }
+    
+    /* Sidebar styles */
+    .sidebar-header{
+      padding:2rem 1.5rem; 
+      border-bottom:1px solid rgba(255,255,255,0.15);
+      background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+    }
+    .sidebar-header h4{
+      margin:0; 
+      font-size:1.3rem; 
+      font-weight:700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .sidebar-header .sub{
+      font-size:0.85rem; 
+      color:rgba(255,255,255,0.8); 
+      margin-top:0.5rem;
+      font-weight: 300;
+    }
+    
+    .sidebar-nav{padding:1.5rem 0}
+    .nav-section{margin-bottom:2rem}
+    .nav-section-title{
+      padding:0.75rem 1.5rem; 
+      font-size:0.75rem; 
+      color:rgba(255,255,255,0.6); 
+      text-transform:uppercase; 
+      letter-spacing:0.15em; 
+      font-weight:600; 
+      margin-bottom:0.75rem;
+    }
+    
+    .nav-item{
+      display:flex; 
+      align-items: center;
+      padding:1rem 1.5rem; 
+      color:rgba(255,255,255,0.85); 
+      text-decoration:none; 
+      transition:all 0.3s ease; 
+      border-left:4px solid transparent;
+      font-weight: 500;
+    }
+    .nav-item:hover{
+      background:var(--sidebar-hover); 
+      color:#fff; 
+      border-left-color:var(--accent);
+      transform: translateX(4px);
+    }
+    .nav-item.active{
+      background:var(--accent); 
+      color:#fff; 
+      border-left-color:#fff;
+      box-shadow: inset -4px 0 8px rgba(0,0,0,0.2);
+    }
+    .nav-item i{
+      width:1.5rem; 
+      margin-right:1rem; 
+      font-size:1.1rem;
+      text-align: center;
+    }
+    .nav-item .badge{
+      margin-left: auto;
+      background: var(--accent);
+      color: white;
+      padding: 0.25rem 0.5rem;
+      border-radius: 1rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    
+    /* Responsive sidebar */
+    @media (max-width: 768px) {
+      .sidebar{transform:translateX(-100%)}
+      .sidebar.show{transform:translateX(0)}
+      .main-content{margin-left:0}
+      .mobile-toggle{display:block}
+    }
+    .mobile-toggle{display:none; position:fixed; top:1rem; left:1rem; z-index:1001; background:var(--sidebar-bg); color:#fff; border:none; padding:0.5rem; border-radius:0.375rem}
+    
+    /* Main content */
+    .content-wrap{padding:2.5rem}
+    .page-header{
+      background: linear-gradient(135deg, var(--card) 0%, #f8f9fa 100%); 
+      border-bottom:1px solid var(--line); 
+      padding:2rem 2.5rem; 
+      margin:-2.5rem -2.5rem 2.5rem -2.5rem;
+      box-shadow: var(--shadow);
+      border-radius: 0 0 1rem 1rem;
+    }
+    .page-header h1{
+      margin:0; 
+      font-size:2rem; 
+      font-weight:700; 
+      color:var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .page-header .breadcrumb{
+      margin:0.75rem 0 0 0; 
+      font-size:1rem; 
+      color:var(--muted);
+      font-weight: 500;
+    }
+    
+    /* Cards grid */
+    .cards-grid{
+      display:grid; 
+      grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); 
+      gap:2rem; 
+      margin-top:2rem;
+    }
+    .card{
+      background:var(--card); 
+      border:1px solid var(--line); 
+      border-radius:1.25rem; 
+      padding:2rem; 
+      box-shadow:var(--shadow); 
+      transition:all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+    }
+    .card:hover{
+      transform:translateY(-8px); 
+      box-shadow:var(--shadow-hover);
+      border-color: var(--accent);
+    }
+    .card h3{
+      margin:0 0 1rem 0; 
+      font-size:1.25rem; 
+      font-weight:600; 
+      color:var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .card p{
+      margin:0 0 1.5rem 0; 
+      color:var(--muted); 
+      font-size:0.95rem; 
+      line-height:1.6;
+    }
+    .card .actions{
+      display:flex; 
+      flex-wrap:wrap; 
+      gap:0.75rem;
+    }
+    
+    /* Buttons */
+    .btn{
+      display:inline-flex; 
+      align-items:center; 
+      padding:0.75rem 1.5rem; 
+      border:2px solid var(--line); 
+      border-radius:0.75rem; 
+      background:var(--card); 
+      text-decoration:none; 
+      color:var(--text); 
+      font-size:0.9rem; 
+      font-weight:600; 
+      transition:all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s;
+    }
+    .btn:hover::before {
+      left: 100%;
+    }
+    .btn:hover{
+      background:var(--accent); 
+      border-color:var(--accent); 
+      color:#fff;
+      transform: translateY(-2px);
+      text-decoration:none;
+    }
+    .btn-primary{
+      border-color:var(--accent); 
+      background:var(--accent); 
+      color:#fff;
+    }
+    .btn-primary:hover{
+      background:var(--accent-hover); 
+      border-color:var(--accent-hover); 
+      color:#fff;
+      transform: translateY(-2px);
+    }
+    .btn i{margin-right:0.5rem; font-size: 1rem;}
+    
+    /* Stats cards */
+    .stats-grid{
+      display:grid; 
+      grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); 
+      gap:1.5rem; 
+      margin-bottom:3rem;
+    }
+    .stat-card{
+      background:linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%); 
+      color:#fff; 
+      padding:2rem; 
+      border-radius:1.25rem; 
+      text-align:center;
+      box-shadow: var(--shadow);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -50%;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+      transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-hover);
+    }
+    .stat-card:hover::before {
+      top: -30%;
+      right: -30%;
+    }
+    .stat-card h4{
+      margin:0; 
+      font-size:2.5rem; 
+      font-weight:700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+    }
+    .stat-card p{
+      margin:1rem 0 0 0; 
+      font-size:1rem; 
+      opacity:0.9;
+      font-weight: 500;
+    }
+    
+    footer{margin-top:3rem; padding:1.5rem 0; border-top:1px solid var(--line); color:var(--muted); font-size:0.8rem; text-align:center}
+    
+    /* Animação para indicadores de dados reais */
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.2); opacity: 0.7; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    
+    /* Loading spinner para cards */
+    .stat-card.loading {
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .stat-card.loading::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      animation: loading-shimmer 1.5s infinite;
+    }
+    
+    @keyframes loading-shimmer {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Mobile toggle -->
+  <button class="mobile-toggle" onclick="toggleSidebar()">
+    <i class="bi bi-list"></i>
+  </button>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h4><i class="bi bi-mortarboard-fill"></i> Sistema Aprender</h4>
+        <div class="sub">Gestão Interna</div>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <!-- Navegação Principal -->
+        <div class="nav-section">
+          <div class="nav-section-title">Principal</div>
+          <a href="{% url 'core:home' %}" class="nav-item active">
+            <i class="bi bi-house"></i> Início
+          </a>
+          <a href="/disponibilidade/" class="nav-item">
+            <i class="bi bi-calendar-check"></i> Mapa Mensal
+          </a>
+        </div>
+
+        <!-- Operações por papel -->
+        {% if perms.core.add_solicitacao or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Coordenação</div>
+          <a href="/solicitar/" class="nav-item">
+            <i class="bi bi-plus-circle"></i> Solicitar Evento
+          </a>
+          <a href="{% url 'core:coordenador_meus_eventos' %}" class="nav-item">
+            <i class="bi bi-calendar-check"></i> Meus Eventos
+          </a>
+        </div>
+        {% endif %}
+
+        {% if perms.core.add_disponibilidadeformadores or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Formador</div>
+          <a href="{% url 'core:formador_eventos' %}" class="nav-item">
+            <i class="bi bi-person-workspace"></i> Meus Eventos
+          </a>
+          <a href="/bloqueios/novo/" class="nav-item">
+            <i class="bi bi-calendar-x"></i> Bloqueio de Agenda
+          </a>
+        </div>
+        {% endif %}
+        
+
+        {% if perms.core.view_aprovacao or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Superintendência</div>
+          <a href="/aprovacoes/pendentes/" class="nav-item">
+            <i class="bi bi-clipboard-check"></i> Aprovações Pendentes
+          </a>
+          <a href="{% url 'core:deslocamentos_list' %}" class="nav-item">
+            <i class="bi bi-geo-alt"></i> Deslocamentos
+          </a>
+        </div>
+        {% endif %}
+
+        {% if perms.core.sync_calendar or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Controle</div>
+          <a href="{% url 'core:controle_pre_agenda' %}" class="nav-item">
+            <i class="bi bi-calendar-plus"></i> Pré-Agenda
+          </a>
+          <a href="{% url 'core:controle_google_calendar' %}" class="nav-item">
+            <i class="bi bi-cloud-check"></i> Monitor Google Calendar
+          </a>
+          <a href="{% url 'core:controle_auditoria' %}" class="nav-item">
+            <i class="bi bi-shield-check"></i> Logs de Auditoria
+          </a>
+          <a href="{% url 'core:controle_api_status' %}" class="nav-item">
+            <i class="bi bi-speedometer2"></i> Status do Sistema
+          </a>
+        </div>
+        {% endif %}
+
+        {% if perms.core.view_relatorios or user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Diretoria</div>
+          <a href="{% url 'core:diretoria_dashboard' %}" class="nav-item">
+            <i class="bi bi-graph-up"></i> Dashboard Executivo
+          </a>
+          <a href="{% url 'core:diretoria_relatorios' %}" class="nav-item">
+            <i class="bi bi-file-earmark-bar-graph"></i> Relatórios Consolidados
+          </a>
+          <a href="/disponibilidade/" class="nav-item">
+            <i class="bi bi-calendar-month"></i> Visão Mensal
+          </a>
+          <a href="{% url 'core:diretoria_api_metrics' %}" class="nav-item">
+            <i class="bi bi-file-earmark-code"></i> Métricas API
+          </a>
+        </div>
+        {% endif %}
+
+        <!-- Gestão Administrativa - apenas para administradores -->
+        {% if user.is_staff %}
+        <div class="nav-section">
+          <div class="nav-section-title">Gestão</div>
+          <a href="{% url 'core:gestao_dashboard' %}" class="nav-item">
+            <i class="bi bi-gear-fill"></i> Dashboard Administrativo
+          </a>
+          <a href="{% url 'core:gestao_formadores' %}" class="nav-item">
+            <i class="bi bi-people-fill"></i> Formadores
+          </a>
+          <a href="{% url 'core:gestao_municipios' %}" class="nav-item">
+            <i class="bi bi-geo-alt-fill"></i> Municípios
+          </a>
+          <a href="{% url 'core:gestao_projetos' %}" class="nav-item">
+            <i class="bi bi-briefcase-fill"></i> Projetos
+          </a>
+          <a href="{% url 'core:gestao_tipos_evento' %}" class="nav-item">
+            <i class="bi bi-calendar-event-fill"></i> Tipos de Evento
+          </a>
+        </div>
+        {% endif %}
+
+        <!-- Administração do Sistema - apenas para administradores -->
+        {% if user.is_superuser %}
+        <div class="nav-section">
+          <div class="nav-section-title">Sistema</div>
+          <a href="/admin/" class="nav-item">
+            <i class="bi bi-gear"></i> Administração
+          </a>
+        </div>
+        {% endif %}
+      </nav>
+    </div>
+
+    <!-- Main content -->
+    <div class="main-content">
+      <div class="page-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h1>Sistema Aprender</h1>
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <span style="font-weight: 500; color: var(--text);">{{ user.get_full_name|default:user.username }}</span>
+            <form method="post" action="{% url 'core:logout' %}" style="display: inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm" style="color: var(--danger); background: none; border: none;" title="Sair do sistema">
+                <i class="bi bi-box-arrow-right"></i> Sair
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+      
+      <div class="content-wrap">
+        <!-- Mensagem de boas-vindas simples -->
+        <div style="background: var(--card); border-radius: 1rem; padding: 2rem; margin-bottom: 2rem; box-shadow: var(--shadow); text-align: center;">
+          <h2 style="margin: 0 0 1rem 0; color: var(--accent); font-weight: 700;">
+            <i class="bi bi-hand-thumbs-up"></i> Bem-vindo ao Sistema Aprender!
+          </h2>
+          <p style="margin: 0; color: var(--muted); font-size: 1.1rem;">
+            Use o menu lateral para acessar as funcionalidades disponíveis para seu perfil.
+          </p>
+        </div>
+
+        <!-- Quick actions -->
+        <h2 style="margin:3rem 0 1.5rem 0; font-size:1.5rem; color:var(--text); font-weight:700; display:flex; align-items:center; gap:0.75rem;">
+          <i class="bi bi-lightning-fill" style="color:var(--accent);"></i> Ações Rápidas
+        </h2>
+        
+        <div class="cards-grid">
+          <!-- PA-06: Solicitar Evento - apenas coordenadores e admins -->
+          {% if perms.core.add_solicitacao or user.is_superuser %}
+          <div class="card">
+            <h3><i class="bi bi-calendar-plus-fill" style="color:var(--accent);"></i> Solicitar Evento</h3>
+            <p>Crie uma nova solicitação de evento educacional com verificação automática de conflitos de agenda e disponibilidade de formadores em tempo real.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="/solicitar/">
+                <i class="bi bi-plus-lg"></i> Criar Solicitação
+              </a>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- COMMIT 4: Meus Eventos - apenas coordenadores -->
+          {% if perms.core.add_solicitacao or user.is_superuser %}
+          <div class="card">
+            <h3><i class="bi bi-calendar-check-fill" style="color:var(--success);"></i> Meus Eventos</h3>
+            <p>Visualize e gerencie todos os eventos que você solicitou. Acompanhe status, aprovações e histórico completo das suas solicitações.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="{% url 'core:coordenador_meus_eventos' %}">
+                <i class="bi bi-list-check"></i> Ver Meus Eventos
+              </a>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- PA-06: Bloqueio de Agenda -->
+          {% if perms.core.add_disponibilidadeformadores or user.is_superuser %}
+          <div class="card">
+            <h3><i class="bi bi-calendar-x-fill" style="color:var(--warning);"></i> Bloqueio de Agenda</h3>
+            <p>Registre períodos de indisponibilidade na sua agenda. Configure bloqueios totais (dia inteiro) ou parciais (horários específicos) para evitar conflitos.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="/bloqueios/novo/">
+                <i class="bi bi-shield-x"></i> Registrar Bloqueio
+              </a>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Mapa Mensal - visível para superintendência, diretoria, controle e admin -->
+          {% if perms.core.view_aprovacao or perms.core.view_relatorios or perms.core.sync_calendar or user.is_superuser %}
+          <div class="card">
+            <h3><i class="bi bi-calendar-week-fill" style="color:var(--success);"></i> Mapa de Disponibilidade</h3>
+            <p>Visualize graficamente a disponibilidade dos formadores, eventos programados e bloqueios de agenda em uma interface mensal intuitiva.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="/disponibilidade/">
+                <i class="bi bi-calendar4-week"></i> Visualizar Mapa
+              </a>
+              {% if perms.core.sync_calendar or user.is_superuser %}
+              <a class="btn" href="/mapa-mensal/?ano=2025&mes=9">
+                <i class="bi bi-file-earmark-code"></i> Dados JSON
+              </a>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- PA-06: Aprovações - apenas superintendência -->
+          {% if perms.core.view_aprovacao or user.is_superuser %}
+          <div class="card">
+            <h3><i class="bi bi-clipboard-check-fill" style="color:#17a2b8;"></i> Central de Aprovações</h3>
+            <p>Analise solicitações de eventos pendentes, verifique detalhes dos formadores e tome decisões de aprovação ou reprovação com justificativas detalhadas.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="/aprovacoes/pendentes/">
+                <i class="bi bi-hourglass-bottom"></i> Pendentes (<span id="aprovacoes-badge">-</span>)
+              </a>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Perfil Controle - Monitoramento -->
+          {% if perms.core.sync_calendar or user.is_superuser %}
+          <div class="card">
+            <h3><i class="bi bi-cloud-check-fill" style="color:#28a745;"></i> Monitor Google Calendar</h3>
+            <p>Monitore a sincronização de eventos com Google Calendar, visualize estatísticas de sucesso e identifique problemas de integração em tempo real.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="{% url 'core:controle_google_calendar' %}">
+                <i class="bi bi-graph-up"></i> Ver Sincronizações
+              </a>
+              <a class="btn" href="{% url 'core:controle_api_status' %}">
+                <i class="bi bi-file-earmark-code"></i> API Status
+              </a>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3><i class="bi bi-shield-check-fill" style="color:#6f42c1;"></i> Auditoria do Sistema</h3>
+            <p>Acesse logs completos de auditoria, monitore atividades dos usuários e analise padrões de uso do sistema com ferramentas avançadas de filtragem.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="{% url 'core:controle_auditoria' %}">
+                <i class="bi bi-shield-lock"></i> Ver Logs
+              </a>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Perfil Diretoria - Visão Estratégica -->
+          {% if perms.core.view_relatorios or user.is_superuser %}
+          <div class="card">
+            <h3><i class="bi bi-graph-up-arrow" style="color:#17a2b8;"></i> Dashboard Executivo</h3>
+            <p>Acesse métricas estratégicas, indicadores de performance e análises executivas com visão consolidada de todos os projetos e formadores.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="{% url 'core:diretoria_dashboard' %}">
+                <i class="bi bi-speedometer"></i> Ver Dashboard
+              </a>
+              <a class="btn" href="{% url 'core:diretoria_api_metrics' %}">
+                <i class="bi bi-file-earmark-code"></i> API Métricas
+              </a>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3><i class="bi bi-file-earmark-bar-graph-fill" style="color:#28a745;"></i> Relatórios Consolidados</h3>
+            <p>Gere relatórios detalhados por período, projeto ou município com análises de performance dos formadores e distribuição geográfica.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="{% url 'core:diretoria_relatorios' %}">
+                <i class="bi bi-table"></i> Ver Relatórios
+              </a>
+              <a class="btn" href="/disponibilidade/">
+                <i class="bi bi-calendar-month"></i> Visão Mensal
+              </a>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        <footer style="margin-top:4rem; padding:2rem 0; border-top:2px solid var(--line); color:var(--muted); text-align:center; background: linear-gradient(135deg, var(--card) 0%, #f8f9fa 100%); border-radius: 1rem 1rem 0 0;">
+          <div style="display:flex; align-items:center; justify-content:center; gap:1rem; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <i class="bi bi-building" style="color:var(--accent);"></i> 
+              <strong>DAT</strong> • Desenvolvimento e Apoio Tecnológico
+            </div>
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <i class="bi bi-person-badge" style="color:var(--success);"></i> 
+              Usuário: <strong>{{ user.username }}</strong>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <i class="bi bi-server" style="color:var(--warning);"></i> 
+              Sistema v1.0 • Django 5.2
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('show');
+    }
+    
+    // Close sidebar when clicking outside on mobile
+    document.addEventListener('click', function(event) {
+      const sidebar = document.getElementById('sidebar');
+      const toggle = document.querySelector('.mobile-toggle');
+      
+      if (window.innerWidth <= 768 && 
+          !sidebar.contains(event.target) && 
+          !toggle.contains(event.target) && 
+          sidebar.classList.contains('show')) {
+        sidebar.classList.remove('show');
+      }
+    });
+
+    // Função para animar contadores
+    function animateCounter(element, target, duration = 1000) {
+      const start = 0;
+      const range = target - start;
+      const startTime = performance.now();
+      
+      function updateCounter(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function (ease-out)
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const current = Math.floor(start + (range * easeOut));
+        
+        element.textContent = current;
+        
+        if (progress < 1) {
+          requestAnimationFrame(updateCounter);
+        } else {
+          element.textContent = target;
+        }
+      }
+      
+      requestAnimationFrame(updateCounter);
+    }
+
+    console.log('✅ Home page carregada - versão simplificada');
+  </script>
+</body>
+</html>

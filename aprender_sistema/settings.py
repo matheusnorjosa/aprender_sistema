@@ -134,7 +134,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # Third-party apps
-    # "mcp_server",  # Django MCP Server - Disabled for Docker compatibility
+    "mcp_server",  # Django MCP Server - Enabled for AI integration
     # Local apps
     "core",
     "relatorios",
@@ -194,13 +194,12 @@ try:
 except ImportError:
     pass
 
-# MCP Server integration - Disabled for Docker compatibility
-# try:
-#     import django_mcp_server
-# 
-#     INSTALLED_APPS.append("django_mcp_server")
-# except ImportError:
-#     pass
+# MCP Server integration - Enabled for AI integration
+try:
+    import django_mcp_server
+    INSTALLED_APPS.append("django_mcp_server")
+except ImportError:
+    pass
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -282,11 +281,16 @@ elif IS_PRODUCTION or IS_STAGING:
         raise ValueError(f"DB_PASSWORD é obrigatória em ambiente {ENVIRONMENT} quando DATABASE_URL não está configurado!")
 
 else:
-    # SQLite para desenvolvimento
+    # FORÇAR USO DO POSTGRESQL DOCKER EM DESENVOLVIMENTO
+    # SQLite removido - sistema totalmente centralizado no Docker
     DATABASES = {
         "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("DB_NAME", "aprender_sistema_db"),
+            "USER": os.getenv("DB_USER", "adm_aprender"),
+            "PASSWORD": os.getenv("DB_PASSWORD", "aprender123456"),
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5433"),
         }
     }
 

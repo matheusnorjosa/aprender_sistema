@@ -1,0 +1,486 @@
+{% extends "core/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Meus Eventos" %} — Coordenador{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-3">
+                <i class="fas fa-calendar-alt"></i>
+                {% trans "Meus Eventos Solicitados" %}
+            </h1>
+            
+            <!-- Estatísticas -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h5 class="card-title">{% trans "Total" %}</h5>
+                                    <h3>{{ stats.total_solicitacoes }}</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-list-ul fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h5 class="card-title">{% trans "Pendentes" %}</h5>
+                                    <h3>{{ stats.eventos_pendentes }}</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-clock fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h5 class="card-title">{% trans "Aprovados" %}</h5>
+                                    <h3>{{ stats.eventos_aprovados }}</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-check-circle fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h5 class="card-title">{% trans "Reprovados" %}</h5>
+                                    <h3>{{ stats.eventos_reprovados }}</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-times-circle fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 d-flex align-items-center">
+                            <i class="fas fa-filter text-primary me-2"></i>
+                            {% trans "Filtros" %}
+                        </h5>
+                        <!-- Contador de filtros ativos -->
+                        {% if request.GET.status or request.GET.periodo or request.GET.projeto %}
+                            <span class="badge bg-primary rounded-pill">
+                                <i class="fas fa-filter me-1"></i>
+                                {% if request.GET.status %}1{% else %}0{% endif %}
+                                {% if request.GET.periodo %}1{% else %}0{% endif %}
+                                {% if request.GET.projeto %}1{% else %}0{% endif %} ativos
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body bg-white">
+                    <form method="get" class="row g-3" id="filtrosForm">
+                        <div class="col-md-3">
+                            <label for="status" class="form-label fw-semibold text-dark">
+                                <i class="fas fa-flag me-1 text-muted"></i>
+                                {% trans "Status" %}
+                            </label>
+                            <select name="status" id="status" class="form-select border-2" onchange="aplicarFiltroAutomatico()">
+                                <option value="">{% trans "Todos os status" %}</option>
+                                {% for key, value in filter_options.status_choices %}
+                                    <option value="{{ key }}" {% if request.GET.status == key %}selected{% endif %}>
+                                        {% if key == "PENDENTE" %}🟡{% elif key == "APROVADO" %}🟢{% elif key == "REPROVADO" %}🔴{% endif %} {{ value }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="periodo" class="form-label fw-semibold text-dark">
+                                <i class="fas fa-calendar me-1 text-muted"></i>
+                                {% trans "Período" %}
+                            </label>
+                            <select name="periodo" id="periodo" class="form-select border-2" onchange="aplicarFiltroAutomatico()">
+                                <option value="">{% trans "Todo o período" %}</option>
+                                {% for key, value in filter_options.periodo_choices %}
+                                    <option value="{{ key }}" {% if request.GET.periodo == key %}selected{% endif %}>
+                                        📅 {{ value }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="projeto" class="form-label fw-semibold text-dark">
+                                <i class="fas fa-project-diagram me-1 text-muted"></i>
+                                {% trans "Projeto" %}
+                            </label>
+                            <select name="projeto" id="projeto" class="form-select border-2" onchange="aplicarFiltroAutomatico()">
+                                <option value="">{% trans "Todos os projetos" %}</option>
+                                {% for projeto in filter_options.projetos %}
+                                    <option value="{{ projeto.id }}" {% if request.GET.projeto == projeto.id|stringformat:"s" %}selected{% endif %}>
+                                        📋 {{ projeto.nome }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold text-dark">{% trans "Ações" %}</label>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary d-flex align-items-center justify-content-center" id="btnFiltrar">
+                                    <span class="spinner-border spinner-border-sm me-2 d-none" id="loadingSpinner"></span>
+                                    <i class="fas fa-search me-2" id="searchIcon"></i>
+                                    <span id="btnText">{% trans "Aplicar Filtros" %}</span>
+                                </button>
+                                {% if request.GET.status or request.GET.periodo or request.GET.projeto %}
+                                    <a href="{% url 'core:coordenador_meus_eventos' %}" class="btn btn-outline-secondary btn-sm">
+                                        <i class="fas fa-times me-1"></i>
+                                        {% trans "Limpar Todos" %}
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </form>
+                    
+                    <!-- Indicadores visuais de filtros ativos -->
+                    {% if request.GET.status or request.GET.periodo or request.GET.projeto %}
+                        <div class="mt-3 pt-3 border-top">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                {% trans "Filtros ativos:" %}
+                            </small>
+                            <div class="mt-2">
+                                {% if request.GET.status %}
+                                    <span class="badge bg-secondary me-2">
+                                        Status: {{ request.GET.status }}
+                                        <a href="?{% if request.GET.periodo %}periodo={{ request.GET.periodo }}&{% endif %}{% if request.GET.projeto %}projeto={{ request.GET.projeto }}{% endif %}" class="text-white ms-1">
+                                            <i class="fas fa-times"></i>
+                                        </a>
+                                    </span>
+                                {% endif %}
+                                {% if request.GET.periodo %}
+                                    <span class="badge bg-secondary me-2">
+                                        Período: {% for key, value in filter_options.periodo_choices %}{% if key == request.GET.periodo %}{{ value }}{% endif %}{% endfor %}
+                                        <a href="?{% if request.GET.status %}status={{ request.GET.status }}&{% endif %}{% if request.GET.projeto %}projeto={{ request.GET.projeto }}{% endif %}" class="text-white ms-1">
+                                            <i class="fas fa-times"></i>
+                                        </a>
+                                    </span>
+                                {% endif %}
+                                {% if request.GET.projeto %}
+                                    <span class="badge bg-secondary me-2">
+                                        Projeto: {% for projeto in filter_options.projetos %}{% if projeto.id|stringformat:"s" == request.GET.projeto %}{{ projeto.nome }}{% endif %}{% endfor %}
+                                        <a href="?{% if request.GET.status %}status={{ request.GET.status }}&{% endif %}{% if request.GET.periodo %}periodo={{ request.GET.periodo }}{% endif %}" class="text-white ms-1">
+                                            <i class="fas fa-times"></i>
+                                        </a>
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <script>
+                // Aplicar filtros automaticamente ao mudar seleção
+                function aplicarFiltroAutomatico() {
+                    const btnFiltrar = document.getElementById('btnFiltrar');
+                    const loadingSpinner = document.getElementById('loadingSpinner');
+                    const searchIcon = document.getElementById('searchIcon');
+                    const btnText = document.getElementById('btnText');
+                    
+                    // Mostrar loading
+                    loadingSpinner.classList.remove('d-none');
+                    searchIcon.classList.add('d-none');
+                    btnText.textContent = 'Filtrando...';
+                    btnFiltrar.disabled = true;
+                    
+                    // Submeter formulário automaticamente após pequeno delay para UX
+                    setTimeout(() => {
+                        document.getElementById('filtrosForm').submit();
+                    }, 300);
+                }
+
+                // Melhorar feedback visual do botão
+                document.getElementById('filtrosForm').addEventListener('submit', function() {
+                    const btnFiltrar = document.getElementById('btnFiltrar');
+                    const loadingSpinner = document.getElementById('loadingSpinner');
+                    const searchIcon = document.getElementById('searchIcon');
+                    const btnText = document.getElementById('btnText');
+                    
+                    loadingSpinner.classList.remove('d-none');
+                    searchIcon.classList.add('d-none');
+                    btnText.textContent = 'Aplicando...';
+                    btnFiltrar.disabled = true;
+                });
+
+                // Atalhos de teclado
+                document.addEventListener('keydown', function(e) {
+                    // Ctrl+F para focar no primeiro filtro
+                    if (e.ctrlKey && e.key === 'f') {
+                        e.preventDefault();
+                        document.getElementById('status').focus();
+                    }
+                    
+                    // Escape para limpar filtros
+                    if (e.key === 'Escape') {
+                        const hasFilters = {{ request.GET.status|yesno:"true,false" }} || 
+                                         {{ request.GET.periodo|yesno:"true,false" }} || 
+                                         {{ request.GET.projeto|yesno:"true,false" }};
+                        if (hasFilters) {
+                            window.location.href = '{% url "core:coordenador_meus_eventos" %}';
+                        }
+                    }
+                });
+            </script>
+
+            <!-- Lista de Eventos -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-check"></i>
+                        {% trans "Eventos" %}
+                    </h5>
+                    <a href="{% url 'core:solicitar_evento' %}" class="btn btn-success btn-sm">
+                        <i class="fas fa-plus"></i>
+                        {% trans "Nova Solicitação" %}
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if eventos %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>{% trans "Evento" %}</th>
+                                        <th>{% trans "Projeto" %}</th>
+                                        <th>{% trans "Município" %}</th>
+                                        <th>{% trans "Data/Hora" %}</th>
+                                        <th>{% trans "Status" %}</th>
+                                        <th>{% trans "Solicitado em" %}</th>
+                                        <th>{% trans "Ações" %}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for evento in eventos %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ evento.titulo_evento }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ evento.tipo_evento.nome }}</small>
+                                            </td>
+                                            <td>{{ evento.projeto.nome }}</td>
+                                            <td>{{ evento.municipio.nome }}</td>
+                                            <td>
+                                                <strong>{{ evento.data_inicio|date:"d/m/Y" }}</strong>
+                                                <br>
+                                                <small>{{ evento.data_inicio|time:"H:i" }} - {{ evento.data_fim|time:"H:i" }}</small>
+                                            </td>
+                                            <td>
+                                                {% if evento.status == "Pendente" %}
+                                                    <span class="badge bg-warning text-dark">
+                                                        <i class="fas fa-clock"></i>
+                                                        {{ evento.status }}
+                                                    </span>
+                                                {% elif evento.status == "Aprovado" %}
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-check-circle"></i>
+                                                        {{ evento.status }}
+                                                    </span>
+                                                {% elif evento.status == "Reprovado" %}
+                                                    <span class="badge bg-danger">
+                                                        <i class="fas fa-times-circle"></i>
+                                                        {{ evento.status }}
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {{ evento.data_solicitacao|date:"d/m/Y H:i" }}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <button type="button" class="btn btn-outline-info" 
+                                                            data-bs-toggle="modal" 
+                                                            data-bs-target="#eventoModal{{ evento.id }}">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                    {% if evento.status == "Pendente" %}
+                                                        <a href="{% url 'core:solicitar_evento' %}?edit={{ evento.id }}" 
+                                                           class="btn btn-outline-warning" 
+                                                           title="{% trans 'Editar' %}">
+                                                            <i class="fas fa-edit"></i>
+                                                        </a>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Paginação -->
+                        {% if is_paginated %}
+                            <div class="d-flex justify-content-center mt-4">
+                                <nav aria-label="{% trans 'Navegação de página' %}">
+                                    <ul class="pagination">
+                                        {% if page_obj.has_previous %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page=1{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.periodo %}&periodo={{ request.GET.periodo }}{% endif %}{% if request.GET.projeto %}&projeto={{ request.GET.projeto }}{% endif %}">
+                                                    {% trans "Primeira" %}
+                                                </a>
+                                            </li>
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.periodo %}&periodo={{ request.GET.periodo }}{% endif %}{% if request.GET.projeto %}&projeto={{ request.GET.projeto }}{% endif %}">
+                                                    {% trans "Anterior" %}
+                                                </a>
+                                            </li>
+                                        {% endif %}
+
+                                        <li class="page-item active">
+                                            <span class="page-link">
+                                                {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                                            </span>
+                                        </li>
+
+                                        {% if page_obj.has_next %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.periodo %}&periodo={{ request.GET.periodo }}{% endif %}{% if request.GET.projeto %}&projeto={{ request.GET.projeto }}{% endif %}">
+                                                    {% trans "Próxima" %}
+                                                </a>
+                                            </li>
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.periodo %}&periodo={{ request.GET.periodo }}{% endif %}{% if request.GET.projeto %}&projeto={{ request.GET.projeto }}{% endif %}">
+                                                    {% trans "Última" %}
+                                                </a>
+                                            </li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                            </div>
+                        {% endif %}
+
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                            <h4 class="text-muted">{% trans "Nenhum evento encontrado" %}</h4>
+                            <p class="text-muted">{% trans "Você ainda não solicitou nenhum evento ou não há eventos que correspondam aos filtros aplicados." %}</p>
+                            <a href="{% url 'core:solicitar_evento' %}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i>
+                                {% trans "Solicitar Primeiro Evento" %}
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modais de Detalhes dos Eventos -->
+{% for evento in eventos %}
+    <div class="modal fade" id="eventoModal{{ evento.id }}" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-calendar-alt"></i>
+                        {{ evento.titulo_evento }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>{% trans "Informações Básicas" %}</h6>
+                            <p><strong>{% trans "Projeto:" %}</strong> {{ evento.projeto.nome }}</p>
+                            <p><strong>{% trans "Município:" %}</strong> {{ evento.municipio.nome }}</p>
+                            <p><strong>{% trans "Tipo de Evento:" %}</strong> {{ evento.tipo_evento.nome }}</p>
+                            <p><strong>{% trans "Status:" %}</strong> 
+                                {% if evento.status == "Pendente" %}
+                                    <span class="badge bg-warning text-dark">{{ evento.status }}</span>
+                                {% elif evento.status == "Aprovado" %}
+                                    <span class="badge bg-success">{{ evento.status }}</span>
+                                {% elif evento.status == "Reprovado" %}
+                                    <span class="badge bg-danger">{{ evento.status }}</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>{% trans "Cronograma" %}</h6>
+                            <p><strong>{% trans "Data de Início:" %}</strong> {{ evento.data_inicio|date:"d/m/Y H:i" }}</p>
+                            <p><strong>{% trans "Data de Fim:" %}</strong> {{ evento.data_fim|date:"d/m/Y H:i" }}</p>
+                            <p><strong>{% trans "Solicitado em:" %}</strong> {{ evento.data_solicitacao|date:"d/m/Y H:i" }}</p>
+                            {% if evento.data_aprovacao_rejeicao %}
+                                <p><strong>{% trans "Decisão em:" %}</strong> {{ evento.data_aprovacao_rejeicao|date:"d/m/Y H:i" }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    {% if evento.numero_encontro_formativo %}
+                        <h6>{% trans "Encontro Formativo" %}</h6>
+                        <p><strong>{% trans "Número:" %}</strong> {{ evento.numero_encontro_formativo }}</p>
+                    {% endif %}
+                    
+                    {% if evento.coordenador_acompanha %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-user-check"></i>
+                            {% trans "Coordenador acompanhará este evento" %}
+                        </div>
+                    {% endif %}
+                    
+                    {% if evento.observacoes %}
+                        <h6>{% trans "Observações" %}</h6>
+                        <p>{{ evento.observacoes|linebreaks }}</p>
+                    {% endif %}
+                    
+                    {% if evento.justificativa_rejeicao %}
+                        <div class="alert alert-danger">
+                            <h6>{% trans "Justificativa da Reprovação" %}</h6>
+                            <p class="mb-0">{{ evento.justificativa_rejeicao|linebreaks }}</p>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Formadores -->
+                    {% if evento.formadores.all %}
+                        <h6>{% trans "Formadores" %}</h6>
+                        <ul class="list-group list-group-flush">
+                            {% for formador in evento.formadores.all %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    {{ formador.nome }}
+                                    <small class="text-muted">{{ formador.email }}</small>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        {% trans "Fechar" %}
+                    </button>
+                    {% if evento.status == "Pendente" %}
+                        <a href="{% url 'core:solicitar_evento' %}?edit={{ evento.id }}" class="btn btn-warning">
+                            <i class="fas fa-edit"></i>
+                            {% trans "Editar" %}
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endfor %}
+{% endblock %}

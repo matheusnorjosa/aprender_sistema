@@ -1,0 +1,352 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Meus Eventos - Sistema Aprender{% endblock %}
+
+{% block nav_formador %}active{% endblock %}
+
+{% block page_title %}
+<i class="bi bi-person-workspace"></i> Meus Eventos
+{% endblock %}
+
+{% block breadcrumb %}
+Visualize todos os eventos em que você está participando
+{% endblock %}
+
+{% block page_actions %}
+<div class="actions">
+  {% if admin_mode %}
+    <div class="btn-group me-2">
+      <a href="?admin_mode=geral" class="btn {% if admin_mode_type == 'geral' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="bi bi-gear"></i> Modo Admin
+      </a>
+      <a href="?admin_mode=formador" class="btn {% if admin_mode_type == 'formador' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="bi bi-person"></i> Simular Formador
+      </a>
+    </div>
+  {% endif %}
+  <a href="{% url 'core:home' %}" class="btn">
+    <i class="bi bi-house"></i> Início
+  </a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --primary-color: #3498db;
+    --success-color: #27ae60;
+    --warning-color: #f39c12;
+    --danger-color: #e74c3c;
+  }
+
+  .formador-info {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #0ea5e9;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    text-align: center;
+  }
+
+  .formador-info h4 {
+    color: var(--primary-color);
+    margin: 0;
+    font-weight: 700;
+  }
+
+  .events-table {
+    background: white;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-bottom: 2rem;
+  }
+
+  .events-table h3 {
+    background: var(--primary-color);
+    color: white;
+    margin: 0;
+    padding: 1rem 1.5rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+
+  .events-table table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+  }
+
+  .events-table th {
+    background: #f8f9fa;
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #2c3e50;
+    border-bottom: 2px solid #dee2e6;
+  }
+
+  .events-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #dee2e6;
+    vertical-align: top;
+  }
+
+  .events-table tbody tr:hover {
+    background: #f8f9fa;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .status-futuro { background: rgba(52, 152, 219, 0.1); color: var(--primary-color); }
+  .status-andamento { background: rgba(39, 174, 96, 0.1); color: var(--success-color); }
+  .status-passado { background: rgba(155, 89, 182, 0.1); color: #9b59b6; }
+  .status-pendente { background: rgba(243, 156, 18, 0.1); color: var(--warning-color); }
+
+  .date-display {
+    font-size: 0.9rem;
+    color: #2c3e50;
+  }
+
+  .date-time {
+    font-weight: 600;
+    color: var(--primary-color);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+    background: white;
+    border-radius: 0.75rem;
+    margin: 2rem 0;
+  }
+
+  .empty-state i {
+    font-size: 3rem;
+    color: #dee2e6;
+    margin-bottom: 1rem;
+  }
+
+  .error-message {
+    background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+    border: 1px solid #fc8181;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    color: #c53030;
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  @media (max-width: 768px) {
+    .events-table th,
+    .events-table td {
+      padding: 0.75rem 0.5rem;
+      font-size: 0.9rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto;">
+  
+  <!-- 🔑 INTERFACE ADMIN -->
+  {% if admin_mode %}
+    <div class="alert alert-info mb-4 border border-primary">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-1">
+            <i class="bi bi-shield-check text-primary"></i>
+            <strong>Modo Administrador Ativo</strong>
+          </h5>
+          <p class="mb-0">
+            {% if admin_formador_simulado %}
+              Simulando formador: <strong>{{ admin_formador_simulado.nome }}</strong>
+            {% elif admin_message %}
+              {{ admin_message }}
+            {% else %}
+              Você está visualizando como superuser.
+            {% endif %}
+          </p>
+        </div>
+        <div>
+          <span class="badge bg-primary">
+            <i class="bi bi-person-gear"></i> ADMIN
+          </span>
+        </div>
+      </div>
+      
+      <!-- Seletor de Formador para Admin -->
+      {% if admin_mode_type == 'formador' and formadores_disponiveis %}
+        <hr class="my-3">
+        <form method="get" class="row g-3">
+          <input type="hidden" name="admin_mode" value="formador">
+          <div class="col-md-8">
+            <label for="admin_formador_id" class="form-label fw-semibold">
+              <i class="bi bi-person-plus"></i> Selecionar Formador para Simular:
+            </label>
+            <select name="admin_formador_id" id="admin_formador_id" class="form-select" onchange="this.form.submit()">
+              <option value="">Escolha um formador...</option>
+              {% for formador_opt in formadores_disponiveis %}
+                <option value="{{ formador_opt.id }}" 
+                        {% if admin_formador_simulado.id == formador_opt.id %}selected{% endif %}>
+                  {{ formador_opt.nome }} ({{ formador_opt.email }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">&nbsp;</label>
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-eye"></i> Visualizar
+              </button>
+            </div>
+          </div>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
+  
+  {% if erro %}
+    <div class="error-message">
+      <i class="bi bi-exclamation-triangle"></i>
+      <h5>Acesso Restrito</h5>
+      <p>{{ erro }}</p>
+    </div>
+  {% elif formador %}
+    <!-- Informações do Formador -->
+    <div class="formador-info">
+      <h4><i class="bi bi-person-circle"></i> {{ formador.nome }}</h4>
+      <p class="mb-0">
+        <i class="bi bi-envelope"></i> {{ formador.email }}
+        {% if formador.area_atuacao %}
+          | <i class="bi bi-briefcase"></i> {{ formador.area_atuacao }}
+        {% endif %}
+      </p>
+    </div>
+
+    <!-- Tabela de eventos -->
+    {% if todos_eventos %}
+      <div class="events-table">
+        <h3><i class="bi bi-calendar-event"></i> Meus Eventos ({{ todos_eventos|length }})</h3>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Título do Evento</th>
+                  <th>Data/Hora</th>
+                  <th>Município</th>
+                  <th>Projeto</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Eventos em Andamento -->
+                {% for evento in eventos_andamento %}
+                  <tr>
+                    <td><strong>{{ evento.titulo_evento }}</strong></td>
+                    <td class="date-display">
+                      <div class="date-time">{{ evento.data_inicio|date:"d/m/Y H:i" }}</div>
+                      <div>até {{ evento.data_fim|date:"d/m/Y H:i" }}</div>
+                    </td>
+                    <td>{{ evento.municipio.nome }}</td>
+                    <td>{{ evento.projeto.nome }}</td>
+                    <td><span class="status-badge status-andamento">Em Andamento</span></td>
+                  </tr>
+                {% endfor %}
+
+                <!-- Eventos Futuros -->
+                {% for evento in eventos_futuros %}
+                  <tr>
+                    <td><strong>{{ evento.titulo_evento }}</strong></td>
+                    <td class="date-display">
+                      <div class="date-time">{{ evento.data_inicio|date:"d/m/Y H:i" }}</div>
+                      <div>até {{ evento.data_fim|date:"d/m/Y H:i" }}</div>
+                    </td>
+                    <td>{{ evento.municipio.nome }}</td>
+                    <td>{{ evento.projeto.nome }}</td>
+                    <td><span class="status-badge status-futuro">Agendado</span></td>
+                  </tr>
+                {% endfor %}
+
+                <!-- Eventos Pendentes -->
+                {% for evento in eventos_pendentes %}
+                  <tr>
+                    <td><strong>{{ evento.titulo_evento }}</strong></td>
+                    <td class="date-display">
+                      <div class="date-time">{{ evento.data_inicio|date:"d/m/Y H:i" }}</div>
+                      <div>até {{ evento.data_fim|date:"d/m/Y H:i" }}</div>
+                    </td>
+                    <td>{{ evento.municipio.nome }}</td>
+                    <td>{{ evento.projeto.nome }}</td>
+                    <td><span class="status-badge status-pendente">Pendente</span></td>
+                  </tr>
+                {% endfor %}
+
+                <!-- Eventos Passados -->
+                {% for evento in eventos_passados %}
+                  <tr>
+                    <td><strong>{{ evento.titulo_evento }}</strong></td>
+                    <td class="date-display">
+                      <div class="date-time">{{ evento.data_inicio|date:"d/m/Y H:i" }}</div>
+                      <div>até {{ evento.data_fim|date:"d/m/Y H:i" }}</div>
+                    </td>
+                    <td>{{ evento.municipio.nome }}</td>
+                    <td>{{ evento.projeto.nome }}</td>
+                    <td><span class="status-badge status-passado">Concluído</span></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+    {% else %}
+      <div class="empty-state">
+        <i class="bi bi-calendar-x"></i>
+        <h4>Você não possui eventos agendados</h4>
+        <p>Você ainda não está participando de nenhum evento no sistema.</p>
+      </div>
+    {% endif %}
+
+  {% else %}
+    <div class="error-message">
+      <i class="bi bi-exclamation-triangle"></i>
+      <h5>Formador não encontrado</h5>
+      <p>Não foi possível localizar um formador associado ao seu usuário.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Adicionar interatividade simples às linhas da tabela
+    const tableRows = document.querySelectorAll('.events-table tbody tr');
+    
+    tableRows.forEach(row => {
+        row.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateX(5px)';
+            this.style.transition = 'transform 0.2s ease';
+        });
+        
+        row.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateX(0)';
+        });
+    });
+});
+</script>
+{% endblock %}

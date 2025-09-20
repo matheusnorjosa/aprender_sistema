@@ -1,3 +1,0 @@
-Deployment trigger - DATABASE_URL configured
-Timestamp: 2025-01-04 12:30:00
-Purpose: Test DATABASE_URL configuration fix

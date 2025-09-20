@@ -1,0 +1,348 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-0">
+            <i class="bi bi-truck text-warning me-2"></i>
+            {{ title }}
+        </h1>
+        <p class="text-muted mb-0">
+            {% if action == 'create' %}
+                Criar novo registro de deslocamento
+            {% else %}
+                Editar deslocamento existente
+            {% endif %}
+        </p>
+    </div>
+    <a href="{% url 'core:deslocamentos_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-2"></i>Voltar à Lista
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Formulário Principal -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-form me-2"></i>Dados do Deslocamento
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="post" id="deslocamentoForm">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="id_data" class="form-label required">Data</label>
+                                {{ form.data }}
+                                {% if form.data.errors %}
+                                    <div class="text-danger small">{{ form.data.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="id_tipo" class="form-label">Tipo</label>
+                                {{ form.tipo }}
+                                {% if form.tipo.errors %}
+                                    <div class="text-danger small">{{ form.tipo.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="id_origem" class="form-label required">Origem</label>
+                                {{ form.origem }}
+                                {% if form.origem.errors %}
+                                    <div class="text-danger small">{{ form.origem.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="id_destino" class="form-label required">Destino</label>
+                                {{ form.destino }}
+                                {% if form.destino.errors %}
+                                    <div class="text-danger small">{{ form.destino.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seção de Formadores -->
+                    <div class="card bg-light border-0 mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0">
+                                <i class="bi bi-people me-2"></i>Formadores no Deslocamento
+                                <span class="badge bg-light text-primary ms-2" id="pessoasCount">0</span>
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">
+                                Selecione até 6 formadores que participarão deste deslocamento.
+                                Os campos não preenchidos serão ignorados.
+                            </p>
+                            
+                            <div class="row">
+                                {% for field in form %}
+                                    {% if 'pessoa_' in field.name %}
+                                        <div class="col-md-6 mb-3">
+                                            <label for="{{ field.id_for_label }}" class="form-label">
+                                                Formador {{ field.name|slice:"7:" }}
+                                            </label>
+                                            <select name="{{ field.name }}" class="form-select formador-select" 
+                                                    id="{{ field.id_for_label }}">
+                                                <option value="">Selecionar formador...</option>
+                                                {% for formador in formadores %}
+                                                    <option value="{{ formador.id }}" 
+                                                            {% if field.value == formador.id %}selected{% endif %}>
+                                                        {{ formador.nome }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                            {% if field.errors %}
+                                                <div class="text-danger small">{{ field.errors.0 }}</div>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle me-2"></i>
+                            {% if action == 'create' %}Criar Deslocamento{% else %}Atualizar Deslocamento{% endif %}
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="limparFormulario()">
+                            <i class="bi bi-arrow-clockwise me-2"></i>Limpar
+                        </button>
+                        <a href="{% url 'core:deslocamentos_list' %}" class="btn btn-outline-danger">
+                            <i class="bi bi-x-circle me-2"></i>Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- Painel de Ajuda -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-info-circle me-2"></i>Instruções
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="small text-muted">
+                    <p><strong>Campos obrigatórios:</strong></p>
+                    <ul class="mb-3">
+                        <li>Data do deslocamento</li>
+                        <li>Cidade de origem</li>
+                        <li>Cidade de destino</li>
+                    </ul>
+                    
+                    <p><strong>Tipos de deslocamento:</strong></p>
+                    <ul class="mb-3">
+                        <li><strong>Deslocamento:</strong> Viagem de ida</li>
+                        <li><strong>Retorno:</strong> Viagem de volta</li>
+                    </ul>
+                    
+                    <p><strong>Formadores:</strong></p>
+                    <p>Você pode selecionar até 6 formadores para o mesmo deslocamento. Campos não preenchidos serão ignorados.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview dos Formadores -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-eye me-2"></i>Formadores Selecionados
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="previewFormadores">
+                    <p class="text-muted small">Nenhum formador selecionado</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar campos do formulário
+    const dataField = document.getElementById('id_data');
+    const tipoField = document.getElementById('id_tipo');
+    const origemField = document.getElementById('id_origem');
+    const destinoField = document.getElementById('id_destino');
+    const formadorSelects = document.querySelectorAll('.formador-select');
+    
+    // Configurar campos como Bootstrap form-control
+    if (dataField) dataField.className = 'form-control';
+    if (tipoField) tipoField.className = 'form-select';
+    if (origemField) origemField.className = 'form-control';
+    if (destinoField) destinoField.className = 'form-control';
+    
+    // Adicionar placeholders
+    if (origemField) origemField.placeholder = 'Ex: Fortaleza - CE';
+    if (destinoField) destinoField.placeholder = 'Ex: Sobral - CE';
+    
+    // Definir data mínima como hoje
+    if (dataField && !dataField.value) {
+        const hoje = new Date().toISOString().split('T')[0];
+        dataField.min = hoje;
+    }
+    
+    // Listener para atualizar preview de formadores
+    formadorSelects.forEach(select => {
+        select.addEventListener('change', atualizarPreview);
+    });
+    
+    // Atualizar preview inicial
+    atualizarPreview();
+});
+
+function atualizarPreview() {
+    const formadorSelects = document.querySelectorAll('.formador-select');
+    const previewDiv = document.getElementById('previewFormadores');
+    const countSpan = document.getElementById('pessoasCount');
+    
+    const formadoresSelecionados = [];
+    const idsUsados = new Set();
+    
+    formadorSelects.forEach(select => {
+        if (select.value) {
+            const text = select.options[select.selectedIndex].text;
+            if (!idsUsados.has(select.value)) {
+                formadoresSelecionados.push({
+                    id: select.value,
+                    nome: text
+                });
+                idsUsados.add(select.value);
+            }
+        }
+    });
+    
+    // Atualizar contador
+    countSpan.textContent = formadoresSelecionados.length;
+    
+    // Atualizar preview
+    if (formadoresSelecionados.length === 0) {
+        previewDiv.innerHTML = '<p class="text-muted small">Nenhum formador selecionado</p>';
+    } else {
+        const badges = formadoresSelecionados.map(f => 
+            `<span class="badge bg-primary me-1 mb-1">${f.nome}</span>`
+        ).join('');
+        previewDiv.innerHTML = badges;
+    }
+    
+    // Validar duplicatas
+    const duplicatas = [];
+    formadorSelects.forEach(select => {
+        if (select.value) {
+            const count = Array.from(formadorSelects).filter(s => s.value === select.value).length;
+            if (count > 1) {
+                duplicatas.push(select);
+            }
+        }
+    });
+    
+    // Destacar duplicatas
+    formadorSelects.forEach(select => {
+        select.classList.remove('is-invalid');
+        const feedback = select.parentNode.querySelector('.invalid-feedback');
+        if (feedback) feedback.remove();
+    });
+    
+    if (duplicatas.length > 0) {
+        duplicatas.forEach(select => {
+            select.classList.add('is-invalid');
+            const feedback = document.createElement('div');
+            feedback.className = 'invalid-feedback';
+            feedback.textContent = 'Formador já selecionado em outro campo';
+            select.parentNode.appendChild(feedback);
+        });
+    }
+}
+
+function limparFormulario() {
+    if (confirm('Tem certeza que deseja limpar todos os campos?')) {
+        document.getElementById('deslocamentoForm').reset();
+        atualizarPreview();
+    }
+}
+
+// Validação antes de enviar
+document.getElementById('deslocamentoForm').addEventListener('submit', function(e) {
+    const formadorSelects = document.querySelectorAll('.formador-select');
+    const idsUsados = new Set();
+    let temDuplicata = false;
+    
+    formadorSelects.forEach(select => {
+        if (select.value) {
+            if (idsUsados.has(select.value)) {
+                temDuplicata = true;
+            } else {
+                idsUsados.add(select.value);
+            }
+        }
+    });
+    
+    if (temDuplicata) {
+        e.preventDefault();
+        alert('Não é possível selecionar o mesmo formador em múltiplos campos.');
+        return false;
+    }
+});
+</script>
+
+<style>
+.required::after {
+    content: " *";
+    color: #dc3545;
+}
+
+.card-header h6 {
+    font-weight: 600;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.form-select:focus,
+.form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.is-invalid {
+    border-color: #dc3545 !important;
+}
+
+.invalid-feedback {
+    display: block !important;
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: #dc3545;
+}
+
+.bg-light {
+    background-color: #f8f9fa !important;
+}
+</style>
+{% endblock %}

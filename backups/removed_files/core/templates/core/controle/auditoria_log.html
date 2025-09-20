@@ -1,0 +1,272 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Logs de Auditoria - Sistema Aprender{% endblock %}
+
+{% block nav_controle %}active{% endblock %}
+
+{% block page_title %}
+<i class="bi bi-shield-check-fill"></i> Logs de Auditoria
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+      background: var(--bs-white);
+      padding: 1.5rem;
+      border-radius: 1rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    
+    .stat-card h3 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 0.5rem 0;
+      color: #3498db;
+    }
+    
+    .filters {
+      background: var(--bs-white);
+      padding: 1.5rem;
+      border-radius: 1rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    
+    .filters form {
+      display: flex;
+      gap: 1rem;
+      align-items: end;
+      flex-wrap: wrap;
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .form-group label {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .form-group select, .form-group input {
+      padding: 0.5rem;
+      border: 1px solid #e9ecef;
+      border-radius: 0.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 2rem;
+    }
+    
+    @media (max-width: 1024px) {
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .logs-table {
+      background: var(--bs-white);
+      border-radius: 1rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    
+    .table-header {
+      background: #3498db;
+      color: white;
+      padding: 1rem;
+    }
+    
+    .table-content {
+      padding: 1rem;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    th, td {
+      text-align: left;
+      padding: 0.75rem;
+      border-bottom: 1px solid #e9ecef;
+    }
+    
+    th {
+      font-weight: 600;
+      background: #f8f9fa;
+    }
+    
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    
+    .sidebar-card {
+      background: var(--bs-white);
+      border-radius: 1rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    
+    .sidebar-card-header {
+      background: #27ae60;
+      color: white;
+      padding: 1rem;
+      font-weight: 600;
+    }
+    
+    .sidebar-card-content {
+      padding: 1rem;
+    }
+    
+    .list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #e9ecef;
+    }
+    
+    .list-item:last-child {
+      border-bottom: none;
+    }
+    
+    .log-details {
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <small class="text-muted">Monitore todas as atividades e ações realizadas no sistema</small>
+</div>
+<div class="stats-grid">
+  <div class="stat-card">
+    <h3>{{ total_logs }}</h3>
+    <p>Total de Logs</p>
+  </div>
+  <div class="stat-card">
+    <h3>{{ logs_hoje }}</h3>
+    <p>Logs Hoje</p>
+  </div>
+</div>
+
+<div class="filters">
+  <form method="get">
+    <div class="form-group">
+      <label for="acao">Ação:</label>
+      <input type="text" name="acao" id="acao" value="{{ acao_filter }}" placeholder="Filtrar por ação...">
+    </div>
+    <div class="form-group">
+      <label for="usuario">Usuário:</label>
+      <input type="text" name="usuario" id="usuario" value="{{ usuario_filter }}" placeholder="Filtrar por usuário...">
+    </div>
+    <div class="form-group">
+      <label for="periodo">Período:</label>
+      <select name="periodo" id="periodo" class="form-select">
+        <option value="1" {% if periodo_filter == '1' %}selected{% endif %}>Último dia</option>
+        <option value="7" {% if periodo_filter == '7' %}selected{% endif %}>Últimos 7 dias</option>
+        <option value="30" {% if periodo_filter == '30' %}selected{% endif %}>Últimos 30 dias</option>
+        <option value="90" {% if periodo_filter == '90' %}selected{% endif %}>Últimos 90 dias</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>&nbsp;</label>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-search"></i> Filtrar
+      </button>
+    </div>
+  </form>
+</div>
+
+<div class="content-grid">
+  <div class="logs-table">
+    <div class="table-header">
+      <h3><i class="bi bi-list-task"></i> Registro de Atividades</h3>
+    </div>
+    <div class="table-content">
+      {% if logs %}
+      <table>
+        <thead>
+          <tr>
+            <th>Data/Hora</th>
+            <th>Usuário</th>
+            <th>Ação</th>
+            <th>Detalhes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td>{{ log.data_hora|date:"d/m/Y H:i:s" }}</td>
+            <td>{{ log.usuario.username }}</td>
+            <td>{{ log.acao }}</td>
+            <td class="log-details" title="{{ log.detalhes }}">{{ log.detalhes|default:"-" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="text-align: center; padding: 2rem; color: #6c757d;">
+        <i class="bi bi-inbox"></i><br>
+        Nenhum log encontrado para os filtros selecionados.
+      </p>
+      {% endif %}
+    </div>
+  </div>
+  
+  <div class="sidebar">
+    <div class="sidebar-card">
+      <div class="sidebar-card-header">
+        <i class="bi bi-graph-up"></i> Ações Mais Frequentes
+      </div>
+      <div class="sidebar-card-content">
+        {% for acao in acoes_frequentes %}
+        <div class="list-item">
+          <span>{{ acao.acao }}</span>
+          <strong>{{ acao.count }}</strong>
+        </div>
+        {% empty %}
+        <p style="color: #6c757d; text-align: center;">Nenhum dado disponível</p>
+        {% endfor %}
+      </div>
+    </div>
+    
+    <div class="sidebar-card">
+      <div class="sidebar-card-header" style="background: #f39c12;">
+        <i class="bi bi-people-fill"></i> Usuários Mais Ativos
+      </div>
+      <div class="sidebar-card-content">
+        {% for usuario in usuarios_ativos %}
+        <div class="list-item">
+          <span>{{ usuario.usuario__username }}</span>
+          <strong>{{ usuario.count }}</strong>
+        </div>
+        {% empty %}
+        <p style="color: #6c757d; text-align: center;">Nenhum dado disponível</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

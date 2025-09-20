@@ -1,13 +1,9 @@
 """
 Views relacionadas ao perfil de Diretoria (visão executiva e relatórios).
+ATUALIZADO: Usa Services centralizados e imports unificados
 """
 
-from django.core.cache import cache
-from django.db.models import Count, Q
-from django.db.models.functions import TruncMonth
-from django.http import HttpResponse
-from django.conf import settings
-import os
+# IMPORT ÚNICO - Single Source of Truth
 from .base import *
 
 
@@ -84,38 +80,19 @@ class DiretoriaIntegratedDashboardView(
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        agora = timezone.now()
-        data_inicio_ano = agora.replace(
-            month=1, day=1, hour=0, minute=0, second=0, microsecond=0
-        )
 
-        # Métricas principais (mesmo código da view original)
-        total_solicitacoes_ano = Solicitacao.objects.filter(
-            data_inicio__gte=data_inicio_ano
-        ).count()
-        solicitacoes_aprovadas_ano = Solicitacao.objects.filter(
-            data_inicio__gte=data_inicio_ano, status=SolicitacaoStatus.APROVADO
-        ).count()
-        taxa_aprovacao_ano = round(
-            (
-                (solicitacoes_aprovadas_ano / total_solicitacoes_ano * 100)
-                if total_solicitacoes_ano > 0
-                else 0
-            ),
-            1,
-        )
+        # Usar Services centralizados - elimina queries ad-hoc
+        stats_gerais = DashboardService.get_estatisticas_gerais()
 
-        context.update(
-            {
-                "total_solicitacoes_ano": total_solicitacoes_ano,
-                "solicitacoes_aprovadas_ano": solicitacoes_aprovadas_ano,
-                "taxa_aprovacao_ano": taxa_aprovacao_ano,
-                "formadores_ativos": Formador.objects.filter(ativo=True).count(),
-                "municipios_total": Municipio.objects.filter(ativo=True).count(),
-                "projetos_ativos": Projeto.objects.filter(ativo=True).count(),
-                "ano_atual": agora.year,
-            }
-        )
+        context.update({
+            "total_solicitacoes_ano": stats_gerais['solicitacoes_ano'],
+            "solicitacoes_aprovadas_ano": stats_gerais['solicitacoes_aprovadas_ano'],
+            "taxa_aprovacao_ano": stats_gerais['taxa_aprovacao_ano'],
+            "formadores_ativos": stats_gerais['formadores_ativos'],
+            "municipios_total": stats_gerais['municipios_ativos'],
+            "projetos_ativos": stats_gerais['projetos_ativos'],
+            "ano_atual": timezone.now().year,
+        })
         return context
 
 
@@ -124,20 +101,35 @@ class DiretoriaDebugView(LoginRequiredMixin, TemplateView):
     template_name = "core/diretoria/debug_dashboard.html"
 
 
-class DashboardStatsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class DashboardStatsAPIView(LoginRequiredMixin, PermissionRequiredMixin, BaseAPIView):
     permission_required = "core.view_relatorios"
 
     def get(self, request):
-        # Estatísticas básicas para o dashboard
-        stats = {
-            "total_solicitacoes": Solicitacao.objects.count(),
-            "formadores_ativos": Formador.objects.filter(ativo=True).count(),
-            "eventos_hoje": Solicitacao.objects.filter(
-                data_inicio__date=timezone.now().date(),
+        """Estatísticas básicas usando Services unificados"""
+        try:
+            # Usar Services centralizados - fonte única de verdade
+            stats_gerais = DashboardService.get_estatisticas_gerais()
+
+            # Query otimizada para eventos de hoje
+            hoje = timezone.now().date()
+            eventos_hoje = get_optimized_solicitacao_queryset().filter(
+                data_inicio__date=hoje,
                 status=SolicitacaoStatus.APROVADO,
-            ).count(),
-        }
-        return JsonResponse(stats)
+            ).count()
+
+            stats = {
+                "total_solicitacoes": stats_gerais['solicitacoes_ano'],
+                "formadores_ativos": stats_gerais['formadores_ativos'],
+                "eventos_hoje": eventos_hoje,
+                "coordenadores_total": stats_gerais['coordenadores_total'],
+                "municipios_ativos": stats_gerais['municipios_ativos'],
+                "taxa_aprovacao": stats_gerais['taxa_aprovacao_ano']
+            }
+
+            return self.get_success_response(stats)
+
+        except Exception as e:
+            return self.get_error_response(f"Erro ao buscar estatísticas: {str(e)}")
 
 
 class DiretoriaAPIMetricsView(LoginRequiredMixin, PermissionRequiredMixin, View):
@@ -221,49 +213,52 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
         return JsonResponse({'data': data})
     
     def get_top_formadores(self):
-        """Top 10 formadores por eventos realizados"""
-        
+        """Top 10 formadores por eventos realizados - OTIMIZADO"""
+
         # Cache por 5 minutos
         cache_key = 'top_formadores_data'
         cached_data = cache.get(cache_key)
         if cached_data:
             return JsonResponse({'data': cached_data})
-        
+
         agora = timezone.now()
         tres_meses_atras = agora - timedelta(days=90)
-        
+
+        # Query otimizada com Services - evita duplicação de lógica
         formadores = (
             FormadoresSolicitacao.objects
-            .select_related('formador', 'formador__area_atuacao', 'solicitacao')
+            .select_related('usuario', 'usuario__area_atuacao', 'solicitacao')
             .filter(
                 solicitacao__data_inicio__gte=tres_meses_atras,
                 solicitacao__status=SolicitacaoStatus.APROVADO
             )
-            .values('formador__nome', 'formador__area_atuacao__name')
+            .values('usuario__first_name', 'usuario__last_name', 'usuario__area_atuacao__name')
             .annotate(eventos=Count('id'))
             .order_by('-eventos')[:10]
         )
-        
+
         data = []
         for formador in formadores:
+            # Combinar first_name e last_name para nome completo
+            nome_completo = f"{formador['usuario__first_name']} {formador['usuario__last_name']}".strip()
             data.append({
-                'nome': formador['formador__nome'],
-                'area': formador.get('formador__area_atuacao__name', 'Formação'),
+                'nome': nome_completo,
+                'area': formador.get('usuario__area_atuacao__name', 'Formação'),
                 'eventos': formador['eventos']
             })
-        
+
         cache.set(cache_key, data, 300)
         return JsonResponse({'data': data})
     
     def get_distribuicao_setores(self):
-        """Distribuição de eventos por setor"""
-        
+        """Distribuição de eventos por setor - OTIMIZADO"""
+
         agora = timezone.now()
         inicio_ano = agora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        
+
+        # Query otimizada usando queryset base
         setores = (
-            Solicitacao.objects
-            .select_related('projeto__setor')
+            get_optimized_solicitacao_queryset()
             .filter(
                 data_inicio__gte=inicio_ano,
                 status=SolicitacaoStatus.APROVADO
@@ -272,7 +267,7 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
             .annotate(eventos=Count('id'))
             .order_by('-eventos')
         )
-        
+
         data = []
         for setor in setores:
             data.append({
@@ -280,18 +275,18 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 'sigla': setor['projeto__setor__sigla'] or 'N/A',
                 'eventos': setor['eventos']
             })
-            
+
         return JsonResponse({'data': data})
     
     def get_municipios_atendidos(self):
-        """Top municípios atendidos"""
-        
+        """Top municípios atendidos - OTIMIZADO"""
+
         agora = timezone.now()
         tres_meses_atras = agora - timedelta(days=90)
-        
+
+        # Query otimizada usando queryset base
         municipios = (
-            Solicitacao.objects
-            .select_related('municipio')
+            get_optimized_solicitacao_queryset()
             .filter(
                 data_inicio__gte=tres_meses_atras,
                 status=SolicitacaoStatus.APROVADO
@@ -300,7 +295,7 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
             .annotate(eventos=Count('id'))
             .order_by('-eventos')[:10]
         )
-        
+
         data = []
         for municipio in municipios:
             data.append({
@@ -308,18 +303,18 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 'uf': municipio['municipio__uf'],
                 'eventos': municipio['eventos']
             })
-            
+
         return JsonResponse({'data': data})
     
     def get_tipos_evento(self):
-        """Distribuição por tipos de evento"""
-        
+        """Distribuição por tipos de evento - OTIMIZADO"""
+
         agora = timezone.now()
         inicio_ano = agora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        
+
+        # Query otimizada usando queryset base
         tipos = (
-            Solicitacao.objects
-            .select_related('tipo_evento')
+            get_optimized_solicitacao_queryset()
             .filter(
                 data_inicio__gte=inicio_ano,
                 status=SolicitacaoStatus.APROVADO
@@ -328,25 +323,25 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
             .annotate(quantidade=Count('id'))
             .order_by('-quantidade')
         )
-        
+
         data = []
         for tipo in tipos:
             data.append({
                 'tipo': tipo['tipo_evento__nome'],
                 'quantidade': tipo['quantidade']
             })
-            
+
         return JsonResponse({'data': data})
     
     def get_projetos_stats(self):
-        """Estatísticas de projetos mais ativos"""
-        
+        """Estatísticas de projetos mais ativos - OTIMIZADO"""
+
         agora = timezone.now()
         tres_meses_atras = agora - timedelta(days=90)
-        
+
+        # Query otimizada usando queryset base
         projetos = (
-            Solicitacao.objects
-            .select_related('projeto')
+            get_optimized_solicitacao_queryset()
             .filter(
                 data_inicio__gte=tres_meses_atras,
                 status=SolicitacaoStatus.APROVADO
@@ -355,14 +350,14 @@ class DashboardChartsAPIView(LoginRequiredMixin, PermissionRequiredMixin, View):
             .annotate(eventos=Count('id'))
             .order_by('-eventos')[:8]
         )
-        
+
         data = []
         for projeto in projetos:
             data.append({
                 'nome': projeto['projeto__nome'],
                 'eventos': projeto['eventos']
             })
-            
+
         return JsonResponse({'data': data})
 
 
@@ -398,3 +393,58 @@ class TestMapFinalView(TemplateView):
 class TestMapAdvancedView(TemplateView):
     """View para o mapa avançado com dados de projetos e animações"""
     template_name = "core/test_map_advanced.html"
+
+class DashboardCursosAPIView(BaseAPIView):
+    """API para dados de cursos do dashboard executivo - OTIMIZADA"""
+
+    def get(self, request):
+        try:
+            # Usar query otimizada do base.py
+            tipos_evento = (
+                get_optimized_solicitacao_queryset()
+                .values('projeto__nome')
+                .annotate(eventos=Count('id'))
+                .order_by('-eventos')
+            )
+
+            series_data = [
+                {
+                    'label': item['projeto__nome'] or 'Sem projeto',
+                    'value': item['eventos']
+                }
+                for item in tipos_evento
+            ]
+
+            dados = {
+                'series': series_data,
+                'total_eventos': sum(item['eventos'] for item in tipos_evento)
+            }
+
+            return self.get_success_response(dados)
+
+        except Exception as e:
+            return self.get_error_response(f"Erro ao buscar dados de cursos: {str(e)}")
+
+class DashboardCoordenadoresAPIView(BaseAPIView):
+    """API para dados de coordenadores - UNIFICADA com Services"""
+
+    def get(self, request):
+        """Retorna dados dos coordenadores usando DashboardService (fonte única)"""
+
+        try:
+            # Usar Service centralizado - elimina duplicação de código
+            dados = DashboardService.get_coordenadores_por_municipio()
+
+            # Adicionar metadados padronizados
+            dados['meta'] = {
+                'fonte_dados': 'dashboard_service_unificado',
+                'observacao': 'Dados processados via Service Layer - Single Source of Truth',
+                'data_atualizacao': timezone.now().isoformat(),
+                'arquitetura': 'Usuario fonte única + Services centralizados',
+                'performance': 'Otimizado com cache e select_related'
+            }
+
+            return self.get_success_response(dados)
+
+        except Exception as e:
+            return self.get_error_response(f"Erro ao buscar dados de coordenadores: {str(e)}")

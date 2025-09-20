@@ -6,11 +6,7 @@ from django.views.generic import TemplateView
 from .views import HomeView  # Nova importação
 from .views import home  # Mantendo a função home também (opcional)
 from .views.health import health_check, health_detailed, health_ready, health_live, health_metrics
-from core.api.dashboard.views import (
-    DashboardCoordenadoresAPIView,
-    DashboardCursosAPIView,
-    DashboardGeoAPIView,
-)
+# Removido: views não existem no módulo core.api.dashboard.views
 from .views import (
     AprovacaoDetailView,
     AprovacoesPendentesView,
@@ -37,7 +33,7 @@ from .views import (
 )
 from .views.mapa_views import MapaDadosAPIView, MapaEstatisticasAPIView
 from .views.mapa_realtime_views import MapaRealtimeAPIView, MapaStatusAPIView, MapaWebhookView
-from .views.diretoria_views import DashboardChartsAPIView, DiretoriaDebugView, DiretoriaIntegratedDashboardView
+from .views.diretoria_views import DashboardChartsAPIView, DiretoriaDebugView, DiretoriaIntegratedDashboardView, DashboardCursosAPIView, DashboardCoordenadoresAPIView
 from .views.admin_views import CommunicationLogsView
 from .views.gestao_views import (
     GestaoDashboardView,
@@ -218,20 +214,16 @@ urlpatterns = [
         name="diretoria_api_charts",
     ),
     path(
-        "diretoria/api/dashboard/geo/",
-        DashboardGeoAPIView.as_view(),
-        name="diretoria_dashboard_geo",
-    ),
-    path(
-        "diretoria/api/dashboard/cursos/",
+        "diretoria/api/cursos/",
         DashboardCursosAPIView.as_view(),
-        name="diretoria_dashboard_cursos",
+        name="diretoria_api_cursos",
     ),
     path(
-        "diretoria/api/dashboard/coordenadores/",
+        "diretoria/api/coordenadores/",
         DashboardCoordenadoresAPIView.as_view(),
-        name="diretoria_dashboard_coordenadores",
+        name="diretoria_api_coordenadores",
     ),
+    # Removido: views não existem
     # Página de debug temporária
     path(
         "diretoria/debug/",

@@ -1,0 +1,1132 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Aprovações Pendentes - Sistema Aprender{% endblock %}
+
+{% block nav_aprovacoes %}active{% endblock %}
+
+{% block page_title %}
+<i class="bi bi-clipboard-check"></i> Aprovações Pendentes
+{% endblock %}
+
+{% block breadcrumb %}
+Gerencie solicitações de eventos aguardando aprovação com ferramentas avançadas
+{% endblock %}
+
+{% block page_actions %}
+<div class="actions">
+  <button type="button" class="btn btn-outline-primary" id="refresh-btn">
+    <i class="bi bi-arrow-clockwise"></i> Atualizar
+  </button>
+  <button type="button" class="btn btn-success" id="bulk-approve-btn" disabled>
+    <i class="bi bi-check-all"></i> Aprovar Selecionadas
+  </button>
+  <button type="button" class="btn btn-danger" id="bulk-reject-btn" disabled>
+    <i class="bi bi-x-circle"></i> Reprovar Selecionadas
+  </button>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --primary-color: #3498db;
+    --success-color: #27ae60;
+    --danger-color: #e74c3c;
+    --warning-color: #f39c12;
+    --info-color: #17a2b8;
+    --border-radius: 0.75rem;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow: 0 4px 15px rgba(0,0,0,0.08);
+    --shadow-hover: 0 8px 25px rgba(0,0,0,0.15);
+  }
+
+  /* Search and filters section */
+  .filters-card {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #2980b9 100%);
+    color: white;
+    margin-bottom: 2rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+  }
+
+  .filters-card .form-control,
+  .filters-card .form-select {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    border-radius: calc(var(--border-radius) * 0.7);
+  }
+
+  .filters-card .form-control::placeholder {
+    color: rgba(255,255,255,0.8);
+  }
+
+  .filters-card .form-control:focus,
+  .filters-card .form-select:focus {
+    background: rgba(255,255,255,0.25);
+    border-color: rgba(255,255,255,0.6);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.2);
+    color: white;
+  }
+
+  .filters-card .form-select option {
+    background-color: var(--primary-color);
+    color: white;
+  }
+
+  /* Loading states */
+  .loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    border-radius: var(--border-radius);
+  }
+
+  .loading-spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Solicitações table */
+  .solicitacoes-container {
+    position: relative;
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .solicitacao-card {
+    border-bottom: 1px solid #e9ecef;
+    padding: 1.5rem;
+    transition: var(--transition);
+    position: relative;
+  }
+
+  .solicitacao-card:last-child {
+    border-bottom: none;
+  }
+
+  .solicitacao-card:hover {
+    background-color: #f8f9fa;
+    transform: translateX(5px);
+  }
+
+  .solicitacao-card.selected {
+    background-color: rgba(52, 152, 219, 0.1);
+    border-left: 5px solid var(--primary-color);
+  }
+
+  .solicitacao-checkbox {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    transform: scale(1.2);
+  }
+
+  .solicitacao-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+
+  .solicitacao-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+  }
+
+  .solicitacao-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 1rem;
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .formadores-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .formador-badge {
+    background-color: var(--info-color);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .conflict-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .conflict-indicator.no-conflicts {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid var(--success-color);
+  }
+
+  .conflict-indicator.has-warnings {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid var(--warning-color);
+  }
+
+  .conflict-indicator.has-errors {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid var(--danger-color);
+  }
+
+  .conflict-indicator:hover {
+    transform: scale(1.05);
+    box-shadow: var(--shadow);
+  }
+
+  /* Action buttons */
+  .solicitacao-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+
+  .btn-action {
+    padding: 0.5rem 1rem;
+    border-radius: calc(var(--border-radius) * 0.7);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: var(--transition);
+    border: none;
+    cursor: pointer;
+  }
+
+  .btn-approve {
+    background-color: var(--success-color);
+    color: white;
+  }
+
+  .btn-approve:hover {
+    background-color: #219a52;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+
+  .btn-reject {
+    background-color: var(--danger-color);
+    color: white;
+  }
+
+  .btn-reject:hover {
+    background-color: #c0392b;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+
+  .btn-details {
+    background-color: var(--info-color);
+    color: white;
+  }
+
+  .btn-details:hover {
+    background-color: #138496;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+
+  /* Pagination */
+  .pagination-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding: 1rem;
+  }
+
+  .pagination-info {
+    font-size: 0.875rem;
+    color: #6c757d;
+  }
+
+  .pagination-controls {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .page-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid #dee2e6;
+    background: white;
+    color: #495057;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .page-btn:hover:not(:disabled) {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+  }
+
+  .page-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .page-btn.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+  }
+
+  /* Conflict details modal */
+  .modal-content {
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .conflict-item {
+    padding: 1rem;
+    margin: 0.5rem 0;
+    border-radius: calc(var(--border-radius) * 0.7);
+    border-left: 4px solid;
+    background-color: rgba(255, 255, 255, 0.8);
+  }
+
+  .conflict-error {
+    border-left-color: var(--danger-color);
+    background-color: #fff5f5;
+  }
+
+  .conflict-warning {
+    border-left-color: var(--warning-color);
+    background-color: #fffbf0;
+  }
+
+  .conflict-code {
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 0.25rem;
+    background-color: rgba(0, 0, 0, 0.1);
+    margin-right: 0.5rem;
+  }
+
+  /* Statistics panel */
+  .stats-panel {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+
+  .stat-card {
+    text-align: center;
+    padding: 1rem;
+    background: white;
+    border-radius: calc(var(--border-radius) * 0.7);
+    box-shadow: var(--shadow);
+  }
+
+  .stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .solicitacao-header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .solicitacao-meta {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .solicitacao-actions {
+      justify-content: stretch;
+    }
+    
+    .btn-action {
+      flex: 1;
+    }
+    
+    .stats-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6c757d;
+  }
+
+  .empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Statistics Panel -->
+<div class="stats-panel">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-number" id="total-pendentes">-</div>
+      <div class="stat-label">Total Pendentes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number text-danger" id="total-conflitos">-</div>
+      <div class="stat-label">Com Conflitos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number text-warning" id="total-avisos">-</div>
+      <div class="stat-label">Com Avisos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number text-success" id="total-limpos">-</div>
+      <div class="stat-label">Sem Problemas</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters Section -->
+<div class="filters-card card">
+  <div class="card-body">
+    <form id="filters-form">
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <label class="form-label text-white">Buscar por título</label>
+          <input type="text" class="form-control" id="search-input" placeholder="Digite o título do evento...">
+        </div>
+        <div class="col-md-2 mb-3">
+          <label class="form-label text-white">Município</label>
+          <select class="form-select" id="municipio-filter">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="col-md-2 mb-3">
+          <label class="form-label text-white">Tipo de Evento</label>
+          <select class="form-select" id="tipo-evento-filter">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="col-md-2 mb-3">
+          <label class="form-label text-white">Data Início</label>
+          <input type="date" class="form-control" id="data-inicio-filter">
+        </div>
+        <div class="col-md-2 mb-3">
+          <label class="form-label text-white">Data Fim</label>
+          <input type="date" class="form-control" id="data-fim-filter">
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-12">
+          <button type="button" class="btn btn-light me-2" id="apply-filters-btn">
+            <i class="bi bi-funnel"></i> Aplicar Filtros
+          </button>
+          <button type="button" class="btn btn-outline-light" id="clear-filters-btn">
+            <i class="bi bi-x-circle"></i> Limpar
+          </button>
+          <div class="float-end">
+            <input type="checkbox" id="select-all-checkbox" class="form-check-input me-2">
+            <label for="select-all-checkbox" class="form-check-label text-white">Selecionar Todas</label>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Solicitações List -->
+<div class="solicitacoes-container">
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="loading-spinner"></div>
+  </div>
+  
+  <div id="solicitacoes-list">
+    <!-- Solicitações will be loaded here -->
+  </div>
+  
+  <div class="empty-state" id="empty-state" style="display: none;">
+    <i class="bi bi-inbox"></i>
+    <h4>Nenhuma solicitação pendente</h4>
+    <p>Não há solicitações aguardando aprovação no momento.</p>
+  </div>
+</div>
+
+<!-- Pagination -->
+<div class="pagination-container">
+  <div class="pagination-info" id="pagination-info"></div>
+  <div class="pagination-controls" id="pagination-controls"></div>
+</div>
+
+<!-- Conflict Details Modal -->
+<div class="modal fade" id="conflictModal" tabindex="-1" aria-labelledby="conflictModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="conflictModalLabel">Análise de Conflitos</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="conflict-details-content">
+        <!-- Conflict details will be loaded here -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+        <button type="button" class="btn btn-success" id="modal-approve-btn">
+          <i class="bi bi-check"></i> Aprovar Mesmo Assim
+        </button>
+        <button type="button" class="btn btn-danger" id="modal-reject-btn">
+          <i class="bi bi-x"></i> Reprovar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Action Modal -->
+<div class="modal fade" id="bulkActionModal" tabindex="-1" aria-labelledby="bulkActionModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="bulkActionModalLabel">Confirmar Ação em Lote</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="bulk-action-message"></p>
+        <div class="mb-3">
+          <label for="bulk-justificativa" class="form-label">Justificativa (opcional)</label>
+          <textarea class="form-control" id="bulk-justificativa" rows="3" placeholder="Adicione uma justificativa para a ação..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn" id="confirm-bulk-action-btn">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Enhanced JavaScript for advanced approval system
+document.addEventListener('DOMContentLoaded', function() {
+    // Estado da aplicação
+    let currentPage = 1;
+    let currentFilters = {};
+    let selectedSolicitacoes = new Set();
+    let currentData = null;
+    let currentSolicitacaoId = null;
+    
+    // Elementos DOM
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const solicitacoesList = document.getElementById('solicitacoes-list');
+    const emptyState = document.getElementById('empty-state');
+    const selectAllCheckbox = document.getElementById('select-all-checkbox');
+    const bulkApproveBtn = document.getElementById('bulk-approve-btn');
+    const bulkRejectBtn = document.getElementById('bulk-reject-btn');
+    const refreshBtn = document.getElementById('refresh-btn');
+    
+    // Filtros
+    const searchInput = document.getElementById('search-input');
+    const municipioFilter = document.getElementById('municipio-filter');
+    const tipoEventoFilter = document.getElementById('tipo-evento-filter');
+    const dataInicioFilter = document.getElementById('data-inicio-filter');
+    const dataFimFilter = document.getElementById('data-fim-filter');
+    const applyFiltersBtn = document.getElementById('apply-filters-btn');
+    const clearFiltersBtn = document.getElementById('clear-filters-btn');
+    
+    // Estatísticas
+    const totalPendentesEl = document.getElementById('total-pendentes');
+    const totalConflitosEl = document.getElementById('total-conflitos');
+    const totalAvisosEl = document.getElementById('total-avisos');
+    const totalLimposEl = document.getElementById('total-limpos');
+    
+    // Modais
+    const conflictModal = new bootstrap.Modal(document.getElementById('conflictModal'));
+    const bulkActionModal = new bootstrap.Modal(document.getElementById('bulkActionModal'));
+    
+    // Inicializar aplicação
+    init();
+    
+    function init() {
+        setupEventListeners();
+        loadFilterOptions();
+        loadSolicitacoes();
+    }
+    
+    function setupEventListeners() {
+        // Refresh
+        refreshBtn.addEventListener('click', () => {
+            selectedSolicitacoes.clear();
+            updateBulkButtons();
+            loadSolicitacoes();
+        });
+        
+        // Filtros
+        applyFiltersBtn.addEventListener('click', applyFilters);
+        clearFiltersBtn.addEventListener('click', clearFilters);
+        
+        // Select all
+        selectAllCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                selectAllSolicitacoes();
+            } else {
+                deselectAllSolicitacoes();
+            }
+        });
+        
+        // Bulk actions
+        bulkApproveBtn.addEventListener('click', () => showBulkActionModal('aprovar'));
+        bulkRejectBtn.addEventListener('click', () => showBulkActionModal('reprovar'));
+        
+        // Modal actions
+        document.getElementById('confirm-bulk-action-btn').addEventListener('click', confirmBulkAction);
+        document.getElementById('modal-approve-btn').addEventListener('click', () => processIndividualAction('aprovar'));
+        document.getElementById('modal-reject-btn').addEventListener('click', () => processIndividualAction('reprovar'));
+        
+        // Debounce search input
+        let searchTimeout;
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                applyFilters();
+            }, 500);
+        });
+    }
+    
+    async function loadFilterOptions() {
+        // Carregar opções de filtros (municipios, tipos de evento, etc.)
+        // This would typically load from API endpoints
+        console.log('Loading filter options...');
+    }
+    
+    async function loadSolicitacoes() {
+        try {
+            showLoading(true);
+            
+            const params = new URLSearchParams({
+                page: currentPage,
+                page_size: 20,
+                ...currentFilters
+            });
+            
+            const response = await fetch(`/api/solicitacoes-pendentes/?${params}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                currentData = data;
+                renderSolicitacoes(data.solicitacoes);
+                renderPagination(data.pagination);
+                updateStatistics(data.solicitacoes);
+            } else {
+                showError(data.error);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar solicitações:', error);
+            showError('Erro ao carregar solicitações');
+        } finally {
+            showLoading(false);
+        }
+    }
+    
+    function renderSolicitacoes(solicitacoes) {
+        if (solicitacoes.length === 0) {
+            solicitacoesList.style.display = 'none';
+            emptyState.style.display = 'block';
+            return;
+        }
+        
+        solicitacoesList.style.display = 'block';
+        emptyState.style.display = 'none';
+        
+        solicitacoesList.innerHTML = solicitacoes.map(sol => `
+            <div class="solicitacao-card ${selectedSolicitacoes.has(sol.id) ? 'selected' : ''}" data-id="${sol.id}">
+                <input type="checkbox" class="form-check-input solicitacao-checkbox" 
+                       data-id="${sol.id}" ${selectedSolicitacoes.has(sol.id) ? 'checked' : ''}>
+                
+                <div class="solicitacao-header">
+                    <div>
+                        <div class="solicitacao-title">${sol.titulo_evento}</div>
+                        <div class="solicitacao-meta">
+                            <div class="meta-item">
+                                <i class="bi bi-building"></i> ${sol.projeto}
+                            </div>
+                            <div class="meta-item">
+                                <i class="bi bi-geo-alt"></i> ${sol.municipio}
+                            </div>
+                            <div class="meta-item">
+                                <i class="bi bi-calendar"></i> ${formatDateTime(sol.data_inicio)}
+                            </div>
+                            <div class="meta-item">
+                                <i class="bi bi-person"></i> ${sol.usuario_solicitante}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="conflict-indicator ${getConflictClass(sol)}" 
+                         data-id="${sol.id}" onclick="showConflictDetails('${sol.id}')">
+                        ${getConflictIndicator(sol)}
+                    </div>
+                </div>
+                
+                <div class="formadores-list">
+                    ${sol.formadores.map(f => `<span class="formador-badge">${f}</span>`).join('')}
+                </div>
+                
+                ${sol.observacoes ? `<div class="text-muted mb-2"><strong>Observações:</strong> ${sol.observacoes}</div>` : ''}
+                
+                <div class="solicitacao-actions">
+                    <button class="btn-action btn-details" onclick="showConflictDetails('${sol.id}')">
+                        <i class="bi bi-info-circle"></i> Detalhes
+                    </button>
+                    <button class="btn-action btn-approve" onclick="processAction('${sol.id}', 'aprovar')">
+                        <i class="bi bi-check"></i> Aprovar
+                    </button>
+                    <button class="btn-action btn-reject" onclick="processAction('${sol.id}', 'reprovar')">
+                        <i class="bi bi-x"></i> Reprovar
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+        // Adicionar event listeners para checkboxes
+        document.querySelectorAll('.solicitacao-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const id = this.dataset.id;
+                if (this.checked) {
+                    selectedSolicitacoes.add(id);
+                    this.closest('.solicitacao-card').classList.add('selected');
+                } else {
+                    selectedSolicitacoes.delete(id);
+                    this.closest('.solicitacao-card').classList.remove('selected');
+                }
+                updateBulkButtons();
+                updateSelectAllState();
+            });
+        });
+    }
+    
+    function getConflictClass(sol) {
+        if (!sol.has_conflicts) return 'no-conflicts';
+        if (sol.has_blocking_conflicts) return 'has-errors';
+        return 'has-warnings';
+    }
+    
+    function getConflictIndicator(sol) {
+        if (!sol.has_conflicts) {
+            return '<i class="bi bi-check-circle"></i> Sem conflitos';
+        }
+        
+        const icon = sol.has_blocking_conflicts ? 'exclamation-triangle' : 'info-circle';
+        const count = sol.conflicts_count || 0;
+        return `<i class="bi bi-${icon}"></i> ${count} conflito${count !== 1 ? 's' : ''}`;
+    }
+    
+    function formatDateTime(dateTimeString) {
+        if (!dateTimeString) return '';
+        const date = new Date(dateTimeString);
+        return date.toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+    
+    function renderPagination(pagination) {
+        const paginationInfo = document.getElementById('pagination-info');
+        const paginationControls = document.getElementById('pagination-controls');
+        
+        paginationInfo.textContent = 
+            `Mostrando ${pagination.total_items} resultado${pagination.total_items !== 1 ? 's' : ''} ` +
+            `(Página ${pagination.current_page} de ${pagination.total_pages})`;
+        
+        let controls = '';
+        
+        // Previous button
+        controls += `<button class="page-btn ${!pagination.has_previous ? 'disabled' : ''}" 
+                            onclick="changePage(${pagination.current_page - 1})" 
+                            ${!pagination.has_previous ? 'disabled' : ''}>
+                        <i class="bi bi-chevron-left"></i>
+                    </button>`;
+        
+        // Page numbers
+        const startPage = Math.max(1, pagination.current_page - 2);
+        const endPage = Math.min(pagination.total_pages, pagination.current_page + 2);
+        
+        if (startPage > 1) {
+            controls += `<button class="page-btn" onclick="changePage(1)">1</button>`;
+            if (startPage > 2) {
+                controls += `<span class="px-2">...</span>`;
+            }
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            controls += `<button class="page-btn ${i === pagination.current_page ? 'active' : ''}" 
+                                onclick="changePage(${i})">${i}</button>`;
+        }
+        
+        if (endPage < pagination.total_pages) {
+            if (endPage < pagination.total_pages - 1) {
+                controls += `<span class="px-2">...</span>`;
+            }
+            controls += `<button class="page-btn" onclick="changePage(${pagination.total_pages})">${pagination.total_pages}</button>`;
+        }
+        
+        // Next button
+        controls += `<button class="page-btn ${!pagination.has_next ? 'disabled' : ''}" 
+                            onclick="changePage(${pagination.current_page + 1})" 
+                            ${!pagination.has_next ? 'disabled' : ''}>
+                        <i class="bi bi-chevron-right"></i>
+                    </button>`;
+        
+        paginationControls.innerHTML = controls;
+    }
+    
+    function updateStatistics(solicitacoes) {
+        const total = solicitacoes.length;
+        const comConflitos = solicitacoes.filter(s => s.has_conflicts && s.has_blocking_conflicts).length;
+        const comAvisos = solicitacoes.filter(s => s.has_conflicts && !s.has_blocking_conflicts).length;
+        const limpos = solicitacoes.filter(s => !s.has_conflicts).length;
+        
+        totalPendentesEl.textContent = total;
+        totalConflitosEl.textContent = comConflitos;
+        totalAvisosEl.textContent = comAvisos;
+        totalLimposEl.textContent = limpos;
+    }
+    
+    function applyFilters() {
+        currentFilters = {
+            q: searchInput.value.trim(),
+            municipio: municipioFilter.value,
+            tipo_evento: tipoEventoFilter.value,
+            data_inicio: dataInicioFilter.value,
+            data_fim: dataFimFilter.value
+        };
+        
+        // Remove empty filters
+        Object.keys(currentFilters).forEach(key => {
+            if (!currentFilters[key]) {
+                delete currentFilters[key];
+            }
+        });
+        
+        currentPage = 1;
+        selectedSolicitacoes.clear();
+        updateBulkButtons();
+        loadSolicitacoes();
+    }
+    
+    function clearFilters() {
+        searchInput.value = '';
+        municipioFilter.value = '';
+        tipoEventoFilter.value = '';
+        dataInicioFilter.value = '';
+        dataFimFilter.value = '';
+        
+        currentFilters = {};
+        currentPage = 1;
+        selectedSolicitacoes.clear();
+        updateBulkButtons();
+        loadSolicitacoes();
+    }
+    
+    function selectAllSolicitacoes() {
+        if (!currentData?.solicitacoes) return;
+        
+        currentData.solicitacoes.forEach(sol => {
+            selectedSolicitacoes.add(sol.id);
+        });
+        
+        document.querySelectorAll('.solicitacao-checkbox').forEach(cb => {
+            cb.checked = true;
+            cb.closest('.solicitacao-card').classList.add('selected');
+        });
+        
+        updateBulkButtons();
+    }
+    
+    function deselectAllSolicitacoes() {
+        selectedSolicitacoes.clear();
+        
+        document.querySelectorAll('.solicitacao-checkbox').forEach(cb => {
+            cb.checked = false;
+            cb.closest('.solicitacao-card').classList.remove('selected');
+        });
+        
+        updateBulkButtons();
+    }
+    
+    function updateSelectAllState() {
+        if (!currentData?.solicitacoes) return;
+        
+        const totalVisible = currentData.solicitacoes.length;
+        const selectedVisible = currentData.solicitacoes.filter(s => selectedSolicitacoes.has(s.id)).length;
+        
+        selectAllCheckbox.checked = totalVisible > 0 && selectedVisible === totalVisible;
+        selectAllCheckbox.indeterminate = selectedVisible > 0 && selectedVisible < totalVisible;
+    }
+    
+    function updateBulkButtons() {
+        const hasSelected = selectedSolicitacoes.size > 0;
+        bulkApproveBtn.disabled = !hasSelected;
+        bulkRejectBtn.disabled = !hasSelected;
+        
+        bulkApproveBtn.innerHTML = `<i class="bi bi-check-all"></i> Aprovar Selecionadas (${selectedSolicitacoes.size})`;
+        bulkRejectBtn.innerHTML = `<i class="bi bi-x-circle"></i> Reprovar Selecionadas (${selectedSolicitacoes.size})`;
+    }
+    
+    async function showConflictDetails(solicitacaoId) {
+        try {
+            currentSolicitacaoId = solicitacaoId;
+            
+            const response = await fetch(`/api/solicitacao-conflicts/${solicitacaoId}/`);
+            const data = await response.json();
+            
+            if (data.success) {
+                renderConflictDetails(data);
+                conflictModal.show();
+            } else {
+                showError(data.error);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar conflitos:', error);
+            showError('Erro ao carregar detalhes dos conflitos');
+        }
+    }
+    
+    function renderConflictDetails(data) {
+        const content = document.getElementById('conflict-details-content');
+        document.getElementById('conflictModalLabel').textContent = `Análise: ${data.titulo}`;
+        
+        if (!data.has_conflicts) {
+            content.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle"></i>
+                    <strong>Nenhum conflito encontrado!</strong>
+                    <p class="mb-0 mt-2">Esta solicitação pode ser aprovada sem restrições.</p>
+                </div>
+            `;
+        } else {
+            let conflictsHtml = `
+                <div class="alert alert-${data.has_blocking_conflicts ? 'danger' : 'warning'}">
+                    <i class="bi bi-${data.has_blocking_conflicts ? 'exclamation-triangle' : 'info-circle'}"></i>
+                    <strong>${data.recommendation.message}</strong>
+                </div>
+                <h6>Detalhes dos Conflitos:</h6>
+            `;
+            
+            data.conflicts.forEach(conflict => {
+                conflictsHtml += `
+                    <div class="conflict-item conflict-${conflict.severity}">
+                        <span class="conflict-code">${conflict.code}</span>
+                        ${conflict.message}
+                        ${conflict.observacoes ? `<br><small class="text-muted">${conflict.observacoes}</small>` : ''}
+                    </div>
+                `;
+            });
+            
+            content.innerHTML = conflictsHtml;
+        }
+        
+        // Update modal buttons
+        const approveBtn = document.getElementById('modal-approve-btn');
+        const rejectBtn = document.getElementById('modal-reject-btn');
+        
+        if (data.has_blocking_conflicts) {
+            approveBtn.className = 'btn btn-outline-success';
+            approveBtn.innerHTML = '<i class="bi bi-check"></i> Aprovar Mesmo Assim';
+            rejectBtn.className = 'btn btn-danger';
+        } else if (data.has_conflicts) {
+            approveBtn.className = 'btn btn-success';
+            rejectBtn.className = 'btn btn-outline-danger';
+        } else {
+            approveBtn.className = 'btn btn-success';
+            rejectBtn.className = 'btn btn-outline-danger';
+        }
+    }
+    
+    function showBulkActionModal(acao) {
+        const count = selectedSolicitacoes.size;
+        const actionText = acao === 'aprovar' ? 'aprovar' : 'reprovar';
+        
+        document.getElementById('bulkActionModalLabel').textContent = 
+            `Confirmar ${actionText.charAt(0).toUpperCase() + actionText.slice(1)}ação em Lote`;
+        
+        document.getElementById('bulk-action-message').textContent = 
+            `Tem certeza que deseja ${actionText} ${count} solicitação${count !== 1 ? 'ões' : ''}?`;
+        
+        const confirmBtn = document.getElementById('confirm-bulk-action-btn');
+        confirmBtn.className = acao === 'aprovar' ? 'btn btn-success' : 'btn btn-danger';
+        confirmBtn.textContent = actionText.charAt(0).toUpperCase() + actionText.slice(1);
+        confirmBtn.dataset.action = acao;
+        
+        document.getElementById('bulk-justificativa').value = '';
+        bulkActionModal.show();
+    }
+    
+    async function confirmBulkAction() {
+        const acao = document.getElementById('confirm-bulk-action-btn').dataset.action;
+        const justificativa = document.getElementById('bulk-justificativa').value.trim();
+        
+        try {
+            const response = await fetch('/api/bulk-approval/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                body: JSON.stringify({
+                    solicitacao_ids: Array.from(selectedSolicitacoes),
+                    acao: acao,
+                    justificativa: justificativa
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showSuccess(data.mensagem);
+                selectedSolicitacoes.clear();
+                updateBulkButtons();
+                loadSolicitacoes();
+                bulkActionModal.hide();
+            } else {
+                showError(data.error);
+            }
+        } catch (error) {
+            console.error('Erro na ação em lote:', error);
+            showError('Erro ao processar ação em lote');
+        }
+    }
+    
+    async function processAction(solicitacaoId, acao) {
+        // Process individual action
+        try {
+            const response = await fetch('/api/bulk-approval/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                body: JSON.stringify({
+                    solicitacao_ids: [solicitacaoId],
+                    acao: acao
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showSuccess(`Solicitação ${acao === 'aprovar' ? 'aprovada' : 'reprovada'} com sucesso`);
+                loadSolicitacoes();
+            } else {
+                showError(data.error);
+            }
+        } catch (error) {
+            console.error('Erro na ação:', error);
+            showError('Erro ao processar ação');
+        }
+    }
+    
+    function processIndividualAction(acao) {
+        if (currentSolicitacaoId) {
+            processAction(currentSolicitacaoId, acao);
+            conflictModal.hide();
+        }
+    }
+    
+    // Global functions for pagination
+    window.changePage = function(page) {
+        if (page < 1 || (currentData && page > currentData.pagination.total_pages)) return;
+        currentPage = page;
+        loadSolicitacoes();
+    };
+    
+    window.processAction = processAction;
+    window.showConflictDetails = showConflictDetails;
+    
+    // Utility functions
+    function showLoading(show) {
+        loadingOverlay.style.display = show ? 'flex' : 'none';
+    }
+    
+    function showError(message) {
+        // You could implement a toast notification here
+        alert('Erro: ' + message);
+    }
+    
+    function showSuccess(message) {
+        // You could implement a toast notification here
+        alert('Sucesso: ' + message);
+    }
+    
+    function getCsrfToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    }
+});
+</script>
+{% endblock %}

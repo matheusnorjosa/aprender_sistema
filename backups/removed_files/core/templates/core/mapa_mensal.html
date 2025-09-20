@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Disponibilidade | Mapa Mensal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#f6f7fb; --card:#fff; --text:#222; --muted:#6b7280; --grid-border:#e5e7eb;
+      --evento:#3b82f6; --multi:#b91c1c; --desloc:#f59e0b; --bloq-total:#111827; --bloq-parc:#9ca3af; --conflito:#dc2626;
+      --badge-bg:#b91c1c; --badge:#fff; --hover:#eff6ff; --head:#fafafa; --sticky:#f3f4f6;
+      --primary: #3b82f6; --primary-hover: #2563eb; --sidebar-bg:#f8fafc; --sidebar-border:#e5e7eb;
+      --accent:#10b981; --danger:#ef4444; --warning:#f59e0b;
+    }
+    body{background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:0; padding:0; display:flex; height:100vh;}
+    
+    /* Layout Principal */
+    .sidebar{width:280px; background:var(--sidebar-bg); border-right:1px solid var(--sidebar-border); padding:20px; overflow-y:auto; flex-shrink:0;}
+    .main-content{flex:1; padding:20px; overflow:auto; min-width:0;}
+    
+    /* Sidebar Styles */
+    .sidebar h2{font-size:18px; font-weight:700; margin:0 0 20px; color:var(--text); display:flex; align-items:center; gap:8px;}
+    .back-btn{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; background:var(--primary); color:#fff; text-decoration:none; border-radius:6px; font-weight:500; transition:all 0.2s; font-size:14px; margin-bottom:20px;}
+    .back-btn:hover{background:var(--primary-hover); color:#fff; transform:translateY(-1px);}
+    
+    /* Menu Sections */
+    .sidebar-section{margin-bottom:24px;}
+    .section-title{font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--muted); margin-bottom:8px;}
+    .sidebar-item{display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:6px; font-size:14px; color:var(--text); text-decoration:none; transition:all 0.2s; margin-bottom:2px;}
+    .sidebar-item:hover{background:var(--hover); color:var(--text);}
+    .sidebar-item.active{background:var(--primary); color:#fff;}
+    .sidebar-item i{width:16px; text-align:center;}
+    
+    /* Filtros */
+    .filter-group{margin-bottom:16px;}
+    .filter-label{font-size:12px; font-weight:600; color:var(--text); margin-bottom:4px; display:block;}
+    .filter-input, .filter-select{width:100%; padding:8px 10px; border:1px solid var(--grid-border); border-radius:6px; background:#fff; font-size:13px;}
+    .filter-input:focus, .filter-select:focus{outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(59,130,246,0.1);}
+    .filter-btn{width:100%; padding:8px 12px; background:var(--primary); color:#fff; border:none; border-radius:6px; font-weight:500; cursor:pointer; transition:background 0.2s; font-size:13px;}
+    .filter-btn:hover{background:var(--primary-hover);}
+    .clear-btn{width:100%; padding:6px 12px; background:var(--muted); color:#fff; border:none; border-radius:6px; font-size:12px; cursor:pointer; margin-top:8px;}
+    
+    /* Estatísticas */
+    .stats-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:16px 0;}
+    .stat-item{background:#fff; padding:12px; border-radius:6px; text-align:center; border:1px solid var(--grid-border);}
+    .stat-value{font-size:18px; font-weight:700; color:var(--primary); margin-bottom:2px;}
+    .stat-label{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.3px;}
+    
+    /* Main Content */
+    .header{display:flex; justify-content:between; align-items:center; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--grid-border);}
+    .toolbar{display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap}
+    .sel,.btn{padding:8px 10px; border:1px solid var(--grid-border); border-radius:6px; background:#fff; font-size:13px;}
+    .btn{cursor:pointer; font-weight:500; transition:all 0.2s;} 
+    .btn:hover{background:#f8fafc; transform:translateY(-1px);}
+    .btn.primary{background:var(--primary); color:#fff;} 
+    .btn.primary:hover{background:var(--primary-hover);}
+    
+    /* Legend */
+    .legend{display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-bottom:12px; padding:12px; background:#fff; border-radius:6px; border:1px solid var(--grid-border);}
+    .legend .dot{display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:middle}
+    
+    /* Table */
+    .table-container{background:#fff; border-radius:8px; border:1px solid var(--grid-border); overflow:hidden;}
+    .table-wrap{overflow:auto; max-height:calc(100vh - 200px);}
+    table{border-collapse:separate; border-spacing:0; width:100%; min-width:700px; table-layout:fixed;}
+    thead th{position:sticky; top:0; background:var(--head); z-index:2; font-weight:700; padding:8px 4px; border-bottom:2px solid var(--grid-border);}
+    thead th:first-child{width:140px; min-width:140px; max-width:140px;}
+    tbody th{position:sticky; left:0; background:var(--sticky); z-index:1; text-align:left; font-weight:600; padding:6px 8px; border-right:2px solid var(--grid-border); width:140px; min-width:140px; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+    th,td{border-bottom:1px solid var(--grid-border); border-right:1px solid var(--grid-border); padding:4px; font-size:10px}
+    tbody tr:hover{background:var(--hover);}
+    tbody tr:hover td{background:transparent;}
+    
+    /* Cells */
+    .cell{width:18px; height:18px; text-align:center; border-radius:3px; position:relative; user-select:none; cursor:pointer; transition:transform 0.1s;}
+    .cell:hover{transform:scale(1.1);}
+    .c-empty{background:transparent}
+    .c-event{background:var(--evento); box-shadow:0 1px 3px rgba(59,130,246,0.3);}
+    .c-desloc{background:var(--desloc); box-shadow:0 1px 3px rgba(245,158,11,0.3);}
+    .c-block-total{background:var(--bloq-total); color:#fff; box-shadow:0 1px 3px rgba(17,24,39,0.4);}
+    .c-block-parc{background:var(--bloq-parc); color:#fff; box-shadow:0 1px 3px rgba(156,163,175,0.4);}
+    .c-conflict{background:var(--conflito); position:relative; animation:pulse 2s infinite; box-shadow:0 1px 3px rgba(239,68,68,0.4);}
+    .c-conflict::after{content:"✕"; color:#fff; font-weight:900; font-size:8px; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-shadow:0 1px 2px rgba(0,0,0,0.3)}
+    @keyframes pulse{0%,100%{opacity:1} 50%{opacity:0.7}}
+    .badge{position:absolute; top:-3px; right:-3px; font-size:7px; line-height:1; background:var(--badge-bg); color:var(--badge); border-radius:6px; padding:1px 3px; min-width:8px; text-align:center; font-weight:700;}
+    .c-desloc .badge{background:#1f2937}
+    
+    /* Formador Details Panel */
+    .formador-details{background:rgba(59,130,246,0.05); border:1px solid rgba(59,130,246,0.2); border-radius:6px; padding:12px; margin-top:8px; font-size:12px;}
+    .detail-item{margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;}
+    .detail-item:last-child{margin-bottom:0;}
+    .detail-item strong{color:var(--text); font-weight:600;}
+    .detail-item span{color:var(--muted);}
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      body{flex-direction:column; height:auto;}
+      .sidebar{width:100%; order:2; padding:15px;}
+      .main-content{order:1; padding:15px;}
+      .stats-grid{grid-template-columns:repeat(4, 1fr);}
+    }
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h2>
+      <i class="bi bi-calendar-check"></i>
+      Disponibilidade
+    </h2>
+    
+    <a href="/" class="back-btn">
+      <i class="bi bi-arrow-left"></i> Voltar ao Sistema
+    </a>
+
+    <!-- Período -->
+    <div class="sidebar-section">
+      <div class="section-title">Período</div>
+      <div class="filter-group">
+        <label class="filter-label">Mês</label>
+        <select id="sidebarMes" class="filter-select"></select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Ano</label>
+        <select id="sidebarAno" class="filter-select"></select>
+      </div>
+      <button id="sidebarAtualizar" class="filter-btn">
+        <i class="bi bi-arrow-clockwise"></i> Atualizar
+      </button>
+    </div>
+
+    <!-- Formador da Superintendência -->
+    <div class="sidebar-section">
+      <div class="section-title">Formador</div>
+      <div class="filter-group">
+        <label class="filter-label">Selecionar Formador</label>
+        <select id="selectFormador" class="filter-select">
+          <option value="">Carregando formadores...</option>
+        </select>
+      </div>
+      <div id="formadorDetails" class="formador-details" style="display:none;">
+        <div class="detail-item">
+          <strong>Email:</strong> <span id="formadorEmail">-</span>
+        </div>
+        <div class="detail-item">
+          <strong>Área:</strong> <span id="formadorArea">-</span>
+        </div>
+        <div class="detail-item">
+          <strong>Status:</strong> <span id="formadorStatus">-</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Filtros -->
+    <div class="sidebar-section">
+      <div class="section-title">Filtros</div>
+      <div class="filter-group">
+        <label class="filter-label">Mostrar Apenas</label>
+        <select id="filterTipo" class="filter-select">
+          <option value="todos">Todos os Status</option>
+          <option value="eventos">Com Eventos</option>
+          <option value="bloqueios">Com Bloqueios</option>
+          <option value="conflitos">Com Conflitos</option>
+          <option value="livres">Disponíveis</option>
+        </select>
+      </div>
+      <button class="clear-btn" onclick="clearFilters()">Limpar Filtros</button>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="sidebar-section">
+      <div class="section-title">Estatísticas</div>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value" id="totalFormadores">-</div>
+          <div class="stat-label">Formadores</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="totalEventos">-</div>
+          <div class="stat-label">Eventos</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="totalBloqueios">-</div>
+          <div class="stat-label">Bloqueios</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="totalConflitos">-</div>
+          <div class="stat-label">Conflitos</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ações Rápidas -->
+    <div class="sidebar-section">
+      <div class="section-title">Navegação</div>
+      <a href="/solicitar/" class="sidebar-item">
+        <i class="bi bi-plus-circle"></i>
+        Nova Solicitação
+      </a>
+      <a href="/bloqueios/novo/" class="sidebar-item">
+        <i class="bi bi-calendar-x"></i>
+        Novo Bloqueio
+      </a>
+      <a href="/aprovacoes/pendentes/" class="sidebar-item">
+        <i class="bi bi-clipboard-check"></i>
+        Aprovações Pendentes
+      </a>
+      <a href="/controle/pre-agenda/" class="sidebar-item">
+        <i class="bi bi-calendar-plus"></i>
+        Pré-Agenda
+      </a>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="header">
+      <h1 style="font-size:24px; font-weight:700; margin:0; color:var(--text);">
+        <i class="bi bi-calendar4-week" style="margin-right:8px;"></i>
+        Mapa Mensal de Disponibilidade
+      </h1>
+    </div>
+
+    <div class="legend">
+      <span><span class="dot" style="background:var(--evento)"></span>Evento</span>
+      <span><span class="dot" style="background:var(--badge-bg)"></span>Mais de um evento</span>
+      <span><span class="dot" style="background:var(--desloc)"></span>Deslocamento</span>
+      <span><span class="dot" style="background:var(--bloq-parc)"></span>Bloqueio Parcial (P)</span>
+      <span><span class="dot" style="background:var(--bloq-total)"></span>Bloqueio Total (T)</span>
+      <span><span class="dot" style="background:var(--conflito)"></span>Conflito (✕)</span>
+    </div>
+
+    <div class="table-container">
+      <div class="table-wrap">
+        <table id="grid">
+          <thead><tr id="headRow"></tr></thead>
+          <tbody id="bodyRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const mNames = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+    
+    // Elements
+    const sidebarMes = document.getElementById('sidebarMes');
+    const sidebarAno = document.getElementById('sidebarAno');
+    const headRow = document.getElementById('headRow');
+    const bodyRows = document.getElementById('bodyRows');
+    const selectFormador = document.getElementById('selectFormador');
+    const filterTipo = document.getElementById('filterTipo');
+    
+    // Formador details elements
+    const formadorDetails = document.getElementById('formadorDetails');
+    const formadorEmail = document.getElementById('formadorEmail');
+    const formadorArea = document.getElementById('formadorArea');
+    const formadorStatus = document.getElementById('formadorStatus');
+    
+    // Stats elements
+    const totalFormadores = document.getElementById('totalFormadores');
+    const totalEventos = document.getElementById('totalEventos'); 
+    const totalBloqueios = document.getElementById('totalBloqueios');
+    const totalConflitos = document.getElementById('totalConflitos');
+    
+    // Global data
+    let currentData = null;
+    let filteredRows = [];
+    
+    function fillSelectors(){
+      const now = new Date();
+      const anoAtual = now.getFullYear();
+      const anos = [anoAtual-1, anoAtual, anoAtual+1];
+      
+      sidebarMes.innerHTML = mNames.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
+      sidebarAno.innerHTML = anos.map(a=>`<option value="${a}">${a}</option>`).join('');
+      
+      sidebarMes.value = now.getMonth()+1;
+      sidebarAno.value = anoAtual;
+      
+      // Carregar formadores da superintendência
+      loadFormadores();
+    }
+
+    async function loadFormadores() {
+      try {
+        selectFormador.innerHTML = '<option value="">Carregando...</option>';
+        
+        const res = await fetch('/api/formadores-superintendencia/', {
+          credentials: 'same-origin',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        });
+        if (!res.ok) throw new Error('Erro ao carregar formadores');
+        
+        const data = await res.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Erro desconhecido');
+        }
+        
+        selectFormador.innerHTML = '<option value="">Todos os Formadores</option>';
+        
+        if (data.formadores && data.formadores.length > 0) {
+          data.formadores.forEach(formador => {
+            const option = document.createElement('option');
+            option.value = formador.nome;
+            option.textContent = formador.nome;
+            option.dataset.id = formador.id;
+            option.dataset.email = formador.email;
+            option.dataset.area = formador.area_atuacao || 'Não informado';
+            option.dataset.ativo = formador.status;
+            selectFormador.appendChild(option);
+          });
+        } else {
+          selectFormador.innerHTML = '<option value="">Nenhum formador encontrado</option>';
+        }
+        
+      } catch (error) {
+        console.error('Erro ao carregar formadores:', error);
+        selectFormador.innerHTML = '<option value="">Erro ao carregar formadores</option>';
+      }
+    }
+
+    function showFormadorDetails(selectedOption) {
+      if (!selectedOption || !selectedOption.value) {
+        formadorDetails.style.display = 'none';
+        return;
+      }
+      
+      formadorEmail.textContent = selectedOption.dataset.email || '-';
+      formadorArea.textContent = selectedOption.dataset.area || '-';
+      formadorStatus.textContent = selectedOption.dataset.ativo || '-';
+      
+      formadorDetails.style.display = 'block';
+    }
+
+    function codeToCell(code){
+      if(!code || code === "-") return {cls:"c-empty", badge:"", text:"", type:"empty"};
+      if(code === "T") return {cls:"c-block-total", badge:"", text:"T", type:"bloqueio"};
+      if(code === "P") return {cls:"c-block-parc", badge:"", text:"P", type:"bloqueio"};
+      if(code === "X") return {cls:"c-conflict", badge:"", text:"", type:"conflito"};
+      if(code.startsWith("D")){
+        const n = code.slice(1);
+        return {cls:"c-desloc", badge: n ? n : "", text:"", type:"desloc"};
+      }
+      const n = parseInt(code,10);
+      if(!isNaN(n)) return {cls:"c-event", badge: n>1 ? String(n) : "", text:"", type:"evento"};
+      return {cls:"c-empty", badge:"", text:"", type:"empty"};
+    }
+
+    function calculateStats(data) {
+      if (!data || !data.linhas) {
+        totalFormadores.textContent = "0";
+        totalEventos.textContent = "0";
+        totalBloqueios.textContent = "0";
+        totalConflitos.textContent = "0";
+        return;
+      }
+      
+      let eventos = 0, bloqueios = 0, conflitos = 0;
+      
+      data.linhas.forEach(linha => {
+        linha.celulas.forEach(code => {
+          const {type} = codeToCell(code);
+          if (type === 'evento') eventos++;
+          else if (type === 'bloqueio') bloqueios++;
+          else if (type === 'conflito') conflitos++;
+        });
+      });
+      
+      totalFormadores.textContent = data.linhas.length;
+      totalEventos.textContent = eventos;
+      totalBloqueios.textContent = bloqueios;
+      totalConflitos.textContent = conflitos;
+    }
+
+    function filterData() {
+      if (!currentData) return;
+      
+      const selectedFormador = selectFormador.value;
+      const filterType = filterTipo.value;
+      
+      filteredRows = currentData.linhas.filter(linha => {
+        // Filter by selected formador
+        if (selectedFormador && linha.formador !== selectedFormador) {
+          return false;
+        }
+        
+        // Filter by type
+        if (filterType !== 'todos') {
+          const hasType = linha.celulas.some(code => {
+            const {type} = codeToCell(code);
+            switch(filterType) {
+              case 'eventos': return type === 'evento';
+              case 'bloqueios': return type === 'bloqueio';
+              case 'conflitos': return type === 'conflito';
+              case 'livres': return type === 'empty';
+              default: return true;
+            }
+          });
+          
+          if (filterType === 'livres') {
+            // Show only those with all empty cells
+            const allEmpty = linha.celulas.every(code => codeToCell(code).type === 'empty');
+            if (!allEmpty) return false;
+          } else if (!hasType) {
+            return false;
+          }
+        }
+        
+        return true;
+      });
+      
+      renderTable();
+    }
+
+    function renderTable() {
+      const dataToRender = filteredRows.length > 0 ? {
+        dias: currentData.dias,
+        linhas: filteredRows
+      } : currentData;
+      
+      if (!dataToRender || !dataToRender.linhas) {
+        bodyRows.innerHTML = '<tr><td colspan="32" style="text-align:center;padding:20px;color:var(--muted);">Nenhum dados encontrado</td></tr>';
+        return;
+      }
+
+      headRow.innerHTML = `<th>Formador</th>` + 
+        dataToRender.dias.map(d=>`<th style="text-align:center;width:auto;font-size:10px;">${d}</th>`).join('');
+
+      const rows = [];
+      for(const linha of dataToRender.linhas){
+        const cells = linha.celulas.map(code=>{
+          const {cls,badge,text} = codeToCell(code);
+          return `<td><div class="cell ${cls}" title="${linha.formador} - Dia ${linha.celulas.indexOf(code)+1}">${text||""}${badge?`<span class="badge">${badge}</span>`:""}</div></td>`;
+        }).join('');
+        rows.push(`<tr><th title="${linha.formador}">${linha.formador}</th>${cells}</tr>`);
+      }
+      bodyRows.innerHTML = rows.join("");
+    }
+
+    async function loadGrid(ano, mes){
+      try {
+        bodyRows.innerHTML = '<tr><td colspan="32" style="text-align:center;padding:20px;color:var(--muted);"><i class="bi bi-arrow-clockwise" style="animation:spin 1s linear infinite;"></i> Carregando...</td></tr>';
+        
+        const res = await fetch(`/mapa-mensal/?ano=${ano}&mes=${mes}`);
+        if(!res.ok) throw new Error("Falha ao buscar dados.");
+        
+        currentData = await res.json();
+        filteredRows = [...currentData.linhas]; // Copy all rows initially
+        
+        calculateStats(currentData);
+        renderTable();
+        
+      } catch(error) {
+        bodyRows.innerHTML = `<tr><td colspan="32" style="text-align:center;padding:20px;color:var(--danger);">❌ Erro: ${error.message}</td></tr>`;
+        calculateStats(null);
+      }
+    }
+
+    function clearFilters() {
+      selectFormador.value = '';
+      filterTipo.value = 'todos';
+      formadorDetails.style.display = 'none';
+      filterData();
+    }
+
+    // Event listeners
+    document.getElementById('sidebarAtualizar').addEventListener('click', () => {
+      loadGrid(sidebarAno.value, sidebarMes.value);
+    });
+    
+    selectFormador.addEventListener('change', (e) => {
+      const selectedOption = e.target.selectedOptions[0];
+      showFormadorDetails(selectedOption);
+      filterData();
+    });
+    
+    filterTipo.addEventListener('change', filterData);
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        selectFormador.focus();
+      }
+    });
+    
+    // Add spin animation for loading
+    const style = document.createElement('style');
+    style.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+    document.head.appendChild(style);
+
+    // Initialize
+    fillSelectors();
+    loadGrid(sidebarAno.value, sidebarMes.value);
+  </script>
+</body>
+</html>

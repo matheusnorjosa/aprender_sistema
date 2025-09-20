@@ -22,11 +22,58 @@
     </div>
 </div>
 
-<div class="card">
+<!-- Filtros -->
+<div class="card mb-4">
     <div class="card-header">
         <h6 class="mb-0">
-            <i class="bi bi-list me-2"></i>Lista de Tipos de Evento
+            <i class="bi bi-funnel me-2"></i>Filtros
+            {% if search or modalidade_filter or status_filter %}
+                <span class="badge bg-primary ms-2">Ativos</span>
+            {% endif %}
         </h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Buscar por nome</label>
+                <input type="text" name="search" class="form-control" 
+                       value="{{ search }}" placeholder="Digite para buscar...">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Modalidade</label>
+                <select name="modalidade" class="form-select">
+                    <option value="">Todas as modalidades</option>
+                    <option value="online" {% if modalidade_filter == 'online' %}selected{% endif %}>Online</option>
+                    <option value="presencial" {% if modalidade_filter == 'presencial' %}selected{% endif %}>Presencial</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="ativo" {% if status_filter == 'ativo' %}selected{% endif %}>Ativos</option>
+                    <option value="inativo" {% if status_filter == 'inativo' %}selected{% endif %}>Inativos</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-search me-2"></i>Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de Tipos de Evento -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">
+            <i class="bi bi-list me-2"></i>
+            Lista de Tipos de Evento ({{ tipos_evento|length }} de {{ page_obj.paginator.count }})
+        </h6>
+        <div class="text-muted small">
+            Total: {{ page_obj.paginator.count }} tipo{{ page_obj.paginator.count|pluralize:"s" }}
+        </div>
     </div>
     <div class="card-body p-0">
         {% if tipos_evento %}
@@ -44,13 +91,20 @@
                         {% for tipo in tipos_evento %}
                         <tr>
                             <td>
-                                <strong>{{ tipo.nome }}</strong>
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-calendar-event text-info me-2"></i>
+                                    <strong>{{ tipo.nome }}</strong>
+                                </div>
                             </td>
                             <td>
                                 {% if tipo.online %}
-                                    <span class="badge bg-primary">Online</span>
+                                    <span class="badge bg-primary">
+                                        <i class="bi bi-laptop me-1"></i>Online
+                                    </span>
                                 {% else %}
-                                    <span class="badge bg-secondary">Presencial</span>
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-geo-alt me-1"></i>Presencial
+                                    </span>
                                 {% endif %}
                             </td>
                             <td>
@@ -81,6 +135,13 @@
             <div class="text-center py-5">
                 <i class="bi bi-calendar-event text-muted" style="font-size: 4rem;"></i>
                 <h5 class="text-muted mt-3">Nenhum tipo de evento encontrado</h5>
+                <p class="text-muted">
+                    {% if search or modalidade_filter or status_filter %}
+                        Tente ajustar os filtros para encontrar tipos de evento.
+                    {% else %}
+                        Comece adicionando um novo tipo de evento ao sistema.
+                    {% endif %}
+                </p>
                 <a href="{% url 'core:gestao_tipos_evento_create' %}" class="btn btn-primary">
                     <i class="bi bi-plus-circle me-2"></i>Adicionar Tipo de Evento
                 </a>
@@ -88,4 +149,39 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Paginação -->
+{% if page_obj.has_other_pages %}
+<nav aria-label="Paginação" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?{% if search %}search={{ search }}&{% endif %}{% if modalidade_filter %}modalidade={{ modalidade_filter }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}page={{ page_obj.previous_page_number }}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+        {% endif %}
+        
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% if search %}search={{ search }}&{% endif %}{% if modalidade_filter %}modalidade={{ modalidade_filter }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}page={{ num }}">{{ num }}</a>
+                </li>
+            {% endif %}
+        {% endfor %}
+        
+        {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?{% if search %}search={{ search }}&{% endif %}{% if modalidade_filter %}modalidade={{ modalidade_filter }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}page={{ page_obj.next_page_number }}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
 {% endblock %}

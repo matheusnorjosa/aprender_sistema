@@ -1,17 +1,13 @@
 """
 Views para o mapa interativo com dados reais do banco
+ATUALIZADO: Usa Services centralizados e imports unificados
 """
-from django.http import JsonResponse
-from django.views import View
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count, Q
-from django.core.cache import cache
-from datetime import datetime, timedelta
 
-from core.models import Municipio, Solicitacao, Projeto, SolicitacaoStatus
+# IMPORT ÚNICO - Single Source of Truth
+from .base import *
 
 
-class MapaDadosAPIView(View):
+class MapaDadosAPIView(BaseAPIView):
     """
     API para fornecer dados do mapa baseados no banco de dados real
     """
@@ -37,16 +33,15 @@ class MapaDadosAPIView(View):
         """
         Busca dados reais do banco para o mapa
         """
-        # Buscar municípios com solicitações aprovadas
+        # Buscar municípios com solicitações aprovadas usando query otimizada
         municipios_com_projetos = (
-            Solicitacao.objects
+            get_optimized_solicitacao_queryset()
             .filter(
                 status__in=[
                     SolicitacaoStatus.APROVADO,
                     SolicitacaoStatus.PRE_AGENDA,
                 ]
             )
-            .select_related('municipio', 'projeto')
             .values(
                 'municipio__nome',
                 'municipio__uf',
@@ -155,7 +150,7 @@ class MapaDadosAPIView(View):
         return mapeamento.get(uf, f'Estado {uf}')
 
 
-class MapaEstatisticasAPIView(View):
+class MapaEstatisticasAPIView(BaseAPIView):
     """
     API para estatísticas gerais do mapa
     """
@@ -181,9 +176,12 @@ class MapaEstatisticasAPIView(View):
         """
         Calcula estatísticas gerais para o mapa
         """
+        # Usar DashboardService para estatísticas gerais como base
+        stats_gerais = DashboardService.get_estatisticas_gerais()
+
         # Total de municípios com projetos
         municipios_com_projetos = (
-            Solicitacao.objects
+            get_optimized_solicitacao_queryset()
             .filter(
                 status__in=[
                     SolicitacaoStatus.APROVADO,
@@ -197,7 +195,7 @@ class MapaEstatisticasAPIView(View):
         
         # Total de estados com projetos
         estados_com_projetos = (
-            Solicitacao.objects
+            get_optimized_solicitacao_queryset()
             .filter(
                 status__in=[
                     SolicitacaoStatus.APROVADO,
@@ -209,35 +207,28 @@ class MapaEstatisticasAPIView(View):
             .count()
         )
         
-        # Total de solicitações aprovadas
-        total_solicitacoes = (
-            Solicitacao.objects
-            .filter(
-                status__in=[
-                    SolicitacaoStatus.APROVADO,
-                    SolicitacaoStatus.PRE_AGENDA,
-                ]
-            )
-            .count()
-        )
+        # Usar dados já calculados do DashboardService
+        total_solicitacoes = stats_gerais['solicitacoes_ano']  # Solicitações do ano atual
+        total_projetos = stats_gerais['projetos_ativos']
         
-        # Total de projetos ativos
-        total_projetos = Projeto.objects.filter(ativo=True).count()
+        # Usar Service para coordenadores
+        coordenadores_ativos = stats_gerais['coordenadores_total']
         
-        # Solicitações por mês (últimos 12 meses)
-        data_limite = datetime.now() - timedelta(days=365)
+        # Usar FormadorService
+        formadores_envolvidos = stats_gerais['formadores_ativos']
+        
+        # Solicitações por mês (últimos 12 meses) - query otimizada
+        data_limite = timezone.now() - timedelta(days=365)
         solicitacoes_por_mes = (
-            Solicitacao.objects
+            get_optimized_solicitacao_queryset()
             .filter(
-                data_solicitacao__gte=data_limite,
+                data_inicio__gte=data_limite,  # Usar data_inicio ao invés de data_solicitacao
                 status__in=[
                     SolicitacaoStatus.APROVADO,
                     SolicitacaoStatus.PRE_AGENDA,
                 ]
             )
-            .extra(
-                select={'mes': "DATE_TRUNC('month', data_solicitacao)"}
-            )
+            .annotate(mes=TruncMonth('data_inicio'))
             .values('mes')
             .annotate(total=Count('id'))
             .order_by('mes')
@@ -246,8 +237,10 @@ class MapaEstatisticasAPIView(View):
         return {
             'municipios_com_projetos': municipios_com_projetos,
             'estados_com_projetos': estados_com_projetos,
-            'total_solicitacoes': total_solicitacoes,
+            'total_solicitacoes': Solicitacao.objects.count(),  # Total geral
             'total_projetos': total_projetos,
+            'coordenadores_ativos': coordenadores_ativos,
+            'formadores_envolvidos': formadores_envolvidos,
             'solicitacoes_por_mes': list(solicitacoes_por_mes),
-            'ultima_atualizacao': datetime.now().isoformat()
+            'ultima_atualizacao': timezone.now().isoformat()
         }

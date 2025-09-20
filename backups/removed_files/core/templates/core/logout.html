@@ -1,0 +1,172 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Logout - Sistema Aprender{% endblock %}
+
+{% block page_title %}Logout{% endblock %}
+
+{% block breadcrumb %}Encerrar sessão{% endblock %}
+
+{% block content %}
+<div class="logout-container">
+  <div class="logout-card">
+    <div class="logout-content">
+      <i class="bi bi-person-check logout-icon"></i>
+      <h2 class="logout-title">Obrigado por usar o Sistema Aprender!</h2>
+      <p class="logout-description">
+        Sua sessão será encerrada com segurança. Clique no botão abaixo para confirmar o logout.
+      </p>
+      
+      <form method="post" action="{% url 'core:logout' %}" class="logout-form">
+        {% csrf_token %}
+        <div class="logout-buttons">
+          <button type="submit" class="btn btn-danger btn-lg logout-btn">
+            <i class="bi bi-box-arrow-right"></i> Sair do Sistema
+          </button>
+          <a href="{% url 'core:home' %}" class="btn btn-lg logout-btn">
+            <i class="bi bi-arrow-left"></i> Voltar ao Sistema
+          </a>
+        </div>
+      </form>
+      
+      <hr class="logout-divider">
+      <p class="logout-security">
+        <i class="bi bi-shield-check"></i> 
+        Seus dados estão seguros. Faça login novamente quando necessário.
+      </p>
+    </div>
+  </div>
+</div>
+
+<style>
+.logout-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  padding: clamp(1rem, 4vw, 2rem);
+}
+
+.logout-card {
+  background: var(--card);
+  border-radius: 1rem;
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 500px;
+  border: 1px solid var(--line);
+}
+
+.logout-content {
+  padding: clamp(2rem, 6vw, 3rem);
+  text-align: center;
+}
+
+.logout-icon {
+  font-size: clamp(3rem, 8vw, 4rem);
+  color: var(--accent);
+  margin-bottom: clamp(1rem, 3vw, 1.5rem);
+  display: block;
+}
+
+.logout-title {
+  margin-bottom: clamp(1rem, 3vw, 1.5rem);
+  color: var(--text);
+  font-size: clamp(1.25rem, 5vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.logout-description {
+  color: var(--muted);
+  margin-bottom: clamp(2rem, 5vw, 2.5rem);
+  font-size: clamp(0.9rem, 3.5vw, 1rem);
+  line-height: 1.5;
+}
+
+.logout-form {
+  margin-bottom: clamp(1.5rem, 4vw, 2rem);
+}
+
+.logout-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 3vw, 1rem);
+  align-items: center;
+}
+
+.logout-btn {
+  width: 100%;
+  max-width: clamp(200px, 60vw, 280px);
+  padding: clamp(0.75rem, 3vw, 1rem) clamp(1rem, 4vw, 1.5rem);
+  font-size: clamp(0.9rem, 3.5vw, 1rem);
+  border-radius: 0.75rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.logout-divider {
+  border: none;
+  height: 1px;
+  background: var(--line);
+  margin: clamp(1.5rem, 4vw, 2rem) 0;
+}
+
+.logout-security {
+  font-size: clamp(0.8rem, 3vw, 0.875rem);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  line-height: 1.4;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .logout-container {
+    min-height: 50vh;
+    padding: 1rem;
+  }
+  
+  .logout-card {
+    margin: 0;
+  }
+  
+  .logout-content {
+    padding: 1.5rem;
+  }
+  
+  .logout-buttons {
+    gap: 0.75rem;
+  }
+  
+  .logout-btn {
+    max-width: 100%;
+    font-size: 0.9rem;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .logout-container {
+    padding: 0.5rem;
+  }
+  
+  .logout-content {
+    padding: 1rem;
+  }
+  
+  .logout-title {
+    font-size: 1.25rem;
+  }
+  
+  .logout-description {
+    font-size: 0.9rem;
+  }
+}
+</style>
+{% endblock %}

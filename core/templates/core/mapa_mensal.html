@@ -8,7 +8,7 @@
   <style>
     :root{
       --bg:#f6f7fb; --card:#fff; --text:#222; --muted:#6b7280; --grid-border:#e5e7eb;
-      --evento:#3b82f6; --multi:#b91c1c; --desloc:#f59e0b; --bloq-total:#111827; --bloq-parc:#9ca3af; --conflito:#dc2626;
+      --evento:#3b82f6; --multi:#b91c1c; --desloc:#f59e0b; --bloq-total:#111827; --bloq-parc:#9ca3af; --conflito:#dc2626; --disponivel:#22c55e;
       --badge-bg:#b91c1c; --badge:#fff; --hover:#eff6ff; --head:#fafafa; --sticky:#f3f4f6;
       --primary: #3b82f6; --primary-hover: #2563eb; --sidebar-bg:#f8fafc; --sidebar-border:#e5e7eb;
       --accent:#10b981; --danger:#ef4444; --warning:#f59e0b;
@@ -79,11 +79,13 @@
     .c-desloc{background:var(--desloc); box-shadow:0 1px 3px rgba(245,158,11,0.3);}
     .c-block-total{background:var(--bloq-total); color:#fff; box-shadow:0 1px 3px rgba(17,24,39,0.4);}
     .c-block-parc{background:var(--bloq-parc); color:#fff; box-shadow:0 1px 3px rgba(156,163,175,0.4);}
-    .c-conflict{background:var(--conflito); position:relative; animation:pulse 2s infinite; box-shadow:0 1px 3px rgba(239,68,68,0.4);}
-    .c-conflict::after{content:"✕"; color:#fff; font-weight:900; font-size:8px; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-shadow:0 1px 2px rgba(0,0,0,0.3)}
-    @keyframes pulse{0%,100%{opacity:1} 50%{opacity:0.7}}
+    .c-available{background:var(--disponivel); color:#fff; box-shadow:0 1px 3px rgba(34,197,94,0.4);}
+    .c-conflict{background:var(--conflito); color:#fff; box-shadow:0 1px 3px rgba(239,68,68,0.4);}
+    .c-multi-event{background:var(--multi); color:#fff; box-shadow:0 1px 3px rgba(185,28,28,0.4);}
+    .c-desloc-event{background:linear-gradient(45deg, var(--desloc) 50%, var(--evento) 50%); color:#fff; box-shadow:0 1px 3px rgba(245,158,11,0.4);}
     .badge{position:absolute; top:-3px; right:-3px; font-size:7px; line-height:1; background:var(--badge-bg); color:var(--badge); border-radius:6px; padding:1px 3px; min-width:8px; text-align:center; font-weight:700;}
     .c-desloc .badge{background:#1f2937}
+    .c-desloc-event .badge{background:#1f2937}
     
     /* Formador Details Panel */
     .formador-details{background:rgba(59,130,246,0.05); border:1px solid rgba(59,130,246,0.2); border-radius:6px; padding:12px; margin-top:8px; font-size:12px;}
@@ -187,6 +189,10 @@
           <div class="stat-value" id="totalConflitos">-</div>
           <div class="stat-label">Conflitos</div>
         </div>
+        <div class="stat-item">
+          <div class="stat-value" id="totalDisponiveis">-</div>
+          <div class="stat-label">Disponíveis</div>
+        </div>
       </div>
     </div>
 
@@ -222,12 +228,14 @@
     </div>
 
     <div class="legend">
-      <span><span class="dot" style="background:var(--evento)"></span>Evento</span>
-      <span><span class="dot" style="background:var(--badge-bg)"></span>Mais de um evento</span>
-      <span><span class="dot" style="background:var(--desloc)"></span>Deslocamento</span>
+      <span><span class="dot" style="background:var(--evento)"></span>Evento (1)</span>
+      <span><span class="dot" style="background:var(--multi)"></span>Mais de um evento (2)</span>
+      <span><span class="dot" style="background:var(--desloc)"></span>Deslocamento (D)</span>
+      <span><span class="dot" style="background:linear-gradient(45deg, var(--desloc) 50%, var(--evento) 50%)"></span>Deslocamento + Evento (D1)</span>
+      <span><span class="dot" style="background:var(--disponivel)"></span>Disponível (V)</span>
       <span><span class="dot" style="background:var(--bloq-parc)"></span>Bloqueio Parcial (P)</span>
       <span><span class="dot" style="background:var(--bloq-total)"></span>Bloqueio Total (T)</span>
-      <span><span class="dot" style="background:var(--conflito)"></span>Conflito (✕)</span>
+      <span><span class="dot" style="background:var(--conflito)"></span>Conflito (X)</span>
     </div>
 
     <div class="table-container">
@@ -262,6 +270,7 @@
     const totalEventos = document.getElementById('totalEventos'); 
     const totalBloqueios = document.getElementById('totalBloqueios');
     const totalConflitos = document.getElementById('totalConflitos');
+    const totalDisponiveis = document.getElementById('totalDisponiveis');
     
     // Global data
     let currentData = null;
@@ -338,15 +347,34 @@
 
     function codeToCell(code){
       if(!code || code === "-") return {cls:"c-empty", badge:"", text:"", type:"empty"};
+      
+      // Códigos baseados na planilha "Disponibilidade | 2025"
       if(code === "T") return {cls:"c-block-total", badge:"", text:"T", type:"bloqueio"};
       if(code === "P") return {cls:"c-block-parc", badge:"", text:"P", type:"bloqueio"};
-      if(code === "X") return {cls:"c-conflict", badge:"", text:"", type:"conflito"};
+      if(code === "V") return {cls:"c-available", badge:"", text:"V", type:"disponivel"};
+      if(code === "X") return {cls:"c-conflict", badge:"", text:"X", type:"conflito"};
+      
+      // Deslocamentos
+      if(code === "D") return {cls:"c-desloc", badge:"", text:"D", type:"desloc"};
+      if(code === "D1") return {cls:"c-desloc-event", badge:"1", text:"D", type:"desloc-event"};
+      
+      // Eventos
+      if(code === "1") return {cls:"c-event", badge:"", text:"1", type:"evento"};
+      if(code === "2") return {cls:"c-multi-event", badge:"", text:"2", type:"multi-evento"};
+      
+      // Deslocamentos com números (D2, D3, etc.)
       if(code.startsWith("D")){
         const n = code.slice(1);
-        return {cls:"c-desloc", badge: n ? n : "", text:"", type:"desloc"};
+        return {cls:"c-desloc-event", badge: n ? n : "", text:"D", type:"desloc-event"};
       }
+      
+      // Eventos numéricos (3, 4, 5, etc.)
       const n = parseInt(code,10);
-      if(!isNaN(n)) return {cls:"c-event", badge: n>1 ? String(n) : "", text:"", type:"evento"};
+      if(!isNaN(n)) {
+        if(n === 1) return {cls:"c-event", badge:"", text:"1", type:"evento"};
+        if(n >= 2) return {cls:"c-multi-event", badge:"", text:String(n), type:"multi-evento"};
+      }
+      
       return {cls:"c-empty", badge:"", text:"", type:"empty"};
     }
 
@@ -356,17 +384,22 @@
         totalEventos.textContent = "0";
         totalBloqueios.textContent = "0";
         totalConflitos.textContent = "0";
+        totalDisponiveis.textContent = "0";
         return;
       }
       
-      let eventos = 0, bloqueios = 0, conflitos = 0;
+      let eventos = 0, bloqueios = 0, conflitos = 0, disponiveis = 0, deslocamentos = 0, deslocEventos = 0;
       
       data.linhas.forEach(linha => {
         linha.celulas.forEach(code => {
           const {type} = codeToCell(code);
           if (type === 'evento') eventos++;
+          else if (type === 'multi-evento') eventos++; // Contar como evento também
           else if (type === 'bloqueio') bloqueios++;
           else if (type === 'conflito') conflitos++;
+          else if (type === 'disponivel') disponiveis++;
+          else if (type === 'desloc') deslocamentos++;
+          else if (type === 'desloc-event') deslocEventos++;
         });
       });
       
@@ -374,6 +407,7 @@
       totalEventos.textContent = eventos;
       totalBloqueios.textContent = bloqueios;
       totalConflitos.textContent = conflitos;
+      totalDisponiveis.textContent = disponiveis;
     }
 
     function filterData() {

@@ -25,7 +25,7 @@ class MapaRealtimeAPIView(View):
         """
         def event_stream():
             # Enviar heartbeat inicial
-            yield f"data: {json.dumps({'type': 'connected', 'timestamp': datetime.now().isoformat()})}\n\n"
+            yield f"data: {json.dumps({'type': 'connected', 'timestamp': timezone.now().isoformat()})}\n\n"
             
             # Usar cache para detectar mudanças
             last_cache_key = 'mapa_last_update'
@@ -33,8 +33,8 @@ class MapaRealtimeAPIView(View):
             
             if not last_update:
                 # Primeira vez, definir timestamp atual
-                cache.set(last_cache_key, datetime.now().isoformat(), timeout=3600)
-                yield f"data: {json.dumps({'type': 'initialized', 'timestamp': datetime.now().isoformat()})}\n\n"
+                cache.set(last_cache_key, timezone.now().isoformat(), timeout=3600)
+                yield f"data: {json.dumps({'type': 'initialized', 'timestamp': timezone.now().isoformat()})}\n\n"
             
             # Manter conexão viva com heartbeat a cada 30 segundos
             heartbeat_count = 0
@@ -84,7 +84,7 @@ class MapaRealtimeAPIView(View):
                             # Enviar evento de atualização
                             event_data = {
                                 'type': 'mapa_update',
-                                'timestamp': datetime.now().isoformat(),
+                                'timestamp': timezone.now().isoformat(),
                                 'estados_afetados': list(estados_afetados),
                                 'municipios_afetados': municipios_afetados,
                                 'message': f'Novos projetos adicionados em {len(estados_afetados)} estado(s)'
@@ -98,7 +98,7 @@ class MapaRealtimeAPIView(View):
                     # Heartbeat a cada 30 segundos para manter conexão viva
                     heartbeat_count += 1
                     if heartbeat_count >= 6:  # 6 * 5s = 30s
-                        yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': datetime.now().isoformat()})}\n\n"
+                        yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': timezone.now().isoformat()})}\n\n"
                         heartbeat_count = 0
                     
                     # Aguardar 5 segundos
@@ -108,7 +108,7 @@ class MapaRealtimeAPIView(View):
                     # Enviar evento de erro
                     error_data = {
                         'type': 'error',
-                        'timestamp': datetime.now().isoformat(),
+                        'timestamp': timezone.now().isoformat(),
                         'message': f'Erro no stream: {str(e)}'
                     }
                     yield f"data: {json.dumps(error_data)}\n\n"
@@ -169,7 +169,7 @@ class MapaStatusAPIView(View):
             
             return JsonResponse({
                 'success': True,
-                'timestamp': datetime.now().isoformat(),
+                'timestamp': timezone.now().isoformat(),
                 'solicitacoes_recentes': solicitacoes_recentes,
                 'estados_afetados': estados_afetados,
                 'tem_atualizacoes': len(estados_afetados) > 0
@@ -217,7 +217,7 @@ class MapaWebhookView(View):
             # Retornar dados para atualização do mapa
             return JsonResponse({
                 'success': True,
-                'timestamp': datetime.now().isoformat(),
+                'timestamp': timezone.now().isoformat(),
                 'municipio': {
                     'nome': municipio.nome,
                     'uf': municipio.uf

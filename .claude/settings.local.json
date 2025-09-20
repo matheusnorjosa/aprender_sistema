@@ -5,13 +5,24 @@
       "Bash(ENVIRONMENT=staging DB_HOST=localhost DB_PORT=5433 DB_NAME=aprender_sistema_db DB_USER=adm_aprender DB_PASSWORD=aprender123456 python test_dashboard_final.py)",
       "Bash(npm uninstall:*)",
       "Bash(npm install:*)",
-      "Bash(codex login)"
+      "Bash(codex login)",
+      "Bash(docker-compose exec:*)",
+      "Bash(find:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(curl:*)",
+      "Bash(ENVIRONMENT=staging DB_HOST=localhost DB_PORT=5433 DB_NAME=aprender_sistema_db DB_USER=adm_aprender DB_PASSWORD=aprender123456 python test_coordinators_verification.py)",
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(py:*)"
     ],
     "deny": [],
     "ask": []
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
-    "playwright"
+    "playwright",
+    "markitdown",
+    "django-aprender",
+    "fastmcp-aprender"
   ]
 }

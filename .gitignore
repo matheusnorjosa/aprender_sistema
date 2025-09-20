@@ -108,3 +108,17 @@ docker-compose.override.yml
 # Editor
 .vscode/settings.json
 .vscode/launch.json
+# Padrões adicionados automaticamente
+0024_add_formador_fields_to_usuario.py
+0025_prepare_usuario_relationships.py
+0026_auto_20250918_1425.py
+0027_alter_disponibilidadeformadores_options_and_more.py
+RELATORIO_ANALISE_GITHUB_FINAL.md
+RELATORIO_EXECUCAO_FINAL_DEDUPLICACAO.md
+RELATORIO_FINAL_DEDUPLICACAO_USUARIOS.md
+RELATORIO_FINAL_MAPEAMENTO_USUARIOS_UNICOS.md
+RELATORIO_ORGANIZACAO_SISTEMA_FINAL.md
+analise_*.json
+migrate_formador_to_usuario.py
+prepare_formador_migration.py
+relatorio_*.json

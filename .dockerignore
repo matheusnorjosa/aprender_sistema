@@ -1,5 +1,6 @@
 # Virtualenv local
 venv/
+.venv_wsl/
 
 # Caches Python
 __pycache__/

@@ -29,26 +29,12 @@ class MapaMensalView(LoginRequiredMixin, SuperintendenciaSetorRequiredMixin, Vie
             d += timedelta(days=1)
 
         # Buscar formadores ativos filtrados por superintendência
-        user = request.user
-        user_setor = getattr(user, 'setor', None)
-        
-        if user.is_superuser:
-            # Superuser vê todos os formadores
-            formadores = list(Formador.objects.filter(ativo=True).order_by("nome"))
-        elif user_setor and getattr(user_setor, 'vinculado_superintendencia', False):
-            # Superintendência vê formadores vinculados:
-            # 1. Formadores com email @planilha.super (importados da aba Super)
-            # 2. Formadores com usuários vinculados à superintendência
-            from django.db.models import Q
-            formadores = list(Formador.objects.filter(
-                Q(ativo=True) & (
-                    Q(email__endswith='@planilha.super') |
-                    Q(usuario__setor__vinculado_superintendencia=True)
-                )
-            ).order_by("nome"))
-        else:
-            # Outros setores veem apenas formadores do mesmo setor
-            formadores = list(Formador.objects.filter(ativo=True, usuario__setor=user_setor).order_by("nome"))
+        # Filtrar apenas formadores da superintendência (email @planilha.super)
+        # Conforme solicitado, mostrar apenas os formadores vinculados à superintendência
+        formadores = list(Formador.objects.filter(
+            ativo=True,
+            email__endswith='@planilha.super'
+        ).order_by("nome"))
 
         # Usar função otimizada para gerar todo o mapa de uma vez
         mapa_otimizado = gerar_mapa_mensal_otimizado(formadores, dias)
@@ -104,26 +90,13 @@ class FormadoresSuperintendenciaView(LoginRequiredMixin, SuperintendenciaSetorRe
             user_setor = getattr(user, 'setor', None)
             logger.info(f"User setor: {user_setor}")
             
-            if user.is_superuser:
-                # Superuser vê todos os formadores
-                logger.info("User is superuser - loading all formadores")
-                formadores = Formador.objects.filter(ativo=True).order_by("nome")
-            elif user_setor and getattr(user_setor, 'vinculado_superintendencia', False):
-                # Superintendência vê formadores vinculados:
-                # 1. Formadores com email @planilha.super (importados da aba Super)
-                # 2. Formadores com usuários vinculados à superintendência
-                logger.info("User from superintendencia - loading superintendencia formadores")
-                from django.db.models import Q
-                formadores = Formador.objects.filter(
-                    Q(ativo=True) & (
-                        Q(email__endswith='@planilha.super') |
-                        Q(usuario__setor__vinculado_superintendencia=True)
-                    )
-                ).order_by("nome")
-            else:
-                # Outros setores veem apenas formadores do mesmo setor
-                logger.info("User from other sector - loading sector formadores")
-                formadores = Formador.objects.filter(ativo=True, usuario__setor=user_setor).order_by("nome")
+            # Filtrar apenas formadores da superintendência (email @planilha.super)
+            # Conforme solicitado, mostrar apenas os formadores vinculados à superintendência
+            logger.info("Loading superintendencia formadores only")
+            formadores = Formador.objects.filter(
+                ativo=True,
+                email__endswith='@planilha.super'
+            ).order_by("nome")
             
             logger.info(f"Found {formadores.count()} formadores")
             

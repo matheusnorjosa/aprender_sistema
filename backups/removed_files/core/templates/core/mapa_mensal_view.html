@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Mapa Mensal (via API)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#f6f7fb; --card:#fff; --text:#111827; --muted:#6b7280; --grid:#e5e7eb;
+      --evento:#3b82f6; --multi:#b91c1c; --desloc:#f59e0b; --bloq-parc:#9ca3af; --bloq-total:#111827; --conflito:#111827;
+      --head:#fafafa; --sticky:#f3f4f6; --hover:#eff6ff;
+    }
+    *{box-sizing:border-box}
+    body{background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:0; padding:24px}
+    .wrap{max-width:1200px; margin:0 auto}
+    .toolbar{display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap}
+    .toolbar h1{font-size:18px; margin:0; font-weight:700}
+    .spacer{flex:1}
+    .sel,.btn{padding:8px 10px; border:1px solid var(--grid); border-radius:8px; background:#fff}
+    .btn{cursor:pointer} .btn:hover{background:#f8fafc}
+    .legend{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-bottom:10px}
+    .legend .dot{display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:middle}
+
+    .card{background:var(--card); border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:12px}
+    .table-wrap{overflow:auto; border:1px solid var(--grid); border-radius:12px}
+    table{border-collapse:separate; border-spacing:0; width:100%; min-width:900px}
+    th,td{border-bottom:1px solid var(--grid); border-right:1px solid var(--grid); padding:8px; font-size:12px}
+    thead th{position:sticky; top:0; background:var(--head); z-index:2; font-weight:700}
+    tbody th{position:sticky; left:0; background:var(--sticky); z-index:1; text-align:left; min-width:220px}
+    tbody tr:hover td{background:var(--hover)}
+    .cell{width:28px; height:24px; text-align:center; border-radius:4px; position:relative; user-select:none}
+    .c-empty{background:transparent}
+    .c-event{background:var(--evento)}
+    .c-desloc{background:var(--desloc)}
+    .c-block-total{background:var(--bloq-total); color:#fff}
+    .c-block-parc{background:var(--bloq-parc); color:#fff}
+    .c-conflict{outline:2px solid var(--conflito); position:relative}
+    .c-conflict::after{content:"X"; color:var(--conflito); font-weight:800; position:absolute; inset:0; display:flex; align-items:center; justify-content:center}
+    .badge{position:absolute; top:-6px; right:-6px; font-size:10px; line-height:1; background:var(--multi); color:#fff; border-radius:10px; padding:3px 5px; min-width:14px; text-align:center}
+    .c-desloc .badge{background:#1f2937}
+    .skeleton{height:14px; width:100%; background:linear-gradient(90deg,#eee,#f6f6f6,#eee); background-size:200% 100%; animation:sh 1.2s infinite}
+    @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <h1>Mapa Mensal (via API)</h1>
+      <div class="spacer"></div>
+      <select id="selMes" class="sel"></select>
+      <select id="selAno" class="sel"></select>
+      <button id="btnAtualizar" class="btn">Atualizar</button>
+    </div>
+
+    <div class="legend">
+      <span><span class="dot" style="background:var(--evento)"></span>Evento</span>
+      <span><span class="dot" style="background:var(--multi)"></span>Mais de um evento</span>
+      <span><span class="dot" style="background:var(--desloc)"></span>Deslocamento</span>
+      <span><span class="dot" style="background:var(--bloq-parc)"></span>Bloqueio Parcial (P)</span>
+      <span><span class="dot" style="background:var(--bloq-total)"></span>Bloqueio Total (T)</span>
+      <span><span class="dot" style="border:2px solid var(--conflito)"></span>Conflito (X)</span>
+    </div>
+
+    <div class="card table-wrap">
+      <table id="grid">
+        <thead><tr id="headRow"></tr></thead>
+        <tbody id="bodyRows">
+          <!-- skeleton enquanto carrega -->
+          <tr><th><div class="skeleton"></div></th>
+            <td colspan="31"><div class="skeleton"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const mNames = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+    const selMes=document.getElementById('selMes');
+    const selAno=document.getElementById('selAno');
+    const headRow=document.getElementById('headRow');
+    const bodyRows=document.getElementById('bodyRows');
+
+    function fillSelectors(){
+      const now = new Date();
+      selMes.innerHTML = mNames.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
+      const anoAtual = now.getFullYear();
+      const anos=[anoAtual-1, anoAtual, anoAtual+1];
+      selAno.innerHTML = anos.map(a=>`<option value="${a}">${a}</option>`).join('');
+      selMes.value = now.getMonth()+1; selAno.value = anoAtual;
+    }
+
+    function codeToCell(code){
+      if(!code || code === "-") return {cls:"c-empty", badge:"", text:""};
+      if(code === "T") return {cls:"c-block-total", badge:"", text:"T"};
+      if(code === "P") return {cls:"c-block-parc",  badge:"", text:"P"};
+      if(code === "X") return {cls:"c-conflict",    badge:"", text:""};
+      if(code.startsWith("D")){
+        const n = code.slice(1);
+        return {cls:"c-desloc", badge: n ? n : "", text:""};
+      }
+      const n = parseInt(code,10);
+      if(!isNaN(n)) return {cls:"c-event", badge: n>1 ? String(n) : "", text:""};
+      return {cls:"c-empty", badge:"", text:""};
+    }
+
+    async function loadGrid(ano, mes){
+      // usa AbortController p/ não travar se trocar rápido
+      const ctrl = new AbortController();
+      const t = setTimeout(()=>ctrl.abort(), 15000);
+
+      bodyRows.innerHTML = `<tr><th><div class="skeleton"></div></th><td colspan="31"><div class="skeleton"></div></td></tr>`;
+      try{
+        const res = await fetch(`/mapa-mensal/?ano=${ano}&mes=${mes}`, {signal: ctrl.signal});
+        if(!res.ok) throw new Error("Falha ao buscar dados.");
+        const data = await res.json();
+
+        headRow.innerHTML = `<th>Formador</th>` + data.dias.map(d=>`<th style="text-align:center;width:28px">${d}</th>`).join('');
+
+        // monta linhas de forma eficiente (string única)
+        const rows=[];
+        for(const linha of data.linhas){
+          let row = `<tr><th>${linha.formador}</th>`;
+          for(const code of linha.celulas){
+            const {cls,badge,text} = codeToCell(code);
+            row += `<td><div class="cell ${cls}">${text||""}${badge?`<span class="badge">${badge}</span>`:""}</div></td>`;
+          }
+          row += `</tr>`;
+          rows.push(row);
+        }
+        bodyRows.innerHTML = rows.join("");
+      }catch(err){
+        bodyRows.innerHTML = `<tr><td colspan="32" style="color:#b91c1c;padding:16px">Erro ao carregar (${err.message}).</td></tr>`;
+      }finally{
+        clearTimeout(t);
+      }
+    }
+
+    fillSelectors();
+    document.getElementById('btnAtualizar').addEventListener('click', ()=>loadGrid(selAno.value, selMes.value));
+    loadGrid(selAno.value, selMes.value);
+  </script>
+</body>
+</html>

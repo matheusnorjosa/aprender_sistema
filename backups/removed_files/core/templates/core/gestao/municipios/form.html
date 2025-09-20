@@ -1,0 +1,141 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}{{ object|yesno:"Editar,Novo" }} Município{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-0">
+            <i class="bi bi-geo-alt-fill text-warning me-2"></i>
+            {{ object|yesno:"Editar,Novo" }} Município
+        </h1>
+        <p class="text-muted mb-0">
+            {% if object %}
+                Editar informações do município
+            {% else %}
+                Adicionar novo município ao sistema
+            {% endif %}
+        </p>
+    </div>
+    <a href="{% url 'core:gestao_municipios' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-2"></i>Voltar à Lista
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Formulário Principal -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-form me-2"></i>Dados do Município
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="post" id="municipioForm">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="id_nome" class="form-label required">{{ form.nome.label }}</label>
+                                {{ form.nome }}
+                                {% if form.nome.errors %}
+                                    <div class="text-danger small">{{ form.nome.errors.0 }}</div>
+                                {% endif %}
+                                {% if form.nome.help_text %}
+                                    <div class="form-text">{{ form.nome.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="id_uf" class="form-label required">{{ form.uf.label }}</label>
+                                {{ form.uf }}
+                                {% if form.uf.errors %}
+                                    <div class="text-danger small">{{ form.uf.errors.0 }}</div>
+                                {% endif %}
+                                {% if form.uf.help_text %}
+                                    <div class="form-text">{{ form.uf.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    {{ form.ativo }}
+                                    <label class="form-check-label" for="id_ativo">
+                                        {{ form.ativo.label }}
+                                    </label>
+                                </div>
+                                {% if form.ativo.errors %}
+                                    <div class="text-danger small">{{ form.ativo.errors.0 }}</div>
+                                {% endif %}
+                                {% if form.ativo.help_text %}
+                                    <div class="form-text">{{ form.ativo.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botões de Ação -->
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <a href="{% url 'core:gestao_municipios' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle me-2"></i>Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle me-2"></i>
+                            {{ object|yesno:"Atualizar,Salvar" }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações Adicionais -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-info-circle me-2"></i>Informações
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6>Campos Obrigatórios</h6>
+                    <ul class="small text-muted mb-0">
+                        <li>Nome do município</li>
+                        <li>UF (Estado)</li>
+                    </ul>
+                </div>
+
+                {% if object %}
+                <div class="mb-3">
+                    <h6>Dados do Registro</h6>
+                    <ul class="small text-muted mb-0">
+                        <li><strong>ID:</strong> {{ object.id }}</li>
+                    </ul>
+                </div>
+                {% endif %}
+
+                <div class="alert alert-info small">
+                    <i class="bi bi-lightbulb me-2"></i>
+                    <strong>Dica:</strong> A combinação nome + UF deve ser única no sistema.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.required::after {
+    content: " *";
+    color: #dc3545;
+}
+</style>
+{% endblock %}

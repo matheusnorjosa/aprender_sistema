@@ -1,0 +1,375 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Deslocamentos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-0">
+            <i class="bi bi-truck text-warning me-2"></i>
+            Deslocamentos
+        </h1>
+        <p class="text-muted mb-0">Sistema de controle de deslocamentos de formadores</p>
+    </div>
+    <a href="{% url 'core:deslocamentos_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-2"></i>Novo Deslocamento
+    </a>
+</div>
+
+<!-- Filtros Avançados -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0">
+            <i class="bi bi-funnel me-2"></i>Filtros
+            {% if filtros_ativos %}
+                <span class="badge bg-primary ms-2">Ativos</span>
+            {% endif %}
+        </h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Data Início</label>
+                <input type="date" name="data_inicio" class="form-control" 
+                       value="{{ request.GET.data_inicio }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Data Fim</label>
+                <input type="date" name="data_fim" class="form-control" 
+                       value="{{ request.GET.data_fim }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Formador</label>
+                <select name="formador" class="form-select">
+                    <option value="">Todos os formadores</option>
+                    {% for formador in formadores %}
+                        <option value="{{ formador.id }}" 
+                                {% if request.GET.formador == formador.id|stringformat:"s" %}selected{% endif %}>
+                            {{ formador.nome }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Tipo</label>
+                <select name="tipo" class="form-select">
+                    <option value="">Todos os tipos</option>
+                    <option value="deslocamento" {% if request.GET.tipo == 'deslocamento' %}selected{% endif %}>
+                        Deslocamento
+                    </option>
+                    <option value="retorno" {% if request.GET.tipo == 'retorno' %}selected{% endif %}>
+                        Retorno
+                    </option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Origem</label>
+                <input type="text" name="origem" class="form-control" 
+                       placeholder="Filtrar por origem..." 
+                       value="{{ request.GET.origem }}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Destino</label>
+                <input type="text" name="destino" class="form-control" 
+                       placeholder="Filtrar por destino..." 
+                       value="{{ request.GET.destino }}">
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-outline-primary">
+                    <i class="bi bi-search me-2"></i>Filtrar
+                </button>
+                <a href="{% url 'core:deslocamentos_list' %}" class="btn btn-outline-secondary ms-2">
+                    <i class="bi bi-x-circle me-2"></i>Limpar
+                </a>
+                <button type="button" class="btn btn-outline-success ms-2" onclick="exportToExcel()">
+                    <i class="bi bi-file-earmark-excel me-2"></i>Exportar Excel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Estatísticas Rápidas -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total</h6>
+                        <h3>{{ deslocamentos|length }}</h3>
+                    </div>
+                    <i class="bi bi-truck fs-1 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Este Mês</h6>
+                        <h3 id="countMesAtual">-</h3>
+                    </div>
+                    <i class="bi bi-calendar-check fs-1 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Deslocamentos</h6>
+                        <h3 id="countDeslocamentos">-</h3>
+                    </div>
+                    <i class="bi bi-arrow-right-circle fs-1 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Retornos</h6>
+                        <h3 id="countRetornos">-</h3>
+                    </div>
+                    <i class="bi bi-arrow-left-circle fs-1 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela Excel-like -->
+<div class="card">
+    <div class="card-header">
+        <h6 class="mb-0">
+            <i class="bi bi-table me-2"></i>Lista de Deslocamentos
+            <span class="badge bg-secondary ms-2">{{ deslocamentos|length }} registros</span>
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0" id="deslocamentosTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="width: 100px;">Data</th>
+                        <th style="width: 100px;">Tipo</th>
+                        <th>Origem</th>
+                        <th>Destino</th>
+                        <th>Formadores</th>
+                        <th style="width: 120px;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for deslocamento in deslocamentos %}
+                    <tr>
+                        <td>
+                            <strong>{{ deslocamento.data|date:"d/m/Y" }}</strong>
+                            <br>
+                            <small class="text-muted">{{ deslocamento.data|date:"D" }}</small>
+                        </td>
+                        <td>
+                            {% if deslocamento.tipo == 'deslocamento' %}
+                                <span class="badge bg-warning">
+                                    <i class="bi bi-arrow-right me-1"></i>Ida
+                                </span>
+                            {% else %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-arrow-left me-1"></i>Volta
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ deslocamento.origem }}</strong>
+                        </td>
+                        <td>
+                            <strong>{{ deslocamento.destino }}</strong>
+                        </td>
+                        <td>
+                            {% if deslocamento.pessoas %}
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for pessoa in deslocamento.pessoas %}
+                                        <span class="badge bg-light text-dark">{{ pessoa.nome }}</span>
+                                    {% endfor %}
+                                </div>
+                                <small class="text-muted">{{ deslocamento.pessoas_count }} pessoa{{ deslocamento.pessoas_count|pluralize }}</small>
+                            {% else %}
+                                <span class="text-muted">Nenhum formador atribuído</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'core:deslocamentos_update' deslocamento.pk %}" 
+                                   class="btn btn-outline-primary" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'core:deslocamentos_delete' deslocamento.pk %}" 
+                                   class="btn btn-outline-danger" title="Excluir">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                                <button type="button" class="btn btn-outline-info" 
+                                        onclick="verDetalhes('{{ deslocamento.id }}')" title="Detalhes">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox display-1 d-block mb-3"></i>
+                            <h5>Nenhum deslocamento encontrado</h5>
+                            <p>{% if filtros_ativos %}Tente ajustar os filtros ou{% endif %} 
+                               <a href="{% url 'core:deslocamentos_create' %}">criar um novo deslocamento</a>
+                            </p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Paginação -->
+    {% if is_paginated %}
+    <div class="card-footer">
+        <nav aria-label="Paginação">
+            <ul class="pagination justify-content-center mb-0">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1">Primeira</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+                    </li>
+                {% endif %}
+
+                <li class="page-item active">
+                    <span class="page-link">
+                        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                    </span>
+                </li>
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Última</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal para Detalhes -->
+<div class="modal fade" id="detalhesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-info-circle me-2"></i>Detalhes do Deslocamento
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detalhesContent">
+                <!-- Conteúdo carregado via AJAX -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Calcular estatísticas
+    const deslocamentos = {{ deslocamentos|length }};
+    const mesAtual = new Date().getMonth() + 1;
+    const anoAtual = new Date().getFullYear();
+    
+    // Simular contadores (em produção, viriam da API)
+    document.getElementById('countMesAtual').textContent = Math.floor(deslocamentos * 0.3);
+    document.getElementById('countDeslocamentos').textContent = Math.floor(deslocamentos * 0.6);
+    document.getElementById('countRetornos').textContent = Math.floor(deslocamentos * 0.4);
+});
+
+function verDetalhes(deslocamentoId) {
+    // Carregar detalhes via AJAX
+    fetch(`/api/deslocamentos/?id=${deslocamentoId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const desloc = data.deslocamentos[0];
+                document.getElementById('detalhesContent').innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Data:</strong> ${desloc.data_display}<br>
+                            <strong>Tipo:</strong> ${desloc.tipo_display}<br>
+                            <strong>Origem:</strong> ${desloc.origem}<br>
+                            <strong>Destino:</strong> ${desloc.destino}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Pessoas:</strong><br>
+                            ${desloc.pessoas.map(p => `<span class="badge bg-primary me-1">${p}</span>`).join('')}
+                            <br><small class="text-muted">${desloc.pessoas_count} pessoa(s)</small>
+                        </div>
+                    </div>
+                `;
+                new bootstrap.Modal(document.getElementById('detalhesModal')).show();
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao carregar detalhes');
+        });
+}
+
+function exportToExcel() {
+    // Simular export (implementar com biblioteca real)
+    alert('Funcionalidade de export será implementada');
+}
+</script>
+
+<style>
+.table th {
+    background-color: #2c3e50 !important;
+    color: white !important;
+    border: none !important;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) > td {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.1) !important;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.btn-group-sm > .btn, .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8125rem;
+}
+</style>
+{% endblock %}

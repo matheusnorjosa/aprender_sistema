@@ -1,0 +1,391 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Decidir Solicitação - Sistema Aprender{% endblock %}
+
+{% block nav_aprovacoes %}active{% endblock %}
+
+{% block page_title %}
+<i class="bi bi-clipboard-check"></i> Decidir Solicitação
+{% endblock %}
+
+{% block breadcrumb %}
+Analise os detalhes e tome uma decisão sobre a solicitação de evento
+{% endblock %}
+
+{% block page_actions %}
+<div class="actions">
+  <a href="{% url 'core:aprovacoes_pendentes' %}" class="btn">
+    <i class="bi bi-arrow-left"></i> Voltar à Lista
+  </a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .info-section {
+    border-left: 4px solid var(--accent);
+    padding-left: 1.5rem;
+    margin-bottom: 2rem;
+    background: #f0f7ff;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+  }
+  .info-section h5 {
+    color: var(--accent);
+    margin-bottom: 1rem;
+    font-weight: 600;
+  }
+  .decision-section {
+    border-left: 4px solid var(--warn);
+    padding-left: 1.5rem;
+    margin-bottom: 2rem;
+    background: #fffbf0;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+  }
+  .decision-section h5 {
+    color: var(--warn);
+    margin-bottom: 1rem;
+    font-weight: 600;
+  }
+  .decision-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  .decision-card {
+    border: 2px solid var(--line);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    text-align: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    background: #fff;
+    position: relative;
+  }
+  .decision-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .decision-card.selected-approve {
+    border-color: var(--ok);
+    background: #f0fff4;
+  }
+  .decision-card.selected-reject {
+    border-color: var(--danger);
+    background: #fff5f5;
+  }
+  .decision-card i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+  }
+  .decision-card input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .decision-card h6 {
+    margin: 0.5rem 0;
+    font-weight: 600;
+  }
+  .decision-card p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
+  .event-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+  }
+  .info-item {
+    margin-bottom: 1rem;
+  }
+  .info-label {
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+  }
+  .info-value {
+    font-size: 1rem;
+  }
+  .date-card {
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  .date-card.start {
+    border-left: 4px solid var(--ok);
+    background: #f0fff4;
+  }
+  .date-card.end {
+    border-left: 4px solid var(--danger);
+    background: #fff5f5;
+  }
+  .formadores-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .btn-approve {
+    background: var(--ok);
+    border-color: var(--ok);
+    color: #fff;
+  }
+  .btn-approve:hover {
+    background: #157347;
+    border-color: #146c43;
+    color: #fff;
+  }
+  .btn-reject {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+  }
+  .btn-reject:hover {
+    background: #bb2d3b;
+    border-color: #b02a37;
+    color: #fff;
+  }
+  .btn-group-submit {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--line);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Event Details -->
+<div class="info-section">
+  <h5><i class="bi bi-calendar-event"></i> {{ sol.titulo_evento }}</h5>
+  
+  <div class="event-info-grid">
+    <!-- Left Column -->
+    <div>
+      <div class="info-item">
+        <div class="info-label">Projeto</div>
+        <div class="info-value">
+          <span class="badge badge-secondary">{{ sol.projeto }}</span>
+        </div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Município</div>
+        <div class="info-value">
+          <i class="bi bi-geo-alt-fill text-danger"></i> {{ sol.municipio }}
+        </div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Tipo de Evento</div>
+        <div class="info-value">
+          <span class="badge badge-primary">{{ sol.tipo_evento }}</span>
+        </div>
+      </div>
+      
+      {% if sol.numero_encontro_formativo %}
+      <div class="info-item">
+        <div class="info-label">Encontro</div>
+        <div class="info-value">{{ sol.numero_encontro_formativo }}</div>
+      </div>
+      {% endif %}
+      
+      <div class="info-item">
+        <div class="info-label">Coordenador Acompanha</div>
+        <div class="info-value">
+          {% if sol.coordenador_acompanha %}
+            <span class="badge badge-success">
+              <i class="bi bi-check-circle"></i> Sim
+            </span>
+          {% else %}
+            <span class="badge badge-secondary">
+              <i class="bi bi-x-circle"></i> Não
+            </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Right Column -->
+    <div>
+      <div class="info-item">
+        <div class="info-label">Período do Evento</div>
+        
+        <div class="date-card start">
+          <div class="d-flex align-items-center mb-1">
+            <i class="bi bi-play-circle-fill text-success me-2"></i>
+            <strong>Início</strong>
+          </div>
+          <div class="ms-4">
+            <div class="h6 text-success mb-0">{{ sol.data_inicio|date:"d/m/Y" }}</div>
+            <div class="text-muted">{{ sol.data_inicio|date:"H:i" }}</div>
+          </div>
+        </div>
+        
+        <div class="date-card end">
+          <div class="d-flex align-items-center mb-1">
+            <i class="bi bi-stop-circle-fill text-danger me-2"></i>
+            <strong>Término</strong>
+          </div>
+          <div class="ms-4">
+            <div class="h6 text-danger mb-0">{{ sol.data_fim|date:"d/m/Y" }}</div>
+            <div class="text-muted">{{ sol.data_fim|date:"H:i" }}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Formadores ({{ formadores|length }})</div>
+        <div class="formadores-grid">
+          {% for f in formadores %}
+            <span class="badge badge-primary">
+              <i class="bi bi-person"></i> {{ f.nome }}
+            </span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  {% if sol.observacoes %}
+  <div class="info-item">
+    <div class="info-label">Observações</div>
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle"></i> {{ sol.observacoes|linebreaksbr }}
+    </div>
+  </div>
+  {% endif %}
+  
+  <div class="info-item mt-3 pt-3" style="border-top: 1px solid var(--line);">
+    <div class="text-muted" style="font-size: 0.875rem;">
+      <i class="bi bi-person-circle"></i> 
+      <strong>Solicitado por:</strong> {{ sol.usuario_solicitante.get_full_name|default:sol.usuario_solicitante.username }}
+      <span class="ms-3">
+        <i class="bi bi-calendar-plus"></i> 
+        <strong>Em:</strong> {{ sol.data_solicitacao|date:"d/m/Y H:i" }}
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Decision Form -->
+<div class="decision-section">
+  <h5><i class="bi bi-clipboard-check"></i> Tomar Decisão</h5>
+  
+  <form method="post" id="decision-form">
+    {% csrf_token %}
+    
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        <h6><i class="bi bi-exclamation-triangle"></i> Erros de Validação:</h6>
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <!-- Decision Options -->
+    <div class="form-group">
+      <label class="form-label">{{ form.decisao.label }}</label>
+      <div class="decision-cards">
+        <div class="decision-card" data-value="Aprovado">
+          <input type="radio" name="decisao" value="Aprovado" id="id_decisao_0" required>
+          <i class="bi bi-check-circle-fill text-success"></i>
+          <h6 class="text-success">Aprovar</h6>
+          <p>Confirmar a realização do evento</p>
+        </div>
+        <div class="decision-card" data-value="Reprovado">
+          <input type="radio" name="decisao" value="Reprovado" id="id_decisao_1" required>
+          <i class="bi bi-x-circle-fill text-danger"></i>
+          <h6 class="text-danger">Reprovar</h6>
+          <p>Negar a realização do evento</p>
+        </div>
+      </div>
+      {% if form.decisao.errors %}
+        <div class="invalid-feedback" style="display: block;">{{ form.decisao.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+
+    <!-- Action Buttons -->
+    <div class="btn-group-submit d-flex justify-content-between">
+      <a href="{% url 'core:aprovacoes_pendentes' %}" class="btn">
+        <i class="bi bi-arrow-left"></i> Cancelar
+      </a>
+      <button type="submit" class="btn btn-primary" id="submit-btn">
+        <i class="bi bi-check-circle"></i> Confirmar Decisão
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('decision-form');
+  const submitBtn = document.getElementById('submit-btn');
+  const decisionCards = document.querySelectorAll('.decision-card');
+  
+  // Gerenciar seleção de decisão
+  decisionCards.forEach(card => {
+    card.addEventListener('click', function() {
+      // Remove seleção anterior
+      decisionCards.forEach(c => {
+        c.classList.remove('selected-approve', 'selected-reject');
+      });
+      
+      // Adiciona seleção atual
+      const value = this.dataset.value;
+      if (value === 'Aprovado') {
+        this.classList.add('selected-approve');
+        submitBtn.className = 'btn btn-approve';
+        submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Aprovar Solicitação';
+      } else {
+        this.classList.add('selected-reject');
+        submitBtn.className = 'btn btn-reject';
+        submitBtn.innerHTML = '<i class="bi bi-x-circle"></i> Reprovar Solicitação';
+      }
+      
+      // Marca o radio button correspondente
+      const radio = this.querySelector('input[type="radio"]');
+      if (radio) {
+        radio.checked = true;
+      }
+    });
+  });
+
+  // Marcar card se radio já estiver selecionado
+  decisionCards.forEach(card => {
+    const radio = card.querySelector('input[type="radio"]');
+    if (radio && radio.checked) {
+      const value = radio.value;
+      if (value === 'Aprovado') {
+        card.classList.add('selected-approve');
+        submitBtn.className = 'btn btn-approve';
+        submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Aprovar Solicitação';
+      } else {
+        card.classList.add('selected-reject');
+        submitBtn.className = 'btn btn-reject';
+        submitBtn.innerHTML = '<i class="bi bi-x-circle"></i> Reprovar Solicitação';
+      }
+    }
+  });
+
+  // Prevenir submit múltiplo
+  form.addEventListener('submit', function() {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processando...';
+  });
+
+  // Adicionar classes de erro aos campos inválidos
+  const formControls = form.querySelectorAll('.form-control, .form-check-input');
+  formControls.forEach(function(control) {
+    const feedback = control.parentNode.querySelector('.invalid-feedback');
+    if (feedback && feedback.textContent.trim()) {
+      control.classList.add('is-invalid');
+    }
+  });
+});
+{% endblock %}

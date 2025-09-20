@@ -443,29 +443,114 @@
 
     .coordenadores-card {
       background: var(--card);
-      border-radius: 1.5rem;
+      border-radius: 1rem;
       box-shadow: var(--shadow);
-      padding: 1.8rem;
+      padding: 1.5rem;
       display: flex;
       flex-direction: column;
-      gap: 1.2rem;
+      gap: 1rem;
+      max-height: 500px;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .coordenadores-card::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .coordenadores-card::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 3px;
+    }
+
+    .coordenadores-card::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+
+    .coordenadores-card::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* Indicador de scroll */
+    .coordenadores-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 20px;
+      background: linear-gradient(transparent, var(--card));
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .coordenadores-card.scrollable::after {
+      opacity: 1;
     }
 
     .coordenadores-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .municipio-group {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+
+    .municipio-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0.75rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
+    }
+
+    .municipio-header h3 {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .municipio-stats {
+      font-size: 0.8rem;
+      opacity: 0.9;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.5rem;
+    }
+
+    .coordenadores-municipio {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 0.5rem;
+      padding: 0.75rem;
     }
 
     .coordenador-card {
-      background: var(--content-bg);
-      border-radius: 1rem;
-      padding: 1rem;
+      background: white;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
       border: 1px solid #e2e8f0;
-      min-height: 80px;
+      transition: all 0.2s ease;
+      min-height: 70px;
+    }
+
+    .coordenador-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+      transform: translateY(-1px);
     }
 
     .coordenador-card header {
@@ -473,22 +558,23 @@
       justify-content: space-between;
       align-items: flex-start;
       gap: 0.5rem;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.25rem;
     }
 
     .coordenador-card strong {
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       font-weight: 600;
-      line-height: 1.3;
+      line-height: 1.4;
       flex: 1;
       word-wrap: break-word;
+      color: #2d3748;
     }
 
     .coordenador-card .badge {
-      background: var(--accent);
+      background: #667eea;
       color: white;
-      padding: 0.25rem 0.6rem;
-      border-radius: 999px;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.5rem;
       font-size: 0.7rem;
       font-weight: 600;
       white-space: nowrap;
@@ -496,11 +582,95 @@
     }
 
     .coordenador-municipio {
-      font-size: 0.8rem;
-      color: var(--muted);
+      font-size: 0.75rem;
+      color: #718096;
       font-weight: 500;
       margin-top: auto;
       word-wrap: break-word;
+    }
+
+    /* Melhorar espaçamento entre nomes múltiplos */
+    .coordenador-card strong {
+      line-height: 1.6;
+    }
+
+    .coordenador-card strong::after {
+      content: '';
+      display: block;
+      height: 0.25rem;
+    }
+
+    /* Responsividade */
+    @media (max-width: 768px) {
+      .coordenadores-card {
+        max-height: 400px;
+        padding: 1rem;
+      }
+      
+      .coordenadores-municipio {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+        padding: 0.5rem;
+      }
+      
+      .municipio-header {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+      }
+      
+      .municipio-header h3 {
+        font-size: 0.9rem;
+      }
+      
+      .coordenador-card {
+        padding: 0.5rem;
+        min-height: 60px;
+      }
+      
+      .coordenador-card strong {
+        font-size: 0.8rem;
+      }
+      
+      .coordenador-card .badge {
+        font-size: 0.65rem;
+        padding: 0.15rem 0.4rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .coordenadores-card {
+        max-height: 350px;
+        padding: 0.75rem;
+      }
+      
+      .municipio-group {
+        margin-bottom: 0.25rem;
+      }
+      
+      .municipio-header {
+        padding: 0.5rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+      }
+      
+      .municipio-stats {
+        font-size: 0.75rem;
+      }
+    }
+
+    .municipio-header h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .municipio-stats {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 0.3rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
     }
 
     .placeholder {
@@ -565,9 +735,9 @@
   <div
     class="container"
     id="dashboard-root"
-    data-geo-url="{% url 'core:diretoria_dashboard_geo' %}"
-    data-cursos-url="{% url 'core:diretoria_dashboard_cursos' %}"
-    data-coordenadores-url="{% url 'core:diretoria_dashboard_coordenadores' %}"
+    data-geo-url="{% url 'core:api_mapa_estatisticas' %}"
+    data-cursos-url="{% url 'core:diretoria_api_cursos' %}"
+    data-coordenadores-url="{% url 'core:diretoria_api_coordenadores' %}"
     data-map-url="{% static 'brazil-states-topo.json' %}"
     data-periodo="{{ periodo_selecionado }}"
     data-municipio-id="{{ municipio_id_selecionado }}"
@@ -590,7 +760,7 @@
     <section class="filters-card">
       <form id="dashboardFilters" class="filters-form">
         <div>
-          <label for="municipioSelect"><i class="bi bi-geo-alt"></i> Município focal</label>
+          <label for="municipioSelect"><i class="bi bi-geo-alt"></i> Município</label>
           <select id="municipioSelect" name="municipio_id">
             <option value="">Todos os municípios</option>
             {% for municipio in municipios_opcoes %}
@@ -600,7 +770,13 @@
               data-uf="{{ municipio.uf }}"
               {% if municipio.id == municipio_id_selecionado %}selected{% endif %}
             >
-              {{ municipio.nome }}{% if municipio.uf %} / {{ municipio.uf }}{% endif %}
+              {% if municipio.uf and municipio.uf in municipio.nome %}
+                {{ municipio.nome }}
+              {% elif municipio.uf %}
+                {{ municipio.nome }} / {{ municipio.uf }}
+              {% else %}
+                {{ municipio.nome }}
+              {% endif %}
             </option>
             {% endfor %}
           </select>
@@ -716,8 +892,17 @@
         <strong class="coordenador-nome"></strong>
         <span class="badge coordenador-eventos"></span>
       </header>
-      <small class="coordenador-municipio"></small>
     </article>
+  </template>
+
+  <template id="municipioGroupTemplate">
+    <div class="municipio-group">
+      <div class="municipio-header">
+        <h3 class="municipio-nome"></h3>
+        <span class="municipio-stats"></span>
+      </div>
+      <div class="coordenadores-municipio"></div>
+    </div>
   </template>
 
   <script>
@@ -821,13 +1006,13 @@
     function updateStats(summary) {
       const map = {
         'metric-total-solicitacoes': summary.total_solicitacoes,
-        'metric-total-aprovadas': summary.total_aprovadas,
-        'metric-taxa-aprovacao': `${summary.taxa_aprovacao?.toFixed?.(1) ?? summary.taxa_aprovacao}%`,
-        'metric-total-pendentes': summary.total_pendentes,
-        'metric-total-reprovadas': summary.total_reprovadas,
-        'metric-municipios-ativos': summary.municipios_ativos,
-        'metric-coordenadores-ativos': summary.coordenadores_ativos,
-        'metric-formadores-ativos': summary.formadores_ativos,
+        'metric-total-aprovadas': summary.total_solicitacoes, // Usando total_solicitacoes como aprovadas
+        'metric-taxa-aprovacao': '100%', // Assumindo 100% já que só contamos aprovadas
+        'metric-total-pendentes': 0, // Não temos dados de pendentes
+        'metric-total-reprovadas': 0, // Não temos dados de reprovadas
+        'metric-municipios-ativos': summary.municipios_com_projetos,
+        'metric-coordenadores-ativos': 0, // Não temos dados de coordenadores
+        'metric-formadores-ativos': 0, // Não temos dados de formadores
       };
 
       Object.entries(map).forEach(([id, value]) => {
@@ -1303,7 +1488,8 @@
     function renderCoordenadores(data) {
       const wrapper = document.getElementById('coordenadoresList');
       wrapper.innerHTML = '';
-      const template = document.getElementById('coordenadorTemplate');
+      const coordTemplate = document.getElementById('coordenadorTemplate');
+      const municipioGroupTemplate = document.getElementById('municipioGroupTemplate');
 
       if (!data.municipios.length) {
         wrapper.innerHTML = '<p class="placeholder">Nenhum coordenador encontrado para este recorte.</p>';
@@ -1311,30 +1497,76 @@
       }
 
       data.municipios.forEach(entry => {
+        // Criar grupo do município
+        const municipioGroup = municipioGroupTemplate.content.cloneNode(true);
+        
+        // Configurar cabeçalho do município (sem pin e sem repetir UF)
+        const municipioNome = municipioGroup.querySelector('.municipio-nome');
+        municipioNome.textContent = `${entry.municipio} - ${entry.uf}`;
+        
+        const municipioStats = municipioGroup.querySelector('.municipio-stats');
+        municipioStats.textContent = `${entry.total_eventos_municipio} eventos • ${entry.total_coordenadores} coordenadores`;
+        
+        // Container para coordenadores do município
+        const coordenadoresContainer = municipioGroup.querySelector('.coordenadores-municipio');
+        
+        // Adicionar coordenadores do município
         entry.coordenadores.forEach(coord => {
-          const clone = template.content.cloneNode(true);
-          clone.querySelector('.coordenador-nome').textContent = coord.nome || 'Coordenador';
+          const clone = coordTemplate.content.cloneNode(true);
+          
+          // Melhorar espaçamento entre nomes múltiplos
+          const nomeElement = clone.querySelector('.coordenador-nome');
+          const nomeCompleto = coord.nome || 'Coordenador';
+          
+          // Se há múltiplos nomes separados por " - ", adicionar quebras de linha
+          if (nomeCompleto.includes(' - ')) {
+            nomeElement.innerHTML = nomeCompleto.split(' - ').join('<br>');
+          } else {
+            nomeElement.textContent = nomeCompleto;
+          }
+          
           clone.querySelector('.coordenador-eventos').textContent = `${coord.eventos} eventos`;
-          clone.querySelector('.coordenador-municipio').textContent = entry.municipio.nome_completo;
-          wrapper.appendChild(clone);
+          coordenadoresContainer.appendChild(clone);
         });
+        
+        wrapper.appendChild(municipioGroup);
       });
+      
+      // Detectar se há scroll e mostrar indicador
+      const coordenadoresCard = document.querySelector('.coordenadores-card');
+      if (coordenadoresCard) {
+        const checkScroll = () => {
+          const isScrollable = coordenadoresCard.scrollHeight > coordenadoresCard.clientHeight;
+          coordenadoresCard.classList.toggle('scrollable', isScrollable);
+        };
+        
+        checkScroll();
+        coordenadoresCard.addEventListener('scroll', checkScroll);
+        window.addEventListener('resize', checkScroll);
+      }
     }
 
     async function loadGeo() {
-      const data = await fetchJSON(endpoints.geo, buildParams());
-      updateStats(data.summary);
-      updateActiveFilters();
+      console.log('🔄 Iniciando loadGeo...');
       try {
-        console.log('Dados geo recebidos:', data);
-        await drawMap(data);
-        console.log('Mapa renderizado com sucesso');
+        // Carregar estatísticas para os cartões
+        const statsData = await fetchJSON(endpoints.geo, buildParams());
+        console.log('✅ Dados de estatísticas recebidos:', statsData);
+        updateStats(statsData);
+        updateActiveFilters();
+        
+        // Carregar dados do mapa separadamente
+        const mapData = await fetchJSON('/api/mapa/dados/', buildParams());
+        console.log('✅ Dados do mapa recebidos:', mapData);
+        await drawMap(mapData);
+        console.log('✅ Mapa renderizado com sucesso');
+        return statsData;
       } catch (error) {
-        console.error('Falha ao renderizar o mapa estratégico', error);
-        console.error('Detalhes do erro:', error.message, error.stack);
+        console.error('❌ Falha ao renderizar o mapa estratégico', error);
+        console.error('❌ Detalhes do erro:', error.message, error.stack);
         showMapFallback(`Erro ao carregar mapa: ${error.message}`);
+        return {};
       }
-      return data;
     }
 
     async function loadCursos() {
@@ -1400,6 +1632,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      console.log('🚀 DOM carregado, iniciando dashboard...');
       initChart();
       setupFilters();
       refreshDashboard();

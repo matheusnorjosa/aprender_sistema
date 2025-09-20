@@ -6,20 +6,29 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from core.models import AprovacaoStatus, Formador, Municipio, Projeto, Setor, TipoEvento, Solicitacao, Usuario
+from core.models import AprovacaoStatus, Municipio, Projeto, Setor, TipoEvento, Solicitacao, Usuario
 from core.services.conflicts import check_conflicts
+from core.services import FormadorService, UsuarioService
 from core.validators import CPFValidator
+
+# COMPATÍVEL: Import direto do Formador para manter compatibilidade temporária
+from core.models import Formador
 
 
 # -------- RF02: Solicitação --------
 class SolicitacaoForm(forms.ModelForm):
     formadores = forms.ModelMultipleChoiceField(
-        queryset=Formador.objects.filter(ativo=True).order_by("nome"),
+        queryset=None,  # Será definido no __init__
         widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
         required=True,
         label="Formadores",
         help_text="Selecione os formadores que participarão do evento",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Usar FormadorService - fonte única
+        self.fields['formadores'].queryset = FormadorService.get_formadores_queryset().order_by('first_name', 'last_name')
 
     class Meta:
         model = Solicitacao
@@ -109,7 +118,7 @@ class SolicitacaoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Customizar a exibição dos formadores para mostrar apenas o nome
-        self.fields["formadores"].label_from_instance = lambda obj: obj.nome
+        self.fields["formadores"].label_from_instance = lambda obj: obj.nome_completo
         
         # 1.2 UI/UX: Tornar campos opcionais (mantém obrigatório formadores, data, projeto, município, tipo)
         self.fields["numero_encontro_formativo"].required = False
@@ -230,7 +239,7 @@ class AprovacaoDecisionForm(forms.Form):
 # -------- Bloqueio de Agenda (Apps Script -> Django) --------
 class BloqueioAgendaForm(forms.Form):
     formador = forms.ModelChoiceField(
-        queryset=Formador.objects.filter(ativo=True).order_by("nome"),
+        queryset=Usuario.objects.filter(formador_ativo=True).order_by("first_name", "last_name"),
         label="Formador",
         required=True,
         widget=forms.Select(
@@ -270,7 +279,7 @@ class BloqueioAgendaForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Customizar a exibição do formador para mostrar apenas o nome
-        self.fields["formador"].label_from_instance = lambda obj: obj.nome
+        self.fields["formador"].label_from_instance = lambda obj: obj.nome_completo
 
 
 # -------- AUTENTICAÇÃO CUSTOMIZADA (CPF + SENHA SIMPLES) --------
@@ -402,15 +411,22 @@ class CPFUserCreationForm(UserCreationForm):
 # -------- GESTÃO ADMINISTRATIVA --------
 
 class FormadorForm(forms.ModelForm):
-    """Formulário para gestão de formadores"""
-    
+    """
+    Formulário para gestão de formadores - FONTE ÚNICA Usuario
+    Convertido para usar Usuario ao invés de Formador separado
+    """
+
     class Meta:
-        model = Formador
-        fields = ['nome', 'email', 'area_atuacao', 'ativo', 'usuario']
+        model = Usuario
+        fields = ['first_name', 'last_name', 'email', 'area_atuacao', 'formador_ativo', 'municipio', 'setor']
         widgets = {
-            'nome': forms.TextInput(attrs={
+            'first_name': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Nome completo do formador'
+                'placeholder': 'Nome do formador'
+            }),
+            'last_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Sobrenome do formador'
             }),
             'email': forms.EmailInput(attrs={
                 'class': 'form-control',
@@ -419,37 +435,60 @@ class FormadorForm(forms.ModelForm):
             'area_atuacao': forms.Select(attrs={
                 'class': 'form-select'
             }),
-            'usuario': forms.Select(attrs={
+            'municipio': forms.Select(attrs={
                 'class': 'form-select'
             }),
-            'ativo': forms.CheckboxInput(attrs={
+            'setor': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'formador_ativo': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             })
         }
         labels = {
-            'nome': 'Nome do Formador',
+            'first_name': 'Nome',
+            'last_name': 'Sobrenome',
             'email': 'E-mail',
             'area_atuacao': 'Área de Atuação',
-            'usuario': 'Usuário do Sistema',
-            'ativo': 'Ativo'
+            'municipio': 'Município',
+            'setor': 'Setor',
+            'formador_ativo': 'Ativo como Formador'
         }
         help_texts = {
-            'nome': 'Nome completo do formador',
+            'first_name': 'Nome do formador',
+            'last_name': 'Sobrenome do formador',
             'email': 'E-mail único para contato e notificações',
             'area_atuacao': 'Grupo/área de atuação do formador',
-            'usuario': 'Usuário do sistema vinculado (opcional)',
-            'ativo': 'Desmarque para desativar o formador'
+            'municipio': 'Município de origem do formador',
+            'setor': 'Setor de vinculação',
+            'formador_ativo': 'Marque para ativar como formador'
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Customizar queryset para área de atuação
+        # Customizar querysets usando Services centralizados
         self.fields['area_atuacao'].queryset = Group.objects.all().order_by('name')
-        # Customizar queryset para usuário
-        self.fields['usuario'].queryset = Usuario.objects.filter(is_active=True).order_by('first_name', 'last_name')
+        self.fields['municipio'].queryset = Municipio.objects.filter(ativo=True).order_by('nome')
+        self.fields['setor'].queryset = Setor.objects.all().order_by('nome')
         # Tornar campos opcionais
         self.fields['area_atuacao'].required = False
-        self.fields['usuario'].required = False
+        self.fields['municipio'].required = False
+        self.fields['setor'].required = False
+
+    def save(self, commit=True):
+        usuario = super().save(commit=False)
+        # Garantir que o usuário seja adicionado ao grupo formador se formador_ativo=True
+        if commit:
+            usuario.save()
+            if usuario.formador_ativo:
+                formador_group, _ = Group.objects.get_or_create(name='formador')
+                usuario.groups.add(formador_group)
+            else:
+                # Remover do grupo se não for mais formador ativo
+                formador_group = Group.objects.filter(name='formador').first()
+                if formador_group:
+                    usuario.groups.remove(formador_group)
+        return usuario
 
 
 class MunicipioForm(forms.ModelForm):

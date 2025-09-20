@@ -52,6 +52,124 @@ class Setor(models.Model):
 # =========================
 # 1) USUÁRIO CUSTOMIZADO
 # =========================
+
+class UsuarioManager(models.Manager):
+    """
+    Manager customizado para Usuario - Single Source of Truth
+    Centraliza todas as queries para evitar duplicação e inconsistências
+    """
+
+    def get_queryset(self):
+        """QuerySet base otimizado com relacionamentos comuns"""
+        return super().get_queryset().select_related('setor', 'municipio')
+
+    def ativos(self):
+        """Usuários ativos no sistema"""
+        return self.filter(is_active=True)
+
+    def inativos(self):
+        """Usuários inativos no sistema"""
+        return self.filter(is_active=False)
+
+    # === FORMADORES ===
+    def formadores(self):
+        """Todos os formadores (fonte única de verdade)"""
+        return self.ativos().filter(
+            formador_ativo=True,
+            groups__name='formador'
+        ).distinct()
+
+    def formadores_por_area(self, area=None):
+        """Formadores filtrados por área de especialização"""
+        qs = self.formadores()
+        if area:
+            qs = qs.filter(area_especializacao=area)
+        return qs
+
+    def formadores_por_municipio(self, municipio=None):
+        """Formadores filtrados por município"""
+        qs = self.formadores()
+        if municipio:
+            qs = qs.filter(municipio=municipio)
+        return qs
+
+    # === COORDENADORES ===
+    def coordenadores(self):
+        """Todos os coordenadores"""
+        return self.ativos().filter(cargo='coordenador')
+
+    def coordenadores_superintendencia(self):
+        """Coordenadores vinculados à superintendência"""
+        return self.coordenadores().filter(
+            setor__vinculado_superintendencia=True
+        )
+
+    def coordenadores_outros_setores(self):
+        """Coordenadores de outros setores (não-superintendência)"""
+        return self.coordenadores().filter(
+            setor__vinculado_superintendencia=False
+        )
+
+    def coordenadores_por_vinculacao(self, superintendencia_only=None):
+        """
+        Coordenadores filtrados por vinculação organizacional
+
+        Args:
+            superintendencia_only (bool):
+                - True: apenas superintendência
+                - False: apenas outros setores
+                - None: todos os coordenadores
+        """
+        qs = self.coordenadores()
+
+        if superintendencia_only is True:
+            qs = qs.filter(setor__vinculado_superintendencia=True)
+        elif superintendencia_only is False:
+            qs = qs.filter(setor__vinculado_superintendencia=False)
+
+        return qs
+
+    # === GERENTES ===
+    def gerentes(self):
+        """Todos os gerentes"""
+        return self.ativos().filter(cargo='gerente')
+
+    def gerentes_superintendencia(self):
+        """Gerentes que podem aprovar solicitações"""
+        return self.gerentes().filter(
+            setor__vinculado_superintendencia=True
+        )
+
+    # === CONTROLE ===
+    def controle(self):
+        """Usuários do controle"""
+        return self.ativos().filter(cargo='controle')
+
+    # === QUERIES OTIMIZADAS PARA DASHBOARD ===
+    def formadores_dashboard(self):
+        """Formadores otimizados para dashboard com prefetch"""
+        return self.formadores().prefetch_related(
+            'groups',
+            'solicitacoes_como_formador'
+        )
+
+    def coordenadores_dashboard(self):
+        """Coordenadores otimizados para dashboard com prefetch"""
+        return self.coordenadores().prefetch_related(
+            'groups',
+            'solicitacoes_criadas'
+        )
+
+    # === QUERIES POR SETOR ===
+    def por_setor(self, setor):
+        """Usuários filtrados por setor"""
+        return self.ativos().filter(setor=setor)
+
+    def por_cargo(self, cargo):
+        """Usuários filtrados por cargo"""
+        return self.ativos().filter(cargo=cargo)
+
+
 class Usuario(AbstractUser):
     """
     User model using Django Groups for role-based permissions
@@ -118,6 +236,61 @@ class Usuario(AbstractUser):
         help_text="Cargo/função do usuário na organização",
     )
 
+    # Campos específicos para formadores (migrados do modelo Formador)
+    AREA_ESPECIALIZACAO_CHOICES = [
+        ("alfabetizacao", "Alfabetização"),
+        ("matematica", "Matemática"),
+        ("linguagem", "Linguagem e Portugês"),
+        ("ciencias", "Ciências"),
+        ("educacao_infantil", "Educação Infantil"),
+        ("gestao_escolar", "Gestão Escolar"),
+        ("tecnologia_educacional", "Tecnologia Educacional"),
+        ("outros", "Outros"),
+    ]
+
+    area_especializacao = models.CharField(
+        max_length=30,
+        choices=AREA_ESPECIALIZACAO_CHOICES,
+        blank=True,
+        verbose_name="Área de Especialização",
+        help_text="Área principal de especialização do formador",
+    )
+
+    anos_experiencia = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Anos de Experiência",
+        help_text="Anos de experiência como formador",
+    )
+
+    observacoes_formador = models.TextField(
+        blank=True,
+        verbose_name="Observações do Formador",
+        help_text="Informações adicionais sobre competências, certificações, etc.",
+    )
+
+    # Campo para compatibilidade durante migração
+    formador_ativo = models.BooleanField(
+        default=False,
+        verbose_name="É Formador Ativo",
+        help_text="Indica se este usuário atua como formador",
+    )
+
+    # === CAMPOS MIGRADOS DO FORMADOR (CONSOLIDAÇÃO) ===
+    # Dados que antes estavam no modelo Formador separado
+    area_atuacao = models.ForeignKey(
+        Group,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        verbose_name="Área de Atuação (Group)",
+        help_text="Área de atuação como Group (compatibilidade com Formador)",
+        related_name="usuarios_area_atuacao"
+    )
+
+    # === MANAGER CUSTOMIZADO ===
+    objects = UsuarioManager()
+
     class Meta:
         verbose_name = "Usuário"
         verbose_name_plural = "Usuários"
@@ -175,6 +348,144 @@ class Usuario(AbstractUser):
     def can_create_requests(self):
         """Verifica se pode criar solicitações (coordenador ou apoio)"""
         return self.cargo in ["coordenador", "apoio_coordenacao"]
+
+    # ===== MÉTODOS DE DIFERENCIAÇÃO DE COORDENADORES =====
+
+    def is_coordenador(self):
+        """Verifica se o usuário é coordenador"""
+        return self.cargo == "coordenador"
+
+    def is_coordenador_superintendencia(self):
+        """Verifica se é coordenador vinculado à superintendência"""
+        return (
+            self.cargo == "coordenador"
+            and self.setor
+            and self.setor.vinculado_superintendencia
+        )
+
+    def is_coordenador_outros_setores(self):
+        """Verifica se é coordenador de outros setores (não-superintendência)"""
+        return (
+            self.cargo == "coordenador"
+            and self.setor
+            and not self.setor.vinculado_superintendencia
+        )
+
+    @classmethod
+    def get_coordenadores_superintendencia(cls):
+        """Retorna coordenadores vinculados à superintendência"""
+        return cls.objects.filter(
+            cargo="coordenador",
+            setor__vinculado_superintendencia=True,
+            is_active=True
+        ).select_related('setor')
+
+    @classmethod
+    def get_coordenadores_outros_setores(cls):
+        """Retorna coordenadores de outros setores (não-superintendência)"""
+        return cls.objects.filter(
+            cargo="coordenador",
+            setor__vinculado_superintendencia=False,
+            is_active=True
+        ).select_related('setor')
+
+    @classmethod
+    def get_coordenadores_por_vinculacao(cls, superintendencia_only=None):
+        """
+        Retorna coordenadores filtrados por vinculação à superintendência
+
+        Args:
+            superintendencia_only (bool):
+                - True: apenas superintendência
+                - False: apenas outros setores
+                - None: todos os coordenadores
+        """
+        queryset = cls.objects.filter(
+            cargo="coordenador",
+            is_active=True
+        ).select_related('setor')
+
+        if superintendencia_only is True:
+            queryset = queryset.filter(setor__vinculado_superintendencia=True)
+        elif superintendencia_only is False:
+            queryset = queryset.filter(setor__vinculado_superintendencia=False)
+
+        return queryset
+
+    @property
+    def tipo_coordenador(self):
+        """Retorna o tipo de coordenador para exibição"""
+        if not self.is_coordenador():
+            return None
+
+        if self.is_coordenador_superintendencia():
+            return "Superintendência"
+        elif self.is_coordenador_outros_setores():
+            return f"Setor {self.setor.nome}"
+        else:
+            return "Sem setor definido"
+
+    # === MÉTODOS UNIFICADOS PARA FORMADORES ===
+    def is_formador(self):
+        """Verifica se o usuário é um formador ativo (fonte única de verdade)"""
+        return self.formador_ativo and self.groups.filter(name="formador").exists()
+
+    @property
+    def area_especializacao_display(self):
+        """Nome da área de especialização formatado"""
+        return dict(self.AREA_ESPECIALIZACAO_CHOICES).get(self.area_especializacao, self.area_especializacao)
+
+    @property
+    def area_atuacao_display(self):
+        """Nome da área de atuação (Group) formatado"""
+        return self.area_atuacao.name if self.area_atuacao else None
+
+    def get_disponibilidades(self):
+        """Retorna as disponibilidades/bloqueios do formador"""
+        if hasattr(self, 'disponibilidades'):
+            return self.disponibilidades.all()
+        return []
+
+    def get_solicitacoes_como_formador(self):
+        """Retorna solicitações onde este usuário é formador"""
+        if hasattr(self, 'solicitacoes_como_formador'):
+            return self.solicitacoes_como_formador.all()
+        return []
+
+    def get_eventos_realizados(self):
+        """Retorna eventos realizados pelo formador (query otimizada)"""
+        return self.get_solicitacoes_como_formador().filter(
+            status='Aprovado'
+        ).select_related('projeto', 'municipio', 'tipo_evento')
+
+    def get_eventos_proximos(self):
+        """Retorna próximos eventos do formador"""
+        from django.utils import timezone
+        return self.get_solicitacoes_como_formador().filter(
+            status='Aprovado',
+            data_inicio__gte=timezone.now()
+        ).select_related('projeto', 'municipio', 'tipo_evento')
+
+    # === COMPATIBILIDADE COM MODELO FORMADOR ===
+    @property
+    def nome_formador(self):
+        """Nome para compatibilidade com modelo Formador"""
+        return self.nome_completo
+
+    @property
+    def email_formador(self):
+        """Email para compatibilidade com modelo Formador"""
+        return self.email
+
+    @property
+    def user_groups(self):
+        """Return user groups (compatibilidade com Formador)"""
+        return self.groups.all()
+
+    @property
+    def has_formador_role(self):
+        """Check if user has formador role (compatibilidade com Formador)"""
+        return self.groups.filter(name="formador").exists()
 
 
 # =========================
@@ -372,8 +683,12 @@ class Solicitacao(models.Model):
     justificativa_rejeicao = models.TextField(blank=True, null=True)
 
     # M2M por through
+    # Alterado para Usuario através do modelo intermediário atualizado
     formadores = models.ManyToManyField(
-        "Formador", through="FormadoresSolicitacao", related_name="solicitacoes"
+        settings.AUTH_USER_MODEL,
+        through="FormadoresSolicitacao",
+        related_name="solicitacoes_como_formador",
+        limit_choices_to={'formador_ativo': True}
     )
 
     class Meta:
@@ -441,15 +756,26 @@ class Solicitacao(models.Model):
 
 class FormadoresSolicitacao(models.Model):
     solicitacao = models.ForeignKey(Solicitacao, on_delete=models.CASCADE)
-    formador = models.ForeignKey(Formador, on_delete=models.PROTECT)
+    # Alterado para Usuario com filtro por grupo formador
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        limit_choices_to={'formador_ativo': True},
+        verbose_name="Formador"
+    )
 
     class Meta:
-        unique_together = [("solicitacao", "formador")]
+        unique_together = [("solicitacao", "usuario")]
         verbose_name = "Formador da Solicitação"
         verbose_name_plural = "Formadores da Solicitação"
 
     def __str__(self):
-        return f"{self.formador} em {self.solicitacao}"
+        return f"{self.usuario.nome_completo} em {self.solicitacao}"
+
+    @property
+    def formador(self):
+        """Propriedade para compatibilidade - retorna o usuário"""
+        return self.usuario
 
 
 class AprovacaoStatus(models.TextChoices):
@@ -526,8 +852,15 @@ class EventoGoogleCalendar(models.Model):
 
 class DisponibilidadeFormadores(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    formador = models.ForeignKey(
-        Formador, on_delete=models.CASCADE, related_name="disponibilidades"
+    # Alterado para Usuario
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="disponibilidades",
+        limit_choices_to={'formador_ativo': True},
+        verbose_name="Formador",
+        null=True,  # Temporário para migração
+        blank=True
     )
     data_bloqueio = models.DateField()
     hora_inicio = models.TimeField()
@@ -538,21 +871,26 @@ class DisponibilidadeFormadores(models.Model):
     class Meta:
         verbose_name = "Disponibilidade de Formador"
         verbose_name_plural = "Disponibilidades de Formadores"
-        ordering = ["formador", "data_bloqueio", "hora_inicio"]
+        ordering = ["usuario", "data_bloqueio", "hora_inicio"]
         constraints = [
             models.CheckConstraint(
                 check=models.Q(hora_fim__gt=models.F("hora_inicio")),
                 name="hora_fim_maior_que_inicio",
             ),
             models.UniqueConstraint(
-                fields=["formador", "data_bloqueio", "hora_inicio", "hora_fim"],
-                name="uniq_formador_intervalo",
+                fields=["usuario", "data_bloqueio", "hora_inicio", "hora_fim"],
+                name="uniq_usuario_intervalo",
             ),
         ]
 
+    @property
+    def formador(self):
+        """Propriedade para compatibilidade - retorna o usuário"""
+        return self.usuario
+
     def __str__(self):
         return (
-            f"{self.formador} — {self.data_bloqueio} {self.hora_inicio}-{self.hora_fim}"
+            f"{self.usuario.nome_completo} — {self.data_bloqueio} {self.hora_inicio}-{self.hora_fim}"
         )
 
 

@@ -1,27 +1,18 @@
 """
 API views para verificação de disponibilidade em tempo real.
 SEMANA 3 - DIA 1: Interface de solicitação aprimorada
+ATUALIZADO: Usa Services centralizados e imports unificados
 """
 
-import json
-
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import Group
-from django.http import JsonResponse
-from django.utils import timezone
-from django.utils.dateparse import parse_datetime
-from django.utils.decorators import method_decorator
-from django.views import View
-from django.views.decorators.csrf import csrf_exempt
-
-from core.models import Formador, Municipio
+# IMPORT ÚNICO - Single Source of Truth
+from .base import *
 from core.services.availability_service import DisponibilidadeEngine
 from core.services.conflicts import check_conflicts
 
 
 @method_decorator(csrf_exempt, name="dispatch")
 @method_decorator(login_required, name="dispatch")
-class CheckAvailabilityAPI(View):
+class CheckAvailabilityAPI(BaseAPIView):
     """
     API endpoint para verificação em tempo real de disponibilidade dos formadores.
 
@@ -81,9 +72,11 @@ class CheckAvailabilityAPI(View):
                     }
                 )
 
-            # Buscar formadores e município
+            # Buscar formadores e município usando Services centralizados
             try:
-                formadores = Formador.objects.filter(id__in=formador_ids, ativo=True)
+                # Usar FormadorService - fonte única
+                formadores_qs = FormadorService.get_formadores_queryset().filter(id__in=formador_ids)
+                formadores = list(formadores_qs)
 
                 if len(formadores) != len(formador_ids):
                     return JsonResponse(
@@ -95,7 +88,12 @@ class CheckAvailabilityAPI(View):
 
                 municipio = None
                 if municipio_id:
-                    municipio = Municipio.objects.get(id=municipio_id)
+                    municipio = MunicipioService.ativos().filter(id=municipio_id).first()
+                    if not municipio:
+                        return JsonResponse({
+                            "success": False,
+                            "error": "Município não encontrado"
+                        })
 
             except Exception as e:
                 return JsonResponse(
@@ -123,21 +121,25 @@ class CheckAvailabilityAPI(View):
                 tipo_codigo = (
                     "T" if bloqueio.tipo_bloqueio.upper() in ["T", "TOTAL"] else "P"
                 )
+                # Nome do formador usando fonte única Usuario
+                formador_nome = getattr(bloqueio.formador, 'nome_completo', bloqueio.formador.nome if hasattr(bloqueio.formador, 'nome') else str(bloqueio.formador))
                 conflict_details.append(
                     {
                         "type": "bloqueio",
                         "code": tipo_codigo,
-                        "formador": bloqueio.formador.nome,
-                        "message": f"[{tipo_codigo}] {bloqueio.formador.nome} bloqueado em {bloqueio.data_bloqueio.strftime('%d/%m')} {bloqueio.hora_inicio.strftime('%H:%M')}-{bloqueio.hora_fim.strftime('%H:%M')}",
+                        "formador": formador_nome,
+                        "message": f"[{tipo_codigo}] {formador_nome} bloqueado em {bloqueio.data_bloqueio.strftime('%d/%m')} {bloqueio.hora_inicio.strftime('%H:%M')}-{bloqueio.hora_fim.strftime('%H:%M')}",
                         "severity": "error",
                     }
                 )
 
             # Eventos confirmados (E)
             for solicitacao in conflitos.get("solicitacoes", []):
-                formadores_nomes = ", ".join(
-                    [f.nome for f in solicitacao.formadores.all()]
-                )
+                # Usar fonte única Usuario para nomes dos formadores
+                formadores_nomes = ", ".join([
+                    getattr(f, 'nome_completo', f.nome if hasattr(f, 'nome') else str(f))
+                    for f in solicitacao.formadores.all()
+                ])
                 conflict_details.append(
                     {
                         "type": "evento",
@@ -168,12 +170,13 @@ class CheckAvailabilityAPI(View):
                 data_formatada = cap["data"].strftime("%d/%m")
                 total_horas = cap["total_com_novo"]
                 limite = cap["limite_diario"]
+                formador_nome = getattr(formador, 'nome_completo', formador.nome if hasattr(formador, 'nome') else str(formador))
                 conflict_details.append(
                     {
                         "type": "capacidade",
                         "code": "M",
-                        "formador": formador.nome,
-                        "message": f"[M] {formador.nome} em {data_formatada}: capacidade diária excedida ({total_horas:.1f}h/{limite}h)",
+                        "formador": formador_nome,
+                        "message": f"[M] {formador_nome} em {data_formatada}: capacidade diária excedida ({total_horas:.1f}h/{limite}h)",
                         "severity": "warning",
                     }
                 )
@@ -184,7 +187,10 @@ class CheckAvailabilityAPI(View):
                     "success": True,
                     "available": not has_conflicts,
                     "conflicts": conflict_details,
-                    "formadores_verificados": [f.nome for f in formadores],
+                    "formadores_verificados": [
+                        getattr(f, 'nome_completo', f.nome if hasattr(f, 'nome') else str(f))
+                        for f in formadores
+                    ],
                     "periodo": f"{data_inicio.strftime('%d/%m/%Y %H:%M')} - {data_fim.strftime('%d/%m/%Y %H:%M')}",
                     "municipio": municipio.nome if municipio else "Não informado",
                 }
@@ -197,7 +203,7 @@ class CheckAvailabilityAPI(View):
 
 
 @method_decorator(login_required, name="dispatch")
-class FormadorDetailsAPI(View):
+class FormadorDetailsAPI(BaseAPIView):
     """
     API para obter detalhes de formadores selecionados.
     Usado para exibir informações contextuais na interface.
@@ -212,11 +218,22 @@ class FormadorDetailsAPI(View):
             )
 
         try:
-            formadores = Formador.objects.filter(
-                id__in=formador_ids, ativo=True
-            ).values("id", "nome", "email", "ativo")
+            # Usar FormadorService - fonte única
+            formadores = FormadorService.get_formadores_queryset().filter(
+                id__in=formador_ids
+            ).values("id", "first_name", "last_name", "email", "formador_ativo")
 
-            return JsonResponse({"success": True, "formadores": list(formadores)})
+            # Adaptar para formato esperado
+            formadores_data = []
+            for f in formadores:
+                formadores_data.append({
+                    "id": f["id"],
+                    "nome": f"{f['first_name']} {f['last_name']}".strip(),
+                    "email": f["email"],
+                    "ativo": f["formador_ativo"]
+                })
+
+            return JsonResponse({"success": True, "formadores": formadores_data})
 
         except Exception as e:
             return JsonResponse(
@@ -225,7 +242,7 @@ class FormadorDetailsAPI(View):
 
 
 @method_decorator(login_required, name="dispatch")
-class FormadoresSuperintendenciaAPI(View):
+class FormadoresSuperintendenciaAPI(BaseAPIView):
     """
     API para obter lista de formadores vinculados à superintendência.
     Usado no dropdown da interface de disponibilidade.
@@ -238,25 +255,24 @@ class FormadoresSuperintendenciaAPI(View):
                 grupo_super = Group.objects.get(name="superintendencia")
             except Group.DoesNotExist:
                 return JsonResponse({
-                    "success": False, 
+                    "success": False,
                     "error": "Grupo superintendência não encontrado"
                 })
 
-            # Buscar formadores vinculados ao grupo superintendencia via usuario
-            formadores = Formador.objects.filter(
-                usuario__groups=grupo_super,
-                ativo=True
-            ).select_related('usuario').order_by('nome')
+            # Usar FormadorService com filtro por grupo superintendência
+            formadores = FormadorService.get_formadores_queryset().filter(
+                groups=grupo_super
+            ).order_by('first_name', 'last_name')
 
-            # Preparar dados de resposta
+            # Preparar dados de resposta usando fonte única Usuario
             formadores_data = []
             for formador in formadores:
                 formadores_data.append({
                     "id": str(formador.id),
-                    "nome": formador.nome,
+                    "nome": formador.nome_completo,
                     "email": formador.email,
                     "area_atuacao": formador.area_atuacao.name if formador.area_atuacao else None,
-                    "usuario_ativo": formador.usuario.is_active if formador.usuario else False
+                    "usuario_ativo": formador.is_active
                 })
 
             return JsonResponse({

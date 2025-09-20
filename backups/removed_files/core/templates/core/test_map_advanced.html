@@ -1,0 +1,891 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa Brasil - Versão Avançada</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        /* Otimizações de performance para animações */
+        .state, .state-label {
+            will-change: transform;
+            transform: translateZ(0);
+            backface-visibility: hidden;
+        }
+        
+        .state {
+            transition: fill 0.3s ease;
+        }
+        
+        .state:hover {
+            fill-opacity: 0.8;
+        }
+        
+        .state.selected {
+            filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6));
+        }
+        
+        .state-label {
+            font-size: 20px !important;
+            font-weight: 900 !important;
+            fill: #000000 !important;
+            stroke: #ffffff !important;
+            stroke-width: 4px !important;
+            text-anchor: middle !important;
+            pointer-events: none !important;
+            opacity: 1 !important;
+            color: #000000 !important;
+        }
+        
+        .test-uf {
+            font-size: 24px !important;
+            font-weight: 900 !important;
+            fill: #ff0000 !important;
+            stroke: #ffffff !important;
+            stroke-width: 4px !important;
+            text-anchor: middle !important;
+            z-index: 9999 !important;
+            opacity: 1 !important;
+            color: #ff0000 !important;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .map-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .main-map {
+            flex: 1;
+            min-width: 600px;
+        }
+        .state-detail {
+            flex: 0 0 300px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .state-detail.hidden {
+            display: none;
+        }
+        #map {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f8f9fa;
+        }
+        .state {
+            fill: #e5e7eb;
+            stroke: #fff;
+            stroke-width: 1;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .state:hover {
+            fill: #3b82f6;
+            stroke-width: 2;
+            stroke: #1d4ed8;
+        }
+        .state.selected {
+            fill: #6ee7b7;
+            stroke: #10b981;
+            stroke-width: 2;
+        }
+        .state.with-projects {
+            fill: #10b981;
+        }
+        .state.with-projects:hover {
+            fill: #059669;
+        }
+        .state.with-projects.selected {
+            fill: #86efac;
+        }
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .tooltip.show {
+            opacity: 1;
+        }
+        .state-info {
+            margin-bottom: 15px;
+        }
+        .state-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+        .state-uf {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .municipality-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .municipality-item {
+            padding: 8px 12px;
+            margin: 2px 0;
+            background: white;
+            border-radius: 4px;
+            border-left: 3px solid #10b981;
+            font-size: 14px;
+        }
+        .municipality-item:hover {
+            background: #f0fdf4;
+        }
+        .legend {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .legend-color {
+            width: 20px;
+            height: 15px;
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+        .log-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-success { color: #28a745; }
+        .log-error { color: #dc3545; }
+        .log-warning { color: #ffc107; }
+        .log-info { color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Voltar ao Dashboard</a>
+        <h1>🗺️ Mapa Brasil - Versão Avançada</h1>
+        <p>Mapa interativo com dados de projetos por estado e município. Estados com projetos aparecem em verde.</p>
+        
+        <div class="map-container">
+            <div class="main-map">
+                <div id="map"></div>
+                
+                <div class="legend">
+                    <h4>Legenda:</h4>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #e5e7eb;"></div>
+                        <span>Estados sem projetos</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #10b981;"></div>
+                        <span>Estados com projetos</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ef4444;"></div>
+                        <span>Estado selecionado</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="state-detail hidden" id="stateDetail">
+                <h3>Detalhes do Estado</h3>
+                <div class="state-info">
+                    <div class="state-name" id="stateName">-</div>
+                    <div class="state-uf" id="stateUF">-</div>
+                </div>
+                <h4>Municípios com Projetos:</h4>
+                <div class="municipality-list" id="municipalityList">
+                    <p>Selecione um estado para ver os municípios</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="log-container">
+            <h3>📋 Log de Debug</h3>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <!-- Tooltip -->
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // Dados reais do banco de dados
+        let projectData = {};
+
+        // Função para log
+        function log(message, type = 'info') {
+            const logContainer = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(message);
+        }
+
+        // Variáveis globais
+        let svg, projection, path, states, tooltip;
+        let selectedState = null;
+        let originalProjection = null;
+        let estatisticas = {};
+        let eventSource = null;
+        let isRealtimeEnabled = false;
+        let isAnimating = false; // Flag para evitar animações simultâneas
+
+        // Carregar dados reais da API
+        async function loadProjectData() {
+            try {
+                log('🔄 Carregando dados reais do banco...');
+                
+                const response = await fetch('/api/mapa/dados/');
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                
+                projectData = await response.json();
+                log(`✅ Dados carregados: ${Object.keys(projectData).length} estados com projetos`, 'success');
+                
+                // Carregar estatísticas
+                const statsResponse = await fetch('/api/mapa/estatisticas/');
+                if (statsResponse.ok) {
+                    estatisticas = await statsResponse.json();
+                    log(`📊 Estatísticas: ${estatisticas.municipios_com_projetos} municípios, ${estatisticas.total_solicitacoes} solicitações`, 'success');
+                }
+                
+                return true;
+            } catch (error) {
+                log(`⚠️ Erro ao carregar dados: ${error.message}. Usando dados simulados.`, 'warning');
+                // Usar dados simulados como fallback
+                projectData = {
+                    'Ceará': {
+                        uf: 'CE',
+                        projects: 15,
+                        municipalities: [
+                            { name: 'Fortaleza', projects: 6 },
+                            { name: 'Caucaia', projects: 2 },
+                            { name: 'Juazeiro do Norte', projects: 2 }
+                        ]
+                    }
+                };
+                return true;
+            }
+        }
+
+        // Carregar e renderizar mapa
+        async function loadMap() {
+            try {
+                log('🔄 Carregando mapa avançado...');
+                
+                // Carregar dados primeiro
+                await loadProjectData();
+                
+                // Carregar arquivo GeoJSON real
+                const response = await fetch('{% static "brazil-real.geojson" %}');
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status} - ${response.statusText}`);
+                }
+                
+                log('✅ Arquivo GeoJSON carregado com sucesso', 'success');
+                
+                const geoData = await response.json();
+                log(`📊 GeoJSON parseado: ${geoData.type}`, 'success');
+                log(`🗺️ Features encontradas: ${geoData.features.length}`, 'success');
+                
+                // Configurar SVG
+                svg = d3.select('#map')
+                    .append('svg')
+                    .attr('width', '100%')
+                    .attr('height', '100%')
+                    .attr('viewBox', '0 0 1200 900');
+                
+                log('📐 SVG configurado', 'success');
+                
+                // Criar projeção Mercator manual (mais confiável)
+                log('🎯 Criando projeção Mercator manual...');
+                
+                projection = d3.geoMercator()
+                    .scale(1200)
+                    .center([-54, -14])
+                    .translate([500, 400]);
+                
+                // Salvar projeção original para zoom
+                originalProjection = {
+                    scale: projection.scale(),
+                    center: projection.center(),
+                    translate: projection.translate()
+                };
+                
+                log('✅ Projeção Mercator criada com sucesso', 'success');
+                
+                path = d3.geoPath().projection(projection);
+                
+                // Configurar tooltip
+                tooltip = d3.select('#tooltip');
+                
+                log('✅ Path generator criado com projeção Mercator', 'success');
+                
+                // Renderizar estados com otimizações
+                states = svg.selectAll('path.state')
+                    .data(geoData.features)
+                    .enter()
+                    .append('path')
+                    .attr('class', function(d) {
+                        const stateName = d.properties.name || d.properties.NAME || 'Estado';
+                        const hasProjects = projectData[stateName];
+                        return hasProjects ? 'state with-projects' : 'state';
+                    })
+                    .attr('d', function(d) {
+                        try {
+                            const pathData = path(d);
+                            if (!pathData || pathData.includes('NaN')) {
+                                log(`⚠️ Path inválido para ${d.properties.name || 'Estado'}: ${pathData}`, 'error');
+                                return null;
+                            }
+                            return pathData;
+                        } catch (error) {
+                            log(`❌ Erro ao gerar path para ${d.properties.name || 'Estado'}: ${error.message}`, 'error');
+                            return null;
+                        }
+                    })
+                    .on('mouseover', function(event, d) {
+                        const stateName = d.properties.name || d.properties.NAME || 'Estado';
+                        const stateData = projectData[stateName];
+                        
+                        tooltip
+                            .html(`
+                                <strong>${stateName}</strong><br/>
+                                ${stateData ? `${stateData.projects} projetos` : 'Sem projetos'}
+                            `)
+                            .style('left', (event.pageX + 10) + 'px')
+                            .style('top', (event.pageY - 10) + 'px')
+                            .classed('show', true);
+                    })
+                    .on('mouseout', function() {
+                        tooltip.classed('show', false);
+                    })
+                    .on('click', function(event, d) {
+                        const stateName = d.properties.name || d.properties.NAME || 'Estado';
+                        selectState(stateName, d);
+                    });
+                
+                // Mapear nomes dos estados para UFs (definir fora das funções)
+                const ufMap = {
+                    'Acre': 'AC', 'Alagoas': 'AL', 'Amapá': 'AP', 'Amazonas': 'AM',
+                    'Bahia': 'BA', 'Ceará': 'CE', 'Distrito Federal': 'DF', 'Espírito Santo': 'ES',
+                    'Goiás': 'GO', 'Maranhão': 'MA', 'Mato Grosso': 'MT', 'Mato Grosso do Sul': 'MS',
+                    'Minas Gerais': 'MG', 'Pará': 'PA', 'Paraíba': 'PB', 'Paraná': 'PR',
+                    'Pernambuco': 'PE', 'Piauí': 'PI', 'Rio de Janeiro': 'RJ', 'Rio Grande do Norte': 'RN',
+                    'Rio Grande do Sul': 'RS', 'Rondônia': 'RO', 'Roraima': 'RR', 'Santa Catarina': 'SC',
+                    'São Paulo': 'SP', 'Sergipe': 'SE', 'Tocantins': 'TO'
+                };
+                
+                log(`🎨 ${states.size()} estados renderizados`, 'success');
+                
+                // UFs removidas conforme solicitado
+                log('🏷️ UFs removidas do mapa', 'info');
+                
+                // Logs de debug das UFs removidos
+                log('🔍 Logs de debug das UFs removidos', 'info');
+                
+                // TESTE CENTRO removido conforme solicitado
+                log('🧪 TESTE CENTRO removido do mapa', 'info');
+                log('🕐 Timestamp: ' + new Date().toISOString(), 'info');
+                
+                // UFs de debug removidas para evitar duplicação
+                log('🔵 UFs de debug removidas (estavam causando duplicação)', 'info');
+                
+                log('🎉 Mapa avançado renderizado com sucesso!', 'success');
+                
+            } catch (error) {
+                log(`❌ Erro ao carregar mapa: ${error.message}`, 'error');
+                console.error('Erro detalhado:', error);
+            }
+        }
+
+        // Função para selecionar estado
+        function selectState(stateName, stateData) {
+            log(`🖱️ Estado selecionado: ${stateName}`, 'success');
+            
+            // Remover seleção anterior
+            states.classed('selected', false);
+            
+            // Selecionar novo estado
+            states.filter(d => (d.properties.name || d.properties.NAME) === stateName)
+                .classed('selected', true);
+            
+            // Atualizar detalhes do estado
+            updateStateDetail(stateName);
+            
+            // Animação de zoom no estado
+            zoomToState(stateName, stateData);
+        }
+
+        // Função para atualizar detalhes do estado
+        function updateStateDetail(stateName) {
+            const stateData = projectData[stateName];
+            const stateDetail = document.getElementById('stateDetail');
+            const stateNameEl = document.getElementById('stateName');
+            const stateUFEl = document.getElementById('stateUF');
+            const municipalityList = document.getElementById('municipalityList');
+            
+            if (stateData) {
+                stateNameEl.textContent = stateName;
+                stateUFEl.textContent = stateData.uf;
+                
+                municipalityList.innerHTML = '';
+                
+                // Adicionar resumo do estado
+                const summaryItem = document.createElement('div');
+                summaryItem.className = 'municipality-item';
+                summaryItem.style.borderLeftColor = '#3b82f6';
+                summaryItem.innerHTML = `
+                    <strong>📊 Resumo do Estado</strong>
+                    <span style="float: right; color: #3b82f6; font-weight: bold;">
+                        ${stateData.projects} projeto${stateData.projects > 1 ? 's' : ''} • ${stateData.solicitacoes} solicitação${stateData.solicitacoes > 1 ? 'ões' : ''}
+                    </span>
+                `;
+                municipalityList.appendChild(summaryItem);
+                
+                // Adicionar municípios
+                if (stateData.municipalities && stateData.municipalities.length > 0) {
+                    stateData.municipalities.forEach(municipality => {
+                        const item = document.createElement('div');
+                        item.className = 'municipality-item';
+                        item.innerHTML = `
+                            <strong>${municipality.name}</strong>
+                            <span style="float: right; color: #10b981; font-weight: bold;">
+                                ${municipality.projects} projeto${municipality.projects > 1 ? 's' : ''} • ${municipality.solicitacoes} solicitação${municipality.solicitacoes > 1 ? 'ões' : ''}
+                            </span>
+                        `;
+                        municipalityList.appendChild(item);
+                    });
+                } else {
+                    const noDataItem = document.createElement('div');
+                    noDataItem.className = 'municipality-item';
+                    noDataItem.style.borderLeftColor = '#6b7280';
+                    noDataItem.innerHTML = '<em>Nenhum município específico encontrado</em>';
+                    municipalityList.appendChild(noDataItem);
+                }
+                
+                stateDetail.classList.remove('hidden');
+            } else {
+                stateNameEl.textContent = stateName;
+                stateUFEl.textContent = 'UF';
+                municipalityList.innerHTML = '<p>Nenhum projeto encontrado neste estado.</p>';
+                stateDetail.classList.remove('hidden');
+            }
+        }
+
+        // Função para zoom no estado
+        function zoomToState(stateName, stateData) {
+            if (!stateData || isAnimating) return;
+            
+            isAnimating = true;
+            
+            // Adicionar feedback visual
+            svg.style('cursor', 'wait');
+            
+            // Calcular centro do estado
+            const centroid = d3.geoCentroid(stateData);
+            const [centerX, centerY] = projection(centroid);
+            
+            // Criar nova projeção focada no estado (zoom moderado)
+            const newProjection = d3.geoMercator()
+                .scale(2000)  // Zoom moderado para melhor performance
+                .center(centroid)
+                .translate([500, 400]);  // Centro do novo viewBox
+            
+            // Criar novo path generator
+            const newPath = d3.geoPath().projection(newProjection);
+            
+            // Aplicar transição suave com easing aos estados
+            states.transition()
+                .duration(600)
+                .ease(d3.easeCubicInOut)
+                .attr('d', newPath);
+            
+            // Aplicar transição suave aos labels
+            svg.selectAll('text.state-label')
+                .transition()
+                .duration(600)
+                .ease(d3.easeCubicInOut)
+                .attr('transform', function(d) {
+                    const centroid = d3.geoCentroid(d);
+                    const [x, y] = newProjection(centroid);
+                    return `translate(${x}, ${y})`;
+                });
+            
+            log(`🔍 Zoom aplicado ao estado: ${stateName}`, 'success');
+            
+            // Liberar flag de animação após a transição
+            setTimeout(() => {
+                isAnimating = false;
+                svg.style('cursor', 'pointer');
+            }, 600);
+            
+            // Botão para voltar ao zoom original
+            setTimeout(() => {
+                addResetButton();
+            }, 800);
+        }
+
+        // Função para adicionar botão de reset
+        function addResetButton() {
+            // Remover botão anterior se existir
+            d3.select('#resetButton').remove();
+            
+            // Adicionar botão de reset
+            const resetButton = svg.append('g')
+                .attr('id', 'resetButton')
+                .style('cursor', 'pointer');
+            
+            resetButton.append('rect')
+                .attr('x', 20)
+                .attr('y', 20)
+                .attr('width', 140)
+                .attr('height', 40)
+                .attr('fill', '#007bff')
+                .attr('rx', 6);
+            
+            resetButton.append('text')
+                .attr('x', 90)
+                .attr('y', 42)
+                .attr('text-anchor', 'middle')
+                .attr('fill', 'white')
+                .attr('font-size', '14px')
+                .attr('font-weight', 'bold')
+                .text('Voltar ao Brasil');
+            
+            resetButton.on('click', resetZoom);
+        }
+
+        // Função para resetar zoom
+        function resetZoom() {
+            if (isAnimating) return;
+            
+            isAnimating = true;
+            svg.style('cursor', 'wait');
+            log('🔄 Resetando zoom para visualização completa', 'info');
+            
+            // Remover botão de reset
+            d3.select('#resetButton').remove();
+            
+            // Resetar projeção para a original
+            projection = d3.geoMercator()
+                .scale(originalProjection.scale)
+                .center(originalProjection.center)
+                .translate(originalProjection.translate);
+            
+            path = d3.geoPath().projection(projection);
+            
+            // Aplicar transição suave com easing aos estados
+            states.transition()
+                .duration(600)
+                .ease(d3.easeCubicInOut)
+                .attr('d', path);
+            
+            // Aplicar transição suave aos labels
+            svg.selectAll('text.state-label')
+                .transition()
+                .duration(600)
+                .ease(d3.easeCubicInOut)
+                .attr('transform', function(d) {
+                    const centroid = d3.geoCentroid(d);
+                    const [x, y] = projection(centroid);
+                    return `translate(${x}, ${y})`;
+                });
+            
+            // Remover seleção
+            states.classed('selected', false);
+            selectedState = null;
+            
+            // Esconder detalhes do estado
+            document.getElementById('stateDetail').classList.add('hidden');
+            
+            // Liberar flag de animação após a transição
+            setTimeout(() => {
+                isAnimating = false;
+                svg.style('cursor', 'pointer');
+            }, 600);
+        }
+
+        // Função para iniciar atualizações em tempo real
+        function startRealtimeUpdates() {
+            if (isRealtimeEnabled) return;
+            
+            log('🔄 Iniciando atualizações em tempo real...', 'info');
+            
+            eventSource = new EventSource('/api/mapa/realtime/');
+            
+            eventSource.onopen = function(event) {
+                log('✅ Conexão em tempo real estabelecida', 'success');
+                isRealtimeEnabled = true;
+                if (window.updateStatusIndicator) {
+                    window.updateStatusIndicator(true, 'Conectado');
+                }
+            };
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'mapa_update') {
+                        log(`🔄 ${data.message}`, 'info');
+                        handleMapaUpdate(data);
+                    } else if (data.type === 'error') {
+                        log(`❌ Erro: ${data.message}`, 'error');
+                    }
+                } catch (error) {
+                    log(`❌ Erro ao processar evento: ${error.message}`, 'error');
+                }
+            };
+            
+            eventSource.onerror = function(event) {
+                log('❌ Erro na conexão em tempo real', 'error');
+                isRealtimeEnabled = false;
+                if (window.updateStatusIndicator) {
+                    window.updateStatusIndicator(false, 'Desconectado');
+                }
+                
+                // Tentar reconectar após 5 segundos
+                setTimeout(() => {
+                    if (!isRealtimeEnabled) {
+                        log('🔄 Tentando reconectar...', 'info');
+                        startRealtimeUpdates();
+                    }
+                }, 5000);
+            };
+        }
+        
+        // Função para parar atualizações em tempo real
+        function stopRealtimeUpdates() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                isRealtimeEnabled = false;
+                log('⏹️ Atualizações em tempo real paradas', 'info');
+            }
+        }
+        
+        // Função para lidar com atualizações do mapa
+        async function handleMapaUpdate(data) {
+            try {
+                log(`🔄 Atualizando mapa: ${data.message}`, 'info');
+                
+                // Recarregar dados do mapa
+                await loadProjectData();
+                
+                // Atualizar cores dos estados afetados
+                if (data.estados_afetados && data.estados_afetados.length > 0) {
+                    updateStateColors(data.estados_afetados);
+                }
+                
+                // Mostrar notificação visual
+                showUpdateNotification(data);
+                
+            } catch (error) {
+                log(`❌ Erro ao atualizar mapa: ${error.message}`, 'error');
+            }
+        }
+        
+        // Função para atualizar cores dos estados
+        function updateStateColors(estadosAfetados) {
+            if (!states) return;
+            
+            states.each(function(d) {
+                const stateName = d.properties.name || d.properties.NAME || 'Estado';
+                const stateData = projectData[stateName];
+                
+                // Atualizar classe do estado
+                const element = d3.select(this);
+                element.attr('class', function() {
+                    if (stateData) {
+                        return 'state with-projects';
+                    } else {
+                        return 'state';
+                    }
+                });
+            });
+            
+            log(`🎨 Cores atualizadas para ${estadosAfetados.length} estado(s)`, 'success');
+        }
+        
+        // Função para mostrar notificação de atualização
+        function showUpdateNotification(data) {
+            // Criar notificação visual temporária
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #10b981;
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                font-weight: bold;
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span>🔄</span>
+                    <span>${data.message}</span>
+                </div>
+            `;
+            
+            // Adicionar CSS para animação
+            if (!document.getElementById('notification-styles')) {
+                const style = document.createElement('style');
+                style.id = 'notification-styles';
+                style.textContent = `
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes slideOut {
+                        from { transform: translateX(0); opacity: 1; }
+                        to { transform: translateX(100%); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            document.body.appendChild(notification);
+            
+            // Remover após 5 segundos
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 5000);
+        }
+        
+        // Função para verificar status de atualizações
+        async function checkUpdateStatus() {
+            try {
+                const response = await fetch('/api/mapa/status/');
+                const data = await response.json();
+                
+                if (data.success && data.tem_atualizacoes) {
+                    log(`📊 ${data.solicitacoes_recentes} solicitações recentes em ${data.estados_afetados.length} estado(s)`, 'info');
+                    
+                    // Se não estiver em tempo real, mostrar aviso
+                    if (!isRealtimeEnabled) {
+                        log('💡 Ative as atualizações em tempo real para ver mudanças automaticamente', 'info');
+                    }
+                }
+            } catch (error) {
+                log(`❌ Erro ao verificar status: ${error.message}`, 'error');
+            }
+        }
+        
+        // Adicionar indicador de status discreto
+        function addStatusIndicator() {
+            const statusContainer = document.createElement('div');
+            statusContainer.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(255, 255, 255, 0.9);
+                padding: 8px 12px;
+                border-radius: 20px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                z-index: 1000;
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                font-size: 12px;
+                color: #666;
+            `;
+            
+            const statusIndicator = document.createElement('div');
+            statusIndicator.style.cssText = `
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #ef4444;
+                transition: background-color 0.3s;
+            `;
+            
+            const statusText = document.createElement('span');
+            statusText.textContent = 'Conectando...';
+            
+            statusContainer.appendChild(statusIndicator);
+            statusContainer.appendChild(statusText);
+            document.body.appendChild(statusContainer);
+            
+            // Atualizar status quando conexão mudar
+            window.updateStatusIndicator = function(connected, message) {
+                statusIndicator.style.background = connected ? '#10b981' : '#ef4444';
+                statusText.textContent = message || (connected ? 'Conectado' : 'Desconectado');
+            };
+        }
+
+        // Iniciar quando a página carregar
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMap().then(() => {
+                addStatusIndicator();
+                checkUpdateStatus();
+                // Iniciar tempo real automaticamente
+                startRealtimeUpdates();
+            });
+        });
+        
+        // Limpar recursos quando a página for fechada
+        window.addEventListener('beforeunload', function() {
+            stopRealtimeUpdates();
+        });
+    </script>
+</body>
+</html>

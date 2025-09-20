@@ -1,0 +1,500 @@
+{
+  "Rondonópolis - MT - MT": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Rondonópolis - MT",
+    "total_solicitacoes": 110,
+    "coordenadores_disponiveis": 0
+  },
+  "Maracanaú - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Maracanaú - CE",
+    "total_solicitacoes": 84,
+    "coordenadores_disponiveis": 0
+  },
+  "Petrolina - PE - PE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Petrolina - PE",
+    "total_solicitacoes": 82,
+    "coordenadores_disponiveis": 0
+  },
+  "Araguari - MG - MG": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Araguari - MG",
+    "total_solicitacoes": 80,
+    "coordenadores_disponiveis": 0
+  },
+  "Uiraúna - PB - PB": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Uiraúna - PB",
+    "total_solicitacoes": 80,
+    "coordenadores_disponiveis": 0
+  },
+  "Amigos do Bem - CE": {
+    "tipo": "coordenador_real",
+    "coordenador": "Maria Nadir - Marilene Lima - Mazuk Eeves",
+    "total_solicitacoes": 71,
+    "coordenadores_disponiveis": 9
+  },
+  "Lagoa Grande - PE - PE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Lagoa Grande - PE",
+    "total_solicitacoes": 58,
+    "coordenadores_disponiveis": 0
+  },
+  "Mirabela - MG - MG": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Mirabela - MG",
+    "total_solicitacoes": 49,
+    "coordenadores_disponiveis": 0
+  },
+  "Pereiro - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Pereiro - CE",
+    "total_solicitacoes": 47,
+    "coordenadores_disponiveis": 0
+  },
+  "Matias Cardoso - MG - MG": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Matias Cardoso - MG",
+    "total_solicitacoes": 46,
+    "coordenadores_disponiveis": 0
+  },
+  "Sobral - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Sobral - CE",
+    "total_solicitacoes": 45,
+    "coordenadores_disponiveis": 0
+  },
+  "Catolé do Rocha - PB - PB": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Catolé do Rocha - PB",
+    "total_solicitacoes": 44,
+    "coordenadores_disponiveis": 0
+  },
+  "Mucambo - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Mucambo - CE",
+    "total_solicitacoes": 42,
+    "coordenadores_disponiveis": 0
+  },
+  "Florestal - MG - MG": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Florestal - MG",
+    "total_solicitacoes": 41,
+    "coordenadores_disponiveis": 0
+  },
+  "Itaparica - BA - BA": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Itaparica - BA",
+    "total_solicitacoes": 38,
+    "coordenadores_disponiveis": 0
+  },
+  "Poço de José de Moura - PB - PB": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Poço de José de Moura - PB",
+    "total_solicitacoes": 35,
+    "coordenadores_disponiveis": 0
+  },
+  "Brejo do Cruz - PB - PB": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Brejo do Cruz - PB",
+    "total_solicitacoes": 33,
+    "coordenadores_disponiveis": 0
+  },
+  "Pomerode - SC - SC": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Pomerode - SC",
+    "total_solicitacoes": 32,
+    "coordenadores_disponiveis": 0
+  },
+  "Araranguá - SC - SC": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Araranguá - SC",
+    "total_solicitacoes": 32,
+    "coordenadores_disponiveis": 0
+  },
+  "Antônio Gonçalves - BA - BA": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Antônio Gonçalves - BA",
+    "total_solicitacoes": 32,
+    "coordenadores_disponiveis": 0
+  },
+  "Craíbas - AL - AL": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Craíbas - AL",
+    "total_solicitacoes": 30,
+    "coordenadores_disponiveis": 0
+  },
+  "Curvelo - MG - MG": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Curvelo - MG",
+    "total_solicitacoes": 30,
+    "coordenadores_disponiveis": 0
+  },
+  "Canarana - BA - BA": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Canarana - BA",
+    "total_solicitacoes": 29,
+    "coordenadores_disponiveis": 0
+  },
+  "Fortim - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Fortim - CE",
+    "total_solicitacoes": 28,
+    "coordenadores_disponiveis": 0
+  },
+  "Pacujá - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Pacujá - CE",
+    "total_solicitacoes": 28,
+    "coordenadores_disponiveis": 0
+  },
+  "Macuco - RJ - RJ": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Macuco - RJ",
+    "total_solicitacoes": 26,
+    "coordenadores_disponiveis": 0
+  },
+  "Iracema - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Iracema - CE",
+    "total_solicitacoes": 25,
+    "coordenadores_disponiveis": 0
+  },
+  "Dias d'Avila - BA - BA": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Dias d'Avila - BA",
+    "total_solicitacoes": 25,
+    "coordenadores_disponiveis": 0
+  },
+  "Maranguape - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Maranguape - CE",
+    "total_solicitacoes": 25,
+    "coordenadores_disponiveis": 0
+  },
+  "Atibaia - SP - SP": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Atibaia - SP",
+    "total_solicitacoes": 25,
+    "coordenadores_disponiveis": 0
+  },
+  "Barreira - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Barreira - CE",
+    "total_solicitacoes": 25,
+    "coordenadores_disponiveis": 0
+  },
+  "Campo Largo - PR - PR": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Campo Largo - PR",
+    "total_solicitacoes": 24,
+    "coordenadores_disponiveis": 0
+  },
+  "Bocaiúva do Sul - PR - PR": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Bocaiúva do Sul - PR",
+    "total_solicitacoes": 22,
+    "coordenadores_disponiveis": 0
+  },
+  "Capivari - SP - SP": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Capivari - SP",
+    "total_solicitacoes": 22,
+    "coordenadores_disponiveis": 0
+  },
+  "Centenário do Sul - PR - PR": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Centenário do Sul - PR",
+    "total_solicitacoes": 21,
+    "coordenadores_disponiveis": 0
+  },
+  "Russas - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Russas - CE",
+    "total_solicitacoes": 21,
+    "coordenadores_disponiveis": 0
+  },
+  "Chorozinho - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Chorozinho - CE",
+    "total_solicitacoes": 20,
+    "coordenadores_disponiveis": 0
+  },
+  "Campo Alegre - AL - AL": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Campo Alegre - AL",
+    "total_solicitacoes": 20,
+    "coordenadores_disponiveis": 0
+  },
+  "São João da Ponte - MG - MG": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador São João da Ponte - MG",
+    "total_solicitacoes": 20,
+    "coordenadores_disponiveis": 0
+  },
+  "Indaial - SC - SC": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Indaial - SC",
+    "total_solicitacoes": 20,
+    "coordenadores_disponiveis": 0
+  },
+  "São Desidério - BA - BA": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador São Desidério - BA",
+    "total_solicitacoes": 19,
+    "coordenadores_disponiveis": 0
+  },
+  "Santo Inácio - PR - PR": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Santo Inácio - PR",
+    "total_solicitacoes": 18,
+    "coordenadores_disponiveis": 0
+  },
+  "Itaquiraí - MS - MS": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Itaquiraí - MS",
+    "total_solicitacoes": 18,
+    "coordenadores_disponiveis": 0
+  },
+  "Santana do Ipanema - AL - AL": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Santana do Ipanema - AL",
+    "total_solicitacoes": 16,
+    "coordenadores_disponiveis": 0
+  },
+  "Criciúma - SC - SC": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Criciúma - SC",
+    "total_solicitacoes": 16,
+    "coordenadores_disponiveis": 0
+  },
+  "Tarrafas - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Tarrafas - CE",
+    "total_solicitacoes": 16,
+    "coordenadores_disponiveis": 0
+  },
+  "Teotônio Vilela - AL - AL": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Teotônio Vilela - AL",
+    "total_solicitacoes": 16,
+    "coordenadores_disponiveis": 0
+  },
+  "Filadélfia - BA - BA": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Filadélfia - BA",
+    "total_solicitacoes": 15,
+    "coordenadores_disponiveis": 0
+  },
+  "Santa Quitéria - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Santa Quitéria - CE",
+    "total_solicitacoes": 14,
+    "coordenadores_disponiveis": 0
+  },
+  "São Sebastião da Amoreira - PR - PR": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador São Sebastião da Amoreira - PR",
+    "total_solicitacoes": 13,
+    "coordenadores_disponiveis": 0
+  },
+  "Murici - AL - AL": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Murici - AL",
+    "total_solicitacoes": 13,
+    "coordenadores_disponiveis": 0
+  },
+  "Ibaretama - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Ibaretama - CE",
+    "total_solicitacoes": 13,
+    "coordenadores_disponiveis": 0
+  },
+  "Serra do Salitre - MG - MG": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Serra do Salitre - MG",
+    "total_solicitacoes": 13,
+    "coordenadores_disponiveis": 0
+  },
+  "São Fidélis - RJ - RJ": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador São Fidélis - RJ",
+    "total_solicitacoes": 13,
+    "coordenadores_disponiveis": 0
+  },
+  "Holambra - SP - SP": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Holambra - SP",
+    "total_solicitacoes": 12,
+    "coordenadores_disponiveis": 0
+  },
+  "Mandaguari - PR - PR": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Mandaguari - PR",
+    "total_solicitacoes": 12,
+    "coordenadores_disponiveis": 0
+  },
+  "Balsa Nova - PR - PR": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Balsa Nova - PR",
+    "total_solicitacoes": 11,
+    "coordenadores_disponiveis": 0
+  },
+  "Balneário Rincão - SC - SC": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Balneário Rincão - SC",
+    "total_solicitacoes": 10,
+    "coordenadores_disponiveis": 0
+  },
+  "Cianorte - PR - PR": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Cianorte - PR",
+    "total_solicitacoes": 10,
+    "coordenadores_disponiveis": 0
+  },
+  "Ponta Grossa - PR - PR": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Ponta Grossa - PR",
+    "total_solicitacoes": 10,
+    "coordenadores_disponiveis": 0
+  },
+  "Tupã - SP - SP": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Tupã - SP",
+    "total_solicitacoes": 8,
+    "coordenadores_disponiveis": 0
+  },
+  "Itagi - BA - BA": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Itagi - BA",
+    "total_solicitacoes": 8,
+    "coordenadores_disponiveis": 0
+  },
+  "São Mateus do Sul - PR - PR": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador São Mateus do Sul - PR",
+    "total_solicitacoes": 8,
+    "coordenadores_disponiveis": 0
+  },
+  "Cabedelo - PB - PB": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Cabedelo - PB",
+    "total_solicitacoes": 8,
+    "coordenadores_disponiveis": 0
+  },
+  "Piên - PR - PR": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Piên - PR",
+    "total_solicitacoes": 8,
+    "coordenadores_disponiveis": 0
+  },
+  "Canavieiras - BA - BA": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Canavieiras - BA",
+    "total_solicitacoes": 7,
+    "coordenadores_disponiveis": 0
+  },
+  "Itapipoca - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Itapipoca - CE",
+    "total_solicitacoes": 6,
+    "coordenadores_disponiveis": 0
+  },
+  "Carandaí - MG - MG": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Carandaí - MG",
+    "total_solicitacoes": 6,
+    "coordenadores_disponiveis": 0
+  },
+  "Ereré - CE - CE": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Ereré - CE",
+    "total_solicitacoes": 4,
+    "coordenadores_disponiveis": 0
+  },
+  "Rio Paranaíba - MG - MG": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Rio Paranaíba - MG",
+    "total_solicitacoes": 4,
+    "coordenadores_disponiveis": 0
+  },
+  "São João do Rio do Peixe - PB - PB": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador São João do Rio do Peixe - PB",
+    "total_solicitacoes": 4,
+    "coordenadores_disponiveis": 0
+  },
+  "Sobral - CE": {
+    "tipo": "coordenador_real",
+    "coordenador": "Maria Nadir - Marilene Lima - Mazuk Eeves",
+    "total_solicitacoes": 3,
+    "coordenadores_disponiveis": 1
+  },
+  "São José do Calçado - ES - SC": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador São José do Calçado - ES",
+    "total_solicitacoes": 3,
+    "coordenadores_disponiveis": 0
+  },
+  "Maracanaú - CE": {
+    "tipo": "coordenador_real",
+    "coordenador": "Laís Aline - Lidiane Oliveira - Lívia Mara",
+    "total_solicitacoes": 2,
+    "coordenadores_disponiveis": 9
+  },
+  "Antônio Gonçalves - BA": {
+    "tipo": "coordenador_real",
+    "coordenador": "Gilcilene Pinheiro Machado",
+    "total_solicitacoes": 1,
+    "coordenadores_disponiveis": 1
+  },
+  "Murici - AL": {
+    "tipo": "coordenador_real",
+    "coordenador": "Vanessa Angélica - Viviane Aquino - Yuri Furtado",
+    "total_solicitacoes": 1,
+    "coordenadores_disponiveis": 1
+  },
+  "Itaparica - BA": {
+    "tipo": "coordenador_real",
+    "coordenador": "Valdemir Silva Santos",
+    "total_solicitacoes": 1,
+    "coordenadores_disponiveis": 4
+  },
+  "Iracema - CE": {
+    "tipo": "coordenador_real",
+    "coordenador": "Aurea Lucia Cruz dos Santos",
+    "total_solicitacoes": 1,
+    "coordenadores_disponiveis": 3
+  },
+  "Indianópolis - MG - MG": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Indianópolis - MG",
+    "total_solicitacoes": 1,
+    "coordenadores_disponiveis": 0
+  },
+  "Indianopolis - MG - MG": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Indianopolis - MG",
+    "total_solicitacoes": 1,
+    "coordenadores_disponiveis": 0
+  },
+  "Canavieiras - BA": {
+    "tipo": "coordenador_generico",
+    "coordenador": "Coordenador Canavieiras",
+    "total_solicitacoes": 1,
+    "coordenadores_disponiveis": 0
+  },
+  "Tarrafas - CE": {
+    "tipo": "coordenador_real",
+    "coordenador": "Valdemir Silva Santos",
+    "total_solicitacoes": 1,
+    "coordenadores_disponiveis": 1
+  },
+  "Petrolina - PE": {
+    "tipo": "coordenador_real",
+    "coordenador": "Valdemir Silva Santos",
+    "total_solicitacoes": 1,
+    "coordenadores_disponiveis": 4
+  }
+}

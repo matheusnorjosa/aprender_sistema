@@ -1,189 +1,193 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
 """
-Teste FINAL com Playwright - Dashboard Executivo - Credenciais corretas
+Script de teste final para validar dashboard após correções
+Testa todos os endpoints críticos do dashboard executivo
 """
 
 import os
+import sys
 import django
-import asyncio
-from playwright.async_api import async_playwright
+import requests
 from datetime import datetime
 
-# Configure Django
+# Setup Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 django.setup()
 
-async def test_dashboard():
-    print("TESTE FINAL - DASHBOARD EXECUTIVO COM CREDENCIAIS CORRETAS")
-    print("="*80)
-    
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False, slow_mo=500)
-        context = await browser.new_context(
-            viewport={'width': 1920, 'height': 1080}
-        )
-        page = await context.new_page()
-        page.set_default_timeout(15000)
-        
-        try:
-            print("\n1. FAZENDO LOGIN COM CPF CORRETO")
-            print("-" * 50)
-            
-            # Login
-            await page.goto("http://localhost:8000/login/")
-            await page.wait_for_selector('input[name="username"]')
-            
-            # Usar CPF como username
-            await page.fill('input[name="username"]', '04215498317')
-            await page.fill('input[name="password"]', 'admin123')
-            
-            print("Credenciais preenchidas: 04215498317 / admin123")
-            
-            # Submit
-            await page.press('input[name="password"]', 'Enter')
-            
-            # Aguardar redirecionamento
-            await page.wait_for_timeout(3000)
-            current_url = page.url
-            print(f"URL após login: {current_url}")
-            
-            # Ir para dashboard
-            print("\n2. ACESSANDO DASHBOARD")
-            await page.goto("http://localhost:8000/diretoria/dashboard/")
-            await page.wait_for_timeout(2000)
-            
-            current_url = page.url
-            print(f"URL dashboard: {current_url}")
-            
-            timestamp = datetime.now().strftime("%H%M%S")
-            
-            if "login" in current_url:
-                print("AINDA NA TELA DE LOGIN!")
-                await page.screenshot(path=f"login_problem_{timestamp}.png", full_page=True)
-            else:
-                print("SUCESSO! Acessou o dashboard!")
-                
-                # Screenshot inicial
-                await page.screenshot(path=f"dashboard_loading_{timestamp}.png", full_page=True)
-                
-                # Aguardar carregamento do dashboard
-                print("\n3. AGUARDANDO CARREGAMENTO DO DASHBOARD")
-                await page.wait_for_timeout(8000)  # 8 segundos para Chart.js tentar carregar
-                
-                # Screenshot final
-                await page.screenshot(path=f"dashboard_final_{timestamp}.png", full_page=True)
-                
-                # Análise completa
-                analysis = await page.evaluate("""
-                    () => {
-                        const results = {
-                            title: document.title,
-                            url: window.location.href,
-                            chartJsAvailable: typeof Chart !== 'undefined',
-                            chartJsVersion: typeof Chart !== 'undefined' ? (Chart.version || 'unknown') : null
-                        };
-                        
-                        // Contar elementos
-                        results.statCards = document.querySelectorAll('.stat-card').length;
-                        results.chartCards = document.querySelectorAll('.chart-card').length;
-                        
-                        // Gráficos Chart.js
-                        results.canvasElements = document.querySelectorAll('canvas').length;
-                        results.activeCharts = document.querySelectorAll('canvas.active').length;
-                        
-                        // Fallbacks
-                        results.fallbackElements = document.querySelectorAll('.chart-fallback').length;
-                        results.visibleFallbacks = document.querySelectorAll('.chart-fallback:not(.hidden)').length;
-                        
-                        // Status indicator
-                        const statusEl = document.getElementById('statusIndicator');
-                        results.statusText = statusEl ? statusEl.textContent : 'Não encontrado';
-                        results.statusVisible = statusEl ? !statusEl.style.display.includes('none') : false;
-                        
-                        // Total de displays funcionando
-                        results.totalDisplays = results.activeCharts + results.visibleFallbacks;
-                        
-                        // Verificar conteúdo dos cards de estatísticas
-                        const statNumbers = [];
-                        document.querySelectorAll('.stat-number').forEach(el => {
-                            statNumbers.push(el.textContent.trim());
-                        });
-                        results.statNumbers = statNumbers;
-                        
-                        // Verificar se há conteúdo nos fallbacks
-                        results.fallbacksWithContent = 0;
-                        document.querySelectorAll('.chart-fallback:not(.hidden)').forEach(fallback => {
-                            if (fallback.textContent.trim().length > 50) {
-                                results.fallbacksWithContent++;
-                            }
-                        });
-                        
-                        return results;
-                    }
-                """)
-                
-                print("\n" + "="*60)
-                print("ANALISE COMPLETA DO DASHBOARD")
-                print("="*60)
-                print(f"Titulo da pagina: {analysis['title']}")
-                print(f"URL: {analysis['url']}")
-                print(f"Chart.js disponivel: {analysis['chartJsAvailable']}")
-                if analysis['chartJsVersion']:
-                    print(f"Chart.js versao: {analysis['chartJsVersion']}")
-                
-                print(f"\nELEMENTOS DA INTERFACE:")
-                print(f"  Cards de estatisticas: {analysis['statCards']}/4")
-                print(f"  Cards de graficos: {analysis['chartCards']}/6")
-                print(f"  Numeros das estatisticas: {analysis['statNumbers']}")
-                
-                print(f"\nGRAFICOS CHART.JS:")
-                print(f"  Canvas elements: {analysis['canvasElements']}")
-                print(f"  Graficos ativos: {analysis['activeCharts']}/6")
-                
-                print(f"\nFALLBACKS VISUAIS:")
-                print(f"  Elementos fallback: {analysis['fallbackElements']}")
-                print(f"  Fallbacks visiveis: {analysis['visibleFallbacks']}/6")
-                print(f"  Fallbacks com conteudo: {analysis['fallbacksWithContent']}/6")
-                
-                print(f"\nSTATUS DO SISTEMA:")
-                print(f"  Indicador status: {analysis['statusText']}")
-                print(f"  Indicador visivel: {analysis['statusVisible']}")
-                print(f"  Total displays funcionando: {analysis['totalDisplays']}/6")
-                
-                # CONCLUSÃO
-                print("\n" + "="*60)
-                print("CONCLUSAO FINAL")
-                print("="*60)
-                
-                if analysis['activeCharts'] >= 6:
-                    print("SUCESSO COMPLETO! Todos os 6 graficos Chart.js estao funcionando!")
-                    print("Dashboard com graficos interativos totalmente funcional!")
-                elif analysis['activeCharts'] > 0:
-                    print(f"SUCESSO PARCIAL! {analysis['activeCharts']}/6 graficos Chart.js funcionando!")
-                    print(f"Restante com fallbacks: {analysis['visibleFallbacks']}/6")
-                elif analysis['visibleFallbacks'] >= 6:
-                    print("FUNCIONAL! Todos os 6 fallbacks visuais estao ativos!")
-                    print("Dashboard totalmente funcional com displays alternativos ricos!")
-                elif analysis['visibleFallbacks'] > 0:
-                    print(f"PARCIALMENTE FUNCIONAL! {analysis['visibleFallbacks']}/6 displays funcionando!")
-                elif analysis['statCards'] >= 4:
-                    print("BASICAMENTE FUNCIONAL! Estatisticas carregaram, mas graficos nao!")
-                else:
-                    print("PROBLEMA GRAVE! Dashboard nao carregou corretamente!")
-                
-                print(f"\nScreenshots gerados:")
-                print(f"- dashboard_loading_{timestamp}.png (carregando)")
-                print(f"- dashboard_final_{timestamp}.png (resultado final)")
-                
-        except Exception as e:
-            print(f"ERRO: {e}")
-            await page.screenshot(path="error_final.png", full_page=True)
-        
-        finally:
-            await browser.close()
-    
-    print("\nTESTE FINAL CONCLUIDO!")
+from django.test import Client
+from django.contrib.auth.models import User
+from core.models import Usuario
 
-if __name__ == "__main__":
-    asyncio.run(test_dashboard())
+def test_dashboard_endpoints():
+    """Testa todos os endpoints críticos do dashboard"""
+
+    print("🔍 INICIANDO TESTES DO DASHBOARD EXECUTIVO")
+    print("=" * 60)
+
+    # Setup cliente de teste
+    client = Client()
+
+    # Login como admin (assumindo que existe)
+    try:
+        admin_user = Usuario.objects.filter(is_superuser=True).first()
+        if not admin_user:
+            print("❌ ERRO: Nenhum usuário admin encontrado")
+            return False
+
+        client.force_login(admin_user)
+        print(f"✅ Login realizado como: {admin_user.username}")
+
+    except Exception as e:
+        print(f"❌ Erro no login: {e}")
+        return False
+
+    # Lista de endpoints para testar
+    endpoints = [
+        ('/diretoria/dashboard/', 'Dashboard Principal'),
+        ('/api/dashboard/stats/', 'API Stats'),
+        ('/api/dashboard/charts/?chart=monthly_evolution', 'API Charts - Monthly'),
+        ('/api/dashboard/charts/?chart=top_formadores', 'API Charts - Formadores'),
+        ('/api/dashboard/charts/?chart=distribuicao_setores', 'API Charts - Setores'),
+        ('/api/dashboard/charts/?chart=municipios_atendidos', 'API Charts - Municípios'),
+        ('/api/dashboard/charts/?chart=tipos_evento', 'API Charts - Tipos'),
+        ('/api/dashboard/charts/?chart=projetos_stats', 'API Charts - Projetos'),
+        ('/api/dashboard/cursos/', 'API Cursos'),
+        ('/api/dashboard/coordenadores/', 'API Coordenadores'),
+    ]
+
+    results = {}
+
+    for endpoint, description in endpoints:
+        try:
+            print(f"\n🧪 Testando: {description}")
+            print(f"   URL: {endpoint}")
+
+            response = client.get(endpoint)
+            status_code = response.status_code
+
+            if status_code == 200:
+                print(f"   ✅ Status: {status_code} OK")
+
+                # Para APIs JSON, verificar estrutura
+                if endpoint.startswith('/api/'):
+                    try:
+                        import json
+                        data = json.loads(response.content)
+
+                        if 'success' in data:
+                            print(f"   ✅ JSON válido com success: {data['success']}")
+                        elif 'data' in data:
+                            print(f"   ✅ JSON válido com data")
+                        else:
+                            print(f"   ⚠️  JSON válido mas estrutura inesperada")
+
+                    except json.JSONDecodeError:
+                        print(f"   ❌ Resposta não é JSON válido")
+
+                results[endpoint] = 'OK'
+
+            elif status_code == 500:
+                print(f"   ❌ Status: {status_code} ERRO INTERNO")
+                results[endpoint] = 'ERRO_500'
+
+            elif status_code == 404:
+                print(f"   ❌ Status: {status_code} NÃO ENCONTRADO")
+                results[endpoint] = 'ERRO_404'
+
+            else:
+                print(f"   ⚠️  Status: {status_code}")
+                results[endpoint] = f'STATUS_{status_code}'
+
+        except Exception as e:
+            print(f"   ❌ Exceção: {str(e)[:100]}...")
+            results[endpoint] = f'EXCEÇÃO: {str(e)[:50]}'
+
+    # Relatório final
+    print("\n" + "=" * 60)
+    print("📊 RELATÓRIO FINAL DOS TESTES")
+    print("=" * 60)
+
+    success_count = sum(1 for result in results.values() if result == 'OK')
+    total_count = len(results)
+
+    print(f"\n✅ Sucessos: {success_count}/{total_count}")
+    print(f"❌ Falhas: {total_count - success_count}/{total_count}")
+
+    if success_count == total_count:
+        print("\n🎉 TODOS OS TESTES PASSARAM! Dashboard funcionando corretamente.")
+        return True
+    else:
+        print(f"\n⚠️  {total_count - success_count} endpoints com problemas:")
+        for endpoint, result in results.items():
+            if result != 'OK':
+                print(f"   - {endpoint}: {result}")
+        return False
+
+def check_database_connectivity():
+    """Verifica conectividade com o banco"""
+    try:
+        from django.db import connection
+        cursor = connection.cursor()
+        cursor.execute("SELECT 1")
+        print("✅ Conectividade com banco PostgreSQL: OK")
+        return True
+    except Exception as e:
+        print(f"❌ Erro de conectividade: {e}")
+        return False
+
+def check_models_integrity():
+    """Verifica integridade dos modelos após unificação"""
+    try:
+        from core.models import Usuario, Solicitacao, FormadoresSolicitacao
+
+        print("\n🔍 Verificando integridade dos modelos...")
+
+        # Verificar contagens básicas
+        usuarios_count = Usuario.objects.count()
+        solicitacoes_count = Solicitacao.objects.count()
+        formadores_sol_count = FormadoresSolicitacao.objects.count()
+
+        print(f"   - Usuários: {usuarios_count}")
+        print(f"   - Solicitações: {solicitacoes_count}")
+        print(f"   - FormadoresSolicitacao: {formadores_sol_count}")
+
+        # Testar query com novo campo usuario
+        try:
+            test_query = FormadoresSolicitacao.objects.select_related('usuario').first()
+            if test_query and hasattr(test_query, 'usuario'):
+                print("   ✅ Campo 'usuario' acessível em FormadoresSolicitacao")
+            else:
+                print("   ❌ Campo 'usuario' não encontrado em FormadoresSolicitacao")
+                return False
+        except Exception as e:
+            print(f"   ❌ Erro ao acessar campo usuario: {e}")
+            return False
+
+        print("✅ Integridade dos modelos: OK")
+        return True
+
+    except Exception as e:
+        print(f"❌ Erro na verificação dos modelos: {e}")
+        return False
+
+if __name__ == '__main__':
+    print(f"🚀 Iniciando validação completa - {datetime.now().strftime('%H:%M:%S')}")
+
+    # Verificações preliminares
+    db_ok = check_database_connectivity()
+    models_ok = check_models_integrity()
+
+    if not (db_ok and models_ok):
+        print("\n❌ Falhas nas verificações preliminares. Abortando testes.")
+        sys.exit(1)
+
+    # Testes do dashboard
+    dashboard_ok = test_dashboard_endpoints()
+
+    if dashboard_ok:
+        print(f"\n🎉 VALIDAÇÃO COMPLETA FINALIZADA COM SUCESSO - {datetime.now().strftime('%H:%M:%S')}")
+        sys.exit(0)
+    else:
+        print(f"\n❌ VALIDAÇÃO FALHOU - {datetime.now().strftime('%H:%M:%S')}")
+        sys.exit(1)

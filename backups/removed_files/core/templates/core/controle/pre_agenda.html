@@ -1,0 +1,541 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Pré-Agenda - Sistema Aprender{% endblock %}
+
+{% block nav_controle_pre_agenda %}active{% endblock %}
+
+{% block head %}
+<style>
+  .card-stats {
+    border-left: 4px solid var(--bs-primary);
+  }
+  .btn-criar-evento {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    border: none;
+    color: white;
+  }
+  .btn-criar-evento:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+  }
+  .btn-remover-evento {
+    background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+    border: none;
+    color: white;
+  }
+  .evento-row:hover {
+    background-color: #f8f9fa;
+  }
+  .status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+  .loading {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2><i class="bi bi-calendar-plus me-2"></i>Pré-Agenda</h2>
+          <p class="text-muted">Eventos aprovados aguardando criação no Google Calendar</p>
+        </div>
+        <div>
+          <button class="btn btn-outline-primary" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise"></i> Atualizar
+          </button>
+        </div>
+      </div>
+
+      <!-- Cards de Estatísticas -->
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card card-stats">
+            <div class="card-body">
+              <div class="d-flex">
+                <div class="me-3">
+                  <i class="bi bi-clock-history text-primary fs-3"></i>
+                </div>
+                <div>
+                  <h5 class="card-title">{{ total_pre_agenda }}</h5>
+                  <p class="card-text text-muted">Total Pré-Agenda</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card card-stats">
+            <div class="card-body">
+              <div class="d-flex">
+                <div class="me-3">
+                  <i class="bi bi-calendar-day text-warning fs-3"></i>
+                </div>
+                <div>
+                  <h5 class="card-title">{{ eventos_hoje }}</h5>
+                  <p class="card-text text-muted">Eventos Hoje</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card card-stats">
+            <div class="card-body">
+              <div class="d-flex">
+                <div class="me-3">
+                  <i class="bi bi-calendar-week text-info fs-3"></i>
+                </div>
+                <div>
+                  <h5 class="card-title">{{ eventos_semana }}</h5>
+                  <p class="card-text text-muted">Esta Semana</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card card-stats">
+            <div class="card-body">
+              <div class="d-flex">
+                <div class="me-3">
+                  <i class="bi bi-check-circle text-success fs-3"></i>
+                </div>
+                <div>
+                  <h5 class="card-title">{{ eventos_sincronizados }}</h5>
+                  <p class="card-text text-muted">Sincronizados</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <i class="bi bi-funnel"></i> Filtros
+        </div>
+        <div class="card-body">
+          <form method="get" class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Projeto</label>
+              <select name="projeto" class="form-select">
+                <option value="">Todos os projetos</option>
+                {% for projeto in projetos_filter %}
+                <option value="{{ projeto.id }}" 
+                  {% if projeto_filter == projeto.id|stringformat:"s" %}selected{% endif %}>
+                  {{ projeto.nome }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Formador</label>
+              <select name="formador" class="form-select">
+                <option value="">Todos os formadores</option>
+                {% for formador in formadores_filter %}
+                <option value="{{ formador.id }}" 
+                  {% if formador_filter == formador.id|stringformat:"s" %}selected{% endif %}>
+                  {{ formador.nome }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Período</label>
+              <select name="periodo" class="form-select">
+                <option value="">Todos</option>
+                <option value="7" {% if periodo_filter == "7" %}selected{% endif %}>Últimos 7 dias</option>
+                <option value="30" {% if periodo_filter == "30" %}selected{% endif %}>Últimos 30 dias</option>
+                <option value="90" {% if periodo_filter == "90" %}selected{% endif %}>Últimos 3 meses</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary me-2">
+                <i class="bi bi-search"></i> Filtrar
+              </button>
+              <a href="{% url 'core:controle_pre_agenda' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-x-circle"></i> Limpar Filtros
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Lista de Eventos -->
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-list-ul"></i> Eventos em Pré-Agenda</span>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary">{{ eventos_pre_agenda|length }} evento{{ eventos_pre_agenda|length|pluralize }}</span>
+            {% if eventos_pre_agenda %}
+            <div class="btn-group">
+              <button class="btn btn-success btn-sm" onclick="criarTodosEventos()" id="btnCriarTodos" title="Criar todos os eventos no Google Calendar">
+                <i class="bi bi-calendar-plus-fill"></i> Criar Todos
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="criarEventosSelecionados()" id="btnCriarSelecionados" style="display: none;" title="Criar eventos selecionados">
+                <i class="bi bi-calendar-plus"></i> Criar Selecionados (<span id="countSelecionados">0</span>)
+              </button>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="card-body">
+          {% if eventos_pre_agenda %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                        <label class="form-check-label" for="selectAll">Selecionar</label>
+                      </div>
+                    </th>
+                    <th>Evento</th>
+                    <th>Data/Hora</th>
+                    <th>Formadores</th>
+                    <th>Projeto</th>
+                    <th>Solicitante</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for evento in eventos_pre_agenda %}
+                  <tr class="evento-row" id="evento-{{ evento.id }}">
+                    <td>
+                      <div class="form-check">
+                        <input class="form-check-input evento-checkbox" type="checkbox" value="{{ evento.id }}" id="evento-check-{{ evento.id }}" onchange="updateBulkButtons()">
+                        <label class="form-check-label" for="evento-check-{{ evento.id }}"></label>
+                      </div>
+                    </td>
+                    <td>
+                      <strong>{{ evento.titulo_evento }}</strong><br>
+                      <small class="text-muted">{{ evento.municipio.nome }}, {{ evento.municipio.uf }}</small>
+                    </td>
+                    <td>
+                      <strong>{{ evento.data_inicio|date:"d/m/Y" }}</strong><br>
+                      <small class="text-muted">{{ evento.data_inicio|time:"H:i" }} - {{ evento.data_fim|time:"H:i" }}</small>
+                    </td>
+                    <td>
+                      {% for formador in evento.formadores.all %}
+                        <span class="badge bg-secondary me-1">{{ formador.nome }}</span>
+                      {% endfor %}
+                    </td>
+                    <td>
+                      <span class="badge bg-info">{{ evento.projeto.nome }}</span>
+                    </td>
+                    <td>
+                      {{ evento.usuario_solicitante.first_name|default:evento.usuario_solicitante.username }}
+                    </td>
+                    <td>
+                      <span class="badge bg-warning status-badge">{{ evento.get_status_display }}</span>
+                    </td>
+                    <td>
+                      <div class="btn-group btn-group-sm">
+                        <button class="btn btn-criar-evento" 
+                                onclick="criarEventoGoogle('{{ evento.id }}', '{{ evento.titulo_evento|escapejs }}')"
+                                title="Criar no Google Calendar">
+                          <i class="bi bi-calendar-plus"></i>
+                        </button>
+                        <button class="btn btn-outline-info" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#modalDetalhes" 
+                                onclick="mostrarDetalhes('{{ evento.id }}')"
+                                title="Ver detalhes">
+                          <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-remover-evento" 
+                                onclick="removerEvento('{{ evento.id }}', '{{ evento.titulo_evento|escapejs }}')"
+                                title="Remover da pré-agenda">
+                          <i class="bi bi-x-lg"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Paginação -->
+            {% if is_paginated %}
+            <nav aria-label="Navegação da pré-agenda">
+              <ul class="pagination justify-content-center mt-4">
+                {% if page_obj.has_previous %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.projeto %}&projeto={{ request.GET.projeto }}{% endif %}{% if request.GET.formador %}&formador={{ request.GET.formador }}{% endif %}{% if request.GET.periodo %}&periodo={{ request.GET.periodo }}{% endif %}">
+                      Anterior
+                    </a>
+                  </li>
+                {% endif %}
+                <li class="page-item active">
+                  <span class="page-link">
+                    Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                  </span>
+                </li>
+                {% if page_obj.has_next %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.projeto %}&projeto={{ request.GET.projeto }}{% endif %}{% if request.GET.formador %}&formador={{ request.GET.formador }}{% endif %}{% if request.GET.periodo %}&periodo={{ request.GET.periodo }}{% endif %}">
+                      Próxima
+                    </a>
+                  </li>
+                {% endif %}
+              </ul>
+            </nav>
+            {% endif %}
+
+          {% else %}
+            <div class="text-center py-5">
+              <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+              <h4 class="text-muted mt-3">Nenhum evento em pré-agenda</h4>
+              <p class="text-muted">
+                {% if projeto_filter or formador_filter or periodo_filter %}
+                  Tente remover alguns filtros para ver mais eventos.
+                {% else %}
+                  Todos os eventos foram processados ou não há eventos aguardando criação.
+                {% endif %}
+              </p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Confirmação -->
+<div class="modal fade" id="modalConfirmacao" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirmar Ação</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="mensagemConfirmacao"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnConfirmarAcao">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript -->
+<script>
+// CSRF Token
+const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value || 
+                  document.querySelector('meta[name=csrf-token]').getAttribute('content');
+
+// Controle de seleção múltipla
+function toggleSelectAll() {
+  const selectAll = document.getElementById('selectAll');
+  const checkboxes = document.querySelectorAll('.evento-checkbox');
+  
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = selectAll.checked;
+  });
+  
+  updateBulkButtons();
+}
+
+// Atualizar botões de ação em lote
+function updateBulkButtons() {
+  const checkboxes = document.querySelectorAll('.evento-checkbox:checked');
+  const count = checkboxes.length;
+  
+  const btnCriarSelecionados = document.getElementById('btnCriarSelecionados');
+  const countSelecionados = document.getElementById('countSelecionados');
+  
+  if (count > 0) {
+    btnCriarSelecionados.style.display = 'block';
+    countSelecionados.textContent = count;
+  } else {
+    btnCriarSelecionados.style.display = 'none';
+  }
+  
+  // Atualizar checkbox "Selecionar Todos"
+  const totalCheckboxes = document.querySelectorAll('.evento-checkbox').length;
+  const selectAll = document.getElementById('selectAll');
+  
+  if (count === 0) {
+    selectAll.checked = false;
+    selectAll.indeterminate = false;
+  } else if (count === totalCheckboxes) {
+    selectAll.checked = true;
+    selectAll.indeterminate = false;
+  } else {
+    selectAll.checked = false;
+    selectAll.indeterminate = true;
+  }
+}
+
+// Criar todos os eventos (função original)
+function criarTodosEventos() {
+  if (confirm('Deseja criar TODOS os eventos visíveis no Google Calendar "Formações"? Esta operação pode levar alguns minutos.')) {
+    const btnCriarTodos = document.getElementById('btnCriarTodos');
+    btnCriarTodos.disabled = true;
+    btnCriarTodos.innerHTML = '<i class="bi bi-hourglass-split"></i> Criando...';
+    
+    fetch('/api/calendar/bulk-create/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrftoken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        create_calendar_events: true
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert(`Criação em lote concluída: ${data.successful} sucessos, ${data.failed} falhas`);
+        location.reload();
+      } else {
+        alert(`Erro na criação em lote: ${data.error}`);
+        btnCriarTodos.disabled = false;
+        btnCriarTodos.innerHTML = '<i class="bi bi-calendar-plus-fill"></i> Criar Todos';
+      }
+    })
+    .catch(error => {
+      alert(`Erro de conexão: ${error.message}`);
+      btnCriarTodos.disabled = false;
+      btnCriarTodos.innerHTML = '<i class="bi bi-calendar-plus-fill"></i> Criar Todos';
+    });
+  }
+}
+
+// Criar eventos selecionados
+function criarEventosSelecionados() {
+  const checkboxes = document.querySelectorAll('.evento-checkbox:checked');
+  const eventoIds = Array.from(checkboxes).map(cb => cb.value);
+  
+  if (eventoIds.length === 0) {
+    alert('Selecione pelo menos um evento para criar no Google Calendar.');
+    return;
+  }
+  
+  if (confirm(`Deseja criar ${eventoIds.length} evento(s) selecionado(s) no Google Calendar "Formações"?`)) {
+    const btnCriarSelecionados = document.getElementById('btnCriarSelecionados');
+    btnCriarSelecionados.disabled = true;
+    btnCriarSelecionados.innerHTML = '<i class="bi bi-hourglass-split"></i> Criando...';
+    
+    fetch('/api/calendar/auto-approval/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrftoken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        solicitacao_ids: eventoIds,
+        create_calendar_events: true
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert(`Eventos criados com sucesso: ${data.successful} sucessos, ${data.failed} falhas`);
+        // Remover linhas criadas com sucesso
+        data.results.forEach(result => {
+          if (result.success) {
+            const row = document.getElementById(`evento-${result.solicitacao_id}`);
+            if (row) row.remove();
+          }
+        });
+        location.reload();
+      } else {
+        alert(`Erro na criação: ${data.error}`);
+        btnCriarSelecionados.disabled = false;
+        btnCriarSelecionados.innerHTML = `<i class="bi bi-calendar-plus"></i> Criar Selecionados (${eventoIds.length})`;
+      }
+    })
+    .catch(error => {
+      alert(`Erro de conexão: ${error.message}`);
+      btnCriarSelecionados.disabled = false;
+      btnCriarSelecionados.innerHTML = `<i class="bi bi-calendar-plus"></i> Criar Selecionados (${eventoIds.length})`;
+    });
+  }
+}
+
+// Criar evento no Google Calendar
+function criarEventoGoogle(eventoId, tituloEvento) {
+  if (confirm(`Deseja criar o evento "${tituloEvento}" no Google Calendar?`)) {
+    const row = document.getElementById(`evento-${eventoId}`);
+    row.classList.add('loading');
+    
+    fetch(`/controle/pre-agenda/criar/${eventoId}/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrftoken,
+        'Content-Type': 'application/json',
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert(`Evento criado com sucesso no Google Calendar!`);
+        // Remover linha da tabela
+        row.remove();
+        // Atualizar contadores
+        location.reload();
+      } else {
+        alert(`Erro ao criar evento: ${data.error}`);
+        row.classList.remove('loading');
+      }
+    })
+    .catch(error => {
+      alert(`Erro de conexão: ${error.message}`);
+      row.classList.remove('loading');
+    });
+  }
+}
+
+// Remover evento da pré-agenda
+function removerEvento(eventoId, tituloEvento) {
+  const motivo = prompt(`Por que deseja remover "${tituloEvento}" da pré-agenda?`, 'Evento cancelado');
+  
+  if (motivo !== null) {
+    const row = document.getElementById(`evento-${eventoId}`);
+    row.classList.add('loading');
+    
+    const formData = new FormData();
+    formData.append('motivo', motivo);
+    
+    fetch(`/controle/pre-agenda/remover/${eventoId}/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrftoken,
+      },
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert('Evento removido da pré-agenda com sucesso!');
+        row.remove();
+        location.reload();
+      } else {
+        alert(`Erro ao remover evento: ${data.error}`);
+        row.classList.remove('loading');
+      }
+    })
+    .catch(error => {
+      alert(`Erro de conexão: ${error.message}`);
+      row.classList.remove('loading');
+    });
+  }
+}
+</script>
+{% endblock %}

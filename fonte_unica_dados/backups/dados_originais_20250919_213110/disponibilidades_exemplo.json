@@ -1,0 +1,38 @@
+{
+  "disponibilidades": [
+    {
+      "formador": "Joao Silva",
+      "email": "joao.teste@exemplo.com",
+      "data": "2025-10-01",
+      "hora_inicio": "08:00",
+      "hora_fim": "12:00",
+      "tipo": "Ferias",
+      "motivo": "Periodo de ferias de outubro"
+    },
+    {
+      "formador": "Maria Educadora Silva",
+      "email": "maria.silva@teste.com",
+      "data": "2025-10-02",
+      "hora_inicio": "14:00",
+      "hora_fim": "17:00",
+      "tipo": "Capacitacao",
+      "motivo": "Curso de atualizacao pedagogica"
+    },
+    {
+      "formador": "Joao Silva",
+      "data": "2025-10-03",
+      "hora_inicio": "10:00",
+      "hora_fim": "11:30",
+      "tipo": "Reuniao",
+      "motivo": "Reuniao de planejamento"
+    },
+    {
+      "nome_formador": "Maria Educadora Silva",
+      "data_bloqueio": "2025-10-04",
+      "inicio": "09:00",
+      "fim": "16:00",
+      "tipo_bloqueio": "Evento especial",
+      "observacao": "Participacao em seminario educacional"
+    }
+  ]
+}

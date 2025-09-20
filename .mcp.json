@@ -7,11 +7,40 @@
       ],
       "env": {}
     },
-    "django-aprender": {
-      "command": "venv/Scripts/python",
+    "markitdown": {
+      "command": "docker",
       "args": [
+        "exec",
+        "-i",
+        "aprender_web",
+        "python",
+        "-m",
+        "markitdown.mcp"
+      ],
+      "env": {}
+    },
+    "django-aprender": {
+      "command": "docker",
+      "args": [
+        "exec",
+        "-i",
+        "aprender_web",
+        "python",
         "manage.py",
         "stdio_server"
+      ],
+      "env": {
+        "DJANGO_SETTINGS_MODULE": "aprender_sistema.settings"
+      }
+    },
+    "fastmcp-aprender": {
+      "command": "docker",
+      "args": [
+        "exec",
+        "-i",
+        "aprender_web",
+        "python",
+        "fastmcp_server.py"
       ],
       "env": {
         "DJANGO_SETTINGS_MODULE": "aprender_sistema.settings"

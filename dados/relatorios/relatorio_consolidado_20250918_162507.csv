@@ -1,0 +1,16 @@
+Categoria,Total,Detalhes
+Total_Usuarios,232,Todos os usuários do sistema
+Total_Coordenadores,39,Usuários no grupo coordenador
+Total_Formadores_Ativos,192,Usuários com formador_ativo=True
+Total_Formadores_Grupo,115,Usuários no grupo formador
+Total_Superintendencia,7,Usuários no grupo superintendencia
+Total_Admin,1,Usuários no grupo admin
+Total_Projetos,24,Projetos cadastrados
+Total_Municipios,74,Municípios cadastrados
+Total_Tipos_Evento,20,Tipos de evento cadastrados
+Total_Solicitacoes,1915,Solicitações cadastradas
+Total_Setores,2,Setores organizacionais
+Coordenadores_Aprender,32,Coordenadores com email @aprendereditora.com.br
+Coordenadores_Outros,7,Coordenadores com outros emails
+Formadores_Setor_Sem Setor,0,Formadores ativos no setor Sem Setor
+Formadores_Setor_Setor Comum,0,Formadores ativos no setor Setor Comum

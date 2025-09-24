@@ -1,42 +1,13 @@
 {
-    "mcp.servers": {
-        "aprender-context": {
-            "command": ".\\venv\\Scripts\\python.exe",
-            "args": [
-                "neural_system/mcp_server_aprender.py"
-            ],
-            "cwd": "."
-        }
-    },
-    "mcp.autoStart": true,
-    "mcp.autoConnect": true,
-    "mcp.autoInit": true,
-    "python.defaultInterpreterPath": ".\\venv\\Scripts\\python.exe",
-    "python.terminal.activateEnvironment": true,
-    "files.autoSave": "afterDelay",
-    "files.autoSaveDelay": 1000,
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-        "source.organizeImports": true
-    },
-    "python.linting.enabled": true,
-    "python.linting.pylintEnabled": true,
-    "python.formatting.provider": "black",
-    "python.sortImports.args": [
-        "--profile",
-        "black"
-    ],
-    "workbench.startupEditor": "welcomePage",
-    "workbench.colorTheme": "Default Dark+",
-    "terminal.integrated.defaultProfile.windows": "PowerShell",
-    "terminal.integrated.profiles.windows": {
-        "PowerShell": {
-            "source": "PowerShell",
-            "args": [
-                "-NoExit",
-                "-Command",
-                ".\\venv\\Scripts\\python.exe cursor_auto_init.py"
-            ]
-        }
+  "mcp.servers": {
+    "aprender-context": {
+      "command": "python",
+      "args": [
+        "neural_system/mcp_server_aprender.py"
+      ],
+      "cwd": "."
     }
+  },
+  "mcp.autoStart": true,
+  "mcp.autoConnect": true
 }

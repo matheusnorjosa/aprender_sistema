@@ -309,7 +309,6 @@ if REDIS_URL and (IS_PRODUCTION or IS_STAGING):
             "LOCATION": REDIS_URL,
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
-                "PARSER_CLASS": "redis.connection.HiredisParser",
                 "CONNECTION_POOL_KWARGS": {
                     "max_connections": 50,
                     "retry_on_timeout": True,

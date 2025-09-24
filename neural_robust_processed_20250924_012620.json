@@ -1,0 +1,171 @@
+{
+  "metadata": {
+    "processing_time": "2025-09-24T01:26:20.628077",
+    "processor_version": "2.0.0",
+    "source_file": "mapeamento_completo_google_sheets_20250923_220315.json",
+    "statistics": {
+      "total_pessoas": 10,
+      "total_projetos": 0,
+      "total_municipios": 0,
+      "total_eventos": 0,
+      "total_atribuicoes": 0,
+      "total_solicitacoes": 0
+    }
+  },
+  "pessoas": {
+    "4b1d4e7f6351": {
+      "id": "4b1d4e7f6351",
+      "nome_completo": "Alison Mendonça De Almeida",
+      "cpf": "05759216333",
+      "email": "alisonalmeida2012@gmail.com",
+      "telefone": "85 99107-4898",
+      "cargo": "Formadores",
+      "gerencia": "Superintendência",
+      "status": "ativo",
+      "roles": [
+        "Formador"
+      ],
+      "created_at": "2025-09-24T01:26:20.836164"
+    },
+    "3f9efade1ec8": {
+      "id": "3f9efade1ec8",
+      "nome_completo": "Alysson Araujo De Macedo",
+      "cpf": "67153887334",
+      "email": "alysson.macedo@gmail.com",
+      "telefone": "85 99936-1920",
+      "cargo": "Formadores",
+      "gerencia": "ACerta",
+      "status": "ativo",
+      "roles": [
+        "Formador"
+      ],
+      "created_at": "2025-09-24T01:26:20.836370"
+    },
+    "9faf032ef420": {
+      "id": "9faf032ef420",
+      "nome_completo": "Amanda Arruda Da Costa Rodrigues",
+      "cpf": "04944374305",
+      "email": "coordenacao80@aprendereditora.com.br",
+      "telefone": "85 98313-6888",
+      "cargo": "Coordenadores",
+      "gerencia": "Outros",
+      "status": "ativo",
+      "roles": [
+        "Coordenador"
+      ],
+      "created_at": "2025-09-24T01:26:20.836433"
+    },
+    "992fefba3eb5": {
+      "id": "992fefba3eb5",
+      "nome_completo": "Amanda Sales Rodrigues Melo",
+      "cpf": "05884229321",
+      "email": "amandasalesr@gmail.com",
+      "telefone": "85 99661-8310",
+      "cargo": "Formadores",
+      "gerencia": "Superintendência",
+      "status": "ativo",
+      "roles": [
+        "Formador"
+      ],
+      "created_at": "2025-09-24T01:26:20.836469"
+    },
+    "c3aa6998b77c": {
+      "id": "c3aa6998b77c",
+      "nome_completo": "Mikaelly Correia Araripe Cavalcante",
+      "cpf": "06721593335",
+      "email": "mikaidim12@gmail.com",
+      "telefone": "",
+      "cargo": "Formadores",
+      "gerencia": "Superintendência",
+      "status": "ativo",
+      "roles": [
+        "Formador"
+      ],
+      "created_at": "2025-09-24T01:26:20.836989"
+    },
+    "caa2628c9f4d": {
+      "id": "caa2628c9f4d",
+      "nome_completo": "Bruno Pereira Dos Santos",
+      "cpf": "04052224329",
+      "email": "brunosantos.prof23@gmail.com",
+      "telefone": "85 99420-8507",
+      "cargo": "Formadores",
+      "gerencia": "",
+      "status": "ativo",
+      "roles": [
+        "Formador"
+      ],
+      "created_at": "2025-09-24T01:26:20.837056"
+    },
+    "27d50fcc019e": {
+      "id": "27d50fcc019e",
+      "nome_completo": "Rodrigo Lima Mota",
+      "cpf": "00919084346",
+      "email": "rodrigolmota2013@gmail.com",
+      "telefone": "(85)991651991",
+      "cargo": "Formadores",
+      "gerencia": "Superintendência",
+      "status": "pendente",
+      "roles": [
+        "Formador"
+      ],
+      "created_at": "2025-09-24T01:26:20.837472"
+    },
+    "020e850b813d": {
+      "id": "020e850b813d",
+      "nome_completo": "Mônica Maria Cosmo Vieira Uchôa",
+      "cpf": "05443752383",
+      "email": "monykauchoa@gmail.com",
+      "telefone": "(85) 986007628",
+      "cargo": "Formadores",
+      "gerencia": "Superintendência",
+      "status": "pendente",
+      "roles": [
+        "Formador"
+      ],
+      "created_at": "2025-09-24T01:26:20.837533"
+    },
+    "419e255b4a7d": {
+      "id": "419e255b4a7d",
+      "nome_completo": "Fabíola Martins Bezerra",
+      "cpf": "41692128353",
+      "email": "fabilbm06@gmail.com",
+      "telefone": "85 994175679",
+      "cargo": "Formadores",
+      "gerencia": "Superintendência",
+      "status": "pendente",
+      "roles": [
+        "Formador"
+      ],
+      "created_at": "2025-09-24T01:26:20.837585"
+    },
+    "3cfce78309db": {
+      "id": "3cfce78309db",
+      "nome_completo": "Jocilania Souza Da Silva",
+      "cpf": "88772101334",
+      "email": "coordenacao6@aprendereditora.com.br",
+      "telefone": "",
+      "cargo": "Coordenadores",
+      "gerencia": "-",
+      "status": "pendente",
+      "roles": [
+        "Coordenador"
+      ],
+      "created_at": "2025-09-24T01:26:20.837630"
+    }
+  },
+  "projetos": {},
+  "municipios": {},
+  "atribuicoes": {},
+  "eventos": {},
+  "solicitacoes": {},
+  "processing_stats": {
+    "start_time": "2025-09-24T01:26:20.628294",
+    "files_processed": 4,
+    "records_processed": 10,
+    "errors": [],
+    "warnings": [],
+    "end_time": "2025-09-24T01:26:20.837666",
+    "duration_seconds": 0.209372
+  }
+}

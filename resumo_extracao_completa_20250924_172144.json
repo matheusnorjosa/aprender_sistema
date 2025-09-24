@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-09-24T17:21:56.362071",
+  "resumo": {
+    "total_usuarios": 140,
+    "total_eventos": 11060,
+    "total_formacoes": 50499,
+    "total_registros": 61699
+  },
+  "arquivos_gerados": {
+    "usuarios": "usuarios_completos_20250924_172144.json",
+    "eventos": "eventos_completos_20250924_172144.json",
+    "formacoes": "formacoes_completas_20250924_172144.json"
+  }
+}

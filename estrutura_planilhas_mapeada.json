@@ -1,0 +1,578 @@
+{
+  "usuarios": {
+    "titulo": "Usuários",
+    "abas": [
+      {
+        "nome": "Ativos",
+        "linhas": 119,
+        "colunas": 25,
+        "gid": 143336602,
+        "headers": [
+          "Nome",
+          "Nome Completo",
+          "CPF",
+          "Telefone",
+          "Email",
+          "Cargo",
+          "Gerência",
+          "Coluna 1"
+        ],
+        "total_headers": 8
+      },
+      {
+        "nome": "Inativos",
+        "linhas": 1000,
+        "colunas": 26,
+        "gid": 0,
+        "headers": [
+          "Nome",
+          "Nome Completo",
+          "CPF",
+          "Telefone",
+          "Email",
+          "Cargo",
+          "Projeto"
+        ],
+        "total_headers": 7
+      },
+      {
+        "nome": "Pendentes",
+        "linhas": 1007,
+        "colunas": 26,
+        "gid": 1344767735,
+        "headers": [
+          "Nome",
+          "Nome Completo",
+          "CPF",
+          "Telefone",
+          "Email",
+          "Cargo",
+          "Projeto",
+          "OBS",
+          "Cadastro Plataformas",
+          "Atualização Agenda"
+        ],
+        "total_headers": 10
+      }
+    ]
+  },
+  "controle": {
+    "titulo": "Planilha de Controle - 2025",
+    "abas": [
+      {
+        "nome": "🟥 AÇÕES",
+        "linhas": 1206,
+        "colunas": 8,
+        "gid": 1393267536,
+        "headers": [
+          "F",
+          "Projeto",
+          "Coordenador",
+          "Data da Entrega",
+          "Data da Carta",
+          "Contato incial",
+          "Data Reunião Alinhamento",
+          "Observação"
+        ],
+        "total_headers": 8
+      },
+      {
+        "nome": "🟥 COMPRAS",
+        "linhas": 4419,
+        "colunas": 7,
+        "gid": 0,
+        "headers": [
+          "CÓD",
+          "Produto",
+          "Quant.",
+          "Município",
+          "UF",
+          "Data",
+          "Uso das coleções"
+        ],
+        "total_headers": 7
+      },
+      {
+        "nome": "ℹ️ FILTRO_PROD.",
+        "linhas": 1526,
+        "colunas": 22,
+        "gid": 1730920068,
+        "headers": [
+          " ",
+          "Município - UF",
+          "Região",
+          "Tipo",
+          "Projeto",
+          "Projeto Detalhe",
+          "Gerência",
+          "Qtd"
+        ],
+        "total_headers": 8
+      },
+      {
+        "nome": "🟥 COORD",
+        "linhas": 47,
+        "colunas": 7,
+        "gid": 1411869819,
+        "headers": [
+          "Coluna 1",
+          "Coordenador"
+        ],
+        "total_headers": 2
+      },
+      {
+        "nome": "ℹ️ FORMAÇÕES",
+        "linhas": 837,
+        "colunas": 50,
+        "gid": 536289527,
+        "headers": [
+          "           "
+        ],
+        "total_headers": 1
+      },
+      {
+        "nome": "ℹ️ DAT",
+        "linhas": 932,
+        "colunas": 21,
+        "gid": 921299990,
+        "headers": [
+          " ",
+          "",
+          "Município - UF",
+          "Projeto Geral",
+          "Projeto",
+          "Aluno Qtde",
+          "Professor Qtde",
+          "⬆️",
+          "Reunião DAT",
+          "Turma criada\nFORMAR"
+        ],
+        "total_headers": 21
+      },
+      {
+        "nome": "☑️ CADASTROS",
+        "linhas": 7716,
+        "colunas": 7,
+        "gid": 1579194652,
+        "headers": [
+          "Município - UF",
+          "Projeto",
+          "Ação",
+          "Informe a...",
+          "Valor",
+          "Responsável",
+          "Observações"
+        ],
+        "total_headers": 7
+      },
+      {
+        "nome": "ℹ️ FORMAÇÕES - ANTIGA",
+        "linhas": 409,
+        "colunas": 44,
+        "gid": 1682623048,
+        "headers": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "1º EF",
+          "",
+          "",
+          "2º EF",
+          ""
+        ],
+        "total_headers": 29
+      },
+      {
+        "nome": "ℹ️ Antiga - DAT",
+        "linhas": 932,
+        "colunas": 11,
+        "gid": 1536578193,
+        "headers": [
+          "",
+          "",
+          "Município - UF",
+          "Projeto Geral",
+          "Projeto",
+          "Aluno Qtde",
+          "Professor Qtde",
+          "Turma criada\nFORMAR",
+          "Usa \nAVALIAR",
+          ""
+        ],
+        "total_headers": 11
+      },
+      {
+        "nome": "🖥️FORMAÇÕES",
+        "linhas": 50500,
+        "colunas": 30,
+        "gid": 838144021,
+        "headers": [
+          "Delete",
+          "Update",
+          "Title",
+          "Start",
+          "End",
+          "Start Time",
+          "End Time",
+          "Repeat",
+          "Interval",
+          "Count"
+        ],
+        "total_headers": 20
+      },
+      {
+        "nome": "☑️ CADASTROS (Antiga)",
+        "linhas": 814,
+        "colunas": 11,
+        "gid": 1521906579,
+        "headers": [
+          "Município - UF",
+          "Projeto",
+          "FORMAR Id",
+          "AVALIAR Liberado em",
+          "AVALIAR Alunos\nRecebidos em",
+          "AVALIAR Alunos\nValidados em",
+          "AVALIAR Alunos import.",
+          "Feitor por",
+          "Observações"
+        ],
+        "total_headers": 9
+      },
+      {
+        "nome": "⚙️ CONFIG",
+        "linhas": 3504,
+        "colunas": 52,
+        "gid": 878114322,
+        "headers": [
+          "Região",
+          "UF",
+          "",
+          "id",
+          "Descrição",
+          "Nome",
+          "Projeto",
+          "Tipo",
+          "Gerência",
+          ""
+        ],
+        "total_headers": 36
+      }
+    ]
+  },
+  "disponibilidade": {
+    "titulo": "Disponibilidade | 2025",
+    "abas": [
+      {
+        "nome": "MENSAL",
+        "linhas": 553,
+        "colunas": 45,
+        "gid": 1510755488,
+        "headers": [
+          "",
+          "",
+          "",
+          "EM MANUTENÇÃO.\n\nAguarde este aviso sumir."
+        ],
+        "total_headers": 4
+      },
+      {
+        "nome": "ANUAL",
+        "linhas": 998,
+        "colunas": 29,
+        "gid": 696255555,
+        "headers": [
+          "",
+          "EM MANUTENÇÃO\n\nAguarde este aviso sumir"
+        ],
+        "total_headers": 2
+      },
+      {
+        "nome": "DESLOCAMENTO",
+        "linhas": 999,
+        "colunas": 11,
+        "gid": 1634387612,
+        "headers": [
+          "Origem",
+          "Tipo",
+          "Destino",
+          "Data",
+          "Pessoa 1",
+          "Pessoa 2",
+          "Pessoa 3",
+          "Pessoa 4",
+          "Pessoa 5",
+          "Pessoa 6"
+        ],
+        "total_headers": 10
+      },
+      {
+        "nome": "Bloqueios",
+        "linhas": 100,
+        "colunas": 4,
+        "gid": 1728789738,
+        "headers": [
+          "Usuário",
+          "Inicio",
+          "Fim",
+          "Tipo"
+        ],
+        "total_headers": 4
+      },
+      {
+        "nome": "Eventos",
+        "linhas": 1257,
+        "colunas": 20,
+        "gid": 1430609894,
+        "headers": [
+          "id",
+          "titulo",
+          "municipio",
+          "ef",
+          "tipo",
+          "data",
+          "inicio",
+          "fim",
+          "projeto",
+          "segmento"
+        ],
+        "total_headers": 18
+      },
+      {
+        "nome": "Configurações",
+        "linhas": 497,
+        "colunas": 8,
+        "gid": 2043156665,
+        "headers": [
+          "Município",
+          "",
+          "Formador",
+          "Email",
+          "",
+          "Usuário",
+          "",
+          "Encontro"
+        ],
+        "total_headers": 8
+      }
+    ]
+  },
+  "acompanhamento": {
+    "titulo": "Acompanhamento de Agenda | 2025",
+    "abas": [
+      {
+        "nome": "ACerta",
+        "linhas": 1002,
+        "colunas": 20,
+        "gid": 1055368874,
+        "headers": [
+          "Coluna 1",
+          "Column 18",
+          "Alteração",
+          "C ancelar",
+          "município",
+          "encontro",
+          "tipo",
+          "data",
+          "hora início",
+          "hora fim"
+        ],
+        "total_headers": 20
+      },
+      {
+        "nome": "Outros",
+        "linhas": 1023,
+        "colunas": 21,
+        "gid": 1647358371,
+        "headers": [
+          "controle",
+          "Column 20",
+          "Column 19",
+          "Coluna 1",
+          "município",
+          "encontro",
+          "tipo",
+          "data",
+          "hora início",
+          "hora fim"
+        ],
+        "total_headers": 21
+      },
+      {
+        "nome": "Super",
+        "linhas": 1986,
+        "colunas": 20,
+        "gid": 0,
+        "headers": [
+          "Coluna 1",
+          "Aprovação",
+          "Atualizar",
+          "C ancelar",
+          "Municípios",
+          "encontro",
+          "tipo",
+          "data",
+          "hora início",
+          "hora fim"
+        ],
+        "total_headers": 20
+      },
+      {
+        "nome": "Brincando",
+        "linhas": 1001,
+        "colunas": 20,
+        "gid": 1101094368,
+        "headers": [
+          "Coluna 1",
+          "Column 20",
+          "A tualizar",
+          "C ancelar",
+          "município",
+          "encontro",
+          "tipo",
+          "data",
+          "hora início",
+          "hora fim"
+        ],
+        "total_headers": 20
+      },
+      {
+        "nome": "Vidas",
+        "linhas": 2001,
+        "colunas": 20,
+        "gid": 1882642294,
+        "headers": [
+          "Coluna 1",
+          "Aprovação",
+          "A",
+          "C",
+          "Município",
+          "Encontro",
+          "tipo",
+          "data",
+          "hora início",
+          "hora fim"
+        ],
+        "total_headers": 20
+      },
+      {
+        "nome": "Pré-Agenda",
+        "linhas": 702,
+        "colunas": 29,
+        "gid": 1739088256,
+        "headers": [
+          "     FILTRAR POR AGENDA"
+        ],
+        "total_headers": 1
+      },
+      {
+        "nome": "Novo Google Agenda",
+        "linhas": 1143,
+        "colunas": 26,
+        "gid": 557299254,
+        "headers": [
+          "Excluir",
+          "Processar",
+          "Título",
+          "Data Inicio",
+          "Data Termino",
+          "Hora Inicio",
+          "Hora Termino",
+          "Repeat",
+          "Interval",
+          "Count"
+        ],
+        "total_headers": 22
+      },
+      {
+        "nome": "Relatórios",
+        "linhas": 1000,
+        "colunas": 26,
+        "gid": 288781206,
+        "headers": [
+          "Mês",
+          "Status",
+          "Município/Projeto",
+          "Tipo/Série/Mod.",
+          "É Acompanhamento?",
+          "Programa",
+          "Título Original do Evento",
+          "Data de Início",
+          "Hora de Início",
+          "Data de Término"
+        ],
+        "total_headers": 15
+      },
+      {
+        "nome": "Google Agenda",
+        "linhas": 2452,
+        "colunas": 32,
+        "gid": 12720600,
+        "headers": [
+          "Delete",
+          "Update",
+          "Title",
+          "Start",
+          "End",
+          "Start Time",
+          "End Time",
+          "Repeat",
+          "Interval",
+          "Count"
+        ],
+        "total_headers": 21
+      },
+      {
+        "nome": "Bloqueios",
+        "linhas": 300,
+        "colunas": 4,
+        "gid": 1398722949,
+        "headers": [
+          "Pessoa",
+          "Data Inicio",
+          "Data Fim",
+          "Tipo"
+        ],
+        "total_headers": 4
+      },
+      {
+        "nome": "Configurações",
+        "linhas": 10066,
+        "colunas": 18,
+        "gid": 2043156665,
+        "headers": [
+          "Acesse aprenderformar.com.br. \nBaixe a lista de cursos csv. \nFiltre somente os cursos 2025.\nCopie as colunas ID, Categoria e Nome Breve.\nCole aqui apenas essas colunas.\nExecute a macro \"Limpa nome projeto\"",
+          "",
+          "",
+          "",
+          "Município",
+          "projeto",
+          "id",
+          "",
+          "Encontro",
+          ""
+        ],
+        "total_headers": 18
+      },
+      {
+        "nome": "DESLOCAMENTO",
+        "linhas": 1000,
+        "colunas": 11,
+        "gid": 1634387612,
+        "headers": [],
+        "total_headers": 0
+      },
+      {
+        "nome": "DISPONIBILIDADE",
+        "linhas": 690,
+        "colunas": 78,
+        "gid": 1510755488,
+        "headers": [
+          "-[a"
+        ],
+        "total_headers": 1
+      }
+    ]
+  }
+}

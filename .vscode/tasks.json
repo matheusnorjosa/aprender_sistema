@@ -1,60 +1,23 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "Sistema Neural APRENDER - Auto Init",
-            "type": "shell",
-            "command": ".\\venv\\Scripts\\python.exe",
-            "args": [
-                "cursor_auto_init.py"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "new",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "runOptions": {
-                "runOn": "folderOpen"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Sistema Neural APRENDER - MCP Commands",
-            "type": "shell",
-            "command": ".\\venv\\Scripts\\python.exe",
-            "args": [
-                "-c",
-                "import neural_system.mcp_server_aprender; print('✅ MCP Server carregado')"
-            ],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "new"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Sistema Neural APRENDER - Validate System",
-            "type": "shell",
-            "command": ".\\venv\\Scripts\\python.exe",
-            "args": [
-                "-c",
-                "from neural_system.mcp_server_aprender import _read_documentation_file; print('✅ Sistema validado')"
-            ],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "new"
-            },
-            "problemMatcher": []
-        }
-    ]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "name": "Sistema Neural APRENDER - Auto Init",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "cursor_auto_init.py"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    }
+  ]
 }

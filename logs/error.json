@@ -1,0 +1,34 @@
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_setores 127   ❌ Erro ao criar setor -: Invalid field name(s) for model Setor: 'descricao'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_setores 127   ❌ Erro ao criar setor Outros: Invalid field name(s) for model Setor: 'descricao'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_setores 127   ❌ Erro ao criar setor ACerta: Invalid field name(s) for model Setor: 'descricao'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_setores 127   ❌ Erro ao criar setor Superintendência: Invalid field name(s) for model Setor: 'descricao'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_pessoas 173   ❌ Erro inesperado ao importar pessoa Alison Mendonça De Almeida: FOR UPDATE cannot be applied to the nullable side of an outer join
+
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_pessoas 173   ❌ Erro inesperado ao importar pessoa Alysson Araujo De Macedo: FOR UPDATE cannot be applied to the nullable side of an outer join
+
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_pessoas 173   ❌ Erro inesperado ao importar pessoa Amanda Arruda Da Costa Rodrigues: FOR UPDATE cannot be applied to the nullable side of an outer join
+
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_pessoas 173   ❌ Erro inesperado ao importar pessoa Amanda Sales Rodrigues Melo: FOR UPDATE cannot be applied to the nullable side of an outer join
+
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_pessoas 173   ❌ Erro inesperado ao importar pessoa Mikaelly Correia Araripe Cavalcante: FOR UPDATE cannot be applied to the nullable side of an outer join
+
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_pessoas 173   ❌ Erro inesperado ao importar pessoa Bruno Pereira Dos Santos: FOR UPDATE cannot be applied to the nullable side of an outer join
+
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_pessoas 173   ❌ Erro inesperado ao importar pessoa Rodrigo Lima Mota: FOR UPDATE cannot be applied to the nullable side of an outer join
+
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_pessoas 173   ❌ Erro inesperado ao importar pessoa Mônica Maria Cosmo Vieira Uchôa: FOR UPDATE cannot be applied to the nullable side of an outer join
+
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_pessoas 173   ❌ Erro inesperado ao importar pessoa Fabíola Martins Bezerra: FOR UPDATE cannot be applied to the nullable side of an outer join
+
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_pessoas 173   ❌ Erro inesperado ao importar pessoa Jocilania Souza Da Silva: FOR UPDATE cannot be applied to the nullable side of an outer join
+
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_municipios 242   ❌ Erro ao criar município Fortaleza: Invalid field name(s) for model Municipio: 'codigo_ibge'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_municipios 242   ❌ Erro ao criar município Caucaia: Invalid field name(s) for model Municipio: 'codigo_ibge'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_municipios 242   ❌ Erro ao criar município Maracanaú: Invalid field name(s) for model Municipio: 'codigo_ibge'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_municipios 242   ❌ Erro ao criar município Sobral: Invalid field name(s) for model Municipio: 'codigo_ibge'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_municipios 242   ❌ Erro ao criar município Juazeiro do Norte: Invalid field name(s) for model Municipio: 'codigo_ibge'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_tipos_evento 276   ❌ Erro ao criar tipo de evento Formação Presencial: Invalid field name(s) for model TipoEvento: 'descricao'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_tipos_evento 276   ❌ Erro ao criar tipo de evento Formação Online: Invalid field name(s) for model TipoEvento: 'descricao'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_tipos_evento 276   ❌ Erro ao criar tipo de evento Reunião: Invalid field name(s) for model TipoEvento: 'descricao'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_tipos_evento 276   ❌ Erro ao criar tipo de evento Capacitação: Invalid field name(s) for model TipoEvento: 'descricao'.
+2025-09-23 22:27:24 __main__ ERROR neural_postgresql_importer_robust _import_tipos_evento 276   ❌ Erro ao criar tipo de evento Workshop: Invalid field name(s) for model TipoEvento: 'descricao'.

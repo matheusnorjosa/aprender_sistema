@@ -1,0 +1,54 @@
+======================================================================
+📊 RELATÓRIO DE QUALIDADE - EXTRAÇÃO GOOGLE SHEETS
+======================================================================
+
+📋 USUARIOS:
+   - total_usuarios: 5
+   - emails_validos: 5
+   - cpfs_validos: 0
+   por_cargo:
+     - Formador: 2
+     - Superintendente: 1
+     - Gerente: 1
+     - Coordenador: 1
+   por_setor:
+     - Projetos Educacionais: 3
+     - Superintendência: 1
+     - Coordenação Regional: 1
+
+📋 PROJETOS:
+   - total_projetos: 3
+   por_colecao:
+     - Matemática: 1
+     - Língua Portuguesa: 1
+     - Educação Infantil: 1
+   por_segmento:
+     - Anos Finais: 1
+     - Anos Iniciais: 1
+     - Educação Infantil: 1
+
+📋 DISPONIBILIDADE:
+   - total_registros: 2
+   - formadores_unicos: 2
+   por_disponibilidade:
+     - Disponível: 1
+     - Parcial: 1
+
+📋 ACOMPANHAMENTO:
+   - total_eventos: 2
+   por_projeto:
+     - ACerta: 1
+     - Lendo e Escrevendo: 1
+   por_status:
+     - Realizado: 2
+   periodo:
+     - inicio: 2025-01-15
+     - fim: 2025-01-20
+
+🎯 RESUMO GERAL:
+   - Planilhas processadas: 4
+   - Modo: PRODUÇÃO
+   - Timestamp: 2025-09-23 18:28:45
+
+✅ EXTRAÇÃO GOOGLE SHEETS CONCLUÍDA COM SUCESSO!
+======================================================================

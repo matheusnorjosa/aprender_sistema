@@ -1269,3 +1269,123 @@ class LogComunicacao(models.Model):
             else "✗" if self.status_envio == "falhado" else "⏳"
         )
         return f"{status_icon} {self.get_tipo_comunicacao_display()} → {destinatario}: {self.assunto}"
+
+
+# =========================
+# SISTEMA DE CURSOS DA PLATAFORMA
+# =========================
+class CursoPlataforma(models.Model):
+    """Modelo para armazenar cursos da plataforma Aprender Formar"""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id_curso = models.CharField(max_length=50, unique=True, help_text="ID do curso na plataforma")
+    categoria = models.CharField(max_length=200, help_text="Categoria do curso")
+    nome_breve = models.CharField(max_length=200, help_text="Nome breve do curso")
+    nome_limpo = models.CharField(max_length=200, blank=True, help_text="Nome processado pelo script de limpeza")
+    ano = models.IntegerField(default=2025, help_text="Ano do curso")
+    ativo = models.BooleanField(default=True)
+
+    # Timestamps
+    data_criacao = models.DateTimeField(auto_now_add=True)
+    data_atualizacao = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Curso da Plataforma"
+        verbose_name_plural = "Cursos da Plataforma"
+        ordering = ['nome_breve']
+        indexes = [
+            models.Index(fields=['id_curso']),
+            models.Index(fields=['categoria']),
+            models.Index(fields=['ano', 'ativo']),
+        ]
+
+    def __str__(self):
+        return f"{self.nome_breve} ({self.id_curso})"
+
+    def get_link_curso(self):
+        """Gera o link do curso na plataforma"""
+        if self.id_curso:
+            return f"https://aprenderformar.com.br/course/view.php?id={self.id_curso}"
+        return ""
+
+
+class ProjetoCursoLink(models.Model):
+    """Vincula Projetos aos Cursos da Plataforma"""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    projeto = models.ForeignKey(
+        'Projeto',
+        on_delete=models.CASCADE,
+        related_name='cursos_vinculados',
+        help_text="Projeto do sistema"
+    )
+    curso_plataforma = models.ForeignKey(
+        'CursoPlataforma',
+        on_delete=models.CASCADE,
+        help_text="Curso correspondente na plataforma"
+    )
+
+    # Campos de controle
+    mapeamento_manual = models.BooleanField(
+        default=False,
+        help_text="Se o mapeamento foi feito manualmente ou automaticamente"
+    )
+    data_vinculacao = models.DateTimeField(auto_now_add=True)
+    usuario_vinculacao = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Usuário que fez a vinculação"
+    )
+
+    class Meta:
+        verbose_name = "Link Projeto-Curso"
+        verbose_name_plural = "Links Projeto-Curso"
+        unique_together = [('projeto', 'curso_plataforma')]
+        ordering = ['projeto__nome', 'curso_plataforma__nome_breve']
+
+    def __str__(self):
+        manual_flag = " (Manual)" if self.mapeamento_manual else " (Auto)"
+        return f"{self.projeto.nome} → {self.curso_plataforma.nome_breve}{manual_flag}"
+
+
+class ImportacaoCursosCSV(models.Model):
+    """Log das importações de CSV de cursos"""
+
+    STATUS_CHOICES = [
+        ('PENDENTE', 'Pendente'),
+        ('PROCESSANDO', 'Processando'),
+        ('CONCLUIDA', 'Concluída'),
+        ('ERRO', 'Erro'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    arquivo_nome = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')
+    total_linhas = models.IntegerField(default=0)
+    cursos_importados = models.IntegerField(default=0)
+    cursos_atualizados = models.IntegerField(default=0)
+    vinculos_criados = models.IntegerField(default=0)
+
+    # Logs
+    log_processamento = models.TextField(blank=True)
+    log_erros = models.TextField(blank=True)
+
+    # Timestamps
+    data_inicio = models.DateTimeField(auto_now_add=True)
+    data_fim = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Importação CSV de Cursos"
+        verbose_name_plural = "Importações CSV de Cursos"
+        ordering = ['-data_inicio']
+
+    def __str__(self):
+        status_icon = {
+            'PENDENTE': '⏳',
+            'PROCESSANDO': '🔄',
+            'CONCLUIDA': '✅',
+            'ERRO': '❌'
+        }.get(self.status, '❓')
+        return f"{status_icon} {self.arquivo_nome} - {self.get_status_display()}"

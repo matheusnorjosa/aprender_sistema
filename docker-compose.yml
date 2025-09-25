@@ -20,16 +20,13 @@ services:
 
   web:
     build: .
-    container_name: aprender_web
+    container_name: aprender_web_${BRANCH:-main}
+    env_file:
+      - .env.${BRANCH:-main}
     environment:
-      DB_NAME: aprender_sistema_db
-      DB_USER: adm_aprender
-      DB_PASSWORD: aprender123456
+      # Sobrescrever configurações específicas do Docker se necessário
       DB_HOST: db
-      DB_PORT: "5432"
-      ENVIRONMENT: staging
-      DJANGO_ENV: development
-      FEATURE_GOOGLE_SYNC: "1"
+      CURRENT_BRANCH: ${BRANCH:-main}
     volumes:
       - .:/app
     ports:
@@ -44,17 +41,16 @@ services:
       - aprender_network
 
   streamlit:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.streamlit
-    container_name: aprender_streamlit
+    container_name: aprender_streamlit_${BRANCH:-main}
+    env_file:
+      - .env.${BRANCH:-main}
     environment:
-      DB_NAME: aprender_sistema_db
-      DB_USER: adm_aprender
-      DB_PASSWORD: aprender123456
+      # Sobrescrever configurações específicas do Docker
       DB_HOST: db
-      DB_PORT: "5432"
-      ENVIRONMENT: staging
+      CURRENT_BRANCH: ${BRANCH:-main}
     volumes:
       - .:/app
     ports:
@@ -71,14 +67,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.mcp
-    container_name: aprender_mcp
+    container_name: aprender_mcp_${BRANCH:-main}
+    env_file:
+      - .env.${BRANCH:-main}
     environment:
-      DB_NAME: aprender_sistema_db
-      DB_USER: adm_aprender
-      DB_PASSWORD: aprender123456
+      # Sobrescrever configurações específicas do MCP
       DB_HOST: db
-      DB_PORT: "5432"
-      ENVIRONMENT: staging
+      CURRENT_BRANCH: ${BRANCH:-main}
       DJANGO_SETTINGS_MODULE: aprender_sistema.settings
       MCP_HOST: "0.0.0.0"
       MCP_PORT: "3001"

@@ -32,6 +32,18 @@ from .formador_views import BloqueioCreateView, FormadorEventosView
 from .home_views import HomeView, home
 from .solicitacao_views import SolicitacaoCreateView, SolicitacaoOKView
 
+# Imports das views de importação
+from .importacao_views import (
+    CursosCSVUploadView,
+    CursosCSVProcessarView,
+    CursosCSVPreviewView,
+    VinculosProjetoCursoListView,
+    CursosSemVinculoListView,
+    VincularCursoProjetoView,
+    DesvincularCursoView,
+    ReprocessarVinculacaoAutomaticaView,
+)
+
 # Lista para facilitar importação
 __all__ = [
     "home",
@@ -58,4 +70,13 @@ __all__ = [
     "TestMapSimpleView",
     "TestMapFinalView",
     "TestMapAdvancedView",
+    # Views de importação
+    "CursosCSVUploadView",
+    "CursosCSVProcessarView",
+    "CursosCSVPreviewView",
+    "VinculosProjetoCursoListView",
+    "CursosSemVinculoListView",
+    "VincularCursoProjetoView",
+    "DesvincularCursoView",
+    "ReprocessarVinculacaoAutomaticaView",
 ]

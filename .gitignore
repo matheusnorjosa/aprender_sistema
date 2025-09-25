@@ -122,3 +122,22 @@ analise_*.json
 migrate_formador_to_usuario.py
 prepare_formador_migration.py
 relatorio_*.json
+
+# Arquivos experimentais/temporários (Sept 2025)
+*_unificado.py
+*_unificado.yml
+*_backup.py
+docker-compose.unificado.yml
+config_unificado.env
+sincronizar_configuracoes.py
+GUIA_*.md
+PLANO_*.md
+PRE_COMMIT_*.md
+QUALITY_*.md
+README_REFATORACAO.md
+REFACTORING_*.md
+RELATORIO_COMPLETO_*.md
+acessar_planilhas_*
+analisar_*
+gerar_planilha_*.py
+mudanca_acesso_*.md

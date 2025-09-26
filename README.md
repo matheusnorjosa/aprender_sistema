@@ -399,8 +399,7 @@ Este projeto está licenciado sob a **MIT License** - veja [LICENSE](./LICENSE) 
 - ✅ **v1.0**: Sistema base de solicitações (Q3 2024)
 - ✅ **v1.1**: Integração Google Calendar (Q4 2024)  
 - ✅ **v1.2**: Sistema de pré-agenda (Q1 2025)
-- 🔄 **v1.3**: Dashboards executivos (Q2 2025)
-- 📋 **v2.0**: Mobile app (Q3 2025)
+- ✅ **v1.3**: Dashboards executivos (Q2 2025)
 
 ---
 

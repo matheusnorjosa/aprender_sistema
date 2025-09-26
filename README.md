@@ -146,7 +146,7 @@ CSRF_TRUSTED_ORIGINS=https://yourdomain.com,http://localhost:8000
    ```bash
    # Copie o JSON para a variável de ambiente
    export GOOGLE_CREDENTIALS_JSON='{"type": "service_account", ...}'
-   
+
    # Configure o ID do calendário
    export GOOGLE_CALENDAR_ID='seu-calendar@group.calendar.google.com'
    ```

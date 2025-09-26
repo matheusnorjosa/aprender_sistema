@@ -62,6 +62,7 @@ google_*.json
 !google_*.json.example
 token.pickle
 service-account.json
+chaveacesso-planilhas@*.json
 *.env
 *.env.*
 !.env.example

@@ -33,10 +33,19 @@ MANIFEST
 *.manifest
 *.spec
 
-# Virtual Environment
+# ========================================
+# DOCKER-ONLY ENVIRONMENT
+# Sistema centralizado em Docker
+# NÃO usar ambientes virtuais locais!
+# ========================================
+
+# Virtual Environments (DEPRECATED - Use Docker!)
 venv/
 env/
 .venv/
+ENV/
+env.bak/
+venv.bak/
 
 # Installer logs
 pip-log.txt
@@ -65,6 +74,40 @@ coverage.xml
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+
+# Local .env files (only .example templates should be versioned)
+.env
+.env.local
+.env.develop
+.env.main
+.env.docker
+.env.*.local
+!.env.*.example
+
+# Docker volumes and data
+postgres_data/
+redis_data/
+elasticsearch_data/
+
+# Large data files (keep organized in dados/)
+/*.json
+!package.json
+!*config*.json
+dados/raw/planilhas/*.json
+dados/processed/*.json
+
+# Backups
+backup_*
+*.backup
+*.old
+*.bak
+
+# Cache directories
+.mypy_cache/
+.pytest_cache/
+.serena/
+.ruff_cache/
+.phpunit.result.cache
 
 # Flask stuff:
 instance/

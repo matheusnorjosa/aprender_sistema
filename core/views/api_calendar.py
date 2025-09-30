@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 APIs para apoio ao grupo Controle na criação manual de eventos no Google Calendar.
 SEMANA 3 - DIA 3: Integração Google Calendar + Google Meet
@@ -174,7 +176,7 @@ class CalendarStatusAPI(View):
 
             # Estatísticas básicas
             stats = {
-                "total_solicitacoes_pre_agenda": Solicitacao.objects.filter(
+                "total_solicitacoes_pre_agenda": Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                     status=SolicitacaoStatus.PRE_AGENDA
                 ).count(),
                 "total_eventos_criados": EventoGoogleCalendar.objects.count(),

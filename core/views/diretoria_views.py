@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 Views relacionadas ao perfil de Diretoria (visão executiva e relatórios).
 ATUALIZADO: Usa Services centralizados e imports unificados
@@ -30,14 +32,14 @@ class DiretoriaExecutiveDashboardView(
 
         municipio_obj = None
         if municipio_id:
-            municipio_obj = Municipio.objects.filter(id=municipio_id).first()
+            municipio_obj = Municipio.objects.prefetch_related("solicitacao_set", "usuario_set").filter(id=municipio_id).first()
         elif municipio_nome_param:
             municipio_obj = (
-                Municipio.objects.filter(nome__iexact=municipio_nome_param).order_by("uf").first()
+                Municipio.objects.prefetch_related("solicitacao_set", "usuario_set").filter(nome__iexact=municipio_nome_param).order_by("uf").first()
             )
 
         municipios_queryset = (
-            Municipio.objects.filter(ativo=True)
+            MunicipioService.ativos()
             .values("id", "nome", "uf")
             .order_by("nome", "uf")
         )
@@ -140,10 +142,10 @@ class DiretoriaAPIMetricsView(LoginRequiredMixin, PermissionRequiredMixin, View)
         data_limite = agora - timedelta(days=30)
 
         metrics = {
-            "solicitacoes_mes": Solicitacao.objects.filter(
+            "solicitacoes_mes": Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                 data_inicio__gte=data_limite
             ).count(),
-            "aprovacoes_mes": Solicitacao.objects.filter(
+            "aprovacoes_mes": Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                 data_inicio__gte=data_limite, status=SolicitacaoStatus.APROVADO
             ).count(),
         }

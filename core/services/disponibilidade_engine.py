@@ -212,7 +212,7 @@ class DisponibilidadeEngine:
                 )
 
         # RD-01: Verificar sobreposição com eventos existentes (X)
-        existing_events = Solicitacao.objects.filter(
+        existing_events = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             formadores=formador,
             status__in=[
                 "APROVADO"
@@ -272,7 +272,7 @@ class DisponibilidadeEngine:
         buffer_end = data_fim + buffer
 
         nearby_events = (
-            Solicitacao.objects.filter(formadores=formador, status__in=["APROVADO"])
+            Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(formadores=formador, status__in=["APROVADO"])
             .exclude(municipio=municipio)
             .filter(
                 Q(data_inicio__gte=buffer_start, data_inicio__lte=buffer_end)
@@ -322,7 +322,7 @@ class DisponibilidadeEngine:
         event_date = data_inicio.date()
 
         # Buscar eventos do mesmo dia
-        daily_events = Solicitacao.objects.filter(
+        daily_events = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             formadores=formador, status__in=["APROVADO"], data_inicio__date=event_date
         )
 
@@ -496,5 +496,5 @@ def check_formador_availability(
     # Usar municipio fornecido ou buscar um padrão
     target_municipio = municipio or Municipio.objects.first()
     return engine.check_availability(
-        Formador.objects.filter(id=formador.id), data_inicio, data_fim, target_municipio
+        FormadorService.filter_formadores(id=formador.id), data_inicio, data_fim, target_municipio
     )

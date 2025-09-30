@@ -127,7 +127,7 @@ class Command(BaseCommand):
                     # Buscar solicitação correspondente no sistema (otimizado)
                     try:
                         # Buscar por data primeiro (mais específico)
-                        solicitacoes_data = Solicitacao.objects.filter(data_inicio__date=data_obj)
+                        solicitacoes_data = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(data_inicio__date=data_obj)
 
                         solicitacao_encontrada = None
                         for solicitacao in solicitacoes_data:
@@ -180,8 +180,8 @@ class Command(BaseCommand):
                 self.stdout.write(f"⚠️  Não encontradas: {nao_encontradas}")
 
                 # Verificar distribuição final
-                aprovados_final = Solicitacao.objects.filter(status=SolicitacaoStatus.APROVADO).count()
-                pendentes_final = Solicitacao.objects.filter(status=SolicitacaoStatus.PENDENTE).count()
+                aprovados_final = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.APROVADO).count()
+                pendentes_final = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.PENDENTE).count()
 
                 self.stdout.write(f"\n📊 DISTRIBUIÇÃO FINAL:")
                 self.stdout.write(f"   APROVADO: {aprovados_final}")

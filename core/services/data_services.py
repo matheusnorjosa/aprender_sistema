@@ -70,7 +70,6 @@ class FormadorService(BaseService):
     def get_formadores_queryset(cls):
         """QuerySet otimizado para formadores"""
         return UsuarioService.ativos().filter(
-            formador_ativo=True,
             groups__name='formador'
         ).distinct().prefetch_related('groups')
 
@@ -125,11 +124,11 @@ class FormadorService(BaseService):
                 formador = Usuario.objects.get(id=formador_id, formador_ativo=True)
 
                 # Estatísticas básicas
-                total_eventos = FormadoresSolicitacao.objects.filter(
+                total_eventos = FormadoresSolicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                     usuario=formador
                 ).count()
 
-                eventos_realizados = FormadoresSolicitacao.objects.filter(
+                eventos_realizados = FormadoresSolicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                     usuario=formador,
                     solicitacao__status='Aprovado'
                 ).count()
@@ -218,7 +217,7 @@ class CoordinatorService(BaseService):
             try:
                 coordenador = Usuario.objects.get(id=coordenador_id, cargo='coordenador')
 
-                solicitacoes = Solicitacao.objects.filter(usuario_solicitante=coordenador)
+                solicitacoes = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(usuario_solicitante=coordenador)
 
                 result = {
                     'nome': coordenador.nome_completo,
@@ -257,15 +256,15 @@ class DashboardService(BaseService):
             inicio_ano = agora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
             result = {
-                'usuarios_total': Usuario.objects.filter(is_active=True).count(),
+                'usuarios_total': UsuarioService.ativos().count(),
                 'formadores_ativos': FormadorService.get_formadores_queryset().count(),
                 'coordenadores_total': CoordinatorService.get_coordenadores_queryset().count(),
                 'coordenadores_superintendencia': CoordinatorService.superintendencia().count(),
                 'coordenadores_outros_setores': CoordinatorService.outros_setores().count(),
-                'municipios_ativos': Municipio.objects.filter(ativo=True).count(),
-                'projetos_ativos': Projeto.objects.filter(ativo=True).count(),
-                'solicitacoes_ano': Solicitacao.objects.filter(data_inicio__gte=inicio_ano).count(),
-                'solicitacoes_aprovadas_ano': Solicitacao.objects.filter(
+                'municipios_ativos': MunicipioService.ativos().count(),
+                'projetos_ativos': ProjetoService.ativos().count(),
+                'solicitacoes_ano': Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(data_inicio__gte=inicio_ano).count(),
+                'solicitacoes_aprovadas_ano': Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                     data_inicio__gte=inicio_ano,
                     status='Aprovado'
                 ).count(),
@@ -431,7 +430,7 @@ class MunicipioService(BaseService):
     def ativos(cls):
         """Municípios ativos otimizados"""
         from core.models import Municipio
-        return Municipio.objects.filter(ativo=True).order_by('nome', 'uf')
+        return MunicipioService.ativos().order_by('nome', 'uf')
 
     @classmethod
     def por_uf(cls, uf: str):
@@ -454,7 +453,7 @@ class MunicipioService(BaseService):
 
             try:
                 municipio = Municipio.objects.get(id=municipio_id)
-                solicitacoes = Solicitacao.objects.filter(municipio=municipio)
+                solicitacoes = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(municipio=municipio)
 
                 result = {
                     'nome': municipio.nome,
@@ -471,3 +470,30 @@ class MunicipioService(BaseService):
                 result = {}
 
         return result
+
+class ProjetoService(BaseService):
+    """
+    Service para Projetos - Queries otimizadas
+    """
+    
+    @classmethod
+    def ativos(cls):
+        """Projetos ativos otimizados"""
+        from core.models import Projeto
+        return Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(ativo=True).order_by('nome')
+    
+    @classmethod
+    def todos(cls):
+        """Todos os projetos"""
+        from core.models import Projeto
+        return Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").order_by('nome')
+    
+    @classmethod
+    def por_setor(cls, setor):
+        """Projetos por setor"""
+        return cls.ativos().filter(setor=setor)
+    
+    @classmethod
+    def superintendencia(cls):
+        """Projetos da superintendência"""
+        return cls.ativos().filter(setor__vinculado_superintendencia=True)

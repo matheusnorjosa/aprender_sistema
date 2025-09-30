@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 Views relacionadas ao perfil de Coordenador.
 """
@@ -14,7 +16,7 @@ class CoordenadorMeusEventosView(LoginRequiredMixin, PermissionRequiredMixin, Li
 
     def get_queryset(self):
         qs = (
-            Solicitacao.objects.filter(usuario_solicitante=self.request.user)
+            Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(usuario_solicitante=self.request.user)
             .select_related("projeto", "municipio", "tipo_evento", "usuario_aprovador")
             .prefetch_related("formadores")
             .order_by("-data_solicitacao")
@@ -50,7 +52,7 @@ class CoordenadorMeusEventosView(LoginRequiredMixin, PermissionRequiredMixin, Li
         context = super().get_context_data(**kwargs)
 
         # Estatísticas do coordenador
-        user_eventos = Solicitacao.objects.filter(usuario_solicitante=self.request.user)
+        user_eventos = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(usuario_solicitante=self.request.user)
 
         total_solicitacoes = user_eventos.count()
         eventos_pendentes = user_eventos.filter(
@@ -79,7 +81,7 @@ class CoordenadorMeusEventosView(LoginRequiredMixin, PermissionRequiredMixin, Li
         ).order_by("data_inicio")[:5]
 
         # Opções para filtros
-        projetos_opcoes = Projeto.objects.filter(ativo=True).order_by("nome")
+        projetos_opcoes = ProjetoService.ativos().order_by("nome")
 
         filter_options = {
             "status_choices": [

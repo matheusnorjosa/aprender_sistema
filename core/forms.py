@@ -239,7 +239,7 @@ class AprovacaoDecisionForm(forms.Form):
 # -------- Bloqueio de Agenda (Apps Script -> Django) --------
 class BloqueioAgendaForm(forms.Form):
     formador = forms.ModelChoiceField(
-        queryset=Usuario.objects.filter(formador_ativo=True).order_by("first_name", "last_name"),
+        queryset=Usuario.objects.filter(groups__name='formador').order_by("first_name", "last_name"),
         label="Formador",
         required=True,
         widget=forms.Select(
@@ -418,7 +418,7 @@ class FormadorForm(forms.ModelForm):
 
     class Meta:
         model = Usuario
-        fields = ['first_name', 'last_name', 'email', 'area_atuacao', 'formador_ativo', 'municipio', 'setor']
+        fields = ['first_name', 'last_name', 'email', 'area_atuacao', 'municipio', 'setor']
         widgets = {
             'first_name': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -441,9 +441,9 @@ class FormadorForm(forms.ModelForm):
             'setor': forms.Select(attrs={
                 'class': 'form-select'
             }),
-            'formador_ativo': forms.CheckboxInput(attrs={
-                'class': 'form-check-input'
-            })
+            # 'formador_ativo': forms.CheckboxInput(attrs={
+            #     'class': 'form-check-input'
+            # })
         }
         labels = {
             'first_name': 'Nome',
@@ -452,7 +452,7 @@ class FormadorForm(forms.ModelForm):
             'area_atuacao': 'Área de Atuação',
             'municipio': 'Município',
             'setor': 'Setor',
-            'formador_ativo': 'Ativo como Formador'
+            # 'formador_ativo': 'Ativo como Formador'
         }
         help_texts = {
             'first_name': 'Nome do formador',
@@ -461,14 +461,14 @@ class FormadorForm(forms.ModelForm):
             'area_atuacao': 'Grupo/área de atuação do formador',
             'municipio': 'Município de origem do formador',
             'setor': 'Setor de vinculação',
-            'formador_ativo': 'Marque para ativar como formador'
+            # 'formador_ativo': 'Marque para ativar como formador'
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Customizar querysets usando Services centralizados
         self.fields['area_atuacao'].queryset = Group.objects.all().order_by('name')
-        self.fields['municipio'].queryset = Municipio.objects.filter(ativo=True).order_by('nome')
+        self.fields['municipio'].queryset = MunicipioService.ativos().order_by('nome')
         self.fields['setor'].queryset = Setor.objects.all().order_by('nome')
         # Tornar campos opcionais
         self.fields['area_atuacao'].required = False
@@ -480,14 +480,14 @@ class FormadorForm(forms.ModelForm):
         # Garantir que o usuário seja adicionado ao grupo formador se formador_ativo=True
         if commit:
             usuario.save()
-            if usuario.formador_ativo:
-                formador_group, _ = Group.objects.get_or_create(name='formador')
-                usuario.groups.add(formador_group)
-            else:
-                # Remover do grupo se não for mais formador ativo
-                formador_group = Group.objects.filter(name='formador').first()
-                if formador_group:
-                    usuario.groups.remove(formador_group)
+            # if usuario.formador_ativo:
+            #     formador_group, _ = Group.objects.get_or_create(name='formador')
+            #     usuario.groups.add(formador_group)
+            # else:
+            #     # Remover do grupo se não for mais formador ativo
+            #     formador_group = Group.objects.filter(name='formador').first()
+            #     if formador_group:
+            #         usuario.groups.remove(formador_group)
         return usuario
 
 

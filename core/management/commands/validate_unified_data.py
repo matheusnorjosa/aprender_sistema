@@ -102,15 +102,15 @@ class Command(BaseCommand):
             errors.append(f'UsuarioManager falhou: {str(e)}')
 
         # Verificar relação Formador-Usuario
-        formadores_sem_usuario = Formador.objects.filter(usuario__isnull=True).count()
+        formadores_sem_usuario = FormadorService.filter_formadores(usuario__isnull=True).count()
         if formadores_sem_usuario > 0:
             warnings.append(f'{formadores_sem_usuario} formadores ainda sem usuário')
         else:
             self.stdout.write('   ✅ Todos formadores têm usuário')
 
         # Verificar consistência formador_ativo
-        usuarios_formadores = Usuario.objects.filter(formador_ativo=True).count()
-        formadores_ativos = Formador.objects.filter(ativo=True).count()
+        usuarios_formadores = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(formador_ativo=True).count()
+        formadores_ativos = FormadorService.get_formadores_queryset().count()
 
         if abs(usuarios_formadores - formadores_ativos) > 5:  # Tolerância pequena
             warnings.append(f'Inconsistência: {usuarios_formadores} vs {formadores_ativos}')
@@ -172,7 +172,7 @@ class Command(BaseCommand):
         self.stdout.write('5️⃣  Testando integridade...')
 
         # Verificar FormadoresSolicitacao
-        inconsistentes = FormadoresSolicitacao.objects.filter(
+        inconsistentes = FormadoresSolicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             usuario__formador_ativo=False
         ).count()
 
@@ -182,7 +182,7 @@ class Command(BaseCommand):
             self.stdout.write('   ✅ FormadoresSolicitacao consistente')
 
         # Verificar solicitações órfãs
-        solicitacoes_orfas = Solicitacao.objects.filter(
+        solicitacoes_orfas = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             usuario_solicitante__isnull=True
         ).count()
 

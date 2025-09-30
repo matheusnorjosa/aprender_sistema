@@ -45,7 +45,7 @@ class Command(BaseCommand):
 
         moved_count = 0
 
-        for projeto in Projeto.objects.all():
+        for projeto in ProjetoService.todos():
             projeto_lower = projeto.nome.lower()
 
             # Tentar mapear baseado no nome
@@ -252,7 +252,7 @@ class Command(BaseCommand):
         self.stdout.write("\n=== RESUMO FINAL ===")
 
         for setor in Setor.objects.all().order_by("nome"):
-            projetos = Projeto.objects.filter(setor=setor)
+            projetos = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(setor=setor)
             status = (
                 "REQUER APROVAÇÃO"
                 if setor.vinculado_superintendencia
@@ -270,10 +270,10 @@ class Command(BaseCommand):
 
         # Estatísticas gerais
         total_projetos = Projeto.objects.count()
-        projetos_super = Projeto.objects.filter(
+        projetos_super = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(
             setor__vinculado_superintendencia=True
         ).count()
-        projetos_direto = Projeto.objects.filter(
+        projetos_direto = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(
             setor__vinculado_superintendencia=False
         ).count()
 

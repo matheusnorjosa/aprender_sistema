@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 Views para pré-agenda do grupo Controle.
 Permite que o grupo Controle visualize eventos aprovados e crie manualmente no Google Calendar.
@@ -40,7 +42,7 @@ class ControlePreAgendaView(LoginRequiredMixin, SuperintendenciaSetorRequiredMix
     def get_queryset(self):
         """Busca eventos em pré-agenda ordenados por data de início."""
         qs = (
-            Solicitacao.objects.filter(status=SolicitacaoStatus.PRE_AGENDA)
+            Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.PRE_AGENDA)
             .select_related(
                 "projeto", "municipio", "tipo_evento", "usuario_solicitante"
             )
@@ -80,15 +82,15 @@ class ControlePreAgendaView(LoginRequiredMixin, SuperintendenciaSetorRequiredMix
         context = super().get_context_data(**kwargs)
 
         # Estatísticas para cards
-        total_pre_agenda = Solicitacao.objects.filter(
+        total_pre_agenda = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             status=SolicitacaoStatus.PRE_AGENDA
         ).count()
 
-        eventos_hoje = Solicitacao.objects.filter(
+        eventos_hoje = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             status=SolicitacaoStatus.PRE_AGENDA, data_inicio__date=timezone.now().date()
         ).count()
 
-        eventos_semana = Solicitacao.objects.filter(
+        eventos_semana = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             status=SolicitacaoStatus.PRE_AGENDA,
             data_inicio__date__gte=timezone.now().date(),
             data_inicio__date__lte=timezone.now().date() + timedelta(days=7),
@@ -106,8 +108,8 @@ class ControlePreAgendaView(LoginRequiredMixin, SuperintendenciaSetorRequiredMix
                 "eventos_semana": eventos_semana,
                 "eventos_sincronizados": eventos_sincronizados,
                 # Opções para filtros
-                "projetos_filter": Projeto.objects.filter(ativo=True).order_by("nome"),
-                "formadores_filter": Formador.objects.filter(ativo=True).order_by(
+                "projetos_filter": ProjetoService.ativos().order_by("nome"),
+                "formadores_filter": FormadorService.get_formadores_queryset().order_by(
                     "nome"
                 ),
                 # Filtros ativos

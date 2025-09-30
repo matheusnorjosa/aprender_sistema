@@ -300,7 +300,7 @@ class Command(BaseMigrationCommand):
             ]
 
             if emails:
-                created_users = Usuario.objects.filter(email__in=emails)
+                created_users = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(email__in=emails)
 
                 for user in created_users:
                     user.groups.add(group)

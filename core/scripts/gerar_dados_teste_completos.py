@@ -32,10 +32,10 @@ def run():
 
     # Buscar dados necessários
     formadores = list(
-        Formador.objects.all()[:20]
+        FormadorService.get_formadores_queryset()[:20]
     )  # Usar 20 formadores para visualização mais clara
-    municipios = list(Municipio.objects.all()[:10])
-    projetos = list(Projeto.objects.all())
+    municipios = list(MunicipioService.todos()[:10])
+    projetos = list(ProjetoService.todos())
     tipos_evento = list(TipoEvento.objects.all())
 
     if not all([formadores, municipios, projetos, tipos_evento]):

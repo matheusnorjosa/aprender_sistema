@@ -217,7 +217,7 @@ class Command(BaseCommand):
             # Verificar se username já existe
             counter = 1
             original_username = username
-            while Usuario.objects.filter(username=username).exists():
+            while Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(username=username).exists():
                 username = f"{original_username}_{counter}"
                 counter += 1
             
@@ -252,7 +252,7 @@ class Command(BaseCommand):
         
         # Buscar formador existente ou criar novo
         try:
-            formador = Formador.objects.get(usuario=usuario)
+            formador = FormadorService.get_formador(usuario=usuario)
         except Formador.DoesNotExist:
             formador = Formador.objects.create(
                 nome=nome_formador,
@@ -430,7 +430,7 @@ class Command(BaseCommand):
                     usuario_solicitante = self.get_or_create_usuario(coordenador_nome, 'coordenador')
                     if not usuario_solicitante:
                         # Usar usuário padrão se não conseguir criar
-                        usuario_solicitante = Usuario.objects.filter(is_superuser=True).first()
+                        usuario_solicitante = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(is_superuser=True).first()
                         if not usuario_solicitante:
                             self.logger.error(f"❌ Nenhum usuário disponível para linha {i}")
                             eventos_pulados += 1
@@ -451,7 +451,7 @@ class Command(BaseCommand):
                     
                     if not self.options['dry_run']:
                         # Verificar se solicitação já existe
-                        existing = Solicitacao.objects.filter(
+                        existing = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                             titulo_evento=titulo,
                             data_inicio=data_inicio
                         ).first()

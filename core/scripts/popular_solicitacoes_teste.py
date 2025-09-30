@@ -19,9 +19,9 @@ def run():
         )
 
     # Busca dados existentes
-    formadores = list(Formador.objects.all()[:5])
-    municipios = list(Municipio.objects.all()[:5])
-    projetos = list(Projeto.objects.all())
+    formadores = list(FormadorService.get_formadores_queryset()[:5])
+    municipios = list(MunicipioService.todos()[:5])
+    projetos = list(ProjetoService.todos())
     tipos_evento = list(TipoEvento.objects.all())
 
     if not formadores or not municipios or not projetos or not tipos_evento:

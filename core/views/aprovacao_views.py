@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 Views relacionadas ao sistema de aprovações de solicitações.
 """
@@ -16,7 +18,7 @@ class AprovacoesPendentesView(LoginRequiredMixin, SuperintendenciaSetorRequiredM
 
     def get_queryset(self):
         qs = (
-            Solicitacao.objects.filter(status=SolicitacaoStatus.PENDENTE)
+            Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.PENDENTE)
             .select_related(
                 "projeto",
                 "municipio",

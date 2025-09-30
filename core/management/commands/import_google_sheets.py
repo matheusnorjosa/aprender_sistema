@@ -189,7 +189,7 @@ class Command(BaseCommand):
         
         if clear and not dry_run:
             count = Formador.objects.count()
-            Formador.objects.all().delete()
+            FormadorService.get_formadores_queryset().delete()
             self.stdout.write(f"Removidos {count} formadores existentes")
         
         for row in data:
@@ -237,7 +237,7 @@ class Command(BaseCommand):
         
         if clear and not dry_run:
             count = Municipio.objects.count()
-            Municipio.objects.all().delete()
+            MunicipioService.todos().delete()
             self.stdout.write(f"Removidos {count} municípios existentes")
         
         for row in data:
@@ -284,7 +284,7 @@ class Command(BaseCommand):
         
         if clear and not dry_run:
             count = Projeto.objects.count()
-            Projeto.objects.all().delete()
+            ProjetoService.todos().delete()
             self.stdout.write(f"Removidos {count} projetos existentes")
         
         for row in data:

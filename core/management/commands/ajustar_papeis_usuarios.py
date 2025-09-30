@@ -102,7 +102,7 @@ class Command(BaseCommand):
                     # Tentar encontrar por nome
                     if not usuario:
                         # Buscar por nome completo ou parte do nome
-                        usuarios_nome = Usuario.objects.filter(
+                        usuarios_nome = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(
                             models.Q(first_name__icontains=nome.split()[0]) |
                             models.Q(last_name__icontains=nome.split()[-1])
                         )
@@ -137,7 +137,7 @@ class Command(BaseCommand):
             for nome, dados in gerentes_conhecidos.items():
                 try:
                     # Buscar por nome
-                    usuarios_nome = Usuario.objects.filter(
+                    usuarios_nome = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(
                         models.Q(first_name__icontains=nome.split()[0]) |
                         models.Q(last_name__icontains=nome.split()[-1])
                     )
@@ -165,9 +165,9 @@ class Command(BaseCommand):
                     )
 
             # 3. Manter formadores que já foram migrados (exceto coordenadores e gerentes)
-            formadores_ativos = Usuario.objects.filter(formador_ativo=True)
-            coordenadores_definidos = Usuario.objects.filter(groups__name='coordenador')
-            gerentes_definidos = Usuario.objects.filter(groups__name='superintendencia')
+            formadores_ativos = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(formador_ativo=True)
+            coordenadores_definidos = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(groups__name='coordenador')
+            gerentes_definidos = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(groups__name='superintendencia')
 
             for usuario in formadores_ativos:
                 # Não sobrescrever se já foi definido como coordenador ou gerente

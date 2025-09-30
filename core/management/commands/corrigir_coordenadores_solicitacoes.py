@@ -111,7 +111,7 @@ class Command(BaseCommand):
             coordenadores_planilha.add(evento['coordenador'])
 
         # Buscar usuários coordenadores no sistema
-        usuarios_coordenadores = Usuario.objects.filter(
+        usuarios_coordenadores = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(
             cargo='coordenador',
             is_active=True
         )
@@ -177,11 +177,11 @@ class Command(BaseCommand):
         self.stdout.write("\n🔧 Iniciando correção das solicitações...")
 
         # Buscar solicitações do admin (importadas incorretamente)
-        admin_user = Usuario.objects.filter(username='admin').first()
+        admin_user = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(username='admin').first()
         if not admin_user:
             raise CommandError("Usuário admin não encontrado")
 
-        solicitacoes_admin = Solicitacao.objects.filter(usuario_solicitante=admin_user)
+        solicitacoes_admin = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(usuario_solicitante=admin_user)
         total_solicitacoes = solicitacoes_admin.count()
 
         self.stdout.write(f"📊 {total_solicitacoes} solicitações para corrigir")

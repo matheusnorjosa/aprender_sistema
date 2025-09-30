@@ -170,7 +170,7 @@ class Command(BaseCommand):
 
             # Mostrar resumo por cargo
             self.stdout.write("\n=== RESUMO POR CARGO ===")
-            usuarios_super = Usuario.objects.filter(setor=setor_super)
+            usuarios_super = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(setor=setor_super)
             for cargo_db, cargo_display in Usuario.CARGO_CHOICES:
                 count = usuarios_super.filter(cargo=cargo_db).count()
                 if count > 0:

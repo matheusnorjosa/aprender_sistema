@@ -8,7 +8,8 @@ from .data_services import (
     FormadorService,
     CoordinatorService,
     DashboardService,
-    MunicipioService
+    MunicipioService,
+    ProjetoService
 )
 
 __all__ = [
@@ -16,5 +17,6 @@ __all__ = [
     'FormadorService',
     'CoordinatorService',
     'DashboardService',
-    'MunicipioService'
+    'MunicipioService',
+    'ProjetoService'
 ]

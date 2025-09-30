@@ -555,7 +555,7 @@ class Command(BaseCommand):
 
             counter = 1
             username = username_base
-            while Usuario.objects.filter(username=username).exists():
+            while Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(username=username).exists():
                 username = f"{username_base}{counter}"
                 counter += 1
             usuario.username = username

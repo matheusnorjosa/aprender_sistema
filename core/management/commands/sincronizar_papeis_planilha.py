@@ -154,7 +154,7 @@ class Command(BaseCommand):
                                 primeiro_nome = nome_parts[0]
                                 ultimo_nome = nome_parts[-1]
 
-                                usuarios_similares = Usuario.objects.filter(
+                                usuarios_similares = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(
                                     first_name__icontains=primeiro_nome,
                                     last_name__icontains=ultimo_nome
                                 )

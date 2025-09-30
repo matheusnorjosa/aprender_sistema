@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 Views para sistema CRUD de Deslocamentos.
 Interface similar ao Excel para gerenciamento de deslocamentos de formadores.
@@ -80,7 +82,7 @@ class DeslocamentoListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'formadores': Formador.objects.filter(ativo=True).order_by('nome'),
+            'formadores': FormadorService.get_formadores_queryset().order_by('nome'),
             'filtros_ativos': any([
                 self.request.GET.get('data_inicio'),
                 self.request.GET.get('data_fim'),
@@ -108,7 +110,7 @@ class DeslocamentoCreateView(LoginRequiredMixin, CreateView):
         context = super().get_context_data(**kwargs)
         context.update({
             'title': 'Novo Deslocamento',
-            'formadores': Formador.objects.filter(ativo=True).order_by('nome'),
+            'formadores': FormadorService.get_formadores_queryset().order_by('nome'),
             'action': 'create'
         })
         return context
@@ -143,7 +145,7 @@ class DeslocamentoUpdateView(LoginRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context.update({
             'title': f'Editar Deslocamento - {self.object}',
-            'formadores': Formador.objects.filter(ativo=True).order_by('nome'),
+            'formadores': FormadorService.get_formadores_queryset().order_by('nome'),
             'action': 'update'
         })
         return context

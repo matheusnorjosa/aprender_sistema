@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 API views para verificação de disponibilidade em tempo real.
 SEMANA 3 - DIA 1: Interface de solicitação aprimorada

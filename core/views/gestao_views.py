@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 Views para gestão administrativa da plataforma.
 Páginas customizadas para CRUD de entidades principais.
@@ -29,9 +31,9 @@ class GestaoDashboardView(GestaoBaseMixin, TemplateView):
         stats = DashboardService.get_estatisticas_gerais()
 
         context.update({
-            'total_formadores': len(FormadorService.todos_formadores()) + Usuario.objects.filter(formador_ativo=False).count(),
+            'total_formadores': len(FormadorService.todos_formadores()) + Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(formador_ativo=False).count(),
             'formadores_ativos': stats['formadores_ativos'],
-            'total_municipios': MunicipioService.ativos().count() + Municipio.objects.filter(ativo=False).count(),
+            'total_municipios': MunicipioService.ativos().count() + Municipio.objects.prefetch_related("solicitacao_set", "usuario_set").filter(ativo=False).count(),
             'municipios_ativos': stats['municipios_ativos'],
             'total_projetos': Projeto.objects.count(),
             'projetos_ativos': stats['projetos_ativos'],
@@ -166,7 +168,7 @@ class MunicipioListView(GestaoBaseMixin, BaseListView):
         base_qs = MunicipioService.ativos()
 
         # Incluir inativos também
-        queryset = Municipio.objects.all()
+        queryset = MunicipioService.todos()
 
         # Busca por nome ou UF
         search = self.request.GET.get('search')

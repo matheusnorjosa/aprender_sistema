@@ -184,7 +184,7 @@ def detailed_health(request):
             "total_users": Usuario.objects.count(),
             "active_users": UsuarioService.ativos().count(),
             "total_solicitacoes": Solicitacao.objects.count(),
-            "solicitacoes_pendentes": Solicitacao.objects.filter(
+            "solicitacoes_pendentes": Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                 status='pendente'
             ).count(),
             "recent_audit_logs": LogAuditoria.objects.filter(
@@ -195,10 +195,10 @@ def detailed_health(request):
         # Estatísticas dos últimos 7 dias
         week_ago = timezone.now() - timedelta(days=7)
         detailed_status["application_metrics"]["weekly_stats"] = {
-            "new_solicitacoes": Solicitacao.objects.filter(
+            "new_solicitacoes": Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                 data_criacao__gte=week_ago
             ).count(),
-            "approved_solicitacoes": Solicitacao.objects.filter(
+            "approved_solicitacoes": Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                 status='aprovado',
                 data_criacao__gte=week_ago
             ).count(),

@@ -17,7 +17,7 @@ def run():
     User = get_user_model()
 
     # Buscar dados existentes
-    formadores = list(Formador.objects.all()[:10])
+    formadores = list(FormadorService.get_formadores_queryset()[:10])
     solicitacoes = list(Solicitacao.objects.all())
 
     if not formadores:
@@ -97,7 +97,7 @@ def run():
     print(f"\n📊 Resumo dos dados de teste criados:")
     print(f"   🔒 Bloqueios criados: {bloqueios_criados}")
     print(f"   ✅ Solicitações aprovadas: {aprovadas}")
-    print(f"   👥 Formadores ativos: {Formador.objects.filter(ativo=True).count()}")
+    print(f"   👥 Formadores ativos: {FormadorService.get_formadores_queryset().count()}")
     print(f"   📅 Total de solicitações: {Solicitacao.objects.count()}")
     print(
         f"   🗓️ Solicitações aprovadas: {Solicitacao.objects.filter(status=SolicitacaoStatus.APROVADO).count()}"

@@ -70,8 +70,8 @@ class Command(BaseCommand):
         self.stdout.write("=" * 50)
 
         total = Usuario.objects.count()
-        emails_planilha = Usuario.objects.filter(email__contains='planilha.').count()
-        emails_sistema = Usuario.objects.filter(email__contains='sistema.local').count()
+        emails_planilha = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(email__contains='planilha.').count()
+        emails_sistema = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(email__contains='sistema.local').count()
         emails_reais = Usuario.objects.exclude(
             email__contains='planilha.'
         ).exclude(
@@ -95,7 +95,7 @@ class Command(BaseCommand):
         # Agrupar por primeiro nome (case-insensitive)
         grupos_nome = defaultdict(list)
 
-        for usuario in Usuario.objects.all():
+        for usuario in Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions"):
             nome_normalizado = self.normalizar_nome(usuario.first_name)
             if nome_normalizado:
                 grupos_nome[nome_normalizado].append(usuario)
@@ -195,13 +195,13 @@ class Command(BaseCommand):
 
         # Transferir FormadoresSolicitacao
         if not self.dry_run:
-            FormadoresSolicitacao.objects.filter(usuario=usuario_origem).update(usuario=usuario_destino)
+            FormadoresSolicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(usuario=usuario_origem).update(usuario=usuario_destino)
 
         # Transferir formadores
         try:
-            formador_origem = Formador.objects.get(usuario=usuario_origem)
+            formador_origem = FormadorService.get_formador(usuario=usuario_origem)
             try:
-                formador_destino = Formador.objects.get(usuario=usuario_destino)
+                formador_destino = FormadorService.get_formador(usuario=usuario_destino)
                 # Já existe formador para destino
                 # Transferir dados importantes se necessário
                 if not self.dry_run:
@@ -282,8 +282,8 @@ class Command(BaseCommand):
         self.stdout.write("=" * 50)
 
         total = Usuario.objects.count()
-        emails_planilha = Usuario.objects.filter(email__contains='planilha.').count()
-        emails_sistema = Usuario.objects.filter(email__contains='sistema.local').count()
+        emails_planilha = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(email__contains='planilha.').count()
+        emails_sistema = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(email__contains='sistema.local').count()
         emails_reais = Usuario.objects.exclude(
             email__contains='planilha.'
         ).exclude(
@@ -297,7 +297,7 @@ class Command(BaseCommand):
 
         # Verificar duplicações restantes
         grupos_nome = defaultdict(list)
-        for usuario in Usuario.objects.all():
+        for usuario in Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions"):
             nome_normalizado = self.normalizar_nome(usuario.first_name)
             if nome_normalizado:
                 grupos_nome[nome_normalizado].append(usuario)

@@ -101,14 +101,14 @@ class Command(BaseCommand):
         from core.models import FormadoresSolicitacao, Aprovacao
         
         # Primeiro, apagar relacionamentos
-        FormadoresSolicitacao.objects.all().delete()
+        FormadoresSolicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").delete()
         Aprovacao.objects.all().delete()
         
         # Depois, apagar modelos principais
-        Solicitacao.objects.all().delete()
+        Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").delete()
         DisponibilidadeFormadores.objects.all().delete()
-        Formador.objects.all().delete()
-        Usuario.objects.filter(is_superuser=False).delete()
+        FormadorService.get_formadores_queryset().delete()
+        Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(is_superuser=False).delete()
         
         self.stdout.write("Dados limpos")
 
@@ -323,7 +323,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("Grupo 'formador' nao encontrado"))
             return
         
-        usuarios_formadores = Usuario.objects.filter(groups=formadores_group)
+        usuarios_formadores = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(groups=formadores_group)
         created_count = 0
         
         for usuario in usuarios_formadores:
@@ -403,7 +403,7 @@ class Command(BaseCommand):
             if not self.dry_run:
                 try:
                     # Verificar se já existe
-                    if Usuario.objects.filter(username=user_data['username']).exists():
+                    if Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(username=user_data['username']).exists():
                         continue
                     
                     # Obter setor padrão

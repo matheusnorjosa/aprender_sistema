@@ -416,7 +416,7 @@ class AvailabilityService:
     ) -> Dict[int, List]:
         """Busca eventos do período agrupados por formador"""
         events = (
-            Solicitacao.objects.filter(
+            Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                 formadores__in=formadores,
                 status__in=["APROVADO"],
                 data_inicio__lte=end,

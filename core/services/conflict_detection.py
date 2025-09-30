@@ -153,7 +153,7 @@ class ConflictDetector:
         conflicts = []
 
         # Buscar eventos aprovados que se sobreponham
-        eventos_existentes = Solicitacao.objects.filter(
+        eventos_existentes = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             status__in=[SolicitacaoStatus.APROVADO, SolicitacaoStatus.PRE_AGENDA],
             formadores=formador,
         ).exclude(id=solicitacao.id)
@@ -200,7 +200,7 @@ class ConflictDetector:
         janela_fim = data_fim + timedelta(hours=4)
 
         eventos_proximos = (
-            Solicitacao.objects.filter(
+            Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                 status__in=[SolicitacaoStatus.APROVADO, SolicitacaoStatus.PRE_AGENDA],
                 formadores=formador,
                 data_inicio__range=(janela_inicio, janela_fim),
@@ -258,7 +258,7 @@ class ConflictDetector:
         data_evento = solicitacao.data_inicio.date()
 
         # Buscar eventos no mesmo dia
-        eventos_no_dia = Solicitacao.objects.filter(
+        eventos_no_dia = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             status__in=[SolicitacaoStatus.APROVADO, SolicitacaoStatus.PRE_AGENDA],
             formadores=formador,
             data_inicio__date=data_evento,

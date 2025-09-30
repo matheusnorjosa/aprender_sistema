@@ -31,7 +31,7 @@ class MapaMensalView(LoginRequiredMixin, SuperintendenciaSetorRequiredMixin, Vie
         # Buscar formadores ativos filtrados por superintendência
         # Filtrar apenas formadores da superintendência (email @planilha.super)
         # Conforme solicitado, mostrar apenas os formadores vinculados à superintendência
-        formadores = list(Formador.objects.filter(
+        formadores = list(FormadorService.filter_formadores(
             ativo=True,
             email__endswith='@planilha.super'
         ).order_by("nome"))
@@ -93,7 +93,7 @@ class FormadoresSuperintendenciaView(LoginRequiredMixin, SuperintendenciaSetorRe
             # Filtrar apenas formadores da superintendência (email @planilha.super)
             # Conforme solicitado, mostrar apenas os formadores vinculados à superintendência
             logger.info("Loading superintendencia formadores only")
-            formadores = Formador.objects.filter(
+            formadores = FormadorService.filter_formadores(
                 ativo=True,
                 email__endswith='@planilha.super'
             ).order_by("nome")

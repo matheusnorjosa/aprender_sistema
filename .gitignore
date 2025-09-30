@@ -33,6 +33,11 @@ MANIFEST
 *.manifest
 *.spec
 
+# Virtual Environment
+venv/
+env/
+.venv/
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
@@ -160,6 +165,23 @@ Thumbs.db
 # Node modules (if any)
 node_modules/
 
+# Security & Credentials
+*.pem
+*.key
+*.p12
+api_keys.txt
+credentials.json
+google_*.json
+!google_*.json.example
+token.pickle
+service-account.json
+chaveacesso-planilhas@*.json
+*.env
+*.env.*
+!.env.example
+secrets/
+acesso_planilhas.json
+
 # Backup files
 *.bak
 *.backup
@@ -183,6 +205,50 @@ config.dev.env
 # Service account keys
 *service_account.json
 google_service_account.json
+
+# Data files (temporary/extracted)
+*.xlsx
+*.xls
+*.csv
+extracted_*.json
+dumps/
+backups/*.sql
+backup_*.json
+temp/
+out/
+out_apps_script/
+logs/*.log
+mapeamento_*.json
+*_planilha_*.json
+*_completos_*.json
+*_extraidos_*.json
+*_organizados_*.json
+*_faltantes_*.json
+*_tratados_*.json
+*_unificados_*.json
+*_limpos_*.json
+*_estatisticas_*.json
+*_relatorio_*.json
+*_consolidacao_*.json
+*_processamento_*.json
+*_extracao_*.json
+*_mapeamento_*.json
+*_resumo_*.json
+*_comparacao_*.json
+*_dados_*.json
+*_eventos_*.json
+*_formacoes_*.json
+*_usuarios_*.json
+*_municipios_*.json
+*_projetos_*.json
+*_disponibilidades_*.json
+*_controle_*.json
+*_agenda_*.json
+*_neural_*.json
+*_processed_*.json
+*_extraction_*.json
+*_robust_*.json
+*_simple_*.json
 
 # AI/ML model files
 *.pkl
@@ -236,3 +302,86 @@ ai_export/
 # Reports
 relatorios/
 dados/
+
+# Editor
+.vscode/settings.json
+.vscode/launch.json
+
+# Arquivos experimentais/temporários
+*_unificado.py
+*_unificado.yml
+*_backup.py
+docker-compose.unificado.yml
+config_unificado.env
+sincronizar_configuracoes.py
+GUIA_*.md
+PLANO_*.md
+PRE_COMMIT_*.md
+QUALITY_*.md
+README_REFATORACAO.md
+REFACTORING_*.md
+RELATORIO_COMPLETO_*.md
+acessar_planilhas_*
+analisar_*
+gerar_planilha_*.py
+mudanca_acesso_*.md
+
+# Arquivos de memória antigos
+docs/memoria/
+lighthouse-*.json
+
+# Arquivos de teste e desenvolvimento
+teste-*
+temp_*
+*_teste.*
+*_temp.*
+*_debug.*
+*_dev.*
+*_development.*
+
+# Arquivos de configuração local
+.claude/
+.serena/
+.config/
+.cursor/
+.codeium/
+.docker/
+.git-for-windows-updater
+.gitconfig
+.gk/
+.ipython/
+.lesshst
+.lmstudio-home-pointer
+.lmstudio/
+.local/
+.matplotlib/
+.n8n/
+.node_repl_history
+.ollama/
+.python_history
+.streamlit/
+
+# Arquivos de sistema Windows
+AppData/
+Contacts/
+Downloads/
+Favorites/
+Links/
+Microsoft/
+Music/
+NTUSER.DAT*
+ntuser.dat*
+ntuser.ini
+Saved Games/
+Searches/
+Tracing/
+Videos/
+
+# Arquivos de backup e temporários
+*.bak
+*.backup
+*_backup_*
+*.tmp
+*.temp
+backup_*
+temp_*

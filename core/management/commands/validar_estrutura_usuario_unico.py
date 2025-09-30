@@ -150,7 +150,7 @@ class Command(BaseCommand):
         # Corrigir SolicitacaoForm para usar Usuario
         conteudo_corrigido = re.sub(
             r'Formador\.objects\.filter\(ativo=True\)',
-            'Usuario.objects.filter(formador_ativo=True)',
+            'Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(formador_ativo=True)',
             conteudo
         )
 
@@ -398,7 +398,7 @@ class Command(BaseCommand):
             self.stdout.write(f"   1. Atualizar core/forms.py para usar Usuario ao invés de Formador")
 
         if self.problemas_encontrados['views_incompativeis']:
-            self.stdout.write(f"   2. Atualizar views para usar Usuario.objects.filter(formador_ativo=True)")
+            self.stdout.write(f"   2. Atualizar views para usar Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(formador_ativo=True)")
 
         if self.problemas_encontrados['servicos_incompativeis']:
             self.stdout.write(f"   3. Atualizar serviços para usar Usuario como tipo")

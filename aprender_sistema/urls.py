@@ -12,9 +12,11 @@ urlpatterns = [
     path("", include("core.urls")),
 ]
 
-# TODO: Reativar quando instalar djangorestframework
+# API REST Framework - Temporariamente desabilitada devido a problemas de compatibilidade
+# TODO: Corrigir problema com coreapi.Field no DRF 3.16.1
 # try:
 #     import rest_framework
 #     urlpatterns.insert(2, path("api/", include("api.urls")))
+#     print("✅ API REST Framework ativada com sucesso")
 # except ImportError:
-#     pass
+#     print("⚠️ Django REST Framework não instalado - API desabilitada")

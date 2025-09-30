@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 APIs de Notificações em Tempo Real
 SEMANA 3 - DIA 4: Sistema de notificações e comunicações

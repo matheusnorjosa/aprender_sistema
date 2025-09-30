@@ -1,3 +1,0 @@
-# Optimized
-
-Scripts otimizados

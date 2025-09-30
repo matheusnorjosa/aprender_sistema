@@ -54,7 +54,7 @@ class Command(BaseCommand):
         from django.db.models import Q
         
         # Usuários de teste (emails @sistema.local, @teste.com, @local)
-        usuarios_teste = Usuario.objects.filter(
+        usuarios_teste = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(
             Q(email__in=['admin@admin.com']) |
             Q(email__icontains='@sistema.local') |
             Q(email__icontains='@teste.com') |
@@ -63,15 +63,15 @@ class Command(BaseCommand):
         )
         
         # Formadores de teste (vinculados a usuários de teste)
-        formadores_teste = Formador.objects.filter(usuario__in=usuarios_teste)
+        formadores_teste = FormadorService.filter_formadores(usuario__in=usuarios_teste)
         
         # Projetos de teste (nomes genéricos)
-        projetos_teste = Projeto.objects.filter(
+        projetos_teste = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(
             nome__in=['Alfabetização', 'Matemática', 'Ciências', 'Projeto Teste']
         )
         
         # Municípios de teste (poucos dados)
-        municipios_teste = Municipio.objects.filter(
+        municipios_teste = Municipio.objects.prefetch_related("solicitacao_set", "usuario_set").filter(
             nome__in=['Fortaleza', 'Caucaia', 'Maracanaú', 'Sobral', 'Juazeiro do Norte']
         ).exclude(
             # Manter Fortaleza se vier das planilhas reais
@@ -79,7 +79,7 @@ class Command(BaseCommand):
         )
         
         # Solicitações de teste (todas as atuais são de exemplo)
-        solicitacoes_teste = Solicitacao.objects.filter(
+        solicitacoes_teste = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             Q(observacoes__icontains='exemplo') |
             Q(observacoes__icontains='teste') |
             Q(usuario_solicitante__in=usuarios_teste)
@@ -154,7 +154,7 @@ class Command(BaseCommand):
         """Garante que existe pelo menos um superusuário para administração"""
         self.logger.info("👤 Verificando usuário administrativo...")
         
-        if not Usuario.objects.filter(is_superuser=True).exists():
+        if not Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(is_superuser=True).exists():
             # Criar superusuário básico
             admin_user = Usuario.objects.create_superuser(
                 username='admin',

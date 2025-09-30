@@ -155,7 +155,7 @@ class MunicipioServiceCentralizado(BaseService):
     def get_base_queryset(cls) -> QuerySet:
         """QuerySet base sem duplicatas"""
         from core.models import Municipio
-        return Municipio.objects.filter(ativo=True).order_by('nome')
+        return MunicipioService.ativos().order_by('nome')
 
     @classmethod
     def distintos_ordenados(cls) -> QuerySet:

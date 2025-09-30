@@ -114,7 +114,7 @@ class Command(BaseCommand):
                 email = f"{username}@sistema.local"
                 
                 # Verificar se já existe
-                if not self.dry_run and Usuario.objects.filter(username=username).exists():
+                if not self.dry_run and Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(username=username).exists():
                     continue
                 
                 if not self.dry_run:
@@ -271,9 +271,9 @@ class Command(BaseCommand):
         
         try:
             # Buscar dados necessários
-            formadores = list(Formador.objects.all()[:5])  # Primeiros 5 formadores
-            projetos = list(Projeto.objects.all()[:3])     # Primeiros 3 projetos
-            municipios = list(Municipio.objects.all()[:3]) # Primeiros 3 municípios
+            formadores = list(FormadorService.get_formadores_queryset()[:5])  # Primeiros 5 formadores
+            projetos = list(ProjetoService.todos()[:3])     # Primeiros 3 projetos
+            municipios = list(MunicipioService.todos()[:3]) # Primeiros 3 municípios
             tipo_presencial = TipoEvento.objects.get(nome='Presencial')
             
             # Criar usuário coordenador padrão

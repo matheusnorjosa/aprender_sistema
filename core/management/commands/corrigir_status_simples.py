@@ -47,7 +47,7 @@ class Command(BaseCommand):
                 with transaction.atomic():
                     # Estratégia: Marcar TODOS como APROVADO inicialmente
                     total_solicitacoes = Solicitacao.objects.count()
-                    Solicitacao.objects.all().update(status=SolicitacaoStatus.APROVADO)
+                    Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").update(status=SolicitacaoStatus.APROVADO)
 
                     # Marcar os últimos X% como PENDENTE para atingir a proporção
                     proporção_pendente = pendentes_esperados / (aprovados_esperados + pendentes_esperados)
@@ -56,11 +56,11 @@ class Command(BaseCommand):
                     # Marcar as últimas N solicitações como PENDENTE
                     solicitacoes_pendentes = Solicitacao.objects.order_by('-id')[:num_pendentes]
                     ids_pendentes = [s.id for s in solicitacoes_pendentes]
-                    Solicitacao.objects.filter(id__in=ids_pendentes).update(status=SolicitacaoStatus.PENDENTE)
+                    Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(id__in=ids_pendentes).update(status=SolicitacaoStatus.PENDENTE)
 
                     # Resultado
-                    aprovados_final = Solicitacao.objects.filter(status=SolicitacaoStatus.APROVADO).count()
-                    pendentes_final = Solicitacao.objects.filter(status=SolicitacaoStatus.PENDENTE).count()
+                    aprovados_final = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.APROVADO).count()
+                    pendentes_final = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.PENDENTE).count()
 
                     self.stdout.write(f"✅ Resultado:")
                     self.stdout.write(f"   APROVADO: {aprovados_final}")

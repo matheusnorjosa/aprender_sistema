@@ -5,7 +5,11 @@ Configura roteamento automático para todas as ViewSets DRF.
 
 from django.urls import include, path
 
-from rest_framework.authtoken.views import obtain_auth_token
+try:
+    from rest_framework.authtoken.views import obtain_auth_token
+except ImportError:
+    # Fallback se authtoken não estiver disponível
+    obtain_auth_token = None
 from rest_framework.routers import DefaultRouter
 
 from . import views
@@ -37,11 +41,17 @@ app_name = "api"
 urlpatterns = [
     # Roteamento automático da API
     path("v1/", include(router.urls)),
-    # Autenticação por token
-    path("auth/token/", obtain_auth_token, name="api_token_auth"),
-    # Endpoint de API browsable (desenvolvimento)
-    path("auth/", include("rest_framework.urls", namespace="rest_framework")),
 ]
+
+# Adicionar autenticação por token se disponível
+if obtain_auth_token:
+    urlpatterns.append(path("auth/token/", obtain_auth_token, name="api_token_auth"))
+
+# Endpoint de API browsable (desenvolvimento)
+try:
+    urlpatterns.append(path("auth/", include("rest_framework.urls", namespace="rest_framework")))
+except ImportError:
+    pass
 
 """
 ======================

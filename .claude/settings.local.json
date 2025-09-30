@@ -15,7 +15,12 @@
       "Bash(python:*)",
       "Bash(py:*)",
       "Bash(git checkout:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git fsck:*)",
+      "Bash(git stash show:*)",
+      "Bash(git stash drop:*)",
+      "Bash(cat:*)",
+      "Bash(git tag:*)"
     ],
     "deny": [],
     "ask": []

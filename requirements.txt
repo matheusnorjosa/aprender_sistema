@@ -1,0 +1,56 @@
+asgiref>=3.7.0
+black>=24.0.0
+
+# Async processing
+celery>=5.3.0
+coverage>=7.3.0
+dj-database-url>=2.1.0
+# Core Django dependencies
+Django>=4.2.0,<5.0.0  # Django 4.2 LTS (suporte até 2026)
+
+# Performance optimization
+django-bulk-update>=2.2.0
+django-celery-beat>=2.5.0
+django-celery-results>=2.5.0
+django-cors-headers>=4.0.0
+django-debug-toolbar>=4.2.0
+
+# Django extensions
+django-extensions>=3.2.0
+django-filter>=23.0
+
+# Data migration libraries
+django-import-export>=4.0.0
+
+# Django REST Framework
+djangorestframework>=3.14.0
+factory-boy>=3.3.0
+
+# Development and code quality tools
+flake8>=6.0.0
+
+# Google APIs integration
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-httplib2>=0.1.0
+google-auth-oauthlib>=1.1.0
+gspread>=6.0.0
+
+# Production server
+gunicorn>=21.0.0
+isort>=5.12.0
+openpyxl>=3.1.0
+pandas>=2.1.0
+Pillow>=10.0.0
+psycopg2-binary>=2.9.0
+
+# Testing and monitoring
+pytest>=7.4.0
+pytest-django>=4.5.0
+
+# Utilities
+python-decouple>=3.8
+redis>=4.5.0
+sqlparse>=0.4.0
+tzdata>=2024.1
+whitenoise>=6.5.0

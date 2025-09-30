@@ -30,7 +30,7 @@ def _conta_eventos_no_dia(formador_id, dia: date) -> int:
     """Conta eventos que intersectam o dia (início <= dia <= fim)"""
     di, df = _dia_range(dia)
     return (
-        Solicitacao.objects.filter(
+        Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             status="Aprovado",
             formadores=formador_id,
             data_inicio__lte=df,
@@ -92,7 +92,7 @@ def gerar_mapa_mensal_otimizado(formadores, dias):
     ).select_related("pessoa_1", "pessoa_2", "pessoa_3", "pessoa_4", "pessoa_5", "pessoa_6")
 
     # 3. Todos os eventos aprovados que intersectam o período
-    eventos = Solicitacao.objects.filter(
+    eventos = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
         status="Aprovado",
         formadores__in=formador_ids,
         data_inicio__lte=dt_fim_periodo,

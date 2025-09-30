@@ -227,7 +227,7 @@ class Command(BaseMigrationCommand):
             }
 
             # Verificar se já existe
-            existing = Solicitacao.objects.filter(
+            existing = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                 titulo=evento_data["titulo"],
                 data_inicio=evento_data["data_inicio"],
                 municipio=municipio,

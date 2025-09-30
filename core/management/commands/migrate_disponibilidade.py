@@ -155,7 +155,7 @@ class Command(BaseCommand):
                     )
                     # Depois buscar formador vinculado
                     try:
-                        formador = Formador.objects.get(usuario=usuario)
+                        formador = FormadorService.get_formador(usuario=usuario)
                     except Formador.DoesNotExist:
                         self.stdout.write(
                             f"Formador não encontrado para usuário: {usuario_nome}"
@@ -167,7 +167,7 @@ class Command(BaseCommand):
                     continue
                 except Usuario.MultipleObjectsReturned:
                     # Tentar busca mais específica
-                    usuario = Usuario.objects.filter(
+                    usuario = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(
                         first_name__iexact=(
                             usuario_nome.split()[0] if usuario_nome else ""
                         )
@@ -175,7 +175,7 @@ class Command(BaseCommand):
                     if not usuario:
                         continue
                     try:
-                        formador = Formador.objects.get(usuario=usuario)
+                        formador = FormadorService.get_formador(usuario=usuario)
                     except Formador.DoesNotExist:
                         continue
 
@@ -269,7 +269,7 @@ class Command(BaseCommand):
                             "horario_fim": horario_fim,
                             "observacoes": "Migrado de planilha de disponibilidade",
                             "status": SolicitacaoStatus.APROVADO,  # Assumir aprovado
-                            "usuario_solicitante": Usuario.objects.filter(
+                            "usuario_solicitante": Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(
                                 groups__name="admin"
                             ).first(),
                         },

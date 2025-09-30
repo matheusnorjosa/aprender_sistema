@@ -1631,6 +1631,54 @@
       });
     }
 
+    // Dashboard Manager Class - Otimizado
+    class DashboardManager {
+      constructor() {
+        this.cache = new Map();
+        this.isLoading = false;
+        this.apiEndpoints = {
+          estatisticas: '/api/mapa/estatisticas/',
+          dados: '/api/mapa/dados/',
+          cursos: '/diretoria/api/cursos/',
+          coordenadores: '/diretoria/api/coordenadores/'
+        };
+      }
+
+      async fetchData(url, params = {}) {
+        const cacheKey = `${url}?${new URLSearchParams(params).toString()}`;
+        
+        if (this.cache.has(cacheKey)) {
+          return this.cache.get(cacheKey);
+        }
+        
+        console.log(`🌐 Fazendo requisição para: ${url}`);
+        
+        try {
+          const response = await fetch(`${url}?${new URLSearchParams(params).toString()}`);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          console.log(`✅ Resposta recebida de ${url}:`, data);
+          
+          this.cache.set(cacheKey, data);
+          return data;
+          
+        } catch (error) {
+          console.error(`❌ Erro na requisição para ${url}:`, error);
+          throw error;
+        }
+      }
+
+      formatNumber(num) {
+        return new Intl.NumberFormat('pt-BR').format(num);
+      }
+    }
+
+    const dashboardManager = new DashboardManager();
+
     document.addEventListener('DOMContentLoaded', () => {
       console.log('🚀 DOM carregado, iniciando dashboard...');
       initChart();

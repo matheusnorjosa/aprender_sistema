@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 # core/views/importacao_views.py
 """
 Views para funcionalidades de importação de cursos via CSV.
@@ -221,7 +223,7 @@ class CursosSemVinculoListView(LoginRequiredMixin, UserPassesTestMixin, ListView
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['total_sem_vinculo'] = self.get_queryset().count()
-        context['projetos'] = Projeto.objects.filter(ativo=True).order_by('nome')
+        context['projetos'] = ProjetoService.ativos().order_by('nome')
         return context
 
 

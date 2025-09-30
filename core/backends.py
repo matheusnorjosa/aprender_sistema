@@ -22,8 +22,8 @@ class CPFAuthenticationBackend(BaseBackend):
             # Limpar CPF (remover qualquer formatação que possa ter)
             cpf_limpo = ''.join(filter(str.isdigit, username))
             
-            # Buscar usuário por CPF
-            user = User.objects.get(cpf=cpf_limpo)
+            # Buscar usuário por CPF (usando only para campos que existem)
+            user = User.objects.only('id', 'username', 'email', 'password', 'is_active', 'is_staff', 'is_superuser', 'cpf', 'telefone', 'cargo', 'municipio_id', 'setor_id', 'area_atuacao_id').get(cpf=cpf_limpo)
             
             # Verificar senha
             if user.check_password(password):
@@ -32,7 +32,7 @@ class CPFAuthenticationBackend(BaseBackend):
         except User.DoesNotExist:
             # Fallback: tentar username normal também
             try:
-                user = User.objects.get(username=username)
+                user = User.objects.only('id', 'username', 'email', 'password', 'is_active', 'is_staff', 'is_superuser', 'cpf', 'telefone', 'cargo', 'municipio_id', 'setor_id', 'area_atuacao_id').get(username=username)
                 if user.check_password(password):
                     return user
             except User.DoesNotExist:
@@ -42,6 +42,6 @@ class CPFAuthenticationBackend(BaseBackend):
     
     def get_user(self, user_id):
         try:
-            return User.objects.get(pk=user_id)
+            return User.objects.only('id', 'username', 'email', 'password', 'is_active', 'is_staff', 'is_superuser', 'cpf', 'telefone', 'cargo', 'municipio_id', 'setor_id', 'area_atuacao_id').get(pk=user_id)
         except User.DoesNotExist:
             return None

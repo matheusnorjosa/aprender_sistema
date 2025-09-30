@@ -34,7 +34,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write("=== CORREÇÃO DAS UFs DOS MUNICÍPIOS ===")
         
-        municipios = Municipio.objects.all()
+        municipios = MunicipioService.todos()
         total_municipios = municipios.count()
         
         self.stdout.write(f"Total de municípios para corrigir: {total_municipios}")

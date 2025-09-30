@@ -282,7 +282,7 @@ class Command(BaseCommand):
 
             # Solicitações aprovadas sem evento no calendar
             aprovadas_sem_evento = (
-                Solicitacao.objects.filter(
+                Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                     status=SolicitacaoStatus.PRE_AGENDA,
                     data_inicio__gte=datetime.now() - timedelta(days=7),
                 )
@@ -332,14 +332,14 @@ class Command(BaseCommand):
 
             # Stats básicas
             total_solicitacoes = Solicitacao.objects.count()
-            aprovadas = Solicitacao.objects.filter(
+            aprovadas = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                 status=SolicitacaoStatus.PRE_AGENDA
             ).count()
             eventos_criados = EventoGoogleCalendar.objects.count()
 
             # Stats últimos 30 dias
             last_30_days = datetime.now() - timedelta(days=30)
-            recent_solicitacoes = Solicitacao.objects.filter(
+            recent_solicitacoes = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                 data_solicitacao__gte=last_30_days
             ).count()
             recent_approvals = LogAuditoria.objects.filter(

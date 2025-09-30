@@ -85,11 +85,11 @@ class Command(BaseCommand):
         """Valida dados das solicitações"""
 
         total = Solicitacao.objects.count()
-        aprovadas = Solicitacao.objects.filter(status=SolicitacaoStatus.APROVADO).count()
-        pendentes = Solicitacao.objects.filter(status=SolicitacaoStatus.PENDENTE).count()
+        aprovadas = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.APROVADO).count()
+        pendentes = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.PENDENTE).count()
 
         # Solicitações com admin
-        com_admin = Solicitacao.objects.filter(usuario_solicitante__username='admin').count()
+        com_admin = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(usuario_solicitante__username='admin').count()
 
         # Por projeto
         por_projeto = dict(
@@ -129,11 +129,11 @@ class Command(BaseCommand):
         """Valida usuários e coordenadores"""
 
         total_usuarios = Usuario.objects.count()
-        coordenadores = Usuario.objects.filter(cargo='coordenador', is_active=True).count()
-        formadores_ativos = Usuario.objects.filter(formador_ativo=True, is_active=True).count()
+        coordenadores = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(cargo='coordenador', is_active=True).count()
+        formadores_ativos = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(formador_ativo=True, is_active=True).count()
 
         # Usuários com eventos
-        usuarios_com_eventos = Usuario.objects.filter(
+        usuarios_com_eventos = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(
             solicitacoes_criadas__isnull=False
         ).distinct().count()
 
@@ -152,12 +152,12 @@ class Command(BaseCommand):
         tipos_evento = TipoEvento.objects.count()
 
         # Municípios com eventos
-        municipios_com_eventos = Municipio.objects.filter(
+        municipios_com_eventos = Municipio.objects.prefetch_related("solicitacao_set", "usuario_set").filter(
             solicitacao__isnull=False
         ).distinct().count()
 
         # Projetos com eventos
-        projetos_com_eventos = Projeto.objects.filter(
+        projetos_com_eventos = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(
             solicitacao__isnull=False
         ).distinct().count()
 
@@ -173,7 +173,7 @@ class Command(BaseCommand):
         """Valida associações de formadores"""
 
         total_associacoes = FormadoresSolicitacao.objects.count()
-        solicitacoes_com_formador = Solicitacao.objects.filter(
+        solicitacoes_com_formador = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             formadoressolicitacao__isnull=False
         ).distinct().count()
 

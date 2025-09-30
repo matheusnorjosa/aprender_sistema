@@ -175,11 +175,17 @@ google_*.json
 !google_*.json.example
 token.pickle
 service-account.json
+service_account.json
 chaveacesso-planilhas@*.json
 *.env
 *.env.*
 !.env.example
 secrets/
+
+# OAuth scripts with credentials
+scripts/oauth/complete_auth_simple.py
+scripts/oauth/renew_auth_simple.py
+scripts/renew_google_calendar_auth.py
 acesso_planilhas.json
 
 # Backup files

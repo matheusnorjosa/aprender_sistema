@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 Views relacionadas aos formadores e bloqueios de agenda.
 """
@@ -82,19 +84,19 @@ class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateV
 
             if admin_mode == "formador" and admin_formador_id:
                 try:
-                    formador = Formador.objects.get(id=admin_formador_id, ativo=True)
+                    formador = FormadorService.get_formador(id=admin_formador_id, ativo=True)
                     context["admin_formador_simulado"] = formador
                 except Formador.DoesNotExist:
                     formador = None
             else:
                 formador = None
-                context["formadores_disponiveis"] = Formador.objects.filter(
+                context["formadores_disponiveis"] = FormadorService.filter_formadores(
                     ativo=True
                 ).order_by("nome")
         else:
             # MODO NORMAL: Encontrar formador pelo email
             try:
-                formador = Formador.objects.get(email=user.email, ativo=True)
+                formador = FormadorService.get_formador(email=user.email, ativo=True)
             except Formador.DoesNotExist:
                 formador = None
 
@@ -103,7 +105,7 @@ class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateV
 
             # Eventos futuros (aprovados)
             eventos_futuros = (
-                Solicitacao.objects.filter(
+                Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                     formadores=formador,
                     status=SolicitacaoStatus.APROVADO,
                     data_inicio__gt=agora,
@@ -116,7 +118,7 @@ class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateV
 
             # Eventos em andamento (aprovados e dentro do período)
             eventos_andamento = (
-                Solicitacao.objects.filter(
+                Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                     formadores=formador,
                     status=SolicitacaoStatus.APROVADO,
                     data_inicio__lte=agora,
@@ -131,7 +133,7 @@ class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateV
             # Eventos passados (últimos 30 dias)
             ultimos_30_dias = agora - timedelta(days=30)
             eventos_passados = (
-                Solicitacao.objects.filter(
+                Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                     formadores=formador,
                     status=SolicitacaoStatus.APROVADO,
                     data_fim__lt=agora,
@@ -145,7 +147,7 @@ class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateV
 
             # Eventos pendentes
             eventos_pendentes = (
-                Solicitacao.objects.filter(
+                Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                     formadores=formador, status=SolicitacaoStatus.PENDENTE
                 )
                 .select_related(
@@ -176,9 +178,9 @@ class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateV
             if user.is_superuser and context.get("admin_mode"):
                 agora = timezone.now()
 
-                total_formadores = Formador.objects.filter(ativo=True).count()
+                total_formadores = FormadorService.get_formadores_queryset().count()
                 eventos_admin_sample = (
-                    Solicitacao.objects.filter(
+                    Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                         status=SolicitacaoStatus.APROVADO, data_inicio__gte=agora
                     )
                     .select_related(

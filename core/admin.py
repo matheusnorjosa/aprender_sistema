@@ -25,7 +25,7 @@ class UsuarioAdmin(UserAdmin):
         "first_name",
         "last_name",
         "get_roles",
-        "formador_ativo",
+        # "formador_ativo",
         "cargo",
         "is_staff",
         "is_active",
@@ -33,7 +33,7 @@ class UsuarioAdmin(UserAdmin):
     )
     list_filter = (
         "groups",
-        "formador_ativo",
+        # "formador_ativo",
         "cargo",
         "area_especializacao",
         "is_staff",
@@ -59,7 +59,7 @@ class UsuarioAdmin(UserAdmin):
             'fields': ('setor', 'cargo')
         }),
         ('Dados de Formador', {
-            'fields': ('formador_ativo', 'area_especializacao', 'anos_experiencia', 'observacoes_formador'),
+            'fields': ('area_especializacao', 'anos_experiencia', 'observacoes_formador'),
             'classes': ('collapse',)
         }),
     )

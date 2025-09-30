@@ -182,7 +182,7 @@ class Command(BaseCommand):
         username = base_username
         contador = 1
 
-        while Usuario.objects.filter(username=username).exists():
+        while Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(username=username).exists():
             username = f"{base_username}_{contador}"
             contador += 1
 
@@ -193,7 +193,7 @@ class Command(BaseCommand):
         self.stdout.write('🔗 Atualizando relacionamentos...')
 
         # FormadoresSolicitacao já usa Usuario - verificar consistência
-        inconsistencias = FormadoresSolicitacao.objects.filter(
+        inconsistencias = FormadoresSolicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             usuario__formador_ativo=False
         ).count()
 
@@ -219,12 +219,12 @@ class Command(BaseCommand):
         self.stdout.write('🔍 Verificando integridade...')
 
         # Verificar se todos os formadores têm Usuario
-        formadores_sem_usuario = Formador.objects.filter(usuario__isnull=True).count()
+        formadores_sem_usuario = FormadorService.filter_formadores(usuario__isnull=True).count()
         if formadores_sem_usuario > 0:
             raise Exception(f'ERRO: {formadores_sem_usuario} formadores ainda sem usuário')
 
         # Verificar se todos os usuários formadores têm grupo correto
-        usuarios_formadores = Usuario.objects.filter(formador_ativo=True)
+        usuarios_formadores = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(formador_ativo=True)
         sem_grupo = usuarios_formadores.exclude(groups__name='formador').count()
         if sem_grupo > 0:
             raise Exception(f'ERRO: {sem_grupo} usuários formadores sem grupo')
@@ -232,7 +232,7 @@ class Command(BaseCommand):
         # Estatísticas finais
         stats = {
             'total_usuarios': Usuario.objects.count(),
-            'usuarios_formadores': Usuario.objects.filter(formador_ativo=True).count(),
+            'usuarios_formadores': Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(formador_ativo=True).count(),
             'formadores_legacy': Formador.objects.count(),
             'solicitacoes_formador': FormadoresSolicitacao.objects.count(),
             'disponibilidades': DisponibilidadeFormadores.objects.count()

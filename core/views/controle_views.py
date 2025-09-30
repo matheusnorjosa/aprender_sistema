@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 Views relacionadas ao perfil de Controle (monitoramento e auditoria).
 """
@@ -146,10 +148,10 @@ class ControleAPIStatusView(LoginRequiredMixin, PermissionRequiredMixin, View):
         data_limite_7d = agora - timedelta(days=7)
 
         # Métricas de solicitações
-        solicitacoes_pendentes = Solicitacao.objects.filter(
+        solicitacoes_pendentes = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             status=SolicitacaoStatus.PENDENTE
         ).count()
-        solicitacoes_24h = Solicitacao.objects.filter(
+        solicitacoes_24h = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             data_solicitacao__gte=data_limite_24h
         ).count()
 
@@ -166,7 +168,7 @@ class ControleAPIStatusView(LoginRequiredMixin, PermissionRequiredMixin, View):
         logs_7d = LogAuditoria.objects.filter(data_hora__gte=data_limite_7d).count()
 
         # Formadores ativos
-        formadores_ativos = Formador.objects.filter(ativo=True).count()
+        formadores_ativos = FormadorService.get_formadores_queryset().count()
 
         payload = {
             "timestamp": agora.isoformat(),

@@ -61,7 +61,7 @@ class Command(BaseCommand):
             # Mostrar alguns exemplos de dados
             if Formador.objects.count() > 0:
                 self.logger.info("Alguns formadores existentes:")
-                for f in Formador.objects.all()[:3]:
+                for f in FormadorService.get_formadores_queryset()[:3]:
                     self.logger.info(f"  - {f.nome} | {f.email}")
                     
         except Exception as e:

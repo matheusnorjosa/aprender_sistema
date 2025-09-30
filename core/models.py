@@ -75,15 +75,14 @@ class UsuarioManager(models.Manager):
     def formadores(self):
         """Todos os formadores (fonte única de verdade)"""
         return self.ativos().filter(
-            formador_ativo=True,
             groups__name='formador'
         ).distinct()
 
     def formadores_por_area(self, area=None):
         """Formadores filtrados por área de especialização"""
         qs = self.formadores()
-        if area:
-            qs = qs.filter(area_especializacao=area)
+        # if area:
+        #     qs = qs.filter(area_especializacao=area)
         return qs
 
     def formadores_por_municipio(self, municipio=None):
@@ -248,33 +247,33 @@ class Usuario(AbstractUser):
         ("outros", "Outros"),
     ]
 
-    area_especializacao = models.CharField(
-        max_length=30,
-        choices=AREA_ESPECIALIZACAO_CHOICES,
-        blank=True,
-        verbose_name="Área de Especialização",
-        help_text="Área principal de especialização do formador",
-    )
+    # area_especializacao = models.CharField(
+    #     max_length=30,
+    #     choices=AREA_ESPECIALIZACAO_CHOICES,
+    #     blank=True,
+    #     verbose_name="Área de Especialização",
+    #     help_text="Área principal de especialização do formador",
+    # )
 
-    anos_experiencia = models.PositiveIntegerField(
-        null=True,
-        blank=True,
-        verbose_name="Anos de Experiência",
-        help_text="Anos de experiência como formador",
-    )
+    # anos_experiencia = models.PositiveIntegerField(
+    #     null=True,
+    #     blank=True,
+    #     verbose_name="Anos de Experiência",
+    #     help_text="Anos de experiência como formador",
+    # )
 
-    observacoes_formador = models.TextField(
-        blank=True,
-        verbose_name="Observações do Formador",
-        help_text="Informações adicionais sobre competências, certificações, etc.",
-    )
+    # observacoes_formador = models.TextField(
+    #     blank=True,
+    #     verbose_name="Observações do Formador",
+    #     help_text="Informações adicionais sobre competências, certificações, etc.",
+    # )
 
     # Campo para compatibilidade durante migração
-    formador_ativo = models.BooleanField(
-        default=False,
-        verbose_name="É Formador Ativo",
-        help_text="Indica se este usuário atua como formador",
-    )
+    # formador_ativo = models.BooleanField(
+    #     default=False,
+    #     verbose_name="É Formador Ativo",
+    #     help_text="Indica se este usuário atua como formador",
+    # )
 
     # === CAMPOS MIGRADOS DO FORMADOR (CONSOLIDAÇÃO) ===
     # Dados que antes estavam no modelo Formador separado
@@ -428,12 +427,12 @@ class Usuario(AbstractUser):
     # === MÉTODOS UNIFICADOS PARA FORMADORES ===
     def is_formador(self):
         """Verifica se o usuário é um formador ativo (fonte única de verdade)"""
-        return self.formador_ativo and self.groups.filter(name="formador").exists()
+        return self.groups.filter(name="formador").exists()
 
     @property
-    def area_especializacao_display(self):
-        """Nome da área de especialização formatado"""
-        return dict(self.AREA_ESPECIALIZACAO_CHOICES).get(self.area_especializacao, self.area_especializacao)
+    # def area_especializacao_display(self):
+    #     """Nome da área de especialização formatado"""
+    #     return dict(self.AREA_ESPECIALIZACAO_CHOICES).get(self.area_especializacao, self.area_especializacao)
 
     @property
     def area_atuacao_display(self):
@@ -688,7 +687,7 @@ class Solicitacao(models.Model):
         settings.AUTH_USER_MODEL,
         through="FormadoresSolicitacao",
         related_name="solicitacoes_como_formador",
-        limit_choices_to={'formador_ativo': True}
+        # limit_choices_to={'formador_ativo': True}
     )
 
     class Meta:
@@ -760,7 +759,7 @@ class FormadoresSolicitacao(models.Model):
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
-        limit_choices_to={'formador_ativo': True},
+        # limit_choices_to={'formador_ativo': True},
         verbose_name="Formador"
     )
 
@@ -857,7 +856,7 @@ class DisponibilidadeFormadores(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="disponibilidades",
-        limit_choices_to={'formador_ativo': True},
+        # limit_choices_to={'formador_ativo': True},
         verbose_name="Formador",
         null=True,  # Temporário para migração
         blank=True

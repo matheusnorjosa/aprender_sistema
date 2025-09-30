@@ -113,7 +113,7 @@ class Command(BaseCommand):
         for user_data in demo_users:
             if not self.dry_run:
                 # Verificar se já existe
-                if Usuario.objects.filter(username=user_data['username']).exists():
+                if Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(username=user_data['username']).exists():
                     continue
                 
                 try:
@@ -147,7 +147,7 @@ class Command(BaseCommand):
                     # Criar formador se necessário
                     if 'formador' in user_data['groups']:
                         # Verificar se já existe formador com mesmo email
-                        if not Formador.objects.filter(email=usuario.email).exists():
+                        if not FormadorService.filter_formadores(email=usuario.email).exists():
                             Formador.objects.create(
                                 usuario=usuario,
                                 nome=usuario.get_full_name(),
@@ -172,10 +172,10 @@ class Command(BaseCommand):
         self.stdout.write("Criando solicitacoes de exemplo...")
         
         # Obter dados necessários
-        coordenadores = Usuario.objects.filter(groups__name='coordenador')
-        formadores = Formador.objects.filter(ativo=True)
-        municipios = list(Municipio.objects.filter(ativo=True)[:10])
-        projetos = list(Projeto.objects.filter(ativo=True)[:10])
+        coordenadores = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(groups__name='coordenador')
+        formadores = FormadorService.get_formadores_queryset()
+        municipios = list(MunicipioService.ativos()[:10])
+        projetos = list(ProjetoService.ativos()[:10])
         tipos_evento = list(TipoEvento.objects.filter(ativo=True))
         
         if not all([coordenadores.exists(), formadores.exists(), municipios, projetos, tipos_evento]):

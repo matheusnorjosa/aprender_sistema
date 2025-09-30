@@ -79,12 +79,12 @@ class Command(BaseCommand):
         
         # Buscar por nome exato primeiro
         try:
-            return Formador.objects.get(nome__iexact=nome_limpo)
+            return FormadorService.get_formador(nome__iexact=nome_limpo)
         except Formador.DoesNotExist:
             pass
         
         # Buscar por nome que contenha
-        formadores = Formador.objects.filter(nome__icontains=nome_limpo)
+        formadores = FormadorService.filter_formadores(nome__icontains=nome_limpo)
         if formadores.exists():
             return formadores.first()
         
@@ -281,7 +281,7 @@ class Command(BaseCommand):
 
             # Definir usuário solicitante (usar admin padrão)
             try:
-                usuario_solicitante = Usuario.objects.filter(is_superuser=True).first()
+                usuario_solicitante = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(is_superuser=True).first()
                 if not usuario_solicitante:
                     self.logger.error("Nenhum superusuário encontrado para ser o solicitante")
                     return None

@@ -155,7 +155,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Removendo {count} projetos existentes...")
 
         with transaction.atomic():
-            Projeto.objects.all().delete()
+            ProjetoService.todos().delete()
 
             if user:
                 LogAuditoria.objects.create(
@@ -433,7 +433,7 @@ class Command(BaseCommand):
                             self.stdout.write(f"  [=] Ja existe: {nome}")
                 else:
                     # Simular criação (dry-run)
-                    exists = Projeto.objects.filter(nome=nome).exists()
+                    exists = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(nome=nome).exists()
                     if exists:
                         if update_existing:
                             resultado["atualizados"] += 1

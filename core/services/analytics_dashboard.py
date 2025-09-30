@@ -324,13 +324,13 @@ class EducationalAnalytics:
             
             # Basic statistics
             stats = {
-                'total_formadores': Formador.objects.filter(ativo=True).count(),
-                'total_municipios': Municipio.objects.filter(ativo=True).count(),
-                'total_projetos': Projeto.objects.filter(ativo=True).count(),
-                'pending_solicitacoes': Solicitacao.objects.filter(
+                'total_formadores': FormadorService.get_formadores_queryset().count(),
+                'total_municipios': MunicipioService.ativos().count(),
+                'total_projetos': ProjetoService.ativos().count(),
+                'pending_solicitacoes': Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                     status=SolicitacaoStatus.PENDENTE
                 ).count(),
-                'approved_this_month': Solicitacao.objects.filter(
+                'approved_this_month': Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                     status=SolicitacaoStatus.APROVADO,
                     data_solicitacao__gte=timezone.now().replace(day=1)
                 ).count()

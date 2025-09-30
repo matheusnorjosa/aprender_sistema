@@ -342,7 +342,7 @@ class GoogleCalendarManagementService:
 
         # Buscar solicitações PRE_AGENDA sem evento criado
         solicitacoes_pendentes = []
-        for solicitacao in Solicitacao.objects.filter(
+        for solicitacao in Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             status=SolicitacaoStatus.PRE_AGENDA
         ):
             if not EventoGoogleCalendar.objects.filter(
@@ -422,7 +422,7 @@ class GoogleCalendarManagementService:
         Retorna resumo das solicitações em PRE_AGENDA para o grupo Controle.
         Ferramenta de apoio para visualização e organização.
         """
-        solicitacoes_pre_agenda = Solicitacao.objects.filter(
+        solicitacoes_pre_agenda = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
             status=SolicitacaoStatus.PRE_AGENDA
         ).select_related("projeto", "municipio", "tipo_evento", "usuario_solicitante")
 

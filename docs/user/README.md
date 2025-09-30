@@ -1,3 +1,0 @@
-# User
-
-Documentação do usuário

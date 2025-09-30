@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 API views para sistema de aprovação avançado com operações em lote.
 SEMANA 3 - DIA 2: Sistema de aprovação/rejeição aprimorado
@@ -204,7 +206,7 @@ class SolicitacoesPendentesAPI(View):
 
             # Query base
             queryset = (
-                Solicitacao.objects.filter(status=SolicitacaoStatus.PENDENTE)
+                Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.PENDENTE)
                 .select_related(
                     "projeto", "municipio", "tipo_evento", "usuario_solicitante"
                 )

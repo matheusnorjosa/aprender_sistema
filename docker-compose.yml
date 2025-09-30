@@ -1,136 +1,339 @@
+# ======================================
+# 🐳 DOCKER COMPOSE UNIFICADO - SISTEMA APRENDER
+# Ambiente único com profiles para dev/prod
+# ======================================
+
 services:
+  # ==========================================
+  # DATABASE - POSTGRESQL
+  # ==========================================
   db:
-    image: postgres:15
-    container_name: aprender_db
+    image: postgres:15-alpine
+    container_name: aprender_db_${ENVIRONMENT:-dev}
+    restart: unless-stopped
+
     environment:
-      POSTGRES_DB: aprender_sistema_db
-      POSTGRES_USER: adm_aprender
-      POSTGRES_PASSWORD: aprender123456
-    ports:
-      - "5433:5432"
+      - POSTGRES_DB=${DB_NAME:-aprender_sistema_dev}
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres123}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/configs/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # Backups apenas em produção
+      - ./backups:/backups:rw
+
+    ports:
+      # Desenvolvimento: expõe porta
+      - target: 5432
+        published: ${DB_PORT:-5432}
+        protocol: tcp
+        mode: host
+
+    # Produção: apenas expose interno
+    expose:
+      - "5432"
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U adm_aprender -d aprender_sistema_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - aprender_network
-
-  web:
-    build: .
-    container_name: aprender_web_${BRANCH:-main}
-    env_file:
-      - .env.${BRANCH:-main}
-    environment:
-      # Sobrescrever configurações específicas do Docker se necessário
-      DB_HOST: db
-      CURRENT_BRANCH: ${BRANCH:-main}
-    volumes:
-      - .:/app
-    ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
-    networks:
-      - aprender_network
-
-  streamlit:
-    build:
-      context: .
-      dockerfile: Dockerfile.streamlit
-    container_name: aprender_streamlit_${BRANCH:-main}
-    env_file:
-      - .env.${BRANCH:-main}
-    environment:
-      # Sobrescrever configurações específicas do Docker
-      DB_HOST: db
-      CURRENT_BRANCH: ${BRANCH:-main}
-    volumes:
-      - .:/app
-    ports:
-      - "8501:8501"
-    depends_on:
-      db:
-        condition: service_healthy
-    command: >
-      sh -c "streamlit run dashboard_streamlit.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --server.enableXsrfProtection false --server.enableCORS false"
-    networks:
-      - aprender_network
-
-  mcp:
-    build:
-      context: .
-      dockerfile: Dockerfile.mcp
-    container_name: aprender_mcp_${BRANCH:-main}
-    env_file:
-      - .env.${BRANCH:-main}
-    environment:
-      # Sobrescrever configurações específicas do MCP
-      DB_HOST: db
-      CURRENT_BRANCH: ${BRANCH:-main}
-      DJANGO_SETTINGS_MODULE: aprender_sistema.settings
-      MCP_HOST: "0.0.0.0"
-      MCP_PORT: "3001"
-      MCP_LOG_LEVEL: INFO
-    volumes:
-      - .:/app
-      - mcp_logs:/app/logs
-    ports:
-      - "3001:3001"
-    depends_on:
-      db:
-        condition: service_healthy
-      web:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-aprender_sistema_dev}"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
+
     networks:
       - aprender_network
 
-  redis:
-    image: redis:7-alpine
-    container_name: aprender_redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    networks:
-      - aprender_network
+  # ==========================================
+  # WEB APPLICATION - DJANGO
+  # ==========================================
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-development}
+    container_name: aprender_web_${ENVIRONMENT:-dev}
+    restart: unless-stopped
 
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: aprender_pgadmin
+    env_file:
+      - .env
+
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-      PGADMIN_CONFIG_SERVER_MODE: "False"
+      # Ambiente específico
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-true}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-aprender_sistema_dev}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres123}
+
+      # Cache & Sessions
+      - CACHE_BACKEND=${CACHE_BACKEND:-locmem}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/1}
+      - SESSION_ENGINE=${SESSION_ENGINE:-django.contrib.sessions.backends.db}
+
+      # Google Integrations (produção)
+      - GOOGLE_CALENDAR_ID=${GOOGLE_CALENDAR_ID:-}
+      - GOOGLE_CREDENTIALS_JSON=${GOOGLE_CREDENTIALS_JSON:-}
+      - GOOGLE_CALENDAR_TIME_ZONE=${GOOGLE_CALENDAR_TIME_ZONE:-America/Fortaleza}
+
+      # Email (produção)
+      - EMAIL_HOST=${EMAIL_HOST:-localhost}
+      - EMAIL_PORT=${EMAIL_PORT:-1025}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-false}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-dev@aprender.com}
+
+      # Security (produção)
+      - SECRET_KEY=${SECRET_KEY:-dev-key-not-for-production}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
+      - SECURE_SSL_REDIRECT=${SECURE_SSL_REDIRECT:-false}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-false}
+      - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-false}
+
+      # Monitoring
+      - SENTRY_DSN=${SENTRY_DSN:-}
+
+    volumes:
+      # Development: código ao vivo
+      - .:/app:cached
+      - /app/__pycache__
+      - /app/.pytest_cache
+      # Volumes comuns
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - logs_volume:/app/logs
+
     ports:
-      - "8080:80"
+      # Development
+      - "${WEB_PORT:-8000}:8000"
+      # Production
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${HEALTH_CHECK_PORT:-8000}/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: ${HEALTH_START_PERIOD:-30s}
+
     networks:
       - aprender_network
 
+  # ==========================================
+  # REDIS - CACHE & SESSIONS
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: aprender_redis_${ENVIRONMENT:-dev}
+    restart: unless-stopped
+
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory ${REDIS_MAX_MEMORY:-256mb}
+      --maxmemory-policy allkeys-lru
+      --timeout 60
+      --tcp-keepalive 60
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+
+    volumes:
+      - redis_data:/data
+
+    ports:
+      # Development: expõe porta
+      - "${REDIS_PORT:-6379}:6379"
+
+    # Production: apenas expose interno
+    expose:
+      - "6379"
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    networks:
+      - aprender_network
+
+
+  # ==========================================
+  # PGADMIN - GERENCIAMENTO DB (DEV)
+  # ==========================================
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: aprender_pgadmin_${ENVIRONMENT:-dev}
+    restart: unless-stopped
+
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@admin.com}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-admin}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+
+    ports:
+      - "${PGADMIN_PORT:-8080}:80"
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+    networks:
+      - aprender_network
+
+    profiles:
+      - development
+      - dev-tools
+
+  # ==========================================
+  # ADMINER - ALTERNATIVA LEVE (DEV)
+  # ==========================================
+  adminer:
+    image: adminer:4-standalone
+    container_name: aprender_adminer_${ENVIRONMENT:-dev}
+    restart: unless-stopped
+
+    environment:
+      - ADMINER_DEFAULT_SERVER=db
+      - ADMINER_DESIGN=flat
+
+    ports:
+      - "${ADMINER_PORT:-8081}:8080"
+
+    depends_on:
+      - db
+
+    networks:
+      - aprender_network
+
+    profiles:
+      - development
+      - dev-tools
+
+  # ==========================================
+  # MAILHOG - TESTE DE EMAIL (DEV)
+  # ==========================================
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: aprender_mailhog_${ENVIRONMENT:-dev}
+    restart: unless-stopped
+
+    ports:
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"  # SMTP server
+      - "${MAILHOG_WEB_PORT:-8025}:8025"   # Web interface
+
+    networks:
+      - aprender_network
+
+    profiles:
+      - development
+      - dev-tools
+
+  # ==========================================
+  # BACKUP AUTOMATION (PROD)
+  # ==========================================
+  backup:
+    image: postgres:15-alpine
+    container_name: aprender_backup_${ENVIRONMENT:-prod}
+    restart: "no"
+
+    environment:
+      - PGPASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+
+    volumes:
+      - ./backups:/backups
+      - ./docker/configs/scripts/backup.sh:/backup.sh:ro
+
+    command: /bin/sh /backup.sh
+
+    depends_on:
+      - db
+
+    networks:
+      - aprender_network
+
+    profiles:
+      - production
+      - backup
+
+  # ==========================================
+  # WATCHTOWER - AUTO-UPDATE (PROD)
+  # ==========================================
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: aprender_watchtower
+    restart: always
+
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=3600
+      - WATCHTOWER_INCLUDE_STOPPED=true
+      - WATCHTOWER_REVIVE_STOPPED=false
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    networks:
+      - aprender_network
+
+    command: aprender_web_${ENVIRONMENT:-prod}
+
+    profiles:
+      - production
+      - monitoring
+
+# ==========================================
+# VOLUMES
+# ==========================================
 volumes:
   postgres_data:
-  mcp_logs:
-  pgadmin_data:
-  redis_data:
+    driver: local
+    name: aprender_postgres_${ENVIRONMENT:-dev}
 
+  static_volume:
+    driver: local
+    name: aprender_static_${ENVIRONMENT:-dev}
+
+  media_volume:
+    driver: local
+    name: aprender_media_${ENVIRONMENT:-dev}
+
+  logs_volume:
+    driver: local
+    name: aprender_logs_${ENVIRONMENT:-dev}
+
+  redis_data:
+    driver: local
+    name: aprender_redis_${ENVIRONMENT:-dev}
+
+
+  pgadmin_data:
+    driver: local
+    name: aprender_pgadmin_${ENVIRONMENT:-dev}
+
+# ==========================================
+# NETWORKS
+# ==========================================
 networks:
   aprender_network:
     driver: bridge
+    name: aprender_${ENVIRONMENT:-dev}_network
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

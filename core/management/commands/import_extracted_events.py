@@ -74,7 +74,7 @@ class Command(BaseCommand):
         nome = nome.strip()
 
         # Buscar por nome exato
-        municipio = Municipio.objects.filter(nome__iexact=nome).first()
+        municipio = Municipio.objects.prefetch_related("solicitacao_set", "usuario_set").filter(nome__iexact=nome).first()
         if municipio:
             return municipio
 
@@ -95,7 +95,7 @@ class Command(BaseCommand):
         nome = nome.strip()
 
         # Buscar por nome exato
-        projeto = Projeto.objects.filter(nome__iexact=nome).first()
+        projeto = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(nome__iexact=nome).first()
         if projeto:
             return projeto
 
@@ -232,7 +232,7 @@ class Command(BaseCommand):
                 # Verificar se já existe (para evitar duplicatas)
                 titulo_evento = f"{projeto.nome} - {municipio.nome} - {registro[5] if len(registro) > 5 else '1'}"
 
-                if Solicitacao.objects.filter(
+                if Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                     titulo_evento=titulo_evento,
                     data_inicio=data_inicio
                 ).exists():

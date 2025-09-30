@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 Views para o mapa interativo com dados reais do banco
 ATUALIZADO: Usa Services centralizados e imports unificados

@@ -552,11 +552,11 @@ class Command(BaseCommand):
         """Buscar formador por nome ou email"""
         try:
             # Tentar por email primeiro
-            return Formador.objects.get(email__iexact=identifier.strip())
+            return FormadorService.get_formador(email__iexact=identifier.strip())
         except Formador.DoesNotExist:
             try:
                 # Tentar por nome
-                return Formador.objects.get(nome__icontains=identifier.strip())
+                return FormadorService.get_formador(nome__icontains=identifier.strip())
             except Formador.DoesNotExist:
                 return None
 

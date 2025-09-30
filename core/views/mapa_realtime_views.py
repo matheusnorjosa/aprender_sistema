@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 Views para atualizações em tempo real do mapa
 """

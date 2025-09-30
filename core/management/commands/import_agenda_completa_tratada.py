@@ -112,7 +112,7 @@ class Command(BaseCommand):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
         # Backup das solicitações atuais
-        solicitacoes_atuais = list(Solicitacao.objects.all().values())
+        solicitacoes_atuais = list(Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").values())
 
         backup_data = {
             'timestamp': timestamp,
@@ -210,7 +210,7 @@ class Command(BaseCommand):
 
         # Remover solicitações (cascata remove relacionamentos)
         count_solicitacoes = Solicitacao.objects.count()
-        Solicitacao.objects.all().delete()
+        Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").delete()
 
         self.stdout.write(f"✅ {count_solicitacoes} solicitações removidas")
 
@@ -270,7 +270,7 @@ class Command(BaseCommand):
 
             # Verificar se já existe uma solicitação com mesmo título e data_inicio
             contador = 1
-            while Solicitacao.objects.filter(titulo_evento=titulo_evento, data_inicio=data_inicio).exists():
+            while Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(titulo_evento=titulo_evento, data_inicio=data_inicio).exists():
                 contador += 1
                 titulo_evento = f"{titulo_base} ({contador})"
 
@@ -348,14 +348,14 @@ class Command(BaseCommand):
                 return coordenador
 
         # Fallback: usar admin
-        admin_user = Usuario.objects.filter(username='admin').first()
+        admin_user = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(username='admin').first()
         return admin_user
 
     def _buscar_coordenador_por_nome(self, nome_coordenador):
         """Busca coordenador por nome similar"""
 
         # Implementar lógica similar ao comando de correção
-        coordenadores = Usuario.objects.filter(cargo='coordenador', is_active=True)
+        coordenadores = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(cargo='coordenador', is_active=True)
 
         for coordenador in coordenadores:
             nome_completo = f"{coordenador.first_name} {coordenador.last_name}".strip()

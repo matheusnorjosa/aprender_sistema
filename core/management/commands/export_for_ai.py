@@ -167,12 +167,12 @@ class Command(BaseCommand):
     def get_municipios_data(self) -> Dict[str, Any]:
         """Dados de municípios e cobertura geográfica"""
 
-        municipios = Municipio.objects.all()
+        municipios = MunicipioService.todos()
 
         municipios_data = []
         for municipio in municipios:
             # Contar usuários por município
-            usuarios_count = Usuario.objects.filter(municipio=municipio).count()
+            usuarios_count = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(municipio=municipio).count()
 
             municipio_data = {
                 "id": str(municipio.id),
@@ -228,7 +228,7 @@ class Command(BaseCommand):
     def get_projetos_data(self) -> Dict[str, Any]:
         """Dados de projetos e tipos de evento"""
 
-        projetos = Projeto.objects.all()
+        projetos = ProjetoService.todos()
         tipos_evento = TipoEvento.objects.all()
 
         projetos_data = []
@@ -270,13 +270,13 @@ class Command(BaseCommand):
             },
             "metricas_sistema": {
                 "total_usuarios": Usuario.objects.count(),
-                "usuarios_ativos": Usuario.objects.filter(is_active=True).count(),
+                "usuarios_ativos": UsuarioService.ativos().count(),
                 "total_municipios": Municipio.objects.count(),
                 "total_formadores": Formador.objects.count(),
                 "total_projetos": Projeto.objects.count(),
             },
             "perfis_sistema": {
-                grupo.name: Usuario.objects.filter(groups=grupo).count()
+                grupo.name: Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(groups=grupo).count()
                 for grupo in Group.objects.all()
             },
             "cobertura_geografica": {
@@ -284,9 +284,9 @@ class Command(BaseCommand):
                     Municipio.objects.values_list("nome", flat=True)
                 ),
                 "distribuicao_usuarios": {
-                    mun.nome: Usuario.objects.filter(municipio=mun).count()
-                    for mun in Municipio.objects.all()
-                    if Usuario.objects.filter(municipio=mun).exists()
+                    mun.nome: Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(municipio=mun).count()
+                    for mun in MunicipioService.todos()
+                    if Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(municipio=mun).exists()
                 },
             },
             "capacidades_sistema": [

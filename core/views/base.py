@@ -283,10 +283,10 @@ def clear_all_caches():
 # AVISO: Imports diretos dos models nas views são DESENCORAJADOS
 # Use os Services sempre que possível
 #
-# ❌ EVITAR:   Formador.objects.filter(ativo=True)
+# ❌ EVITAR:   FormadorService.get_formadores_queryset()
 # ✅ USAR:     FormadorService.todos_formadores()
 #
-# ❌ EVITAR:   Usuario.objects.filter(cargo='coordenador')
+# ❌ EVITAR:   UsuarioService.por_cargo("coordenador")
 # ✅ USAR:     CoordinatorService.todos_coordenadores()
 
 # Note: Import specific mixins in individual modules as needed

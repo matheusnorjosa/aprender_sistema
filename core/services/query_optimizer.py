@@ -246,7 +246,7 @@ class OptimizedQueryManager:
                     ),
                     Prefetch(
                         'solicitacao_set',
-                        queryset=Solicitacao.objects.filter(
+                        queryset=Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
                             status__in=['Aprovado', 'PreAgenda'],
                             data_inicio__month=mes,
                             data_inicio__year=ano
@@ -307,9 +307,9 @@ class OptimizedQueryManager:
             
             # Basic counts with single query
             basic_stats = {
-                'formadores_ativos': Formador.objects.filter(ativo=True).count(),
-                'municipios_ativos': Municipio.objects.filter(ativo=True).count(),
-                'projetos_ativos': Projeto.objects.filter(ativo=True).count(),
+                'formadores_ativos': FormadorService.get_formadores_queryset().count(),
+                'municipios_ativos': MunicipioService.ativos().count(),
+                'projetos_ativos': ProjetoService.ativos().count(),
                 'tipos_evento_ativos': TipoEvento.objects.filter(ativo=True).count()
             }
             

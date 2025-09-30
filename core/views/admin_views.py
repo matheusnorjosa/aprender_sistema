@@ -1,3 +1,5 @@
+from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+
 """
 Views de administração do sistema.
 SEMANA 3 - DIA 4: Logs de comunicação e administração avançada.

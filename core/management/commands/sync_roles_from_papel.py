@@ -61,7 +61,7 @@ class Command(BaseCommand):
         users_by_papel = {}
         total_users = Usuario.objects.count()
 
-        for user in Usuario.objects.all():
+        for user in Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions"):
             papel = user.papel or "sem_papel"
             if papel not in users_by_papel:
                 users_by_papel[papel] = []
@@ -85,7 +85,7 @@ class Command(BaseCommand):
             )
 
             # Simular as alterações
-            for user in Usuario.objects.all():
+            for user in Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions"):
                 if user.papel:
                     current_groups = list(user.groups.values_list("name", flat=True))
                     target_group = user.papel

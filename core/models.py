@@ -3,7 +3,7 @@ import uuid
 from datetime import timedelta
 
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser, Group
+from django.contrib.auth.models import AbstractUser, BaseUserManager, Group
 from django.db import models
 from django.utils import timezone
 
@@ -53,15 +53,20 @@ class Setor(models.Model):
 # 1) USUÁRIO CUSTOMIZADO
 # =========================
 
-class UsuarioManager(models.Manager):
+class UsuarioManager(BaseUserManager):
     """
     Manager customizado para Usuario - Single Source of Truth
     Centraliza todas as queries para evitar duplicação e inconsistências
     """
+    use_in_migrations = True
 
     def get_queryset(self):
         """QuerySet base otimizado com relacionamentos comuns"""
         return super().get_queryset().select_related('setor', 'municipio')
+
+    def get_by_natural_key(self, username):
+        """Busca usuário por username (necessário para autenticação)"""
+        return self.get(**{self.model.USERNAME_FIELD: username})
 
     def ativos(self):
         """Usuários ativos no sistema"""
@@ -923,86 +928,86 @@ class Deslocamento(models.Model):
     Modelo para registrar deslocamentos de formadores entre municípios.
     Suporta até 6 pessoas por deslocamento, com tipo Deslocamento ou Retorno.
     """
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     data = models.DateField(verbose_name="Data")
-    
+
     # Origem e destino - municípios ou locais
     origem = models.CharField(
-        max_length=255, 
+        max_length=255,
         verbose_name="Origem",
         help_text="Local de partida do deslocamento"
     )
     destino = models.CharField(
-        max_length=255, 
+        max_length=255,
         verbose_name="Destino",
         help_text="Local de chegada do deslocamento"
     )
-    
+
     # Tipo de deslocamento
     TIPO_CHOICES = [
         ('deslocamento', 'Deslocamento'),
         ('retorno', 'Retorno'),
     ]
     tipo = models.CharField(
-        max_length=15, 
-        choices=TIPO_CHOICES, 
+        max_length=15,
+        choices=TIPO_CHOICES,
         default='deslocamento',
         verbose_name="Tipo",
         help_text="Tipo do deslocamento: ida ou volta"
     )
-    
+
     # Até 6 pessoas por deslocamento (conforme planilha)
     pessoa_1 = models.ForeignKey(
-        "Formador", 
-        null=True, blank=True, 
-        on_delete=models.SET_NULL, 
+        "Formador",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
         related_name='deslocamentos_p1',
         verbose_name="Pessoa 1"
     )
     pessoa_2 = models.ForeignKey(
-        "Formador", 
-        null=True, blank=True, 
-        on_delete=models.SET_NULL, 
+        "Formador",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
         related_name='deslocamentos_p2',
         verbose_name="Pessoa 2"
     )
     pessoa_3 = models.ForeignKey(
-        "Formador", 
-        null=True, blank=True, 
-        on_delete=models.SET_NULL, 
+        "Formador",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
         related_name='deslocamentos_p3',
         verbose_name="Pessoa 3"
     )
     pessoa_4 = models.ForeignKey(
-        "Formador", 
-        null=True, blank=True, 
-        on_delete=models.SET_NULL, 
+        "Formador",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
         related_name='deslocamentos_p4',
         verbose_name="Pessoa 4"
     )
     pessoa_5 = models.ForeignKey(
-        "Formador", 
-        null=True, blank=True, 
-        on_delete=models.SET_NULL, 
+        "Formador",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
         related_name='deslocamentos_p5',
         verbose_name="Pessoa 5"
     )
     pessoa_6 = models.ForeignKey(
-        "Formador", 
-        null=True, blank=True, 
-        on_delete=models.SET_NULL, 
+        "Formador",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
         related_name='deslocamentos_p6',
         verbose_name="Pessoa 6"
     )
-    
+
     # Campos de auditoria (serão adicionados na próxima migration)
     # created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     # updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
-    
+
     # DEPRECATED: Mantido por compatibilidade - remover em futuras versões
     formadores = models.ManyToManyField(
-        "Formador", 
+        "Formador",
         related_name="deslocamentos_old",
         blank=True,
         help_text="DEPRECATED: Use pessoa_1 até pessoa_6"
@@ -1029,39 +1034,39 @@ class Deslocamento(models.Model):
     def __str__(self):
         tipo_icon = "→" if self.tipo == "deslocamento" else "←"
         return f"{self.data:%d/%m/%Y} {self.origem} {tipo_icon} {self.destino} ({self.get_tipo_display()})"
-    
+
     @property
     def pessoas(self):
         """Retorna lista de pessoas não-nulas do deslocamento"""
         return [p for p in [
-            self.pessoa_1, self.pessoa_2, self.pessoa_3, 
+            self.pessoa_1, self.pessoa_2, self.pessoa_3,
             self.pessoa_4, self.pessoa_5, self.pessoa_6
         ] if p is not None]
-    
+
     @property
     def total_pessoas(self):
         """Retorna quantidade de pessoas no deslocamento"""
         return len(self.pessoas)
-    
+
     def clean(self):
         """Validações customizadas"""
         from django.core.exceptions import ValidationError
-        
+
         if not self.origem or not self.destino:
             raise ValidationError("Origem e destino são obrigatórios.")
-        
+
         if self.origem == self.destino:
             raise ValidationError("Origem e destino não podem ser iguais.")
-        
+
         # Verificar pessoas duplicadas
         pessoas = self.pessoas
         if len(pessoas) != len(set(pessoas)):
             raise ValidationError("Não é possível ter a mesma pessoa em posições diferentes.")
-        
+
         # Deve ter pelo menos uma pessoa
         if len(pessoas) == 0:
             raise ValidationError("Deve ter pelo menos uma pessoa no deslocamento.")
-    
+
     def save(self, *args, **kwargs):
         """Override save para executar validações"""
         self.clean()

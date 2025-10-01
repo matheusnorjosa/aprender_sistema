@@ -1,5 +1,11 @@
 """
-Django settings for aprender_sistema project - VERSÃO SIMPLIFICADA
+Django settings for aprender_sistema project - DOCKER CENTRALIZED
+==================================================================
+
+Sistema centralizado 100% em Docker com Django REST Framework
+Configuração unificada para desenvolvimento e produção
+
+Para mais informações: docs/DOCKER_CENTRALIZED.md
 """
 
 import os
@@ -8,15 +14,28 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'dev-insecure-key-only-for-local-development-do-not-use-in-production-51-chars'
+# ========================================
+# ENVIRONMENT CONFIGURATION
+# ========================================
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+IS_DEVELOPMENT = ENVIRONMENT == 'development'
+IS_PRODUCTION = ENVIRONMENT == 'production'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# ========================================
+# SECURITY SETTINGS
+# ========================================
+SECRET_KEY = os.getenv(
+    'SECRET_KEY',
+    'dev-insecure-key-only-for-local-development-do-not-use-in-production-51-chars'
+)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+DEBUG = os.getenv('DEBUG', 'True') == 'True' if IS_DEVELOPMENT else False
 
-# Application definition
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
+
+# ========================================
+# APPLICATION DEFINITION
+# ========================================
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -24,13 +43,21 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # Third-party apps
+    'rest_framework',
+    'rest_framework.authtoken',
+    'corsheaders',
+    'django_filters',
+
     # Local apps
-    # 'core',  # Temporariamente desabilitado para teste
-    # 'api',
+    'core',
+    'api',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # CORS deve vir antes do CommonMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -59,15 +86,35 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'aprender_sistema.wsgi.application'
 
-# Database
+# ========================================
+# DATABASE (DOCKER POSTGRESQL)
+# ========================================
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME', 'aprender_sistema_db'),
+        'USER': os.getenv('DB_USER', 'adm_aprender'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'aprender123456'),
+        'HOST': os.getenv('DB_HOST', 'db'),  # Nome do serviço Docker
+        'PORT': os.getenv('DB_PORT', '5432'),
+        'OPTIONS': {
+            'connect_timeout': 10,
+        },
     }
 }
 
-# Password validation
+# Fallback para SQLite em desenvolvimento local (temporário)
+if IS_DEVELOPMENT and os.getenv('USE_SQLITE', 'False') == 'True':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+
+# ========================================
+# PASSWORD VALIDATION
+# ========================================
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -83,23 +130,204 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# Internationalization
+# ========================================
+# INTERNATIONALIZATION
+# ========================================
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
+# ========================================
+# STATIC FILES (CSS, JavaScript, Images)
+# ========================================
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
 
-# Default primary key field type
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# ========================================
+# DEFAULT PRIMARY KEY FIELD TYPE
+# ========================================
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Login URLs
+# ========================================
+# AUTHENTICATION
+# ========================================
 LOGIN_URL = '/admin/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
 # Custom User Model
-# AUTH_USER_MODEL = 'core.Usuario'  # Temporariamente desabilitado
+AUTH_USER_MODEL = 'core.Usuario'
+
+# ========================================
+# DJANGO REST FRAMEWORK
+# ========================================
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+    'DATETIME_FORMAT': '%Y-%m-%d %H:%M:%S',
+    'DATE_FORMAT': '%Y-%m-%d',
+    'TIME_FORMAT': '%H:%M:%S',
+}
+
+# ========================================
+# CORS CONFIGURATION (para React)
+# ========================================
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',  # React dev server
+    'http://127.0.0.1:3000',
+    'http://localhost:8000',  # Django
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# ========================================
+# CACHE (Redis em produção, LocMem em dev)
+# ========================================
+if IS_PRODUCTION:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': os.getenv('REDIS_URL', 'redis://redis:6379/0'),
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'unique-snowflake',
+        }
+    }
+
+# ========================================
+# LOGGING
+# ========================================
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'django.log',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],
+        'level': 'INFO' if IS_PRODUCTION else 'DEBUG',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'core': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if IS_DEVELOPMENT else 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
+# ========================================
+# SECURITY SETTINGS (Produção)
+# ========================================
+if IS_PRODUCTION:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+# ========================================
+# GOOGLE APIS (para importação de planilhas)
+# ========================================
+GOOGLE_SHEETS_CREDENTIALS_FILE = os.getenv(
+    'GOOGLE_SHEETS_CREDENTIALS_FILE',
+    str(BASE_DIR / 'credentials' / 'google_sheets_credentials.json')
+)
+
+# ========================================
+# DOCKER SPECIFIC SETTINGS
+# ========================================
+# Ajustar timeouts para containers Docker
+SESSION_COOKIE_AGE = 3600 * 24 * 7  # 7 dias
+SESSION_SAVE_EVERY_REQUEST = True
+
+# ========================================
+# SYSTEM INFORMATION (para debug)
+# ========================================
+SYSTEM_INFO = {
+    'ENVIRONMENT': ENVIRONMENT,
+    'DEBUG': DEBUG,
+    'DATABASE': DATABASES['default']['ENGINE'],
+    'CACHE': CACHES['default']['BACKEND'],
+    'DOCKER_MODE': os.getenv('DOCKER_MODE', 'True') == 'True',
+}
+
+# Exibir info no console (apenas em desenvolvimento)
+if IS_DEVELOPMENT and DEBUG:
+    print("\n" + "="*60)
+    print("🐳 SISTEMA APRENDER - DOCKER CENTRALIZED")
+    print("="*60)
+    for key, value in SYSTEM_INFO.items():
+        print(f"  {key}: {value}")
+    print("="*60 + "\n")

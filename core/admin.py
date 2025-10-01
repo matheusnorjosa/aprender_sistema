@@ -35,7 +35,7 @@ class UsuarioAdmin(UserAdmin):
         "groups",
         # "formador_ativo",
         "cargo",
-        "area_especializacao",
+        "area_atuacao",
         "is_staff",
         "is_superuser",
         "is_active",

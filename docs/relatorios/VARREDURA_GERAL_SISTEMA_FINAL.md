@@ -49,7 +49,6 @@
 #### **Configurações (5):**
 - `.env.develop.example` - Exemplo desenvolvimento
 - `.env.example` - Exemplo geral
-- `.env.figma.example` - Exemplo Figma
 - `.env.main.example` - Exemplo principal
 - `.env.main` - Configuração principal
 

@@ -211,7 +211,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='disponibilidadeformadores',
-            constraint=models.CheckConstraint(condition=models.Q(('hora_fim__gt', models.F('hora_inicio'))), name='hora_fim_maior_que_inicio'),
+            constraint=models.CheckConstraint(check=models.Q(('hora_fim__gt', models.F('hora_inicio'))), name='hora_fim_maior_que_inicio'),
         ),
         migrations.AddConstraint(
             model_name='disponibilidadeformadores',

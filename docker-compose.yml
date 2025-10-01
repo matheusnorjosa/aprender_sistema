@@ -130,6 +130,41 @@ services:
       - aprender_network
 
   # ==========================================
+  # FRONTEND - REACT
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: ${FRONTEND_TARGET:-development}
+    container_name: aprender_frontend_${ENVIRONMENT:-dev}
+    restart: unless-stopped
+
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api
+      - REACT_APP_ENV=${ENVIRONMENT:-development}
+      - CHOKIDAR_USEPOLLING=true  # Hot reload no Docker
+
+    volumes:
+      # Development: código ao vivo
+      - ./frontend:/app:cached
+      - /app/node_modules
+
+    ports:
+      # Development
+      - "${FRONTEND_PORT:-3000}:3000"
+
+    depends_on:
+      web:
+        condition: service_started
+
+    networks:
+      - aprender_network
+
+    stdin_open: true
+    tty: true
+
+  # ==========================================
   # REDIS - CACHE & SESSIONS
   # ==========================================
   redis:

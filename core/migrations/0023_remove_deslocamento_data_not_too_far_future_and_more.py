@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="deslocamento",
             constraint=models.CheckConstraint(
-                condition=models.Q(("data__lte", datetime.date(2026, 9, 12))),
+                check=models.Q(("data__lte", datetime.date(2026, 9, 12))),
                 name="data_not_too_far_future",
                 violation_error_message="Data não pode ser mais de 1 ano no futuro.",
             ),

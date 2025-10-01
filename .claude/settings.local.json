@@ -20,7 +20,13 @@
       "Bash(git stash show:*)",
       "Bash(git stash drop:*)",
       "Bash(cat:*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(docker-compose:*)",
+      "Bash(docker rm:*)",
+      "Bash(docker logs:*)",
+      "Bash(for file in core/migrations/0002_aprovacao_disponibilidadeformadores_and_more.py core/migrations/0017_add_solicitacao_constraints.py core/migrations/0021_deslocamento_expansion.py core/migrations/0023_remove_deslocamento_data_not_too_far_future_and_more.py)",
+      "Bash(do sed -i 's/condition=models\\.Q(/check=models.Q(/g' \"$file\")",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="solicitacao",
             constraint=models.CheckConstraint(
-                condition=models.Q(("data_fim__gt", models.F("data_inicio"))),
+                check=models.Q(("data_fim__gt", models.F("data_inicio"))),
                 name="data_fim_after_inicio",
                 violation_error_message="Data de fim deve ser posterior à data de início.",
             ),
@@ -45,7 +45,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="solicitacao",
             constraint=models.CheckConstraint(
-                condition=models.Q(
+                check=models.Q(
                     (
                         "data_fim__lte",
                         django.db.models.expressions.CombinedExpression(

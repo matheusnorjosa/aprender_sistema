@@ -225,22 +225,27 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # ========================================
-# CACHE (Redis em produção, LocMem em dev)
+# CACHE (Redis via django-redis em todos os ambientes)
 # ========================================
-if IS_PRODUCTION:
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-            'LOCATION': os.getenv('REDIS_URL', 'redis://redis:6379/0'),
-        }
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': os.getenv('REDIS_URL', 'redis://redis:6379/1'),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'SOCKET_CONNECT_TIMEOUT': 5,
+            'SOCKET_TIMEOUT': 5,
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 50,
+                'retry_on_timeout': True,
+            },
+            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
+            'IGNORE_EXCEPTIONS': True,  # Fallback para DB se Redis falhar
+        },
+        'KEY_PREFIX': 'aprender',
+        'TIMEOUT': 300,  # 5 minutos padrão
     }
-else:
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'unique-snowflake',
-        }
-    }
+}
 
 # ========================================
 # LOGGING

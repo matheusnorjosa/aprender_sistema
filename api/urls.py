@@ -13,6 +13,7 @@ except ImportError:
 from rest_framework.routers import DefaultRouter
 
 from . import views
+from core.views.api_health import api_health_check
 
 # Router principal da API
 router = DefaultRouter()
@@ -39,6 +40,9 @@ router.register(r"estatisticas", views.EstatisticasViewSet, basename="estatistic
 app_name = "api"
 
 urlpatterns = [
+    # Health check (público)
+    path("health/", api_health_check, name="api_health"),
+
     # Roteamento automático da API
     path("v1/", include(router.urls)),
 ]

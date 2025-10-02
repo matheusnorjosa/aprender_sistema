@@ -13,14 +13,15 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Iterator, Union
+from typing import Any, Dict, Iterator, List, Optional, Union
+
+import ijson
+import numpy as np
+import orjson
+import pandas as pd
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-import ijson
-import orjson
 from mistletoe import Document
-import pandas as pd
-import numpy as np
 
 # ========================================
 # FEATURE FLAG VALIDATION
@@ -570,20 +571,20 @@ Sistema APRENDER/
             filename = arguments.get("filename", "")
             method = arguments.get("method", "auto")
             chunk_size = arguments.get("chunk_size", 1000)
-            
+
             if not filename:
                 return [{"type": "text", "text": "❌ Erro: filename é obrigatório"}]
-            
+
             try:
                 # Análise do arquivo
                 analysis = _analyze_file_structure(filename)
                 if analysis.get("error"):
                     return [{"type": "text", "text": f"❌ Erro ao analisar arquivo: {analysis['error']}"}]
-                
+
                 # Determinar método se auto
                 if method == "auto":
                     method = analysis.get("recommended_method", "chunks")
-                
+
                 # Processar arquivo
                 if method == "streaming":
                     chunks = list(_process_json_streaming(filename))
@@ -591,31 +592,31 @@ Sistema APRENDER/
                 else:
                     chunks = list(_process_json_chunks(filename, chunk_size))
                     result = f"✅ Processado via chunks: {len(chunks)} chunks de {chunk_size} itens"
-                
+
                 # Adicionar informações da análise
                 result += f"\n\n📊 Análise do arquivo:\n"
                 result += f"• Tamanho: {analysis.get('size_mb', 0):.2f} MB\n"
                 result += f"• Tokens estimados: {analysis.get('estimated_tokens', 0):,}\n"
                 result += f"• Método recomendado: {analysis.get('recommended_method', 'chunks')}\n"
-                
+
                 return [{"type": "text", "text": result}]
-                
+
             except Exception as e:
                 return [{"type": "text", "text": f"❌ Erro ao processar arquivo: {str(e)}"}]
 
         elif name == "process_large_markdown":
             filename = arguments.get("filename", "")
             method = arguments.get("method", "sections")
-            
+
             if not filename:
                 return [{"type": "text", "text": "❌ Erro: filename é obrigatório"}]
-            
+
             try:
                 # Análise do arquivo
                 analysis = _analyze_file_structure(filename)
                 if analysis.get("error"):
                     return [{"type": "text", "text": f"❌ Erro ao analisar arquivo: {analysis['error']}"}]
-                
+
                 # Processar arquivo
                 if method == "sections":
                     sections = list(_process_markdown_sections(filename))
@@ -623,41 +624,41 @@ Sistema APRENDER/
                 else:
                     chunks = list(_process_markdown_tokens(filename))
                     result = f"✅ Processado por tokens: {len(chunks)} chunks encontrados"
-                
+
                 # Adicionar informações da análise
                 result += f"\n\n📊 Análise do arquivo:\n"
                 result += f"• Tamanho: {analysis.get('size_mb', 0):.2f} MB\n"
                 result += f"• Tokens estimados: {analysis.get('estimated_tokens', 0):,}\n"
-                
+
                 if analysis.get("structure_info", {}).get("sections"):
                     result += f"• Seções identificadas: {analysis['structure_info']['sections']}\n"
                     if analysis["structure_info"].get("section_titles"):
                         result += f"• Primeiras seções: {', '.join(analysis['structure_info']['section_titles'][:5])}\n"
-                
+
                 return [{"type": "text", "text": result}]
-                
+
             except Exception as e:
                 return [{"type": "text", "text": f"❌ Erro ao processar arquivo: {str(e)}"}]
 
         elif name == "analyze_file_structure":
             filename = arguments.get("filename", "")
-            
+
             if not filename:
                 return [{"type": "text", "text": "❌ Erro: filename é obrigatório"}]
-            
+
             try:
                 analysis = _analyze_file_structure(filename)
-                
+
                 if analysis.get("error"):
                     return [{"type": "text", "text": f"❌ Erro: {analysis['error']}"}]
-                
+
                 result = f"📊 Análise do arquivo: {analysis['filename']}\n\n"
                 result += f"📁 Informações básicas:\n"
                 result += f"• Tamanho: {analysis['size_bytes']:,} bytes ({analysis['size_mb']:.2f} MB)\n"
                 result += f"• Extensão: {analysis['extension']}\n"
                 result += f"• Tokens estimados: {analysis['estimated_tokens']:,}\n"
                 result += f"• Método recomendado: {analysis['recommended_method']}\n\n"
-                
+
                 if analysis.get("structure_info"):
                     result += f"🏗️ Estrutura:\n"
                     for key, value in analysis["structure_info"].items():
@@ -667,9 +668,9 @@ Sistema APRENDER/
                                 result += f"  - {', '.join(map(str, value))}\n"
                         else:
                             result += f"• {key}: {value}\n"
-                
+
                 return [{"type": "text", "text": result}]
-                
+
             except Exception as e:
                 return [{"type": "text", "text": f"❌ Erro ao analisar arquivo: {str(e)}"}]
 
@@ -679,31 +680,31 @@ Sistema APRENDER/
             columns = arguments.get("columns", [])
             filters = arguments.get("filters", {})
             group_by = arguments.get("group_by", "")
-            
+
             if not data_source or not analysis_type:
                 return [{"type": "text", "text": "❌ Erro: data_source e analysis_type são obrigatórios"}]
-            
+
             try:
                 # Carregar dados
                 df = _load_data_with_pandas(data_source)
                 if df is None:
                     return [{"type": "text", "text": f"❌ Erro: Não foi possível carregar dados de {data_source}"}]
-                
+
                 # Aplicar filtros se fornecidos
                 if filters:
                     df = _apply_pandas_filters(df, filters)
-                
+
                 # Selecionar colunas específicas se fornecidas
                 if columns:
                     available_columns = [col for col in columns if col in df.columns]
                     if available_columns:
                         df = df[available_columns]
-                
+
                 # Executar análise
                 result = _perform_pandas_analysis(df, analysis_type, group_by)
-                
+
                 return [{"type": "text", "text": result}]
-                
+
             except Exception as e:
                 return [{"type": "text", "text": f"❌ Erro na análise com Pandas: {str(e)}"}]
 
@@ -727,9 +728,9 @@ def _analyze_file_structure(filename: str) -> Dict[str, Any]:
         file_path = Path(filename)
         if not file_path.exists():
             return {"error": f"Arquivo não encontrado: {filename}"}
-        
+
         file_size = file_path.stat().st_size
-        
+
         analysis = {
             'filename': filename,
             'size_bytes': file_size,
@@ -739,13 +740,13 @@ def _analyze_file_structure(filename: str) -> Dict[str, Any]:
             'recommended_method': '',
             'structure_info': {}
         }
-        
+
         # Estimar tokens (aproximadamente 4 caracteres por token)
         analysis['estimated_tokens'] = file_size // 4
-        
+
         if file_path.suffix.lower() == '.json':
             analysis['recommended_method'] = 'streaming' if file_size > 5 * 1024 * 1024 else 'chunks'
-            
+
             # Analisar estrutura JSON
             try:
                 with open(filename, 'rb') as f:
@@ -761,10 +762,10 @@ def _analyze_file_structure(filename: str) -> Dict[str, Any]:
                     analysis['structure_info'] = structure
             except Exception as e:
                 analysis['structure_info'] = {'error': f'Não foi possível analisar estrutura: {str(e)}'}
-        
+
         elif file_path.suffix.lower() in ['.md', '.txt']:
             analysis['recommended_method'] = 'sections'
-            
+
             # Analisar estrutura Markdown
             try:
                 with open(filename, 'r', encoding='utf-8') as f:
@@ -776,9 +777,9 @@ def _analyze_file_structure(filename: str) -> Dict[str, Any]:
                     }
             except Exception as e:
                 analysis['structure_info'] = {'error': f'Não foi possível analisar estrutura: {str(e)}'}
-        
+
         return analysis
-        
+
     except Exception as e:
         return {"error": f"Erro ao analisar arquivo: {str(e)}"}
 
@@ -797,7 +798,7 @@ def _process_json_chunks(filename: str, chunk_size: int = 1000) -> Iterator[List
     try:
         with open(filename, 'rb') as file:
             data = orjson.loads(file.read())
-            
+
             if isinstance(data, list):
                 for i in range(0, len(data), chunk_size):
                     yield data[i:i+chunk_size]
@@ -816,10 +817,10 @@ def _process_markdown_sections(filename: str) -> Iterator[str]:
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             content = f.read()
-        
+
         # Divide por seções principais
         sections = re.split(r'\n(?=## )', content)
-        
+
         for section in sections:
             if section.strip():
                 yield section.strip()
@@ -832,22 +833,22 @@ def _process_markdown_tokens(filename: str, max_tokens: int = 20000) -> Iterator
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             content = f.read()
-        
+
         # Divide por parágrafos primeiro
         paragraphs = content.split('\n\n')
         current_chunk = ""
-        
+
         for paragraph in paragraphs:
             # Estimar tokens (aproximadamente 4 caracteres por token)
             estimated_tokens = len(current_chunk + paragraph) // 4
-            
+
             if estimated_tokens > max_tokens:
                 if current_chunk:
                     yield current_chunk
                 current_chunk = paragraph
             else:
                 current_chunk += "\n\n" + paragraph if current_chunk else paragraph
-        
+
         if current_chunk:
             yield current_chunk
     except Exception as e:
@@ -865,22 +866,22 @@ def _load_data_with_pandas(data_source: str) -> Optional[pd.DataFrame]:
             with open(filename, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             return pd.json_normalize(data)
-        
+
         elif data_source.startswith('csv_file:'):
             # Carregar de arquivo CSV
             filename = data_source.replace('csv_file:', '')
             return pd.read_csv(filename)
-        
+
         elif data_source == 'system_data':
             # Dados do sistema APRENDER (exemplo)
             return _load_system_data_sample()
-        
+
         elif data_source.startswith('json_data:'):
             # Dados JSON diretos
             json_str = data_source.replace('json_data:', '')
             data = json.loads(json_str)
             return pd.json_normalize(data)
-        
+
         else:
             # Tentar carregar como arquivo
             if Path(data_source).exists():
@@ -890,9 +891,9 @@ def _load_data_with_pandas(data_source: str) -> Optional[pd.DataFrame]:
                     return pd.json_normalize(data)
                 elif data_source.endswith('.csv'):
                     return pd.read_csv(data_source)
-            
+
         return None
-        
+
     except Exception as e:
         logger.error(f"Erro ao carregar dados: {e}")
         return None
@@ -939,35 +940,35 @@ def _perform_pandas_analysis(df: pd.DataFrame, analysis_type: str, group_by: str
     try:
         result = f"📊 Análise Pandas - {analysis_type.upper()}\n"
         result += f"📈 Dados: {len(df)} registros, {len(df.columns)} colunas\n\n"
-        
+
         if analysis_type == "statistics":
             result += _get_statistics_analysis(df)
-        
+
         elif analysis_type == "grouping":
             if group_by and group_by in df.columns:
                 result += _get_grouping_analysis(df, group_by)
             else:
                 result += "⚠️ Coluna para agrupamento não especificada ou não encontrada\n"
                 result += f"Colunas disponíveis: {', '.join(df.columns.tolist())}\n"
-        
+
         elif analysis_type == "filtering":
             result += _get_filtering_analysis(df)
-        
+
         elif analysis_type == "insights":
             result += _get_insights_analysis(df)
-        
+
         elif analysis_type == "summary":
             result += _get_summary_analysis(df)
-        
+
         elif analysis_type == "correlation":
             result += _get_correlation_analysis(df)
-        
+
         else:
             result += f"❌ Tipo de análise '{analysis_type}' não suportado\n"
             result += "Tipos disponíveis: statistics, grouping, filtering, insights, summary, correlation\n"
-        
+
         return result
-        
+
     except Exception as e:
         logger.error(f"Erro na análise: {e}")
         return f"❌ Erro na análise: {str(e)}"
@@ -975,7 +976,7 @@ def _perform_pandas_analysis(df: pd.DataFrame, analysis_type: str, group_by: str
 def _get_statistics_analysis(df: pd.DataFrame) -> str:
     """Análise estatística dos dados"""
     result = "📊 ESTATÍSTICAS DESCRITIVAS:\n\n"
-    
+
     # Estatísticas numéricas
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     if len(numeric_cols) > 0:
@@ -983,7 +984,7 @@ def _get_statistics_analysis(df: pd.DataFrame) -> str:
         stats = df[numeric_cols].describe()
         result += stats.to_string()
         result += "\n\n"
-    
+
     # Estatísticas categóricas
     categorical_cols = df.select_dtypes(include=['object']).columns
     if len(categorical_cols) > 0:
@@ -993,19 +994,19 @@ def _get_statistics_analysis(df: pd.DataFrame) -> str:
             top_values = df[col].value_counts().head(3)
             result += f"  Top 3: {dict(top_values)}\n"
         result += "\n"
-    
+
     return result
 
 def _get_grouping_analysis(df: pd.DataFrame, group_by: str) -> str:
     """Análise de agrupamento"""
     result = f"📊 ANÁLISE POR AGRUPAMENTO: {group_by}\n\n"
-    
+
     # Contagem por grupo
     group_counts = df[group_by].value_counts()
     result += f"📈 Contagem por {group_by}:\n"
     result += group_counts.to_string()
     result += "\n\n"
-    
+
     # Estatísticas numéricas por grupo
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     if len(numeric_cols) > 0:
@@ -1013,13 +1014,13 @@ def _get_grouping_analysis(df: pd.DataFrame, group_by: str) -> str:
         grouped_stats = df.groupby(group_by)[numeric_cols].agg(['mean', 'sum', 'count'])
         result += grouped_stats.to_string()
         result += "\n\n"
-    
+
     return result
 
 def _get_filtering_analysis(df: pd.DataFrame) -> str:
     """Análise de filtros possíveis"""
     result = "🔍 ANÁLISE DE FILTROS DISPONÍVEIS:\n\n"
-    
+
     for col in df.columns:
         if df[col].dtype == 'object':
             unique_values = df[col].unique()[:10]  # Primeiros 10 valores
@@ -1028,13 +1029,13 @@ def _get_filtering_analysis(df: pd.DataFrame) -> str:
         elif pd.api.types.is_numeric_dtype(df[col]):
             result += f"• {col}: numérico (min: {df[col].min()}, max: {df[col].max()})\n"
         result += "\n"
-    
+
     return result
 
 def _get_insights_analysis(df: pd.DataFrame) -> str:
     """Análise de insights automáticos"""
     result = "💡 INSIGHTS AUTOMÁTICOS:\n\n"
-    
+
     # Insights sobre dados faltantes
     missing_data = df.isnull().sum()
     if missing_data.sum() > 0:
@@ -1043,7 +1044,7 @@ def _get_insights_analysis(df: pd.DataFrame) -> str:
             if missing > 0:
                 result += f"• {col}: {missing} valores faltantes ({missing/len(df)*100:.1f}%)\n"
         result += "\n"
-    
+
     # Insights sobre distribuição
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     if len(numeric_cols) > 0:
@@ -1058,7 +1059,7 @@ def _get_insights_analysis(df: pd.DataFrame) -> str:
             else:
                 result += "(aproximadamente simétrico)\n"
         result += "\n"
-    
+
     # Insights sobre correlações
     if len(numeric_cols) > 1:
         result += "🔗 Correlações Fortes (>0.7):\n"
@@ -1069,47 +1070,47 @@ def _get_insights_analysis(df: pd.DataFrame) -> str:
                 corr_val = corr_matrix.iloc[i, j]
                 if abs(corr_val) > 0.7:
                     strong_corr.append(f"• {corr_matrix.columns[i]} ↔ {corr_matrix.columns[j]}: {corr_val:.2f}")
-        
+
         if strong_corr:
             result += "\n".join(strong_corr[:5])  # Máximo 5 correlações
         else:
             result += "Nenhuma correlação forte encontrada\n"
         result += "\n"
-    
+
     return result
 
 def _get_summary_analysis(df: pd.DataFrame) -> str:
     """Resumo geral dos dados"""
     result = "📋 RESUMO GERAL DOS DADOS:\n\n"
-    
+
     result += f"📊 Dimensões: {len(df)} linhas × {len(df.columns)} colunas\n"
     result += f"💾 Memória: {df.memory_usage(deep=True).sum() / 1024:.1f} KB\n\n"
-    
+
     result += "📝 Tipos de Dados:\n"
     dtype_counts = df.dtypes.value_counts()
     for dtype, count in dtype_counts.items():
         result += f"• {dtype}: {count} colunas\n"
     result += "\n"
-    
+
     result += "🔍 Primeiras 5 Linhas:\n"
     result += df.head().to_string()
     result += "\n\n"
-    
+
     return result
 
 def _get_correlation_analysis(df: pd.DataFrame) -> str:
     """Análise de correlações"""
     result = "🔗 ANÁLISE DE CORRELAÇÕES:\n\n"
-    
+
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     if len(numeric_cols) < 2:
         return result + "❌ Necessário pelo menos 2 colunas numéricas para análise de correlação\n"
-    
+
     corr_matrix = df[numeric_cols].corr()
     result += "📊 Matriz de Correlação:\n"
     result += corr_matrix.to_string()
     result += "\n\n"
-    
+
     # Correlações mais fortes
     result += "🔥 Correlações Mais Fortes:\n"
     corr_pairs = []
@@ -1117,11 +1118,11 @@ def _get_correlation_analysis(df: pd.DataFrame) -> str:
         for j in range(i+1, len(corr_matrix.columns)):
             corr_val = corr_matrix.iloc[i, j]
             corr_pairs.append((abs(corr_val), corr_val, corr_matrix.columns[i], corr_matrix.columns[j]))
-    
+
     corr_pairs.sort(reverse=True)
     for abs_corr, corr, col1, col2 in corr_pairs[:5]:
         result += f"• {col1} ↔ {col2}: {corr:.3f}\n"
-    
+
     return result
 
 if __name__ == "__main__":

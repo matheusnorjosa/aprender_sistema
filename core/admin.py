@@ -3,16 +3,20 @@ from django.contrib.auth.admin import UserAdmin
 
 from .models import (
     Aprovacao,
+    AprovacaoHistorico,
     Deslocamento,
     DisponibilidadeFormadores,
     EventoGoogleCalendar,
     FormadoresSolicitacao,
     LogAuditoria,
+    MarcadorPlanilha,
     Municipio,
+    Participante,
     Projeto,
     Solicitacao,
     TipoEvento,
     Usuario,
+    VinculoUsuarioSetor,
 )
 
 
@@ -128,10 +132,18 @@ class EventoGoogleCalendarAdmin(admin.ModelAdmin):
         "solicitacao",
         "provider_event_id",
         "status_sincronizacao",
+        "tentativas",
+        "request_id_short",
         "data_criacao",
     )
-    list_filter = ("status_sincronizacao",)
-    search_fields = ("provider_event_id", "html_link", "meet_link")
+    list_filter = ("status_sincronizacao", "tentativas")
+    search_fields = ("provider_event_id", "html_link", "meet_link", "request_id", "hash_payload")
+    readonly_fields = ("data_criacao", "ultima_tentativa", "tentativas")
+
+    def request_id_short(self, obj):
+        """Display first 12 chars of request_id"""
+        return f"{obj.request_id[:12]}..." if obj.request_id else ""
+    request_id_short.short_description = "Request ID"
 
 
 @admin.register(DisponibilidadeFormadores)
@@ -160,3 +172,46 @@ class DeslocamentoAdmin(admin.ModelAdmin):
     list_filter = ("data",)
     search_fields = ("origem", "destino", "formadores__nome")
     filter_horizontal = ("formadores",)
+
+
+# ====================================
+# NOVOS MODELOS CANÔNICOS
+# ====================================
+
+@admin.register(VinculoUsuarioSetor)
+class VinculoUsuarioSetorAdmin(admin.ModelAdmin):
+    list_display = ("usuario", "setor", "papel", "ativo", "created_at")
+    search_fields = ("usuario__username", "usuario__first_name", "usuario__last_name", "usuario__cpf", "setor__nome")
+    list_filter = ("papel", "setor", "ativo")
+    date_hierarchy = "created_at"
+
+
+@admin.register(Participante)
+class ParticipanteAdmin(admin.ModelAdmin):
+    list_display = ("solicitacao", "usuario", "papel", "created_at")
+    search_fields = ("solicitacao__titulo_evento", "usuario__username", "usuario__first_name", "usuario__last_name", "usuario__cpf")
+    list_filter = ("papel",)
+    date_hierarchy = "created_at"
+
+
+@admin.register(MarcadorPlanilha)
+class MarcadorPlanilhaAdmin(admin.ModelAdmin):
+    list_display = ("origem_aba", "linha", "external_hash_short", "cancelado_flag", "created_at")
+    search_fields = ("external_hash", "origem_aba", "linha", "gid")
+    list_filter = ("origem_aba", "cancelado_flag", "created_at")
+    date_hierarchy = "created_at"
+    readonly_fields = ("external_hash", "created_at", "updated_at")
+
+    def external_hash_short(self, obj):
+        """Display first 12 chars of hash"""
+        return f"{obj.external_hash[:12]}..." if obj.external_hash else ""
+    external_hash_short.short_description = "Hash (resumido)"
+
+
+@admin.register(AprovacaoHistorico)
+class AprovacaoHistoricoAdmin(admin.ModelAdmin):
+    list_display = ("solicitacao", "usuario", "status_anterior", "status_novo", "decisao", "origem", "data_decisao")
+    list_filter = ("decisao", "origem", "status_anterior", "status_novo", "data_decisao")
+    search_fields = ("solicitacao__titulo_evento", "usuario__username", "justificativa")
+    date_hierarchy = "data_decisao"
+    readonly_fields = ("data_decisao",)

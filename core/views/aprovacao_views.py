@@ -1,4 +1,9 @@
-from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+from core.services import (
+    FormadorService,
+    MunicipioService,
+    ProjetoService,
+    UsuarioService,
+)
 
 """
 Views relacionadas ao sistema de aprovações de solicitações.
@@ -7,10 +12,13 @@ Views relacionadas ao sistema de aprovações de solicitações.
 from django.db import transaction
 
 from core.mixins import SuperintendenciaSetorRequiredMixin
+
 from .base import *
 
 
-class AprovacoesPendentesView(LoginRequiredMixin, SuperintendenciaSetorRequiredMixin, ListView):
+class AprovacoesPendentesView(
+    LoginRequiredMixin, SuperintendenciaSetorRequiredMixin, ListView
+):
     template_name = "core/aprovacoes_pendentes_enhanced.html"
     model = Solicitacao
     context_object_name = "pendentes"
@@ -18,7 +26,11 @@ class AprovacoesPendentesView(LoginRequiredMixin, SuperintendenciaSetorRequiredM
 
     def get_queryset(self):
         qs = (
-            Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.PENDENTE)
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(status=SolicitacaoStatus.CRIADO)
             .select_related(
                 "projeto",
                 "municipio",
@@ -60,7 +72,7 @@ class AprovacaoDetailView(LoginRequiredMixin, PermissionRequiredMixin, FormView)
 
     def dispatch(self, request, *args, **kwargs):
         self.solicitacao = get_object_or_404(Solicitacao, pk=kwargs["pk"])
-        if self.solicitacao.status != SolicitacaoStatus.PENDENTE:
+        if self.solicitacao.status != SolicitacaoStatus.CRIADO:
             messages.warning(request, "Esta solicitação já foi decidida.")
             return redirect("core:aprovacoes_pendentes")
         return super().dispatch(request, *args, **kwargs)
@@ -92,11 +104,12 @@ class AprovacaoDetailView(LoginRequiredMixin, PermissionRequiredMixin, FormView)
                 )
 
                 # 2. Atualizar status da solicitação
-                self.solicitacao.status = (
-                    SolicitacaoStatus.PRE_AGENDA
-                    if decisao == AprovacaoStatus.APROVADO
-                    else SolicitacaoStatus.REPROVADO
-                )
+                if decisao == AprovacaoStatus.APROVADO:
+                    self.solicitacao.status = SolicitacaoStatus.APROVADO
+                else:
+                    # Reprovação: manter CRIADO, registrado via AprovacaoHistorico
+                    self.solicitacao.status = SolicitacaoStatus.CRIADO
+
                 self.solicitacao.usuario_aprovador = self.request.user
                 self.solicitacao.data_aprovacao_rejeicao = timezone.now()
                 self.solicitacao.save(
@@ -122,8 +135,8 @@ class AprovacaoDetailView(LoginRequiredMixin, PermissionRequiredMixin, FormView)
                     raise ValueError("Falha ao criar registro de aprovação")
 
                 if self.solicitacao.status not in [
-                    SolicitacaoStatus.PRE_AGENDA,
-                    SolicitacaoStatus.REPROVADO,
+                    SolicitacaoStatus.APROVADO,
+                    SolicitacaoStatus.CRIADO,
                 ]:
                     raise ValueError("Status da solicitação inválido após atualização")
 
@@ -139,10 +152,10 @@ class AprovacaoDetailView(LoginRequiredMixin, PermissionRequiredMixin, FormView)
             return redirect("core:aprovacao_detail", pk=self.solicitacao.pk)
 
         # 5. Mensagens de sucesso
-        if self.solicitacao.status == SolicitacaoStatus.PRE_AGENDA:
+        if self.solicitacao.status == SolicitacaoStatus.APROVADO:
             messages.success(
                 self.request,
-                "Solicitação aprovada e enviada para pré-agenda. "
+                "Solicitação aprovada. "
                 "O grupo Controle criará o evento no Google Calendar.",
             )
         else:

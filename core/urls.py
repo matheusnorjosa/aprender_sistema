@@ -35,6 +35,7 @@ from .views.api_approval import (
     SolicitacaoConflictsAPI,
     SolicitacoesPendentesAPI,
 )
+from .views.controle_preagenda import preagenda_list, preagenda_calendar_action
 from .views.api_availability import CheckAvailabilityAPI, FormadorDetailsAPI
 from .views.api_notifications import (
     CommunicationLogsAPI,
@@ -171,6 +172,18 @@ urlpatterns = [
     #     RemoverEventoPreAgendaView.as_view(),
     #     name="controle_remover_evento",
     # ),
+    # REINTRODUZIDO: Pré-agenda como fila operacional (status CRIADO/APROVADO)
+    # Hotfix Dia 3 COMPLETO - sem uso de status legado PRE_AGENDA
+    path(
+        "controle/pre-agenda/",
+        preagenda_list,
+        name="controle-preagenda",
+    ),
+    path(
+        "controle/pre-agenda/<uuid:solicitacao_id>/calendar/",
+        preagenda_calendar_action,
+        name="controle-preagenda-calendar",
+    ),
     # Perfil Diretoria - Visão Estratégica e Relatórios Executivos
     path(
         "diretoria/dashboard/",

@@ -1,0 +1,2 @@
+# Força LF em scripts shell (evita problemas com CRLF)
+scripts/*.sh text eol=lf

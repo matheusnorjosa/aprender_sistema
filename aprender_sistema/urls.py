@@ -6,7 +6,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("django.contrib.auth.urls")),
     path("api/", include("api.urls")),  # API REST + healthcheck
-    # path("", include("core.urls")),  # Temporariamente desabilitado
+    path("", include("core.urls")),  # Core URLs (Hotfix Dia 3: reabilitado)
 ]
 
 # ========================================
@@ -14,7 +14,7 @@ urlpatterns = [
 # ========================================
 
 # MCP Tools - Apenas se habilitado
-if getattr(settings, 'MCP_TOOLS_ENABLED', False):
+if getattr(settings, "MCP_TOOLS_ENABLED", False):
     try:
         urlpatterns.append(path("mcp/", include("core.mcp.urls")))
     except ImportError:
@@ -22,7 +22,7 @@ if getattr(settings, 'MCP_TOOLS_ENABLED', False):
         pass
 
 # APIs Experimentais - Apenas se habilitado
-if getattr(settings, 'EXPERIMENTAL_APIS_ENABLED', False):
+if getattr(settings, "EXPERIMENTAL_APIS_ENABLED", False):
     try:
         urlpatterns.append(path("experimental/", include("core.experimental.urls")))
     except ImportError:

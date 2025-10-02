@@ -2,12 +2,16 @@
 """
 Servidor MCP para fornecer contexto do Sistema APRENDER
 Adaptado para estrutura existente do projeto.
+
+⚠️  PROTEGIDO POR FEATURE FLAGS - Não expor em produção!
 """
 
 import asyncio
 import json
 import logging
+import os
 import re
+import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Iterator, Union
 from mcp.server import Server
@@ -18,9 +22,28 @@ from mistletoe import Document
 import pandas as pd
 import numpy as np
 
+# ========================================
+# FEATURE FLAG VALIDATION
+# ========================================
+# Verificar se MCP tools estão habilitados
+MCP_TOOLS_ENABLED = os.getenv('MCP_TOOLS_ENABLED', 'False') == 'True'
+MCP_DEBUG_MODE = os.getenv('MCP_DEBUG_MODE', 'False') == 'True'
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+
+# Bloquear em produção se não explicitamente habilitado
+if ENVIRONMENT == 'production' and not MCP_TOOLS_ENABLED:
+    print("❌ MCP Tools bloqueados em produção. Defina MCP_TOOLS_ENABLED=True para habilitar.")
+    sys.exit(1)
+
 # Configuração de logging
-logging.basicConfig(level=logging.INFO)
+log_level = logging.DEBUG if MCP_DEBUG_MODE else logging.INFO
+logging.basicConfig(level=log_level)
 logger = logging.getLogger(__name__)
+
+# Log de inicialização
+logger.info(f"🚀 Iniciando MCP Server - Ambiente: {ENVIRONMENT}")
+logger.info(f"🔧 MCP Tools Enabled: {MCP_TOOLS_ENABLED}")
+logger.info(f"🐛 Debug Mode: {MCP_DEBUG_MODE}")
 
 # Inicialização do servidor MCP
 server = Server("aprender-context")

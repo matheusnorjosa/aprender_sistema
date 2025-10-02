@@ -55,6 +55,9 @@ INSTALLED_APPS = [
     'api',
 ]
 
+# Custom User Model
+AUTH_USER_MODEL = 'core.Usuario'
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # CORS deve vir antes do CommonMiddleware
@@ -328,6 +331,42 @@ SYSTEM_INFO = {
     'DOCKER_MODE': os.getenv('DOCKER_MODE', 'True') == 'True',
 }
 
+# ========================================
+# FEATURE FLAGS
+# ========================================
+# Controle de funcionalidades experimentais e ferramentas de desenvolvimento
+
+# MCP Tools - Apenas em desenvolvimento ou com flag explícita
+MCP_TOOLS_ENABLED = os.getenv('MCP_TOOLS_ENABLED', 'False' if IS_PRODUCTION else 'True') == 'True'
+MCP_DEBUG_MODE = os.getenv('MCP_DEBUG_MODE', 'False' if IS_PRODUCTION else 'True') == 'True'
+
+# Google Integrations
+GOOGLE_CALENDAR_ENABLED = os.getenv('GOOGLE_CALENDAR_ENABLED', 'True') == 'True'
+GOOGLE_SHEETS_ENABLED = os.getenv('GOOGLE_SHEETS_ENABLED', 'True') == 'True'
+
+# Analytics e Dashboards
+ANALYTICS_ENABLED = os.getenv('ANALYTICS_ENABLED', 'True') == 'True'
+DASHBOARD_DEBUG = os.getenv('DASHBOARD_DEBUG', 'False' if IS_PRODUCTION else 'True') == 'True'
+
+# APIs Experimentais
+EXPERIMENTAL_APIS_ENABLED = os.getenv('EXPERIMENTAL_APIS_ENABLED', 'False' if IS_PRODUCTION else 'True') == 'True'
+
+# Logs e Auditoria
+AUDIT_LOGS_ENABLED = os.getenv('AUDIT_LOGS_ENABLED', 'True') == 'True'
+DETAILED_LOGGING = os.getenv('DETAILED_LOGGING', 'False' if IS_PRODUCTION else 'True') == 'True'
+
+# ========================================
+# FEATURE FLAGS VALIDATION
+# ========================================
+# Garantir que MCP tools não sejam expostos em produção
+if IS_PRODUCTION and MCP_TOOLS_ENABLED:
+    import warnings
+    warnings.warn(
+        "MCP_TOOLS_ENABLED está ativo em produção! "
+        "Isso pode expor ferramentas de desenvolvimento.",
+        UserWarning
+    )
+
 # Exibir info no console (apenas em desenvolvimento)
 if IS_DEVELOPMENT and DEBUG:
     print("\n" + "="*60)
@@ -335,4 +374,11 @@ if IS_DEVELOPMENT and DEBUG:
     print("="*60)
     for key, value in SYSTEM_INFO.items():
         print(f"  {key}: {value}")
+    
+    print("\n🔧 FEATURE FLAGS:")
+    print(f"  MCP_TOOLS_ENABLED: {MCP_TOOLS_ENABLED}")
+    print(f"  GOOGLE_CALENDAR_ENABLED: {GOOGLE_CALENDAR_ENABLED}")
+    print(f"  GOOGLE_SHEETS_ENABLED: {GOOGLE_SHEETS_ENABLED}")
+    print(f"  ANALYTICS_ENABLED: {ANALYTICS_ENABLED}")
+    print(f"  EXPERIMENTAL_APIS_ENABLED: {EXPERIMENTAL_APIS_ENABLED}")
     print("="*60 + "\n")

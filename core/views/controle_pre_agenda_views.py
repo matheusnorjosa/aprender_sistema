@@ -1,4 +1,9 @@
-from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+from core.services import (
+    FormadorService,
+    MunicipioService,
+    ProjetoService,
+    UsuarioService,
+)
 
 """
 Views para pré-agenda do grupo Controle.
@@ -9,7 +14,6 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from core.mixins import SuperintendenciaSetorRequiredMixin
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
@@ -17,6 +21,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import ListView
 
+from core.mixins import SuperintendenciaSetorRequiredMixin
 from core.models import (
     EventoGoogleCalendar,
     Formador,
@@ -27,22 +32,28 @@ from core.models import (
 )
 
 
-class ControlePreAgendaView(LoginRequiredMixin, SuperintendenciaSetorRequiredMixin, ListView):
+class ControlePreAgendaView(
+    LoginRequiredMixin, PermissionRequiredMixin, ListView
+):
     """
     Página principal de pré-agenda para o grupo Controle.
-    Lista todos os eventos com status PRE_AGENDA para criação manual no Google Calendar.
+    Lista eventos CRIADOS ou APROVADOS aguardando criação manual no Google Calendar.
     """
 
-    permission_required = "core.sync_calendar"
+    permission_required = "core.can_controlar_preagenda"
     template_name = "core/controle/pre_agenda.html"
     model = Solicitacao
     context_object_name = "eventos_pre_agenda"
     paginate_by = 20
 
     def get_queryset(self):
-        """Busca eventos em pré-agenda ordenados por data de início."""
+        """Busca eventos na fila de pré-agenda (CRIADO/APROVADO) ordenados por data de início."""
         qs = (
-            Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.PRE_AGENDA)
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(status__in=[SolicitacaoStatus.CRIADO, SolicitacaoStatus.APROVADO])
             .select_related(
                 "projeto", "municipio", "tipo_evento", "usuario_solicitante"
             )
@@ -81,20 +92,42 @@ class ControlePreAgendaView(LoginRequiredMixin, SuperintendenciaSetorRequiredMix
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Estatísticas para cards
-        total_pre_agenda = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-            status=SolicitacaoStatus.PRE_AGENDA
-        ).count()
+        # Estatísticas para cards - fila de pré-agenda (CRIADO + APROVADO)
+        fila_preagenda = [SolicitacaoStatus.CRIADO, SolicitacaoStatus.APROVADO]
 
-        eventos_hoje = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-            status=SolicitacaoStatus.PRE_AGENDA, data_inicio__date=timezone.now().date()
-        ).count()
+        total_pre_agenda = (
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(status__in=fila_preagenda)
+            .count()
+        )
 
-        eventos_semana = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-            status=SolicitacaoStatus.PRE_AGENDA,
-            data_inicio__date__gte=timezone.now().date(),
-            data_inicio__date__lte=timezone.now().date() + timedelta(days=7),
-        ).count()
+        eventos_hoje = (
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(
+                status__in=fila_preagenda,
+                data_inicio__date=timezone.now().date(),
+            )
+            .count()
+        )
+
+        eventos_semana = (
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(
+                status__in=fila_preagenda,
+                data_inicio__date__gte=timezone.now().date(),
+                data_inicio__date__lte=timezone.now().date() + timedelta(days=7),
+            )
+            .count()
+        )
 
         # Eventos já sincronizados (para comparação)
         eventos_sincronizados = EventoGoogleCalendar.objects.filter(
@@ -133,9 +166,11 @@ class CriarEventoGoogleCalendarView(LoginRequiredMixin, PermissionRequiredMixin,
     def post(self, request, solicitacao_id):
         """Cria evento no Google Calendar e atualiza status da solicitação."""
         try:
-            # Buscar solicitação
+            # Buscar solicitação na fila de pré-agenda (CRIADO ou APROVADO)
             solicitacao = get_object_or_404(
-                Solicitacao, id=solicitacao_id, status=SolicitacaoStatus.PRE_AGENDA
+                Solicitacao,
+                id=solicitacao_id,
+                status__in=[SolicitacaoStatus.CRIADO, SolicitacaoStatus.APROVADO],
             )
 
             # Verificar se já não foi criado
@@ -184,8 +219,8 @@ class CriarEventoGoogleCalendarView(LoginRequiredMixin, PermissionRequiredMixin,
                     status_sincronizacao=EventoGoogleCalendar.SincronizacaoStatus.OK,
                 )
 
-                # Atualizar status da solicitação para APROVADO
-                solicitacao.status = SolicitacaoStatus.APROVADO
+                # Atualizar status da solicitação para AGENDADO (evento criado no Calendar)
+                solicitacao.status = SolicitacaoStatus.AGENDADO
                 solicitacao.save(update_fields=["status"])
 
                 # Log de auditoria
@@ -236,17 +271,19 @@ class RemoverEventoPreAgendaView(LoginRequiredMixin, PermissionRequiredMixin, Vi
     permission_required = "core.sync_calendar"
 
     def post(self, request, solicitacao_id):
-        """Remove evento da pré-agenda (marca como reprovado pelo controle)."""
+        """Remove evento da fila de pré-agenda (cancela evento)."""
         try:
             solicitacao = get_object_or_404(
-                Solicitacao, id=solicitacao_id, status=SolicitacaoStatus.PRE_AGENDA
+                Solicitacao,
+                id=solicitacao_id,
+                status__in=[SolicitacaoStatus.CRIADO, SolicitacaoStatus.APROVADO],
             )
 
             # Verificar motivo (opcional)
             motivo = request.POST.get("motivo", "Removido pelo controle")
 
-            # Atualizar status para reprovado
-            solicitacao.status = SolicitacaoStatus.REPROVADO
+            # Atualizar status para CANCELADO (não usar REPROVADO, que não é status canônico)
+            solicitacao.status = SolicitacaoStatus.CANCELADO
             solicitacao.save(update_fields=["status"])
 
             # Log de auditoria

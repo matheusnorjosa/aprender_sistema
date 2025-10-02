@@ -105,7 +105,7 @@ class BulkApprovalAPI(View):
             solicitacao = get_object_or_404(Solicitacao, pk=sol_id)
 
             # Verificar se já foi processada
-            if solicitacao.status != SolicitacaoStatus.PENDENTE:
+            if solicitacao.status != SolicitacaoStatus.CRIADO:
                 return {
                     "success": False,
                     "solicitacao_id": sol_id,
@@ -113,14 +113,13 @@ class BulkApprovalAPI(View):
                     "erro": "Solicitação já foi processada",
                 }
 
-            # Definir status baseado na ação
+            # Definir status e decisão baseado na ação
             if acao == "aprovar":
-                # CORRIGIDO: Aprovação vai direto para APROVADO (não PRE_AGENDA)
-                # PRE_AGENDA foi removido na migration 0033
                 novo_status = SolicitacaoStatus.APROVADO
                 decisao = AprovacaoStatus.APROVADO
             else:
-                novo_status = SolicitacaoStatus.REPROVADO
+                # Reprovação: manter CRIADO, decisão registrada via Aprovacao
+                novo_status = SolicitacaoStatus.CRIADO
                 decisao = AprovacaoStatus.REPROVADO
 
             # Criar aprovação
@@ -210,13 +209,13 @@ class SolicitacoesPendentesAPI(View):
             page = int(request.GET.get("page", 1))
             page_size = min(int(request.GET.get("page_size", 20)), 100)  # Max 100
 
-            # Query base
+            # Query base - fila de aprovações (status CRIADO)
             queryset = (
                 Solicitacao.objects.select_related(
                     "municipio", "projeto", "tipo_evento", "solicitante"
                 )
                 .prefetch_related("formadores")
-                .filter(status=SolicitacaoStatus.PENDENTE)
+                .filter(status=SolicitacaoStatus.CRIADO)
                 .select_related(
                     "projeto", "municipio", "tipo_evento", "usuario_solicitante"
                 )

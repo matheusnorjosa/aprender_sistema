@@ -1,4 +1,9 @@
-from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+from core.services import (
+    FormadorService,
+    MunicipioService,
+    ProjetoService,
+    UsuarioService,
+)
 
 """
 APIs para apoio ao grupo Controle na criação manual de eventos no Google Calendar.
@@ -29,7 +34,7 @@ from core.services.integrations.google_calendar import is_enabled as google_enab
 class ManualCreateEventAPI(View):
     """
     API para criação MANUAL de evento no Google Calendar
-    pelo grupo Controle a partir de uma solicitação em PRE_AGENDA.
+    pelo grupo Controle a partir de solicitação na fila de pré-agenda (CRIADO/APROVADO).
     """
 
     def post(self, request):
@@ -45,12 +50,15 @@ class ManualCreateEventAPI(View):
             # Buscar solicitação
             solicitacao = get_object_or_404(Solicitacao, pk=solicitacao_id)
 
-            # Verificar se está em status adequado
-            if solicitacao.status != SolicitacaoStatus.PRE_AGENDA:
+            # Verificar se está na fila de pré-agenda (CRIADO ou APROVADO)
+            if solicitacao.status not in [
+                SolicitacaoStatus.CRIADO,
+                SolicitacaoStatus.APROVADO,
+            ]:
                 return JsonResponse(
                     {
                         "success": False,
-                        "error": f"Solicitação deve estar em PRE_AGENDA (atual: {solicitacao.status})",
+                        "error": f"Solicitação deve estar CRIADA ou APROVADA (atual: {solicitacao.status})",
                     }
                 )
 
@@ -74,7 +82,7 @@ class ManualCreateEventAPI(View):
 class BulkCreateEventsAPI(View):
     """
     API para criação em lote de eventos no Google Calendar
-    para todas as solicitações em PRE_AGENDA.
+    para todas as solicitações na fila de pré-agenda (CRIADO/APROVADO).
     """
 
     def post(self, request):
@@ -87,7 +95,7 @@ class BulkCreateEventsAPI(View):
                     }
                 )
 
-            # Processar todas as solicitações em PRE_AGENDA MANUALMENTE
+            # Processar todas as solicitações na fila (CRIADO/APROVADO) MANUALMENTE
             management_service = GoogleCalendarManagementService()
             result = management_service.bulk_create_events_for_controle(request.user)
 
@@ -174,11 +182,16 @@ class CalendarStatusAPI(View):
             # Verificar status da integração
             integration_enabled = google_enabled()
 
-            # Estatísticas básicas
+            # Estatísticas básicas - fila de pré-agenda (CRIADO + APROVADO)
             stats = {
-                "total_solicitacoes_pre_agenda": Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-                    status=SolicitacaoStatus.PRE_AGENDA
-                ).count(),
+                "total_solicitacoes_pre_agenda": Solicitacao.objects.select_related(
+                    "municipio", "projeto", "tipo_evento", "solicitante"
+                )
+                .prefetch_related("formadores")
+                .filter(
+                    status__in=[SolicitacaoStatus.CRIADO, SolicitacaoStatus.APROVADO]
+                )
+                .count(),
                 "total_eventos_criados": EventoGoogleCalendar.objects.count(),
                 "eventos_com_meet": EventoGoogleCalendar.objects.exclude(
                     meet_link__isnull=True
@@ -342,12 +355,15 @@ class AutoApprovalWithCalendarAPI(View):
                     try:
                         solicitacao = get_object_or_404(Solicitacao, pk=sol_id)
 
-                        if solicitacao.status != SolicitacaoStatus.PRE_AGENDA:
+                        if solicitacao.status not in [
+                            SolicitacaoStatus.CRIADO,
+                            SolicitacaoStatus.APROVADO,
+                        ]:
                             results.append(
                                 {
                                     "solicitacao_id": sol_id,
                                     "success": False,
-                                    "error": f"Status inválido: {solicitacao.status}",
+                                    "error": f"Status inválido: {solicitacao.status} (esperado CRIADO ou APROVADO)",
                                 }
                             )
                             continue

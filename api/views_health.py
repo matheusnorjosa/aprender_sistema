@@ -5,8 +5,9 @@ Endpoint para healthcheck do Docker Compose.
 Verifica conectividade com PostgreSQL e Redis.
 """
 
-from django.http import JsonResponse
 from django.db import connections
+from django.http import JsonResponse
+
 from django_redis import get_redis_connection
 
 

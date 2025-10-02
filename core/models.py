@@ -1660,7 +1660,7 @@ class MarcadorPlanilha(models.Model):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
+
     # Hash único para idempotência
     external_hash = models.CharField(
         max_length=64,
@@ -1668,7 +1668,7 @@ class MarcadorPlanilha(models.Model):
         db_index=True,
         help_text="Hash SHA256 para garantir idempotência da importação"
     )
-    
+
     # Referências às planilhas
     gid = models.CharField(
         max_length=50,
@@ -1685,13 +1685,13 @@ class MarcadorPlanilha(models.Model):
         max_length=255,
         help_text="Fonte da importação (sheets:aba ou csv:arquivo)"
     )
-    
+
     # Flags de controle
     cancelado_flag = models.BooleanField(
         default=False,
         help_text="Se o evento foi marcado como cancelado na planilha"
     )
-    
+
     # Relacionamentos opcionais
     solicitacao = models.ForeignKey(
         'Solicitacao',
@@ -1709,7 +1709,7 @@ class MarcadorPlanilha(models.Model):
         related_name='marcadores_planilha',
         help_text="Disponibilidade associada (se aplicável)"
     )
-    
+
     # Vinculação para remarcações
     remarcado_para = models.ForeignKey(
         'self',
@@ -1719,7 +1719,7 @@ class MarcadorPlanilha(models.Model):
         related_name='remarcado_de',
         help_text="Marcador da nova data (para eventos remarcados)"
     )
-    
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

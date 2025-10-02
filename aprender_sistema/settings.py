@@ -374,7 +374,7 @@ if IS_DEVELOPMENT and DEBUG:
     print("="*60)
     for key, value in SYSTEM_INFO.items():
         print(f"  {key}: {value}")
-    
+
     print("\n🔧 FEATURE FLAGS:")
     print(f"  MCP_TOOLS_ENABLED: {MCP_TOOLS_ENABLED}")
     print(f"  GOOGLE_CALENDAR_ENABLED: {GOOGLE_CALENDAR_ENABLED}")

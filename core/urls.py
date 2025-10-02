@@ -3,9 +3,8 @@ from django.contrib.auth.views import LogoutView
 from django.urls import path
 from django.views.generic import TemplateView
 
-from .views import HomeView  # Nova importação
-from .views.health import health_check, health_detailed, health_ready, health_live, health_metrics
 # Removido: views não existem no módulo core.api.dashboard.views
+from .views import HomeView  # Nova importação
 from .views import (
     AprovacaoDetailView,
     AprovacoesPendentesView,
@@ -25,22 +24,12 @@ from .views import (
     RemoverEventoPreAgendaView,
     SolicitacaoCreateView,
     SolicitacaoOKView,
-    TestMapView,
-    TestMapSimpleView,
-    TestMapFinalView,
     TestMapAdvancedView,
+    TestMapFinalView,
+    TestMapSimpleView,
+    TestMapView,
 )
-from .views.mapa_views import MapaDadosAPIView, MapaEstatisticasAPIView
-from .views.mapa_realtime_views import MapaRealtimeAPIView, MapaStatusAPIView, MapaWebhookView
-from .views.diretoria_views import DashboardChartsAPIView, DiretoriaDebugView, DiretoriaIntegratedDashboardView, DashboardCursosAPIView, DashboardCoordenadoresAPIView
 from .views.admin_views import CommunicationLogsView
-from .views.gestao_views import (
-    GestaoDashboardView,
-    FormadorListView, FormadorCreateView, FormadorUpdateView, FormadorDeleteView,
-    MunicipioListView, MunicipioCreateView, MunicipioUpdateView, MunicipioDeleteView,
-    ProjetoListView, ProjetoCreateView, ProjetoUpdateView, ProjetoDeleteView,
-    TipoEventoListView, TipoEventoCreateView, TipoEventoUpdateView, TipoEventoDeleteView
-)
 from .views.api_approval import (
     BulkApprovalAPI,
     SolicitacaoConflictsAPI,
@@ -56,13 +45,56 @@ from .views.api_notifications import (
     RealtimeNotificationsAPI,
     UserNotificationsAPI,
 )
-from .views_calendar import MapaMensalPageView, MapaMensalView, FormadoresSuperintendenciaView
 from .views.deslocamento_views import (
-    DeslocamentoListView,
-    DeslocamentoCreateView,
-    DeslocamentoUpdateView,
-    DeslocamentoDeleteView,
     DeslocamentoAPI,
+    DeslocamentoCreateView,
+    DeslocamentoDeleteView,
+    DeslocamentoListView,
+    DeslocamentoUpdateView,
+)
+from .views.diretoria_views import (
+    DashboardChartsAPIView,
+    DashboardCoordenadoresAPIView,
+    DashboardCursosAPIView,
+    DiretoriaDebugView,
+    DiretoriaIntegratedDashboardView,
+)
+from .views.gestao_views import (
+    FormadorCreateView,
+    FormadorDeleteView,
+    FormadorListView,
+    FormadorUpdateView,
+    GestaoDashboardView,
+    MunicipioCreateView,
+    MunicipioDeleteView,
+    MunicipioListView,
+    MunicipioUpdateView,
+    ProjetoCreateView,
+    ProjetoDeleteView,
+    ProjetoListView,
+    ProjetoUpdateView,
+    TipoEventoCreateView,
+    TipoEventoDeleteView,
+    TipoEventoListView,
+    TipoEventoUpdateView,
+)
+from .views.health import (
+    health_check,
+    health_detailed,
+    health_live,
+    health_metrics,
+    health_ready,
+)
+from .views.mapa_realtime_views import (
+    MapaRealtimeAPIView,
+    MapaStatusAPIView,
+    MapaWebhookView,
+)
+from .views.mapa_views import MapaDadosAPIView, MapaEstatisticasAPIView
+from .views_calendar import (
+    FormadoresSuperintendenciaView,
+    MapaMensalPageView,
+    MapaMensalView,
 )
 
 app_name = "core"
@@ -123,22 +155,22 @@ urlpatterns = [
         ControleAPIStatusView.as_view(),
         name="controle_api_status",
     ),
-    # Perfil Controle - Pré-Agenda
-    path(
-        "controle/pre-agenda/",
-        ControlePreAgendaView.as_view(),
-        name="controle_pre_agenda",
-    ),
-    path(
-        "controle/pre-agenda/criar/<uuid:solicitacao_id>/",
-        CriarEventoGoogleCalendarView.as_view(),
-        name="controle_criar_evento",
-    ),
-    path(
-        "controle/pre-agenda/remover/<uuid:solicitacao_id>/",
-        RemoverEventoPreAgendaView.as_view(),
-        name="controle_remover_evento",
-    ),
+    # DEPRECATED: Rota desativada após migration 0033 (remoção de PRE_AGENDA)
+    # path(
+    #     "controle/pre-agenda/",
+    #     ControlePreAgendaView.as_view(),
+    #     name="controle_pre_agenda",
+    # ),
+    # path(
+    #     "controle/pre-agenda/criar/<uuid:solicitacao_id>/",
+    #     CriarEventoGoogleCalendarView.as_view(),
+    #     name="controle_criar_evento",
+    # ),
+    # path(
+    #     "controle/pre-agenda/remover/<uuid:solicitacao_id>/",
+    #     RemoverEventoPreAgendaView.as_view(),
+    #     name="controle_remover_evento",
+    # ),
     # Perfil Diretoria - Visão Estratégica e Relatórios Executivos
     path(
         "diretoria/dashboard/",
@@ -236,34 +268,78 @@ urlpatterns = [
         name="diretoria_test",
     ),
     # Serve Chart.js directly (removido - usar sistema padrão de static files)
-
     # Gestão Administrativa - CRUD para entidades principais
     path("gestao/", GestaoDashboardView.as_view(), name="gestao_dashboard"),
-
     # Gestão de Formadores
     path("gestao/formadores/", FormadorListView.as_view(), name="gestao_formadores"),
-    path("gestao/formadores/novo/", FormadorCreateView.as_view(), name="gestao_formadores_create"),
-    path("gestao/formadores/<uuid:pk>/editar/", FormadorUpdateView.as_view(), name="gestao_formadores_update"),
-    path("gestao/formadores/<uuid:pk>/excluir/", FormadorDeleteView.as_view(), name="gestao_formadores_delete"),
-
+    path(
+        "gestao/formadores/novo/",
+        FormadorCreateView.as_view(),
+        name="gestao_formadores_create",
+    ),
+    path(
+        "gestao/formadores/<uuid:pk>/editar/",
+        FormadorUpdateView.as_view(),
+        name="gestao_formadores_update",
+    ),
+    path(
+        "gestao/formadores/<uuid:pk>/excluir/",
+        FormadorDeleteView.as_view(),
+        name="gestao_formadores_delete",
+    ),
     # Gestão de Municípios
     path("gestao/municipios/", MunicipioListView.as_view(), name="gestao_municipios"),
-    path("gestao/municipios/novo/", MunicipioCreateView.as_view(), name="gestao_municipios_create"),
-    path("gestao/municipios/<uuid:pk>/editar/", MunicipioUpdateView.as_view(), name="gestao_municipios_update"),
-    path("gestao/municipios/<uuid:pk>/excluir/", MunicipioDeleteView.as_view(), name="gestao_municipios_delete"),
-
+    path(
+        "gestao/municipios/novo/",
+        MunicipioCreateView.as_view(),
+        name="gestao_municipios_create",
+    ),
+    path(
+        "gestao/municipios/<uuid:pk>/editar/",
+        MunicipioUpdateView.as_view(),
+        name="gestao_municipios_update",
+    ),
+    path(
+        "gestao/municipios/<uuid:pk>/excluir/",
+        MunicipioDeleteView.as_view(),
+        name="gestao_municipios_delete",
+    ),
     # Gestão de Projetos
     path("gestao/projetos/", ProjetoListView.as_view(), name="gestao_projetos"),
-    path("gestao/projetos/novo/", ProjetoCreateView.as_view(), name="gestao_projetos_create"),
-    path("gestao/projetos/<uuid:pk>/editar/", ProjetoUpdateView.as_view(), name="gestao_projetos_update"),
-    path("gestao/projetos/<uuid:pk>/excluir/", ProjetoDeleteView.as_view(), name="gestao_projetos_delete"),
-
+    path(
+        "gestao/projetos/novo/",
+        ProjetoCreateView.as_view(),
+        name="gestao_projetos_create",
+    ),
+    path(
+        "gestao/projetos/<uuid:pk>/editar/",
+        ProjetoUpdateView.as_view(),
+        name="gestao_projetos_update",
+    ),
+    path(
+        "gestao/projetos/<uuid:pk>/excluir/",
+        ProjetoDeleteView.as_view(),
+        name="gestao_projetos_delete",
+    ),
     # Gestão de Tipos de Evento
-    path("gestao/tipos-evento/", TipoEventoListView.as_view(), name="gestao_tipos_evento"),
-    path("gestao/tipos-evento/novo/", TipoEventoCreateView.as_view(), name="gestao_tipos_evento_create"),
-    path("gestao/tipos-evento/<uuid:pk>/editar/", TipoEventoUpdateView.as_view(), name="gestao_tipos_evento_update"),
-    path("gestao/tipos-evento/<uuid:pk>/excluir/", TipoEventoDeleteView.as_view(), name="gestao_tipos_evento_delete"),
-
+    path(
+        "gestao/tipos-evento/", TipoEventoListView.as_view(), name="gestao_tipos_evento"
+    ),
+    path(
+        "gestao/tipos-evento/novo/",
+        TipoEventoCreateView.as_view(),
+        name="gestao_tipos_evento_create",
+    ),
+    path(
+        "gestao/tipos-evento/<uuid:pk>/editar/",
+        TipoEventoUpdateView.as_view(),
+        name="gestao_tipos_evento_update",
+    ),
+    path(
+        "gestao/tipos-evento/<uuid:pk>/excluir/",
+        TipoEventoDeleteView.as_view(),
+        name="gestao_tipos_evento_delete",
+    ),
     # API para Dashboard Principal
     path(
         "api/dashboard-stats/",
@@ -341,12 +417,22 @@ urlpatterns = [
         CommunicationLogsView.as_view(),
         name="admin_communication_logs",
     ),
-
     # Sistema CRUD para Deslocamentos
     path("deslocamentos/", DeslocamentoListView.as_view(), name="deslocamentos_list"),
-    path("deslocamentos/novo/", DeslocamentoCreateView.as_view(), name="deslocamentos_create"),
-    path("deslocamentos/<uuid:pk>/editar/", DeslocamentoUpdateView.as_view(), name="deslocamentos_update"),
-    path("deslocamentos/<uuid:pk>/excluir/", DeslocamentoDeleteView.as_view(), name="deslocamentos_delete"),
+    path(
+        "deslocamentos/novo/",
+        DeslocamentoCreateView.as_view(),
+        name="deslocamentos_create",
+    ),
+    path(
+        "deslocamentos/<uuid:pk>/editar/",
+        DeslocamentoUpdateView.as_view(),
+        name="deslocamentos_update",
+    ),
+    path(
+        "deslocamentos/<uuid:pk>/excluir/",
+        DeslocamentoDeleteView.as_view(),
+        name="deslocamentos_delete",
+    ),
     path("api/deslocamentos/", DeslocamentoAPI.as_view(), name="deslocamentos_api"),
-
 ]

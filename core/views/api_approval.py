@@ -1,5 +1,3 @@
-from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
-
 """
 API views para sistema de aprovação avançado com operações em lote.
 SEMANA 3 - DIA 2: Sistema de aprovação/rejeição aprimorado
@@ -23,6 +21,12 @@ from core.models import (
     LogAuditoria,
     Solicitacao,
     SolicitacaoStatus,
+)
+from core.services import (
+    FormadorService,
+    MunicipioService,
+    ProjetoService,
+    UsuarioService,
 )
 from core.services.conflicts import check_conflicts
 
@@ -111,7 +115,9 @@ class BulkApprovalAPI(View):
 
             # Definir status baseado na ação
             if acao == "aprovar":
-                novo_status = SolicitacaoStatus.PRE_AGENDA
+                # CORRIGIDO: Aprovação vai direto para APROVADO (não PRE_AGENDA)
+                # PRE_AGENDA foi removido na migration 0033
+                novo_status = SolicitacaoStatus.APROVADO
                 decisao = AprovacaoStatus.APROVADO
             else:
                 novo_status = SolicitacaoStatus.REPROVADO
@@ -206,7 +212,11 @@ class SolicitacoesPendentesAPI(View):
 
             # Query base
             queryset = (
-                Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.PENDENTE)
+                Solicitacao.objects.select_related(
+                    "municipio", "projeto", "tipo_evento", "solicitante"
+                )
+                .prefetch_related("formadores")
+                .filter(status=SolicitacaoStatus.PENDENTE)
                 .select_related(
                     "projeto", "municipio", "tipo_evento", "usuario_solicitante"
                 )

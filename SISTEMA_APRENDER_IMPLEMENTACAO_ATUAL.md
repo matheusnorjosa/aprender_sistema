@@ -96,19 +96,19 @@ class Usuario(AbstractUser):
     email = models.EmailField()
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=150)
-    
+
     # Campos Customizados
     cpf = models.CharField(max_length=11, unique=True)  # Login
     telefone = models.CharField(max_length=15)
     cargo = models.CharField(max_length=20, choices=CARGO_CHOICES)
     municipio = models.ForeignKey('Municipio', on_delete=models.SET_NULL)
     setor = models.ForeignKey('Setor', on_delete=models.SET_NULL)
-    
+
     # Campos Formador
     area_especializacao = models.CharField(max_length=100)
     anos_experiencia = models.PositiveIntegerField(default=0)
     formador_ativo = models.BooleanField(default=True)
-    
+
     # Manager Customizado
     objects = UsuarioManager()
 ```
@@ -146,19 +146,19 @@ class Solicitacao(models.Model):
     titulo_evento = models.CharField(max_length=300)
     data_inicio = models.DateTimeField()
     data_fim = models.DateTimeField()
-    
+
     # Relacionamentos
     usuario_solicitante = models.ForeignKey('Usuario', on_delete=models.CASCADE)
     municipio = models.ForeignKey('Municipio', on_delete=models.CASCADE)
     projeto = models.ForeignKey('Projeto', on_delete=models.CASCADE)
     tipo_evento = models.ForeignKey('TipoEvento', on_delete=models.CASCADE)
     formadores = models.ManyToManyField('Usuario', related_name='eventos_formador')
-    
+
     # Controle
     status = models.CharField(max_length=20, choices=STATUS_CHOICES)
     numero_encontro_formativo = models.PositiveIntegerField(default=1)
     observacoes = models.TextField(blank=True)
-    
+
     # Aprovação
     usuario_aprovador = models.ForeignKey('Usuario', null=True, blank=True)
     data_aprovacao_rejeicao = models.DateTimeField(null=True, blank=True)
@@ -313,7 +313,7 @@ class SolicitacaoStatus(models.TextChoices):
 def save(self, *args, **kwargs):
     """Implementa aprovação automática por setor"""
     is_new_record = self._state.adding
-    
+
     if is_new_record:
         if self.projeto.setor.vinculado_superintendencia:
             # FLUXO A: Superintendência - fica pendente
@@ -322,7 +322,7 @@ def save(self, *args, **kwargs):
             # FLUXO B: Outros setores - aprovação automática
             self.status = SolicitacaoStatus.APROVADO
             self.data_aprovacao_rejeicao = timezone.now()
-    
+
     super().save(*args, **kwargs)
 ```
 
@@ -386,10 +386,10 @@ EVENTOS GOOGLE CALENDAR:
 ```python
 class IsOwnerOrReadOnly(permissions.BasePermission):
     """Permite edição apenas para o dono do objeto"""
-    
+
 class IsFormadorOrReadOnly(permissions.BasePermission):
     """Permite edição apenas para formadores"""
-    
+
 class IsSuperintendenciaOrReadOnly(permissions.BasePermission):
     """Permite edição apenas para superintendência"""
 ```
@@ -404,19 +404,19 @@ class IsSuperintendenciaOrReadOnly(permissions.BasePermission):
 ```python
 class GoogleCalendarService:
     """Serviço real para integração com Google Calendar API"""
-    
+
     def create_event(self, solicitacao):
         """Cria evento no Google Calendar"""
         # Implementação real com OAuth2
         # Gera link Google Meet automaticamente
         # Envia convites por email
-        
+
     def update_event(self, event_id, solicitacao):
         """Atualiza evento existente"""
-        
+
     def delete_event(self, event_id):
         """Remove evento do calendário"""
-        
+
     def list_events(self, formador, date_range):
         """Lista eventos para verificação de conflitos"""
 ```

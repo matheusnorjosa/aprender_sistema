@@ -3,7 +3,7 @@ import uuid
 from datetime import timedelta
 
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser, BaseUserManager, Group
+from django.contrib.auth.models import AbstractUser, BaseUserManager, Group, Permission
 from django.db import models
 from django.utils import timezone
 
@@ -47,6 +47,57 @@ class Setor(models.Model):
 
     def __str__(self):
         return self.nome
+
+
+# =========================
+# VINCULO USUARIO-SETOR
+# =========================
+
+PAPEL_VINCULO = [
+    ("GERENTE", "Gerente"),
+    ("COORDENADOR", "Coordenador"),
+    ("FORMADOR", "Formador"),
+]
+
+
+class VinculoUsuarioSetor(models.Model):
+    """
+    Vínculo explícito entre usuário e setor com papel específico.
+    Um usuário pode ter múltiplos vínculos em diferentes setores.
+    """
+    usuario = models.ForeignKey(
+        "Usuario",
+        on_delete=models.CASCADE,
+        related_name="vinculos_setores",
+        verbose_name="Usuário"
+    )
+    setor = models.ForeignKey(
+        "Setor",
+        on_delete=models.CASCADE,
+        related_name="vinculos_usuarios",
+        verbose_name="Setor"
+    )
+    papel = models.CharField(
+        max_length=20,
+        choices=PAPEL_VINCULO,
+        verbose_name="Papel"
+    )
+    ativo = models.BooleanField(default=True, verbose_name="Ativo")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = (("usuario", "setor", "papel"),)
+        verbose_name = "Vínculo Usuário-Setor"
+        verbose_name_plural = "Vínculos Usuário-Setor"
+        ordering = ["setor__nome", "papel", "usuario__username"]
+        indexes = [
+            models.Index(fields=["usuario", "setor"]),
+            models.Index(fields=["setor", "papel"]),
+        ]
+
+    def __str__(self):
+        return f"{self.usuario.username} - {self.setor.nome} ({self.get_papel_display()})"
 
 
 # =========================
@@ -290,6 +341,40 @@ class Usuario(AbstractUser):
         verbose_name="Área de Atuação (Group)",
         help_text="Área de atuação como Group (compatibilidade com Formador)",
         related_name="usuarios_area_atuacao"
+    )
+
+    # === CAMPOS PARA IMPORTAÇÃO DE PLANILHAS ===
+    origem = models.CharField(
+        max_length=50,
+        blank=True,
+        default='',
+        verbose_name="Origem do Cadastro",
+        help_text="Origem do cadastro: 'planilha', 'manual', etc."
+    )
+
+    is_provisorio = models.BooleanField(
+        default=False,
+        verbose_name="Cadastro Provisório",
+        help_text="Usuário criado automaticamente pela importação, aguardando reconciliação com planilha Ativos"
+    )
+
+    # === CAMPOS DE PERMISSÕES ===
+    # Override para corrigir related_name (evitar conflito com 'user_set')
+    groups = models.ManyToManyField(
+        Group,
+        blank=True,
+        related_name="usuarios",
+        related_query_name="usuario",
+        verbose_name="groups",
+        help_text="The groups this user belongs to.",
+    )
+    user_permissions = models.ManyToManyField(
+        Permission,
+        blank=True,
+        related_name="usuarios",
+        related_query_name="usuario",
+        verbose_name="user permissions",
+        help_text="Specific permissions for this user.",
     )
 
     # === MANAGER CUSTOMIZADO ===
@@ -644,10 +729,11 @@ class TipoEvento(models.Model):
 # 3) FLUXO OPERACIONAL
 # =========================
 class SolicitacaoStatus(models.TextChoices):
-    PENDENTE = "Pendente", "Pendente"
-    PRE_AGENDA = "PreAgenda", "Pré-Agenda"
-    APROVADO = "Aprovado", "Aprovado"
-    REPROVADO = "Reprovado", "Reprovado"
+    CRIADO = "CRIADO", "Criado"
+    APROVADO = "APROVADO", "Aprovado"
+    AGENDADO = "AGENDADO", "Agendado"
+    REALIZADO = "REALIZADO", "Realizado"
+    CANCELADO = "CANCELADO", "Cancelado"
 
 
 class Solicitacao(models.Model):
@@ -674,7 +760,7 @@ class Solicitacao(models.Model):
     status = models.CharField(
         max_length=20,
         choices=SolicitacaoStatus.choices,
-        default=SolicitacaoStatus.PENDENTE,
+        default=SolicitacaoStatus.CRIADO,
     )
     usuario_aprovador = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -685,6 +771,17 @@ class Solicitacao(models.Model):
     )
     data_aprovacao_rejeicao = models.DateTimeField(null=True, blank=True)
     justificativa_rejeicao = models.TextField(blank=True, null=True)
+
+    # Novo campo para rastreamento de remarcações
+    remarcado_para = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="remarcacoes_anteriores",
+        verbose_name="Remarcado Para",
+        help_text="Se esta solicitação foi remarcada, referência para a nova solicitação"
+    )
 
     # M2M por through
     # Alterado para Usuario através do modelo intermediário atualizado
@@ -782,6 +879,63 @@ class FormadoresSolicitacao(models.Model):
         return self.usuario
 
 
+# =========================
+# PARTICIPANTE (NOVO MODELO CANÔNICO)
+# =========================
+
+PAPEL_PARTICIPANTE = [
+    ("FORMADOR", "Formador"),
+    ("COORDENADOR", "Coordenador"),
+    ("COORDENADOR_ACOMPANHA", "Coordenador Acompanha"),
+    ("CONVIDADO", "Convidado"),
+    ("APOIO", "Apoio"),
+]
+
+
+class Participante(models.Model):
+    """
+    Modelo canônico para participantes de solicitações.
+    Substitui FormadoresSolicitacao com papel explícito.
+    """
+    solicitacao = models.ForeignKey(
+        "Solicitacao",
+        on_delete=models.CASCADE,
+        related_name="participantes",
+        verbose_name="Solicitação"
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="participacoes",
+        verbose_name="Usuário"
+    )
+    papel = models.CharField(
+        max_length=30,
+        choices=PAPEL_PARTICIPANTE,
+        verbose_name="Papel"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = (("solicitacao", "usuario", "papel"),)
+        verbose_name = "Participante"
+        verbose_name_plural = "Participantes"
+        ordering = ["solicitacao", "papel", "usuario__username"]
+        indexes = [
+            models.Index(fields=["solicitacao", "papel"]),
+            models.Index(fields=["usuario", "papel"]),
+        ]
+
+    def __str__(self):
+        return f"{self.usuario.username} ({self.get_papel_display()}) - {self.solicitacao.titulo_evento}"
+
+
+# =========================
+# =========================
+# MARCADOR PLANILHA (IDEMPOTÊNCIA)
+# =========================
+# REMOVIDO: Definição duplicada - ver linha ~1712 para versão canônica atual
+
 class AprovacaoStatus(models.TextChoices):
     APROVADO = "Aprovado", "Aprovado"
     REPROVADO = "Reprovado", "Reprovado"
@@ -808,6 +962,74 @@ class Aprovacao(models.Model):
         return f"{self.status_decisao} — {self.solicitacao.titulo_evento}"
 
 
+# =========================
+# APROVACAO HISTORICO (AUDIT TRAIL)
+# =========================
+
+
+class AprovacaoHistorico(models.Model):
+    """
+    Histórico completo de decisões de aprovação/reprovação.
+    Registra todas as mudanças de status para auditoria.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    solicitacao = models.ForeignKey(
+        "Solicitacao",
+        on_delete=models.CASCADE,
+        related_name="historico_aprovacoes",
+        verbose_name="Solicitação"
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="decisoes_historico",
+        verbose_name="Usuário Responsável",
+        null=True,
+        blank=True,
+        help_text="Usuário que tomou a decisão (null para importações de planilha)"
+    )
+    status_anterior = models.CharField(
+        max_length=20,
+        choices=SolicitacaoStatus.choices,
+        verbose_name="Status Anterior"
+    )
+    status_novo = models.CharField(
+        max_length=20,
+        choices=SolicitacaoStatus.choices,
+        verbose_name="Status Novo"
+    )
+    decisao = models.CharField(
+        max_length=20,
+        choices=AprovacaoStatus.choices,
+        verbose_name="Decisão"
+    )
+    justificativa = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Justificativa"
+    )
+    origem = models.CharField(
+        max_length=50,
+        default='sistema',
+        verbose_name="Origem",
+        help_text="Ex: planilha, sistema, api"
+    )
+    data_decisao = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Histórico de Aprovação"
+        verbose_name_plural = "Históricos de Aprovações"
+        ordering = ["-data_decisao"]
+        indexes = [
+            models.Index(fields=["solicitacao", "-data_decisao"]),
+            models.Index(fields=["usuario", "-data_decisao"]),
+            models.Index(fields=["-data_decisao"]),
+        ]
+
+    def __str__(self):
+        return f"{self.solicitacao.titulo_evento} - {self.status_anterior} → {self.status_novo} ({self.data_decisao:%d/%m/%Y %H:%M})"
+
+
 class EventoGoogleCalendar(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     solicitacao = models.OneToOneField(
@@ -831,7 +1053,43 @@ class EventoGoogleCalendar(models.Model):
     raw_payload = models.JSONField(
         blank=True, null=True, verbose_name="Payload bruto da resposta"
     )  # novo campo
+
+    # Novos campos para idempotência e retry
+    request_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="Request ID",
+        help_text="ID único da requisição para idempotência"
+    )
+    hash_payload = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="Hash do Payload",
+        help_text="SHA256 do payload enviado ao Google Calendar"
+    )
+    tentativas = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Tentativas",
+        help_text="Número de tentativas de sincronização"
+    )
+    ultimo_erro = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Último Erro",
+        help_text="Descrição do último erro ocorrido"
+    )
+
     data_criacao = models.DateTimeField(auto_now_add=True)
+    ultima_tentativa = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Última Tentativa",
+        help_text="Data/hora da última tentativa de sincronização"
+    )
 
     class SincronizacaoStatus(models.TextChoices):
         PENDENTE = "Pendente", "Pendente"
@@ -1393,3 +1651,98 @@ class ImportacaoCursosCSV(models.Model):
             'ERRO': '❌'
         }.get(self.status, '❓')
         return f"{status_icon} {self.arquivo_nome} - {self.get_status_display()}"
+
+
+class MarcadorPlanilha(models.Model):
+    """
+    Marcador para rastrear importações de planilhas e garantir idempotência.
+    Vincula dados importados às suas origens nas planilhas.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # Hash único para idempotência
+    external_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+        help_text="Hash SHA256 para garantir idempotência da importação"
+    )
+    
+    # Referências às planilhas
+    gid = models.CharField(
+        max_length=50,
+        help_text="ID da linha na planilha (Google Sheets gid)"
+    )
+    linha = models.IntegerField(
+        help_text="Número da linha na planilha"
+    )
+    origem_aba = models.CharField(
+        max_length=100,
+        help_text="Nome da aba de origem"
+    )
+    origem = models.CharField(
+        max_length=255,
+        help_text="Fonte da importação (sheets:aba ou csv:arquivo)"
+    )
+    
+    # Flags de controle
+    cancelado_flag = models.BooleanField(
+        default=False,
+        help_text="Se o evento foi marcado como cancelado na planilha"
+    )
+    
+    # Relacionamentos opcionais
+    solicitacao = models.ForeignKey(
+        'Solicitacao',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='marcadores_planilha',
+        help_text="Solicitação associada (se aplicável)"
+    )
+    disponibilidade = models.ForeignKey(
+        'DisponibilidadeFormadores',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='marcadores_planilha',
+        help_text="Disponibilidade associada (se aplicável)"
+    )
+    
+    # Vinculação para remarcações
+    remarcado_para = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='remarcado_de',
+        help_text="Marcador da nova data (para eventos remarcados)"
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Marcador de Planilha"
+        verbose_name_plural = "Marcadores de Planilha"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['external_hash']),
+            models.Index(fields=['origem_aba', 'linha']),
+            models.Index(fields=['cancelado_flag']),
+        ]
+
+    def __str__(self):
+        tipo = "Solicitação" if self.solicitacao else "Disponibilidade"
+        cancelado = " (Cancelado)" if self.cancelado_flag else ""
+        return f"{tipo} - {self.origem_aba}:{self.linha}{cancelado}"
+
+    def is_remarcado(self) -> bool:
+        """Verifica se este evento foi remarcado"""
+        return self.remarcado_para is not None
+
+    def get_remarcacoes(self):
+        """Retorna todas as remarcações deste evento"""
+        return MarcadorPlanilha.objects.filter(remarcado_para=self)

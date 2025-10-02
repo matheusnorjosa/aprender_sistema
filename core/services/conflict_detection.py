@@ -152,11 +152,19 @@ class ConflictDetector:
         """RD-01: Verificar sobreposição com eventos existentes"""
         conflicts = []
 
-        # Buscar eventos aprovados que se sobreponham
-        eventos_existentes = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-            status__in=[SolicitacaoStatus.APROVADO, SolicitacaoStatus.PRE_AGENDA],
-            formadores=formador,
-        ).exclude(id=solicitacao.id)
+        # Buscar eventos aprovados/agendados que se sobreponham
+        # CORRIGIDO: PRE_AGENDA removido na migration 0033 → usar AGENDADO
+        eventos_existentes = (
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(
+                status__in=[SolicitacaoStatus.APROVADO, SolicitacaoStatus.AGENDADO],
+                formadores=formador,
+            )
+            .exclude(id=solicitacao.id)
+        )
 
         for evento in eventos_existentes:
             # RD-01: Verificar overlap (borda: fim == início não conflita)
@@ -199,9 +207,14 @@ class ConflictDetector:
         janela_inicio = data_inicio - timedelta(hours=4)
         janela_fim = data_fim + timedelta(hours=4)
 
+        # CORRIGIDO: PRE_AGENDA removido na migration 0033 → usar AGENDADO
         eventos_proximos = (
-            Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-                status__in=[SolicitacaoStatus.APROVADO, SolicitacaoStatus.PRE_AGENDA],
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(
+                status__in=[SolicitacaoStatus.APROVADO, SolicitacaoStatus.AGENDADO],
                 formadores=formador,
                 data_inicio__range=(janela_inicio, janela_fim),
             )
@@ -258,11 +271,19 @@ class ConflictDetector:
         data_evento = solicitacao.data_inicio.date()
 
         # Buscar eventos no mesmo dia
-        eventos_no_dia = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-            status__in=[SolicitacaoStatus.APROVADO, SolicitacaoStatus.PRE_AGENDA],
-            formadores=formador,
-            data_inicio__date=data_evento,
-        ).exclude(id=solicitacao.id)
+        # CORRIGIDO: PRE_AGENDA removido na migration 0033 → usar AGENDADO
+        eventos_no_dia = (
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(
+                status__in=[SolicitacaoStatus.APROVADO, SolicitacaoStatus.AGENDADO],
+                formadores=formador,
+                data_inicio__date=data_evento,
+            )
+            .exclude(id=solicitacao.id)
+        )
 
         # Calcular horas totais
         duracao_nova = (

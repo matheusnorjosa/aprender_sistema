@@ -43,7 +43,7 @@ class UsuarioAdmin(UserAdmin):
         "is_staff",
         "is_superuser",
         "is_active",
-        "date_joined"
+        "date_joined",
     )
     search_fields = ("username", "first_name", "last_name", "email", "cpf")
     ordering = ("username",)
@@ -56,16 +56,19 @@ class UsuarioAdmin(UserAdmin):
 
     # Expandir fieldsets para incluir campos de formador
     fieldsets = UserAdmin.fieldsets + (
-        ('Informações Pessoais', {
-            'fields': ('cpf', 'telefone', 'municipio')
-        }),
-        ('Estrutura Organizacional', {
-            'fields': ('setor', 'cargo')
-        }),
-        ('Dados de Formador', {
-            'fields': ('area_especializacao', 'anos_experiencia', 'observacoes_formador'),
-            'classes': ('collapse',)
-        }),
+        ("Informações Pessoais", {"fields": ("cpf", "telefone", "municipio")}),
+        ("Estrutura Organizacional", {"fields": ("setor", "cargo")}),
+        (
+            "Dados de Formador",
+            {
+                "fields": (
+                    "area_especializacao",
+                    "anos_experiencia",
+                    "observacoes_formador",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
     )
 
     add_fieldsets = UserAdmin.add_fieldsets
@@ -92,9 +95,11 @@ class TipoEventoAdmin(admin.ModelAdmin):
     search_fields = ("nome",)
 
 
-class FormadoresSolicitacaoInline(admin.TabularInline):
-    model = FormadoresSolicitacao
-    extra = 0
+# DEPRECATED: FormadoresSolicitacaoInline comentado após Hotfix Dia 3
+# Migração prevista para modelo Participante conforme especificação
+# class FormadoresSolicitacaoInline(admin.TabularInline):
+#     model = FormadoresSolicitacao
+#     extra = 0
 
 
 @admin.register(Solicitacao)
@@ -111,7 +116,8 @@ class SolicitacaoAdmin(admin.ModelAdmin):
     list_filter = ("status", "projeto", "tipo_evento", "municipio")
     search_fields = ("titulo_evento", "observacoes")
     date_hierarchy = "data_inicio"
-    inlines = [FormadoresSolicitacaoInline]
+    # DEPRECATED: inlines removido após Hotfix Dia 3 (migração para Participante)
+    # inlines = [FormadoresSolicitacaoInline]
 
 
 @admin.register(Aprovacao)
@@ -137,12 +143,19 @@ class EventoGoogleCalendarAdmin(admin.ModelAdmin):
         "data_criacao",
     )
     list_filter = ("status_sincronizacao", "tentativas")
-    search_fields = ("provider_event_id", "html_link", "meet_link", "request_id", "hash_payload")
+    search_fields = (
+        "provider_event_id",
+        "html_link",
+        "meet_link",
+        "request_id",
+        "hash_payload",
+    )
     readonly_fields = ("data_criacao", "ultima_tentativa", "tentativas")
 
     def request_id_short(self, obj):
         """Display first 12 chars of request_id"""
         return f"{obj.request_id[:12]}..." if obj.request_id else ""
+
     request_id_short.short_description = "Request ID"
 
 
@@ -156,7 +169,12 @@ class DisponibilidadeFormadoresAdmin(admin.ModelAdmin):
         "tipo_bloqueio",
     )
     list_filter = ("tipo_bloqueio", "data_bloqueio")
-    search_fields = ("usuario__first_name", "usuario__last_name", "usuario__username", "motivo")
+    search_fields = (
+        "usuario__first_name",
+        "usuario__last_name",
+        "usuario__username",
+        "motivo",
+    )
 
 
 @admin.register(LogAuditoria)
@@ -178,10 +196,17 @@ class DeslocamentoAdmin(admin.ModelAdmin):
 # NOVOS MODELOS CANÔNICOS
 # ====================================
 
+
 @admin.register(VinculoUsuarioSetor)
 class VinculoUsuarioSetorAdmin(admin.ModelAdmin):
     list_display = ("usuario", "setor", "papel", "ativo", "created_at")
-    search_fields = ("usuario__username", "usuario__first_name", "usuario__last_name", "usuario__cpf", "setor__nome")
+    search_fields = (
+        "usuario__username",
+        "usuario__first_name",
+        "usuario__last_name",
+        "usuario__cpf",
+        "setor__nome",
+    )
     list_filter = ("papel", "setor", "ativo")
     date_hierarchy = "created_at"
 
@@ -189,14 +214,26 @@ class VinculoUsuarioSetorAdmin(admin.ModelAdmin):
 @admin.register(Participante)
 class ParticipanteAdmin(admin.ModelAdmin):
     list_display = ("solicitacao", "usuario", "papel", "created_at")
-    search_fields = ("solicitacao__titulo_evento", "usuario__username", "usuario__first_name", "usuario__last_name", "usuario__cpf")
+    search_fields = (
+        "solicitacao__titulo_evento",
+        "usuario__username",
+        "usuario__first_name",
+        "usuario__last_name",
+        "usuario__cpf",
+    )
     list_filter = ("papel",)
     date_hierarchy = "created_at"
 
 
 @admin.register(MarcadorPlanilha)
 class MarcadorPlanilhaAdmin(admin.ModelAdmin):
-    list_display = ("origem_aba", "linha", "external_hash_short", "cancelado_flag", "created_at")
+    list_display = (
+        "origem_aba",
+        "linha",
+        "external_hash_short",
+        "cancelado_flag",
+        "created_at",
+    )
     search_fields = ("external_hash", "origem_aba", "linha", "gid")
     list_filter = ("origem_aba", "cancelado_flag", "created_at")
     date_hierarchy = "created_at"
@@ -205,13 +242,28 @@ class MarcadorPlanilhaAdmin(admin.ModelAdmin):
     def external_hash_short(self, obj):
         """Display first 12 chars of hash"""
         return f"{obj.external_hash[:12]}..." if obj.external_hash else ""
+
     external_hash_short.short_description = "Hash (resumido)"
 
 
 @admin.register(AprovacaoHistorico)
 class AprovacaoHistoricoAdmin(admin.ModelAdmin):
-    list_display = ("solicitacao", "usuario", "status_anterior", "status_novo", "decisao", "origem", "data_decisao")
-    list_filter = ("decisao", "origem", "status_anterior", "status_novo", "data_decisao")
+    list_display = (
+        "solicitacao",
+        "usuario",
+        "status_anterior",
+        "status_novo",
+        "decisao",
+        "origem",
+        "data_decisao",
+    )
+    list_filter = (
+        "decisao",
+        "origem",
+        "status_anterior",
+        "status_novo",
+        "data_decisao",
+    )
     search_fields = ("solicitacao__titulo_evento", "usuario__username", "justificativa")
     date_hierarchy = "data_decisao"
     readonly_fields = ("data_decisao",)

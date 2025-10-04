@@ -1,4 +1,9 @@
-from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+from core.services import (
+    FormadorService,
+    MunicipioService,
+    ProjetoService,
+    UsuarioService,
+)
 
 """
 Views relacionadas aos formadores e bloqueios de agenda.
@@ -84,7 +89,9 @@ class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateV
 
             if admin_mode == "formador" and admin_formador_id:
                 try:
-                    formador = FormadorService.get_formador(id=admin_formador_id, ativo=True)
+                    formador = FormadorService.get_formador(
+                        id=admin_formador_id, ativo=True
+                    )
                     context["admin_formador_simulado"] = formador
                 except Formador.DoesNotExist:
                     formador = None
@@ -105,7 +112,11 @@ class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateV
 
             # Eventos futuros (aprovados)
             eventos_futuros = (
-                Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
+                Solicitacao.objects.select_related(
+                    "municipio", "projeto", "tipo_evento", "solicitante"
+                )
+                .prefetch_related("formadores")
+                .filter(
                     formadores=formador,
                     status=SolicitacaoStatus.APROVADO,
                     data_inicio__gt=agora,
@@ -118,7 +129,11 @@ class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateV
 
             # Eventos em andamento (aprovados e dentro do período)
             eventos_andamento = (
-                Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
+                Solicitacao.objects.select_related(
+                    "municipio", "projeto", "tipo_evento", "solicitante"
+                )
+                .prefetch_related("formadores")
+                .filter(
                     formadores=formador,
                     status=SolicitacaoStatus.APROVADO,
                     data_inicio__lte=agora,
@@ -133,7 +148,11 @@ class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateV
             # Eventos passados (últimos 30 dias)
             ultimos_30_dias = agora - timedelta(days=30)
             eventos_passados = (
-                Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
+                Solicitacao.objects.select_related(
+                    "municipio", "projeto", "tipo_evento", "solicitante"
+                )
+                .prefetch_related("formadores")
+                .filter(
                     formadores=formador,
                     status=SolicitacaoStatus.APROVADO,
                     data_fim__lt=agora,
@@ -145,10 +164,15 @@ class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateV
                 .order_by("-data_inicio")
             )
 
-            # Eventos pendentes
+            # Eventos aguardando agendamento (CRIADO ou APROVADO)
             eventos_pendentes = (
-                Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-                    formadores=formador, status=SolicitacaoStatus.PENDENTE
+                Solicitacao.objects.select_related(
+                    "municipio", "projeto", "tipo_evento", "solicitante"
+                )
+                .prefetch_related("formadores")
+                .filter(
+                    formadores=formador,
+                    status__in=[SolicitacaoStatus.CRIADO, SolicitacaoStatus.APROVADO],
                 )
                 .select_related(
                     "projeto", "municipio", "tipo_evento", "usuario_solicitante"
@@ -180,9 +204,11 @@ class FormadorEventosView(LoginRequiredMixin, PermissionRequiredMixin, TemplateV
 
                 total_formadores = FormadorService.get_formadores_queryset().count()
                 eventos_admin_sample = (
-                    Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-                        status=SolicitacaoStatus.APROVADO, data_inicio__gte=agora
+                    Solicitacao.objects.select_related(
+                        "municipio", "projeto", "tipo_evento", "solicitante"
                     )
+                    .prefetch_related("formadores")
+                    .filter(status=SolicitacaoStatus.APROVADO, data_inicio__gte=agora)
                     .select_related(
                         "projeto", "municipio", "tipo_evento", "usuario_solicitante"
                     )

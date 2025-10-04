@@ -32,9 +32,7 @@ from core.models import (
 )
 
 
-class ControlePreAgendaView(
-    LoginRequiredMixin, PermissionRequiredMixin, ListView
-):
+class ControlePreAgendaView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     """
     Página principal de pré-agenda para o grupo Controle.
     Lista eventos CRIADOS ou APROVADOS aguardando criação manual no Google Calendar.

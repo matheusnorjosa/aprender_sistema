@@ -14,7 +14,16 @@
       "Bash(findstr:*)",
       "Bash(sed:*)",
       "Bash(rm:*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(git apply:*)",
+      "Bash(grep:*)",
+      "Bash(while read u)",
+      "Bash(do printf \"GET %s -> \" \"$u\")",
+      "Bash(done)",
+      "Bash(tee:*)",
+      "Bash(git rev-parse --short HEAD)",
+      "Bash(git rev-parse:*)",
+      "Bash(do echo \">>> $u\")"
     ],
     "deny": [],
     "ask": []

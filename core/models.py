@@ -65,23 +65,20 @@ class VinculoUsuarioSetor(models.Model):
     Vínculo explícito entre usuário e setor com papel específico.
     Um usuário pode ter múltiplos vínculos em diferentes setores.
     """
+
     usuario = models.ForeignKey(
         "Usuario",
         on_delete=models.CASCADE,
         related_name="vinculos_setores",
-        verbose_name="Usuário"
+        verbose_name="Usuário",
     )
     setor = models.ForeignKey(
         "Setor",
         on_delete=models.CASCADE,
         related_name="vinculos_usuarios",
-        verbose_name="Setor"
+        verbose_name="Setor",
     )
-    papel = models.CharField(
-        max_length=20,
-        choices=PAPEL_VINCULO,
-        verbose_name="Papel"
-    )
+    papel = models.CharField(max_length=20, choices=PAPEL_VINCULO, verbose_name="Papel")
     ativo = models.BooleanField(default=True, verbose_name="Ativo")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -97,23 +94,27 @@ class VinculoUsuarioSetor(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.usuario.username} - {self.setor.nome} ({self.get_papel_display()})"
+        return (
+            f"{self.usuario.username} - {self.setor.nome} ({self.get_papel_display()})"
+        )
 
 
 # =========================
 # 1) USUÁRIO CUSTOMIZADO
 # =========================
 
+
 class UsuarioManager(BaseUserManager):
     """
     Manager customizado para Usuario - Single Source of Truth
     Centraliza todas as queries para evitar duplicação e inconsistências
     """
+
     use_in_migrations = True
 
     def get_queryset(self):
         """QuerySet base otimizado com relacionamentos comuns"""
-        return super().get_queryset().select_related('setor', 'municipio')
+        return super().get_queryset().select_related("setor", "municipio")
 
     def get_by_natural_key(self, username):
         """Busca usuário por username (necessário para autenticação)"""
@@ -130,9 +131,7 @@ class UsuarioManager(BaseUserManager):
     # === FORMADORES ===
     def formadores(self):
         """Todos os formadores (fonte única de verdade)"""
-        return self.ativos().filter(
-            groups__name='formador'
-        ).distinct()
+        return self.ativos().filter(groups__name="formador").distinct()
 
     def formadores_por_area(self, area=None):
         """Formadores filtrados por área de especialização"""
@@ -151,19 +150,15 @@ class UsuarioManager(BaseUserManager):
     # === COORDENADORES ===
     def coordenadores(self):
         """Todos os coordenadores"""
-        return self.ativos().filter(cargo='coordenador')
+        return self.ativos().filter(cargo="coordenador")
 
     def coordenadores_superintendencia(self):
         """Coordenadores vinculados à superintendência"""
-        return self.coordenadores().filter(
-            setor__vinculado_superintendencia=True
-        )
+        return self.coordenadores().filter(setor__vinculado_superintendencia=True)
 
     def coordenadores_outros_setores(self):
         """Coordenadores de outros setores (não-superintendência)"""
-        return self.coordenadores().filter(
-            setor__vinculado_superintendencia=False
-        )
+        return self.coordenadores().filter(setor__vinculado_superintendencia=False)
 
     def coordenadores_por_vinculacao(self, superintendencia_only=None):
         """
@@ -187,33 +182,27 @@ class UsuarioManager(BaseUserManager):
     # === GERENTES ===
     def gerentes(self):
         """Todos os gerentes"""
-        return self.ativos().filter(cargo='gerente')
+        return self.ativos().filter(cargo="gerente")
 
     def gerentes_superintendencia(self):
         """Gerentes que podem aprovar solicitações"""
-        return self.gerentes().filter(
-            setor__vinculado_superintendencia=True
-        )
+        return self.gerentes().filter(setor__vinculado_superintendencia=True)
 
     # === CONTROLE ===
     def controle(self):
         """Usuários do controle"""
-        return self.ativos().filter(cargo='controle')
+        return self.ativos().filter(cargo="controle")
 
     # === QUERIES OTIMIZADAS PARA DASHBOARD ===
     def formadores_dashboard(self):
         """Formadores otimizados para dashboard com prefetch"""
         return self.formadores().prefetch_related(
-            'groups',
-            'solicitacoes_como_formador'
+            "groups", "solicitacoes_como_formador"
         )
 
     def coordenadores_dashboard(self):
         """Coordenadores otimizados para dashboard com prefetch"""
-        return self.coordenadores().prefetch_related(
-            'groups',
-            'solicitacoes_criadas'
-        )
+        return self.coordenadores().prefetch_related("groups", "solicitacoes_criadas")
 
     # === QUERIES POR SETOR ===
     def por_setor(self, setor):
@@ -340,22 +329,22 @@ class Usuario(AbstractUser):
         null=True,
         verbose_name="Área de Atuação (Group)",
         help_text="Área de atuação como Group (compatibilidade com Formador)",
-        related_name="usuarios_area_atuacao"
+        related_name="usuarios_area_atuacao",
     )
 
     # === CAMPOS PARA IMPORTAÇÃO DE PLANILHAS ===
     origem = models.CharField(
         max_length=50,
         blank=True,
-        default='',
+        default="",
         verbose_name="Origem do Cadastro",
-        help_text="Origem do cadastro: 'planilha', 'manual', etc."
+        help_text="Origem do cadastro: 'planilha', 'manual', etc.",
     )
 
     is_provisorio = models.BooleanField(
         default=False,
         verbose_name="Cadastro Provisório",
-        help_text="Usuário criado automaticamente pela importação, aguardando reconciliação com planilha Ativos"
+        help_text="Usuário criado automaticamente pela importação, aguardando reconciliação com planilha Ativos",
     )
 
     # === CAMPOS DE PERMISSÕES ===
@@ -464,19 +453,15 @@ class Usuario(AbstractUser):
     def get_coordenadores_superintendencia(cls):
         """Retorna coordenadores vinculados à superintendência"""
         return cls.objects.filter(
-            cargo="coordenador",
-            setor__vinculado_superintendencia=True,
-            is_active=True
-        ).select_related('setor')
+            cargo="coordenador", setor__vinculado_superintendencia=True, is_active=True
+        ).select_related("setor")
 
     @classmethod
     def get_coordenadores_outros_setores(cls):
         """Retorna coordenadores de outros setores (não-superintendência)"""
         return cls.objects.filter(
-            cargo="coordenador",
-            setor__vinculado_superintendencia=False,
-            is_active=True
-        ).select_related('setor')
+            cargo="coordenador", setor__vinculado_superintendencia=False, is_active=True
+        ).select_related("setor")
 
     @classmethod
     def get_coordenadores_por_vinculacao(cls, superintendencia_only=None):
@@ -490,9 +475,8 @@ class Usuario(AbstractUser):
                 - None: todos os coordenadores
         """
         queryset = cls.objects.filter(
-            cargo="coordenador",
-            is_active=True
-        ).select_related('setor')
+            cargo="coordenador", is_active=True
+        ).select_related("setor")
 
         if superintendencia_only is True:
             queryset = queryset.filter(setor__vinculado_superintendencia=True)
@@ -531,29 +515,33 @@ class Usuario(AbstractUser):
 
     def get_disponibilidades(self):
         """Retorna as disponibilidades/bloqueios do formador"""
-        if hasattr(self, 'disponibilidades'):
+        if hasattr(self, "disponibilidades"):
             return self.disponibilidades.all()
         return []
 
     def get_solicitacoes_como_formador(self):
         """Retorna solicitações onde este usuário é formador"""
-        if hasattr(self, 'solicitacoes_como_formador'):
+        if hasattr(self, "solicitacoes_como_formador"):
             return self.solicitacoes_como_formador.all()
         return []
 
     def get_eventos_realizados(self):
         """Retorna eventos realizados pelo formador (query otimizada)"""
-        return self.get_solicitacoes_como_formador().filter(
-            status='Aprovado'
-        ).select_related('projeto', 'municipio', 'tipo_evento')
+        return (
+            self.get_solicitacoes_como_formador()
+            .filter(status="Aprovado")
+            .select_related("projeto", "municipio", "tipo_evento")
+        )
 
     def get_eventos_proximos(self):
         """Retorna próximos eventos do formador"""
         from django.utils import timezone
-        return self.get_solicitacoes_como_formador().filter(
-            status='Aprovado',
-            data_inicio__gte=timezone.now()
-        ).select_related('projeto', 'municipio', 'tipo_evento')
+
+        return (
+            self.get_solicitacoes_como_formador()
+            .filter(status="Aprovado", data_inicio__gte=timezone.now())
+            .select_related("projeto", "municipio", "tipo_evento")
+        )
 
     # === COMPATIBILIDADE COM MODELO FORMADOR ===
     @property
@@ -662,7 +650,9 @@ class Municipio(models.Model):
 class Formador(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nome = models.CharField(max_length=255, verbose_name="Nome do Formador")
-    email = models.EmailField(max_length=255, unique=True, verbose_name="E-mail")
+    email = models.EmailField(
+        max_length=255, unique=True, verbose_name="E-mail", blank=True, null=True
+    )
     area_atuacao = models.ForeignKey(
         Group,
         on_delete=models.SET_NULL,
@@ -780,7 +770,7 @@ class Solicitacao(models.Model):
         blank=True,
         related_name="remarcacoes_anteriores",
         verbose_name="Remarcado Para",
-        help_text="Se esta solicitação foi remarcada, referência para a nova solicitação"
+        help_text="Se esta solicitação foi remarcada, referência para a nova solicitação",
     )
 
     # M2M por through
@@ -826,6 +816,7 @@ class Solicitacao(models.Model):
         permissions = [
             ("sync_calendar", "Can sync with Google Calendar"),
             ("view_own_solicitacoes", "Can view own solicitações (Coordenador)"),
+            ("can_controlar_preagenda", "Can manage pre-agenda queue (Controle)"),
         ]
 
     def __str__(self):
@@ -835,21 +826,31 @@ class Solicitacao(models.Model):
         """
         Implementa aprovação automática para setores não-superintendência.
 
-        FLUXO A (Superintendência): Coordenador → Pendente → Gerente aprova → Aprovado
-        FLUXO B (Outros setores): Coordenador → Aprovado automaticamente
+        FLUXO A (Superintendência): Coordenador → CRIADO → Gerente aprova → APROVADO
+        FLUXO B (Outros setores): Coordenador → APROVADO automaticamente
         """
         # Se é uma nova solicitação (verificar se existe no banco)
         is_new_record = self._state.adding
 
         if is_new_record:
-            # Verificar se o projeto é da superintendência
-            if self.projeto.setor.vinculado_superintendencia:
-                # FLUXO A: Superintendência - fica pendente para aprovação manual
-                self.status = SolicitacaoStatus.PENDENTE
+            # Verificar se o projeto é da superintendência (protegido para imports)
+            if (
+                self.projeto
+                and self.projeto.setor
+                and self.projeto.setor.vinculado_superintendencia
+            ):
+                # FLUXO A: Superintendência - fica CRIADO para aprovação manual
+                self.status = SolicitacaoStatus.CRIADO
             else:
-                # FLUXO B: Outros setores - aprovação automática
-                self.status = SolicitacaoStatus.APROVADO
-                self.data_aprovacao_rejeicao = timezone.now()
+                # FLUXO B: Outros setores - aprovação automática (ou sem projeto/setor)
+                # Durante imports, o status já vem definido, não sobrescrever
+                if (
+                    self.status != SolicitacaoStatus.CRIADO
+                    and self.status != SolicitacaoStatus.REALIZADO
+                    and self.status != SolicitacaoStatus.CANCELADO
+                ):
+                    self.status = SolicitacaoStatus.APROVADO
+                    self.data_aprovacao_rejeicao = timezone.now()
                 # Não define usuario_aprovador pois é automático
 
         super().save(*args, **kwargs)
@@ -862,7 +863,7 @@ class FormadoresSolicitacao(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         # limit_choices_to={'formador_ativo': True},
-        verbose_name="Formador"
+        verbose_name="Formador",
     )
 
     class Meta:
@@ -897,22 +898,21 @@ class Participante(models.Model):
     Modelo canônico para participantes de solicitações.
     Substitui FormadoresSolicitacao com papel explícito.
     """
+
     solicitacao = models.ForeignKey(
         "Solicitacao",
         on_delete=models.CASCADE,
         related_name="participantes",
-        verbose_name="Solicitação"
+        verbose_name="Solicitação",
     )
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="participacoes",
-        verbose_name="Usuário"
+        verbose_name="Usuário",
     )
     papel = models.CharField(
-        max_length=30,
-        choices=PAPEL_PARTICIPANTE,
-        verbose_name="Papel"
+        max_length=30, choices=PAPEL_PARTICIPANTE, verbose_name="Papel"
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -935,6 +935,7 @@ class Participante(models.Model):
 # MARCADOR PLANILHA (IDEMPOTÊNCIA)
 # =========================
 # REMOVIDO: Definição duplicada - ver linha ~1712 para versão canônica atual
+
 
 class AprovacaoStatus(models.TextChoices):
     APROVADO = "Aprovado", "Aprovado"
@@ -972,12 +973,13 @@ class AprovacaoHistorico(models.Model):
     Histórico completo de decisões de aprovação/reprovação.
     Registra todas as mudanças de status para auditoria.
     """
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     solicitacao = models.ForeignKey(
         "Solicitacao",
         on_delete=models.CASCADE,
         related_name="historico_aprovacoes",
-        verbose_name="Solicitação"
+        verbose_name="Solicitação",
     )
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -986,33 +988,25 @@ class AprovacaoHistorico(models.Model):
         verbose_name="Usuário Responsável",
         null=True,
         blank=True,
-        help_text="Usuário que tomou a decisão (null para importações de planilha)"
+        help_text="Usuário que tomou a decisão (null para importações de planilha)",
     )
     status_anterior = models.CharField(
-        max_length=20,
-        choices=SolicitacaoStatus.choices,
-        verbose_name="Status Anterior"
+        max_length=20, choices=SolicitacaoStatus.choices, verbose_name="Status Anterior"
     )
     status_novo = models.CharField(
-        max_length=20,
-        choices=SolicitacaoStatus.choices,
-        verbose_name="Status Novo"
+        max_length=20, choices=SolicitacaoStatus.choices, verbose_name="Status Novo"
     )
     decisao = models.CharField(
-        max_length=20,
-        choices=AprovacaoStatus.choices,
-        verbose_name="Decisão"
+        max_length=20, choices=AprovacaoStatus.choices, verbose_name="Decisão"
     )
     justificativa = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name="Justificativa"
+        blank=True, null=True, verbose_name="Justificativa"
     )
     origem = models.CharField(
         max_length=50,
-        default='sistema',
+        default="sistema",
         verbose_name="Origem",
-        help_text="Ex: planilha, sistema, api"
+        help_text="Ex: planilha, sistema, api",
     )
     data_decisao = models.DateTimeField(auto_now_add=True)
 
@@ -1061,7 +1055,7 @@ class EventoGoogleCalendar(models.Model):
         blank=True,
         db_index=True,
         verbose_name="Request ID",
-        help_text="ID único da requisição para idempotência"
+        help_text="ID único da requisição para idempotência",
     )
     hash_payload = models.CharField(
         max_length=64,
@@ -1069,18 +1063,18 @@ class EventoGoogleCalendar(models.Model):
         blank=True,
         db_index=True,
         verbose_name="Hash do Payload",
-        help_text="SHA256 do payload enviado ao Google Calendar"
+        help_text="SHA256 do payload enviado ao Google Calendar",
     )
     tentativas = models.PositiveIntegerField(
         default=0,
         verbose_name="Tentativas",
-        help_text="Número de tentativas de sincronização"
+        help_text="Número de tentativas de sincronização",
     )
     ultimo_erro = models.TextField(
         blank=True,
         null=True,
         verbose_name="Último Erro",
-        help_text="Descrição do último erro ocorrido"
+        help_text="Descrição do último erro ocorrido",
     )
 
     data_criacao = models.DateTimeField(auto_now_add=True)
@@ -1088,7 +1082,7 @@ class EventoGoogleCalendar(models.Model):
         null=True,
         blank=True,
         verbose_name="Última Tentativa",
-        help_text="Data/hora da última tentativa de sincronização"
+        help_text="Data/hora da última tentativa de sincronização",
     )
 
     class SincronizacaoStatus(models.TextChoices):
@@ -1121,8 +1115,6 @@ class DisponibilidadeFormadores(models.Model):
         related_name="disponibilidades",
         # limit_choices_to={'formador_ativo': True},
         verbose_name="Formador",
-        null=True,  # Temporário para migração
-        blank=True
     )
     data_bloqueio = models.DateField()
     hora_inicio = models.TimeField()
@@ -1151,9 +1143,7 @@ class DisponibilidadeFormadores(models.Model):
         return self.usuario
 
     def __str__(self):
-        return (
-            f"{self.usuario.nome_completo} — {self.data_bloqueio} {self.hora_inicio}-{self.hora_fim}"
-        )
+        return f"{self.usuario.nome_completo} — {self.data_bloqueio} {self.hora_inicio}-{self.hora_fim}"
 
 
 class LogAuditoria(models.Model):
@@ -1194,69 +1184,75 @@ class Deslocamento(models.Model):
     origem = models.CharField(
         max_length=255,
         verbose_name="Origem",
-        help_text="Local de partida do deslocamento"
+        help_text="Local de partida do deslocamento",
     )
     destino = models.CharField(
         max_length=255,
         verbose_name="Destino",
-        help_text="Local de chegada do deslocamento"
+        help_text="Local de chegada do deslocamento",
     )
 
     # Tipo de deslocamento
     TIPO_CHOICES = [
-        ('deslocamento', 'Deslocamento'),
-        ('retorno', 'Retorno'),
+        ("deslocamento", "Deslocamento"),
+        ("retorno", "Retorno"),
     ]
     tipo = models.CharField(
         max_length=15,
         choices=TIPO_CHOICES,
-        default='deslocamento',
+        default="deslocamento",
         verbose_name="Tipo",
-        help_text="Tipo do deslocamento: ida ou volta"
+        help_text="Tipo do deslocamento: ida ou volta",
     )
 
     # Até 6 pessoas por deslocamento (conforme planilha)
     pessoa_1 = models.ForeignKey(
         "Formador",
-        null=True, blank=True,
+        null=True,
+        blank=True,
         on_delete=models.SET_NULL,
-        related_name='deslocamentos_p1',
-        verbose_name="Pessoa 1"
+        related_name="deslocamentos_p1",
+        verbose_name="Pessoa 1",
     )
     pessoa_2 = models.ForeignKey(
         "Formador",
-        null=True, blank=True,
+        null=True,
+        blank=True,
         on_delete=models.SET_NULL,
-        related_name='deslocamentos_p2',
-        verbose_name="Pessoa 2"
+        related_name="deslocamentos_p2",
+        verbose_name="Pessoa 2",
     )
     pessoa_3 = models.ForeignKey(
         "Formador",
-        null=True, blank=True,
+        null=True,
+        blank=True,
         on_delete=models.SET_NULL,
-        related_name='deslocamentos_p3',
-        verbose_name="Pessoa 3"
+        related_name="deslocamentos_p3",
+        verbose_name="Pessoa 3",
     )
     pessoa_4 = models.ForeignKey(
         "Formador",
-        null=True, blank=True,
+        null=True,
+        blank=True,
         on_delete=models.SET_NULL,
-        related_name='deslocamentos_p4',
-        verbose_name="Pessoa 4"
+        related_name="deslocamentos_p4",
+        verbose_name="Pessoa 4",
     )
     pessoa_5 = models.ForeignKey(
         "Formador",
-        null=True, blank=True,
+        null=True,
+        blank=True,
         on_delete=models.SET_NULL,
-        related_name='deslocamentos_p5',
-        verbose_name="Pessoa 5"
+        related_name="deslocamentos_p5",
+        verbose_name="Pessoa 5",
     )
     pessoa_6 = models.ForeignKey(
         "Formador",
-        null=True, blank=True,
+        null=True,
+        blank=True,
         on_delete=models.SET_NULL,
-        related_name='deslocamentos_p6',
-        verbose_name="Pessoa 6"
+        related_name="deslocamentos_p6",
+        verbose_name="Pessoa 6",
     )
 
     # Campos de auditoria (serão adicionados na próxima migration)
@@ -1268,7 +1264,7 @@ class Deslocamento(models.Model):
         "Formador",
         related_name="deslocamentos_old",
         blank=True,
-        help_text="DEPRECATED: Use pessoa_1 até pessoa_6"
+        help_text="DEPRECATED: Use pessoa_1 até pessoa_6",
     )
 
     class Meta:
@@ -1296,10 +1292,18 @@ class Deslocamento(models.Model):
     @property
     def pessoas(self):
         """Retorna lista de pessoas não-nulas do deslocamento"""
-        return [p for p in [
-            self.pessoa_1, self.pessoa_2, self.pessoa_3,
-            self.pessoa_4, self.pessoa_5, self.pessoa_6
-        ] if p is not None]
+        return [
+            p
+            for p in [
+                self.pessoa_1,
+                self.pessoa_2,
+                self.pessoa_3,
+                self.pessoa_4,
+                self.pessoa_5,
+                self.pessoa_6,
+            ]
+            if p is not None
+        ]
 
     @property
     def total_pessoas(self):
@@ -1319,7 +1323,9 @@ class Deslocamento(models.Model):
         # Verificar pessoas duplicadas
         pessoas = self.pessoas
         if len(pessoas) != len(set(pessoas)):
-            raise ValidationError("Não é possível ter a mesma pessoa em posições diferentes.")
+            raise ValidationError(
+                "Não é possível ter a mesma pessoa em posições diferentes."
+            )
 
         # Deve ter pelo menos uma pessoa
         if len(pessoas) == 0:
@@ -1540,10 +1546,14 @@ class CursoPlataforma(models.Model):
     """Modelo para armazenar cursos da plataforma Aprender Formar"""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    id_curso = models.CharField(max_length=50, unique=True, help_text="ID do curso na plataforma")
+    id_curso = models.CharField(
+        max_length=50, unique=True, help_text="ID do curso na plataforma"
+    )
     categoria = models.CharField(max_length=200, help_text="Categoria do curso")
     nome_breve = models.CharField(max_length=200, help_text="Nome breve do curso")
-    nome_limpo = models.CharField(max_length=200, blank=True, help_text="Nome processado pelo script de limpeza")
+    nome_limpo = models.CharField(
+        max_length=200, blank=True, help_text="Nome processado pelo script de limpeza"
+    )
     ano = models.IntegerField(default=2025, help_text="Ano do curso")
     ativo = models.BooleanField(default=True)
 
@@ -1554,11 +1564,11 @@ class CursoPlataforma(models.Model):
     class Meta:
         verbose_name = "Curso da Plataforma"
         verbose_name_plural = "Cursos da Plataforma"
-        ordering = ['nome_breve']
+        ordering = ["nome_breve"]
         indexes = [
-            models.Index(fields=['id_curso']),
-            models.Index(fields=['categoria']),
-            models.Index(fields=['ano', 'ativo']),
+            models.Index(fields=["id_curso"]),
+            models.Index(fields=["categoria"]),
+            models.Index(fields=["ano", "ativo"]),
         ]
 
     def __str__(self):
@@ -1576,21 +1586,21 @@ class ProjetoCursoLink(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     projeto = models.ForeignKey(
-        'Projeto',
+        "Projeto",
         on_delete=models.CASCADE,
-        related_name='cursos_vinculados',
-        help_text="Projeto do sistema"
+        related_name="cursos_vinculados",
+        help_text="Projeto do sistema",
     )
     curso_plataforma = models.ForeignKey(
-        'CursoPlataforma',
+        "CursoPlataforma",
         on_delete=models.CASCADE,
-        help_text="Curso correspondente na plataforma"
+        help_text="Curso correspondente na plataforma",
     )
 
     # Campos de controle
     mapeamento_manual = models.BooleanField(
         default=False,
-        help_text="Se o mapeamento foi feito manualmente ou automaticamente"
+        help_text="Se o mapeamento foi feito manualmente ou automaticamente",
     )
     data_vinculacao = models.DateTimeField(auto_now_add=True)
     usuario_vinculacao = models.ForeignKey(
@@ -1598,14 +1608,14 @@ class ProjetoCursoLink(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        help_text="Usuário que fez a vinculação"
+        help_text="Usuário que fez a vinculação",
     )
 
     class Meta:
         verbose_name = "Link Projeto-Curso"
         verbose_name_plural = "Links Projeto-Curso"
-        unique_together = [('projeto', 'curso_plataforma')]
-        ordering = ['projeto__nome', 'curso_plataforma__nome_breve']
+        unique_together = [("projeto", "curso_plataforma")]
+        ordering = ["projeto__nome", "curso_plataforma__nome_breve"]
 
     def __str__(self):
         manual_flag = " (Manual)" if self.mapeamento_manual else " (Auto)"
@@ -1616,15 +1626,15 @@ class ImportacaoCursosCSV(models.Model):
     """Log das importações de CSV de cursos"""
 
     STATUS_CHOICES = [
-        ('PENDENTE', 'Pendente'),
-        ('PROCESSANDO', 'Processando'),
-        ('CONCLUIDA', 'Concluída'),
-        ('ERRO', 'Erro'),
+        ("PENDENTE", "Pendente"),
+        ("PROCESSANDO", "Processando"),
+        ("CONCLUIDA", "Concluída"),
+        ("ERRO", "Erro"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     arquivo_nome = models.CharField(max_length=255)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PENDENTE")
     total_linhas = models.IntegerField(default=0)
     cursos_importados = models.IntegerField(default=0)
     cursos_atualizados = models.IntegerField(default=0)
@@ -1641,15 +1651,15 @@ class ImportacaoCursosCSV(models.Model):
     class Meta:
         verbose_name = "Importação CSV de Cursos"
         verbose_name_plural = "Importações CSV de Cursos"
-        ordering = ['-data_inicio']
+        ordering = ["-data_inicio"]
 
     def __str__(self):
         status_icon = {
-            'PENDENTE': '⏳',
-            'PROCESSANDO': '🔄',
-            'CONCLUIDA': '✅',
-            'ERRO': '❌'
-        }.get(self.status, '❓')
+            "PENDENTE": "⏳",
+            "PROCESSANDO": "🔄",
+            "CONCLUIDA": "✅",
+            "ERRO": "❌",
+        }.get(self.status, "❓")
         return f"{status_icon} {self.arquivo_nome} - {self.get_status_display()}"
 
 
@@ -1666,58 +1676,60 @@ class MarcadorPlanilha(models.Model):
         max_length=64,
         unique=True,
         db_index=True,
-        help_text="Hash SHA256 para garantir idempotência da importação"
+        help_text="Hash SHA256 para garantir idempotência da importação",
     )
 
     # Referências às planilhas
     gid = models.CharField(
         max_length=50,
-        help_text="ID da linha na planilha (Google Sheets gid)"
+        null=True,
+        blank=True,
+        help_text="ID da linha na planilha (Google Sheets gid)",
     )
     linha = models.IntegerField(
-        help_text="Número da linha na planilha"
+        null=True, blank=True, help_text="Número da linha na planilha"
     )
     origem_aba = models.CharField(
-        max_length=100,
-        help_text="Nome da aba de origem"
+        max_length=100, null=True, blank=True, help_text="Nome da aba de origem"
     )
     origem = models.CharField(
         max_length=255,
-        help_text="Fonte da importação (sheets:aba ou csv:arquivo)"
+        null=True,
+        blank=True,
+        help_text="Fonte da importação (sheets:aba ou csv:arquivo)",
     )
 
     # Flags de controle
     cancelado_flag = models.BooleanField(
-        default=False,
-        help_text="Se o evento foi marcado como cancelado na planilha"
+        default=False, help_text="Se o evento foi marcado como cancelado na planilha"
     )
 
     # Relacionamentos opcionais
     solicitacao = models.ForeignKey(
-        'Solicitacao',
+        "Solicitacao",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='marcadores_planilha',
-        help_text="Solicitação associada (se aplicável)"
+        related_name="marcadores_planilha",
+        help_text="Solicitação associada (se aplicável)",
     )
     disponibilidade = models.ForeignKey(
-        'DisponibilidadeFormadores',
+        "DisponibilidadeFormadores",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='marcadores_planilha',
-        help_text="Disponibilidade associada (se aplicável)"
+        related_name="marcadores_planilha",
+        help_text="Disponibilidade associada (se aplicável)",
     )
 
     # Vinculação para remarcações
     remarcado_para = models.ForeignKey(
-        'self',
+        "self",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='remarcado_de',
-        help_text="Marcador da nova data (para eventos remarcados)"
+        related_name="remarcado_de",
+        help_text="Marcador da nova data (para eventos remarcados)",
     )
 
     # Timestamps
@@ -1727,11 +1739,11 @@ class MarcadorPlanilha(models.Model):
     class Meta:
         verbose_name = "Marcador de Planilha"
         verbose_name_plural = "Marcadores de Planilha"
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=['external_hash']),
-            models.Index(fields=['origem_aba', 'linha']),
-            models.Index(fields=['cancelado_flag']),
+            models.Index(fields=["external_hash"]),
+            models.Index(fields=["origem_aba", "linha"]),
+            models.Index(fields=["cancelado_flag"]),
         ]
 
     def __str__(self):
@@ -1746,3 +1758,55 @@ class MarcadorPlanilha(models.Model):
     def get_remarcacoes(self):
         """Retorna todas as remarcações deste evento"""
         return MarcadorPlanilha.objects.filter(remarcado_para=self)
+
+
+# ===== Disponibilidades (STAGING) =====
+
+
+class StagingDisponAnual(models.Model):
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    nome_formador = models.CharField(max_length=255, blank=True, default="")
+    ano = models.IntegerField()
+    mes = models.PositiveSmallIntegerField()  # 1..12
+    horas = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = (("usuario", "nome_formador", "ano", "mes"),)
+
+
+class StagingDeslocamento(models.Model):
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    nome_formador = models.CharField(max_length=255, blank=True, default="")
+    data = models.DateField(null=True, blank=True)
+    origem = models.CharField(max_length=255, blank=True, default="")
+    destino = models.CharField(max_length=255, blank=True, default="")
+    observacao = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class StagingBloqueio(models.Model):
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    nome_formador = models.CharField(max_length=255, blank=True, default="")
+    inicio = models.DateTimeField(null=True, blank=True)
+    fim = models.DateTimeField(null=True, blank=True)
+    motivo = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)

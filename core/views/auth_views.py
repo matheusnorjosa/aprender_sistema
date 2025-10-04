@@ -1,17 +1,24 @@
-from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+from core.services import (
+    FormadorService,
+    MunicipioService,
+    ProjetoService,
+    UsuarioService,
+)
 
 """
 Views relacionadas à autenticação de usuários.
 """
 
-from .base import *
 from core.forms import CPFAuthenticationForm, CPFUserCreationForm
+
+from .base import *
 
 
 class CustomLoginView(LoginView):
     """
     View de login customizada usando CPF como username
     """
+
     form_class = CPFAuthenticationForm
     template_name = "core/login.html"
     redirect_authenticated_user = True
@@ -37,13 +44,13 @@ class CPFSignupView(CreateView):
     """
     View de cadastro usando CPF
     """
+
     form_class = CPFUserCreationForm
     template_name = "core/signup.html"
     success_url = reverse_lazy("core:login")
 
     def form_valid(self, form):
         messages.success(
-            self.request,
-            "Usuário criado com sucesso! Faça login com seu CPF."
+            self.request, "Usuário criado com sucesso! Faça login com seu CPF."
         )
         return super().form_valid(form)

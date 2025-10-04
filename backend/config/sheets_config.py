@@ -13,7 +13,9 @@ Para obter os IDs:
 # =============================================================================
 
 # Planilha de Agenda 2025
-AGENDA_2025_ID = "1oqDA9tN-wNiFVLS3KYTFzsXKpJpvDECfeKucjwf9GKs"  # ID da planilha principal de agenda
+AGENDA_2025_ID = (
+    "1oqDA9tN-wNiFVLS3KYTFzsXKpJpvDECfeKucjwf9GKs"  # ID da planilha principal de agenda
+)
 
 # Planilha de Disponibilidade
 DISPONIBILIDADE_2025_ID = "1C4_9Gn8gwKjgD1CgssIKaU4bacwv7XuL2QnoSVwomxU"  # ID da planilha de disponibilidade dos formadores
@@ -31,29 +33,25 @@ USUARIOS_ID = "1yPH-uCRc2XyThLU7V4pSoNYozydn1-IRRJRjubFCjXs"  # ID da planilha c
 
 # Abas da Planilha de Agenda
 ABAS = {
-    # Eventos por projeto
-    # 'ACerta': '123456789',  # Exemplo: ID numérico da aba
-    # 'Brincando': '987654321',
-    # 'Novo Lendo': '456789123',
-    # 'Super': '789123456',  # Aba de controle da superintendência
-
-    # Abas de controle
-    # 'Bloqueios': '321654987',
-    # 'Deslocamentos': '654987321',
-    # 'Configuracoes': '147258369',
+    "ACerta": "1055368874",
+    "Outros": "1647358371",
+    "Super": "0",
+    "Brincando": "1101094368",
+    "Vidas": "1882642294",
 }
+
 
 # Abas da Planilha de Disponibilidade
 ABAS_DISPONIBILIDADE = {
-    # 'Janeiro': '111111111',
-    # 'Fevereiro': '222222222',
-    # etc...
+    "ANUAL": "696255555",
+    "DESLOCAMENTO": "1634387612",
+    "Bloqueios": "1728789738",
 }
+
 
 # Abas da Planilha de Usuários
 ABAS_USUARIOS = {
-    # 'Ativos': '333333333',
-    # 'Inativos': '444444444',
+    "Ativos": "143336602",
 }
 
 
@@ -72,3 +70,43 @@ MAX_RETRIES = 3
 
 # Delay entre tentativas (segundos)
 RETRY_DELAY = 2
+
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+
+def csv_url(sheet_id: str, gid: str) -> str:
+    """
+    Gera URL de exportação CSV para uma aba específica.
+
+    Args:
+        sheet_id: ID da planilha Google Sheets
+        gid: ID da aba (GID)
+
+    Returns:
+        str: URL de exportação no formato CSV
+    """
+    return (
+        f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+    )
+
+
+def get_aba_gid(aba_nome: str) -> str:
+    """
+    Retorna o GID de uma aba pelo nome.
+
+    Args:
+        aba_nome: Nome da aba (case-insensitive)
+
+    Returns:
+        str: GID da aba ou string vazia se não encontrada
+    """
+    aba_nome_normalized = aba_nome.strip().lower()
+
+    for key, value in ABAS.items():
+        if key.lower() == aba_nome_normalized:
+            return value
+
+    return ""

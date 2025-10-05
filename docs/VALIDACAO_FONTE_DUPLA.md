@@ -1,6 +1,6 @@
 # Validação Fonte Dupla
 
-Gerado em: 2025-10-05 11:47:54
+Gerado em: 2025-10-05 12:09:33
 
 ## Fontes Comparadas
 - **Fonte A**: sheets

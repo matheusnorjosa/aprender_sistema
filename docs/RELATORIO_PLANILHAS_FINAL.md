@@ -328,14 +328,71 @@ Sistema staging importado com **93.1% de vinculação** e **99.8% de datas váli
 | **BLOQUEIOS Vinculados** | 0% | **91.9%** | **∞** 🎯 |
 
 ### 🎯 Sistema Pronto Para:
-- ✅ Promoção staging → produção
+- ✅ Promoção staging → produção (comando opcional)
 - ✅ Cross-check choques de agenda
 - ✅ Análise CH mensal
 - ✅ Dashboard de disponibilidade
 
 ---
 
-**Gerado em**: 2025-10-04 23:50 UTC
+## 📊 Validação Final Cross-Check (2025-10-04 23:55 UTC)
+
+### Choques de Agenda (Top 10):
+| Usuario ID | Choques | Observação |
+|------------|---------|------------|
+| 13279 | 6 | ⚠️ Crítico |
+| 13247 | 6 | ⚠️ Crítico |
+| 13278 | 4 | ⚠️ Alto |
+| 13172 | 4 | ⚠️ Alto |
+| 13258 | 3 | ⚠️ Médio |
+| 13244 | 3 | ⚠️ Médio |
+| 13268 | 2 | ⚠️ Baixo |
+| 13259 | 2 | ⚠️ Baixo |
+| 13292 | 2 | ⚠️ Baixo |
+| 9470 | 2 | ⚠️ Baixo |
+
+### Carga Horária Mensal (Top alertas):
+| Usuario ID | Mês | CH | Status |
+|------------|-----|-----|--------|
+| 13279 | 2025-06 | **157.5h** | 🔴 SOBRECARGA |
+| 13247 | 2025-06 | **154.5h** | 🔴 SOBRECARGA |
+| 13279 | 2025-10 | **143.0h** | 🔴 SOBRECARGA |
+| 13277 | 2025-09 | **131.0h** | 🔴 SOBRECARGA |
+| 13185 | 2025-09 | **117.0h** | 🟠 ALERTA |
+| 13247 | 2025-09 | **115.0h** | 🟠 ALERTA |
+| 13279 | 2025-11 | **114.5h** | 🟠 ALERTA |
+| 13249 | 2025-10 | **114.0h** | 🟠 ALERTA |
+| 13247 | 2025-11 | **114.0h** | 🟠 ALERTA |
+| 13278 | 2025-11 | **110.0h** | 🟠 ALERTA |
+
+**Análise**:
+- 10 usuários com conflitos de horário
+- 10 usuários com ≥110h/mês (pico 157.5h)
+- Pico de sobrecarga: **Junho 2025**
+
+### SSOT — Espelhos Atualizados:
+```
+✅ /app/data/ingest/dia3/abas/acerta.csv (109KB)
+✅ /app/data/ingest/dia3/abas/brincando.csv (129KB)
+✅ /app/data/ingest/dia3/abas/vidas.csv (85KB)
+✅ /app/data/ingest/dia3/abas/super.csv (304KB)
+✅ /app/data/ingest/dia3/abas/outros.csv (36KB)
+TOTAL: 664KB (5 abas)
+```
+
+### Guard Anti-MENSAL:
+✅ **PASS** - Lógica de skip implementada (linhas 114-121)
+```python
+if tipo.upper() == "MENSAL":
+    if verbose:
+        self.stdout.write(self.style.WARNING(f"   ⏭️  Ignorando MENSAL para {formador}"))
+    skipped += 1
+    continue
+```
+
+---
+
+**Gerado em**: 2025-10-04 23:55 UTC
 **Responsável**: Sistema Automatizado de Validação
 **Branch**: `fix/limpa-diff-20251003-191daf4`
-**Commit**: Próximo (staging + hotfix completo + relatório final)
+**Commit**: 7848860 (staging + hotfix completo + cross-check final)

@@ -392,7 +392,39 @@ if tipo.upper() == "MENSAL":
 
 ---
 
-**Gerado em**: 2025-10-04 23:55 UTC
+---
+
+## 🔄 Tentativa de Promoção Staging → Finais (2025-10-05 00:05 UTC)
+
+### Resultado:
+❌ **Promoção não completada** - Staging mantido como fonte oficial
+
+### Análise:
+1. **StagingDisponAnual** → ❌ Modelo final incompatível (estrutura diferente)
+2. **StagingDeslocamento** → ❌ IntegrityError (1 registro sem data, mas modelo final exige NOT NULL)
+3. **StagingBloqueio** → ⏭️ Não tentado (dependências anteriores)
+
+### Decisão Arquitetural:
+✅ **Staging como Fonte Definitiva** (arquitetura válida)
+
+**Justificativa**:
+- Staging tem 838 registros completos
+- 93.1% vinculação de usuários (excelente)
+- 99.8% datas válidas (379/380 DESLOC)
+- Estrutura otimizada para importação Google Sheets
+- Modelos finais têm constraints incompatíveis
+
+**Próximos Passos** (opcional):
+1. Criar views/adapters para ler de staging
+2. Ou ajustar modelos finais para aceitar nullables
+3. Ou implementar transformação staging→finais com limpeza
+
+---
+
+**Gerado em**: 2025-10-05 00:05 UTC
 **Responsável**: Sistema Automatizado de Validação
 **Branch**: `fix/limpa-diff-20251003-191daf4`
-**Commit**: 7848860 (staging + hotfix completo + cross-check final)
+**Commits**:
+- 7848860: staging + hotfix completo
+- 23854da: cross-check + SSOT final
+- **Staging = fonte oficial** ✅

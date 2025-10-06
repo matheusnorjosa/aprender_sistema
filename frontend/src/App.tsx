@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './App.css';
+import ReportsConflitos from './pages/ReportsConflitos';
+import ReportsWorkload from './pages/ReportsWorkload';
 
 interface HealthStatus {
   status: string;
@@ -8,7 +11,7 @@ interface HealthStatus {
   timestamp: string;
 }
 
-function App() {
+function HomePage() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,13 +56,34 @@ function App() {
           <ul>
             <li>✅ FASE 1: Apps e REST Framework</li>
             <li>✅ FASE 2: Testar Sistema Docker</li>
-            <li>🔄 FASE 3: React + Docker (em andamento)</li>
-            <li>⏳ FASE 4: Implementar API completa</li>
-            <li>⏳ FASE 5: Criar componentes React</li>
+            <li>✅ FASE 3: React + Docker</li>
+            <li>✅ FASE 4: API de Reports (Conflitos & Workload)</li>
+            <li>✅ FASE 5: Componentes React para Reports</li>
           </ul>
         </div>
+
+        <nav style={{display:"flex",gap:16,margin:"16px 0",justifyContent:"center"}}>
+          <Link to="/reports/conflitos" style={{padding:"8px 16px",background:"#61dafb",color:"#282c34",borderRadius:4,textDecoration:"none"}}>
+            📊 Conflitos
+          </Link>
+          <Link to="/reports/workload" style={{padding:"8px 16px",background:"#61dafb",color:"#282c34",borderRadius:4,textDecoration:"none"}}>
+            ⏱️ Workload
+          </Link>
+        </nav>
       </header>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/reports/conflitos" element={<ReportsConflitos />} />
+        <Route path="/reports/workload" element={<ReportsWorkload />} />
+      </Routes>
+    </Router>
   );
 }
 

@@ -1,12 +1,19 @@
 from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic import RedirectView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("django.contrib.auth.urls")),
     path("api/", include("api.urls")),  # API REST + healthcheck
-    path("api/reports/", include("backend.reports.urls")),  # Reports API (conflitos + workload)
+    path(
+        "api/reports/", include("backend.reports.urls")
+    ),  # Reports API (conflitos + workload)
+    path(
+        "diretoria/dashboard/",
+        RedirectView.as_view(url="http://localhost:3000/dashboard", permanent=False),
+    ),  # Redirect para dashboard React
     path("", include("core.urls")),  # Core URLs (Hotfix Dia 3: reabilitado)
 ]
 

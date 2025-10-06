@@ -23,7 +23,9 @@
       "Bash(tee:*)",
       "Bash(git rev-parse --short HEAD)",
       "Bash(git rev-parse:*)",
-      "Bash(do echo \">>> $u\")"
+      "Bash(do echo \">>> $u\")",
+      "Bash(pwsh:*)",
+      "Bash(powershell.exe:*)"
     ],
     "deny": [],
     "ask": []

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './App.css';
 import ReportsConflitos from './pages/ReportsConflitos';
 import ReportsWorkload from './pages/ReportsWorkload';
+import Dashboard from './pages/Dashboard';
 
 interface HealthStatus {
   status: string;
@@ -63,6 +64,9 @@ function HomePage() {
         </div>
 
         <nav style={{display:"flex",gap:16,margin:"16px 0",justifyContent:"center"}}>
+          <Link to="/dashboard" style={{padding:"8px 16px",background:"#61dafb",color:"#282c34",borderRadius:4,textDecoration:"none"}}>
+            📈 Dashboard
+          </Link>
           <Link to="/reports/conflitos" style={{padding:"8px 16px",background:"#61dafb",color:"#282c34",borderRadius:4,textDecoration:"none"}}>
             📊 Conflitos
           </Link>
@@ -80,6 +84,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/reports/conflitos" element={<ReportsConflitos />} />
         <Route path="/reports/workload" element={<ReportsWorkload />} />
       </Routes>

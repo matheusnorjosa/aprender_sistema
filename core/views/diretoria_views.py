@@ -50,9 +50,7 @@ class DiretoriaExecutiveDashboardView(
                 .first()
             )
 
-        municipios_queryset = (
-            MunicipioService.ativos().values("id", "nome", "uf").order_by("nome", "uf")
-        )
+        municipios_queryset = MunicipioService.ativos().values("id", "nome", "uf")
 
         context.update(
             {

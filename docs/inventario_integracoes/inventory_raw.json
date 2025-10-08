@@ -1,0 +1,5620 @@
+{
+  "matches": [
+    {
+      "type": "scheduler",
+      "file": ".env.develop.example"
+    },
+    {
+      "type": "scheduler",
+      "file": ".env.main.example"
+    },
+    {
+      "type": "mcp",
+      "file": ".gitignore"
+    },
+    {
+      "type": "google_api",
+      "file": ".gitignore"
+    },
+    {
+      "type": "scheduler",
+      "file": ".gitignore"
+    },
+    {
+      "type": "gspread",
+      "file": "access_control_sheet.py"
+    },
+    {
+      "type": "gspread",
+      "file": "analisador_completo_planilhas.py"
+    },
+    {
+      "type": "gspread",
+      "file": "autorizar_google_sheets.py"
+    },
+    {
+      "type": "google_api",
+      "file": "autorizar_google_sheets.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "CATALOG_STRUCTURE.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "CHANGELOG.md"
+    },
+    {
+      "type": "google_api",
+      "file": "CHECKLIST_LIBERACAO.md"
+    },
+    {
+      "type": "mcp",
+      "file": "CLAUDE.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "CLAUDE.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "CLAUDE_CONTEXT_PACKAGE.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "CODEOWNERS"
+    },
+    {
+      "type": "google_api",
+      "file": "CODEX_CONTEXT_PACKAGE.md"
+    },
+    {
+      "type": "google_api",
+      "file": "configurar_oauth.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "CONTRIBUTING.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "CORRECAO_STATUS_DISPONIBILIDADE.md"
+    },
+    {
+      "type": "openai_assistants",
+      "file": "C:Usersdatsu.codexconfig.toml"
+    },
+    {
+      "type": "scheduler",
+      "file": "Dockerfile"
+    },
+    {
+      "type": "scheduler",
+      "file": "DOCKER_WORKFLOW.md"
+    },
+    {
+      "type": "gspread",
+      "file": "estrategia_analise_planilhas_sheets.py"
+    },
+    {
+      "type": "google_api",
+      "file": "estrategia_analise_planilhas_sheets.py"
+    },
+    {
+      "type": "openai_assistants",
+      "file": "ESTRATEGIA_INTEGRACAO_ORACULO.md"
+    },
+    {
+      "type": "gspread",
+      "file": "ESTRATEGIA_MIGRACAO_FINAL.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "ESTRATEGIA_MIGRACAO_FINAL.md"
+    },
+    {
+      "type": "google_api",
+      "file": "extrair_dados_completos_frescos.py"
+    },
+    {
+      "type": "gspread",
+      "file": "extrator_municipios_reais.py"
+    },
+    {
+      "type": "gspread",
+      "file": "extrator_projetos_reais.py"
+    },
+    {
+      "type": "gspread",
+      "file": "extrator_usuarios_reais.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "FINAL_MIGRATION_REPORT.md"
+    },
+    {
+      "type": "google_api",
+      "file": "google_service_account.json.example"
+    },
+    {
+      "type": "mcp",
+      "file": "GSPREAD_MCP_SETUP.md"
+    },
+    {
+      "type": "gspread",
+      "file": "GSPREAD_MCP_SETUP.md"
+    },
+    {
+      "type": "google_api",
+      "file": "GSPREAD_MCP_SETUP.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "GSPREAD_MCP_SETUP.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "GUIA_SEGURANCA.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "INVENTORY_COMPLETE.md"
+    },
+    {
+      "type": "mcp",
+      "file": "mapa_estrutura_pastas_sistema.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "mapa_estrutura_pastas_sistema.md"
+    },
+    {
+      "type": "gspread",
+      "file": "mapear_estrutura_planilhas.py"
+    },
+    {
+      "type": "gspread",
+      "file": "map_all_sheets_complete.py"
+    },
+    {
+      "type": "gspread",
+      "file": "map_sheets_simple.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "mcp_bridge.py"
+    },
+    {
+      "type": "mcp",
+      "file": "mcp_server_entrypoint.py"
+    },
+    {
+      "type": "gspread",
+      "file": "neural_data_extractor.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "PADROES_CODIGO_PYTHON.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "PERMISSION_SYSTEM_MIGRATION.md"
+    },
+    {
+      "type": "google_api",
+      "file": "PLANO_IMPLEMENTACAO_EXECUTIVO.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "PLANO_IMPLEMENTACAO_EXECUTIVO.md"
+    },
+    {
+      "type": "gspread",
+      "file": "processar_codigo_oauth.py"
+    },
+    {
+      "type": "google_api",
+      "file": "README.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "README.md"
+    },
+    {
+      "type": "mcp",
+      "file": "relatorio_documentacao_sistema_completo.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "relatorio_documentacao_sistema_completo.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "RELATORIO_FINAL_DIA2.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "RELATORIO_FINAL_DIA3.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "RELATORIO_FINAL_IMPLEMENTACAO_NEURAL.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "RELATORIO_HARMONIZACAO_DIA2.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "RELATORIO_IMPLEMENTACAO_DIA3_COMPLETA.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "RELATORIO_TESTES_DIA3.md"
+    },
+    {
+      "type": "mcp",
+      "file": "RENDER_MCP_INTEGRATION.md"
+    },
+    {
+      "type": "gspread",
+      "file": "requirements.txt"
+    },
+    {
+      "type": "google_api",
+      "file": "requirements.txt"
+    },
+    {
+      "type": "scheduler",
+      "file": "requirements.txt"
+    },
+    {
+      "type": "scheduler",
+      "file": "resumo_executivo_sistema_aprender.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "RESUMO_TESTES_DIA3_FINAL.md"
+    },
+    {
+      "type": "google_api",
+      "file": "SECURITY.md"
+    },
+    {
+      "type": "google_api",
+      "file": "SISTEMA_APRENDER_IMPLEMENTACAO_ATUAL.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "SISTEMA_APRENDER_IMPLEMENTACAO_ATUAL.md"
+    },
+    {
+      "type": "mcp",
+      "file": "SISTEMA_NEURAL_IMPLEMENTACAO_COMPLETA.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "start_celery.bat"
+    },
+    {
+      "type": "scheduler",
+      "file": "start_celery_beat.bat"
+    },
+    {
+      "type": "gspread",
+      "file": "temp_analyze_complete_projects_structure.py"
+    },
+    {
+      "type": "gspread",
+      "file": "temp_analyze_corrected_context.py"
+    },
+    {
+      "type": "gspread",
+      "file": "temp_analyze_nominal_structure.py"
+    },
+    {
+      "type": "gspread",
+      "file": "temp_analyze_organizational_context.py"
+    },
+    {
+      "type": "gspread",
+      "file": "temp_analyze_unique_people_roles.py"
+    },
+    {
+      "type": "mcp",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "anthropic",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "autogen",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "crewai",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "smolagents",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "dspy",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "gspread",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "google_api",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "pydrive",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "slack",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "airtable",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "jira",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "trello",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "temp_inventario_step1.py"
+    },
+    {
+      "type": "gspread",
+      "file": "temp_map_google_sheets_complete.py"
+    },
+    {
+      "type": "gspread",
+      "file": "teste_acesso_oauth2_manual.py"
+    },
+    {
+      "type": "google_api",
+      "file": "teste_acesso_oauth2_manual.py"
+    },
+    {
+      "type": "gspread",
+      "file": "teste_acesso_planilhas_oauth2.py"
+    },
+    {
+      "type": "google_api",
+      "file": "teste_acesso_planilhas_oauth2.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "validate_control_sheet_data.py"
+    },
+    {
+      "type": "scheduler",
+      "file": ".claude/CLAUDE.md"
+    },
+    {
+      "type": "mcp",
+      "file": ".cursor/mcp_settings_docker.json"
+    },
+    {
+      "type": "scheduler",
+      "file": ".github/dependabot.yml"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/aprovacao-corrigida.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/aprovacao-interface-test.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/aprovacao-sem-justificativa.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/bloqueio-agenda-page.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/bloqueio-page-after-server-restart.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/bloqueio-page-after-styling.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/bloqueio-page-all-fixes-applied.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/bloqueio-page-final-verification.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/bloqueio-page-spacing-adjusted.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/interface-aprovacao-corrigida.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/mapa-final-working.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/mapa-mensal-current-state.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/menu-padronizado-aprovacoes.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/menu-padronizado-home.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/menu-responsivo-mobile.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-aprovacao-01-super-dashboard.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-aprovacao-01-superintendencia-dashboard.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-aprovacao-02-lista-pendentes.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-aprovacao-02-pending-approvals-list.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-aprovacao-03-approval-detail-page.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-aprovacao-03-detalhes-solicitacao.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-aprovacao-04-approval-success.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-aprovacao-04-aprovacao-sucesso.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-audit-diretoria-menu.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-audit-formador-menu.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-cadastros-01-login-page.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-cadastros-01-tela-login.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-cadastros-02-dashboard-admin.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-cadastros-03-municipios-list.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-cadastros-04-criar-municipio-form.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-google-calendar-01-pre-agenda-page.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-google-calendar-02-google-calendar-monitor.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-solicitacao-01-coordenador-dashboard.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-solicitacao-01-form-solicitar-evento.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-solicitacao-02-form-preenchido-online.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-solicitacao-02-solicitacao-form.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-solicitacao-03-form-filled.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-solicitacao-03-form-preenchido-online.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-solicitacao-03-solicitacao-enviada-redirect.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-solicitacao-04-success-message.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-gui-solicitacao-04-sucesso-toast-inline.png"
+    },
+    {
+      "type": "jira",
+      "file": ".playwright-mcp/out-responsividade-desktop-login-1366x768.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-responsividade-desktop-login-1366x768.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/out-responsividade-desktop-login-1920x1080.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/page-2025-09-05T18-00-13-926Z.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/page-2025-09-05T18-05-02-692Z.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/page-2025-09-05T18-10-03-156Z.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/page-2025-09-05T19-17-33-073Z.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/secao-decisao-aprovacao.png"
+    },
+    {
+      "type": "scheduler",
+      "file": ".playwright-mcp/solicitar-evento-page.png"
+    },
+    {
+      "type": "scheduler",
+      "file": "api/serializers.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "api/urls.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "api/views.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "aprender_sistema/celery.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "aprender_sistema/__init__.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/admin.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/models.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/tasks.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/tests.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/tests_permissions.py"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/AJUSTES_CHECKLISTS_MEMORIAS_COMPLETO.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/AJUSTES_CHECKLISTS_MEMORIAS_COMPLETO.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/AUDITORIA_ANTI_REGRESSAO_FINAL.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/AUDITORIA_COMPLETA.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/CATALOG_STRUCTURE.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/CHANGELOG.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/CHECKLIST_GO_NOGO_DIA3.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/CHECKLIST_LIBERACAO.md"
+    },
+    {
+      "type": "mcp",
+      "file": "docs/CLAUDE.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/CLAUDE.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/CLAUDE_CONTEXT_PACKAGE.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/CODEX_CONTEXT_PACKAGE.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/COMMITS_CONSOLIDADOS.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/CONTRIBUTING.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/CORRECAO_STATUS_DISPONIBILIDADE.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/DOCKER_CENTRALIZED.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/DOCKER_WORKFLOW.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/DOCUMENTACAO_TECNICA_COMPLETA.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/DOCUMENTACAO_UNIFICADA_SISTEMA_APRENDER.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/DOCUMENTACAO_UNIFICADA_SISTEMA_APRENDER.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/estrategias"
+    },
+    {
+      "type": "openai_assistants",
+      "file": "docs/ESTRATEGIA_INTEGRACAO_ORACULO.md"
+    },
+    {
+      "type": "gspread",
+      "file": "docs/ESTRATEGIA_MIGRACAO_FINAL.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/ESTRATEGIA_MIGRACAO_FINAL.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/FINAL_MIGRATION_REPORT.md"
+    },
+    {
+      "type": "mcp",
+      "file": "docs/GSPREAD_MCP_SETUP.md"
+    },
+    {
+      "type": "gspread",
+      "file": "docs/GSPREAD_MCP_SETUP.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/GSPREAD_MCP_SETUP.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/GSPREAD_MCP_SETUP.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/GUIAS_ESTRATEGIAS_COMPLETO.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/GUIA_SEGURANCA.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/INSIGHTS_MAPEAMENTO_SPRINT_COMPLETO.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/INTEGRACAO_MCPS_COMPLETA.md"
+    },
+    {
+      "type": "mcp",
+      "file": "docs/INTEGRACOES_TESTES_COMPLETO.md"
+    },
+    {
+      "type": "gspread",
+      "file": "docs/INTEGRACOES_TESTES_COMPLETO.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/INTEGRACOES_TESTES_COMPLETO.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/INVENTORY_COMPLETE.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/LIMPEZA_COMPLETA.md"
+    },
+    {
+      "type": "mcp",
+      "file": "docs/mapa_estrutura_pastas_sistema.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/mapa_estrutura_pastas_sistema.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/matriz_dependencias_2025.csv"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/matriz_responsabilidades.csv"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/MEMORIA_CONSOLIDADA.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/MIGRACAO_INTEGRACAO_COMPLETO.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/MIGRACAO_INTEGRACAO_COMPLETO.md"
+    },
+    {
+      "type": "gspread",
+      "file": "docs/mudanca_acesso_planilhas_e_plano_de_reorganizacao.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/mudanca_acesso_planilhas_e_plano_de_reorganizacao.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/mudanca_acesso_planilhas_e_plano_de_reorganizacao.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/OPERACOES_DEPLOY_COMPLETO.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/PADROES_CODIGO_PYTHON.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/PERMISSION_SYSTEM_MIGRATION.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/PERMISSOES_GRUPOS_COMPLETO.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/planos"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/planos"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/PLANO_REORGANIZACAO_COMPLETA_2025.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/PRE_COMMIT_HARDENING_REPORT.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/PRE_COMMIT_HOOKS.md"
+    },
+    {
+      "type": "mcp",
+      "file": "docs/PROMPT_MESTRE_SISTEMA_APRENDER.md"
+    },
+    {
+      "type": "gspread",
+      "file": "docs/PROMPT_MESTRE_SISTEMA_APRENDER.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/PROMPT_MESTRE_SISTEMA_APRENDER.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/PROMPT_MESTRE_SISTEMA_APRENDER.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/README.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/README.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/RELATORIOS_ANALISES_COMPLETO.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/RELATORIOS_MIGRACOES_COMPLETO.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/RELATORIO_COMPLETO_TODAS_FASES.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/RELATORIO_DASHBOARD_EXECUTIVO.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/RELATORIO_RBAC_CONFLITOS.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/RELATORIO_SSOT_GESTAO.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/RELATORIO_SSOT_LOCK.md"
+    },
+    {
+      "type": "mcp",
+      "file": "docs/RENDER_MCP_INTEGRATION.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/SECURITY.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/SEGURANCA_COMPLETA.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/SEGURANCA_COMPLETA.md"
+    },
+    {
+      "type": "anthropic",
+      "file": "docs/SESSAO_HOTFIX_DIA3_COMPLETA.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/SESSAO_HOTFIX_DIA3_COMPLETA.md"
+    },
+    {
+      "type": "mcp",
+      "file": "docs/SISTEMA_NEURAL_IMPLEMENTACAO_COMPLETA.md"
+    },
+    {
+      "type": "gspread",
+      "file": "docs/SOLUCAO_ERRO_DJANGO_TEMPLATE.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/SOLUCAO_ERRO_DJANGO_TEMPLATE.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/SOLUCAO_ERRO_DJANGO_TEMPLATE.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "logs/application.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "logs/audit.log"
+    },
+    {
+      "type": "anthropic",
+      "file": "neural_system/README.md"
+    },
+    {
+      "type": "mcp",
+      "file": "neural_system/requirements_mcp.txt"
+    },
+    {
+      "type": "anthropic",
+      "file": "neural_system/requirements_mcp.txt"
+    },
+    {
+      "type": "anthropic",
+      "file": "neural_system/update_context.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "neural_system/update_context.py"
+    },
+    {
+      "type": "anthropic",
+      "file": "neural_system/upload_to_claude.py"
+    },
+    {
+      "type": "mcp",
+      "file": "neural_system/validate_system.py"
+    },
+    {
+      "type": "anthropic",
+      "file": "neural_system/validate_system.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/api_google_calendar_sync.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/google_calendar_integration_success.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/relatorio_auditoria_completo.md"
+    },
+    {
+      "type": "anthropic",
+      "file": "out/RELATORIO_AUDITORIA_FUNCIONAL_COMPLETA.md"
+    },
+    {
+      "type": "anthropic",
+      "file": "out/RELATORIO_CONSOLIDADO_AUDITORIA_GERAL.md"
+    },
+    {
+      "type": "anthropic",
+      "file": "out/RELATORIO_RESPONSIVIDADE_SISTEMA_APRENDER.md"
+    },
+    {
+      "type": "google_api",
+      "file": "reports/RELATORIO_GOOGLE_CALENDAR_API.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "reports/RELATORIO_GOOGLE_CALENDAR_API.md"
+    },
+    {
+      "type": "google_api",
+      "file": "reports/RELATORIO_MAPEAMENTO_GOOGLE_CALENDAR_2025.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "reports/RELATORIO_MAPEAMENTO_GOOGLE_CALENDAR_2025.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "reports/RELATORIO_MIGRACAO_ATUALIZADO.md"
+    },
+    {
+      "type": "gspread",
+      "file": "reports/RELATORIO_MIGRACAO_COMPLETA.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "reports/RELATORIO_MIGRACAO_COMPLETA.md"
+    },
+    {
+      "type": "google_api",
+      "file": "reports/RELATORIO_VALIDACAO_COMPLETA.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "reports/RELATORIO_VALIDACAO_COMPLETA.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "scripts/analise_repositorio_github.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/import_agenda_2025_contexto_supremo.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/import_agenda_2025_contexto_supremo.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/import_controle_2025_contexto_supremo.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/import_controle_2025_contexto_supremo.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/import_disponibilidade_2025_contexto_supremo.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/import_disponibilidade_2025_contexto_supremo.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/import_usuarios_contexto_supremo.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/import_usuarios_contexto_supremo.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/processar_codigo_oauth.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/processar_planilhas_contexto_supremo.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/renew_google_calendar_auth.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "scripts/sincronizar_configuracoes.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/teste_acesso_oauth2_manual.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/teste_acesso_oauth2_manual.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/teste_acesso_planilhas_oauth2.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/teste_acesso_planilhas_oauth2.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "sql/views_disponibilidades.sql"
+    },
+    {
+      "type": "scheduler",
+      "file": "static/brazil-real.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "static/brazil-states-official.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "static/brazil-states-real.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/brazil-states-topo-new.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/brazil-real.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/brazil-states-real.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/brazil-states-official.json"
+    },
+    {
+      "type": "mcp",
+      "file": "teste-detectar-contexto/chat-export-1758331475496.json"
+    },
+    {
+      "type": "anthropic",
+      "file": "teste-detectar-contexto/chat-export-1758331475496.json"
+    },
+    {
+      "type": "google_api",
+      "file": "teste-detectar-contexto/chat-export-1758331475496.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "teste-detectar-contexto/chat-export-1758331475496.json"
+    },
+    {
+      "type": "mcp",
+      "file": "teste-detectar-contexto/chat-export-1758331482119.json"
+    },
+    {
+      "type": "anthropic",
+      "file": "teste-detectar-contexto/chat-export-1758331482119.json"
+    },
+    {
+      "type": "google_api",
+      "file": "teste-detectar-contexto/chat-export-1758331482119.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "teste-detectar-contexto/chat-export-1758331482119.json"
+    },
+    {
+      "type": "mcp",
+      "file": "teste-detectar-contexto/chat-export-1758331497084.json"
+    },
+    {
+      "type": "anthropic",
+      "file": "teste-detectar-contexto/chat-export-1758331497084.json"
+    },
+    {
+      "type": "google_api",
+      "file": "teste-detectar-contexto/chat-export-1758331497084.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "teste-detectar-contexto/chat-export-1758331497084.json"
+    },
+    {
+      "type": "mcp",
+      "file": "teste-detectar-contexto/chat-export-1758331520508.json"
+    },
+    {
+      "type": "anthropic",
+      "file": "teste-detectar-contexto/chat-export-1758331520508.json"
+    },
+    {
+      "type": "google_api",
+      "file": "teste-detectar-contexto/chat-export-1758331520508.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "teste-detectar-contexto/chat-export-1758331520508.json"
+    },
+    {
+      "type": "mcp",
+      "file": "teste-detectar-contexto/chat-export-1758384151425.json"
+    },
+    {
+      "type": "anthropic",
+      "file": "teste-detectar-contexto/chat-export-1758384151425.json"
+    },
+    {
+      "type": "google_api",
+      "file": "teste-detectar-contexto/chat-export-1758384151425.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "teste-detectar-contexto/chat-export-1758384151425.json"
+    },
+    {
+      "type": "mcp",
+      "file": "teste-detectar-contexto/chat-export-1758384939956.json"
+    },
+    {
+      "type": "anthropic",
+      "file": "teste-detectar-contexto/chat-export-1758384939956.json"
+    },
+    {
+      "type": "google_api",
+      "file": "teste-detectar-contexto/chat-export-1758384939956.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "teste-detectar-contexto/chat-export-1758384939956.json"
+    },
+    {
+      "type": "mcp",
+      "file": "teste-detectar-contexto/chat-🎓 Sistema APRENDER Análise (1).txt"
+    },
+    {
+      "type": "anthropic",
+      "file": "teste-detectar-contexto/chat-🎓 Sistema APRENDER Análise (1).txt"
+    },
+    {
+      "type": "openai_assistants",
+      "file": "teste-detectar-contexto/chat-🎓 Sistema APRENDER Análise (1).txt"
+    },
+    {
+      "type": "google_api",
+      "file": "teste-detectar-contexto/chat-🎓 Sistema APRENDER Análise (1).txt"
+    },
+    {
+      "type": "scheduler",
+      "file": "teste-detectar-contexto/chat-🎓 Sistema APRENDER Análise (1).txt"
+    },
+    {
+      "type": "mcp",
+      "file": "teste-detectar-contexto/chat-🎓 Sistema APRENDER Análise.txt"
+    },
+    {
+      "type": "anthropic",
+      "file": "teste-detectar-contexto/chat-🎓 Sistema APRENDER Análise.txt"
+    },
+    {
+      "type": "google_api",
+      "file": "teste-detectar-contexto/chat-🎓 Sistema APRENDER Análise.txt"
+    },
+    {
+      "type": "scheduler",
+      "file": "teste-detectar-contexto/chat-🎓 Sistema APRENDER Análise.txt"
+    },
+    {
+      "type": "scheduler",
+      "file": "tests/create_groups.py"
+    },
+    {
+      "type": "google_api",
+      "file": "tests/test_calendar_discovery.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "tests/test_permission_system.py"
+    },
+    {
+      "type": "google_api",
+      "file": "tests/legacy/test_calendar_quick.py"
+    },
+    {
+      "type": "gspread",
+      "file": "tests/legacy/test_direct_access.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "tests/legacy/test_direct_access.py"
+    },
+    {
+      "type": "gspread",
+      "file": "tests/legacy/test_full_google_integration.py"
+    },
+    {
+      "type": "google_api",
+      "file": "tests/legacy/test_full_google_integration.py"
+    },
+    {
+      "type": "google_api",
+      "file": "tests/legacy/test_google_calendar_validation.py"
+    },
+    {
+      "type": "google_api",
+      "file": "tests/legacy/test_google_connection.py"
+    },
+    {
+      "type": "gspread",
+      "file": "tests/legacy/test_google_sheets_connection.py"
+    },
+    {
+      "type": "gspread",
+      "file": "tests/legacy/test_new_credentials.py"
+    },
+    {
+      "type": "google_api",
+      "file": "tests/legacy/test_new_credentials.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "tests/legacy/test_permission_system.py"
+    },
+    {
+      "type": "mcp",
+      "file": "tests/neural_system/test_context_updates.py"
+    },
+    {
+      "type": "anthropic",
+      "file": "tests/neural_system/test_context_updates.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/client.js"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/css/components.min.css.br"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/css/mobile-optimizations.min.css.br"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/js/accessibility-audit.min.js.gz"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/rest_framework/css/bootstrap.min.css.map"
+    },
+    {
+      "type": "trello",
+      "file": "staticfiles/rest_framework/css/font-awesome-4.0.3.css"
+    },
+    {
+      "type": "openai_assistants",
+      "file": "staticfiles/rest_framework/js/coreapi-0.1.1.js"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/rest_framework/fonts/glyphicons-halflings-regular.eot"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/rest_framework/fonts/glyphicons-halflings-regular.woff"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/rest_framework/fonts/fontawesome-webfont.woff"
+    },
+    {
+      "type": "trello",
+      "file": "staticfiles/rest_framework/fonts/fontawesome-webfont.ttf"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/rest_framework/fonts/fontawesome-webfont.ttf"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/rest_framework/fonts/glyphicons-halflings-regular.woff2"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/rest_framework/img/glyphicons-halflings.png"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/rest_framework/docs/js/highlight.pack.js"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/xterm-BY7uk_OU.js.map"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/index-DqgFLybq.js.map"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/codemirror_view-aIuSN42d.js.map"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/codemirror_language-4kk4Aqm3.js"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/codemirror_lang-python-DvjhpaK2.js.map"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/zip-Bf48tRr5.js.map"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/core-Dwn9Kajy.js.map"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/codemirror_lang-python-DvjhpaK2.js"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/codemirror_state-1d1uncXx.js.map"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/codemirror_language-4kk4Aqm3.js.map"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/codemirror-CAEZ6Sg7.js.map"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/py-DiOXdevv.js.map"
+    },
+    {
+      "type": "scheduler",
+      "file": "staticfiles/reactpy_django/pyscript/zip-Bf48tRr5.js"
+    },
+    {
+      "type": "scheduler",
+      "file": "static/css/components.min.css.br"
+    },
+    {
+      "type": "scheduler",
+      "file": "static/css/mobile-optimizations.min.css.br"
+    },
+    {
+      "type": "scheduler",
+      "file": "static/js/accessibility-audit.min.js.gz"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/oauth/complete_auth_simple.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/oauth/complete_auth_simple.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/oauth/configurar_conta_corporativa.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/oauth/configurar_conta_corporativa.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/oauth/configurar_oauth.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/oauth/configurar_oauth.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/oauth/configurar_oauth_conta_corporativa.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/oauth/configurar_oauth_conta_corporativa.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/oauth/configurar_oauth_final.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/oauth/configurar_oauth_final.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/oauth/configurar_oauth_simples.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/oauth/configurar_oauth_simples.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/oauth/finalizar_oauth_novo.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/oauth/finalizar_oauth_novo.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/oauth/oauth_localhost.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/oauth/oauth_localhost.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/oauth/oauth_manual.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/oauth/oauth_manual.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/oauth/processar_callback.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/oauth/processar_callback.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/oauth/testar_com_oauth.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/otimizados/script_otimizado_Alta_similaridade_de_funções_20250919_010610.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/otimizados/script_otimizado_Alta_similaridade_de_funções_20250919_010610.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/teste/acessar_planilha_simples.py"
+    },
+    {
+      "type": "google_api",
+      "file": "scripts/teste/acessar_planilha_simples.py"
+    },
+    {
+      "type": "gspread",
+      "file": "scripts/teste/testar_planilha_direto.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "reports/lighthouse/lighthouse-home.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "reports/lighthouse/lighthouse-login.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "reports/lighthouse/lighthouse-mapa.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "reports/lighthouse/lighthouse-solicitar.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "out_apps_script/Acompanhamento de Agenda/Code.gs"
+    },
+    {
+      "type": "scheduler",
+      "file": "out_apps_script/Disponibilidade/Code.gs"
+    },
+    {
+      "type": "scheduler",
+      "file": "out_apps_script/Planilha de Controle - 2025/Code.gs"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/gui_aprovacao/01_superintendencia_dashboard.png"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/gui_aprovacao/02_pending_approvals_list.png"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/gui_aprovacao/03_approval_detail_page.png"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/gui_aprovacao/04_approval_success.png"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/gui_aprovacoes/evidencia_aprovacoes_pendentes.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/gui_google_calendar/01_pre_agenda_page.png"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/gui_google_calendar/02_google_calendar_monitor.png"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/gui_solicitacao/01_coordenador_dashboard.png"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/gui_solicitacao/02_solicitacao_form.png"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/gui_solicitacao/03_form_filled.png"
+    },
+    {
+      "type": "scheduler",
+      "file": "out/gui_solicitacao/04_success_message.png"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/relatorios/ANALISE_PARIDADE_LOCAL_DOCKER.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/relatorios/relatorio_auditoria_completo.md"
+    },
+    {
+      "type": "anthropic",
+      "file": "docs/relatorios/RELATORIO_AUDITORIA_FUNCIONAL_COMPLETA.md"
+    },
+    {
+      "type": "anthropic",
+      "file": "docs/relatorios/RELATORIO_CONSOLIDADO_AUDITORIA_GERAL.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/relatorios/RELATORIO_GOOGLE_CALENDAR_API.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/relatorios/RELATORIO_GOOGLE_CALENDAR_API.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/relatorios/RELATORIO_MAPEAMENTO_GOOGLE_CALENDAR_2025.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/relatorios/RELATORIO_MAPEAMENTO_GOOGLE_CALENDAR_2025.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/relatorios/RELATORIO_MIGRACAO_ATUALIZADO.md"
+    },
+    {
+      "type": "gspread",
+      "file": "docs/relatorios/RELATORIO_MIGRACAO_COMPLETA.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/relatorios/RELATORIO_MIGRACAO_COMPLETA.md"
+    },
+    {
+      "type": "anthropic",
+      "file": "docs/relatorios/RELATORIO_RESPONSIVIDADE_SISTEMA_APRENDER.md"
+    },
+    {
+      "type": "google_api",
+      "file": "docs/relatorios/RELATORIO_VALIDACAO_COMPLETA.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/relatorios/RELATORIO_VALIDACAO_COMPLETA.md"
+    },
+    {
+      "type": "mcp",
+      "file": "docs/relatorios/VARREDURA_GERAL_SISTEMA_FINAL.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "docs/relatorios/VARREDURA_GERAL_SISTEMA_FINAL.md"
+    },
+    {
+      "type": "google_api",
+      "file": "dados/extraidos/oauth_config_success.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "dados/processed/comparacao_dados_extraidos_vs_sistema_20250919_235406.json"
+    },
+    {
+      "type": "mcp",
+      "file": "dados/processed/temp_chat_export_3.json"
+    },
+    {
+      "type": "anthropic",
+      "file": "dados/processed/temp_chat_export_3.json"
+    },
+    {
+      "type": "google_api",
+      "file": "dados/processed/temp_chat_export_3.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "dados/processed/temp_chat_export_3.json"
+    },
+    {
+      "type": "mcp",
+      "file": "dados/processed/temp_chat_export_4.json"
+    },
+    {
+      "type": "anthropic",
+      "file": "dados/processed/temp_chat_export_4.json"
+    },
+    {
+      "type": "google_api",
+      "file": "dados/processed/temp_chat_export_4.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "dados/processed/temp_chat_export_4.json"
+    },
+    {
+      "type": "mcp",
+      "file": "dados/processed/temp_chat_export_5.json"
+    },
+    {
+      "type": "anthropic",
+      "file": "dados/processed/temp_chat_export_5.json"
+    },
+    {
+      "type": "google_api",
+      "file": "dados/processed/temp_chat_export_5.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "dados/processed/temp_chat_export_5.json"
+    },
+    {
+      "type": "mcp",
+      "file": "dados/processed/temp_chat_export_6.json"
+    },
+    {
+      "type": "anthropic",
+      "file": "dados/processed/temp_chat_export_6.json"
+    },
+    {
+      "type": "google_api",
+      "file": "dados/processed/temp_chat_export_6.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "dados/processed/temp_chat_export_6.json"
+    },
+    {
+      "type": "mcp",
+      "file": "dados/processed/temp_chat_export_7.json"
+    },
+    {
+      "type": "anthropic",
+      "file": "dados/processed/temp_chat_export_7.json"
+    },
+    {
+      "type": "google_api",
+      "file": "dados/processed/temp_chat_export_7.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "dados/processed/temp_chat_export_7.json"
+    },
+    {
+      "type": "mcp",
+      "file": "dados/processed/temp_chat_export_8.json"
+    },
+    {
+      "type": "anthropic",
+      "file": "dados/processed/temp_chat_export_8.json"
+    },
+    {
+      "type": "google_api",
+      "file": "dados/processed/temp_chat_export_8.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "dados/processed/temp_chat_export_8.json"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/migrations/0002_aprovacao_disponibilidadeformadores_and_more.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/migrations/0009_setup_groups_permissions.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/migrations/0011_assign_permissions_to_groups.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/migrations/0032_add_canonical_models_and_fields.py"
+    },
+    {
+      "type": "google_api",
+      "file": "core/services/google_apis_integration.py"
+    },
+    {
+      "type": "gspread",
+      "file": "core/services/google_sheets_service.py"
+    },
+    {
+      "type": "google_api",
+      "file": "core/services/google_sheets_service.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/services/google_sheets_service.py"
+    },
+    {
+      "type": "anthropic",
+      "file": "core/services/system_prompts.py"
+    },
+    {
+      "type": "openai_assistants",
+      "file": "core/services/system_prompts.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/views/controle_preagenda.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/views/controle_pre_agenda_views.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/views/controle_views.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/templates/core/home.html"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/templates/core/controle/google_calendar_monitor.html"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/templates/core/controle/google_calendar_monitor_backup.html"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/templates/core/controle/pre_agenda.html"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/templates/core/coordenador/meus_eventos.html"
+    },
+    {
+      "type": "google_api",
+      "file": "core/services/integrations/error_handling.py"
+    },
+    {
+      "type": "google_api",
+      "file": "core/services/integrations/google_calendar.py"
+    },
+    {
+      "type": "gspread",
+      "file": "core/services/integrations/google_sheets_service.py"
+    },
+    {
+      "type": "google_api",
+      "file": "core/services/integrations/google_sheets_service.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/mcp/toolsets/solicitacao_toolset.py"
+    },
+    {
+      "type": "google_api",
+      "file": "core/management/commands/calendar_check.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/management/commands/calendar_check.py"
+    },
+    {
+      "type": "gspread",
+      "file": "core/management/commands/extract_google_sheets_master.py"
+    },
+    {
+      "type": "google_api",
+      "file": "core/management/commands/extract_google_sheets_master.py"
+    },
+    {
+      "type": "gspread",
+      "file": "core/management/commands/import_agenda_completa.py"
+    },
+    {
+      "type": "google_api",
+      "file": "core/management/commands/import_agenda_completa.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/management/commands/migrate_formacoes.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/management/commands/sincronizar_papeis_planilha.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "core/management/commands/sync_roles_from_papel.py"
+    },
+    {
+      "type": "google_api",
+      "file": "core/management/commands/tier3_tools.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "backups/removed_files/.env.example"
+    },
+    {
+      "type": "google_api",
+      "file": "backups/removed_files/.env.local"
+    },
+    {
+      "type": "scheduler",
+      "file": "backups/removed_files/backup_configs_20250916_205510.tar.gz"
+    },
+    {
+      "type": "scheduler",
+      "file": "backups/removed_files/db.sqlite3.backup"
+    },
+    {
+      "type": "google_api",
+      "file": "backups/removed_files/temp/extract_specific_tabs.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "backups/removed_files/temp/manage_environments.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "backups/removed_files/temp/setup_groups_simple.py"
+    },
+    {
+      "type": "google_api",
+      "file": "backups/removed_files/temp/varredura_planilha.py"
+    },
+    {
+      "type": "scheduler",
+      "file": "backups/removed_files/core/templates/core/home.html"
+    },
+    {
+      "type": "scheduler",
+      "file": "backups/removed_files/core/templates/core/controle/google_calendar_monitor.html"
+    },
+    {
+      "type": "scheduler",
+      "file": "backups/removed_files/core/templates/core/controle/google_calendar_monitor_backup.html"
+    },
+    {
+      "type": "scheduler",
+      "file": "backups/removed_files/core/templates/core/controle/pre_agenda.html"
+    },
+    {
+      "type": "scheduler",
+      "file": "backups/removed_files/core/templates/core/coordenador/meus_eventos.html"
+    },
+    {
+      "type": "scheduler",
+      "file": "backups/removed_files/.github/ISSUE_TEMPLATE/chore.md"
+    },
+    {
+      "type": "scheduler",
+      "file": "backups/removed_files/.github/ISSUE_TEMPLATE/feature_request.md"
+    },
+    {
+      "type": "google_api",
+      "file": "aprender_sistema/tools/service_account.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/acessar_planilhas_2025_direto.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/acessar_planilhas_2025_direto.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/analisar_planilhas_2025.data.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/analisar_planilhas_2025.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/analisar_planilhas_2025.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/analisar_planilhas_2025.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/extract_all_data_from_sheets.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/extract_all_data_from_sheets.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/map_sheets_simple.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/map_sheets_simple.meta.json"
+    },
+    {
+      "type": "scheduler",
+      "file": ".mypy_cache/3.13/sincronizar_configuracoes.data.json"
+    },
+    {
+      "type": "scheduler",
+      "file": ".mypy_cache/3.13/sincronizar_configuracoes.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/temp_analyze_nominal_structure.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/temp_analyze_nominal_structure.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/pagination.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/pagination.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_base_client.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_base_client.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_client.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_client.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_compat.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_compat.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_constants.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_constants.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_decoders.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_decoders.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_exceptions.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_exceptions.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_files.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_files.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_legacy_response.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_legacy_response.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_models.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_models.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_qs.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_qs.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_resource.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_resource.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_response.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_response.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_streaming.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_streaming.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_types.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_types.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_version.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_version.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/__init__.meta.json"
+    },
+    {
+      "type": "scheduler",
+      "file": ".mypy_cache/3.13/api/serializers.data.json"
+    },
+    {
+      "type": "scheduler",
+      "file": ".mypy_cache/3.13/core/models.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/auth.data.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/gspread/auth.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/auth.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/gspread/auth.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/cell.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/cell.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/client.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/client.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/gspread/client.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/exceptions.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/exceptions.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/http_client.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/http_client.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/gspread/http_client.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/spreadsheet.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/spreadsheet.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/urls.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/urls.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/utils.data.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/gspread/utils.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/utils.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/gspread/utils.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/worksheet.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/worksheet.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/__init__.data.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/gspread/__init__.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/gspread/__init__.meta.json"
+    },
+    {
+      "type": "scheduler",
+      "file": ".mypy_cache/3.13/logging/handlers.data.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/__init__.data.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/rag/llm/chat_model.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/rag/llm/chat_model.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/rag/llm/cv_model.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/rag/llm/cv_model.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/rag/llm/cv_model.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/rag/llm/__init__.data.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/rag/utils/mcp_tool_call_conn.data.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/rag/utils/mcp_tool_call_conn.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/pydantic_settings/sources/providers/gcp.data.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/pydantic_settings/sources/providers/gcp.meta.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/resources/completions.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/audio_model.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/completion_create_params.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/audio/speech_model.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/beta/assistant_update_params.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/fine_tuning/job_create_params.data.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/openai/types/responses/tool.data.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/openai/types/responses/tool_choice_mcp.data.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/openai/types/responses/tool_choice_mcp_param.data.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/openai/types/responses/tool_param.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/shared/chat_model.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/shared_params/chat_model.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/beta/realtime/session.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/beta/realtime/session_create_params.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/beta/realtime/session_update_event.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/beta/realtime/session_update_event_param.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/beta/realtime/transcription_session.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/beta/realtime/transcription_session_create_params.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/beta/realtime/transcription_session_update.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/types/beta/realtime/transcription_session_update_param.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/resources/beta/assistants.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/resources/responses/responses.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/resources/fine_tuning/jobs/jobs.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/resources/chat/completions/completions.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/resources/beta/realtime/sessions.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/resources/beta/threads/threads.data.json"
+    },
+    {
+      "type": "openai_assistants",
+      "file": ".mypy_cache/3.13/openai/resources/beta/threads/runs/runs.data.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/client/session.meta.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/client/session_group.data.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/client/session_group.meta.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/client/sse.meta.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/server/session.meta.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/server/sse.meta.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/server/stdio.meta.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/server/streamable_http_manager.data.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/server/fastmcp/server.data.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/server/lowlevel/server.meta.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/mcp/client/stdio/__init__.meta.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/core/services/google_sheets_service.data.json"
+    },
+    {
+      "type": "gspread",
+      "file": ".mypy_cache/3.13/core/services/google_sheets_service.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/core/services/google_sheets_service.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/core/services/integrations/google_calendar.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/core/services/integrations/google_calendar_service.data.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/core/services/integrations/google_calendar_service.meta.json"
+    },
+    {
+      "type": "mcp",
+      "file": ".mypy_cache/3.13/api/db/db_models.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/completions.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/completions.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/models.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/models.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/anthropic_beta_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/anthropic_beta_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/base64_image_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/base64_image_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/base64_pdf_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/base64_pdf_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_api_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_api_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_authentication_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_authentication_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_billing_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_billing_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_error_response.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_error_response.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_gateway_timeout_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_gateway_timeout_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_invalid_request_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_invalid_request_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_not_found_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_not_found_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_overloaded_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_overloaded_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_permission_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_permission_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_rate_limit_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta_rate_limit_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/cache_control_ephemeral_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/cache_control_ephemeral_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/cache_creation.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/cache_creation.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citations_config_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citations_config_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citations_delta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citations_delta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citations_search_result_location.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citations_search_result_location.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citations_web_search_result_location.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citations_web_search_result_location.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_char_location.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_char_location.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_char_location_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_char_location_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_content_block_location.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_content_block_location.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_content_block_location_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_content_block_location_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_page_location.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_page_location.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_page_location_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_page_location_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_search_result_location_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_search_result_location_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_web_search_result_location_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/citation_web_search_result_location_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/completion.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/completion.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/completion_create_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/completion_create_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block_delta_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block_delta_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block_source_content_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block_source_content_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block_start_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block_start_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block_stop_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/content_block_stop_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/document_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/document_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/image_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/image_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/input_json_delta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/input_json_delta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_count_tokens_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_count_tokens_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_count_tokens_tool_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_count_tokens_tool_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_create_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_create_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_delta_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_delta_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_delta_usage.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_delta_usage.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_start_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_start_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_stop_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_stop_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_stream_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_stream_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_tokens_count.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/message_tokens_count.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/metadata_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/metadata_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/model.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/model.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/model_info.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/model_info.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/model_list_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/model_list_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/model_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/model_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/plain_text_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/plain_text_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_content_block_delta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_content_block_delta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_content_block_delta_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_content_block_delta_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_content_block_start_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_content_block_start_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_content_block_stop_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_content_block_stop_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_message_delta_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_message_delta_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_message_start_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_message_start_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_message_stop_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_message_stop_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_message_stream_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/raw_message_stream_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/redacted_thinking_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/redacted_thinking_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/redacted_thinking_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/redacted_thinking_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/search_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/search_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/server_tool_usage.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/server_tool_usage.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/server_tool_use_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/server_tool_use_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/server_tool_use_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/server_tool_use_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/signature_delta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/signature_delta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/stop_reason.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/stop_reason.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/text_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/text_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/text_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/text_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/text_citation.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/text_citation.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/text_citation_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/text_citation_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/text_delta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/text_delta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/thinking_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/thinking_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/thinking_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/thinking_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/thinking_config_disabled_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/thinking_config_disabled_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/thinking_config_enabled_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/thinking_config_enabled_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/thinking_config_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/thinking_config_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/thinking_delta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/thinking_delta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_bash_20250124_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_bash_20250124_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_choice_any_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_choice_any_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_choice_auto_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_choice_auto_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_choice_none_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_choice_none_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_choice_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_choice_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_choice_tool_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_choice_tool_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_text_editor_20250124_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_text_editor_20250124_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_text_editor_20250429_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_text_editor_20250429_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_text_editor_20250728_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_text_editor_20250728_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_union_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_union_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_use_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_use_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_use_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/tool_use_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/url_image_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/url_image_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/url_pdf_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/url_pdf_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/usage.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/usage.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_20250305_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_20250305_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_request_error_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_request_error_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_result_block_content.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_result_block_content.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_result_block_param_content_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_result_block_param_content_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_result_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/web_search_tool_result_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_decoders/jsonl.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_decoders/jsonl.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_compat.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_compat.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_datetime_parse.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_datetime_parse.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_httpx.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_httpx.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_logs.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_logs.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_proxy.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_proxy.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_reflection.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_reflection.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_streams.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_streams.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_sync.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_sync.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_transform.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_transform.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_typing.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_typing.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_utils.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/_utils.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/_utils/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_base64_image_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_base64_image_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_base64_pdf_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_base64_pdf_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_base64_pdf_source.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_base64_pdf_source.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_base64_pdf_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_base64_pdf_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_output_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_output_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_output_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_output_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_tool_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_tool_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_tool_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_tool_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_tool_result_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_tool_result_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_tool_result_error_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_bash_code_execution_tool_result_error_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_cache_control_ephemeral_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_cache_control_ephemeral_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_cache_creation.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_cache_creation.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citations_config_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citations_config_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citations_delta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citations_delta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citations_web_search_result_location.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citations_web_search_result_location.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_char_location.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_char_location.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_char_location_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_char_location_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_config.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_config.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_content_block_location.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_content_block_location.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_content_block_location_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_content_block_location_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_page_location.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_page_location.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_page_location_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_page_location_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_search_result_location.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_search_result_location.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_search_result_location_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_search_result_location_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_web_search_result_location_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_citation_web_search_result_location_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_output_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_output_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_output_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_output_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_20250522_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_20250522_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_20250825_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_20250825_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_block_content.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_block_content.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_block_param_content_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_block_param_content_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_error_code.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_error_code.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_error_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_code_execution_tool_result_error_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_container.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_container.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_container_upload_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_container_upload_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_container_upload_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_container_upload_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_content_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_content_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_content_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_content_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_content_block_source_content_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_content_block_source_content_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_content_block_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_content_block_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_document_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_document_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_file_document_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_file_document_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_file_image_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_file_image_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_image_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_image_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_input_json_delta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_input_json_delta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_mcp_tool_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_mcp_tool_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_mcp_tool_use_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_mcp_tool_use_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_mcp_tool_use_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_mcp_tool_use_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_message.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_message.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_message_delta_usage.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_message_delta_usage.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_message_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_message_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_message_tokens_count.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_message_tokens_count.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_metadata_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_metadata_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_model_info.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_model_info.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_plain_text_source.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_plain_text_source.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_plain_text_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_plain_text_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_content_block_delta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_content_block_delta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_content_block_delta_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_content_block_delta_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_content_block_start_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_content_block_start_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_content_block_stop_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_content_block_stop_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_message_delta_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_message_delta_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_message_start_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_message_start_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_message_stop_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_message_stop_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_message_stream_event.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_raw_message_stream_event.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_redacted_thinking_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_redacted_thinking_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_redacted_thinking_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_redacted_thinking_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_request_document_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_request_document_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_request_mcp_server_tool_configuration_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_request_mcp_server_tool_configuration_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_request_mcp_server_url_definition_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_request_mcp_server_url_definition_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_request_mcp_tool_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_request_mcp_tool_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_search_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_search_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_server_tool_usage.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_server_tool_usage.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_server_tool_use_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_server_tool_use_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_server_tool_use_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_server_tool_use_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_signature_delta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_signature_delta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_stop_reason.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_stop_reason.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_citation.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_citation.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_citation_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_citation_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_delta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_delta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_create_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_create_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_create_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_create_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_str_replace_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_str_replace_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_str_replace_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_str_replace_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_tool_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_tool_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_tool_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_tool_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_tool_result_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_tool_result_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_tool_result_error_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_tool_result_error_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_view_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_view_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_view_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_text_editor_code_execution_view_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_thinking_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_thinking_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_thinking_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_thinking_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_thinking_config_disabled_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_thinking_config_disabled_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_thinking_config_enabled_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_thinking_config_enabled_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_thinking_config_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_thinking_config_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_thinking_delta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_thinking_delta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_bash_20241022_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_bash_20241022_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_bash_20250124_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_bash_20250124_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_choice_any_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_choice_any_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_choice_auto_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_choice_auto_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_choice_none_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_choice_none_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_choice_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_choice_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_choice_tool_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_choice_tool_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_computer_use_20241022_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_computer_use_20241022_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_computer_use_20250124_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_computer_use_20250124_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_text_editor_20241022_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_text_editor_20241022_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_text_editor_20250124_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_text_editor_20250124_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_text_editor_20250429_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_text_editor_20250429_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_text_editor_20250728_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_text_editor_20250728_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_union_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_union_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_use_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_use_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_use_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_tool_use_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_url_image_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_url_image_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_url_pdf_source_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_url_pdf_source_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_usage.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_usage.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_tool_20250910_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_tool_20250910_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_tool_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_tool_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_tool_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_tool_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_tool_result_error_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_tool_result_error_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_tool_result_error_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_tool_result_error_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_tool_result_error_code.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_fetch_tool_result_error_code.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_20250305_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_20250305_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_request_error_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_request_error_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_result_block.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_result_block.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_result_block_content.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_result_block_content.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_result_block_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_result_block_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_result_block_param_content_param.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_result_block_param_content_param.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_result_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_result_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_result_error_code.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/beta_web_search_tool_result_error_code.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/deleted_file.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/deleted_file.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/file_list_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/file_list_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/file_metadata.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/file_metadata.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/file_upload_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/file_upload_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/message_count_tokens_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/message_count_tokens_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/message_create_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/message_create_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/model_list_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/model_list_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/batch_create_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/batch_create_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/batch_list_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/batch_list_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/deleted_message_batch.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/deleted_message_batch.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_canceled_result.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_canceled_result.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_errored_result.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_errored_result.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_expired_result.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_expired_result.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_individual_response.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_individual_response.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_request_counts.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_request_counts.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_result.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_result.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_succeeded_result.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/message_batch_succeeded_result.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/messages/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/api_error_object.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/api_error_object.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/authentication_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/authentication_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/billing_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/billing_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/error_object.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/error_object.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/error_response.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/error_response.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/gateway_timeout_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/gateway_timeout_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/invalid_request_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/invalid_request_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/not_found_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/not_found_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/overloaded_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/overloaded_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/permission_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/permission_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/rate_limit_error.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/rate_limit_error.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/shared/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/batch_create_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/batch_create_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/batch_list_params.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/batch_list_params.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_deleted_message_batch.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_deleted_message_batch.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_canceled_result.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_canceled_result.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_errored_result.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_errored_result.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_expired_result.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_expired_result.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_individual_response.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_individual_response.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_request_counts.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_request_counts.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_result.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_result.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_succeeded_result.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/beta_message_batch_succeeded_result.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/types/beta/messages/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/beta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/beta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/files.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/files.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/models.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/models.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/messages/batches.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/messages/batches.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/messages/messages.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/messages/messages.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/messages/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/messages/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/messages/batches.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/messages/batches.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/messages/messages.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/messages/messages.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/messages/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/resources/beta/messages/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/bedrock/_auth.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/bedrock/_auth.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/bedrock/_beta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/bedrock/_beta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/bedrock/_beta_messages.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/bedrock/_beta_messages.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/bedrock/_client.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/bedrock/_client.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/bedrock/_stream_decoder.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/bedrock/_stream_decoder.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/bedrock/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/bedrock/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/streaming/_beta_messages.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/streaming/_beta_messages.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/streaming/_beta_types.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/streaming/_beta_types.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/streaming/_messages.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/streaming/_messages.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/streaming/_types.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/streaming/_types.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/streaming/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/streaming/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/tools/_beta_functions.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/tools/_beta_functions.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/tools/_beta_runner.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/tools/_beta_runner.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/tools/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/tools/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/_auth.data.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/_auth.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/_auth.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/_auth.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/_beta.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/_beta.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/_beta_messages.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/_beta_messages.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/_client.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/_client.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/_client.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/vertex/__init__.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/_extras/_common.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/_extras/_common.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/_extras/_google_auth.data.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/anthropic/lib/_extras/_google_auth.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/_extras/_google_auth.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/anthropic/lib/_extras/_google_auth.meta.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/_extras/__init__.data.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/anthropic/lib/_extras/__init__.data.json"
+    },
+    {
+      "type": "anthropic",
+      "file": ".mypy_cache/3.13/anthropic/lib/_extras/__init__.meta.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.13/anthropic/lib/_extras/__init__.meta.json"
+    },
+    {
+      "type": "scheduler",
+      "file": ".mypy_cache/3.11/core/models.data.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.11/core/services/integrations/google_calendar_service.data.json"
+    },
+    {
+      "type": "google_api",
+      "file": ".mypy_cache/3.11/core/services/integrations/google_calendar_service.meta.json"
+    },
+    {
+      "type": "scheduler",
+      "file": ".github/workflows/branch-protection.yml"
+    },
+    {
+      "type": "scheduler",
+      "file": ".github/workflows/ci.yml"
+    }
+  ],
+  "manifests": [],
+  "deps": {
+    "requirements.txt": [
+      "asgiref>=3.7.0",
+      "black>=24.0.0",
+      "",
+      "# Async processing",
+      "celery>=5.3.0",
+      "coverage>=7.3.0",
+      "dj-database-url>=2.1.0",
+      "# Core Django dependencies",
+      "Django>=4.2.0,<5.0.0  # Django 4.2 LTS (suporte até 2026)",
+      "",
+      "# Performance optimization",
+      "django-bulk-update>=2.2.0",
+      "django-celery-beat>=2.5.0",
+      "django-celery-results>=2.5.0",
+      "django-cors-headers>=4.0.0",
+      "django-debug-toolbar>=4.2.0",
+      "",
+      "# Django extensions",
+      "django-extensions>=3.2.0",
+      "django-filter>=23.0",
+      "",
+      "# Data migration libraries",
+      "django-import-export>=4.0.0",
+      "django-redis>=5.4.0  # Redis cache backend para Django",
+      "",
+      "# Django REST Framework",
+      "djangorestframework>=3.14.0",
+      "factory-boy>=3.3.0",
+      "",
+      "# Development and code quality tools",
+      "flake8>=6.0.0",
+      "",
+      "# Google APIs integration",
+      "google-api-python-client>=2.100.0",
+      "google-auth>=2.23.0",
+      "google-auth-httplib2>=0.1.0",
+      "google-auth-oauthlib>=1.1.0",
+      "gspread>=6.0.0",
+      "",
+      "# Production server",
+      "gunicorn>=21.0.0",
+      "ijson>=3.4.0  # MCP JSON streaming dependency (Hotfix Dia 3)",
+      "isort>=5.12.0",
+      "openpyxl>=3.1.0",
+      "pandas>=2.1.0",
+      "Pillow>=10.0.0",
+      "psycopg2-binary>=2.9.0",
+      "",
+      "# Testing and monitoring",
+      "pytest>=7.4.0",
+      "pytest-django>=4.5.0",
+      "",
+      "# Utilities",
+      "python-decouple>=3.8",
+      "redis>=4.5.0",
+      "sqlparse>=0.4.0",
+      "tzdata>=2024.1",
+      "whitenoise>=6.5.0"
+    ],
+    "pyproject.toml": [
+      "[build-system]",
+      "requires = [\"setuptools>=61.0\", \"wheel\"]",
+      "build-backend = \"setuptools.build_meta\"",
+      "",
+      "[project]",
+      "name = \"aprender-sistema\"",
+      "version = \"1.0.0\"",
+      "description = \"Sistema de Gestão de Aprendizagem\"",
+      "readme = \"README.md\"",
+      "license = {text = \"MIT\"}",
+      "authors = [",
+      "    {name = \"Sistema Aprender\", email = \"noreply@aprender.local\"}",
+      "]",
+      "keywords = [\"django\", \"education\", \"management\", \"calendar\"]",
+      "classifiers = [",
+      "    \"Development Status :: 4 - Beta\",",
+      "    \"Environment :: Web Environment\",",
+      "    \"Framework :: Django :: 5.2\",",
+      "    \"Intended Audience :: Education\",",
+      "    \"License :: OSI Approved :: MIT License\",",
+      "    \"Operating System :: OS Independent\",",
+      "    \"Programming Language :: Python :: 3\",",
+      "    \"Programming Language :: Python :: 3.13\",",
+      "    \"Topic :: Education\",",
+      "    \"Topic :: Internet :: WWW/HTTP\",",
+      "    \"Topic :: Internet :: WWW/HTTP :: Dynamic Content\",",
+      "]",
+      "requires-python = \">=3.13\"",
+      "",
+      "[tool.black]",
+      "line-length = 88",
+      "target-version = ['py313']",
+      "include = '\\.pyi?$'",
+      "extend-exclude = '''",
+      "/(",
+      "    migrations",
+      "    | __pycache__",
+      "    | staticfiles",
+      "    | media",
+      "    | logs  ",
+      "    | out",
+      "    | temp",
+      "    | venv",
+      "    | \\.venv",
+      "    | node_modules",
+      "    | \\.git",
+      ")/",
+      "'''",
+      "",
+      "[tool.isort]",
+      "profile = \"black\"",
+      "line_length = 88",
+      "multi_line_output = 3",
+      "include_trailing_comma = true",
+      "force_grid_wrap = 0",
+      "use_parentheses = true",
+      "ensure_newline_before_comments = true",
+      "known_django = \"django\"",
+      "known_first_party = [\"core\", \"api\", \"relatorios\", \"aprender_sistema\"]",
+      "sections = [\"FUTURE\", \"STDLIB\", \"DJANGO\", \"THIRDPARTY\", \"FIRSTPARTY\", \"LOCALFOLDER\"]",
+      "skip_glob = [\"*/migrations/*.py\", \"*/__pycache__/*\", \"*/venv/*\", \"*/.venv/*\"]",
+      "",
+      "[tool.bandit]",
+      "exclude_dirs = [\"tests\", \"migrations\", \"venv\", \".venv\", \"staticfiles\", \"media\"]",
+      "skips = [\"B101\", \"B601\"]  # Skip assert_used and shell_injection for Django",
+      "",
+      "[tool.coverage.run]",
+      "source = [\"core\", \"api\", \"relatorios\"]",
+      "branch = true",
+      "omit = [",
+      "    \"*/migrations/*\",",
+      "    \"*/venv/*\",",
+      "    \"*/.venv/*\",",
+      "    \"*/tests/*\",",
+      "    \"manage.py\",",
+      "    \"*/settings/*\",",
+      "    \"*/asgi.py\",",
+      "    \"*/wsgi.py\",",
+      "]",
+      "",
+      "[tool.coverage.report]",
+      "precision = 2",
+      "show_missing = true",
+      "skip_covered = false",
+      "exclude_lines = [",
+      "    \"pragma: no cover\",",
+      "    \"def __repr__\",",
+      "    \"if self.debug:\",",
+      "    \"if settings.DEBUG\",",
+      "    \"raise AssertionError\",",
+      "    \"raise NotImplementedError\",",
+      "    \"if 0:\",",
+      "    \"if __name__ == .__main__.:\",",
+      "    \"class .*\\\\bProtocol\\\\):\",",
+      "    \"@(abc\\\\.)?abstractmethod\",",
+      "]",
+      "",
+      "[tool.mypy]",
+      "python_version = \"3.13\"",
+      "check_untyped_defs = true",
+      "ignore_missing_imports = true",
+      "warn_unused_ignores = true",
+      "warn_return_any = true",
+      "warn_unreachable = true",
+      "exclude = [",
+      "    \"migrations/\",",
+      "    \"venv/\",",
+      "    \".venv/\",",
+      "    \"staticfiles/\",",
+      "]",
+      "",
+      "[tool.pytest.ini_options]",
+      "DJANGO_SETTINGS_MODULE = \"aprender_sistema.settings\"",
+      "python_files = [\"tests.py\", \"test_*.py\", \"*_tests.py\"]",
+      "python_classes = [\"Test*\"]",
+      "python_functions = [\"test_*\"]",
+      "addopts = [",
+      "    \"--strict-markers\",",
+      "    \"--strict-config\",",
+      "    \"--verbose\",",
+      "    \"--tb=short\",",
+      "    \"--cov=core\",",
+      "    \"--cov=api\",",
+      "    \"--cov-report=term-missing\",",
+      "    \"--cov-report=html:htmlcov\",",
+      "    \"--cov-fail-under=80\",",
+      "]",
+      "markers = [",
+      "    \"slow: marks tests as slow (deselect with '-m \\\"not slow\\\"')\",",
+      "    \"integration: marks tests as integration tests\",",
+      "    \"unit: marks tests as unit tests\",",
+      "]",
+      "testpaths = [\"core/tests\", \"api/tests\"]"
+    ],
+    "package.json": []
+  },
+  "summary": {
+    "total_matches": 1349,
+    "total_manifests": 0,
+    "by_type": {
+      "scheduler": 282,
+      "mcp": 55,
+      "google_api": 116,
+      "gspread": 94,
+      "openai_assistants": 29,
+      "anthropic": 761,
+      "autogen": 1,
+      "crewai": 1,
+      "smolagents": 1,
+      "dspy": 1,
+      "pydrive": 1,
+      "slack": 1,
+      "airtable": 1,
+      "jira": 2,
+      "trello": 3
+    }
+  }
+}

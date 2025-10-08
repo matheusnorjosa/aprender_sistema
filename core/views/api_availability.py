@@ -251,7 +251,7 @@ class FormadorDetailsAPI(BaseAPIView):
             formadores = (
                 FormadorService.get_formadores_queryset()
                 .filter(id__in=formador_ids)
-                .values("id", "first_name", "last_name", "email", "formador_ativo")
+                .values("id", "first_name", "last_name", "email", "is_active")
             )
 
             # Adaptar para formato esperado
@@ -262,7 +262,7 @@ class FormadorDetailsAPI(BaseAPIView):
                         "id": f["id"],
                         "nome": f"{f['first_name']} {f['last_name']}".strip(),
                         "email": f["email"],
-                        "ativo": f["formador_ativo"],
+                        "ativo": f["is_active"],
                     }
                 )
 

@@ -65,6 +65,10 @@ services:
       - DEBUG=${DEBUG:-true}
       - DB_HOST=db
       - DB_PORT=5432
+      # Google Sheets Service Account
+      - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/gsheets_sa_json
+      # Timezone
+      - TZ=America/Fortaleza
       - DB_NAME=${DB_NAME:-aprender_sistema_dev}
       - DB_USER=${DB_USER:-postgres}
       - DB_PASSWORD=${DB_PASSWORD:-postgres123}
@@ -107,6 +111,9 @@ services:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
       - logs_volume:/app/logs
+
+    secrets:
+      - gsheets_sa_json
 
     ports:
       # Development
@@ -332,6 +339,65 @@ services:
     profiles:
       - production
       - monitoring
+
+  # ==========================================
+  # SSOT CRON - IMPORTS AUTOMATIZADOS
+  # ==========================================
+  ssot_cron:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-development}
+    container_name: ssot_cron_${ENVIRONMENT:-dev}
+    restart: unless-stopped
+
+    depends_on:
+      - web
+
+    volumes:
+      - .:/app  # compartilha código, logs e scripts
+
+    environment:
+      - TZ=America/Fortaleza
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-aprender_sistema_dev}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres123}
+      # garante que o runner cron enxergue a SA também (via bind ou secret)
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/creds/gsheet_sa.json
+
+    # Usar cron nativo do sistema em vez de supercronic
+    command: >
+      bash -c "
+        echo 'Starting SSOT Cron...' &&
+        echo 'Installing cron...' &&
+        apt-get update && apt-get install -y cron &&
+        echo 'Setting up cron job...' &&
+        echo '30 7 * * * bash /app/devops/run_ssot_imports.sh' > /etc/cron.d/ssot &&
+        echo '30 18 * * * bash /app/devops/run_ssot_imports.sh' >> /etc/cron.d/ssot &&
+        chmod 0644 /etc/cron.d/ssot &&
+        echo 'Starting cron daemon...' &&
+        cron &&
+        echo 'SSOT Cron started successfully!' &&
+        tail -f /dev/null
+      "
+    user: root
+
+    networks:
+      - aprender_network
+
+    profiles:
+      - development
+      - production
+
+# ==========================================
+# SECRETS
+# ==========================================
+secrets:
+  gsheets_sa_json:
+    file: ./creds/gsheet_sa.json
 
 # ==========================================
 # VOLUMES

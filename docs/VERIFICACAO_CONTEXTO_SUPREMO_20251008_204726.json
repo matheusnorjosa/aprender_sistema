@@ -1,0 +1,71 @@
+{
+  "status": "FAIL",
+  "items": {
+    "TIME_ZONE": {
+      "pass": true,
+      "error": ""
+    },
+    "DOCS_ROOT": {
+      "pass": true,
+      "error": ""
+    },
+    "Grupos minimos": {
+      "pass": false,
+      "error": "Grupos faltando: {'gerente'}"
+    },
+    "Papeis permitidos": {
+      "pass": true,
+      "error": ""
+    },
+    "AGENDADO por ingestao": {
+      "pass": true,
+      "error": ""
+    },
+    "Solicitante conformidade": {
+      "pass": false,
+      "error": "Apenas 0.0% conforme (esperado >= 95%)"
+    },
+    "Views disponibilidades": {
+      "pass": true,
+      "error": ""
+    },
+    "MarcadorPlanilha UNIQUE": {
+      "pass": true,
+      "error": ""
+    }
+  },
+  "metrics": {
+    "vinculos_por_papel": {
+      "FORMADOR": 15,
+      "GERENTE": 1,
+      "COORDENADOR": 1
+    },
+    "vinculos_por_setor": {
+      "Superintendência": 1,
+      "ACerta": 5,
+      "Setor Teste": 5,
+      "Vidas": 1,
+      "Setor Test Dia 2": 5
+    },
+    "total_eventos": 2178,
+    "eventos_por_status": {
+      "REALIZADO": 1712,
+      "CRIADO": 263,
+      "CANCELADO": 95,
+      "APROVADO": 108
+    },
+    "solicitante_conformidade_pct": 0.0,
+    "vw_disp_normalizada_count": 780,
+    "vw_disp_anual_agregada_count": 336,
+    "vw_disp_desloc_agregada_count": 376,
+    "vw_disp_bloq_agregada_count": 68,
+    "total_marcadores": 120,
+    "total_usuarios": 229,
+    "total_vinculos": 17,
+    "total_setores": 5
+  },
+  "errors": [
+    "Grupos minimos: Grupos faltando: {'gerente'}",
+    "Solicitante conformidade: Apenas 0.0% conforme (esperado >= 95%)"
+  ]
+}

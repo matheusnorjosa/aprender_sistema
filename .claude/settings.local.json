@@ -25,7 +25,17 @@
       "Bash(git rev-parse:*)",
       "Bash(do echo \">>> $u\")",
       "Bash(pwsh:*)",
-      "Bash(powershell.exe:*)"
+      "Bash(powershell.exe:*)",
+      "Bash(for f in core/templates/core/*.html core/templates/core/**/*.html)",
+      "Bash(do [ -f \"$f\" ])",
+      "Bash(echo:*)",
+      "Bash(head:*)",
+      "Bash(for f in core/templates/core/**/*.html)",
+      "Bash(awk:*)",
+      "Bash(for f in core/templates/core/diretoria/*.html)",
+      "Bash(for f in core/templates/core/gestao/**/*.html)",
+      "Bash(mkdir:*)",
+      "Bash(ls -1 \"C:\\Users\\datsu\\OneDrive\\Documentos\\Aprender Sistema\\core\\migrations\"\" | grep \"^[0-9] \")"
     ],
     "deny": [],
     "ask": []

@@ -3,6 +3,28 @@ import uuid
 from datetime import timedelta
 
 from django.conf import settings
+from django.db import models
+
+
+class UsuarioAlias(models.Model):
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="aliases",
+    )
+    alias = models.CharField(max_length=150, unique=True, db_index=True)
+    origem = models.CharField(max_length=50, default="manual")
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["alias"], name="idx_alias_alias")]
+        verbose_name = "Alias de Usuário"
+        verbose_name_plural = "Aliases de Usuário"
+
+    def __str__(self):  # pragma: no cover
+        return f"{self.alias} -> {self.usuario_id}"
+
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager, Group, Permission
 from django.db import models
 from django.utils import timezone
@@ -39,6 +61,8 @@ class Setor(models.Model):
     ativo = models.BooleanField(default=True, verbose_name="Ativo")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Manager explícito para ferramentas de linting/type-checking
+    objects = models.Manager()
 
     class Meta:
         verbose_name = "Setor"
@@ -53,11 +77,18 @@ class Setor(models.Model):
 # VINCULO USUARIO-SETOR
 # =========================
 
-PAPEL_VINCULO = [
-    ("GERENTE", "Gerente"),
-    ("COORDENADOR", "Coordenador"),
-    ("FORMADOR", "Formador"),
-]
+
+class PapelVinculo(models.TextChoices):
+    """
+    Papéis canônicos para vínculos usuário-setor.
+    Harmonizado em CAIXA ALTA para consistência.
+    """
+
+    GERENTE = "GERENTE", "Gerente"
+    COORDENADOR = "COORDENADOR", "Coordenador"
+    FORMADOR = "FORMADOR", "Formador"
+    CONTROLE = "CONTROLE", "Controle"
+    SUPER = "SUPER", "Superintendência"
 
 
 class VinculoUsuarioSetor(models.Model):
@@ -78,7 +109,9 @@ class VinculoUsuarioSetor(models.Model):
         related_name="vinculos_usuarios",
         verbose_name="Setor",
     )
-    papel = models.CharField(max_length=20, choices=PAPEL_VINCULO, verbose_name="Papel")
+    papel = models.CharField(
+        max_length=20, choices=PapelVinculo.choices, verbose_name="Papel"
+    )
     ativo = models.BooleanField(default=True, verbose_name="Ativo")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1255,6 +1288,56 @@ class Deslocamento(models.Model):
         verbose_name="Pessoa 6",
     )
 
+    # Novos campos (ETAPA 2): vínculo direto com Usuario para mapa
+    pessoa_1_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="deslocamentos_p1_user",
+        verbose_name="Pessoa 1 (Usuário)",
+    )
+    pessoa_2_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="deslocamentos_p2_user",
+        verbose_name="Pessoa 2 (Usuário)",
+    )
+    pessoa_3_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="deslocamentos_p3_user",
+        verbose_name="Pessoa 3 (Usuário)",
+    )
+    pessoa_4_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="deslocamentos_p4_user",
+        verbose_name="Pessoa 4 (Usuário)",
+    )
+    pessoa_5_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="deslocamentos_p5_user",
+        verbose_name="Pessoa 5 (Usuário)",
+    )
+    pessoa_6_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="deslocamentos_p6_user",
+        verbose_name="Pessoa 6 (Usuário)",
+    )
+
     # Campos de auditoria (serão adicionados na próxima migration)
     # created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     # updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
@@ -1309,6 +1392,22 @@ class Deslocamento(models.Model):
     def total_pessoas(self):
         """Retorna quantidade de pessoas no deslocamento"""
         return len(self.pessoas)
+
+    @property
+    def usuarios(self):
+        """Retorna lista de usuarios (AUTH_USER) vinculados ao deslocamento, se mapeados."""
+        return [
+            u
+            for u in [
+                self.pessoa_1_user,
+                self.pessoa_2_user,
+                self.pessoa_3_user,
+                self.pessoa_4_user,
+                self.pessoa_5_user,
+                self.pessoa_6_user,
+            ]
+            if u is not None
+        ]
 
     def clean(self):
         """Validações customizadas"""
@@ -1669,34 +1768,46 @@ class MarcadorPlanilha(models.Model):
     Vincula dados importados às suas origens nas planilhas.
     """
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # HOTFIX DIA 3: Na tabela é bigint generated by default as identity
+    id = models.BigAutoField(primary_key=True)
 
-    # Hash único para idempotência
+    # Hash único para idempotência (SHA1 = 40 chars)
     external_hash = models.CharField(
-        max_length=64,
+        max_length=40,
         unique=True,
         db_index=True,
-        help_text="Hash SHA256 para garantir idempotência da importação",
+        help_text="Hash SHA1 para garantir idempotência da importação",
     )
+
+    # Campos de tipo e vinculação genérica
+    tipo_entidade = models.CharField(
+        max_length=50,
+        default="",
+        blank=True,
+        help_text="Tipo de entidade (usuario, solicitacao, disponibilidade, etc.)",
+    )
+    entidade_id = models.UUIDField(
+        null=True, blank=True, help_text="ID da entidade vinculada (se aplicável)"
+    )
+    raw_data = models.JSONField(default=dict, help_text="Dados brutos da importação")
 
     # Referências às planilhas
     gid = models.CharField(
-        max_length=50,
-        null=True,
+        max_length=32,
         blank=True,
+        default="",
         help_text="ID da linha na planilha (Google Sheets gid)",
     )
-    linha = models.IntegerField(
-        null=True, blank=True, help_text="Número da linha na planilha"
-    )
-    origem_aba = models.CharField(
-        max_length=100, null=True, blank=True, help_text="Nome da aba de origem"
+    linha = models.CharField(
+        max_length=20, null=True, blank=True, help_text="Número da linha na planilha"
     )
     origem = models.CharField(
-        max_length=255,
-        null=True,
-        blank=True,
+        max_length=32,
+        default="",
         help_text="Fonte da importação (sheets:aba ou csv:arquivo)",
+    )
+    origem_aba = models.CharField(
+        max_length=50, default="", help_text="Nome da aba de origem"
     )
 
     # Flags de controle
@@ -1704,33 +1815,7 @@ class MarcadorPlanilha(models.Model):
         default=False, help_text="Se o evento foi marcado como cancelado na planilha"
     )
 
-    # Relacionamentos opcionais
-    solicitacao = models.ForeignKey(
-        "Solicitacao",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="marcadores_planilha",
-        help_text="Solicitação associada (se aplicável)",
-    )
-    disponibilidade = models.ForeignKey(
-        "DisponibilidadeFormadores",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="marcadores_planilha",
-        help_text="Disponibilidade associada (se aplicável)",
-    )
-
-    # Vinculação para remarcações
-    remarcado_para = models.ForeignKey(
-        "self",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="remarcado_de",
-        help_text="Marcador da nova data (para eventos remarcados)",
-    )
+    # Relacionamentos opcionais removidos (campos nunca existiram na tabela)
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)

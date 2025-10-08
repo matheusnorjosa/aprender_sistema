@@ -41,11 +41,7 @@ class GestaoDashboardView(GestaoBaseMixin, TemplateView):
 
         context.update(
             {
-                "total_formadores": len(FormadorService.todos_formadores())
-                + Usuario.objects.select_related("municipio", "projeto")
-                .prefetch_related("groups", "user_permissions")
-                .filter(formador_ativo=False)
-                .count(),
+                "total_formadores": FormadorService.get_formadores_queryset().count(),
                 "formadores_ativos": stats["formadores_ativos"],
                 "total_municipios": MunicipioService.ativos().count()
                 + Municipio.objects.prefetch_related("solicitacao_set", "usuario_set")
@@ -75,12 +71,8 @@ class FormadorListView(GestaoBaseMixin, BaseListView):
     select_related_fields = ["setor", "municipio", "area_atuacao"]
 
     def get_queryset(self):
-        # Usar Service centralizado - inclui formadores ativos e inativos
-        queryset = (
-            UsuarioService.get_optimized_queryset()
-            .filter(Q(formador_ativo=True) | Q(groups__name="formador"))
-            .distinct()
-        )
+        # Usar Service centralizado - formadores são identificados pelo grupo
+        queryset = FormadorService.get_formadores_queryset()
 
         # Busca por nome ou email
         search = self.request.GET.get("search")
@@ -96,12 +88,12 @@ class FormadorListView(GestaoBaseMixin, BaseListView):
         if area:
             queryset = queryset.filter(area_atuacao_id=area)
 
-        # Filtro por status
+        # Filtro por status (ativo = membro do grupo formador e is_active=True)
         status = self.request.GET.get("status")
         if status == "ativo":
-            queryset = queryset.filter(formador_ativo=True)
+            queryset = queryset.filter(is_active=True)
         elif status == "inativo":
-            queryset = queryset.filter(formador_ativo=False)
+            queryset = queryset.filter(is_active=False)
 
         return queryset.order_by("first_name", "last_name")
 
@@ -124,10 +116,7 @@ class FormadorCreateView(GestaoBaseMixin, BaseCreateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        # Garantir que o usuário seja marcado como formador
-        self.object.formador_ativo = True
-        self.object.save()
-        # Adicionar ao grupo formador
+        # Adicionar ao grupo formador (fonte única de identificação)
         formador_group, _ = Group.objects.get_or_create(name="formador")
         self.object.groups.add(formador_group)
         messages.success(self.request, "Formador criado com sucesso!")
@@ -143,12 +132,8 @@ class FormadorUpdateView(GestaoBaseMixin, BaseUpdateView):
     success_url = reverse_lazy("core:gestao_formadores")
 
     def get_queryset(self):
-        # Apenas usuários que são formadores
-        return (
-            UsuarioService.get_optimized_queryset()
-            .filter(Q(formador_ativo=True) | Q(groups__name="formador"))
-            .distinct()
-        )
+        # Apenas usuários que são formadores (identificados pelo grupo)
+        return FormadorService.get_formadores_queryset()
 
     def form_valid(self, form):
         messages.success(self.request, "Formador atualizado com sucesso!")
@@ -163,19 +148,12 @@ class FormadorDeleteView(GestaoBaseMixin, DeleteView):
     success_url = reverse_lazy("core:gestao_formadores")
 
     def get_queryset(self):
-        # Apenas usuários que são formadores
-        return (
-            UsuarioService.get_optimized_queryset()
-            .filter(Q(formador_ativo=True) | Q(groups__name="formador"))
-            .distinct()
-        )
+        # Apenas usuários que são formadores (identificados pelo grupo)
+        return FormadorService.get_formadores_queryset()
 
     def delete(self, request, *args, **kwargs):
         self.object = self.get_object()
-        # Soft delete - apenas desativa o formador
-        self.object.formador_ativo = False
-        self.object.save()
-        # Remover do grupo formador
+        # Soft delete - remover do grupo formador
         formador_group = Group.objects.filter(name="formador").first()
         if formador_group:
             self.object.groups.remove(formador_group)

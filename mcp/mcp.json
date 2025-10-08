@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "name_for_model": "apr_mcp",
+  "description_for_model": "Ferramentas Aprender (stub MCP).",
+  "tools": [
+    {
+      "name": "health",
+      "description": "Ping MCP - verifica se o servidor está respondendo",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ],
+  "contact_email": "dev@aprender.local",
+  "legal_info_url": "https://example.org/legal"
+}

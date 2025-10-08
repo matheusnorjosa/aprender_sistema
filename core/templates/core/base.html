@@ -472,10 +472,12 @@
           <a href="{% url 'core:controle_google_calendar' %}" class="nav-item {% block nav_controle_calendar %}{% endblock %}">
             <i class="bi bi-cloud-check"></i> Monitor Google Calendar
           </a>
-          <a href="{% url 'core:controle_auditoria' %}" class="nav-item {% block nav_controle_auditoria %}{% endblock %}">
+          <!-- Escondido no dia 07/10 para melhorar a apresentação -->
+          <a href="{% url 'core:controle_auditoria' %}" class="nav-item {% block nav_controle_auditoria %}{% endblock %}" style="display: none;">
             <i class="bi bi-shield-check"></i> Logs de Auditoria
           </a>
-          <a href="{% url 'core:controle_api_status' %}" class="nav-item {% block nav_controle_api %}{% endblock %}">
+          <!-- Escondido no dia 07/10 para melhorar a apresentação -->
+          <a href="{% url 'core:controle_api_status' %}" class="nav-item {% block nav_controle_api %}{% endblock %}" style="display: none;">
             <i class="bi bi-speedometer2"></i> Status do Sistema
           </a>
         </div>
@@ -487,7 +489,11 @@
           <a href="{% url 'core:diretoria_dashboard' %}" class="nav-item {% block nav_diretoria_dashboard %}{% endblock %}">
             <i class="bi bi-graph-up"></i> Dashboard Executivo
           </a>
-          <a href="{% url 'core:diretoria_dashboard_integrado' %}" class="nav-item {% block nav_diretoria_integrado %}{% endblock %}">
+          <a href="http://localhost:3000/#/dashboard" class="nav-item" target="_blank" rel="noopener noreferrer" style="display: none;">
+            <i class="bi bi-bar-chart"></i> Dashboard BI (React)
+          </a>
+          <!-- Escondido no dia 07/10 para melhorar a apresentação -->
+          <a href="{% url 'core:diretoria_dashboard_integrado' %}" class="nav-item {% block nav_diretoria_integrado %}{% endblock %}" style="display: none;">
             <i class="bi bi-cpu"></i> Dashboard Integrado
           </a>
           <a href="{% url 'core:diretoria_relatorios' %}" class="nav-item {% block nav_diretoria_relatorios %}{% endblock %}">
@@ -498,7 +504,8 @@
             <i class="bi bi-calendar-month"></i> Visão Mensal
           </a>
           {% endif %}
-          <a href="{% url 'core:diretoria_api_metrics' %}" class="nav-item {% block nav_diretoria_api %}{% endblock %}">
+          <!-- Escondido no dia 07/10 para melhorar a apresentação -->
+          <a href="{% url 'core:diretoria_api_metrics' %}" class="nav-item {% block nav_diretoria_api %}{% endblock %}" style="display: none;">
             <i class="bi bi-file-earmark-code"></i> Métricas API
           </a>
         </div>

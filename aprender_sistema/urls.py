@@ -10,10 +10,6 @@ urlpatterns = [
     path(
         "api/reports/", include("backend.reports.urls")
     ),  # Reports API (conflitos + workload)
-    path(
-        "diretoria/dashboard/",
-        RedirectView.as_view(url="http://localhost:3000/dashboard", permanent=False),
-    ),  # Redirect para dashboard React
     path("", include("core.urls")),  # Core URLs (Hotfix Dia 3: reabilitado)
 ]
 

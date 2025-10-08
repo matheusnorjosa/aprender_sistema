@@ -30,7 +30,11 @@ def _conta_eventos_no_dia(formador_id, dia: date) -> int:
     """Conta eventos que intersectam o dia (início <= dia <= fim)"""
     di, df = _dia_range(dia)
     return (
-        Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
+        Solicitacao.objects.select_related(
+            "municipio", "projeto", "tipo_evento", "usuario_solicitante"
+        )
+        .prefetch_related("formadores")
+        .filter(
             status="Aprovado",
             formadores=formador_id,
             data_inicio__lte=df,
@@ -44,9 +48,13 @@ def _conta_eventos_no_dia(formador_id, dia: date) -> int:
 def _tem_desloc_no_dia(formador_id, dia: date) -> bool:
     """Verifica deslocamentos de forma otimizada"""
     return Deslocamento.objects.filter(
-        Q(pessoa_1_id=formador_id) | Q(pessoa_2_id=formador_id) | Q(pessoa_3_id=formador_id) |
-        Q(pessoa_4_id=formador_id) | Q(pessoa_5_id=formador_id) | Q(pessoa_6_id=formador_id),
-        data=dia
+        Q(pessoa_1_id=formador_id)
+        | Q(pessoa_2_id=formador_id)
+        | Q(pessoa_3_id=formador_id)
+        | Q(pessoa_4_id=formador_id)
+        | Q(pessoa_5_id=formador_id)
+        | Q(pessoa_6_id=formador_id),
+        data=dia,
     ).exists()
 
 
@@ -70,51 +78,74 @@ def gerar_mapa_mensal_otimizado(formadores, dias):
     # === BUSCAR TODOS OS DADOS DE UMA VEZ ===
 
     # 1. Todos os bloqueios do período
-    # Mapear formador_ids para usuario_ids
-    usuario_ids = [f.usuario.id for f in formadores if f.usuario]
+    # formadores já são objetos Usuario (fonte única)
     bloqueios = DisponibilidadeFormadores.objects.filter(
-        usuario_id__in=usuario_ids,
+        usuario_id__in=formador_ids,
         data_bloqueio__gte=dia_inicio,
         data_bloqueio__lte=dia_fim,
     ).select_related("usuario")
 
     # 2. Todos os deslocamentos do período
-    from django.db.models import Q
-    desloc_query = Q()
-    for fid in formador_ids:
-        desloc_query |= (
-            Q(pessoa_1_id=fid) | Q(pessoa_2_id=fid) | Q(pessoa_3_id=fid) |
-            Q(pessoa_4_id=fid) | Q(pessoa_5_id=fid) | Q(pessoa_6_id=fid)
+    # HOTFIX 06/10: Desabilitado temporariamente (modelo Deslocamento ainda aponta para Formador legado)
+    # TODO ETAPA 2: Reativar após migration de Deslocamento.pessoa_* para Usuario
+    from django.conf import settings
+
+    if getattr(settings, "FEATURE_MAP_DESLOCAMENTOS_ENABLED", False):
+        from django.db.models import Q
+
+        desloc_query = Q()
+        for fid in formador_ids:
+            desloc_query |= (
+                Q(pessoa_1_user_id=fid)
+                | Q(pessoa_2_user_id=fid)
+                | Q(pessoa_3_user_id=fid)
+                | Q(pessoa_4_user_id=fid)
+                | Q(pessoa_5_user_id=fid)
+                | Q(pessoa_6_user_id=fid)
+            )
+
+        deslocamentos = Deslocamento.objects.filter(
+            desloc_query, data__gte=dia_inicio, data__lte=dia_fim
         )
-    
-    deslocamentos = Deslocamento.objects.filter(
-        desloc_query, data__gte=dia_inicio, data__lte=dia_fim
-    ).select_related("pessoa_1", "pessoa_2", "pessoa_3", "pessoa_4", "pessoa_5", "pessoa_6")
+    else:
+        deslocamentos = []
 
     # 3. Todos os eventos aprovados que intersectam o período
-    eventos = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-        status="Aprovado",
-        formadores__in=formador_ids,
-        data_inicio__lte=dt_fim_periodo,
-        data_fim__gte=dt_inicio,
-    ).prefetch_related("formadores")
+    eventos = (
+        Solicitacao.objects.select_related(
+            "municipio", "projeto", "tipo_evento", "usuario_solicitante"
+        )
+        .prefetch_related("formadores")
+        .filter(
+            status="Aprovado",
+            formadores__in=formador_ids,
+            data_inicio__lte=dt_fim_periodo,
+            data_fim__gte=dt_inicio,
+        )
+        .prefetch_related("formadores")
+    )
 
     # === ORGANIZAR DADOS EM ESTRUTURAS RÁPIDAS ===
 
     # Bloqueios: {formador_id: {data: tipo}}
     bloqueios_map = defaultdict(dict)
     for bloq in bloqueios:
-        # Mapear usuario_id para formador_id
-        if hasattr(bloq.usuario, 'formador_profile') and bloq.usuario.formador_profile:
-            formador_id = bloq.usuario.formador_profile.id
-            bloqueios_map[formador_id][bloq.data_bloqueio] = bloq.tipo_bloqueio.lower()
+        # usuario_id já é o formador_id (fonte única)
+        bloqueios_map[bloq.usuario_id][bloq.data_bloqueio] = bloq.tipo_bloqueio.lower()
 
     # Deslocamentos: {formador_id: {data: True}}
     desloc_map = defaultdict(set)
     for desloc in deslocamentos:
-        for formador in desloc.pessoas:
-            if formador:  # Verificar se não é None
-                desloc_map[formador.id].add(desloc.data)
+        for uid in [
+            desloc.pessoa_1_user_id,
+            desloc.pessoa_2_user_id,
+            desloc.pessoa_3_user_id,
+            desloc.pessoa_4_user_id,
+            desloc.pessoa_5_user_id,
+            desloc.pessoa_6_user_id,
+        ]:
+            if uid:
+                desloc_map[uid].add(desloc.data)
 
     # Eventos: {formador_id: {data: count}}
     eventos_map = defaultdict(lambda: defaultdict(int))
@@ -179,7 +210,7 @@ def _marcador_otimizado(formador_id, dia, tipo_bloqueio, tem_desloc, qtd_eventos
             return "1"  # Um evento
         else:
             return "V"  # Disponível (célula vazia na planilha)
-    
+
     # Fallback para casos não mapeados
     if tem_desloc and qtd_eventos > 0:
         return "D1"

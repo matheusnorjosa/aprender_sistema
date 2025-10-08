@@ -1,62 +1,62 @@
-import React from 'react';
-import { apiGet } from '../lib/api';
+import React, { useEffect, useState } from 'react';
 
-type KPIs = {
+type Kpis = {
   total_solicitacoes: number;
-  by_status: Record<string, number>;
-  conflitos_total: number;
+  total_conflitos: number;
+  total_usuarios: number;
   overload_users: number;
-  usuarios_total: number;
-  municipios_total: number;
-  projetos_total: number;
-  disp_staging_total: number;
+  por_status: { CRIADO: number; APROVADO: number; REALIZADO: number; CANCELADO: number };
 };
 
 export default function Dashboard() {
-  const [kpis, setKpis] = React.useState<KPIs | null>(null);
-  const [err, setErr] = React.useState<string | null>(null);
+  const [kpis, setKpis] = useState<Kpis | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    apiGet('/api/reports/kpis')
+  useEffect(() => {
+    fetch('/api/reports/kpis', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
       .then(setKpis)
       .catch(e => setErr(String(e)));
   }, []);
 
   return (
-    <div style={{ padding: 16 }}>
-      <h1>Dashboard Executivo</h1>
-      {err && <p style={{ color: 'crimson' }}>Erro: {err}</p>}
-      {!kpis && !err && <p>Carregando…</p>}
-      {kpis && (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, margin: '12px 0' }}>
-            <Card title="Solicitações">{kpis.total_solicitacoes}</Card>
-            <Card title="Conflitos">{kpis.conflitos_total}</Card>
-            <Card title="Usuários">{kpis.usuarios_total}</Card>
-            <Card title="Overload (≥110h)">{kpis.overload_users}</Card>
+    <div style={{ minHeight: '100vh', padding: '24px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: 'white', marginBottom: '24px' }}>
+          Dashboard Executivo
+        </h1>
+        {err && (
+          <div style={{ background: '#fef2f2', color: '#dc2626', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+            Erro: {err}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
-            <Card title="CRIADO">{kpis.by_status?.CRIADO ?? 0}</Card>
-            <Card title="APROVADO">{kpis.by_status?.APROVADO ?? 0}</Card>
-            <Card title="REALIZADO">{kpis.by_status?.REALIZADO ?? 0}</Card>
-            <Card title="CANCELADO">{kpis.by_status?.CANCELADO ?? 0}</Card>
+        )}
+        {!kpis && !err && (
+          <div style={{ background: 'rgba(255,255,255,0.9)', padding: '16px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+            Carregando KPIs...
           </div>
-          <div style={{ marginTop: 16 }}>
-            <small>
-              Municípios: {kpis.municipios_total} • Projetos: {kpis.projetos_total} • Disp (staging): {kpis.disp_staging_total}
-            </small>
+        )}
+        {kpis && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            <Card title='SolicitaÃ§Ãµes' value={kpis.total_solicitacoes} />
+            <Card title='Conflitos' value={kpis.total_conflitos} />
+            <Card title='UsuÃ¡rios' value={kpis.total_usuarios} />
+            <Card title='Sobrecarga (â‰¥110h)' value={kpis.overload_users} />
+            <Card title='Criado' value={kpis.por_status.CRIADO} />
+            <Card title='Aprovado' value={kpis.por_status.APROVADO} />
+            <Card title='Realizado' value={kpis.por_status.REALIZADO} />
+            <Card title='Cancelado' value={kpis.por_status.CANCELADO} />
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
-function Card({ title, children }: { title: string; children: any }) {
+function Card({ title, value }: { title: string; value: number }) {
   return (
-    <div style={{ border: '1px solid #eee', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-      <div style={{ fontSize: 12, opacity: 0.7 }}>{title}</div>
-      <div style={{ fontSize: 24, fontWeight: 700 }}>{children}</div>
+    <div style={{ background: 'rgba(255,255,255,0.95)', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', padding: '16px' }}>
+      <div style={{ color: '#64748b', fontSize: '14px' }}>{title}</div>
+      <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{value}</div>
     </div>
   );
 }

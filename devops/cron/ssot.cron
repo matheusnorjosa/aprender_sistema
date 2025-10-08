@@ -1,0 +1,9 @@
+# ========================================
+# CRON para SSOT Imports
+# ========================================
+# Executa imports com cross-check automático
+# Timezone: America/Fortaleza
+
+# m h  dom mon dow   command
+30 7  *   *   *   bash /app/devops/run_ssot_imports.sh
+30 18 *   *   *   bash /app/devops/run_ssot_imports.sh

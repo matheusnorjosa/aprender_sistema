@@ -1,0 +1,507 @@
+{
+  "total_repos": 29,
+  "total_mentions": 30,
+  "repos": [
+    {
+      "repo": "matheusnorjosa/aprender_sistema",
+      "url": "https://github.com/matheusnorjosa/aprender_sistema",
+      "mentions": [
+        {
+          "source": ".git/config",
+          "type": "git_remote"
+        },
+        {
+          "source": ".git/config",
+          "type": "git_remote"
+        }
+      ],
+      "types": [
+        "git_remote"
+      ],
+      "sources": [
+        ".git/config"
+      ],
+      "mention_count": 2
+    },
+    {
+      "repo": "David-OConnor/pyflow",
+      "url": "https://github.com/David-OConnor/pyflow",
+      "mentions": [
+        {
+          "source": ".gitignore",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        ".gitignore"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "psf/black",
+      "url": "https://github.com/psf/black",
+      "mentions": [
+        {
+          "source": ".pre-commit-config.yaml",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        ".pre-commit-config.yaml"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "pycqa/isor",
+      "url": "https://github.com/pycqa/isor",
+      "mentions": [
+        {
+          "source": ".pre-commit-config.yaml",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        ".pre-commit-config.yaml"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "pycqa/flake8",
+      "url": "https://github.com/pycqa/flake8",
+      "mentions": [
+        {
+          "source": ".pre-commit-config.yaml",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        ".pre-commit-config.yaml"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "PyCQA/band",
+      "url": "https://github.com/PyCQA/band",
+      "mentions": [
+        {
+          "source": ".pre-commit-config.yaml",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        ".pre-commit-config.yaml"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "Lucas-C/pre-commit-hooks-safety",
+      "url": "https://github.com/Lucas-C/pre-commit-hooks-safety",
+      "mentions": [
+        {
+          "source": ".pre-commit-config.yaml",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        ".pre-commit-config.yaml"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "pre-commit/pre-commit-hooks",
+      "url": "https://github.com/pre-commit/pre-commit-hooks",
+      "mentions": [
+        {
+          "source": ".pre-commit-config.yaml",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        ".pre-commit-config.yaml"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "compilerla/conventional-pre-comm",
+      "url": "https://github.com/compilerla/conventional-pre-comm",
+      "mentions": [
+        {
+          "source": ".pre-commit-config.yaml",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        ".pre-commit-config.yaml"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "Yelp/detect-secrets",
+      "url": "https://github.com/Yelp/detect-secrets",
+      "mentions": [
+        {
+          "source": ".pre-commit-config.yaml",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        ".pre-commit-config.yaml"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "en/repositories",
+      "url": "https://github.com/en/repositories",
+      "mentions": [
+        {
+          "source": "CODEOWNERS",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "CODEOWNERS"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "SEU_USUARIO/aprender_sistema",
+      "url": "https://github.com/SEU_USUARIO/aprender_sistema",
+      "mentions": [
+        {
+          "source": "CONTRIBUTING.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "CONTRIBUTING.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "REPO_ORIGINAL/aprender_sistema",
+      "url": "https://github.com/REPO_ORIGINAL/aprender_sistema",
+      "mentions": [
+        {
+          "source": "CONTRIBUTING.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "CONTRIBUTING.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "pre-commit/mirrors-mypy",
+      "url": "https://github.com/pre-commit/mirrors-mypy",
+      "mentions": [
+        {
+          "source": "PADROES_CODIGO_PYTHON.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "PADROES_CODIGO_PYTHON.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "usuario/repo",
+      "url": "https://github.com/usuario/repo",
+      "mentions": [
+        {
+          "source": "RENDER_MCP_INTEGRATION.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "RENDER_MCP_INTEGRATION.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "USUARIO/aprender_sistema",
+      "url": "https://github.com/USUARIO/aprender_sistema",
+      "mentions": [
+        {
+          "source": "SECURITY.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "SECURITY.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "Lucas-C/pre-commit-hooks",
+      "url": "https://github.com/Lucas-C/pre-commit-hooks",
+      "mentions": [
+        {
+          "source": "SECURITY.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "SECURITY.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "en/code-security",
+      "url": "https://github.com/en/code-security",
+      "mentions": [
+        {
+          "source": ".github/dependabot.yml",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        ".github/dependabot.yml"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "infiniflow/ragflow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "mentions": [
+        {
+          "source": "docs/CLAUDE.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "docs/CLAUDE.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "getsentry/sentry-mcp",
+      "url": "https://github.com/getsentry/sentry-mcp",
+      "mentions": [
+        {
+          "source": "docs/CLAUDE.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "docs/CLAUDE.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "microsoft/playwright-mcp",
+      "url": "https://github.com/microsoft/playwright-mcp",
+      "mentions": [
+        {
+          "source": "docs/CLAUDE.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "docs/CLAUDE.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "microsoft/markitdown",
+      "url": "https://github.com/microsoft/markitdown",
+      "mentions": [
+        {
+          "source": "docs/CLAUDE.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "docs/CLAUDE.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "upstash/context7",
+      "url": "https://github.com/upstash/context7",
+      "mentions": [
+        {
+          "source": "docs/CLAUDE.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "docs/CLAUDE.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "oraios/serena",
+      "url": "https://github.com/oraios/serena",
+      "mentions": [
+        {
+          "source": "docs/CLAUDE.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "docs/CLAUDE.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "jlowin/fastmcp",
+      "url": "https://github.com/jlowin/fastmcp",
+      "mentions": [
+        {
+          "source": "docs/CLAUDE.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "docs/CLAUDE.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "GLips/Figma-Context-MCP",
+      "url": "https://github.com/GLips/Figma-Context-MCP",
+      "mentions": [
+        {
+          "source": "docs/GUIA_MODERNIZACAO_UI.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "docs/GUIA_MODERNIZACAO_UI.md"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "your-org/aprender-sistema",
+      "url": "https://github.com/your-org/aprender-sistema",
+      "mentions": [
+        {
+          "source": "teste-detectar-contexto/chat-🎓 Sistema APRENDER Análise.txt",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "teste-detectar-contexto/chat-🎓 Sistema APRENDER Análise.txt"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "GoogleChrome/lighthouse",
+      "url": "https://github.com/GoogleChrome/lighthouse",
+      "mentions": [
+        {
+          "source": "reports/lighthouse/lighthouse-home.json",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "reports/lighthouse/lighthouse-home.json"
+      ],
+      "mention_count": 1
+    },
+    {
+      "repo": "your-org/aprender_sistema",
+      "url": "https://github.com/your-org/aprender_sistema",
+      "mentions": [
+        {
+          "source": "docs/dev/setup.md",
+          "type": "code_reference"
+        }
+      ],
+      "types": [
+        "code_reference"
+      ],
+      "sources": [
+        "docs/dev/setup.md"
+      ],
+      "mention_count": 1
+    }
+  ],
+  "summary_by_type": {
+    "git_remote": 2,
+    "code_reference": 28
+  }
+}

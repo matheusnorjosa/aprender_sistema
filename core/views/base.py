@@ -9,8 +9,8 @@ ELIMINA imports duplicados e inconsistências
 # ===============================
 import json
 import os
-from datetime import time, timedelta, datetime
-from typing import Dict, List, Optional, Any, Union
+from datetime import datetime, time, timedelta
+from typing import Any, Dict, List, Optional, Union
 
 # ===============================
 # IMPORTS DJANGO CORE
@@ -26,55 +26,23 @@ from django.core.cache import cache
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import models, transaction
-from django.db.models import Count, Q, Prefetch, F, Max, Min, Sum, Avg
-from django.db.models.functions import TruncMonth, TruncWeek, TruncDay
-from django.http import JsonResponse, HttpResponse, Http404
+from django.db.models import Avg, Count, F, Max, Min, Prefetch, Q, Sum
+from django.db.models.functions import TruncDay, TruncMonth, TruncWeek
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy, reverse
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import (
     CreateView,
+    DeleteView,
+    DetailView,
     FormView,
     ListView,
     TemplateView,
-    DetailView,
     UpdateView,
-    DeleteView
-)
-
-# ===============================
-# IMPORTS DA APLICAÇÃO - MODELS
-# ===============================
-from core.models import (
-    # Estrutura Organizacional
-    Setor,
-    Usuario,
-
-    # Cadastros de Referência (FONTE ÚNICA)
-    Municipio,
-    Projeto,
-    TipoEvento,
-
-    # Fluxo Operacional
-    Solicitacao,
-    SolicitacaoStatus,
-    FormadoresSolicitacao,
-
-    # Aprovações e Controle
-    Aprovacao,
-    AprovacaoStatus,
-    EventoGoogleCalendar,
-
-    # Disponibilidades e Logs
-    DisponibilidadeFormadores,
-    LogAuditoria,
-    Deslocamento,
-
-    # COMPATIBILIDADE TEMPORÁRIA
-    Formador,  # SERÁ REMOVIDO após migração completa
 )
 
 # ===============================
@@ -83,22 +51,43 @@ from core.models import (
 from core.forms import (
     AprovacaoDecisionForm,
     BloqueioAgendaForm,
-    SolicitacaoForm,
     FormadorForm,
     MunicipioForm,
     ProjetoForm,
+    SolicitacaoForm,
     TipoEventoForm,
+)
+
+# ===============================
+# IMPORTS DA APLICAÇÃO - MODELS
+# ===============================
+from core.models import Formador  # SERÁ REMOVIDO após migração completa
+from core.models import (  # Estrutura Organizacional; Cadastros de Referência (FONTE ÚNICA); Fluxo Operacional; Aprovações e Controle; Disponibilidades e Logs; COMPATIBILIDADE TEMPORÁRIA
+    Aprovacao,
+    AprovacaoStatus,
+    Deslocamento,
+    DisponibilidadeFormadores,
+    EventoGoogleCalendar,
+    FormadoresSolicitacao,
+    LogAuditoria,
+    Municipio,
+    Projeto,
+    Setor,
+    Solicitacao,
+    SolicitacaoStatus,
+    TipoEvento,
+    Usuario,
 )
 
 # ===============================
 # IMPORTS DA APLICAÇÃO - SERVICES
 # ===============================
 from core.services import (
-    UsuarioService,
-    FormadorService,
     CoordinatorService,
     DashboardService,
+    FormadorService,
     MunicipioService,
+    UsuarioService,
 )
 
 # ===============================
@@ -107,18 +96,25 @@ from core.services import (
 User = get_user_model()  # Alias para Usuario
 
 # Cache timeouts padronizados
-CACHE_TIMEOUT_SHORT = 300      # 5 minutos
-CACHE_TIMEOUT_MEDIUM = 1800    # 30 minutos
-CACHE_TIMEOUT_LONG = 3600      # 1 hora
+CACHE_TIMEOUT_SHORT = 300  # 5 minutos
+CACHE_TIMEOUT_MEDIUM = 1800  # 30 minutos
+CACHE_TIMEOUT_LONG = 3600  # 1 hora
 
 # Query optimizations padrão
-USUARIO_SELECT_RELATED = ['setor', 'municipio', 'area_atuacao']
-SOLICITACAO_SELECT_RELATED = ['projeto', 'municipio', 'tipo_evento', 'usuario_solicitante', 'usuario_aprovador']
-SOLICITACAO_PREFETCH_RELATED = ['formadores']
+USUARIO_SELECT_RELATED = ["setor", "municipio", "area_atuacao"]
+SOLICITACAO_SELECT_RELATED = [
+    "projeto",
+    "municipio",
+    "tipo_evento",
+    "usuario_solicitante",
+    "usuario_aprovador",
+]
+SOLICITACAO_PREFETCH_RELATED = ["formadores"]
 
 # ===============================
 # MIXINS E CLASSES BASE
 # ===============================
+
 
 class OptimizedQueryMixin:
     """
@@ -174,13 +170,15 @@ class ServiceBasedViewMixin:
         context = super().get_context_data(**kwargs)
 
         # Adicionar services no contexto para uso nos templates
-        context.update({
-            'usuario_service': UsuarioService,
-            'formador_service': FormadorService,
-            'coordinator_service': CoordinatorService,
-            'dashboard_service': DashboardService,
-            'municipio_service': MunicipioService,
-        })
+        context.update(
+            {
+                "usuario_service": UsuarioService,
+                "formador_service": FormadorService,
+                "coordinator_service": CoordinatorService,
+                "dashboard_service": DashboardService,
+                "municipio_service": MunicipioService,
+            }
+        )
 
         return context
 
@@ -189,13 +187,18 @@ class ServiceBasedViewMixin:
 # CLASSES BASE PARA VIEWS
 # ===============================
 
-class BaseListView(OptimizedQueryMixin, CachedViewMixin, ServiceBasedViewMixin, ListView):
+
+class BaseListView(
+    OptimizedQueryMixin, CachedViewMixin, ServiceBasedViewMixin, ListView
+):
     """Classe base otimizada para ListView"""
+
     paginate_by = 25
 
 
 class BaseDetailView(OptimizedQueryMixin, ServiceBasedViewMixin, DetailView):
     """Classe base otimizada para DetailView"""
+
     pass
 
 
@@ -221,6 +224,7 @@ class BaseUpdateView(ServiceBasedViewMixin, UpdateView):
 
 class BaseTemplateView(CachedViewMixin, ServiceBasedViewMixin, TemplateView):
     """Classe base para TemplateView"""
+
     pass
 
 
@@ -234,32 +238,37 @@ class BaseAPIView(View):
         try:
             return super().dispatch(request, *args, **kwargs)
         except Exception as e:
-            return JsonResponse({
-                'error': str(e),
-                'timestamp': timezone.now().isoformat()
-            }, status=500)
+            return JsonResponse(
+                {"error": str(e), "timestamp": timezone.now().isoformat()}, status=500
+            )
 
     def get_success_response(self, data, message="Success"):
         """Resposta JSON padrão de sucesso"""
-        return JsonResponse({
-            'success': True,
-            'message': message,
-            'data': data,
-            'timestamp': timezone.now().isoformat()
-        })
+        return JsonResponse(
+            {
+                "success": True,
+                "message": message,
+                "data": data,
+                "timestamp": timezone.now().isoformat(),
+            }
+        )
 
     def get_error_response(self, message, status=400):
         """Resposta JSON padrão de erro"""
-        return JsonResponse({
-            'success': False,
-            'error': message,
-            'timestamp': timezone.now().isoformat()
-        }, status=status)
+        return JsonResponse(
+            {
+                "success": False,
+                "error": message,
+                "timestamp": timezone.now().isoformat(),
+            },
+            status=status,
+        )
 
 
 # ===============================
 # FUNÇÕES UTILITÁRIAS
 # ===============================
+
 
 def get_optimized_usuario_queryset():
     """QuerySet otimizado padrão para Usuario"""
@@ -268,7 +277,9 @@ def get_optimized_usuario_queryset():
 
 def get_optimized_solicitacao_queryset():
     """QuerySet otimizado padrão para Solicitacao"""
-    return Solicitacao.objects.select_related(*SOLICITACAO_SELECT_RELATED).prefetch_related(*SOLICITACAO_PREFETCH_RELATED)
+    return Solicitacao.objects.select_related(
+        *SOLICITACAO_SELECT_RELATED
+    ).prefetch_related(*SOLICITACAO_PREFETCH_RELATED)
 
 
 def clear_all_caches():

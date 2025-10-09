@@ -1,177 +1,44 @@
-# CODEOWNERS - Sistema Aprender
-# Define quem deve revisar mudanças em cada módulo
-# Para mais informações: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# Global owners
+* @datsu
 
-# ==============================================
-# CONFIGURAÇÕES GLOBAIS 
-# ==============================================
-# Fallback - todos os arquivos não especificados
-* @matheusnorjosa
+# Core Django application
+/aprender_sistema/ @datsu
+/core/ @datsu
+/ingestao/ @datsu
+/dashboard/ @datsu
 
-# ==============================================
-# CÓDIGO CRÍTICO - REVISÃO OBRIGATÓRIA
-# ==============================================
+# Infrastructure and DevOps
+/devops/ @datsu
+/docker/ @datsu
+/.github/ @datsu
+/docker-compose.yml @datsu
+/Dockerfile @datsu
 
-## Configurações do Sistema
-/aprender_sistema/settings*.py @matheusnorjosa
-/.env.example @matheusnorjosa
-/pyproject.toml @matheusnorjosa
+# Documentation
+/docs/ @datsu
+*.md @datsu
 
-## Models (Schema de Dados)
-/core/models.py @matheusnorjosa
-/core/migrations/ @matheusnorjosa
+# Configuration files
+/.gitignore @datsu
+/.gitattributes @datsu
+/.editorconfig @datsu
+/CODEOWNERS @datsu
+/pyproject.toml @datsu
+/requirements*.txt @datsu
 
-## Segurança e Autenticação
-/core/views/auth_views.py @matheusnorjosa
-/core/mixins.py @matheusnorjosa
+# SQL and database
+/sql/ @datsu
+*.sql @datsu
 
-## Integrações Externas (Google APIs)
-/core/services/ @matheusnorjosa
-/core/api_*.py @matheusnorjosa
+# Scripts and utilities
+/scripts/ @datsu
+/mcp/ @datsu
+/aiops/ @datsu
 
-# ==============================================
-# MÓDULOS DA APLICAÇÃO
-# ==============================================
+# Frontend (if exists)
+/frontend/ @datsu
 
-## App Core (Sistema Base)
-/core/ @matheusnorjosa
-/core/views/ @matheusnorjosa
-/core/forms.py @matheusnorjosa
-/core/urls.py @matheusnorjosa
-/core/admin.py @matheusnorjosa
-
-## App API (REST Endpoints)
-/api/ @matheusnorjosa
-
-## App Relatórios (Dashboards)
-/relatorios/ @matheusnorjosa
-
-## Templates Críticos
-/core/templates/core/base.html @matheusnorjosa
-/core/templates/core/home.html @matheusnorjosa
-
-# ==============================================
-# INFRAESTRUTURA E DEVOPS
-# ==============================================
-
-## Docker
-/Dockerfile* @matheusnorjosa
-/docker-compose*.yml @matheusnorjosa
-/docker/ @matheusnorjosa
-
-## Dependências
-/requirements*.txt @matheusnorjosa
-/package.json @matheusnorjosa
-/package-lock.json @matheusnorjosa
-
-## CI/CD e Automação
-/.github/ @matheusnorjosa
-/.github/workflows/ @matheusnorjosa
-/.pre-commit-config.yaml @matheusnorjosa
-/scripts/ @matheusnorjosa
-/Makefile @matheusnorjosa
-
-## Testes
-/tests/ @matheusnorjosa
-/conftest.py @matheusnorjosa
-/pytest.ini @matheusnorjosa
-
-# ==============================================
-# DOCUMENTAÇÃO E GUIDELINES
-# ==============================================
-
-## Documentação Estrutural
-/README.md @matheusnorjosa
-/CONTRIBUTING.md @matheusnorjosa
-/SECURITY.md @matheusnorjosa
-/CHANGELOG.md @matheusnorjosa
-/LICENSE @matheusnorjosa
-
-## Documentação Técnica
-/docs/ @matheusnorjosa
-/CLAUDE.md @matheusnorjosa
-/.claude/ @matheusnorjosa
-
-## Issue Templates
-/.github/ISSUE_TEMPLATE/ @matheusnorjosa
-/.github/PULL_REQUEST_TEMPLATE.md @matheusnorjosa
-
-# ==============================================
-# COMANDOS E SCRIPTS DJANGO
-# ==============================================
-
-## Management Commands
-/core/management/ @matheusnorjosa
-/core/management/commands/ @matheusnorjosa
-
-## Dados e Fixtures
-/fixtures/ @matheusnorjosa
-/dumps/ @matheusnorjosa
-
-# ==============================================
-# ARQUIVOS ESPECIAIS
-# ==============================================
-
-## Git Configuration
-/.gitignore @matheusnorjosa
-/.gitattributes @matheusnorjosa
-/.gitmessage @matheusnorjosa
-
-## Editor Configuration
-/.vscode/ @matheusnorjosa
-/.editorconfig @matheusnorjosa
-
-## Dependabot e Bots
-/.github/dependabot.yml @matheusnorjosa
-
-# ==============================================
-# REGRAS ESPECÍFICAS POR FUNCIONALIDADE
-# ==============================================
-
-## Sistema de Aprovações (Critical Business Logic)
-/core/views/*aprovacao* @matheusnorjosa
-/core/views/coordenador_views.py @matheusnorjosa
-/core/views/diretoria_views.py @matheusnorjosa
-
-## Sistema de Disponibilidade (Core Algorithm)  
-/core/services/availability_service.py @matheusnorjosa
-/core/services/conflicts.py @matheusnorjosa
-/core/services/disponibilidade_engine.py @matheusnorjosa
-
-## Integrações Google (External Dependencies)
-/core/views/api_*.py @matheusnorjosa
-/core/services/*google* @matheusnorjosa
-
-## Sistema de Auditoria (Compliance)
-/core/views/*log* @matheusnorjosa
-/core/models.py @matheusnorjosa # LogAuditoria model
-
-# ==============================================  
-# EXCLUSÕES (Não requerem revisão)
-# ==============================================
-# Estes arquivos podem ser modificados sem code review obrigatório:
-
-# Arquivos de desenvolvimento local (comentados para clareza)
-# /.env
-# /db.sqlite3
-# /__pycache__/
-# /.pytest_cache/
-# /htmlcov/
-
-# Logs e arquivos temporários (comentados para clareza)  
-# /logs/
-# /temp/
-# *.log
-
-# ==============================================
-# NOTAS IMPORTANTES
-# ==============================================
-# 
-# 1. Ordem importa: Regras mais específicas devem vir DEPOIS das gerais
-# 2. Caminhos devem começar com / para serem relativos ao root
-# 3. Para arquivos críticos de negócio, considere adicionar múltiplos reviewers
-# 4. Este arquivo deve ser atualizado quando novos módulos forem adicionados
-# 5. Para emergências, use bypass com justificativa no commit message
-#
-# Última atualização: 2025-09-11
-# Para mudanças neste arquivo, revisar com: @matheusnorjosa
+# Security and credentials
+/creds/ @datsu
+*credentials* @datsu
+*service-account* @datsu

@@ -15,38 +15,42 @@ Resultado esperado: 2.113 APROVADO + 144 PENDENTE
 import json
 import logging
 from datetime import datetime
+
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
+
 from core.models import Solicitacao, SolicitacaoStatus
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = 'Corrige status das solicitações baseado nos dados extraídos'
+    help = "Corrige status das solicitações baseado nos dados extraídos"
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Simula a correção sem fazer alterações no banco',
+            "--dry-run",
+            action="store_true",
+            help="Simula a correção sem fazer alterações no banco",
         )
         parser.add_argument(
-            '--verbose',
-            action='store_true',
-            help='Mostra informações detalhadas',
+            "--verbose",
+            action="store_true",
+            help="Mostra informações detalhadas",
         )
 
     def handle(self, *args, **options):
-        self.dry_run = options['dry_run']
-        self.verbose = options['verbose']
+        self.dry_run = options["dry_run"]
+        self.verbose = options["verbose"]
 
         self.stdout.write("🔧 CORREÇÃO DE STATUS DAS SOLICITAÇÕES")
         self.stdout.write("=" * 60)
 
         if self.dry_run:
-            self.stdout.write(self.style.WARNING("MODO SIMULAÇÃO - Nenhuma alteração será feita"))
+            self.stdout.write(
+                self.style.WARNING("MODO SIMULAÇÃO - Nenhuma alteração será feita")
+            )
 
         try:
             # 1. Carregar dados tratados das planilhas
@@ -56,27 +60,31 @@ class Command(BaseCommand):
             self._corrigir_status_solicitacoes(dados_tratados)
 
         except Exception as e:
-            raise CommandError(f'Erro durante correção: {e}')
+            raise CommandError(f"Erro durante correção: {e}")
 
     def _carregar_dados_tratados(self):
         """Carrega dados tratados das planilhas"""
         self.stdout.write("📋 Carregando dados tratados...")
 
-        arquivo_dados = 'dados/extraidos/dados_completos_tratados_20250919_153743.json'
+        arquivo_dados = "dados/extraidos/dados_completos_tratados_20250919_153743.json"
 
         try:
-            with open(arquivo_dados, 'r', encoding='utf-8') as f:
+            with open(arquivo_dados, "r", encoding="utf-8") as f:
                 dados = json.load(f)
         except FileNotFoundError:
             raise CommandError(f"Arquivo não encontrado: {arquivo_dados}")
 
-        eventos = dados.get('eventos_agenda', [])
-        stats = dados.get('estatisticas', {})
+        eventos = dados.get("eventos_agenda", [])
+        stats = dados.get("estatisticas", {})
 
         self.stdout.write(f"✅ {len(eventos)} eventos carregados")
         self.stdout.write(f"📊 Status esperado nos dados:")
-        self.stdout.write(f"   Aprovados: {stats.get('por_status', {}).get('APROVADO', 0)}")
-        self.stdout.write(f"   Pendentes: {stats.get('por_status', {}).get('PENDENTE', 0)}")
+        self.stdout.write(
+            f"   Aprovados: {stats.get('por_status', {}).get('APROVADO', 0)}"
+        )
+        self.stdout.write(
+            f"   Pendentes: {stats.get('por_status', {}).get('PENDENTE', 0)}"
+        )
 
         return dados
 
@@ -84,7 +92,7 @@ class Command(BaseCommand):
         """Corrige status das solicitações baseado nos dados tratados"""
         self.stdout.write("\n🔧 Iniciando correção de status...")
 
-        eventos = dados_tratados.get('eventos_agenda', [])
+        eventos = dados_tratados.get("eventos_agenda", [])
 
         # Contar status atual das solicitações
         total_solicitacoes = Solicitacao.objects.count()
@@ -99,8 +107,8 @@ class Command(BaseCommand):
                 def normalizar_texto(texto):
                     """Normaliza texto para matching"""
                     if not texto:
-                        return ''
-                    return texto.strip().upper().replace(' - ', ' ').replace('-', ' ')
+                        return ""
+                    return texto.strip().upper().replace(" - ", " ").replace("-", " ")
 
                 # Processar cada evento dos dados tratados
                 for i, evento in enumerate(eventos, 1):
@@ -109,25 +117,31 @@ class Command(BaseCommand):
                         self.stdout.write(f"📊 Processando evento {i}/{len(eventos)}")
 
                     # Extrair dados do evento
-                    municipio_evento = normalizar_texto(evento.get('municipio', ''))
-                    projeto_evento = normalizar_texto(evento.get('projeto', ''))
-                    data_evento = evento.get('data', '')
-                    status_calculado = evento.get('status_calculado', 'APROVADO')
+                    municipio_evento = normalizar_texto(evento.get("municipio", ""))
+                    projeto_evento = normalizar_texto(evento.get("projeto", ""))
+                    data_evento = evento.get("data", "")
+                    status_calculado = evento.get("status_calculado", "APROVADO")
 
                     # Converter data para formato do sistema
                     try:
-                        if '/' in data_evento:
-                            data_obj = datetime.strptime(data_evento, '%d/%m/%Y').date()
+                        if "/" in data_evento:
+                            data_obj = datetime.strptime(data_evento, "%d/%m/%Y").date()
                         else:
-                            data_obj = datetime.strptime(data_evento, '%Y-%m-%d').date()
-                        data_str = data_obj.strftime('%Y-%m-%d')
+                            data_obj = datetime.strptime(data_evento, "%Y-%m-%d").date()
+                        data_str = data_obj.strftime("%Y-%m-%d")
                     except (ValueError, AttributeError):
                         continue
 
                     # Buscar solicitação correspondente no sistema (otimizado)
                     try:
                         # Buscar por data primeiro (mais específico)
-                        solicitacoes_data = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(data_inicio__date=data_obj)
+                        solicitacoes_data = (
+                            Solicitacao.objects.select_related(
+                                "municipio", "projeto", "tipo_evento", "solicitante"
+                            )
+                            .prefetch_related("formadores")
+                            .filter(data_inicio__date=data_obj)
+                        )
 
                         solicitacao_encontrada = None
                         for solicitacao in solicitacoes_data:
@@ -135,7 +149,10 @@ class Command(BaseCommand):
                             projeto_sol = normalizar_texto(solicitacao.projeto.nome)
 
                             # Match exato
-                            if (municipio_evento == municipio_sol and projeto_evento == projeto_sol):
+                            if (
+                                municipio_evento == municipio_sol
+                                and projeto_evento == projeto_sol
+                            ):
                                 solicitacao_encontrada = solicitacao
                                 break
 
@@ -145,7 +162,9 @@ class Command(BaseCommand):
                             if municipio_palavras:
                                 palavra_principal = municipio_palavras[0]
                                 for solicitacao in solicitacoes_data:
-                                    municipio_sol = normalizar_texto(solicitacao.municipio.nome)
+                                    municipio_sol = normalizar_texto(
+                                        solicitacao.municipio.nome
+                                    )
                                     if palavra_principal in municipio_sol:
                                         solicitacao_encontrada = solicitacao
                                         break
@@ -154,7 +173,7 @@ class Command(BaseCommand):
 
                     if solicitacao_encontrada:
                         # Aplicar status correto
-                        if status_calculado == 'APROVADO':
+                        if status_calculado == "APROVADO":
                             novo_status = SolicitacaoStatus.APROVADO
                             corrigidas_aprovado += 1
                         else:
@@ -166,12 +185,19 @@ class Command(BaseCommand):
                             solicitacao_encontrada.status = novo_status
                             solicitacao_encontrada.save()
 
-                            if self.verbose and (corrigidas_aprovado + corrigidas_pendente) <= 10:
-                                self.stdout.write(f"  ✅ {solicitacao_encontrada.municipio.nome} → {novo_status}")
+                            if (
+                                self.verbose
+                                and (corrigidas_aprovado + corrigidas_pendente) <= 10
+                            ):
+                                self.stdout.write(
+                                    f"  ✅ {solicitacao_encontrada.municipio.nome} → {novo_status}"
+                                )
                     else:
                         nao_encontradas += 1
                         if self.verbose and nao_encontradas <= 5:
-                            self.stdout.write(f"  ❌ Não encontrado: {municipio_evento} - {data_evento}")
+                            self.stdout.write(
+                                f"  ❌ Não encontrado: {municipio_evento} - {data_evento}"
+                            )
 
                 # Resultado final
                 self.stdout.write(f"\n✅ Status corrigidos:")
@@ -180,8 +206,22 @@ class Command(BaseCommand):
                 self.stdout.write(f"⚠️  Não encontradas: {nao_encontradas}")
 
                 # Verificar distribuição final
-                aprovados_final = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.APROVADO).count()
-                pendentes_final = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(status=SolicitacaoStatus.PENDENTE).count()
+                aprovados_final = (
+                    Solicitacao.objects.select_related(
+                        "municipio", "projeto", "tipo_evento", "solicitante"
+                    )
+                    .prefetch_related("formadores")
+                    .filter(status=SolicitacaoStatus.APROVADO)
+                    .count()
+                )
+                pendentes_final = (
+                    Solicitacao.objects.select_related(
+                        "municipio", "projeto", "tipo_evento", "solicitante"
+                    )
+                    .prefetch_related("formadores")
+                    .filter(status=SolicitacaoStatus.PENDENTE)
+                    .count()
+                )
 
                 self.stdout.write(f"\n📊 DISTRIBUIÇÃO FINAL:")
                 self.stdout.write(f"   APROVADO: {aprovados_final}")
@@ -194,26 +234,32 @@ class Command(BaseCommand):
 
             status_counts = {}
             for evento in eventos:
-                status = evento.get('status_calculado', 'APROVADO')
+                status = evento.get("status_calculado", "APROVADO")
                 status_counts[status] = status_counts.get(status, 0) + 1
 
-            self.stdout.write(f"  → APROVADO: {status_counts.get('APROVADO', 0)} solicitações")
-            self.stdout.write(f"  → PENDENTE: {status_counts.get('PENDENTE', 0)} solicitações")
+            self.stdout.write(
+                f"  → APROVADO: {status_counts.get('APROVADO', 0)} solicitações"
+            )
+            self.stdout.write(
+                f"  → PENDENTE: {status_counts.get('PENDENTE', 0)} solicitações"
+            )
 
     def _log_resultado(self, aprovados, pendentes):
         """Log dos resultados para auditoria"""
         resultado = {
-            'timestamp': timezone.now().isoformat(),
-            'status_aprovado': aprovados,
-            'status_pendente': pendentes,
-            'total_corrigido': aprovados + pendentes,
-            'dry_run': self.dry_run
+            "timestamp": timezone.now().isoformat(),
+            "status_aprovado": aprovados,
+            "status_pendente": pendentes,
+            "total_corrigido": aprovados + pendentes,
+            "dry_run": self.dry_run,
         }
 
-        arquivo_log = f"logs/correcao_status_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        arquivo_log = (
+            f"logs/correcao_status_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
 
         try:
-            with open(arquivo_log, 'w', encoding='utf-8') as f:
+            with open(arquivo_log, "w", encoding="utf-8") as f:
                 json.dump(resultado, f, indent=2, ensure_ascii=False)
 
             self.stdout.write(f"📝 Log salvo em: {arquivo_log}")

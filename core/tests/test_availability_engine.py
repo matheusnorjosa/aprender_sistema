@@ -9,12 +9,20 @@ Author: Claude Code
 Date: Janeiro 2025
 """
 
+from datetime import datetime, timedelta
+
 from django.test import TestCase
 from django.utils import timezone
-from datetime import datetime, timedelta
+
 from core.models import (
-    Usuario, Formador, Municipio, Projeto, TipoEvento,
-    Solicitacao, BloqueioAgenda, SolicitacaoStatus
+    BloqueioAgenda,
+    Formador,
+    Municipio,
+    Projeto,
+    Solicitacao,
+    SolicitacaoStatus,
+    TipoEvento,
+    Usuario,
 )
 
 
@@ -24,44 +32,33 @@ class AvailabilityEngineTest(TestCase):
     def setUp(self):
         """Setup básico para testes"""
         # Criar município
-        self.municipio_fortaleza = Municipio.objects.create(
-            nome="Fortaleza",
-            uf="CE"
-        )
-        self.municipio_caucaia = Municipio.objects.create(
-            nome="Caucaia",
-            uf="CE"
-        )
+        self.municipio_fortaleza = Municipio.objects.create(nome="Fortaleza", uf="CE")
+        self.municipio_caucaia = Municipio.objects.create(nome="Caucaia", uf="CE")
 
         # Criar formador
         self.formador_user = Usuario.objects.create_user(
             username="formador1",
             cpf="12345678901",
             municipio=self.municipio_fortaleza,
-            formador_ativo=True
+            formador_ativo=True,
         )
 
         self.formador = Formador.objects.create(
-            usuario=self.formador_user,
-            nome="João Silva",
-            especialidade="matematica"
+            usuario=self.formador_user, nome="João Silva", especialidade="matematica"
         )
 
         # Criar projeto e tipo evento
         self.projeto = Projeto.objects.create(
-            nome="Projeto Teste",
-            descricao="Projeto para testes"
+            nome="Projeto Teste", descricao="Projeto para testes"
         )
 
         self.tipo_evento = TipoEvento.objects.create(
-            nome="Formação",
-            descricao="Formação básica"
+            nome="Formação", descricao="Formação básica"
         )
 
         # Criar coordenador
         self.coordenador = Usuario.objects.create_user(
-            username="coord1",
-            cpf="98765432100"
+            username="coord1", cpf="98765432100"
         )
 
     def test_rd01_nao_sobreposicao_total(self):
@@ -79,7 +76,7 @@ class AvailabilityEngineTest(TestCase):
             data_inicio=data_inicio,
             data_fim=data_fim,
             titulo="Evento Existente",
-            status=SolicitacaoStatus.APROVADO
+            status=SolicitacaoStatus.APROVADO,
         )
 
         # Tentar criar evento sobreposto
@@ -91,13 +88,13 @@ class AvailabilityEngineTest(TestCase):
             municipio=self.municipio_fortaleza,
             data_inicio=data_inicio + timedelta(minutes=30),
             data_fim=data_fim + timedelta(minutes=30),
-            titulo="Evento Conflitante"
+            titulo="Evento Conflitante",
         )
 
         # Verificar se há conflito (implementar método)
         conflitos = self._verificar_conflitos(nova_solicitacao)
         self.assertTrue(len(conflitos) > 0)
-        self.assertIn("E", conflitos[0]['tipo'])  # Evento conflitante
+        self.assertIn("E", conflitos[0]["tipo"])  # Evento conflitante
 
     def test_rd01_sem_conflito_adjacente(self):
         """RD-01: Sem conflito quando fim == início"""
@@ -114,7 +111,7 @@ class AvailabilityEngineTest(TestCase):
             data_inicio=data_inicio,
             data_fim=data_fim,
             titulo="Evento Existente",
-            status=SolicitacaoStatus.APROVADO
+            status=SolicitacaoStatus.APROVADO,
         )
 
         # Criar evento adjacente (fim do primeiro == início do segundo)
@@ -126,7 +123,7 @@ class AvailabilityEngineTest(TestCase):
             municipio=self.municipio_fortaleza,
             data_inicio=data_fim,  # Exatamente quando o primeiro termina
             data_fim=data_fim + timedelta(hours=1),
-            titulo="Evento Adjacente"
+            titulo="Evento Adjacente",
         )
 
         # NÃO deve haver conflito
@@ -144,7 +141,7 @@ class AvailabilityEngineTest(TestCase):
             data_inicio=data_inicio_bloqueio,
             data_fim=data_fim_bloqueio,
             tipo_bloqueio="T",  # Total
-            motivo="Bloqueio total para testes"
+            motivo="Bloqueio total para testes",
         )
 
         # Tentar criar evento dentro do bloqueio
@@ -156,12 +153,12 @@ class AvailabilityEngineTest(TestCase):
             municipio=self.municipio_fortaleza,
             data_inicio=data_inicio_bloqueio + timedelta(hours=1),
             data_fim=data_inicio_bloqueio + timedelta(hours=2),
-            titulo="Evento Bloqueado"
+            titulo="Evento Bloqueado",
         )
 
         conflitos = self._verificar_conflitos(nova_solicitacao)
         self.assertTrue(len(conflitos) > 0)
-        self.assertIn("T", conflitos[0]['tipo'])  # Bloqueio total
+        self.assertIn("T", conflitos[0]["tipo"])  # Bloqueio total
 
     def test_rd03_bloqueio_parcial(self):
         """RD-03: Bloqueio parcial permite fora do intervalo"""
@@ -172,9 +169,9 @@ class AvailabilityEngineTest(TestCase):
         BloqueioAgenda.objects.create(
             formador=self.formador,
             data_inicio=data_inicio_bloqueio + timedelta(hours=1),  # Início 1h depois
-            data_fim=data_inicio_bloqueio + timedelta(hours=3),      # Fim 1h antes
+            data_fim=data_inicio_bloqueio + timedelta(hours=3),  # Fim 1h antes
             tipo_bloqueio="P",  # Parcial
-            motivo="Bloqueio parcial para testes"
+            motivo="Bloqueio parcial para testes",
         )
 
         # Evento ANTES do bloqueio (deve ser permitido)
@@ -186,7 +183,7 @@ class AvailabilityEngineTest(TestCase):
             municipio=self.municipio_fortaleza,
             data_inicio=data_inicio_bloqueio,
             data_fim=data_inicio_bloqueio + timedelta(minutes=50),
-            titulo="Evento Antes do Bloqueio"
+            titulo="Evento Antes do Bloqueio",
         )
 
         conflitos_antes = self._verificar_conflitos(evento_antes)
@@ -201,12 +198,12 @@ class AvailabilityEngineTest(TestCase):
             municipio=self.municipio_fortaleza,
             data_inicio=data_inicio_bloqueio + timedelta(hours=2),
             data_fim=data_inicio_bloqueio + timedelta(hours=2, minutes=30),
-            titulo="Evento Durante Bloqueio"
+            titulo="Evento Durante Bloqueio",
         )
 
         conflitos_durante = self._verificar_conflitos(evento_durante)
         self.assertTrue(len(conflitos_durante) > 0)
-        self.assertIn("P", conflitos_durante[0]['tipo'])
+        self.assertIn("P", conflitos_durante[0]["tipo"])
 
     def test_rd04_buffer_deslocamento(self):
         """RD-04: Buffer de deslocamento entre municípios"""
@@ -223,7 +220,7 @@ class AvailabilityEngineTest(TestCase):
             data_inicio=data_inicio,
             data_fim=data_fim,
             titulo="Evento em Fortaleza",
-            status=SolicitacaoStatus.APROVADO
+            status=SolicitacaoStatus.APROVADO,
         )
 
         # Tentar criar evento em Caucaia logo depois (sem buffer suficiente)
@@ -235,12 +232,12 @@ class AvailabilityEngineTest(TestCase):
             municipio=self.municipio_caucaia,  # Município diferente
             data_inicio=data_fim + timedelta(minutes=30),  # Só 30min de buffer
             data_fim=data_fim + timedelta(hours=1, minutes=30),
-            titulo="Evento em Caucaia"
+            titulo="Evento em Caucaia",
         )
 
         conflitos = self._verificar_conflitos(evento_caucaia)
         self.assertTrue(len(conflitos) > 0)
-        self.assertIn("D", conflitos[0]['tipo'])  # Deslocamento
+        self.assertIn("D", conflitos[0]["tipo"])  # Deslocamento
 
     def test_rd04_mesmo_municipio_sem_buffer(self):
         """RD-04: Mesmo município não precisa de buffer"""
@@ -257,7 +254,7 @@ class AvailabilityEngineTest(TestCase):
             data_inicio=data_inicio,
             data_fim=data_fim,
             titulo="Primeiro Evento",
-            status=SolicitacaoStatus.APROVADO
+            status=SolicitacaoStatus.APROVADO,
         )
 
         # Criar segundo evento no mesmo município imediatamente depois
@@ -269,12 +266,12 @@ class AvailabilityEngineTest(TestCase):
             municipio=self.municipio_fortaleza,  # Mesmo município
             data_inicio=data_fim,  # Imediatamente depois
             data_fim=data_fim + timedelta(hours=1),
-            titulo="Segundo Evento"
+            titulo="Segundo Evento",
         )
 
         conflitos = self._verificar_conflitos(segundo_evento)
         # Não deve haver conflito de deslocamento no mesmo município
-        conflitos_deslocamento = [c for c in conflitos if c['tipo'] == 'D']
+        conflitos_deslocamento = [c for c in conflitos if c["tipo"] == "D"]
         self.assertEqual(len(conflitos_deslocamento), 0)
 
     def test_rd06_timezone_awareness(self):
@@ -298,52 +295,61 @@ class AvailabilityEngineTest(TestCase):
 
         # RD-01: Verificar sobreposição com eventos aprovados
         eventos_existentes = Solicitacao.objects.filter(
-            formador=solicitacao.formador,
-            status=SolicitacaoStatus.APROVADO
+            formador=solicitacao.formador, status=SolicitacaoStatus.APROVADO
         ).exclude(pk=solicitacao.pk if solicitacao.pk else 0)
 
         for evento in eventos_existentes:
             # Verificar sobreposição (qualquer overlap > 0)
-            if (solicitacao.data_inicio < evento.data_fim and
-                solicitacao.data_fim > evento.data_inicio):
-                conflitos.append({
-                    'tipo': 'E',
-                    'detalhes': f'Conflito com evento {evento.titulo}',
-                    'evento': evento
-                })
+            if (
+                solicitacao.data_inicio < evento.data_fim
+                and solicitacao.data_fim > evento.data_inicio
+            ):
+                conflitos.append(
+                    {
+                        "tipo": "E",
+                        "detalhes": f"Conflito com evento {evento.titulo}",
+                        "evento": evento,
+                    }
+                )
 
         # RD-02/RD-03: Verificar bloqueios
         bloqueios = BloqueioAgenda.objects.filter(
             formador=solicitacao.formador,
             data_inicio__lt=solicitacao.data_fim,
-            data_fim__gt=solicitacao.data_inicio
+            data_fim__gt=solicitacao.data_inicio,
         )
 
         for bloqueio in bloqueios:
-            if bloqueio.tipo_bloqueio == 'T':
+            if bloqueio.tipo_bloqueio == "T":
                 # Bloqueio total
-                conflitos.append({
-                    'tipo': 'T',
-                    'detalhes': f'Bloqueio total: {bloqueio.motivo}',
-                    'bloqueio': bloqueio
-                })
-            elif bloqueio.tipo_bloqueio == 'P':
+                conflitos.append(
+                    {
+                        "tipo": "T",
+                        "detalhes": f"Bloqueio total: {bloqueio.motivo}",
+                        "bloqueio": bloqueio,
+                    }
+                )
+            elif bloqueio.tipo_bloqueio == "P":
                 # Bloqueio parcial - verificar se evento está dentro do bloqueio
-                if (solicitacao.data_inicio >= bloqueio.data_inicio and
-                    solicitacao.data_fim <= bloqueio.data_fim):
-                    conflitos.append({
-                        'tipo': 'P',
-                        'detalhes': f'Bloqueio parcial: {bloqueio.motivo}',
-                        'bloqueio': bloqueio
-                    })
+                if (
+                    solicitacao.data_inicio >= bloqueio.data_inicio
+                    and solicitacao.data_fim <= bloqueio.data_fim
+                ):
+                    conflitos.append(
+                        {
+                            "tipo": "P",
+                            "detalhes": f"Bloqueio parcial: {bloqueio.motivo}",
+                            "bloqueio": bloqueio,
+                        }
+                    )
 
         # RD-04: Verificar buffer de deslocamento
         from django.conf import settings
-        buffer_minutes = getattr(settings, 'TRAVEL_BUFFER_MINUTES', 90)
+
+        buffer_minutes = getattr(settings, "TRAVEL_BUFFER_MINUTES", 90)
 
         eventos_proximos = Solicitacao.objects.filter(
-            formador=solicitacao.formador,
-            status=SolicitacaoStatus.APROVADO
+            formador=solicitacao.formador, status=SolicitacaoStatus.APROVADO
         ).exclude(pk=solicitacao.pk if solicitacao.pk else 0)
 
         for evento in eventos_proximos:
@@ -352,22 +358,30 @@ class AvailabilityEngineTest(TestCase):
                 # Verificar se há buffer suficiente
                 if evento.data_fim <= solicitacao.data_inicio:
                     # Evento anterior - verificar buffer após
-                    diff = (solicitacao.data_inicio - evento.data_fim).total_seconds() / 60
+                    diff = (
+                        solicitacao.data_inicio - evento.data_fim
+                    ).total_seconds() / 60
                     if diff < buffer_minutes:
-                        conflitos.append({
-                            'tipo': 'D',
-                            'detalhes': f'Buffer insuficiente após {evento.titulo} ({diff:.0f}min < {buffer_minutes}min)',
-                            'evento': evento
-                        })
+                        conflitos.append(
+                            {
+                                "tipo": "D",
+                                "detalhes": f"Buffer insuficiente após {evento.titulo} ({diff:.0f}min < {buffer_minutes}min)",
+                                "evento": evento,
+                            }
+                        )
                 elif solicitacao.data_fim <= evento.data_inicio:
                     # Evento posterior - verificar buffer antes
-                    diff = (evento.data_inicio - solicitacao.data_fim).total_seconds() / 60
+                    diff = (
+                        evento.data_inicio - solicitacao.data_fim
+                    ).total_seconds() / 60
                     if diff < buffer_minutes:
-                        conflitos.append({
-                            'tipo': 'D',
-                            'detalhes': f'Buffer insuficiente antes de {evento.titulo} ({diff:.0f}min < {buffer_minutes}min)',
-                            'evento': evento
-                        })
+                        conflitos.append(
+                            {
+                                "tipo": "D",
+                                "detalhes": f"Buffer insuficiente antes de {evento.titulo} ({diff:.0f}min < {buffer_minutes}min)",
+                                "evento": evento,
+                            }
+                        )
 
         return conflitos
 

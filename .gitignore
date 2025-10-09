@@ -434,3 +434,47 @@ Videos/
 *.temp
 backup_*
 temp_*
+
+# Credenciais locais
+creds/*.json
+creds/
+*credentials*
+*service-account*
+*api-key*
+*secret*
+*token*
+
+# Data directories
+data/private/
+dumps/
+backups/
+logs/
+
+# Temporary files
+temp_*
+tmp_*
+*_temp
+*_tmp
+
+# Development files
+test_*
+debug_*
+*_debug
+*_test
+
+# Local configuration
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

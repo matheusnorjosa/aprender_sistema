@@ -48,26 +48,28 @@ def api_root(request):
 
     Retorna informações sobre a API e links para os principais endpoints.
     """
-    return JsonResponse({
-        "message": "Aprender Sistema API",
-        "version": "v1",
-        "endpoints": {
-            "health": "/api/health/",
-            "api_v1": "/api/v1/",
-            "usuarios": "/api/v1/usuarios/",
-            "projetos": "/api/v1/projetos/",
-            "municipios": "/api/v1/municipios/",
-            "tipos-evento": "/api/v1/tipos-evento/",
-            "formadores": "/api/v1/formadores/",
-            "solicitacoes": "/api/v1/solicitacoes/",
-            "aprovacoes": "/api/v1/aprovacoes/",
-            "eventos-google": "/api/v1/eventos-google/",
-            "disponibilidade": "/api/v1/disponibilidade/",
-            "logs-auditoria": "/api/v1/logs-auditoria/",
-            "estatisticas": "/api/v1/estatisticas/",
-        },
-        "auth": {
-            "token": "/api/auth/token/",
-            "login": "/api/auth/login/",
+    return JsonResponse(
+        {
+            "message": "Aprender Sistema API",
+            "version": "v1",
+            "endpoints": {
+                "health": "/api/health/",
+                "api_v1": "/api/v1/",
+                "usuarios": "/api/v1/usuarios/",
+                "projetos": "/api/v1/projetos/",
+                "municipios": "/api/v1/municipios/",
+                "tipos-evento": "/api/v1/tipos-evento/",
+                "formadores": "/api/v1/formadores/",
+                "solicitacoes": "/api/v1/solicitacoes/",
+                "aprovacoes": "/api/v1/aprovacoes/",
+                "eventos-google": "/api/v1/eventos-google/",
+                "disponibilidade": "/api/v1/disponibilidade/",
+                "logs-auditoria": "/api/v1/logs-auditoria/",
+                "estatisticas": "/api/v1/estatisticas/",
+            },
+            "auth": {
+                "token": "/api/auth/token/",
+                "login": "/api/auth/login/",
+            },
         }
-    })
+    )

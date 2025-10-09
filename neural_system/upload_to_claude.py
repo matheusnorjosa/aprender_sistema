@@ -12,7 +12,7 @@ from typing import List
 
 # Configuração da API do Claude
 # NOTA: Configure sua API key como variável de ambiente
-API_KEY = os.getenv('CLAUDE_API_KEY')
+API_KEY = os.getenv("CLAUDE_API_KEY")
 if not API_KEY:
     print("⚠️ CLAUDE_API_KEY não configurada como variável de ambiente")
     print("   Para configurar: export CLAUDE_API_KEY=sua_chave_aqui")
@@ -35,10 +35,11 @@ ESSENTIAL_DOCS = [
     "docs/hierarquia_organizacional.md",
 ]
 
+
 def upload_document_to_claude(file_path: Path) -> bool:
     """Faz upload de um documento para o Claude"""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         # Criar mensagem com o documento
@@ -63,9 +64,9 @@ def upload_document_to_claude(file_path: Path) -> bool:
 
                     Use este contexto para fornecer respostas precisas e contextualizadas sobre o Sistema APRENDER.
                     Sempre que trabalhar com código para este sistema, siga rigorosamente os padrões aqui definidos.
-                    """
+                    """,
                 }
-            ]
+            ],
         )
 
         print(f"✅ Documento {file_path.name} enviado com sucesso!")
@@ -74,6 +75,7 @@ def upload_document_to_claude(file_path: Path) -> bool:
     except Exception as e:
         print(f"❌ Erro ao enviar documento {file_path.name}: {e}")
         return False
+
 
 def main():
     """Função principal"""
@@ -112,7 +114,10 @@ def main():
     else:
         print("⚠️ Alguns documentos não puderam ser enviados. Verifique os logs acima.")
         print()
-        print("🔧 Documentos faltantes podem ser criados com base nos padrões existentes.")
+        print(
+            "🔧 Documentos faltantes podem ser criados com base nos padrões existentes."
+        )
+
 
 if __name__ == "__main__":
     main()

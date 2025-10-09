@@ -443,7 +443,8 @@
           <a href="/disponibilidade/" class="nav-item">
             <i class="bi bi-calendar-month"></i> Visão Mensal
           </a>
-          <a href="{% url 'core:diretoria_api_metrics' %}" class="nav-item">
+          <!-- Escondido no dia 07/10 para melhorar a apresentação -->
+          <a href="{% url 'core:diretoria_api_metrics' %}" class="nav-item" style="display: none;">
             <i class="bi bi-file-earmark-code"></i> Métricas API
           </a>
         </div>
@@ -622,7 +623,8 @@
               <a class="btn btn-primary" href="{% url 'core:diretoria_dashboard' %}">
                 <i class="bi bi-speedometer"></i> Ver Dashboard
               </a>
-              <a class="btn" href="{% url 'core:diretoria_api_metrics' %}">
+              <!-- Escondido no dia 07/10 para melhorar a apresentação -->
+              <a class="btn" href="{% url 'core:diretoria_api_metrics' %}" style="display: none;">
                 <i class="bi bi-file-earmark-code"></i> API Métricas
               </a>
             </div>

@@ -234,10 +234,20 @@ class Command(BaseMigrationCommand):
                         if formacao_data:
                             # Verificar se já existe (se solicitado)
                             if options.get("skip_existing"):
-                                exists = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-                                    titulo=formacao_data["titulo"],
-                                    data_inicio=formacao_data["data_inicio"],
-                                ).exists()
+                                exists = (
+                                    Solicitacao.objects.select_related(
+                                        "municipio",
+                                        "projeto",
+                                        "tipo_evento",
+                                        "solicitante",
+                                    )
+                                    .prefetch_related("formadores")
+                                    .filter(
+                                        titulo=formacao_data["titulo"],
+                                        data_inicio=formacao_data["data_inicio"],
+                                    )
+                                    .exists()
+                                )
 
                                 if exists:
                                     self.stats["skipped"] += 1

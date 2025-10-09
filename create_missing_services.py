@@ -15,15 +15,18 @@ import sys
 import logging
 
 # Configurar Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 import django
+
 django.setup()
 
 from django.db.models import QuerySet
 from core.models import Setor, TipoEvento
 
 # Configurar logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -31,23 +34,23 @@ def create_missing_services():
     """Cria services que estão faltando"""
     print("🔧 CRIANDO SERVICES FALTANTES")
     print("=" * 40)
-    
+
     # Adicionar SetorService ao data_services.py
     add_setor_service()
-    
+
     # Adicionar TipoEventoService ao data_services.py
     add_tipo_evento_service()
-    
+
     # Atualizar __init__.py
     update_services_init()
-    
+
     print("\n✅ Services criados com sucesso!")
 
 
 def add_setor_service():
     """Adiciona SetorService ao data_services.py"""
     print("\n🏢 Criando SetorService...")
-    
+
     setor_service_code = '''
 class SetorService(BaseService):
     """
@@ -75,18 +78,18 @@ class SetorService(BaseService):
         """Outros setores (não superintendência)"""
         return cls.ativos().filter(vinculado_superintendencia=False)
 '''
-    
+
     # Adicionar ao final do arquivo data_services.py
-    with open('core/services/data_services.py', 'a', encoding='utf-8') as f:
+    with open("core/services/data_services.py", "a", encoding="utf-8") as f:
         f.write(setor_service_code)
-    
+
     print("  ✅ SetorService adicionado")
 
 
 def add_tipo_evento_service():
     """Adiciona TipoEventoService ao data_services.py"""
     print("\n📅 Criando TipoEventoService...")
-    
+
     tipo_evento_service_code = '''
 class TipoEventoService(BaseService):
     """
@@ -119,18 +122,18 @@ class TipoEventoService(BaseService):
         """Tipos de evento para uso em formulários"""
         return cls.ativos().order_by('nome')
 '''
-    
+
     # Adicionar ao final do arquivo data_services.py
-    with open('core/services/data_services.py', 'a', encoding='utf-8') as f:
+    with open("core/services/data_services.py", "a", encoding="utf-8") as f:
         f.write(tipo_evento_service_code)
-    
+
     print("  ✅ TipoEventoService adicionado")
 
 
 def update_services_init():
     """Atualiza __init__.py para incluir novos services"""
     print("\n📦 Atualizando __init__.py...")
-    
+
     init_content = '''"""
 Services Layer - Centralizacao da logica de negocio
 Implementa Single Source of Truth e DRY principles
@@ -164,10 +167,10 @@ __all__ = [
     'MunicipioServiceCentralizado'
 ]
 '''
-    
-    with open('core/services/__init__.py', 'w', encoding='utf-8') as f:
+
+    with open("core/services/__init__.py", "w", encoding="utf-8") as f:
         f.write(init_content)
-    
+
     print("  ✅ __init__.py atualizado")
 
 
@@ -175,7 +178,7 @@ def main():
     """Função principal"""
     try:
         create_missing_services()
-        
+
     except Exception as e:
         logger.error(f"❌ Erro ao criar services: {str(e)}")
         raise
@@ -183,4 +186,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

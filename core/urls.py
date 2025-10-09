@@ -35,7 +35,6 @@ from .views.api_approval import (
     SolicitacaoConflictsAPI,
     SolicitacoesPendentesAPI,
 )
-from .views.controle_preagenda import preagenda_list, preagenda_calendar_action
 from .views.api_availability import CheckAvailabilityAPI, FormadorDetailsAPI
 from .views.api_notifications import (
     CommunicationLogsAPI,
@@ -46,6 +45,7 @@ from .views.api_notifications import (
     RealtimeNotificationsAPI,
     UserNotificationsAPI,
 )
+from .views.controle_preagenda import preagenda_calendar_action, preagenda_list
 from .views.deslocamento_views import (
     DeslocamentoAPI,
     DeslocamentoCreateView,

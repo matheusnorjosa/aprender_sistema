@@ -247,7 +247,11 @@ class Command(BaseCommand):
         self.stdout.write("\n=== RESUMO FINAL POR SETOR ===")
 
         for setor in Setor.objects.all().order_by("nome"):
-            usuarios = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(setor=setor)
+            usuarios = (
+                Usuario.objects.select_related("municipio", "projeto")
+                .prefetch_related("groups", "user_permissions")
+                .filter(setor=setor)
+            )
             status = (
                 "REQUER APROVAÇÃO"
                 if setor.vinculado_superintendencia
@@ -265,12 +269,18 @@ class Command(BaseCommand):
 
         # Estatísticas gerais
         total_usuarios = Usuario.objects.exclude(setor__isnull=True).count()
-        usuarios_super = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(
-            setor__vinculado_superintendencia=True
-        ).count()
-        usuarios_direto = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(
-            setor__vinculado_superintendencia=False
-        ).count()
+        usuarios_super = (
+            Usuario.objects.select_related("municipio", "projeto")
+            .prefetch_related("groups", "user_permissions")
+            .filter(setor__vinculado_superintendencia=True)
+            .count()
+        )
+        usuarios_direto = (
+            Usuario.objects.select_related("municipio", "projeto")
+            .prefetch_related("groups", "user_permissions")
+            .filter(setor__vinculado_superintendencia=False)
+            .count()
+        )
 
         self.stdout.write(f"\n=== ESTATÍSTICAS GERAIS ===")
         self.stdout.write(f"Total usuários com setor: {total_usuarios}")

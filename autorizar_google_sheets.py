@@ -9,6 +9,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 import json
 
+
 def autorizar_google_sheets():
     """Autoriza acesso às planilhas Google Sheets"""
 
@@ -25,7 +26,7 @@ def autorizar_google_sheets():
         print("✅ Credenciais encontradas")
 
         # Configurar fluxo OAuth2
-        scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+        scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
         flow = InstalledAppFlow.from_client_secrets_file(credentials_file, scopes)
 
         print("🔧 Iniciando autorização OAuth2...")
@@ -38,7 +39,7 @@ def autorizar_google_sheets():
 
         # Salvar token
         token_file = "google_oauth_token.json"
-        with open(token_file, 'w') as token:
+        with open(token_file, "w") as token:
             token.write(creds.to_json())
 
         print(f"💾 Token salvo em: {token_file}")
@@ -62,8 +63,10 @@ def autorizar_google_sheets():
     except Exception as e:
         print(f"❌ ERRO: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 if __name__ == "__main__":
     autorizar_google_sheets()

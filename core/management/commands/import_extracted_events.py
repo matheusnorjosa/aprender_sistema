@@ -8,32 +8,39 @@ do arquivo mapeamento_completo_google_sheets_20250923_220315.json
 import json
 import os
 from datetime import datetime
+
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from django.contrib.auth import get_user_model
 from django.utils import timezone
+
 from core.models import (
-    Municipio, Projeto, TipoEvento, Solicitacao,
-    SolicitacaoStatus, Setor
+    Municipio,
+    Projeto,
+    Setor,
+    Solicitacao,
+    SolicitacaoStatus,
+    TipoEvento,
 )
 
 User = get_user_model()
 
+
 class Command(BaseCommand):
-    help = 'Importa eventos usando dados já extraídos do Google Sheets'
+    help = "Importa eventos usando dados já extraídos do Google Sheets"
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--limit',
+            "--limit",
             type=int,
             default=500,
-            help='Limite de registros por aba (padrão: 500)'
+            help="Limite de registros por aba (padrão: 500)",
         )
         parser.add_argument(
-            '--aba',
+            "--aba",
             type=str,
-            help='Importar apenas uma aba específica',
-            choices=['Super', 'ACerta', 'Outros', 'Brincando', 'Vidas']
+            help="Importar apenas uma aba específica",
+            choices=["Super", "ACerta", "Outros", "Brincando", "Vidas"],
         )
 
     def normalizar_data(self, data_str, hora_str="08:00"):
@@ -62,7 +69,9 @@ class Command(BaseCommand):
             return timezone.make_aware(dt)
         except Exception as e:
             self.stdout.write(
-                self.style.WARNING(f"❌ Erro ao processar data '{data_str}' + hora '{hora_str}': {e}")
+                self.style.WARNING(
+                    f"❌ Erro ao processar data '{data_str}' + hora '{hora_str}': {e}"
+                )
             )
             return None
 
@@ -74,15 +83,17 @@ class Command(BaseCommand):
         nome = nome.strip()
 
         # Buscar por nome exato
-        municipio = Municipio.objects.prefetch_related("solicitacao_set", "usuario_set").filter(nome__iexact=nome).first()
+        municipio = (
+            Municipio.objects.prefetch_related("solicitacao_set", "usuario_set")
+            .filter(nome__iexact=nome)
+            .first()
+        )
         if municipio:
             return municipio
 
         # Criar novo município (assumir CE como padrão)
         municipio = Municipio.objects.create(
-            nome=nome,
-            uf="CE",  # Padrão baseado nos dados existentes
-            ativo=True
+            nome=nome, uf="CE", ativo=True  # Padrão baseado nos dados existentes
         )
         self.stdout.write(f"✅ Município criado: {nome}/CE")
         return municipio
@@ -95,27 +106,29 @@ class Command(BaseCommand):
         nome = nome.strip()
 
         # Buscar por nome exato
-        projeto = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(nome__iexact=nome).first()
+        projeto = (
+            Projeto.objects.select_related("setor")
+            .prefetch_related("solicitacao_set")
+            .filter(nome__iexact=nome)
+            .first()
+        )
         if projeto:
             return projeto
 
         # Obter setor padrão "Outros"
         from core.models import Setor
+
         setor_outros = Setor.objects.filter(nome="Outros").first()
         if not setor_outros:
             setor_outros = Setor.objects.create(
                 nome="Outros",
                 sigla="OUTROS",
                 vinculado_superintendencia=False,
-                ativo=True
+                ativo=True,
             )
 
         # Criar novo projeto
-        projeto = Projeto.objects.create(
-            nome=nome,
-            setor=setor_outros,
-            ativo=True
-        )
+        projeto = Projeto.objects.create(nome=nome, setor=setor_outros, ativo=True)
         self.stdout.write(f"✅ Projeto criado: {nome}")
         return projeto
 
@@ -132,7 +145,7 @@ class Command(BaseCommand):
             "MAT": "Matemática",
             "FORM": "Formação",
             "Presencial": "Presencial",
-            "Online": "Online"
+            "Online": "Online",
         }
         nome = mapeamento.get(nome, nome)
 
@@ -141,9 +154,7 @@ class Command(BaseCommand):
             return tipo
 
         tipo = TipoEvento.objects.create(
-            nome=nome,
-            online=(nome.lower() == "online"),
-            ativo=True
+            nome=nome, online=(nome.lower() == "online"), ativo=True
         )
         self.stdout.write(f"✅ Tipo evento criado: {nome}")
         return tipo
@@ -157,8 +168,7 @@ class Command(BaseCommand):
 
         # Buscar por nome completo ou parcial
         user = User.objects.filter(
-            first_name__icontains=nome.split()[0],
-            formador_ativo=True
+            first_name__icontains=nome.split()[0], formador_ativo=True
         ).first()
 
         return user
@@ -166,10 +176,12 @@ class Command(BaseCommand):
     def importar_aba(self, dados_aba, nome_aba, limit):
         """Importar uma aba específica"""
         self.stdout.write(f"\n🚀 Importando aba: {nome_aba}")
-        self.stdout.write(f"📊 Registros válidos: {dados_aba.get('registros_validos', 0)}")
+        self.stdout.write(
+            f"📊 Registros válidos: {dados_aba.get('registros_validos', 0)}"
+        )
 
-        registros = dados_aba.get('amostra_dados', [])
-        cabecalhos = dados_aba.get('cabecalhos', [])
+        registros = dados_aba.get("amostra_dados", [])
+        cabecalhos = dados_aba.get("cabecalhos", [])
 
         if not registros:
             self.stdout.write(self.style.ERROR("❌ Nenhum registro encontrado"))
@@ -181,7 +193,9 @@ class Command(BaseCommand):
         # Obter projeto padrão para esta aba
         projeto_padrao = self.obter_ou_criar_projeto(nome_aba)
 
-        for i, registro in enumerate(registros[1:limit+1]):  # Pular cabeçalho (primeira linha)
+        for i, registro in enumerate(
+            registros[1 : limit + 1]
+        ):  # Pular cabeçalho (primeira linha)
             try:
                 if len(registro) < 10:  # Validação básica
                     continue
@@ -193,7 +207,9 @@ class Command(BaseCommand):
                 hora_inicio = registro[8] if len(registro) > 8 else "08:00"
                 hora_fim = registro[9] if len(registro) > 9 else "17:00"
                 projeto_nome = registro[10] if len(registro) > 10 else nome_aba
-                tipo_evento_nome = registro[6] if len(registro) > 6 else "Presencial"  # campo "tipo"
+                tipo_evento_nome = (
+                    registro[6] if len(registro) > 6 else "Presencial"
+                )  # campo "tipo"
                 formador_nome = registro[14] if len(registro) > 14 else ""  # Formador 1
 
                 # Verificar se está aprovado (campo "Aprovação" = índice 1)
@@ -232,10 +248,14 @@ class Command(BaseCommand):
                 # Verificar se já existe (para evitar duplicatas)
                 titulo_evento = f"{projeto.nome} - {municipio.nome} - {registro[5] if len(registro) > 5 else '1'}"
 
-                if Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-                    titulo_evento=titulo_evento,
-                    data_inicio=data_inicio
-                ).exists():
+                if (
+                    Solicitacao.objects.select_related(
+                        "municipio", "projeto", "tipo_evento", "solicitante"
+                    )
+                    .prefetch_related("formadores")
+                    .filter(titulo_evento=titulo_evento, data_inicio=data_inicio)
+                    .exists()
+                ):
                     continue  # Pular duplicata
 
                 # Criar solicitação
@@ -247,15 +267,19 @@ class Command(BaseCommand):
                         tipo_evento=tipo_evento,
                         data_inicio=data_inicio,
                         data_fim=data_fim,
-                        numero_encontro_formativo=registro[5] if len(registro) > 5 else "1",
+                        numero_encontro_formativo=(
+                            registro[5] if len(registro) > 5 else "1"
+                        ),
                         coordenador_acompanha=True,
                         observacoes=f"Importado da aba {nome_aba}",
                         status=SolicitacaoStatus.APROVADO,  # Dados históricos já aprovados
-                        usuario_solicitante=admin_user
+                        usuario_solicitante=admin_user,
                     )
                 except Exception as e:
                     self.stdout.write(f"❌ Erro ao criar solicitação: {e}")
-                    self.stdout.write(f"   Projeto: {projeto.nome}, Setor: {projeto.setor}")
+                    self.stdout.write(
+                        f"   Projeto: {projeto.nome}, Setor: {projeto.setor}"
+                    )
                     continue
 
                 # Tentar associar formador se encontrado
@@ -277,12 +301,16 @@ class Command(BaseCommand):
                     )
 
         self.stdout.write(
-            self.style.SUCCESS(f"✅ Aba {nome_aba}: {contador} solicitações importadas, {erros} erros")
+            self.style.SUCCESS(
+                f"✅ Aba {nome_aba}: {contador} solicitações importadas, {erros} erros"
+            )
         )
         return contador
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.SUCCESS("🚀 INICIANDO IMPORTAÇÃO DE EVENTOS DOS DADOS EXTRAÍDOS"))
+        self.stdout.write(
+            self.style.SUCCESS("🚀 INICIANDO IMPORTAÇÃO DE EVENTOS DOS DADOS EXTRAÍDOS")
+        )
 
         # Carregar dados extraídos
         arquivo_dados = "mapeamento_completo_google_sheets_20250923_220315.json"
@@ -292,13 +320,13 @@ class Command(BaseCommand):
 
         self.stdout.write(f"📂 Carregando dados de: {arquivo_dados}")
 
-        with open(arquivo_dados, 'r', encoding='utf-8') as f:
+        with open(arquivo_dados, "r", encoding="utf-8") as f:
             dados = json.load(f)
 
         # Encontrar planilha de agenda
         planilha_agenda = None
-        for nome, planilha in dados.get('planilhas', {}).items():
-            if 'Acompanhamento' in nome and 'Agenda' in nome:
+        for nome, planilha in dados.get("planilhas", {}).items():
+            if "Acompanhamento" in nome and "Agenda" in nome:
                 planilha_agenda = planilha
                 break
 
@@ -309,19 +337,19 @@ class Command(BaseCommand):
         self.stdout.write(f"📋 Total de abas: {planilha_agenda.get('total_abas', 0)}")
 
         # Importar abas específicas ou todas
-        if options['aba']:
-            abas_importar = [options['aba']]
+        if options["aba"]:
+            abas_importar = [options["aba"]]
         else:
-            abas_importar = ['Super', 'ACerta']  # Começar com as principais
+            abas_importar = ["Super", "ACerta"]  # Começar com as principais
 
         total_importado = 0
 
-        for aba_config in planilha_agenda.get('abas', []):
-            nome_aba = aba_config.get('nome')
+        for aba_config in planilha_agenda.get("abas", []):
+            nome_aba = aba_config.get("nome")
 
             if nome_aba in abas_importar:
                 total_importado += self.importar_aba(
-                    aba_config, nome_aba, options['limit']
+                    aba_config, nome_aba, options["limit"]
                 )
 
         self.stdout.write(self.style.SUCCESS(f"\n🎉 IMPORTAÇÃO CONCLUÍDA!"))

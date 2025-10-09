@@ -4,7 +4,7 @@ import sys
 import django
 
 # Configure Django settings
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
 from django.template import Template, Context
@@ -19,7 +19,7 @@ print("=== TESTE DO SISTEMA DE GESTAO ADMINISTRATIVA ===\n")
 
 # 1. Verificar usuário admin
 try:
-    admin_user = User.objects.get(username='admin')
+    admin_user = User.objects.get(username="admin")
     print(f"[OK] Usuario admin encontrado: {admin_user.username}")
     print(f"   is_staff: {admin_user.is_staff}")
     print(f"   is_superuser: {admin_user.is_superuser}")
@@ -43,11 +43,11 @@ print()
 # 3. Verificar URLs de gestão
 print("🔗 VERIFICAÇÃO DE URLs:")
 urls_gestao = [
-    'core:gestao_dashboard',
-    'core:gestao_formadores',
-    'core:gestao_municipios', 
-    'core:gestao_projetos',
-    'core:gestao_tipos_evento'
+    "core:gestao_dashboard",
+    "core:gestao_formadores",
+    "core:gestao_municipios",
+    "core:gestao_projetos",
+    "core:gestao_tipos_evento",
 ]
 
 for url_name in urls_gestao:
@@ -74,9 +74,9 @@ template_content = """
 
 try:
     template = Template(template_content)
-    context = Context({'user': admin_user})
+    context = Context({"user": admin_user})
     rendered = template.render(context)
-    if 'Dashboard Administrativo' in rendered:
+    if "Dashboard Administrativo" in rendered:
         print("   ✅ Menu de gestão renderiza corretamente para admin")
     else:
         print("   ❌ Menu de gestão NÃO renderiza para admin")
@@ -87,13 +87,14 @@ print()
 
 # 5. Verificar templates
 import os
+
 print("📄 VERIFICAÇÃO DE TEMPLATES:")
 templates_required = [
-    'core/templates/core/gestao/dashboard.html',
-    'core/templates/core/gestao/formadores/list.html',
-    'core/templates/core/gestao/municipios/list.html',
-    'core/templates/core/gestao/projetos/list.html',
-    'core/templates/core/gestao/tipos_evento/list.html'
+    "core/templates/core/gestao/dashboard.html",
+    "core/templates/core/gestao/formadores/list.html",
+    "core/templates/core/gestao/municipios/list.html",
+    "core/templates/core/gestao/projetos/list.html",
+    "core/templates/core/gestao/tipos_evento/list.html",
 ]
 
 for template_path in templates_required:
@@ -109,11 +110,24 @@ print("🏗️ VERIFICAÇÃO DE VIEWS:")
 try:
     from core.views.gestao_views import (
         GestaoDashboardView,
-        FormadorListView, FormadorCreateView, FormadorUpdateView, FormadorDeleteView,
-        MunicipioListView, MunicipioCreateView, MunicipioUpdateView, MunicipioDeleteView,
-        ProjetoListView, ProjetoCreateView, ProjetoUpdateView, ProjetoDeleteView,
-        TipoEventoListView, TipoEventoCreateView, TipoEventoUpdateView, TipoEventoDeleteView
+        FormadorListView,
+        FormadorCreateView,
+        FormadorUpdateView,
+        FormadorDeleteView,
+        MunicipioListView,
+        MunicipioCreateView,
+        MunicipioUpdateView,
+        MunicipioDeleteView,
+        ProjetoListView,
+        ProjetoCreateView,
+        ProjetoUpdateView,
+        ProjetoDeleteView,
+        TipoEventoListView,
+        TipoEventoCreateView,
+        TipoEventoUpdateView,
+        TipoEventoDeleteView,
     )
+
     print("   ✅ Todas as views de gestão importadas com sucesso")
 except ImportError as e:
     print(f"   ❌ Erro na importação das views: {e}")
@@ -124,6 +138,7 @@ print()
 print("📝 VERIFICAÇÃO DE FORMULÁRIOS:")
 try:
     from core.forms import FormadorForm, MunicipioForm, ProjetoForm, TipoEventoForm
+
     print("   ✅ Todos os formulários de gestão importados com sucesso")
 except ImportError as e:
     print(f"   ❌ Erro na importação dos formulários: {e}")

@@ -13,12 +13,13 @@ import sys
 import django
 
 # Configurar Django
-sys.path.append('/app')
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
+sys.path.append("/app")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
 from core.models import Municipio
 from django.db import transaction
+
 
 class ExtratorMunicipiosReais:
     """Extrai e importa os 76 municípios reais das planilhas"""
@@ -30,7 +31,7 @@ class ExtratorMunicipiosReais:
     def conectar_planilhas(self):
         """Conecta às planilhas Google Sheets"""
         try:
-            with open('google_oauth_token.json', 'r') as f:
+            with open("google_oauth_token.json", "r") as f:
                 token_data = json.load(f)
 
             creds = Credentials.from_authorized_user_info(token_data)
@@ -49,7 +50,7 @@ class ExtratorMunicipiosReais:
         municipio_uf = str(municipio_uf_str).strip()
 
         # Padrões comuns: "Município - UF", "Município-UF", "Município/UF"
-        for separador in [' - ', '-', '/']:
+        for separador in [" - ", "-", "/"]:
             if separador in municipio_uf:
                 partes = municipio_uf.split(separador)
                 if len(partes) >= 2:
@@ -69,29 +70,36 @@ class ExtratorMunicipiosReais:
 
         print("📋 Extraindo municípios da Planilha de Controle...")
 
-        sheet_controle = self.gc.open_by_key('1P6YG3sIAEpiAPIQL9bKBaIznNl3V9VLan9CpVnrEOgA')
+        sheet_controle = self.gc.open_by_key(
+            "1P6YG3sIAEpiAPIQL9bKBaIznNl3V9VLan9CpVnrEOgA"
+        )
 
         municipios_encontrados = set()
 
         # Aba CADASTROS
         try:
             print("   📋 Analisando aba CADASTROS...")
-            aba_cadastros = sheet_controle.worksheet('☑️ CADASTROS')
+            aba_cadastros = sheet_controle.worksheet("☑️ CADASTROS")
             dados_cadastros = aba_cadastros.get_all_records()
             df_cadastros = pd.DataFrame(dados_cadastros)
 
             print(f"   📊 Total de registros na aba CADASTROS: {len(df_cadastros)}")
 
             # Extrair municípios únicos
-            if 'Município - UF' in df_cadastros.columns:
-                municipios_cadastros = df_cadastros[df_cadastros['Município - UF'].notna() & (df_cadastros['Município - UF'] != '')]
+            if "Município - UF" in df_cadastros.columns:
+                municipios_cadastros = df_cadastros[
+                    df_cadastros["Município - UF"].notna()
+                    & (df_cadastros["Município - UF"] != "")
+                ]
 
-                for municipio_uf in municipios_cadastros['Município - UF'].unique():
+                for municipio_uf in municipios_cadastros["Município - UF"].unique():
                     municipio, uf = self.normalizar_municipio_uf(municipio_uf)
                     if municipio:
-                        municipios_encontrados.add((municipio, uf, 'CADASTROS'))
+                        municipios_encontrados.add((municipio, uf, "CADASTROS"))
 
-                print(f"   🏛️ Municípios únicos em CADASTROS: {len(municipios_encontrados)}")
+                print(
+                    f"   🏛️ Municípios únicos em CADASTROS: {len(municipios_encontrados)}"
+                )
 
         except Exception as e:
             self.erros.append(f"Erro na aba CADASTROS: {e}")
@@ -100,7 +108,7 @@ class ExtratorMunicipiosReais:
         # Aba COMPRAS
         try:
             print("   📋 Analisando aba COMPRAS...")
-            aba_compras = sheet_controle.worksheet('🟥 COMPRAS')
+            aba_compras = sheet_controle.worksheet("🟥 COMPRAS")
             dados_compras = aba_compras.get_all_records()
             df_compras = pd.DataFrame(dados_compras)
 
@@ -109,21 +117,29 @@ class ExtratorMunicipiosReais:
             # Extrair municípios únicos
             municipios_compras_antes = len(municipios_encontrados)
 
-            if 'Município' in df_compras.columns:
-                municipios_compras = df_compras[df_compras['Município'].notna() & (df_compras['Município'] != '')]
+            if "Município" in df_compras.columns:
+                municipios_compras = df_compras[
+                    df_compras["Município"].notna() & (df_compras["Município"] != "")
+                ]
 
                 for _, row in municipios_compras.iterrows():
-                    municipio = str(row['Município']).strip().title()
-                    uf = str(row.get('UF', '')).strip().upper() if row.get('UF') else None
+                    municipio = str(row["Município"]).strip().title()
+                    uf = (
+                        str(row.get("UF", "")).strip().upper()
+                        if row.get("UF")
+                        else None
+                    )
 
-                    if municipio and municipio.lower() not in ['nan', 'none']:
+                    if municipio and municipio.lower() not in ["nan", "none"]:
                         # Validar UF se existir
                         if uf and (len(uf) != 2 or not uf.isalpha()):
                             uf = None
 
-                        municipios_encontrados.add((municipio, uf, 'COMPRAS'))
+                        municipios_encontrados.add((municipio, uf, "COMPRAS"))
 
-                print(f"   🏛️ Novos municípios em COMPRAS: {len(municipios_encontrados) - municipios_compras_antes}")
+                print(
+                    f"   🏛️ Novos municípios em COMPRAS: {len(municipios_encontrados) - municipios_compras_antes}"
+                )
 
         except Exception as e:
             self.erros.append(f"Erro na aba COMPRAS: {e}")
@@ -132,7 +148,7 @@ class ExtratorMunicipiosReais:
         # Aba FILTRO_PROD
         try:
             print("   📋 Analisando aba FILTRO_PROD...")
-            aba_filtro = sheet_controle.worksheet('ℹ️ FILTRO_PROD.')
+            aba_filtro = sheet_controle.worksheet("ℹ️ FILTRO_PROD.")
             dados_filtro = aba_filtro.get_all_records()
             df_filtro = pd.DataFrame(dados_filtro)
 
@@ -140,27 +156,45 @@ class ExtratorMunicipiosReais:
 
             municipios_filtro_antes = len(municipios_encontrados)
 
-            if 'Município - UF' in df_filtro.columns:
-                municipios_filtro = df_filtro[df_filtro['Município - UF'].notna() & (df_filtro['Município - UF'] != '')]
+            if "Município - UF" in df_filtro.columns:
+                municipios_filtro = df_filtro[
+                    df_filtro["Município - UF"].notna()
+                    & (df_filtro["Município - UF"] != "")
+                ]
 
-                for municipio_uf in municipios_filtro['Município - UF'].unique():
+                for municipio_uf in municipios_filtro["Município - UF"].unique():
                     municipio, uf = self.normalizar_municipio_uf(municipio_uf)
                     if municipio:
                         # Adicionar informação de região se disponível
                         regiao = None
-                        matching_rows = df_filtro[df_filtro['Município - UF'] == municipio_uf]
-                        if not matching_rows.empty and 'Região' in matching_rows.columns:
-                            regiao = str(matching_rows.iloc[0]['Região']).strip()
+                        matching_rows = df_filtro[
+                            df_filtro["Município - UF"] == municipio_uf
+                        ]
+                        if (
+                            not matching_rows.empty
+                            and "Região" in matching_rows.columns
+                        ):
+                            regiao = str(matching_rows.iloc[0]["Região"]).strip()
 
-                        municipios_encontrados.add((municipio, uf, f'FILTRO_PROD ({regiao})' if regiao else 'FILTRO_PROD'))
+                        municipios_encontrados.add(
+                            (
+                                municipio,
+                                uf,
+                                f"FILTRO_PROD ({regiao})" if regiao else "FILTRO_PROD",
+                            )
+                        )
 
-                print(f"   🏛️ Novos municípios em FILTRO_PROD: {len(municipios_encontrados) - municipios_filtro_antes}")
+                print(
+                    f"   🏛️ Novos municípios em FILTRO_PROD: {len(municipios_encontrados) - municipios_filtro_antes}"
+                )
 
         except Exception as e:
             self.erros.append(f"Erro na aba FILTRO_PROD: {e}")
             print(f"   ❌ Erro na aba FILTRO_PROD: {e}")
 
-        print(f"📊 Total de municípios únicos encontrados: {len(municipios_encontrados)}")
+        print(
+            f"📊 Total de municípios únicos encontrados: {len(municipios_encontrados)}"
+        )
 
         return list(municipios_encontrados)
 
@@ -170,7 +204,9 @@ class ExtratorMunicipiosReais:
         print("📋 Extraindo municípios da Acompanhamento de Agenda...")
 
         try:
-            sheet_agenda = self.gc.open_by_key('16ul8qvHb-1CRs5Z7zYcVP9Rh2munCefWWNsAiJfZYYU')
+            sheet_agenda = self.gc.open_by_key(
+                "16ul8qvHb-1CRs5Z7zYcVP9Rh2munCefWWNsAiJfZYYU"
+            )
 
             municipios_agenda = set()
 
@@ -189,17 +225,32 @@ class ExtratorMunicipiosReais:
                     df = pd.DataFrame(dados)
 
                     # Procurar colunas que podem conter municípios
-                    colunas_municipio = [col for col in df.columns if any(termo in col.lower() for termo in ['município', 'municipio', 'cidade', 'local'])]
+                    colunas_municipio = [
+                        col
+                        for col in df.columns
+                        if any(
+                            termo in col.lower()
+                            for termo in ["município", "municipio", "cidade", "local"]
+                        )
+                    ]
 
                     for coluna in colunas_municipio:
-                        municipios_coluna = df[df[coluna].notna() & (df[coluna] != '')]
+                        municipios_coluna = df[df[coluna].notna() & (df[coluna] != "")]
 
                         for municipio_str in municipios_coluna[coluna].unique():
                             municipio, uf = self.normalizar_municipio_uf(municipio_str)
-                            if municipio and municipio.lower() not in ['nan', 'none', 'município']:
-                                municipios_agenda.add((municipio, uf, f'AGENDA-{worksheet.title}'))
+                            if municipio and municipio.lower() not in [
+                                "nan",
+                                "none",
+                                "município",
+                            ]:
+                                municipios_agenda.add(
+                                    (municipio, uf, f"AGENDA-{worksheet.title}")
+                                )
 
-                    print(f"      🏛️ Municípios encontrados na aba {worksheet.title}: {len([m for m in municipios_agenda if f'AGENDA-{worksheet.title}' in m[2]])}")
+                    print(
+                        f"      🏛️ Municípios encontrados na aba {worksheet.title}: {len([m for m in municipios_agenda if f'AGENDA-{worksheet.title}' in m[2]])}"
+                    )
 
                 except Exception as e:
                     self.erros.append(f"Erro na aba {worksheet.title} da agenda: {e}")
@@ -230,34 +281,34 @@ class ExtratorMunicipiosReais:
 
             if chave not in municipios_consolidados:
                 municipios_consolidados[chave] = {
-                    'nome': municipio,
-                    'uf': uf,
-                    'fontes': [fonte],
-                    'uf_mais_comum': uf
+                    "nome": municipio,
+                    "uf": uf,
+                    "fontes": [fonte],
+                    "uf_mais_comum": uf,
                 }
             else:
                 # Adicionar fonte
-                if fonte not in municipios_consolidados[chave]['fontes']:
-                    municipios_consolidados[chave]['fontes'].append(fonte)
+                if fonte not in municipios_consolidados[chave]["fontes"]:
+                    municipios_consolidados[chave]["fontes"].append(fonte)
 
                 # Se não tínhamos UF antes e agora temos, usar
-                if not municipios_consolidados[chave]['uf'] and uf:
-                    municipios_consolidados[chave]['uf'] = uf
-                    municipios_consolidados[chave]['uf_mais_comum'] = uf
+                if not municipios_consolidados[chave]["uf"] and uf:
+                    municipios_consolidados[chave]["uf"] = uf
+                    municipios_consolidados[chave]["uf_mais_comum"] = uf
 
         # Converter para lista ordenada
         municipios_finais = []
         for dados in municipios_consolidados.values():
             municipio_data = {
-                'nome': dados['nome'],
-                'uf': dados['uf_mais_comum'],
-                'fontes': dados['fontes'],
-                'total_fontes': len(dados['fontes'])
+                "nome": dados["nome"],
+                "uf": dados["uf_mais_comum"],
+                "fontes": dados["fontes"],
+                "total_fontes": len(dados["fontes"]),
             }
             municipios_finais.append(municipio_data)
 
         # Ordenar por frequência (mais fontes primeiro) e depois alfabeticamente
-        municipios_finais.sort(key=lambda x: (-x['total_fontes'], x['nome']))
+        municipios_finais.sort(key=lambda x: (-x["total_fontes"], x["nome"]))
 
         print(f"📊 Total de municípios consolidados: {len(municipios_finais)}")
 
@@ -272,8 +323,8 @@ class ExtratorMunicipiosReais:
             try:
                 with transaction.atomic():
                     # Verificar se já existe
-                    nome = municipio_data['nome']
-                    uf = municipio_data['uf']
+                    nome = municipio_data["nome"]
+                    uf = municipio_data["uf"]
 
                     # Buscar por nome exato primeiro
                     if Municipio.objects.filter(nome=nome).exists():
@@ -283,17 +334,21 @@ class ExtratorMunicipiosReais:
                     # Criar município
                     municipio = Municipio.objects.create(
                         nome=nome,
-                        uf=uf or 'CE',  # Default para CE se não tiver UF
-                        ativo=True
+                        uf=uf or "CE",  # Default para CE se não tiver UF
+                        ativo=True,
                     )
 
                     self.municipios_importados += 1
 
                     if self.municipios_importados % 10 == 0:
-                        print(f"   ✅ {self.municipios_importados} municípios importados...")
+                        print(
+                            f"   ✅ {self.municipios_importados} municípios importados..."
+                        )
 
             except Exception as e:
-                self.erros.append(f"Erro importando município '{municipio_data['nome']}': {e}")
+                self.erros.append(
+                    f"Erro importando município '{municipio_data['nome']}': {e}"
+                )
                 print(f"   ❌ Erro: {municipio_data['nome']} - {e}")
 
         print(f"✅ Total de municípios importados: {self.municipios_importados}")
@@ -302,37 +357,40 @@ class ExtratorMunicipiosReais:
         """Gera relatório da importação"""
 
         relatorio = {
-            'timestamp': '2025-09-23',
-            'municipios_importados': self.municipios_importados,
-            'total_erros': len(self.erros),
-            'erros': self.erros,
-            'estatisticas': {
-                'total_municipios_sistema': Municipio.objects.count(),
-                'municipios_por_uf': {},
-                'top_10_municipios': municipios_data[:10],
-                'distribuicao_por_fontes': {}
-            }
+            "timestamp": "2025-09-23",
+            "municipios_importados": self.municipios_importados,
+            "total_erros": len(self.erros),
+            "erros": self.erros,
+            "estatisticas": {
+                "total_municipios_sistema": Municipio.objects.count(),
+                "municipios_por_uf": {},
+                "top_10_municipios": municipios_data[:10],
+                "distribuicao_por_fontes": {},
+            },
         }
 
         # Estatísticas por UF
         for municipio in municipios_data:
-            uf = municipio['uf'] or 'SEM_UF'
-            if uf not in relatorio['estatisticas']['municipios_por_uf']:
-                relatorio['estatisticas']['municipios_por_uf'][uf] = 0
-            relatorio['estatisticas']['municipios_por_uf'][uf] += 1
+            uf = municipio["uf"] or "SEM_UF"
+            if uf not in relatorio["estatisticas"]["municipios_por_uf"]:
+                relatorio["estatisticas"]["municipios_por_uf"][uf] = 0
+            relatorio["estatisticas"]["municipios_por_uf"][uf] += 1
 
         # Estatísticas por número de fontes
         for municipio in municipios_data:
-            total_fontes = municipio['total_fontes']
-            if total_fontes not in relatorio['estatisticas']['distribuicao_por_fontes']:
-                relatorio['estatisticas']['distribuicao_por_fontes'][total_fontes] = 0
-            relatorio['estatisticas']['distribuicao_por_fontes'][total_fontes] += 1
+            total_fontes = municipio["total_fontes"]
+            if total_fontes not in relatorio["estatisticas"]["distribuicao_por_fontes"]:
+                relatorio["estatisticas"]["distribuicao_por_fontes"][total_fontes] = 0
+            relatorio["estatisticas"]["distribuicao_por_fontes"][total_fontes] += 1
 
-        with open('/app/relatorio_importacao_municipios_reais.json', 'w', encoding='utf-8') as f:
+        with open(
+            "/app/relatorio_importacao_municipios_reais.json", "w", encoding="utf-8"
+        ) as f:
             json.dump(relatorio, f, indent=2, ensure_ascii=False)
 
         print("📄 Relatório salvo: relatorio_importacao_municipios_reais.json")
         return relatorio
+
 
 def main():
     """Executa extração e importação de municípios reais"""
@@ -352,7 +410,9 @@ def main():
         municipios_agenda = extrator.extrair_municipios_da_agenda()
 
         # Consolidar
-        municipios_consolidados = extrator.consolidar_municipios(municipios_controle, municipios_agenda)
+        municipios_consolidados = extrator.consolidar_municipios(
+            municipios_controle, municipios_agenda
+        )
 
         if not municipios_consolidados:
             print("❌ Nenhum município válido encontrado")
@@ -367,19 +427,25 @@ def main():
         print("\n📊 RESUMO DA IMPORTAÇÃO:")
         print(f"   ✅ Municípios importados: {relatorio['municipios_importados']}")
         print(f"   ❌ Erros: {relatorio['total_erros']}")
-        print(f"   🏛️ Total no sistema: {relatorio['estatisticas']['total_municipios_sistema']}")
+        print(
+            f"   🏛️ Total no sistema: {relatorio['estatisticas']['total_municipios_sistema']}"
+        )
 
         print(f"\n📊 DISTRIBUIÇÃO POR UF:")
-        for uf, count in relatorio['estatisticas']['municipios_por_uf'].items():
+        for uf, count in relatorio["estatisticas"]["municipios_por_uf"].items():
             print(f"   - {uf}: {count}")
 
         print(f"\n📊 TOP 5 MUNICÍPIOS MAIS FREQUENTES:")
-        for i, municipio in enumerate(relatorio['estatisticas']['top_10_municipios'][:5]):
-            print(f"   {i+1}. {municipio['nome']} ({municipio['uf']}) - {municipio['total_fontes']} fontes")
+        for i, municipio in enumerate(
+            relatorio["estatisticas"]["top_10_municipios"][:5]
+        ):
+            print(
+                f"   {i+1}. {municipio['nome']} ({municipio['uf']}) - {municipio['total_fontes']} fontes"
+            )
 
-        if relatorio['total_erros'] > 0:
+        if relatorio["total_erros"] > 0:
             print(f"\n⚠️ Primeiros 3 erros:")
-            for erro in relatorio['erros'][:3]:
+            for erro in relatorio["erros"][:3]:
                 print(f"   - {erro}")
 
         print("\n🎉 IMPORTAÇÃO DE MUNICÍPIOS REAIS CONCLUÍDA!")
@@ -388,8 +454,10 @@ def main():
     except Exception as e:
         print(f"❌ ERRO na extração: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 if __name__ == "__main__":
     main()

@@ -7,12 +7,13 @@ import sys
 import django
 
 # Configure Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
-sys.path.append('/app')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
+sys.path.append("/app")
 django.setup()
 
 from core.models import *
 from django.contrib.auth.models import Group
+
 
 def main():
     print("═══════════════════════════════════════════════════════════")
@@ -73,10 +74,12 @@ def main():
     print(f"👨‍🏫 FORMADORES: {formadores.count()}")
     if formadores.count() == 0:
         print("   ⚠️  NENHUM FORMADOR ENCONTRADO")
-        print("   📝 Usuários no grupo 'formador' devem ter registro Formador associado")
+        print(
+            "   📝 Usuários no grupo 'formador' devem ter registro Formador associado"
+        )
 
         # Verificar usuários do grupo formador
-        grupo_formador = Group.objects.filter(name='formador').first()
+        grupo_formador = Group.objects.filter(name="formador").first()
         if grupo_formador:
             usuarios_formadores = grupo_formador.user_set.all()
             print(f"   👥 Usuários no grupo 'formador': {usuarios_formadores.count()}")
@@ -91,7 +94,7 @@ def main():
     print("🔗 VERIFICAÇÃO DE INTEGRIDADE RELACIONAL:")
 
     # Verificar se usuários em grupos têm registros associados
-    grupo_formador = Group.objects.filter(name='formador').first()
+    grupo_formador = Group.objects.filter(name="formador").first()
     if grupo_formador:
         usuarios_formadores = grupo_formador.user_set.all()
         formadores_registrados = Formador.objects.all()
@@ -100,7 +103,9 @@ def main():
         print(f"   📊 Registros Formador criados: {formadores_registrados.count()}")
 
         if usuarios_formadores.count() != formadores_registrados.count():
-            print("   ⚠️  INCONSISTÊNCIA: Número de usuários ≠ número de registros Formador")
+            print(
+                "   ⚠️  INCONSISTÊNCIA: Número de usuários ≠ número de registros Formador"
+            )
         else:
             print("   ✅ CONSISTENTE: Grupos e registros alinhados")
 
@@ -109,6 +114,7 @@ def main():
     print("✅ VALIDAÇÃO CONCLUÍDA COM SUCESSO!")
     print("📋 Dados extraídos das planilhas Google Sheets estão íntegros")
     print("═══════════════════════════════════════════════════════════")
+
 
 if __name__ == "__main__":
     main()

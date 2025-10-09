@@ -10,13 +10,14 @@ import django
 from datetime import datetime, timedelta
 
 # Configurar Django
-sys.path.append('/app')
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
+sys.path.append("/app")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
 from core.models import Usuario, Formador, Municipio, Projeto
 from django.contrib.auth.models import Group
 from django.db import connection
+
 
 class TestadorSistemaReal:
     """Testa o sistema com dados reais importados"""
@@ -45,16 +46,18 @@ class TestadorSistemaReal:
         print(f"   📚 Projetos: {total_projetos}")
         print(f"   👤 Grupos: {total_grupos}")
 
-        self.resultados['contagens'] = {
-            'usuarios': total_usuarios,
-            'formadores': total_formadores,
-            'municipios': total_municipios,
-            'projetos': total_projetos,
-            'grupos': total_grupos
+        self.resultados["contagens"] = {
+            "usuarios": total_usuarios,
+            "formadores": total_formadores,
+            "municipios": total_municipios,
+            "projetos": total_projetos,
+            "grupos": total_grupos,
         }
 
         # Teste 2: Consistência usuários ↔ formadores
-        usuarios_formador_grupo = Usuario.objects.filter(groups__name='formador').count()
+        usuarios_formador_grupo = Usuario.objects.filter(
+            groups__name="formador"
+        ).count()
         gap_formadores = abs(usuarios_formador_grupo - total_formadores)
 
         print(f"\n🔗 Consistência usuários ↔ formadores:")
@@ -68,13 +71,15 @@ class TestadorSistemaReal:
             print("   ⚠️ Gap mínimo aceitável")
         else:
             print("   ❌ Gap significativo encontrado")
-            self.erros.append(f"Gap significativo usuários/formadores: {gap_formadores}")
+            self.erros.append(
+                f"Gap significativo usuários/formadores: {gap_formadores}"
+            )
 
-        self.resultados['consistencia_formadores'] = {
-            'usuarios_grupo': usuarios_formador_grupo,
-            'registros_formador': total_formadores,
-            'gap': gap_formadores,
-            'status': 'OK' if gap_formadores <= 2 else 'ERRO'
+        self.resultados["consistencia_formadores"] = {
+            "usuarios_grupo": usuarios_formador_grupo,
+            "registros_formador": total_formadores,
+            "gap": gap_formadores,
+            "status": "OK" if gap_formadores <= 2 else "ERRO",
         }
 
         # Teste 3: Usuários sem grupo
@@ -84,7 +89,7 @@ class TestadorSistemaReal:
         if usuarios_sem_grupo.exists():
             for usuario in usuarios_sem_grupo:
                 print(f"   - {usuario.username}")
-                if usuario.username != 'admin':  # Admin sem grupo é esperado
+                if usuario.username != "admin":  # Admin sem grupo é esperado
                     self.erros.append(f"Usuário sem grupo: {usuario.username}")
 
         # Teste 4: Dados válidos
@@ -97,10 +102,10 @@ class TestadorSistemaReal:
         print(f"   🏛️ Municípios sem UF: {municipios_sem_uf}")
         print(f"   📚 Projetos inativos: {projetos_inativos}")
 
-        self.resultados['validacao_dados'] = {
-            'formadores_sem_email': formadores_sem_email,
-            'municipios_sem_uf': municipios_sem_uf,
-            'projetos_inativos': projetos_inativos
+        self.resultados["validacao_dados"] = {
+            "formadores_sem_email": formadores_sem_email,
+            "municipios_sem_uf": municipios_sem_uf,
+            "projetos_inativos": projetos_inativos,
         }
 
         return True
@@ -115,24 +120,24 @@ class TestadorSistemaReal:
         grupos_analise = {}
         for grupo in Group.objects.all():
             count = grupo.user_set.count()
-            usuarios_grupo = list(grupo.user_set.values_list('username', flat=True)[:5])
+            usuarios_grupo = list(grupo.user_set.values_list("username", flat=True)[:5])
 
             grupos_analise[grupo.name] = {
-                'count': count,
-                'usuarios_exemplo': usuarios_grupo
+                "count": count,
+                "usuarios_exemplo": usuarios_grupo,
             }
 
             print(f"👥 Grupo '{grupo.name}': {count} usuários")
             if usuarios_grupo:
                 print(f"   Exemplos: {', '.join(usuarios_grupo)}")
 
-        self.resultados['grupos_analise'] = grupos_analise
+        self.resultados["grupos_analise"] = grupos_analise
 
         # Verificar hierarquia esperada
-        coordenadores = grupos_analise.get('coordenador', {}).get('count', 0)
-        gerentes = grupos_analise.get('gerente', {}).get('count', 0)
-        formadores = grupos_analise.get('formador', {}).get('count', 0)
-        superintendencia = grupos_analise.get('superintendencia', {}).get('count', 0)
+        coordenadores = grupos_analise.get("coordenador", {}).get("count", 0)
+        gerentes = grupos_analise.get("gerente", {}).get("count", 0)
+        formadores = grupos_analise.get("formador", {}).get("count", 0)
+        superintendencia = grupos_analise.get("superintendencia", {}).get("count", 0)
 
         print(f"\n📊 Hierarquia organizacional:")
         print(f"   🏛️ Superintendência: {superintendencia}")
@@ -142,7 +147,9 @@ class TestadorSistemaReal:
 
         # Validar pirâmide organizacional
         if superintendencia == 0:
-            print("   ⚠️ Nenhum usuário na superintendência - necessário para aprovações")
+            print(
+                "   ⚠️ Nenhum usuário na superintendência - necessário para aprovações"
+            )
             self.erros.append("Nenhum usuário na superintendência")
 
         if gerentes < coordenadores:
@@ -170,12 +177,14 @@ class TestadorSistemaReal:
             start_time = datetime.now()
 
             # Query 1: Formadores com seus usuários e grupos
-            formadores_query = list(Formador.objects.select_related('usuario', 'area_atuacao').all())
+            formadores_query = list(
+                Formador.objects.select_related("usuario", "area_atuacao").all()
+            )
 
             # Query 2: Municípios por UF
             municipios_por_uf = {}
             for municipio in Municipio.objects.all():
-                uf = municipio.uf or 'SEM_UF'
+                uf = municipio.uf or "SEM_UF"
                 if uf not in municipios_por_uf:
                     municipios_por_uf[uf] = 0
                 municipios_por_uf[uf] += 1
@@ -199,11 +208,11 @@ class TestadorSistemaReal:
                 print("❌ Performance baixa")
                 self.erros.append(f"Performance baixa: {tempo_queries:.2f}s")
 
-            self.resultados['performance'] = {
-                'tempo_queries': tempo_queries,
-                'formadores_processados': len(formadores_query),
-                'ufs_encontradas': len(municipios_por_uf),
-                'projetos_ativos': len(projetos_ativos)
+            self.resultados["performance"] = {
+                "tempo_queries": tempo_queries,
+                "formadores_processados": len(formadores_query),
+                "ufs_encontradas": len(municipios_por_uf),
+                "projetos_ativos": len(projetos_ativos),
             }
 
         except Exception as e:
@@ -220,7 +229,7 @@ class TestadorSistemaReal:
         print("=" * 60)
 
         # Teste 1: Municípios conhecidos
-        municipios_importantes = ['Maracanaú', 'Petrolina', 'Sobral', 'Fortaleza']
+        municipios_importantes = ["Maracanaú", "Petrolina", "Sobral", "Fortaleza"]
         municipios_encontrados = []
 
         for nome in municipios_importantes:
@@ -233,7 +242,7 @@ class TestadorSistemaReal:
                 self.erros.append(f"Município importante não encontrado: {nome}")
 
         # Teste 2: Projetos conhecidos
-        projetos_importantes = ['ACerta', 'Matemática', 'Tema', 'Brincando']
+        projetos_importantes = ["ACerta", "Matemática", "Tema", "Brincando"]
         projetos_encontrados = []
 
         for nome in projetos_importantes:
@@ -245,10 +254,12 @@ class TestadorSistemaReal:
                 print(f"   ❌ Projeto não encontrado: {nome}")
 
         # Teste 3: Formadores com emails válidos
-        formadores_email_valido = Formador.objects.exclude(email__exact='').count()
+        formadores_email_valido = Formador.objects.exclude(email__exact="").count()
         total_formadores = Formador.objects.count()
 
-        print(f"\n📧 Formadores com email válido: {formadores_email_valido}/{total_formadores}")
+        print(
+            f"\n📧 Formadores com email válido: {formadores_email_valido}/{total_formadores}"
+        )
 
         if total_formadores > 0:
             percentual = (formadores_email_valido / total_formadores) * 100
@@ -262,10 +273,10 @@ class TestadorSistemaReal:
                 print("   ❌ Qualidade baixa de dados")
                 self.erros.append(f"Qualidade baixa emails: {percentual:.1f}%")
 
-        self.resultados['dados_especificos'] = {
-            'municipios_encontrados': municipios_encontrados,
-            'projetos_encontrados': projetos_encontrados,
-            'percentual_emails_validos': percentual if total_formadores > 0 else 0
+        self.resultados["dados_especificos"] = {
+            "municipios_encontrados": municipios_encontrados,
+            "projetos_encontrados": projetos_encontrados,
+            "percentual_emails_validos": percentual if total_formadores > 0 else 0,
         }
 
         return True
@@ -274,27 +285,42 @@ class TestadorSistemaReal:
         """Gera relatório final dos testes"""
 
         relatorio = {
-            'timestamp': datetime.now().isoformat(),
-            'teste_executado': 'Sistema com dados reais',
-            'status_geral': 'SUCESSO' if len(self.erros) == 0 else 'COM_PROBLEMAS',
-            'total_erros': len(self.erros),
-            'erros': self.erros,
-            'resultados': self.resultados,
-            'resumo_final': {
-                'usuarios_importados': self.resultados.get('contagens', {}).get('usuarios', 0),
-                'formadores_criados': self.resultados.get('contagens', {}).get('formadores', 0),
-                'municipios_importados': self.resultados.get('contagens', {}).get('municipios', 0),
-                'projetos_importados': self.resultados.get('contagens', {}).get('projetos', 0),
-                'gap_formadores': self.resultados.get('consistencia_formadores', {}).get('gap', 0),
-                'qualidade_emails': self.resultados.get('dados_especificos', {}).get('percentual_emails_validos', 0)
-            }
+            "timestamp": datetime.now().isoformat(),
+            "teste_executado": "Sistema com dados reais",
+            "status_geral": "SUCESSO" if len(self.erros) == 0 else "COM_PROBLEMAS",
+            "total_erros": len(self.erros),
+            "erros": self.erros,
+            "resultados": self.resultados,
+            "resumo_final": {
+                "usuarios_importados": self.resultados.get("contagens", {}).get(
+                    "usuarios", 0
+                ),
+                "formadores_criados": self.resultados.get("contagens", {}).get(
+                    "formadores", 0
+                ),
+                "municipios_importados": self.resultados.get("contagens", {}).get(
+                    "municipios", 0
+                ),
+                "projetos_importados": self.resultados.get("contagens", {}).get(
+                    "projetos", 0
+                ),
+                "gap_formadores": self.resultados.get(
+                    "consistencia_formadores", {}
+                ).get("gap", 0),
+                "qualidade_emails": self.resultados.get("dados_especificos", {}).get(
+                    "percentual_emails_validos", 0
+                ),
+            },
         }
 
-        with open('/app/relatorio_teste_sistema_dados_reais.json', 'w', encoding='utf-8') as f:
+        with open(
+            "/app/relatorio_teste_sistema_dados_reais.json", "w", encoding="utf-8"
+        ) as f:
             json.dump(relatorio, f, indent=2, ensure_ascii=False)
 
         print("\n📄 Relatório salvo: relatorio_teste_sistema_dados_reais.json")
         return relatorio
+
 
 def main():
     """Executa teste completo do sistema"""
@@ -318,7 +344,7 @@ def main():
         print("📊 RESUMO FINAL DOS TESTES")
         print("=" * 60)
 
-        resumo = relatorio['resumo_final']
+        resumo = relatorio["resumo_final"]
         print(f"✅ Status geral: {relatorio['status_geral']}")
         print(f"👥 Usuários importados: {resumo['usuarios_importados']}")
         print(f"👨‍🏫 Formadores criados: {resumo['formadores_criados']}")
@@ -327,10 +353,10 @@ def main():
         print(f"🔗 Gap formadores: {resumo['gap_formadores']}")
         print(f"📧 Qualidade emails: {resumo['qualidade_emails']:.1f}%")
 
-        if relatorio['total_erros'] > 0:
+        if relatorio["total_erros"] > 0:
             print(f"\n⚠️ Total de erros encontrados: {relatorio['total_erros']}")
             print("Primeiros 5 erros:")
-            for erro in relatorio['erros'][:5]:
+            for erro in relatorio["erros"][:5]:
                 print(f"   - {erro}")
         else:
             print("\n🎉 TODOS OS TESTES PASSARAM COM SUCESSO!")
@@ -341,8 +367,10 @@ def main():
     except Exception as e:
         print(f"❌ ERRO nos testes: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 if __name__ == "__main__":
     main()

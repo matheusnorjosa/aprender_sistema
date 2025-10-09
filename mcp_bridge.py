@@ -23,28 +23,37 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 # Configurar Django para acessar banco Docker
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
-os.environ.setdefault('ENVIRONMENT', 'staging')
-os.environ.setdefault('DB_HOST', 'localhost')
-os.environ.setdefault('DB_PORT', '5433')
-os.environ.setdefault('DB_NAME', 'aprender_sistema_db')
-os.environ.setdefault('DB_USER', 'adm_aprender')
-os.environ.setdefault('DB_PASSWORD', 'aprender123456')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
+os.environ.setdefault("ENVIRONMENT", "staging")
+os.environ.setdefault("DB_HOST", "localhost")
+os.environ.setdefault("DB_PORT", "5433")
+os.environ.setdefault("DB_NAME", "aprender_sistema_db")
+os.environ.setdefault("DB_USER", "adm_aprender")
+os.environ.setdefault("DB_PASSWORD", "aprender123456")
 
 # Adicionar path da aplicação Django
 sys.path.insert(0, str(Path(__file__).parent))
 
 try:
     import django
+
     django.setup()
 
     # Imports Django após setup
     from core.models import (
-        Usuario, Formador, Municipio, Projeto, TipoEvento,
-        Solicitacao, Aprovacao, LogAuditoria, SolicitacaoStatus
+        Usuario,
+        Formador,
+        Municipio,
+        Projeto,
+        TipoEvento,
+        Solicitacao,
+        Aprovacao,
+        LogAuditoria,
+        SolicitacaoStatus,
     )
     from django.db import connection
     from django.utils import timezone
+
     DJANGO_AVAILABLE = True
 
 except Exception as e:
@@ -55,6 +64,7 @@ except Exception as e:
 try:
     from mcp.server import Server
     from mcp.server.stdio import stdio_server
+
     MCP_AVAILABLE = True
 except ImportError:
     print("❌ MCP não disponível - instalar com: pip install mcp", file=sys.stderr)
@@ -63,13 +73,15 @@ except ImportError:
 # Configuração de logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler('mcp_bridge.log'),
-        logging.StreamHandler(sys.stderr)  # Log para stderr para não interferir com STDIO
-    ]
+        logging.FileHandler("mcp_bridge.log"),
+        logging.StreamHandler(
+            sys.stderr
+        ),  # Log para stderr para não interferir com STDIO
+    ],
 )
-logger = logging.getLogger('mcp_bridge')
+logger = logging.getLogger("mcp_bridge")
 
 if not MCP_AVAILABLE:
     logger.error("MCP não disponível - bridge não pode funcionar")
@@ -77,6 +89,7 @@ if not MCP_AVAILABLE:
 
 # Inicialização do servidor MCP
 server = Server("aprender-context")
+
 
 @server.list_tools()
 async def handle_list_tools() -> List[Dict[str, Any]]:
@@ -107,13 +120,13 @@ async def handle_list_tools() -> List[Dict[str, Any]]:
                     "limit": {
                         "type": "integer",
                         "description": "Limite de formadores retornados (padrão: 10)",
-                        "default": 10
+                        "default": 10,
                     },
                     "status": {
                         "type": "string",
                         "description": "Filtrar por status: ativo, inativo, todos",
-                        "default": "ativo"
-                    }
+                        "default": "ativo",
+                    },
                 },
             },
         },
@@ -126,7 +139,7 @@ async def handle_list_tools() -> List[Dict[str, Any]]:
                     "periodo": {
                         "type": "string",
                         "description": "Período: hoje, semana, mes, ano, todos",
-                        "default": "mes"
+                        "default": "mes",
                     }
                 },
             },
@@ -162,15 +175,23 @@ async def handle_list_tools() -> List[Dict[str, Any]]:
                 "type": "object",
                 "properties": {},
             },
-        }
+        },
     ]
 
+
 @server.call_tool()
-async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[Dict[str, Any]]:
+async def handle_call_tool(
+    name: str, arguments: Dict[str, Any]
+) -> List[Dict[str, Any]]:
     """Executa as ferramentas do bridge MCP com dados reais do Docker"""
 
     if not DJANGO_AVAILABLE:
-        return [{"type": "text", "text": "❌ Django não disponível - verifique configuração do banco Docker"}]
+        return [
+            {
+                "type": "text",
+                "text": "❌ Django não disponível - verifique configuração do banco Docker",
+            }
+        ]
 
     try:
         if name == "get_system_context":
@@ -207,9 +228,11 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[Dict[st
         logger.error(f"Erro ao executar ferramenta {name}: {e}")
         return [{"type": "text", "text": f"❌ Erro ao executar {name}: {str(e)}"}]
 
+
 # ===============================
 # FUNÇÕES COM DADOS REAIS DOCKER
 # ===============================
+
 
 async def get_system_context_real() -> List[Dict[str, Any]]:
     """Contexto completo com dados reais do PostgreSQL Docker"""
@@ -228,9 +251,15 @@ async def get_system_context_real() -> List[Dict[str, Any]]:
             total_solicitacoes = Solicitacao.objects.count()
 
             # Estatísticas por status
-            solicitacoes_pendentes = Solicitacao.objects.filter(status=SolicitacaoStatus.PENDENTE).count()
-            solicitacoes_aprovadas = Solicitacao.objects.filter(status=SolicitacaoStatus.APROVADO).count()
-            solicitacoes_rejeitadas = Solicitacao.objects.filter(status=SolicitacaoStatus.REJEITADO).count()
+            solicitacoes_pendentes = Solicitacao.objects.filter(
+                status=SolicitacaoStatus.PENDENTE
+            ).count()
+            solicitacoes_aprovadas = Solicitacao.objects.filter(
+                status=SolicitacaoStatus.APROVADO
+            ).count()
+            solicitacoes_rejeitadas = Solicitacao.objects.filter(
+                status=SolicitacaoStatus.REJEITADO
+            ).count()
 
             # Logs de auditoria recentes
             logs_24h = LogAuditoria.objects.filter(
@@ -238,18 +267,18 @@ async def get_system_context_real() -> List[Dict[str, Any]]:
             ).count()
 
             return {
-                'usuarios': {'total': total_usuarios, 'ativos': usuarios_ativos},
-                'formadores': total_formadores,
-                'municipios': total_municipios,
-                'projetos': total_projetos,
-                'tipos_evento': total_tipos_evento,
-                'solicitacoes': {
-                    'total': total_solicitacoes,
-                    'pendentes': solicitacoes_pendentes,
-                    'aprovadas': solicitacoes_aprovadas,
-                    'rejeitadas': solicitacoes_rejeitadas
+                "usuarios": {"total": total_usuarios, "ativos": usuarios_ativos},
+                "formadores": total_formadores,
+                "municipios": total_municipios,
+                "projetos": total_projetos,
+                "tipos_evento": total_tipos_evento,
+                "solicitacoes": {
+                    "total": total_solicitacoes,
+                    "pendentes": solicitacoes_pendentes,
+                    "aprovadas": solicitacoes_aprovadas,
+                    "rejeitadas": solicitacoes_rejeitadas,
                 },
-                'auditoria_24h': logs_24h
+                "auditoria_24h": logs_24h,
             }
 
         stats = await get_real_stats()
@@ -303,6 +332,7 @@ async def get_system_context_real() -> List[Dict[str, Any]]:
         logger.error(f"Erro ao obter contexto real: {e}")
         return [{"type": "text", "text": f"❌ Erro ao acessar dados reais: {str(e)}"}]
 
+
 async def get_database_stats_real() -> List[Dict[str, Any]]:
     """Estatísticas em tempo real do banco PostgreSQL"""
     try:
@@ -316,7 +346,8 @@ async def get_database_stats_real() -> List[Dict[str, Any]]:
                 version = cursor.fetchone()[0]
 
                 # Estatísticas de tabelas
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT
                         schemaname,
                         tablename,
@@ -327,21 +358,24 @@ async def get_database_stats_real() -> List[Dict[str, Any]]:
                     WHERE schemaname = 'public'
                     ORDER BY (n_tup_ins + n_tup_upd + n_tup_del) DESC
                     LIMIT 10
-                """)
+                """
+                )
                 table_stats = cursor.fetchall()
 
                 # Conexões ativas
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT count(*) as active_connections
                     FROM pg_stat_activity
                     WHERE state = 'active'
-                """)
+                """
+                )
                 active_connections = cursor.fetchone()[0]
 
                 return {
-                    'version': version,
-                    'table_stats': table_stats,
-                    'active_connections': active_connections
+                    "version": version,
+                    "table_stats": table_stats,
+                    "active_connections": active_connections,
                 }
 
         stats = await get_db_stats()
@@ -354,7 +388,7 @@ async def get_database_stats_real() -> List[Dict[str, Any]]:
 
 ## 📊 **Atividade por Tabela** (Top 10)
 """
-        for schema, table, inserts, updates, deletes in stats['table_stats']:
+        for schema, table, inserts, updates, deletes in stats["table_stats"]:
             total_ops = inserts + updates + deletes
             result += f"- **{table}**: {total_ops:,} operações (I:{inserts}, U:{updates}, D:{deletes})\n"
 
@@ -363,7 +397,13 @@ async def get_database_stats_real() -> List[Dict[str, Any]]:
         return [{"type": "text", "text": result}]
 
     except Exception as e:
-        return [{"type": "text", "text": f"❌ Erro ao obter estatísticas do banco: {str(e)}"}]
+        return [
+            {
+                "type": "text",
+                "text": f"❌ Erro ao obter estatísticas do banco: {str(e)}",
+            }
+        ]
+
 
 async def get_formadores_info_real(limit: int, status: str) -> List[Dict[str, Any]]:
     """Informações reais dos formadores"""
@@ -372,7 +412,7 @@ async def get_formadores_info_real(limit: int, status: str) -> List[Dict[str, An
 
         @sync_to_async
         def get_formadores():
-            qs = Formador.objects.select_related('usuario')
+            qs = Formador.objects.select_related("usuario")
 
             if status == "ativo":
                 qs = qs.filter(usuario__is_active=True)
@@ -383,7 +423,9 @@ async def get_formadores_info_real(limit: int, status: str) -> List[Dict[str, An
 
         formadores = await get_formadores()
 
-        result = f"# 👨‍🏫 FORMADORES - {status.upper()} ({len(formadores)} de {limit})\n\n"
+        result = (
+            f"# 👨‍🏫 FORMADORES - {status.upper()} ({len(formadores)} de {limit})\n\n"
+        )
 
         for formador in formadores:
             result += f"## {formador.nome}\n"
@@ -398,7 +440,13 @@ async def get_formadores_info_real(limit: int, status: str) -> List[Dict[str, An
         return [{"type": "text", "text": result}]
 
     except Exception as e:
-        return [{"type": "text", "text": f"❌ Erro ao obter informações dos formadores: {str(e)}"}]
+        return [
+            {
+                "type": "text",
+                "text": f"❌ Erro ao obter informações dos formadores: {str(e)}",
+            }
+        ]
+
 
 async def get_solicitacoes_stats_real(periodo: str) -> List[Dict[str, Any]]:
     """Estatísticas reais das solicitações"""
@@ -435,23 +483,28 @@ async def get_solicitacoes_stats_real(periodo: str) -> List[Dict[str, Any]]:
 
             # Top projetos
             from django.db.models import Count
-            top_projetos = qs.values('projeto__nome').annotate(
-                count=Count('id')
-            ).order_by('-count')[:5]
+
+            top_projetos = (
+                qs.values("projeto__nome")
+                .annotate(count=Count("id"))
+                .order_by("-count")[:5]
+            )
 
             # Top formadores
-            top_formadores = qs.values('formador__nome').annotate(
-                count=Count('id')
-            ).order_by('-count')[:5]
+            top_formadores = (
+                qs.values("formador__nome")
+                .annotate(count=Count("id"))
+                .order_by("-count")[:5]
+            )
 
             return {
-                'total': total,
-                'pendentes': pendentes,
-                'aprovadas': aprovadas,
-                'rejeitadas': rejeitadas,
-                'top_projetos': list(top_projetos),
-                'top_formadores': list(top_formadores),
-                'periodo': periodo
+                "total": total,
+                "pendentes": pendentes,
+                "aprovadas": aprovadas,
+                "rejeitadas": rejeitadas,
+                "top_projetos": list(top_projetos),
+                "top_formadores": list(top_formadores),
+                "periodo": periodo,
             }
 
         stats = await get_stats()
@@ -467,17 +520,25 @@ async def get_solicitacoes_stats_real(periodo: str) -> List[Dict[str, Any]]:
 ## 🎯 **Top 5 Projetos**
 """
 
-        for projeto in stats['top_projetos']:
-            result += f"- **{projeto['projeto__nome']}**: {projeto['count']} solicitações\n"
+        for projeto in stats["top_projetos"]:
+            result += (
+                f"- **{projeto['projeto__nome']}**: {projeto['count']} solicitações\n"
+            )
 
         result += "\n## 👨‍🏫 **Top 5 Formadores**\n"
-        for formador in stats['top_formadores']:
+        for formador in stats["top_formadores"]:
             result += f"- **{formador['formador__nome']}**: {formador['count']} solicitações\n"
 
         return [{"type": "text", "text": result}]
 
     except Exception as e:
-        return [{"type": "text", "text": f"❌ Erro ao obter estatísticas das solicitações: {str(e)}"}]
+        return [
+            {
+                "type": "text",
+                "text": f"❌ Erro ao obter estatísticas das solicitações: {str(e)}",
+            }
+        ]
+
 
 async def get_projetos_overview_real() -> List[Dict[str, Any]]:
     """Visão geral real dos projetos"""
@@ -489,10 +550,16 @@ async def get_projetos_overview_real() -> List[Dict[str, Any]]:
             from django.db.models import Count
 
             projetos = Projeto.objects.annotate(
-                total_solicitacoes=Count('solicitacao'),
-                aprovadas=Count('solicitacao', filter=models.Q(solicitacao__status=SolicitacaoStatus.APROVADO)),
-                pendentes=Count('solicitacao', filter=models.Q(solicitacao__status=SolicitacaoStatus.PENDENTE))
-            ).order_by('-total_solicitacoes')
+                total_solicitacoes=Count("solicitacao"),
+                aprovadas=Count(
+                    "solicitacao",
+                    filter=models.Q(solicitacao__status=SolicitacaoStatus.APROVADO),
+                ),
+                pendentes=Count(
+                    "solicitacao",
+                    filter=models.Q(solicitacao__status=SolicitacaoStatus.PENDENTE),
+                ),
+            ).order_by("-total_solicitacoes")
 
             return list(projetos)
 
@@ -506,12 +573,20 @@ async def get_projetos_overview_real() -> List[Dict[str, Any]]:
             result += f"- **Total Solicitações**: {projeto.total_solicitacoes}\n"
             result += f"- **Aprovadas**: {projeto.aprovadas}\n"
             result += f"- **Pendentes**: {projeto.pendentes}\n"
-            result += f"- **Status**: {'✅ Ativo' if projeto.ativo else '❌ Inativo'}\n\n"
+            result += (
+                f"- **Status**: {'✅ Ativo' if projeto.ativo else '❌ Inativo'}\n\n"
+            )
 
         return [{"type": "text", "text": result}]
 
     except Exception as e:
-        return [{"type": "text", "text": f"❌ Erro ao obter visão geral dos projetos: {str(e)}"}]
+        return [
+            {
+                "type": "text",
+                "text": f"❌ Erro ao obter visão geral dos projetos: {str(e)}",
+            }
+        ]
+
 
 async def check_system_health_real() -> List[Dict[str, Any]]:
     """Verificação real de saúde do sistema"""
@@ -526,29 +601,29 @@ async def check_system_health_real() -> List[Dict[str, Any]]:
             try:
                 with connection.cursor() as cursor:
                     cursor.execute("SELECT 1")
-                    checks['database'] = '✅ OK'
+                    checks["database"] = "✅ OK"
             except Exception as e:
-                checks['database'] = f'❌ ERRO: {str(e)}'
+                checks["database"] = f"❌ ERRO: {str(e)}"
 
             # Check 2: Data integrity
             try:
                 total_solicitacoes = Solicitacao.objects.count()
                 total_formadores = Formador.objects.count()
                 if total_solicitacoes > 0 and total_formadores > 0:
-                    checks['data_integrity'] = '✅ OK - Dados presentes'
+                    checks["data_integrity"] = "✅ OK - Dados presentes"
                 else:
-                    checks['data_integrity'] = '⚠️ AVISO - Poucos dados'
+                    checks["data_integrity"] = "⚠️ AVISO - Poucos dados"
             except Exception as e:
-                checks['data_integrity'] = f'❌ ERRO: {str(e)}'
+                checks["data_integrity"] = f"❌ ERRO: {str(e)}"
 
             # Check 3: Recent activity
             try:
                 recent_logs = LogAuditoria.objects.filter(
                     timestamp__gte=timezone.now() - timezone.timedelta(hours=24)
                 ).count()
-                checks['activity'] = f'✅ OK - {recent_logs} eventos nas últimas 24h'
+                checks["activity"] = f"✅ OK - {recent_logs} eventos nas últimas 24h"
             except Exception as e:
-                checks['activity'] = f'❌ ERRO: {str(e)}'
+                checks["activity"] = f"❌ ERRO: {str(e)}"
 
             return checks
 
@@ -560,13 +635,14 @@ async def check_system_health_real() -> List[Dict[str, Any]]:
             result += f"## {check_name.replace('_', ' ').title()}\n{status}\n\n"
 
         # Resumo geral
-        all_ok = all('✅' in status for status in checks.values())
+        all_ok = all("✅" in status for status in checks.values())
         result += f"## Status Geral\n{'✅ SISTEMA SAUDÁVEL' if all_ok else '⚠️ ATENÇÃO NECESSÁRIA'}\n"
 
         return [{"type": "text", "text": result}]
 
     except Exception as e:
         return [{"type": "text", "text": f"❌ Erro na verificação de saúde: {str(e)}"}]
+
 
 async def analyze_approval_flow_real() -> List[Dict[str, Any]]:
     """Análise real do fluxo de aprovações"""
@@ -580,26 +656,34 @@ async def analyze_approval_flow_real() -> List[Dict[str, Any]]:
 
             # Análise das aprovações
             total_solicitacoes = Solicitacao.objects.count()
-            aprovadas = Solicitacao.objects.filter(status=SolicitacaoStatus.APROVADO).count()
-            pendentes = Solicitacao.objects.filter(status=SolicitacaoStatus.PENDENTE).count()
-            rejeitadas = Solicitacao.objects.filter(status=SolicitacaoStatus.REJEITADO).count()
+            aprovadas = Solicitacao.objects.filter(
+                status=SolicitacaoStatus.APROVADO
+            ).count()
+            pendentes = Solicitacao.objects.filter(
+                status=SolicitacaoStatus.PENDENTE
+            ).count()
+            rejeitadas = Solicitacao.objects.filter(
+                status=SolicitacaoStatus.REJEITADO
+            ).count()
 
             # Taxa de aprovação
-            taxa_aprovacao = (aprovadas / total_solicitacoes * 100) if total_solicitacoes > 0 else 0
+            taxa_aprovacao = (
+                (aprovadas / total_solicitacoes * 100) if total_solicitacoes > 0 else 0
+            )
 
             # Gargalos (solicitações pendentes há muito tempo)
             old_pendentes = Solicitacao.objects.filter(
                 status=SolicitacaoStatus.PENDENTE,
-                data_criacao__lt=timezone.now() - timedelta(days=7)
+                data_criacao__lt=timezone.now() - timedelta(days=7),
             ).count()
 
             return {
-                'total': total_solicitacoes,
-                'aprovadas': aprovadas,
-                'pendentes': pendentes,
-                'rejeitadas': rejeitadas,
-                'taxa_aprovacao': taxa_aprovacao,
-                'old_pendentes': old_pendentes
+                "total": total_solicitacoes,
+                "aprovadas": aprovadas,
+                "pendentes": pendentes,
+                "rejeitadas": rejeitadas,
+                "taxa_aprovacao": taxa_aprovacao,
+                "old_pendentes": old_pendentes,
             }
 
         flow = await analyze_flow()
@@ -619,16 +703,18 @@ async def analyze_approval_flow_real() -> List[Dict[str, Any]]:
 ## 📈 **Recomendações**
 """
 
-        if flow['old_pendentes'] > 0:
+        if flow["old_pendentes"] > 0:
             result += f"- 🔴 **URGENTE**: {flow['old_pendentes']} solicitações pendentes há mais de 7 dias precisam de atenção\n"
 
-        if flow['taxa_aprovacao'] < 50:
+        if flow["taxa_aprovacao"] < 50:
             result += "- ⚠️ Taxa de aprovação baixa - revisar critérios ou processo\n"
-        elif flow['taxa_aprovacao'] > 90:
+        elif flow["taxa_aprovacao"] > 90:
             result += "- ✅ Taxa de aprovação alta - fluxo funcionando bem\n"
 
-        if flow['pendentes'] > flow['aprovadas']:
-            result += "- 📋 Backlog de pendentes maior que aprovadas - priorizar análises\n"
+        if flow["pendentes"] > flow["aprovadas"]:
+            result += (
+                "- 📋 Backlog de pendentes maior que aprovadas - priorizar análises\n"
+            )
 
         result += "\n✅ **Análise baseada em dados reais do sistema**"
 
@@ -636,6 +722,7 @@ async def analyze_approval_flow_real() -> List[Dict[str, Any]]:
 
     except Exception as e:
         return [{"type": "text", "text": f"❌ Erro na análise do fluxo: {str(e)}"}]
+
 
 async def get_architecture_patterns() -> List[Dict[str, Any]]:
     """Padrões de arquitetura do Sistema APRENDER"""
@@ -691,9 +778,11 @@ core/                   # App principal
 
     return [{"type": "text", "text": patterns}]
 
+
 # ===============================
 # FUNÇÃO PRINCIPAL
 # ===============================
+
 
 async def main():
     """Função principal do bridge MCP"""
@@ -718,6 +807,7 @@ async def main():
     async with stdio_server() as (read_stream, write_stream):
         logger.info("🚀 MCP Bridge rodando - aguardando comandos do Cursor")
         await server.run(read_stream, write_stream, {})
+
 
 if __name__ == "__main__":
     try:

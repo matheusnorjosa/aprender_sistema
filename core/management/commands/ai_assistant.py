@@ -18,14 +18,16 @@ Date: Janeiro 2025
 import asyncio
 import json
 from pathlib import Path
+
 from django.core.management.base import BaseCommand, CommandError
+
 from core.services.claude_code_integration import (
-    ai_generate_model,
-    ai_generate_view,
-    ai_generate_tests,
     ai_analyze_code,
     ai_generate_docs,
-    claude_code_service
+    ai_generate_model,
+    ai_generate_tests,
+    ai_generate_view,
+    claude_code_service,
 )
 
 
@@ -34,76 +36,70 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--generate-model',
-            type=str,
-            help='Generate Django model from description'
+            "--generate-model", type=str, help="Generate Django model from description"
         )
-        
+
         parser.add_argument(
-            '--app-name',
+            "--app-name",
             type=str,
-            default='core',
-            help='Django app name for generated model'
+            default="core",
+            help="Django app name for generated model",
         )
-        
+
         parser.add_argument(
-            '--generate-view',
+            "--generate-view",
             type=str,
-            help='Generate Django views for given model name'
+            help="Generate Django views for given model name",
         )
-        
+
         parser.add_argument(
-            '--view-type',
+            "--view-type",
             type=str,
-            default='CRUD',
-            choices=['CRUD', 'API', 'ListView', 'DetailView', 'FormView'],
-            help='Type of views to generate'
+            default="CRUD",
+            choices=["CRUD", "API", "ListView", "DetailView", "FormView"],
+            help="Type of views to generate",
         )
-        
+
         parser.add_argument(
-            '--generate-tests',
+            "--generate-tests",
             type=str,
-            help='Generate tests for component description'
+            help="Generate tests for component description",
         )
-        
+
         parser.add_argument(
-            '--test-type',
+            "--test-type",
             type=str,
-            default='unit',
-            choices=['unit', 'integration', 'functional'],
-            help='Type of tests to generate'
+            default="unit",
+            choices=["unit", "integration", "functional"],
+            help="Type of tests to generate",
         )
-        
+
         parser.add_argument(
-            '--analyze-code',
+            "--analyze-code", type=str, help="Analyze code quality of given file path"
+        )
+
+        parser.add_argument(
+            "--generate-docs",
             type=str,
-            help='Analyze code quality of given file path'
+            help="Generate documentation for given file path",
         )
-        
+
         parser.add_argument(
-            '--generate-docs',
+            "--doc-type",
             type=str,
-            help='Generate documentation for given file path'
+            default="api",
+            choices=["api", "user", "technical"],
+            help="Type of documentation to generate",
         )
-        
+
         parser.add_argument(
-            '--doc-type',
+            "--output",
             type=str,
-            default='api',
-            choices=['api', 'user', 'technical'],
-            help='Type of documentation to generate'
+            help="Output file path (optional, prints to console if not specified)",
         )
-        
+
         parser.add_argument(
-            '--output',
-            type=str,
-            help='Output file path (optional, prints to console if not specified)'
-        )
-        
-        parser.add_argument(
-            '--test-sdk',
-            action='store_true',
-            help='Test if Claude Code SDK is working'
+            "--test-sdk", action="store_true", help="Test if Claude Code SDK is working"
         )
 
     def handle(self, *args, **options):
@@ -111,18 +107,18 @@ class Command(BaseCommand):
             raise CommandError(
                 "Claude Code SDK not available. Install with: pip install claude-code-sdk"
             )
-        
-        if options['test_sdk']:
+
+        if options["test_sdk"]:
             self.test_sdk()
             return
-        
+
         # Run async operations
         asyncio.run(self.handle_async(options))
-    
+
     def test_sdk(self):
         """Test if Claude Code SDK is properly configured"""
         self.stdout.write("Testing Claude Code SDK...")
-        
+
         if claude_code_service.enabled:
             self.stdout.write(
                 self.style.SUCCESS("[OK] Claude Code SDK is available and ready!")
@@ -136,76 +132,68 @@ class Command(BaseCommand):
                 "  --generate-docs path/to/file.py"
             )
         else:
-            self.stdout.write(
-                self.style.ERROR("[ERROR] Claude Code SDK not available")
-            )
-    
+            self.stdout.write(self.style.ERROR("[ERROR] Claude Code SDK not available"))
+
     async def handle_async(self, options):
         """Handle async operations"""
         result = None
-        
-        if options['generate_model']:
+
+        if options["generate_model"]:
             self.stdout.write("Generating Django model...")
             result = await ai_generate_model(
-                options['generate_model'],
-                options['app_name']
+                options["generate_model"], options["app_name"]
             )
-            
-        elif options['generate_view']:
+
+        elif options["generate_view"]:
             self.stdout.write("Generating Django views...")
             result = await ai_generate_view(
-                options['generate_view'],
-                options['view_type']
+                options["generate_view"], options["view_type"]
             )
-            
-        elif options['generate_tests']:
+
+        elif options["generate_tests"]:
             self.stdout.write("Generating test cases...")
             result = await ai_generate_tests(
-                options['generate_tests'],
-                options['test_type']
+                options["generate_tests"], options["test_type"]
             )
-            
-        elif options['analyze_code']:
-            file_path = Path(options['analyze_code'])
+
+        elif options["analyze_code"]:
+            file_path = Path(options["analyze_code"])
             if not file_path.exists():
                 raise CommandError(f"File not found: {file_path}")
-            
+
             self.stdout.write(f"Analyzing code: {file_path}")
-            
+
             # Read file content
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     code_content = f.read()
             except Exception as e:
                 raise CommandError(f"Error reading file: {e}")
-            
+
             analysis = await ai_analyze_code(code_content, "django")
             if analysis:
                 result = json.dumps(analysis, indent=2)
-            
-        elif options['generate_docs']:
-            file_path = Path(options['generate_docs'])
+
+        elif options["generate_docs"]:
+            file_path = Path(options["generate_docs"])
             if not file_path.exists():
                 raise CommandError(f"File not found: {file_path}")
-            
+
             self.stdout.write(f"Generating documentation for: {file_path}")
-            result = await ai_generate_docs(
-                str(file_path),
-                options['doc_type']
-            )
-        
+            result = await ai_generate_docs(str(file_path), options["doc_type"])
+
         else:
             raise CommandError(
                 "Please specify an action. Use --help to see available options."
             )
-        
+
         # Handle output
         if result:
-            if options['output']:
-                output_path = Path(options['output'])
+            if options["output"]:
+                output_path = Path(options["output"])
                 try:
                     output_path.parent.mkdir(parents=True, exist_ok=True)
-                    with open(output_path, 'w', encoding='utf-8') as f:
+                    with open(output_path, "w", encoding="utf-8") as f:
                         f.write(result)
                     self.stdout.write(
                         self.style.SUCCESS(f"[OK] Output saved to: {output_path}")
@@ -213,12 +201,14 @@ class Command(BaseCommand):
                 except Exception as e:
                     raise CommandError(f"Error saving output: {e}")
             else:
-                self.stdout.write("\n" + "="*60)
+                self.stdout.write("\n" + "=" * 60)
                 self.stdout.write("GENERATED RESULT:")
-                self.stdout.write("="*60)
+                self.stdout.write("=" * 60)
                 self.stdout.write(result)
-                self.stdout.write("="*60)
+                self.stdout.write("=" * 60)
         else:
             self.stdout.write(
-                self.style.WARNING("[WARNING] No result generated. Check logs for errors.")
+                self.style.WARNING(
+                    "[WARNING] No result generated. Check logs for errors."
+                )
             )

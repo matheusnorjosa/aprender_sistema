@@ -386,7 +386,13 @@ class Command(BaseCommand):
                             self.stdout.write(f"  [=] Ja existe: {nome} ({uf})")
                 else:
                     # Simular criação (dry-run)
-                    exists = Municipio.objects.prefetch_related("solicitacao_set", "usuario_set").filter(nome=nome, uf=uf).exists()
+                    exists = (
+                        Municipio.objects.prefetch_related(
+                            "solicitacao_set", "usuario_set"
+                        )
+                        .filter(nome=nome, uf=uf)
+                        .exists()
+                    )
                     if exists:
                         resultado["duplicados"] += 1
                         self.stdout.write(f"  [=] [DRY] Ja existe: {nome} ({uf})")

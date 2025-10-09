@@ -15,6 +15,7 @@ from typing import Dict, List, Tuple, Optional
 # Adicionar diretório atual ao path
 sys.path.insert(0, str(Path(__file__).parent))
 
+
 def check_documentation_files() -> Tuple[bool, List[str]]:
     """Verifica se arquivos de documentação essenciais existem."""
     docs_dir = Path(__file__).parent.parent
@@ -22,7 +23,7 @@ def check_documentation_files() -> Tuple[bool, List[str]]:
         "ARQUITETURA_REFERENCIA.md",
         "PADROES_CODIGO_PYTHON.md",
         "GUIA_SEGURANCA.md",
-        "CLAUDE_CONTEXT_PACKAGE.md"
+        "CLAUDE_CONTEXT_PACKAGE.md",
     ]
 
     issues = []
@@ -33,13 +34,16 @@ def check_documentation_files() -> Tuple[bool, List[str]]:
         else:
             # Verificar se o arquivo não está vazio
             try:
-                content = doc_path.read_text(encoding='utf-8')
+                content = doc_path.read_text(encoding="utf-8")
                 if len(content.strip()) < 100:
-                    issues.append(f"⚠️ Documento muito pequeno: {doc} ({len(content)} chars)")
+                    issues.append(
+                        f"⚠️ Documento muito pequeno: {doc} ({len(content)} chars)"
+                    )
             except Exception as e:
                 issues.append(f"❌ Erro ao ler {doc}: {e}")
 
     return len(issues) == 0, issues
+
 
 def check_mcp_server() -> Tuple[bool, List[str]]:
     """Verifica se o servidor MCP pode ser carregado."""
@@ -47,7 +51,12 @@ def check_mcp_server() -> Tuple[bool, List[str]]:
 
     try:
         # Tentar importar o módulo do servidor MCP
-        from mcp_server_aprender import server, _read_documentation_file, handle_list_tools, handle_call_tool
+        from mcp_server_aprender import (
+            server,
+            _read_documentation_file,
+            handle_list_tools,
+            handle_call_tool,
+        )
 
         # Verificar se o servidor tem as ferramentas esperadas
         tools = asyncio.run(handle_list_tools())
@@ -59,7 +68,7 @@ def check_mcp_server() -> Tuple[bool, List[str]]:
             "validate_code_pattern",
             "check_security_vulnerabilities",
             "get_system_context",
-            "get_project_structure"
+            "get_project_structure",
         ]
 
         tool_names = [tool["name"] for tool in tools]
@@ -71,37 +80,43 @@ def check_mcp_server() -> Tuple[bool, List[str]]:
         try:
             result = asyncio.run(handle_call_tool("get_project_structure", {}))
             if not result or result[0]["type"] != "text":
-                issues.append("❌ Ferramenta get_project_structure não retornou resultado válido")
+                issues.append(
+                    "❌ Ferramenta get_project_structure não retornou resultado válido"
+                )
         except Exception as e:
             issues.append(f"❌ Erro ao testar ferramenta MCP: {e}")
 
     except ImportError as e:
         issues.append(f"❌ Não é possível importar servidor MCP: {e}")
-        issues.append("   Instale as dependências: pip install -r neural_system/requirements_mcp.txt")
+        issues.append(
+            "   Instale as dependências: pip install -r neural_system/requirements_mcp.txt"
+        )
     except Exception as e:
         issues.append(f"❌ Erro no servidor MCP: {e}")
 
     return len(issues) == 0, issues
 
+
 def _is_running_in_docker() -> bool:
     """Detecta se está rodando dentro de um container Docker."""
     # Primeiro, verificar pistas mais diretas
-    if os.path.exists('/.dockerenv'):
+    if os.path.exists("/.dockerenv"):
         return True
 
-    if os.environ.get('DOCKER_CONTAINER') == 'true':
+    if os.environ.get("DOCKER_CONTAINER") == "true":
         return True
 
-    if os.environ.get('PYTHONPATH') == '/app':
+    if os.environ.get("PYTHONPATH") == "/app":
         return True
 
     # Verificar cgroup como fallback
     try:
-        with open('/proc/1/cgroup', 'r') as f:
+        with open("/proc/1/cgroup", "r") as f:
             content = f.read()
-            return 'docker' in content or 'containerd' in content
+            return "docker" in content or "containerd" in content
     except (FileNotFoundError, PermissionError):
         return False
+
 
 def check_cursor_configuration() -> Tuple[bool, List[str]]:
     """Verifica configuração do Cursor."""
@@ -122,15 +137,19 @@ def check_cursor_configuration() -> Tuple[bool, List[str]]:
         return False, issues
 
     if not mcp_settings.exists():
-        issues.append(f"❌ Arquivo {mcp_settings.name} não encontrado para ambiente {env_name}")
+        issues.append(
+            f"❌ Arquivo {mcp_settings.name} não encontrado para ambiente {env_name}"
+        )
         return False, issues
 
     try:
-        with open(mcp_settings, 'r') as f:
+        with open(mcp_settings, "r") as f:
             settings = json.load(f)
 
         if "mcpServers" not in settings:
-            issues.append(f"❌ Configuração mcpServers não encontrada em {mcp_settings.name}")
+            issues.append(
+                f"❌ Configuração mcpServers não encontrada em {mcp_settings.name}"
+            )
         elif "aprender-context" not in settings["mcpServers"]:
             issues.append("❌ Servidor aprender-context não configurado")
         else:
@@ -140,13 +159,17 @@ def check_cursor_configuration() -> Tuple[bool, List[str]]:
             if _is_running_in_docker():
                 # Em Docker, verificar se usa docker-compose
                 if server_config.get("command") != "docker-compose":
-                    issues.append("⚠️ Configuração Docker deve usar 'docker-compose' como comando")
+                    issues.append(
+                        "⚠️ Configuração Docker deve usar 'docker-compose' como comando"
+                    )
             else:
                 # Local, verificar se o arquivo MCP existe
                 if "args" in server_config:
                     mcp_server_path = Path(server_config["args"][0])
                     if not mcp_server_path.exists():
-                        issues.append(f"❌ Servidor MCP não encontrado no caminho: {mcp_server_path}")
+                        issues.append(
+                            f"❌ Servidor MCP não encontrado no caminho: {mcp_server_path}"
+                        )
 
     except json.JSONDecodeError as e:
         issues.append(f"❌ JSON inválido em {mcp_settings.name}: {e}")
@@ -154,6 +177,7 @@ def check_cursor_configuration() -> Tuple[bool, List[str]]:
         issues.append(f"❌ Erro ao verificar configuração Cursor: {e}")
 
     return len(issues) == 0, issues
+
 
 def check_test_coverage() -> Tuple[bool, List[str]]:
     """Verifica se testes existem e podem ser executados."""
@@ -165,10 +189,7 @@ def check_test_coverage() -> Tuple[bool, List[str]]:
         issues.append("❌ Diretório de testes não encontrado")
         return False, issues
 
-    test_files = [
-        "test_mcp_server.py",
-        "test_context_updates.py"
-    ]
+    test_files = ["test_mcp_server.py", "test_context_updates.py"]
 
     for test_file in test_files:
         test_path = tests_dir / test_file
@@ -178,11 +199,13 @@ def check_test_coverage() -> Tuple[bool, List[str]]:
     # Tentar executar testes (só verificar sintaxe)
     try:
         import pytest
+
         # Não executar os testes realmente, só verificar se pytest está disponível
     except ImportError:
         issues.append("⚠️ pytest não instalado - recomendado para executar testes")
 
     return len(issues) == 0, issues
+
 
 def test_mcp_functionality() -> Tuple[bool, List[str]]:
     """Testa funcionalidade básica do MCP."""
@@ -200,39 +223,43 @@ def test_view(request, item_id: int) -> HttpResponse:
     return render(request, 'template.html')
 '''
 
-        result = asyncio.run(handle_call_tool("validate_code_pattern", {
-            "code": test_code_good,
-            "context": "view"
-        }))
+        result = asyncio.run(
+            handle_call_tool(
+                "validate_code_pattern", {"code": test_code_good, "context": "view"}
+            )
+        )
 
         if "✅" not in result[0]["text"]:
             issues.append("⚠️ Validação de código bom não retornou resultado positivo")
 
         # Teste 2: Validação de código com problemas
-        test_code_bad = '''
+        test_code_bad = """
 def bad_view(request):
     print("Debug message")
     return HttpResponse("OK")
-'''
+"""
 
-        result = asyncio.run(handle_call_tool("validate_code_pattern", {
-            "code": test_code_bad,
-            "context": "view"
-        }))
+        result = asyncio.run(
+            handle_call_tool(
+                "validate_code_pattern", {"code": test_code_bad, "context": "view"}
+            )
+        )
 
         if "ERRO" not in result[0]["text"]:
             issues.append("⚠️ Validação de código ruim não detectou problemas")
 
         # Teste 3: Verificação de segurança
-        test_code_unsafe = '''
+        test_code_unsafe = """
 api_key = "hardcoded-secret"
 user_input = request.GET['input']
 query = "SELECT * FROM table WHERE id = %s" % user_input
-'''
+"""
 
-        result = asyncio.run(handle_call_tool("check_security_vulnerabilities", {
-            "code": test_code_unsafe
-        }))
+        result = asyncio.run(
+            handle_call_tool(
+                "check_security_vulnerabilities", {"code": test_code_unsafe}
+            )
+        )
 
         if "RISCO" not in result[0]["text"]:
             issues.append("⚠️ Verificação de segurança não detectou vulnerabilidades")
@@ -242,16 +269,13 @@ query = "SELECT * FROM table WHERE id = %s" % user_input
 
     return len(issues) == 0, issues
 
+
 def check_dependencies() -> Tuple[bool, List[str]]:
     """Verifica se dependências necessárias estão instaladas."""
     issues = []
 
     # Verificar dependências Python
-    required_packages = [
-        "mcp",
-        "anthropic",
-        "requests"
-    ]
+    required_packages = ["mcp", "anthropic", "requests"]
 
     for package in required_packages:
         try:
@@ -261,9 +285,12 @@ def check_dependencies() -> Tuple[bool, List[str]]:
 
     # Verificar Python version
     if sys.version_info < (3, 8):
-        issues.append(f"❌ Python {sys.version_info.major}.{sys.version_info.minor} muito antigo. Mínimo: 3.8")
+        issues.append(
+            f"❌ Python {sys.version_info.major}.{sys.version_info.minor} muito antigo. Mínimo: 3.8"
+        )
 
     return len(issues) == 0, issues
+
 
 def main():
     """Função principal de validação."""
@@ -329,6 +356,7 @@ def main():
         print("🔧 Corrija os problemas acima e execute novamente:")
         print("   python neural_system/validate_system.py")
         return False
+
 
 if __name__ == "__main__":
     success = main()

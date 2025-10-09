@@ -12,9 +12,10 @@ Date: Janeiro 2025
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Union
+from typing import Any, Dict, List, Optional, Union
+
 from django.conf import settings
-from django.template import Template, Context
+from django.template import Context, Template
 
 try:
     import openai
@@ -31,8 +32,12 @@ except ImportError:
     Anthropic = None
 
 from core.models import (
-    Formador, Municipio, Projeto, TipoEvento,
-    Solicitacao, SolicitacaoStatus
+    Formador,
+    Municipio,
+    Projeto,
+    Solicitacao,
+    SolicitacaoStatus,
+    TipoEvento,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,39 +47,39 @@ class SystemPromptEngine:
     """
     Advanced system prompt engineering for AI interactions
     """
-    
+
     def __init__(self):
         self.prompts_registry = {}
         self._load_builtin_prompts()
-        
+
         # Initialize AI clients if available
         self.openai_client = None
         self.anthropic_client = None
         self._setup_ai_clients()
-    
+
     def _setup_ai_clients(self):
         """Setup AI service clients"""
         # OpenAI
-        if OpenAI and hasattr(settings, 'OPENAI_API_KEY'):
+        if OpenAI and hasattr(settings, "OPENAI_API_KEY"):
             try:
                 self.openai_client = OpenAI(
-                    api_key=getattr(settings, 'OPENAI_API_KEY', None)
+                    api_key=getattr(settings, "OPENAI_API_KEY", None)
                 )
             except Exception as e:
                 logger.warning(f"OpenAI client setup failed: {e}")
-        
+
         # Anthropic
-        if Anthropic and hasattr(settings, 'ANTHROPIC_API_KEY'):
+        if Anthropic and hasattr(settings, "ANTHROPIC_API_KEY"):
             try:
                 self.anthropic_client = Anthropic(
-                    api_key=getattr(settings, 'ANTHROPIC_API_KEY', None)
+                    api_key=getattr(settings, "ANTHROPIC_API_KEY", None)
                 )
             except Exception as e:
                 logger.warning(f"Anthropic client setup failed: {e}")
-    
+
     def _load_builtin_prompts(self):
         """Load built-in system prompts"""
-        
+
         # Educational Analysis Prompts
         self.register_prompt(
             "analyze_student_performance",
@@ -105,9 +110,9 @@ class SystemPromptEngine:
             5. Action Items
             """,
             category="education",
-            description="Analyze student performance data with educational insights"
+            description="Analyze student performance data with educational insights",
         )
-        
+
         # Schedule Optimization Prompts
         self.register_prompt(
             "optimize_class_schedule",
@@ -142,9 +147,9 @@ class SystemPromptEngine:
             4. Quality assurance measures
             """,
             category="scheduling",
-            description="Optimize educational schedules with AI assistance"
+            description="Optimize educational schedules with AI assistance",
         )
-        
+
         # Content Generation Prompts
         self.register_prompt(
             "generate_course_content",
@@ -173,9 +178,9 @@ class SystemPromptEngine:
             Format: Structured educational content suitable for professional trainers.
             """,
             category="content",
-            description="Generate structured educational content and curricula"
+            description="Generate structured educational content and curricula",
         )
-        
+
         # Report Generation Prompts
         self.register_prompt(
             "generate_executive_report",
@@ -205,9 +210,9 @@ class SystemPromptEngine:
             Tone: Professional, data-driven, actionable
             """,
             category="reporting",
-            description="Generate executive-level educational reports"
+            description="Generate executive-level educational reports",
         )
-        
+
         # Quality Assurance Prompts
         self.register_prompt(
             "review_educational_quality",
@@ -240,9 +245,9 @@ class SystemPromptEngine:
             5. Success metrics
             """,
             category="quality",
-            description="Conduct comprehensive educational quality reviews"
+            description="Conduct comprehensive educational quality reviews",
         )
-        
+
         # Communication Prompts
         self.register_prompt(
             "draft_stakeholder_communication",
@@ -270,185 +275,191 @@ class SystemPromptEngine:
             
             Format: {{format}} (email, memo, presentation, etc.)
             """,
-            category="communication", 
-            description="Draft professional stakeholder communications"
+            category="communication",
+            description="Draft professional stakeholder communications",
         )
-    
+
     def register_prompt(
-        self, 
-        name: str, 
-        template: str, 
+        self,
+        name: str,
+        template: str,
         category: str = "general",
         description: str = "",
-        metadata: Dict[str, Any] = None
+        metadata: Dict[str, Any] = None,
     ) -> bool:
         """
         Register a new system prompt
-        
+
         Args:
             name: Unique prompt identifier
             template: Prompt template with Django template syntax
             category: Prompt category for organization
             description: Human-readable description
             metadata: Additional prompt metadata
-            
+
         Returns:
             True if registration successful
         """
         try:
             self.prompts_registry[name] = {
-                'template': template,
-                'category': category,
-                'description': description,
-                'metadata': metadata or {},
-                'created_at': datetime.now().isoformat()
+                "template": template,
+                "category": category,
+                "description": description,
+                "metadata": metadata or {},
+                "created_at": datetime.now().isoformat(),
             }
             logger.info(f"Registered prompt: {name}")
             return True
         except Exception as e:
             logger.error(f"Failed to register prompt {name}: {e}")
             return False
-    
-    def get_prompt(
-        self, 
-        name: str, 
-        context: Dict[str, Any] = None
-    ) -> Optional[str]:
+
+    def get_prompt(self, name: str, context: Dict[str, Any] = None) -> Optional[str]:
         """
         Get rendered prompt by name
-        
+
         Args:
             name: Prompt identifier
             context: Template context variables
-            
+
         Returns:
             Rendered prompt string or None if not found
         """
         if name not in self.prompts_registry:
             logger.warning(f"Prompt not found: {name}")
             return None
-        
+
         try:
-            template_str = self.prompts_registry[name]['template']
+            template_str = self.prompts_registry[name]["template"]
             template = Template(template_str)
             context_obj = Context(context or {})
             rendered = template.render(context_obj)
-            
+
             return rendered.strip()
         except Exception as e:
             logger.error(f"Failed to render prompt {name}: {e}")
             return None
-    
+
     def list_prompts(self, category: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         List available prompts, optionally filtered by category
-        
+
         Args:
             category: Filter by category
-            
+
         Returns:
             List of prompt metadata
         """
         prompts = []
         for name, config in self.prompts_registry.items():
-            if category is None or config['category'] == category:
-                prompts.append({
-                    'name': name,
-                    'category': config['category'],
-                    'description': config['description'],
-                    'created_at': config['created_at']
-                })
-        
-        return sorted(prompts, key=lambda x: x['category'])
-    
+            if category is None or config["category"] == category:
+                prompts.append(
+                    {
+                        "name": name,
+                        "category": config["category"],
+                        "description": config["description"],
+                        "created_at": config["created_at"],
+                    }
+                )
+
+        return sorted(prompts, key=lambda x: x["category"])
+
     def get_categories(self) -> List[str]:
         """Get all available prompt categories"""
         categories = set()
         for config in self.prompts_registry.values():
-            categories.add(config['category'])
+            categories.add(config["category"])
         return sorted(list(categories))
-    
+
     async def execute_prompt_openai(
         self,
         prompt_name: str,
         context: Dict[str, Any] = None,
         model: str = "gpt-4",
-        **kwargs
+        **kwargs,
     ) -> Optional[str]:
         """
         Execute prompt using OpenAI API
-        
+
         Args:
             prompt_name: Registered prompt name
             context: Template context
             model: OpenAI model to use
             **kwargs: Additional OpenAI parameters
-            
+
         Returns:
             AI response or None if error
         """
         if not self.openai_client:
             logger.warning("OpenAI client not available")
             return None
-        
+
         prompt = self.get_prompt(prompt_name, context)
         if not prompt:
             return None
-        
+
         try:
             response = await self.openai_client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": prompt},
-                    {"role": "user", "content": context.get("user_input", "Please analyze the provided data.")}
+                    {
+                        "role": "user",
+                        "content": context.get(
+                            "user_input", "Please analyze the provided data."
+                        ),
+                    },
                 ],
-                **kwargs
+                **kwargs,
             )
-            
+
             return response.choices[0].message.content
         except Exception as e:
             logger.error(f"OpenAI API error: {e}")
             return None
-    
+
     async def execute_prompt_anthropic(
         self,
         prompt_name: str,
         context: Dict[str, Any] = None,
         model: str = "claude-3-sonnet-20240229",
         max_tokens: int = 1000,
-        **kwargs
+        **kwargs,
     ) -> Optional[str]:
         """
         Execute prompt using Anthropic Claude API
-        
+
         Args:
             prompt_name: Registered prompt name
             context: Template context
             model: Claude model to use
             max_tokens: Maximum response tokens
             **kwargs: Additional Anthropic parameters
-            
+
         Returns:
             AI response or None if error
         """
         if not self.anthropic_client:
             logger.warning("Anthropic client not available")
             return None
-        
+
         prompt = self.get_prompt(prompt_name, context)
         if not prompt:
             return None
-        
+
         try:
             response = await self.anthropic_client.messages.create(
                 model=model,
                 max_tokens=max_tokens,
                 messages=[
-                    {"role": "user", "content": f"{prompt}\n\nUser Input: {context.get('user_input', 'Please analyze the provided data.')}"}
+                    {
+                        "role": "user",
+                        "content": f"{prompt}\n\nUser Input: {context.get('user_input', 'Please analyze the provided data.')}",
+                    }
                 ],
-                **kwargs
+                **kwargs,
             )
-            
+
             return response.content[0].text if response.content else None
         except Exception as e:
             logger.error(f"Anthropic API error: {e}")
@@ -459,76 +470,74 @@ class EducationalPromptGenerator:
     """
     Specialized prompt generator for educational contexts
     """
-    
+
     def __init__(self):
         self.prompt_engine = SystemPromptEngine()
-    
+
     def generate_formador_analysis_prompt(self, formador: Formador) -> str:
         """Generate analysis prompt for a specific formador"""
         context = {
-            'formador_name': formador.usuario.get_full_name(),
-            'formador_id': str(formador.id),
-            'active_status': formador.ativo,
-            'creation_date': formador.data_criacao.isoformat(),
+            "formador_name": formador.usuario.get_full_name(),
+            "formador_id": str(formador.id),
+            "active_status": formador.ativo,
+            "creation_date": formador.data_criacao.isoformat(),
         }
-        
-        return self.prompt_engine.get_prompt('analyze_formador_performance', context)
-    
+
+        return self.prompt_engine.get_prompt("analyze_formador_performance", context)
+
     def generate_schedule_optimization_prompt(
-        self, 
+        self,
         solicitacoes: List[Solicitacao],
         formadores: List[Formador],
-        constraints: Dict[str, Any] = None
+        constraints: Dict[str, Any] = None,
     ) -> str:
         """Generate schedule optimization prompt"""
         context = {
-            'solicitacoes_count': len(solicitacoes),
-            'formadores_count': len(formadores),
-            'constraints': json.dumps(constraints or {}),
-            'formadores': [f.usuario.get_full_name() for f in formadores],
-            'time_period': 'Current planning period'
+            "solicitacoes_count": len(solicitacoes),
+            "formadores_count": len(formadores),
+            "constraints": json.dumps(constraints or {}),
+            "formadores": [f.usuario.get_full_name() for f in formadores],
+            "time_period": "Current planning period",
         }
-        
-        return self.prompt_engine.get_prompt('optimize_class_schedule', context)
-    
+
+        return self.prompt_engine.get_prompt("optimize_class_schedule", context)
+
     def generate_quality_review_prompt(
-        self,
-        projeto: Projeto,
-        feedback_data: Dict[str, Any] = None
+        self, projeto: Projeto, feedback_data: Dict[str, Any] = None
     ) -> str:
         """Generate quality review prompt for a project"""
         context = {
-            'scope': f"Project: {projeto.nome}",
-            'criteria': "Educational standards and best practices",
-            'feedback': json.dumps(feedback_data or {}),
-            'project_description': projeto.descricao or "No description available"
+            "scope": f"Project: {projeto.nome}",
+            "criteria": "Educational standards and best practices",
+            "feedback": json.dumps(feedback_data or {}),
+            "project_description": projeto.descricao or "No description available",
         }
-        
-        return self.prompt_engine.get_prompt('review_educational_quality', context)
-    
+
+        return self.prompt_engine.get_prompt("review_educational_quality", context)
+
     def generate_report_prompt(
         self,
         report_type: str,
         data_summary: Dict[str, Any],
         metrics: Dict[str, Any] = None,
-        period: str = "Monthly"
+        period: str = "Monthly",
     ) -> str:
         """Generate executive report prompt"""
         context = {
-            'data_summary': json.dumps(data_summary),
-            'metrics': json.dumps(metrics or {}),
-            'period': period,
-            'report_type': report_type
+            "data_summary": json.dumps(data_summary),
+            "metrics": json.dumps(metrics or {}),
+            "period": period,
+            "report_type": report_type,
         }
-        
-        return self.prompt_engine.get_prompt('generate_executive_report', context)
+
+        return self.prompt_engine.get_prompt("generate_executive_report", context)
 
 
 class PromptTemplateLibrary:
     """
     Library of reusable prompt templates for common educational scenarios
     """
-    
+
     TEMPLATES = {
         "lesson_plan": """
         Create a detailed lesson plan for:
@@ -546,7 +555,6 @@ class PromptTemplateLibrary:
         - Closing activities
         - Required materials
         """,
-        
         "assessment_rubric": """
         Design an assessment rubric for:
         
@@ -556,7 +564,6 @@ class PromptTemplateLibrary:
         
         Provide clear descriptions for each performance level and specific indicators.
         """,
-        
         "feedback_analysis": """
         Analyze participant feedback:
         
@@ -570,7 +577,6 @@ class PromptTemplateLibrary:
         - Actionable recommendations
         - Satisfaction trends
         """,
-        
         "resource_recommendation": """
         Recommend educational resources for:
         
@@ -580,26 +586,26 @@ class PromptTemplateLibrary:
         Budget: {{budget}}
         
         Suggest diverse, high-quality resources with justification.
-        """
+        """,
     }
-    
+
     @classmethod
     def get_template(cls, name: str) -> Optional[str]:
         """Get template by name"""
         return cls.TEMPLATES.get(name)
-    
+
     @classmethod
     def list_templates(cls) -> List[str]:
         """List available template names"""
         return list(cls.TEMPLATES.keys())
-    
+
     @classmethod
     def render_template(cls, name: str, context: Dict[str, Any]) -> Optional[str]:
         """Render template with context"""
         template_str = cls.get_template(name)
         if not template_str:
             return None
-        
+
         try:
             template = Template(template_str)
             context_obj = Context(context)
@@ -627,10 +633,7 @@ def list_available_prompts(category: Optional[str] = None) -> List[Dict[str, Any
 
 
 def register_custom_prompt(
-    name: str, 
-    template: str, 
-    category: str = "custom",
-    description: str = ""
+    name: str, template: str, category: str = "custom", description: str = ""
 ) -> bool:
     """Register a custom prompt"""
     return system_prompts.register_prompt(name, template, category, description)
@@ -640,13 +643,17 @@ async def execute_ai_prompt(
     prompt_name: str,
     context: Dict[str, Any] = None,
     provider: str = "anthropic",
-    **kwargs
+    **kwargs,
 ) -> Optional[str]:
     """Execute AI prompt with specified provider"""
     if provider.lower() == "openai":
-        return await system_prompts.execute_prompt_openai(prompt_name, context, **kwargs)
+        return await system_prompts.execute_prompt_openai(
+            prompt_name, context, **kwargs
+        )
     elif provider.lower() == "anthropic":
-        return await system_prompts.execute_prompt_anthropic(prompt_name, context, **kwargs)
+        return await system_prompts.execute_prompt_anthropic(
+            prompt_name, context, **kwargs
+        )
     else:
         logger.warning(f"Unknown AI provider: {provider}")
         return None

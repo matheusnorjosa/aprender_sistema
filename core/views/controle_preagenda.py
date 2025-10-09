@@ -4,15 +4,17 @@ View de Pré-Agenda (fila operacional) - Hotfix Dia 3 COMPLETO
 Lista solicitações em estado CRIADO/APROVADO aguardando agendamento no Google Calendar.
 """
 
-from django.contrib.auth.decorators import login_required, permission_required
-from django.http import HttpResponseRedirect
-from django.shortcuts import render, get_object_or_404
-from django.urls import reverse
-from core.models import Solicitacao, EventoGoogleCalendar
-from core.services.google_calendar_automation import manual_create_calendar_event
 import hashlib
 import json
 import uuid
+
+from django.contrib.auth.decorators import login_required, permission_required
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
+
+from core.models import EventoGoogleCalendar, Solicitacao
+from core.services.google_calendar_automation import manual_create_calendar_event
 
 
 @login_required

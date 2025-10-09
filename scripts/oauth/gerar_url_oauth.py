@@ -5,22 +5,23 @@ Script para gerar URL de OAuth2 para acesso manual
 
 import json
 
+
 def gerar_url_oauth():
     """Gera URL de OAuth2 para autorização manual"""
 
     # Carregar credenciais
-    with open('credentials.json', 'r') as f:
+    with open("credentials.json", "r") as f:
         creds = json.load(f)
 
-    client_config = creds['installed']
-    client_id = client_config['client_id']
+    client_config = creds["installed"]
+    client_id = client_config["client_id"]
 
     # Escopos necessários
     scopes = [
-        'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive.file'
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive.file",
     ]
-    scope_string = '%20'.join(scopes)  # URL encode spaces
+    scope_string = "%20".join(scopes)  # URL encode spaces
 
     # Gerar URL
     auth_url = (
@@ -51,10 +52,11 @@ def gerar_url_oauth():
     print("=" * 50)
 
     # Salvar para uso posterior
-    with open('oauth_url.txt', 'w') as f:
+    with open("oauth_url.txt", "w") as f:
         f.write(auth_url)
 
     print("URL salva em: oauth_url.txt")
+
 
 if __name__ == "__main__":
     gerar_url_oauth()

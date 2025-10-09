@@ -1,4 +1,9 @@
-from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+from core.services import (
+    FormadorService,
+    MunicipioService,
+    ProjetoService,
+    UsuarioService,
+)
 
 """
 Views relacionadas às solicitações de eventos.
@@ -34,11 +39,11 @@ class SolicitacaoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateV
 
                 # 3. Definir status inicial
                 if requer_aprovacao:
-                    solicitacao.status = SolicitacaoStatus.PENDENTE
+                    solicitacao.status = SolicitacaoStatus.CRIADO
                     message = "Solicitação registrada com sucesso. Aguardando aprovação da superintendência."
                 else:
-                    solicitacao.status = SolicitacaoStatus.PRE_AGENDA
-                    message = "Solicitação registrada e enviada para pré-agenda. Aguarde criação no Google Calendar pelo controle."
+                    solicitacao.status = SolicitacaoStatus.APROVADO
+                    message = "Solicitação aprovada automaticamente e enviada para pré-agenda. Aguarde criação no Google Calendar pelo controle."
 
                 # 4. Salvar solicitação
                 response = super().form_valid(form)
@@ -90,18 +95,22 @@ class SolicitacaoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateV
                     raise ValueError("Falha ao salvar solicitação")
 
                 # 7. Resposta: Toast notification ao invés de redirect (1.1 UI/UX)
-                if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
                     # Resposta AJAX para toast notification
-                    return JsonResponse({
-                        'success': True, 
-                        'message': message,
-                        'solicitacao_id': str(self.object.pk),
-                        'titulo': self.object.titulo_evento or 'Evento sem título'
-                    })
-                
+                    return JsonResponse(
+                        {
+                            "success": True,
+                            "message": message,
+                            "solicitacao_id": str(self.object.pk),
+                            "titulo": self.object.titulo_evento or "Evento sem título",
+                        }
+                    )
+
                 # Para requests não-AJAX, mostrar mensagem e renderizar o mesmo template
                 messages.success(self.request, message)
-                return self.render_to_response(self.get_context_data(form=SolicitacaoForm()))
+                return self.render_to_response(
+                    self.get_context_data(form=SolicitacaoForm())
+                )
 
         except Exception as e:
             # Log do erro
@@ -111,14 +120,16 @@ class SolicitacaoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateV
                 entidade_afetada_id=None,
                 detalhes=f"ERRO ao criar solicitação: {str(e)}",
             )
-            
+
             # Resposta de erro: JSON para AJAX ou mensagem normal
-            if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': False, 
-                    'message': f"Erro ao criar solicitação: {str(e)}"
-                })
-            
+            if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "message": f"Erro ao criar solicitação: {str(e)}",
+                    }
+                )
+
             messages.error(self.request, f"Erro ao criar solicitação: {str(e)}")
             return self.form_invalid(form)
 

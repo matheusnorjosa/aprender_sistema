@@ -1,0 +1,649 @@
+{
+  "migration_timestamp": "2025-10-08T00:00:00Z",
+  "source_directory": "C:\\Users\\datsu\\OneDrive\\Documentos\\Aprender Sistema",
+  "target_directory": "C:\\Users\\datsu\\OneDrive\\Documentos\\Aprender Sistema\\docs",
+  "files_migrated": [
+    {
+      "from": "AI_INTEGRATION_SUMMARY.md",
+      "to": "docs/AI_INTEGRATION_SUMMARY.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "ARQUITETURA_REFERENCIA.md",
+      "to": "docs/ARQUITETURA_REFERENCIA.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "CATALOG_STRUCTURE.md",
+      "to": "docs/CATALOG_STRUCTURE.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "CHANGELOG.md",
+      "to": "docs/CHANGELOG.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "CHECKLIST_LIBERACAO.md",
+      "to": "docs/CHECKLIST_LIBERACAO.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "CLAUDE_CONTEXT_PACKAGE.md",
+      "to": "docs/CLAUDE_CONTEXT_PACKAGE.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "CLAUDE.md",
+      "to": "docs/CLAUDE.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "CODEX_CONTEXT_PACKAGE.md",
+      "to": "docs/CODEX_CONTEXT_PACKAGE.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "CODEX_QUICK_START.md",
+      "to": "docs/CODEX_QUICK_START.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "COMPREHENSIVE_TESTING_REPORT.md",
+      "to": "docs/COMPREHENSIVE_TESTING_REPORT.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "CONTRIBUTING.md",
+      "to": "docs/CONTRIBUTING.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "CORRECAO_STATUS_DISPONIBILIDADE.md",
+      "to": "docs/CORRECAO_STATUS_DISPONIBILIDADE.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "DASHBOARD_SOLUTION_REPORT.md",
+      "to": "docs/DASHBOARD_SOLUTION_REPORT.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "DASHBOARD_TESTS.md",
+      "to": "docs/DASHBOARD_TESTS.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "DEPLOYMENT_PRODUCTION.md",
+      "to": "docs/DEPLOYMENT_PRODUCTION.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "DOCKER_WORKFLOW.md",
+      "to": "docs/DOCKER_WORKFLOW.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "DOCUMENTACAO_PROJETO.md",
+      "to": "docs/DOCUMENTACAO_PROJETO.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "ESTRATEGIA_INTEGRACAO_ORACULO.md",
+      "to": "docs/ESTRATEGIA_INTEGRACAO_ORACULO.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "ESTRATEGIA_MIGRACAO_FINAL.md",
+      "to": "docs/ESTRATEGIA_MIGRACAO_FINAL.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "FINAL_MIGRATION_REPORT.md",
+      "to": "docs/FINAL_MIGRATION_REPORT.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "GSPREAD_MCP_SETUP.md",
+      "to": "docs/GSPREAD_MCP_SETUP.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "GUIA_AUTOMACAO_CURSOR.md",
+      "to": "docs/GUIA_AUTOMACAO_CURSOR.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "GUIA_SEGURANCA.md",
+      "to": "docs/GUIA_SEGURANCA.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "GUIA_SELF_HOSTING.md",
+      "to": "docs/GUIA_SELF_HOSTING.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "INVENTORY_COMPLETE.md",
+      "to": "docs/INVENTORY_COMPLETE.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "PADROES_CODIGO_PYTHON.md",
+      "to": "docs/PADROES_CODIGO_PYTHON.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "PERMISSION_SYSTEM_MIGRATION.md",
+      "to": "docs/PERMISSION_SYSTEM_MIGRATION.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "PLANO_IMPLEMENTACAO_EXECUTIVO.md",
+      "to": "docs/PLANO_IMPLEMENTACAO_EXECUTIVO.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "PROTOCOLO_COLABORACAO_CLAUDE_CODEX.md",
+      "to": "docs/PROTOCOLO_COLABORACAO_CLAUDE_CODEX.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "QUICK_START_INTEGRACOES.md",
+      "to": "docs/QUICK_START_INTEGRACOES.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_ANALISE_CONTEXTO_COMPLETA.md",
+      "to": "docs/RELATORIO_ANALISE_CONTEXTO_COMPLETA.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_AUDITORIA_COMPLETA.md",
+      "to": "docs/RELATORIO_AUDITORIA_COMPLETA.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_AUDITORIA_DASHBOARD_EXECUTIVO.md",
+      "to": "docs/RELATORIO_AUDITORIA_DASHBOARD_EXECUTIVO.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_AUDITORIA_FINAL_COMPLETA.md",
+      "to": "docs/RELATORIO_AUDITORIA_FINAL_COMPLETA.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_AUDITORIA_REFERENCIAS.md",
+      "to": "docs/RELATORIO_AUDITORIA_REFERENCIAS.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_AUDITORIA_SINGLE_SOURCE_TRUTH.md",
+      "to": "docs/RELATORIO_AUDITORIA_SINGLE_SOURCE_TRUTH.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_COMPLETO_ENTENDIMENTO_SISTEMA.md",
+      "to": "docs/RELATORIO_COMPLETO_ENTENDIMENTO_SISTEMA.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_COMPLETO_TODAS_IMPLEMENTACOES.md",
+      "to": "docs/RELATORIO_COMPLETO_TODAS_IMPLEMENTACOES.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_CONFIGURACAO_CREDENCIAIS_CRON.md",
+      "to": "docs/RELATORIO_CONFIGURACAO_CREDENCIAIS_CRON.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_CORRECAO_SINGLE_SOURCE_TRUTH.md",
+      "to": "docs/RELATORIO_CORRECAO_SINGLE_SOURCE_TRUTH.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_FINAL_ANALISE_COMPLETA_GITHUB.md",
+      "to": "docs/RELATORIO_FINAL_ANALISE_COMPLETA_GITHUB.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_FINAL_COMPLETO.md",
+      "to": "docs/RELATORIO_FINAL_COMPLETO.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_FINAL_DIA2.md",
+      "to": "docs/RELATORIO_FINAL_DIA2.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_FINAL_DIA3_COMPLETO.md",
+      "to": "docs/RELATORIO_FINAL_DIA3_COMPLETO.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_FINAL_DIA3.md",
+      "to": "docs/RELATORIO_FINAL_DIA3.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_FINAL_IMPLEMENTACAO_NEURAL.md",
+      "to": "docs/RELATORIO_FINAL_IMPLEMENTACAO_NEURAL.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_FINAL_IMPORTACAO_COMPLETA.md",
+      "to": "docs/RELATORIO_FINAL_IMPORTACAO_COMPLETA.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_FINAL_IMPORTACAO_DADOS_REAIS.md",
+      "to": "docs/RELATORIO_FINAL_IMPORTACAO_DADOS_REAIS.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_HARMONIZACAO_DIA2.md",
+      "to": "docs/RELATORIO_HARMONIZACAO_DIA2.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_IMPLEMENTACAO_DIA3_COMPLETA.md",
+      "to": "docs/RELATORIO_IMPLEMENTACAO_DIA3_COMPLETA.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_IMPLEMENTACAO_NEURAL.md",
+      "to": "docs/RELATORIO_IMPLEMENTACAO_NEURAL.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_IMPORT_VINCULOS_SETOR.md",
+      "to": "docs/RELATORIO_IMPORT_VINCULOS_SETOR.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_INTEGRACOES_COMPLETO.md",
+      "to": "docs/RELATORIO_INTEGRACOES_COMPLETO.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_INVENTARIO_INTEGRACOES.md",
+      "to": "docs/RELATORIO_INVENTARIO_INTEGRACOES.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_MAPEAMENTO_ENTIDADES_COMPLETO.md",
+      "to": "docs/RELATORIO_MAPEAMENTO_ENTIDADES_COMPLETO.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_STATUS_DADOS_DASHBOARD.md",
+      "to": "docs/RELATORIO_STATUS_DADOS_DASHBOARD.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_TESTES_DIA3.md",
+      "to": "docs/RELATORIO_TESTES_DIA3.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RELATORIO_VERIFICACAO_SISTEMA.md",
+      "to": "docs/RELATORIO_VERIFICACAO_SISTEMA.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "RENDER_MCP_INTEGRATION.md",
+      "to": "docs/RENDER_MCP_INTEGRATION.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "SECURITY.md",
+      "to": "docs/SECURITY.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "SISTEMA_APRENDER_IMPLEMENTACAO_ATUAL.md",
+      "to": "docs/SISTEMA_APRENDER_IMPLEMENTACAO_ATUAL.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "SISTEMA_NEURAL_IMPLEMENTACAO_COMPLETA.md",
+      "to": "docs/SISTEMA_NEURAL_IMPLEMENTACAO_COMPLETA.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "SUMARIO_EXECUTIVO_FINAL.md",
+      "to": "docs/SUMARIO_EXECUTIVO_FINAL.md",
+      "reason": "Documentação fora de docs/"
+    },
+    {
+      "from": "TESTES_DIA3_RESULTADO_FINAL.md",
+      "to": "docs/TESTES_DIA3_RESULTADO_FINAL.md",
+      "reason": "Documentação fora de docs/"
+    }
+  ],
+  "operations": [
+    {
+      "type": "move",
+      "source": "AI_INTEGRATION_SUMMARY.md",
+      "destination": "docs/AI_INTEGRATION_SUMMARY.md"
+    },
+    {
+      "type": "move",
+      "source": "ARQUITETURA_REFERENCIA.md",
+      "destination": "docs/ARQUITETURA_REFERENCIA.md"
+    },
+    {
+      "type": "move",
+      "source": "CATALOG_STRUCTURE.md",
+      "destination": "docs/CATALOG_STRUCTURE.md"
+    },
+    {
+      "type": "move",
+      "source": "CHANGELOG.md",
+      "destination": "docs/CHANGELOG.md"
+    },
+    {
+      "type": "move",
+      "source": "CHECKLIST_LIBERACAO.md",
+      "destination": "docs/CHECKLIST_LIBERACAO.md"
+    },
+    {
+      "type": "move",
+      "source": "CLAUDE_CONTEXT_PACKAGE.md",
+      "destination": "docs/CLAUDE_CONTEXT_PACKAGE.md"
+    },
+    {
+      "type": "move",
+      "source": "CLAUDE.md",
+      "destination": "docs/CLAUDE.md"
+    },
+    {
+      "type": "move",
+      "source": "CODEX_CONTEXT_PACKAGE.md",
+      "destination": "docs/CODEX_CONTEXT_PACKAGE.md"
+    },
+    {
+      "type": "move",
+      "source": "CODEX_QUICK_START.md",
+      "destination": "docs/CODEX_QUICK_START.md"
+    },
+    {
+      "type": "move",
+      "source": "COMPREHENSIVE_TESTING_REPORT.md",
+      "destination": "docs/COMPREHENSIVE_TESTING_REPORT.md"
+    },
+    {
+      "type": "move",
+      "source": "CONTRIBUTING.md",
+      "destination": "docs/CONTRIBUTING.md"
+    },
+    {
+      "type": "move",
+      "source": "CORRECAO_STATUS_DISPONIBILIDADE.md",
+      "destination": "docs/CORRECAO_STATUS_DISPONIBILIDADE.md"
+    },
+    {
+      "type": "move",
+      "source": "DASHBOARD_SOLUTION_REPORT.md",
+      "destination": "docs/DASHBOARD_SOLUTION_REPORT.md"
+    },
+    {
+      "type": "move",
+      "source": "DASHBOARD_TESTS.md",
+      "destination": "docs/DASHBOARD_TESTS.md"
+    },
+    {
+      "type": "move",
+      "source": "DEPLOYMENT_PRODUCTION.md",
+      "destination": "docs/DEPLOYMENT_PRODUCTION.md"
+    },
+    {
+      "type": "move",
+      "source": "DOCKER_WORKFLOW.md",
+      "destination": "docs/DOCKER_WORKFLOW.md"
+    },
+    {
+      "type": "move",
+      "source": "DOCUMENTACAO_PROJETO.md",
+      "destination": "docs/DOCUMENTACAO_PROJETO.md"
+    },
+    {
+      "type": "move",
+      "source": "ESTRATEGIA_INTEGRACAO_ORACULO.md",
+      "destination": "docs/ESTRATEGIA_INTEGRACAO_ORACULO.md"
+    },
+    {
+      "type": "move",
+      "source": "ESTRATEGIA_MIGRACAO_FINAL.md",
+      "destination": "docs/ESTRATEGIA_MIGRACAO_FINAL.md"
+    },
+    {
+      "type": "move",
+      "source": "FINAL_MIGRATION_REPORT.md",
+      "destination": "docs/FINAL_MIGRATION_REPORT.md"
+    },
+    {
+      "type": "move",
+      "source": "GSPREAD_MCP_SETUP.md",
+      "destination": "docs/GSPREAD_MCP_SETUP.md"
+    },
+    {
+      "type": "move",
+      "source": "GUIA_AUTOMACAO_CURSOR.md",
+      "destination": "docs/GUIA_AUTOMACAO_CURSOR.md"
+    },
+    {
+      "type": "move",
+      "source": "GUIA_SEGURANCA.md",
+      "destination": "docs/GUIA_SEGURANCA.md"
+    },
+    {
+      "type": "move",
+      "source": "GUIA_SELF_HOSTING.md",
+      "destination": "docs/GUIA_SELF_HOSTING.md"
+    },
+    {
+      "type": "move",
+      "source": "INVENTORY_COMPLETE.md",
+      "destination": "docs/INVENTORY_COMPLETE.md"
+    },
+    {
+      "type": "move",
+      "source": "PADROES_CODIGO_PYTHON.md",
+      "destination": "docs/PADROES_CODIGO_PYTHON.md"
+    },
+    {
+      "type": "move",
+      "source": "PERMISSION_SYSTEM_MIGRATION.md",
+      "destination": "docs/PERMISSION_SYSTEM_MIGRATION.md"
+    },
+    {
+      "type": "move",
+      "source": "PLANO_IMPLEMENTACAO_EXECUTIVO.md",
+      "destination": "docs/PLANO_IMPLEMENTACAO_EXECUTIVO.md"
+    },
+    {
+      "type": "move",
+      "source": "PROTOCOLO_COLABORACAO_CLAUDE_CODEX.md",
+      "destination": "docs/PROTOCOLO_COLABORACAO_CLAUDE_CODEX.md"
+    },
+    {
+      "type": "move",
+      "source": "QUICK_START_INTEGRACOES.md",
+      "destination": "docs/QUICK_START_INTEGRACOES.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_ANALISE_CONTEXTO_COMPLETA.md",
+      "destination": "docs/RELATORIO_ANALISE_CONTEXTO_COMPLETA.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_AUDITORIA_COMPLETA.md",
+      "destination": "docs/RELATORIO_AUDITORIA_COMPLETA.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_AUDITORIA_DASHBOARD_EXECUTIVO.md",
+      "destination": "docs/RELATORIO_AUDITORIA_DASHBOARD_EXECUTIVO.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_AUDITORIA_FINAL_COMPLETA.md",
+      "destination": "docs/RELATORIO_AUDITORIA_FINAL_COMPLETA.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_AUDITORIA_REFERENCIAS.md",
+      "destination": "docs/RELATORIO_AUDITORIA_REFERENCIAS.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_AUDITORIA_SINGLE_SOURCE_TRUTH.md",
+      "destination": "docs/RELATORIO_AUDITORIA_SINGLE_SOURCE_TRUTH.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_COMPLETO_ENTENDIMENTO_SISTEMA.md",
+      "destination": "docs/RELATORIO_COMPLETO_ENTENDIMENTO_SISTEMA.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_COMPLETO_TODAS_IMPLEMENTACOES.md",
+      "destination": "docs/RELATORIO_COMPLETO_TODAS_IMPLEMENTACOES.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_CONFIGURACAO_CREDENCIAIS_CRON.md",
+      "destination": "docs/RELATORIO_CONFIGURACAO_CREDENCIAIS_CRON.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_CORRECAO_SINGLE_SOURCE_TRUTH.md",
+      "destination": "docs/RELATORIO_CORRECAO_SINGLE_SOURCE_TRUTH.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_FINAL_ANALISE_COMPLETA_GITHUB.md",
+      "destination": "docs/RELATORIO_FINAL_ANALISE_COMPLETA_GITHUB.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_FINAL_COMPLETO.md",
+      "destination": "docs/RELATORIO_FINAL_COMPLETO.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_FINAL_DIA2.md",
+      "destination": "docs/RELATORIO_FINAL_DIA2.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_FINAL_DIA3_COMPLETO.md",
+      "destination": "docs/RELATORIO_FINAL_DIA3_COMPLETO.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_FINAL_DIA3.md",
+      "destination": "docs/RELATORIO_FINAL_DIA3.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_FINAL_IMPLEMENTACAO_NEURAL.md",
+      "destination": "docs/RELATORIO_FINAL_IMPLEMENTACAO_NEURAL.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_FINAL_IMPORTACAO_COMPLETA.md",
+      "destination": "docs/RELATORIO_FINAL_IMPORTACAO_COMPLETA.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_FINAL_IMPORTACAO_DADOS_REAIS.md",
+      "destination": "docs/RELATORIO_FINAL_IMPORTACAO_DADOS_REAIS.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_HARMONIZACAO_DIA2.md",
+      "destination": "docs/RELATORIO_HARMONIZACAO_DIA2.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_IMPLEMENTACAO_DIA3_COMPLETA.md",
+      "destination": "docs/RELATORIO_IMPLEMENTACAO_DIA3_COMPLETA.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_IMPLEMENTACAO_NEURAL.md",
+      "destination": "docs/RELATORIO_IMPLEMENTACAO_NEURAL.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_IMPORT_VINCULOS_SETOR.md",
+      "destination": "docs/RELATORIO_IMPORT_VINCULOS_SETOR.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_INTEGRACOES_COMPLETO.md",
+      "destination": "docs/RELATORIO_INTEGRACOES_COMPLETO.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_INVENTARIO_INTEGRACOES.md",
+      "destination": "docs/RELATORIO_INVENTARIO_INTEGRACOES.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_MAPEAMENTO_ENTIDADES_COMPLETO.md",
+      "destination": "docs/RELATORIO_MAPEAMENTO_ENTIDADES_COMPLETO.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_STATUS_DADOS_DASHBOARD.md",
+      "destination": "docs/RELATORIO_STATUS_DADOS_DASHBOARD.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_TESTES_DIA3.md",
+      "destination": "docs/RELATORIO_TESTES_DIA3.md"
+    },
+    {
+      "type": "move",
+      "source": "RELATORIO_VERIFICACAO_SISTEMA.md",
+      "destination": "docs/RELATORIO_VERIFICACAO_SISTEMA.md"
+    },
+    {
+      "type": "move",
+      "source": "RENDER_MCP_INTEGRATION.md",
+      "destination": "docs/RENDER_MCP_INTEGRATION.md"
+    },
+    {
+      "type": "move",
+      "source": "SECURITY.md",
+      "destination": "docs/SECURITY.md"
+    },
+    {
+      "type": "move",
+      "source": "SISTEMA_APRENDER_IMPLEMENTACAO_ATUAL.md",
+      "destination": "docs/SISTEMA_APRENDER_IMPLEMENTACAO_ATUAL.md"
+    },
+    {
+      "type": "move",
+      "source": "SISTEMA_NEURAL_IMPLEMENTACAO_COMPLETA.md",
+      "destination": "docs/SISTEMA_NEURAL_IMPLEMENTACAO_COMPLETA.md"
+    },
+    {
+      "type": "move",
+      "source": "SUMARIO_EXECUTIVO_FINAL.md",
+      "destination": "docs/SUMARIO_EXECUTIVO_FINAL.md"
+    },
+    {
+      "type": "move",
+      "source": "TESTES_DIA3_RESULTADO_FINAL.md",
+      "destination": "docs/TESTES_DIA3_RESULTADO_FINAL.md"
+    }
+  ]
+}

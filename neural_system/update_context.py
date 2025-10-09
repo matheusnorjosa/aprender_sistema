@@ -17,7 +17,8 @@ from typing import Dict, List, Optional
 DOCS_DIR = Path(__file__).parent.parent
 CONTEXT_DIR = Path(__file__).parent / "context"
 LAST_UPDATE_FILE = CONTEXT_DIR / "last_update.json"
-CLAUDE_API_KEY = os.getenv('CLAUDE_API_KEY')
+CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
+
 
 def calculate_file_hash(file_path: Path) -> str:
     """Calcula hash SHA256 de um arquivo"""
@@ -26,6 +27,7 @@ def calculate_file_hash(file_path: Path) -> str:
         for chunk in iter(lambda: f.read(4096), b""):
             sha256_hash.update(chunk)
     return sha256_hash.hexdigest()
+
 
 def get_file_hashes() -> Dict[str, str]:
     """Retorna hashes de todos os arquivos de documentação"""
@@ -38,7 +40,7 @@ def get_file_hashes() -> Dict[str, str]:
         "GUIA_SEGURANCA.md",
         "CLAUDE_CONTEXT_PACKAGE.md",
         "CLAUDE.md",
-        "DOCUMENTACAO_PROJETO.md"
+        "DOCUMENTACAO_PROJETO.md",
     ]
 
     for doc_name in main_docs:
@@ -55,13 +57,15 @@ def get_file_hashes() -> Dict[str, str]:
 
     return file_hashes
 
+
 def load_last_hashes() -> Dict[str, str]:
     """Carrega hashes da última atualização"""
     if LAST_UPDATE_FILE.exists():
-        with open(LAST_UPDATE_FILE, 'r') as f:
+        with open(LAST_UPDATE_FILE, "r") as f:
             data = json.load(f)
             return data.get("hashes", {})
     return {}
+
 
 def save_last_hashes(hashes: Dict[str, str]) -> None:
     """Salva hashes da atualização atual"""
@@ -71,11 +75,12 @@ def save_last_hashes(hashes: Dict[str, str]) -> None:
         "timestamp": datetime.now().isoformat(),
         "hashes": hashes,
         "project": "Sistema APRENDER",
-        "version": "1.0"
+        "version": "1.0",
     }
 
-    with open(LAST_UPDATE_FILE, 'w') as f:
+    with open(LAST_UPDATE_FILE, "w") as f:
         json.dump(data, f, indent=2)
+
 
 def restart_mcp_server() -> bool:
     """Reinicia o servidor MCP para carregar nova documentação"""
@@ -99,6 +104,7 @@ def restart_mcp_server() -> bool:
         print(f"❌ Erro ao gerenciar servidor MCP: {e}")
         return False
 
+
 def update_claude_context(changed_files: List[str]) -> bool:
     """Atualiza contexto do Claude com arquivos modificados"""
     if not CLAUDE_API_KEY:
@@ -107,6 +113,7 @@ def update_claude_context(changed_files: List[str]) -> bool:
         return False
 
     import anthropic
+
     client = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
 
     success_count = 0
@@ -119,7 +126,7 @@ def update_claude_context(changed_files: List[str]) -> bool:
             continue
 
         try:
-            with open(full_path, 'r', encoding='utf-8') as f:
+            with open(full_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
             response = client.messages.create(
@@ -139,9 +146,9 @@ def update_claude_context(changed_files: List[str]) -> bool:
                         - Alterações no fluxo de aprovação
 
                         Substitua qualquer informação anterior sobre este documento com esta nova versão.
-                        """
+                        """,
                     }
-                ]
+                ],
             )
 
             print(f"✅ Contexto do Claude atualizado para {file_path}")
@@ -151,6 +158,7 @@ def update_claude_context(changed_files: List[str]) -> bool:
             print(f"❌ Erro ao atualizar contexto do Claude para {file_path}: {e}")
 
     return success_count == len(changed_files)
+
 
 def main():
     """Função principal"""
@@ -173,7 +181,9 @@ def main():
         print(f"   Última verificação: {load_last_hashes().get('timestamp', 'Nunca')}")
         return
 
-    print(f"\n🔄 Encontrados {len(changed_files)} arquivos modificados. Atualizando contextos...")
+    print(
+        f"\n🔄 Encontrados {len(changed_files)} arquivos modificados. Atualizando contextos..."
+    )
     print("-" * 50)
 
     # Atualizar contexto do Claude
@@ -199,7 +209,9 @@ def main():
 
     print("📊 RESUMO DA ATUALIZAÇÃO:")
     print(f"   Arquivos modificados: {len(changed_files)}")
-    print(f"   Atualização Claude: {'✅' if CLAUDE_API_KEY and claude_success else '⚠️'}")
+    print(
+        f"   Atualização Claude: {'✅' if CLAUDE_API_KEY and claude_success else '⚠️'}"
+    )
     print(f"   Servidor MCP: {'✅' if mcp_success else '❌'}")
     print(f"   Hashes salvos: ✅")
 
@@ -211,7 +223,10 @@ def main():
         print("   2. Verifique se o Claude tem as informações atualizadas")
         print("   3. Execute este script regularmente para manter sincronizado")
     else:
-        print("⚠️ Alguns componentes não puderam ser atualizados. Verifique os logs acima.")
+        print(
+            "⚠️ Alguns componentes não puderam ser atualizados. Verifique os logs acima."
+        )
+
 
 if __name__ == "__main__":
     main()

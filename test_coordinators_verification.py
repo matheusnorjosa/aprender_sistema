@@ -12,11 +12,12 @@ from datetime import datetime
 
 # Setup Django
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
 from core.models import Usuario, Solicitacao
 from django.db.models import Count
+
 
 def test_dashboard_coordinators():
     """Testa se os coordenadores estão aparecendo corretamente no dashboard"""
@@ -25,27 +26,32 @@ def test_dashboard_coordinators():
     print("=" * 60)
 
     # 1. Verificar quantas solicitações ainda têm admin como solicitante
-    admin_user = Usuario.objects.filter(username='admin').first()
+    admin_user = Usuario.objects.filter(username="admin").first()
 
     if admin_user:
-        admin_requests = Solicitacao.objects.filter(usuario_solicitante=admin_user).count()
+        admin_requests = Solicitacao.objects.filter(
+            usuario_solicitante=admin_user
+        ).count()
         print(f"📊 Solicitações ainda com admin como solicitante: {admin_requests}")
 
     # 2. Verificar coordenadores únicos nas solicitações
     coordinators_with_requests = (
-        Solicitacao.objects
-        .values('usuario_solicitante__nome_completo', 'usuario_solicitante__username')
-        .annotate(total_requests=Count('id'))
-        .order_by('-total_requests')
+        Solicitacao.objects.values(
+            "usuario_solicitante__nome_completo", "usuario_solicitante__username"
+        )
+        .annotate(total_requests=Count("id"))
+        .order_by("-total_requests")
     )
 
-    print(f"\n👥 COORDENADORES COM SOLICITAÇÕES ({len(coordinators_with_requests)} total):")
+    print(
+        f"\n👥 COORDENADORES COM SOLICITAÇÕES ({len(coordinators_with_requests)} total):"
+    )
     print("-" * 60)
 
     for i, coord in enumerate(coordinators_with_requests[:10], 1):
-        nome = coord['usuario_solicitante__nome_completo'] or 'Nome não informado'
-        username = coord['usuario_solicitante__username']
-        total = coord['total_requests']
+        nome = coord["usuario_solicitante__nome_completo"] or "Nome não informado"
+        username = coord["usuario_solicitante__username"]
+        total = coord["total_requests"]
         print(f"{i:2d}. {nome} ({username}) - {total} solicitações")
 
     if len(coordinators_with_requests) > 10:
@@ -53,14 +59,13 @@ def test_dashboard_coordinators():
 
     # 3. Verificar coordenadores por município (simulando API)
     coordinators_by_city = (
-        Solicitacao.objects
-        .values(
-            'municipio__nome',
-            'usuario_solicitante__nome_completo',
-            'usuario_solicitante__username'
+        Solicitacao.objects.values(
+            "municipio__nome",
+            "usuario_solicitante__nome_completo",
+            "usuario_solicitante__username",
         )
-        .annotate(total_eventos=Count('id'))
-        .order_by('municipio__nome', '-total_eventos')
+        .annotate(total_eventos=Count("id"))
+        .order_by("municipio__nome", "-total_eventos")
     )
 
     print(f"\n🏙️ COORDENADORES POR MUNICÍPIO (top 15):")
@@ -70,10 +75,10 @@ def test_dashboard_coordinators():
     city_count = 0
 
     for coord in coordinators_by_city:
-        city = coord['municipio__nome']
-        nome = coord['usuario_solicitante__nome_completo'] or 'Nome não informado'
-        username = coord['usuario_solicitante__username']
-        total = coord['total_eventos']
+        city = coord["municipio__nome"]
+        nome = coord["usuario_solicitante__nome_completo"] or "Nome não informado"
+        username = coord["usuario_solicitante__username"]
+        total = coord["total_eventos"]
 
         if city != current_city:
             current_city = city
@@ -86,7 +91,7 @@ def test_dashboard_coordinators():
 
     # 4. Verificar se ainda há "admin" nos resultados
     has_admin = any(
-        coord['usuario_solicitante__username'] == 'admin'
+        coord["usuario_solicitante__username"] == "admin"
         for coord in coordinators_with_requests
     )
 
@@ -95,8 +100,9 @@ def test_dashboard_coordinators():
 
     if has_admin:
         admin_count = next(
-            coord['total_requests'] for coord in coordinators_with_requests
-            if coord['usuario_solicitante__username'] == 'admin'
+            coord["total_requests"]
+            for coord in coordinators_with_requests
+            if coord["usuario_solicitante__username"] == "admin"
         )
         print(f"⚠️  Ainda há {admin_count} solicitações com 'admin' como solicitante")
         print("   Pode ser necessário executar novamente o comando de correção")
@@ -113,6 +119,7 @@ def test_dashboard_coordinators():
     print(f"   Total de coordenadores: {total_coordinators}")
     print(f"   Média por coordenador: {total_requests/total_coordinators:.1f}")
 
+
 def test_api_endpoint():
     """Testa o endpoint da API do dashboard"""
 
@@ -121,7 +128,9 @@ def test_api_endpoint():
 
     try:
         # Tentar acessar a API local
-        response = requests.get('http://localhost:8000/api/dashboard/coordenadores/', timeout=10)
+        response = requests.get(
+            "http://localhost:8000/api/dashboard/coordenadores/", timeout=10
+        )
 
         if response.status_code == 200:
             data = response.json()
@@ -144,6 +153,7 @@ def test_api_endpoint():
 
     except Exception as e:
         print(f"❌ Erro ao testar API: {e}")
+
 
 if __name__ == "__main__":
     print(f"🕐 Início da verificação: {datetime.now().strftime('%H:%M:%S')}")

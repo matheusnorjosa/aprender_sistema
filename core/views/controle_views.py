@@ -1,4 +1,9 @@
-from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+from core.services import (
+    FormadorService,
+    MunicipioService,
+    ProjetoService,
+    UsuarioService,
+)
 
 """
 Views relacionadas ao perfil de Controle (monitoramento e auditoria).
@@ -147,13 +152,23 @@ class ControleAPIStatusView(LoginRequiredMixin, PermissionRequiredMixin, View):
         data_limite_24h = agora - timedelta(hours=24)
         data_limite_7d = agora - timedelta(days=7)
 
-        # Métricas de solicitações
-        solicitacoes_pendentes = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-            status=SolicitacaoStatus.PENDENTE
-        ).count()
-        solicitacoes_24h = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-            data_solicitacao__gte=data_limite_24h
-        ).count()
+        # Métricas de solicitações (fila pré-agenda: CRIADO + APROVADO)
+        solicitacoes_pre_agenda = (
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(status__in=[SolicitacaoStatus.CRIADO, SolicitacaoStatus.APROVADO])
+            .count()
+        )
+        solicitacoes_24h = (
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(data_solicitacao__gte=data_limite_24h)
+            .count()
+        )
 
         # Métricas de sincronização Google Calendar
         sync_ok_24h = EventoGoogleCalendar.objects.filter(
@@ -175,7 +190,7 @@ class ControleAPIStatusView(LoginRequiredMixin, PermissionRequiredMixin, View):
             "sistema_status": "OK",
             "metricas": {
                 "solicitacoes": {
-                    "pendentes": solicitacoes_pendentes,
+                    "pre_agenda": solicitacoes_pre_agenda,
                     "ultimas_24h": solicitacoes_24h,
                 },
                 "google_calendar": {

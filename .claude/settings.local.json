@@ -2,19 +2,10 @@
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
-      "Bash(docker exec:*)",
-      "Bash(docker-compose:*)",
-      "Bash(curl:*)",
-      "Bash(python:*)",
-      "Bash(docker:*)",
-      "Bash(dir:*)",
-      "Bash(git rm:*)",
-      "Bash(test:*)",
-      "Bash(git grep:*)",
-      "Bash(findstr:*)",
-      "Bash(sed:*)",
-      "Bash(rm:*)",
-      "Bash(git tag:*)"
+      "Bash(pre-commit run:*)",
+      "Bash(pip install:*)",
+      "Bash(python3 -m pip install:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

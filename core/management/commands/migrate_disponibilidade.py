@@ -167,11 +167,16 @@ class Command(BaseCommand):
                     continue
                 except Usuario.MultipleObjectsReturned:
                     # Tentar busca mais específica
-                    usuario = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(
-                        first_name__iexact=(
-                            usuario_nome.split()[0] if usuario_nome else ""
+                    usuario = (
+                        Usuario.objects.select_related("municipio", "projeto")
+                        .prefetch_related("groups", "user_permissions")
+                        .filter(
+                            first_name__iexact=(
+                                usuario_nome.split()[0] if usuario_nome else ""
+                            )
                         )
-                    ).first()
+                        .first()
+                    )
                     if not usuario:
                         continue
                     try:
@@ -269,9 +274,12 @@ class Command(BaseCommand):
                             "horario_fim": horario_fim,
                             "observacoes": "Migrado de planilha de disponibilidade",
                             "status": SolicitacaoStatus.APROVADO,  # Assumir aprovado
-                            "usuario_solicitante": Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(
-                                groups__name="admin"
-                            ).first(),
+                            "usuario_solicitante": Usuario.objects.select_related(
+                                "municipio", "projeto"
+                            )
+                            .prefetch_related("groups", "user_permissions")
+                            .filter(groups__name="admin")
+                            .first(),
                         },
                     )
                     if created:

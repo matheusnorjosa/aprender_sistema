@@ -3,11 +3,14 @@ Data Services - Single Source of Truth para todas as queries
 Centraliza lógica de negócio e elimina duplicação de código
 """
 
-from django.db.models import Count, Q, Prefetch
-from django.utils import timezone
-from django.core.cache import cache
+from typing import Any, Dict, List, Optional
+
 from django.contrib.auth.models import Group
-from typing import Optional, List, Dict, Any
+from django.core.cache import cache
+from django.db.models import Count, Prefetch, Q
+from django.utils import timezone
+
+from core.models import Municipio, Projeto, Setor, Solicitacao, Usuario
 
 
 class BaseService:
@@ -37,7 +40,8 @@ class UsuarioService(BaseService):
     def get_optimized_queryset(cls):
         """QuerySet base otimizado para Usuario"""
         from core.models import Usuario
-        return Usuario.objects.select_related('setor', 'municipio', 'area_atuacao')
+
+        return Usuario.objects.select_related("setor", "municipio", "area_atuacao")
 
     @classmethod
     def ativos(cls):
@@ -69,14 +73,17 @@ class FormadorService(BaseService):
     @classmethod
     def get_formadores_queryset(cls):
         """QuerySet otimizado para formadores"""
-        return UsuarioService.ativos().filter(
-            groups__name='formador'
-        ).distinct().prefetch_related('groups')
+        return (
+            UsuarioService.ativos()
+            .filter(groups__name="formador")
+            .distinct()
+            .prefetch_related("groups")
+        )
 
     @classmethod
-    def todos_formadores(cls) -> 'QuerySet':
+    def todos_formadores(cls) -> "QuerySet":
         """Todos os formadores ativos (fonte única)"""
-        cache_key = cls.get_cache_key('todos_formadores')
+        cache_key = cls.get_cache_key("todos_formadores")
         result = cache.get(cache_key)
 
         if result is None:
@@ -102,46 +109,88 @@ class FormadorService(BaseService):
         return qs
 
     @classmethod
+    def por_superintendencia(cls, super_only: bool = False):
+        """
+        Formadores da superintendência com fallback temporário
+
+        HOTFIX: Enquanto os 72 formadores sem setor não forem mapeados,
+        retorna todos os formadores quando super_only=True para manter
+        a tela de disponibilidade funcionando.
+
+        Args:
+            super_only: Se True, filtra por setor superintendência (com fallback)
+
+        Returns:
+            QuerySet de formadores (todos se super_only e fallback ativo)
+        """
+        from django.conf import settings
+
+        qs = cls.get_formadores_queryset()
+
+        if super_only:
+            # Fallback temporário: mostra todos os formadores enquanto mapeamos os setores
+            # TODO: Remover após backfill completo dos setores dos formadores
+            if getattr(settings, "FEATURE_SUPER_FALLBACK", True):
+                return qs
+            # Quando o fallback for desativado, usar filtro real
+            return qs.filter(setor__vinculado_superintendencia=True)
+
+        return qs
+
+    @classmethod
     def com_eventos_realizados(cls):
         """Formadores com eventos realizados (otimizado)"""
         return cls.get_formadores_queryset().prefetch_related(
             Prefetch(
-                'solicitacoes_como_formador',
-                queryset=None  # Será definido quando importado
+                "solicitacoes_como_formador",
+                queryset=None,  # Será definido quando importado
             )
         )
 
     @classmethod
     def estatisticas_formador(cls, formador_id: str) -> Dict[str, Any]:
         """Estatísticas completas de um formador"""
-        cache_key = cls.get_cache_key('stats_formador', formador_id)
+        cache_key = cls.get_cache_key("stats_formador", formador_id)
         result = cache.get(cache_key)
 
         if result is None:
-            from core.models import Usuario, FormadoresSolicitacao
+            from core.models import FormadoresSolicitacao, Usuario
 
             try:
-                formador = Usuario.objects.get(id=formador_id, formador_ativo=True)
+                # Buscar formador usando o queryset centralizado
+                formador = cls.get_formadores_queryset().get(id=formador_id)
 
                 # Estatísticas básicas
-                total_eventos = FormadoresSolicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-                    usuario=formador
-                ).count()
+                total_eventos = (
+                    FormadoresSolicitacao.objects.select_related(
+                        "municipio", "projeto", "tipo_evento", "solicitante"
+                    )
+                    .prefetch_related("formadores")
+                    .filter(usuario=formador)
+                    .count()
+                )
 
-                eventos_realizados = FormadoresSolicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-                    usuario=formador,
-                    solicitacao__status='Aprovado'
-                ).count()
+                eventos_realizados = (
+                    FormadoresSolicitacao.objects.select_related(
+                        "municipio", "projeto", "tipo_evento", "solicitante"
+                    )
+                    .prefetch_related("formadores")
+                    .filter(usuario=formador, solicitacao__status="Aprovado")
+                    .count()
+                )
 
                 result = {
-                    'nome': formador.nome_completo,
-                    'email': formador.email,
-                    'area_atuacao': formador.area_atuacao_display,
-                    'municipio': formador.municipio.nome if formador.municipio else None,
-                    'total_eventos': total_eventos,
-                    'eventos_realizados': eventos_realizados,
-                    'eventos_pendentes': total_eventos - eventos_realizados,
-                    'ativo': formador.formador_ativo,
+                    "nome": formador.nome_completo,
+                    "email": formador.email,
+                    "area_atuacao": formador.area_atuacao_display,
+                    "municipio": (
+                        formador.municipio.nome if formador.municipio else None
+                    ),
+                    "total_eventos": total_eventos,
+                    "eventos_realizados": eventos_realizados,
+                    "eventos_pendentes": total_eventos - eventos_realizados,
+                    "ativo": formador.is_active
+                    and formador.groups.filter(name="formador").exists(),
                 }
 
                 cache.set(cache_key, result, cls.cache_timeout)
@@ -161,9 +210,8 @@ class CoordinatorService(BaseService):
     @classmethod
     def get_coordenadores_queryset(cls):
         """QuerySet otimizado para coordenadores"""
-        return UsuarioService.por_cargo('coordenador').prefetch_related(
-            'groups',
-            'solicitacoes_criadas'
+        return UsuarioService.por_cargo("coordenador").prefetch_related(
+            "groups", "solicitacoes_criadas"
         )
 
     @classmethod
@@ -208,25 +256,38 @@ class CoordinatorService(BaseService):
     @classmethod
     def estatisticas_coordenador(cls, coordenador_id: str) -> Dict[str, Any]:
         """Estatísticas completas de um coordenador"""
-        cache_key = cls.get_cache_key('stats_coord', coordenador_id)
+        cache_key = cls.get_cache_key("stats_coord", coordenador_id)
         result = cache.get(cache_key)
 
         if result is None:
-            from core.models import Usuario, Solicitacao
+            from core.models import Solicitacao, Usuario
 
             try:
-                coordenador = Usuario.objects.get(id=coordenador_id, cargo='coordenador')
+                coordenador = Usuario.objects.get(
+                    id=coordenador_id, cargo="coordenador"
+                )
 
-                solicitacoes = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(usuario_solicitante=coordenador)
+                solicitacoes = (
+                    Solicitacao.objects.select_related(
+                        "municipio", "projeto", "tipo_evento", "solicitante"
+                    )
+                    .prefetch_related("formadores")
+                    .filter(usuario_solicitante=coordenador)
+                )
 
                 result = {
-                    'nome': coordenador.nome_completo,
-                    'setor': coordenador.setor_nome,
-                    'vinculacao': 'Superintendência' if coordenador.setor and coordenador.setor.vinculado_superintendencia else 'Outros Setores',
-                    'total_solicitacoes': solicitacoes.count(),
-                    'aprovadas': solicitacoes.filter(status='Aprovado').count(),
-                    'pendentes': solicitacoes.filter(status='Pendente').count(),
-                    'reprovadas': solicitacoes.filter(status='Reprovado').count(),
+                    "nome": coordenador.nome_completo,
+                    "setor": coordenador.setor_nome,
+                    "vinculacao": (
+                        "Superintendência"
+                        if coordenador.setor
+                        and coordenador.setor.vinculado_superintendencia
+                        else "Outros Setores"
+                    ),
+                    "total_solicitacoes": solicitacoes.count(),
+                    "aprovadas": solicitacoes.filter(status="Aprovado").count(),
+                    "pendentes": solicitacoes.filter(status="Pendente").count(),
+                    "reprovadas": solicitacoes.filter(status="Reprovado").count(),
                 }
 
                 cache.set(cache_key, result, cls.cache_timeout)
@@ -246,35 +307,44 @@ class DashboardService(BaseService):
     @classmethod
     def get_estatisticas_gerais(cls) -> Dict[str, Any]:
         """Estatísticas gerais do sistema"""
-        cache_key = cls.get_cache_key('stats_gerais')
+        cache_key = cls.get_cache_key("stats_gerais")
         result = cache.get(cache_key)
 
         if result is None:
-            from core.models import Usuario, Solicitacao, Municipio, Projeto
+            from core.models import Municipio, Projeto, Solicitacao, Usuario
 
             agora = timezone.now()
-            inicio_ano = agora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            inicio_ano = agora.replace(
+                month=1, day=1, hour=0, minute=0, second=0, microsecond=0
+            )
 
             result = {
-                'usuarios_total': UsuarioService.ativos().count(),
-                'formadores_ativos': FormadorService.get_formadores_queryset().count(),
-                'coordenadores_total': CoordinatorService.get_coordenadores_queryset().count(),
-                'coordenadores_superintendencia': CoordinatorService.superintendencia().count(),
-                'coordenadores_outros_setores': CoordinatorService.outros_setores().count(),
-                'municipios_ativos': MunicipioService.ativos().count(),
-                'projetos_ativos': ProjetoService.ativos().count(),
-                'solicitacoes_ano': Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(data_inicio__gte=inicio_ano).count(),
-                'solicitacoes_aprovadas_ano': Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-                    data_inicio__gte=inicio_ano,
-                    status='Aprovado'
-                ).count(),
-                'data_atualizacao': agora.isoformat(),
+                "usuarios_total": UsuarioService.ativos().count(),
+                "formadores_ativos": FormadorService.get_formadores_queryset().count(),
+                "coordenadores_total": CoordinatorService.get_coordenadores_queryset().count(),
+                "coordenadores_superintendencia": CoordinatorService.superintendencia().count(),
+                "coordenadores_outros_setores": CoordinatorService.outros_setores().count(),
+                "municipios_ativos": MunicipioService.ativos().count(),
+                "projetos_ativos": ProjetoService.ativos().count(),
+                "solicitacoes_ano": Solicitacao.objects.select_related(
+                    "municipio", "projeto", "tipo_evento", "solicitante"
+                )
+                .prefetch_related("formadores")
+                .filter(data_inicio__gte=inicio_ano)
+                .count(),
+                "solicitacoes_aprovadas_ano": Solicitacao.objects.select_related(
+                    "municipio", "projeto", "tipo_evento", "solicitante"
+                )
+                .prefetch_related("formadores")
+                .filter(data_inicio__gte=inicio_ano, status="Aprovado")
+                .count(),
+                "data_atualizacao": agora.isoformat(),
             }
 
             # Calcular taxa de aprovação
-            total_ano = result['solicitacoes_ano']
-            aprovadas_ano = result['solicitacoes_aprovadas_ano']
-            result['taxa_aprovacao_ano'] = round(
+            total_ano = result["solicitacoes_ano"]
+            aprovadas_ano = result["solicitacoes_aprovadas_ano"]
+            result["taxa_aprovacao_ano"] = round(
                 (aprovadas_ano / total_ano * 100) if total_ano > 0 else 0, 1
             )
 
@@ -288,7 +358,7 @@ class DashboardService(BaseService):
         Dados dos coordenadores agrupados por município
         OTIMIZADO para dashboard executivo
         """
-        cache_key = cls.get_cache_key('coords_municipio')
+        cache_key = cls.get_cache_key("coords_municipio")
         result = cache.get(cache_key)
 
         if result is None:
@@ -296,33 +366,32 @@ class DashboardService(BaseService):
 
             # Query unificada e otimizada - CORRIGIDA para evitar duplicação
             solicitacoes_por_coordenador = (
-                Solicitacao.objects
-                .values(
-                    'municipio__nome',
-                    'municipio__uf',
-                    'usuario_solicitante__first_name',
-                    'usuario_solicitante__last_name',
-                    'usuario_solicitante__username',
-                    'usuario_solicitante__cargo',
-                    'usuario_solicitante__setor__nome',
-                    'usuario_solicitante__setor__vinculado_superintendencia'
+                Solicitacao.objects.values(
+                    "municipio__nome",
+                    "municipio__uf",
+                    "usuario_solicitante__first_name",
+                    "usuario_solicitante__last_name",
+                    "usuario_solicitante__username",
+                    "usuario_solicitante__cargo",
+                    "usuario_solicitante__setor__nome",
+                    "usuario_solicitante__setor__vinculado_superintendencia",
                 )
-                .annotate(total_eventos=Count('id'))
-                .order_by('municipio__uf', 'municipio__nome', '-total_eventos')
+                .annotate(total_eventos=Count("id"))
+                .order_by("municipio__uf", "municipio__nome", "-total_eventos")
             )
 
             # Agrupar por município
             municipios = {}
             totais = {
-                'coordenadores': 0,
-                'eventos': 0,
-                'superintendencia': 0,
-                'outros_setores': 0
+                "coordenadores": 0,
+                "eventos": 0,
+                "superintendencia": 0,
+                "outros_setores": 0,
             }
 
             for item in solicitacoes_por_coordenador:
-                municipio_nome = item['municipio__nome']
-                municipio_uf = item['municipio__uf']
+                municipio_nome = item["municipio__nome"]
+                municipio_uf = item["municipio__uf"]
 
                 # Limpar nome do município
                 if municipio_uf and f" - {municipio_uf}" in municipio_nome:
@@ -333,87 +402,95 @@ class DashboardService(BaseService):
                 # Criar município se não existe
                 if municipio_key not in municipios:
                     municipios[municipio_key] = {
-                        'municipio': municipio_nome,
-                        'uf': municipio_uf,
-                        'coordenadores': [],
-                        'total_eventos': 0,
-                        'total_coordenadores': 0
+                        "municipio": municipio_nome,
+                        "uf": municipio_uf,
+                        "coordenadores": [],
+                        "total_eventos": 0,
+                        "total_coordenadores": 0,
                     }
 
                 # Determinar tipo de coordenador
-                cargo = item['usuario_solicitante__cargo']
-                vinculado_super = item['usuario_solicitante__setor__vinculado_superintendencia']
+                cargo = item["usuario_solicitante__cargo"]
+                vinculado_super = item[
+                    "usuario_solicitante__setor__vinculado_superintendencia"
+                ]
 
-                if cargo == 'coordenador' and vinculado_super:
-                    tipo_coordenador = 'superintendencia'
-                    vinculacao = 'Superintendência'
-                    totais['superintendencia'] += 1
-                elif cargo == 'coordenador' and not vinculado_super:
-                    tipo_coordenador = 'outros_setores'
-                    vinculacao = item['usuario_solicitante__setor__nome'] or 'Outros Setores'
-                    totais['outros_setores'] += 1
+                if cargo == "coordenador" and vinculado_super:
+                    tipo_coordenador = "superintendencia"
+                    vinculacao = "Superintendência"
+                    totais["superintendencia"] += 1
+                elif cargo == "coordenador" and not vinculado_super:
+                    tipo_coordenador = "outros_setores"
+                    vinculacao = (
+                        item["usuario_solicitante__setor__nome"] or "Outros Setores"
+                    )
+                    totais["outros_setores"] += 1
                 else:
-                    tipo_coordenador = 'outro_cargo'
-                    vinculacao = 'N/A'
+                    tipo_coordenador = "outro_cargo"
+                    vinculacao = "N/A"
 
                 # Nome do coordenador
-                first_name = item['usuario_solicitante__first_name'] or ''
-                last_name = item['usuario_solicitante__last_name'] or ''
+                first_name = item["usuario_solicitante__first_name"] or ""
+                last_name = item["usuario_solicitante__last_name"] or ""
                 nome = f"{first_name} {last_name}".strip()
                 if not nome:
-                    nome = item['usuario_solicitante__username']
+                    nome = item["usuario_solicitante__username"]
 
                 # Verificar se coordenador já existe no município
-                username = item['usuario_solicitante__username']
+                username = item["usuario_solicitante__username"]
                 coordenador_existente = None
-                
-                for coord in municipios[municipio_key]['coordenadores']:
-                    if coord['username'] == username:
+
+                for coord in municipios[municipio_key]["coordenadores"]:
+                    if coord["username"] == username:
                         coordenador_existente = coord
                         break
-                
+
                 if coordenador_existente:
                     # Atualizar eventos do coordenador existente
-                    coordenador_existente['eventos'] += item['total_eventos']
+                    coordenador_existente["eventos"] += item["total_eventos"]
                 else:
                     # Adicionar novo coordenador
-                    municipios[municipio_key]['coordenadores'].append({
-                        'nome': nome,
-                        'username': username,
-                        'eventos': item['total_eventos'],
-                        'tipo_coordenador': tipo_coordenador,
-                        'vinculacao': vinculacao
-                    })
-                    municipios[municipio_key]['total_coordenadores'] += 1
-                    totais['coordenadores'] += 1
+                    municipios[municipio_key]["coordenadores"].append(
+                        {
+                            "nome": nome,
+                            "username": username,
+                            "eventos": item["total_eventos"],
+                            "tipo_coordenador": tipo_coordenador,
+                            "vinculacao": vinculacao,
+                        }
+                    )
+                    municipios[municipio_key]["total_coordenadores"] += 1
+                    totais["coordenadores"] += 1
 
                 # Atualizar totais
-                municipios[municipio_key]['total_eventos'] += item['total_eventos']
-                totais['eventos'] += item['total_eventos']
+                municipios[municipio_key]["total_eventos"] += item["total_eventos"]
+                totais["eventos"] += item["total_eventos"]
 
             # Ordenar coordenadores por eventos
             for municipio_data in municipios.values():
-                municipio_data['coordenadores'].sort(key=lambda x: x['eventos'], reverse=True)
+                municipio_data["coordenadores"].sort(
+                    key=lambda x: x["eventos"], reverse=True
+                )
 
             # Converter para lista ordenada
             municipios_lista = sorted(
                 municipios.values(),
-                key=lambda x: (-x['total_eventos'], x['uf'], x['municipio'])
+                key=lambda x: (-x["total_eventos"], x["uf"], x["municipio"]),
             )
 
             result = {
-                'municipios': municipios_lista,
-                'estatisticas': totais,
-                'diferenciacao': {
-                    'superintendencia': {
-                        'total': totais['superintendencia'],
-                        'descricao': 'Coordenadores vinculados à superintendência'
+                "municipios": municipios_lista,
+                "estatisticas": totais,
+                "diferenciacao": {
+                    "superintendencia": {
+                        "total": totais["superintendencia"],
+                        "descricao": "Coordenadores vinculados à superintendência",
                     },
-                    'outros_setores': {
-                        'total': totais['outros_setores'],
-                        'descricao': 'Coordenadores de outros setores'
-                    }
-                }
+                    "outros_setores": {
+                        "total": totais["outros_setores"],
+                        "descricao": "Coordenadores de outros setores",
+                    },
+                },
             }
 
             cache.set(cache_key, result, cls.cache_timeout)
@@ -429,8 +506,7 @@ class MunicipioService(BaseService):
     @classmethod
     def ativos(cls):
         """Municípios ativos otimizados"""
-        from core.models import Municipio
-        return MunicipioService.ativos().order_by('nome', 'uf')
+        return Municipio.objects.filter(ativo=True).order_by("nome", "uf")
 
     @classmethod
     def por_uf(cls, uf: str):
@@ -445,7 +521,7 @@ class MunicipioService(BaseService):
     @classmethod
     def estatisticas_municipio(cls, municipio_id: str) -> Dict[str, Any]:
         """Estatísticas de um município"""
-        cache_key = cls.get_cache_key('stats_municipio', municipio_id)
+        cache_key = cls.get_cache_key("stats_municipio", municipio_id)
         result = cache.get(cache_key)
 
         if result is None:
@@ -453,15 +529,23 @@ class MunicipioService(BaseService):
 
             try:
                 municipio = Municipio.objects.get(id=municipio_id)
-                solicitacoes = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(municipio=municipio)
+                solicitacoes = (
+                    Solicitacao.objects.select_related(
+                        "municipio", "projeto", "tipo_evento", "solicitante"
+                    )
+                    .prefetch_related("formadores")
+                    .filter(municipio=municipio)
+                )
 
                 result = {
-                    'nome': municipio.nome,
-                    'uf': municipio.uf,
-                    'total_eventos': solicitacoes.count(),
-                    'eventos_aprovados': solicitacoes.filter(status='Aprovado').count(),
-                    'eventos_pendentes': solicitacoes.filter(status='Pendente').count(),
-                    'coordenadores_unicos': solicitacoes.values('usuario_solicitante').distinct().count(),
+                    "nome": municipio.nome,
+                    "uf": municipio.uf,
+                    "total_eventos": solicitacoes.count(),
+                    "eventos_aprovados": solicitacoes.filter(status="Aprovado").count(),
+                    "eventos_pendentes": solicitacoes.filter(status="Pendente").count(),
+                    "coordenadores_unicos": solicitacoes.values("usuario_solicitante")
+                    .distinct()
+                    .count(),
                 }
 
                 cache.set(cache_key, result, cls.cache_timeout)
@@ -471,28 +555,36 @@ class MunicipioService(BaseService):
 
         return result
 
+
 class ProjetoService(BaseService):
     """
     Service para Projetos - Queries otimizadas
     """
-    
+
     @classmethod
     def ativos(cls):
         """Projetos ativos otimizados"""
-        from core.models import Projeto
-        return Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(ativo=True).order_by('nome')
-    
+        return (
+            Projeto.objects.select_related("setor")
+            .prefetch_related("solicitacao_set")
+            .filter(ativo=True)
+            .order_by("nome")
+        )
+
     @classmethod
     def todos(cls):
         """Todos os projetos"""
-        from core.models import Projeto
-        return Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").order_by('nome')
-    
+        return (
+            Projeto.objects.select_related("setor")
+            .prefetch_related("solicitacao_set")
+            .order_by("nome")
+        )
+
     @classmethod
     def por_setor(cls, setor):
         """Projetos por setor"""
         return cls.ativos().filter(setor=setor)
-    
+
     @classmethod
     def superintendencia(cls):
         """Projetos da superintendência"""

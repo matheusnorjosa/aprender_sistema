@@ -1,22 +1,24 @@
 """
 Services Layer - Centralizacao da logica de negocio
-Implementa Single Source of Truth e DRY principles
+Implementa Single Source of Truth and DRY principles
 """
 
 from .data_services import (
-    UsuarioService,
-    FormadorService,
     CoordinatorService,
     DashboardService,
+    FormadorService,
     MunicipioService,
-    ProjetoService
+    ProjetoService,
+    UsuarioService,
 )
+from .pessoas import get_pessoas_super_qs
 
 __all__ = [
-    'UsuarioService',
-    'FormadorService',
-    'CoordinatorService',
-    'DashboardService',
-    'MunicipioService',
-    'ProjetoService'
+    "UsuarioService",
+    "FormadorService",
+    "CoordinatorService",
+    "DashboardService",
+    "MunicipioService",
+    "ProjetoService",
+    "get_pessoas_super_qs",
 ]

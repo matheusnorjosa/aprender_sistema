@@ -14,4 +14,3 @@ class CoreConfig(AppConfig):
             import core.signals
         except ImportError:
             pass
-        

@@ -97,6 +97,42 @@ jobs:
 
         echo "✅ No CONCLUIDO status found"
 
+    - name: 🔍 Block legacy PENDENTE as SolicitacaoStatus
+      run: |
+        echo "🔍 Scanning for PENDENTE as SolicitacaoStatus..."
+
+        # Allow SincronizacaoStatus.PENDENTE, block SolicitacaoStatus.PENDENTE
+        if grep -r "SolicitacaoStatus\.PENDENTE" \
+          --include="*.py" \
+          --exclude-dir="migrations" \
+          --exclude-dir="venv" \
+          --exclude-dir=".venv" \
+          core/ api/ ingestao/ 2>/dev/null; then
+
+          echo "❌ BLOCKER: SolicitacaoStatus.PENDENTE found (use CRIADO)!"
+          exit 1
+        fi
+
+        echo "✅ No SolicitacaoStatus.PENDENTE found"
+
+    - name: 🔍 Block legacy REPROVADO as SolicitacaoStatus
+      run: |
+        echo "🔍 Scanning for REPROVADO as SolicitacaoStatus..."
+
+        # Allow AprovacaoStatus.REPROVADO, block SolicitacaoStatus.REPROVADO
+        if grep -r "SolicitacaoStatus\.REPROVADO" \
+          --include="*.py" \
+          --exclude-dir="migrations" \
+          --exclude-dir="venv" \
+          --exclude-dir=".venv" \
+          core/ api/ ingestao/ 2>/dev/null; then
+
+          echo "❌ BLOCKER: SolicitacaoStatus.REPROVADO found (use CANCELADO)!"
+          exit 1
+        fi
+
+        echo "✅ No SolicitacaoStatus.REPROVADO found"
+
   # ===== TESTES POR MÓDULO =====
   tests:
     name: 🧪 Testes por Módulo

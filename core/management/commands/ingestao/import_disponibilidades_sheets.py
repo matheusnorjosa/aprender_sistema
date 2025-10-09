@@ -35,63 +35,61 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--from',
+            "--from",
             type=str,
-            choices=['sheets', 'csv'],
-            default='sheets',
-            help='Fonte dos dados: sheets (Google Sheets) ou csv (arquivo local)'
+            choices=["sheets", "csv"],
+            default="sheets",
+            help="Fonte dos dados: sheets (Google Sheets) ou csv (arquivo local)",
         )
         parser.add_argument(
-            '--csv-file',
-            type=str,
-            help='Caminho para arquivo CSV (quando --from=csv)'
+            "--csv-file", type=str, help="Caminho para arquivo CSV (quando --from=csv)"
         )
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Execução de teste sem salvar no banco'
+            "--dry-run",
+            action="store_true",
+            help="Execução de teste sem salvar no banco",
         )
         parser.add_argument(
-            '--clear',
-            action='store_true',
-            help='Limpar disponibilidades existentes antes da importação'
+            "--clear",
+            action="store_true",
+            help="Limpar disponibilidades existentes antes da importação",
         )
         parser.add_argument(
-            '--verbose',
-            action='store_true',
-            help='Mostrar informações detalhadas'
+            "--verbose", action="store_true", help="Mostrar informações detalhadas"
         )
         parser.add_argument(
-            '--periodo',
-            type=str,
-            help='Período específico (YYYY-MM) para importar'
+            "--periodo", type=str, help="Período específico (YYYY-MM) para importar"
         )
 
     def handle(self, *args, **options):
-        self.dry_run = options['dry_run']
-        self.verbose = options['verbose']
-        self.clear = options['clear']
-        self.source = options['from']
-        self.csv_file = options['csv_file']
-        self.periodo = options['periodo']
+        self.dry_run = options["dry_run"]
+        self.verbose = options["verbose"]
+        self.clear = options["clear"]
+        self.source = options["from"]
+        self.csv_file = options["csv_file"]
+        self.periodo = options["periodo"]
 
         if self.verbose:
             logging.basicConfig(level=logging.DEBUG)
 
         self.stdout.write(
-            self.style.SUCCESS('🚀 Iniciando importação canônica de disponibilidades...')
+            self.style.SUCCESS(
+                "🚀 Iniciando importação canônica de disponibilidades..."
+            )
         )
 
         try:
-            if self.source == 'sheets':
+            if self.source == "sheets":
                 self._import_from_sheets()
-            elif self.source == 'csv':
+            elif self.source == "csv":
                 if not self.csv_file:
                     raise CommandError("--csv-file é obrigatório quando --from=csv")
                 self._import_from_csv(self.csv_file)
 
             self.stdout.write(
-                self.style.SUCCESS('✅ Importação de disponibilidades concluída com sucesso!')
+                self.style.SUCCESS(
+                    "✅ Importação de disponibilidades concluída com sucesso!"
+                )
             )
 
         except Exception as e:
@@ -103,8 +101,8 @@ class Command(BaseCommand):
         try:
             from core.services.google_sheets_service import google_sheets_service
 
-            spreadsheet_id = sheets_config.get_spreadsheet_id('disponibilidade')
-            abas = sheets_config.get_abas('disponibilidade')
+            spreadsheet_id = sheets_config.get_spreadsheet_id("disponibilidade")
+            abas = sheets_config.get_abas("disponibilidade")
 
             self.stdout.write(f"📊 Importando da planilha: {spreadsheet_id}")
 
@@ -118,7 +116,9 @@ class Command(BaseCommand):
 
                 if not data:
                     self.stdout.write(
-                        self.style.WARNING(f"⚠️  Aba '{sheet_name}' vazia ou inacessível")
+                        self.style.WARNING(
+                            f"⚠️  Aba '{sheet_name}' vazia ou inacessível"
+                        )
                     )
                     continue
 
@@ -133,12 +133,12 @@ class Command(BaseCommand):
     def _import_from_csv(self, csv_file: str):
         """Importa disponibilidades de arquivo CSV"""
         try:
-            with open(csv_file, 'r', encoding='utf-8') as file:
+            with open(csv_file, "r", encoding="utf-8") as file:
                 reader = csv.DictReader(file)
                 data = list(reader)
 
             self.stdout.write(f"📄 Importando de arquivo: {csv_file}")
-            self._process_availability_data(data, 'CSV', f"csv:{csv_file}")
+            self._process_availability_data(data, "CSV", f"csv:{csv_file}")
 
         except FileNotFoundError:
             raise CommandError(f"Arquivo não encontrado: {csv_file}")
@@ -157,17 +157,17 @@ class Command(BaseCommand):
 
         for row_num, row in enumerate(data, 1):
             try:
-                result = self._create_or_update_availability(row, aba_name, source, row_num)
-                if result == 'created':
+                result = self._create_or_update_availability(
+                    row, aba_name, source, row_num
+                )
+                if result == "created":
                     created_count += 1
-                elif result == 'updated':
+                elif result == "updated":
                     updated_count += 1
 
             except Exception as e:
                 error_count += 1
-                self.stdout.write(
-                    self.style.ERROR(f"❌ Erro na linha {row_num}: {e}")
-                )
+                self.stdout.write(self.style.ERROR(f"❌ Erro na linha {row_num}: {e}"))
                 if self.verbose:
                     logger.error(f"Erro linha {row_num}: {e}")
 
@@ -175,9 +175,9 @@ class Command(BaseCommand):
         if not self.dry_run:
             LogAuditoria.objects.create(
                 usuario=None,  # Sistema
-                acao='RF03',  # Importação de disponibilidades
+                acao="RF03",  # Importação de disponibilidades
                 detalhes=f"Importação canônica: {created_count} criadas, {updated_count} atualizadas, {error_count} erros",
-                origem=source
+                origem=source,
             )
 
         self.stdout.write(
@@ -186,15 +186,17 @@ class Command(BaseCommand):
             )
         )
 
-    def _create_or_update_availability(self, row: Dict, aba_name: str, source: str, row_num: int) -> str:
+    def _create_or_update_availability(
+        self, row: Dict, aba_name: str, source: str, row_num: int
+    ) -> str:
         """Cria ou atualiza uma disponibilidade"""
         # Extrair dados da linha (ajustar conforme estrutura da planilha)
-        formador_nome = row.get('Formador', '').strip()
-        data_str = row.get('Data', '').strip()
-        periodo_inicio = row.get('Período Início', '').strip()
-        periodo_fim = row.get('Período Fim', '').strip()
-        disponivel = row.get('Disponível', '').strip().upper()
-        observacoes = row.get('Observações', '').strip()
+        formador_nome = row.get("Formador", "").strip()
+        data_str = row.get("Data", "").strip()
+        periodo_inicio = row.get("Período Início", "").strip()
+        periodo_fim = row.get("Período Fim", "").strip()
+        disponivel = row.get("Disponível", "").strip().upper()
+        observacoes = row.get("Observações", "").strip()
 
         if not formador_nome or not data_str:
             raise ValueError("Formador e Data são obrigatórios")
@@ -206,24 +208,27 @@ class Command(BaseCommand):
 
         # Processar data
         try:
-            data_disponibilidade = datetime.strptime(data_str, '%d/%m/%Y').date()
+            data_disponibilidade = datetime.strptime(data_str, "%d/%m/%Y").date()
         except:
             try:
-                data_disponibilidade = datetime.strptime(data_str, '%Y-%m-%d').date()
+                data_disponibilidade = datetime.strptime(data_str, "%Y-%m-%d").date()
             except:
                 raise ValueError(f"Formato de data inválido: {data_str}")
 
         # Filtrar por período se especificado
         if self.periodo:
-            periodo_date = datetime.strptime(self.periodo, '%Y-%m').date()
-            if data_disponibilidade.year != periodo_date.year or data_disponibilidade.month != periodo_date.month:
-                return 'skipped'
+            periodo_date = datetime.strptime(self.periodo, "%Y-%m").date()
+            if (
+                data_disponibilidade.year != periodo_date.year
+                or data_disponibilidade.month != periodo_date.month
+            ):
+                return "skipped"
 
         # Processar horários
         hora_inicio, hora_fim = self._process_horarios(periodo_inicio, periodo_fim)
 
         # Determinar disponibilidade
-        is_disponivel = disponivel in ['SIM', 'TRUE', '1', 'DISPONÍVEL']
+        is_disponivel = disponivel in ["SIM", "TRUE", "1", "DISPONÍVEL"]
 
         # Gerar hash único para idempotência
         external_hash = hashlib.sha256(
@@ -234,10 +239,10 @@ class Command(BaseCommand):
         try:
             marcador = MarcadorPlanilha.objects.get(external_hash=external_hash)
             disponibilidade = marcador.disponibilidade
-            action = 'updated'
+            action = "updated"
         except MarcadorPlanilha.DoesNotExist:
             disponibilidade = None
-            action = 'created'
+            action = "created"
 
         # Criar ou atualizar disponibilidade
         if not disponibilidade:
@@ -260,17 +265,19 @@ class Command(BaseCommand):
                 MarcadorPlanilha.objects.get_or_create(
                     external_hash=external_hash,
                     defaults={
-                        'disponibilidade': disponibilidade,
-                        'gid': str(row_num),
-                        'linha': row_num,
-                        'origem_aba': aba_name,
-                        'origem': source
-                    }
+                        "disponibilidade": disponibilidade,
+                        "gid": str(row_num),
+                        "linha": row_num,
+                        "origem_aba": aba_name,
+                        "origem": source,
+                    },
                 )
 
         if self.verbose:
             status = "Disponível" if is_disponivel else "Indisponível"
-            self.stdout.write(f"✅ {action.title()}: {formador_nome} - {data_str} ({status})")
+            self.stdout.write(
+                f"✅ {action.title()}: {formador_nome} - {data_str} ({status})"
+            )
 
         return action
 
@@ -286,7 +293,9 @@ class Command(BaseCommand):
         except Usuario.DoesNotExist:
             return None
 
-    def _process_horarios(self, periodo_inicio: str, periodo_fim: str) -> Tuple[str, str]:
+    def _process_horarios(
+        self, periodo_inicio: str, periodo_fim: str
+    ) -> Tuple[str, str]:
         """Processa horários de início e fim"""
         # Horários padrão se não especificados
         hora_inicio = "08:00"
@@ -295,7 +304,7 @@ class Command(BaseCommand):
         if periodo_inicio:
             try:
                 # Tentar diferentes formatos
-                if ':' in periodo_inicio:
+                if ":" in periodo_inicio:
                     hora_inicio = periodo_inicio
                 else:
                     # Assumir formato HHMM
@@ -306,7 +315,7 @@ class Command(BaseCommand):
         if periodo_fim:
             try:
                 # Tentar diferentes formatos
-                if ':' in periodo_fim:
+                if ":" in periodo_fim:
                     hora_fim = periodo_fim
                 else:
                     # Assumir formato HHMM

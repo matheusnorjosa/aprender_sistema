@@ -252,7 +252,11 @@ class Command(BaseCommand):
         self.stdout.write("\n=== RESUMO FINAL ===")
 
         for setor in Setor.objects.all().order_by("nome"):
-            projetos = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(setor=setor)
+            projetos = (
+                Projeto.objects.select_related("setor")
+                .prefetch_related("solicitacao_set")
+                .filter(setor=setor)
+            )
             status = (
                 "REQUER APROVAÇÃO"
                 if setor.vinculado_superintendencia
@@ -270,12 +274,18 @@ class Command(BaseCommand):
 
         # Estatísticas gerais
         total_projetos = Projeto.objects.count()
-        projetos_super = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(
-            setor__vinculado_superintendencia=True
-        ).count()
-        projetos_direto = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(
-            setor__vinculado_superintendencia=False
-        ).count()
+        projetos_super = (
+            Projeto.objects.select_related("setor")
+            .prefetch_related("solicitacao_set")
+            .filter(setor__vinculado_superintendencia=True)
+            .count()
+        )
+        projetos_direto = (
+            Projeto.objects.select_related("setor")
+            .prefetch_related("solicitacao_set")
+            .filter(setor__vinculado_superintendencia=False)
+            .count()
+        )
 
         self.stdout.write(f"\n=== ESTATÍSTICAS GERAIS ===")
         self.stdout.write(f"Total de projetos: {total_projetos}")

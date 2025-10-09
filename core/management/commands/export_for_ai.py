@@ -172,7 +172,12 @@ class Command(BaseCommand):
         municipios_data = []
         for municipio in municipios:
             # Contar usuários por município
-            usuarios_count = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(municipio=municipio).count()
+            usuarios_count = (
+                Usuario.objects.select_related("municipio", "projeto")
+                .prefetch_related("groups", "user_permissions")
+                .filter(municipio=municipio)
+                .count()
+            )
 
             municipio_data = {
                 "id": str(municipio.id),
@@ -276,7 +281,10 @@ class Command(BaseCommand):
                 "total_projetos": Projeto.objects.count(),
             },
             "perfis_sistema": {
-                grupo.name: Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(groups=grupo).count()
+                grupo.name: Usuario.objects.select_related("municipio", "projeto")
+                .prefetch_related("groups", "user_permissions")
+                .filter(groups=grupo)
+                .count()
                 for grupo in Group.objects.all()
             },
             "cobertura_geografica": {
@@ -284,9 +292,15 @@ class Command(BaseCommand):
                     Municipio.objects.values_list("nome", flat=True)
                 ),
                 "distribuicao_usuarios": {
-                    mun.nome: Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(municipio=mun).count()
+                    mun.nome: Usuario.objects.select_related("municipio", "projeto")
+                    .prefetch_related("groups", "user_permissions")
+                    .filter(municipio=mun)
+                    .count()
                     for mun in MunicipioService.todos()
-                    if Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(municipio=mun).exists()
+                    if Usuario.objects.select_related("municipio", "projeto")
+                    .prefetch_related("groups", "user_permissions")
+                    .filter(municipio=mun)
+                    .exists()
                 },
             },
             "capacidades_sistema": [

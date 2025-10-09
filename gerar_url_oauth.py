@@ -7,6 +7,7 @@ import json
 import base64
 import urllib.parse
 
+
 def gerar_url_oauth():
     """Gera URL de autorização OAuth2"""
 
@@ -14,23 +15,23 @@ def gerar_url_oauth():
     print("=" * 50)
 
     # Carregar credenciais
-    with open('credentials.json', 'r') as f:
+    with open("credentials.json", "r") as f:
         creds = json.load(f)
 
-    client_id = creds['installed']['client_id']
+    client_id = creds["installed"]["client_id"]
 
     # Parâmetros OAuth2
     params = {
-        'response_type': 'code',
-        'client_id': client_id,
-        'redirect_uri': 'http://localhost:9090',
-        'scope': 'https://www.googleapis.com/auth/spreadsheets.readonly',
-        'access_type': 'offline',
-        'prompt': 'consent'
+        "response_type": "code",
+        "client_id": client_id,
+        "redirect_uri": "http://localhost:9090",
+        "scope": "https://www.googleapis.com/auth/spreadsheets.readonly",
+        "access_type": "offline",
+        "prompt": "consent",
     }
 
     # Gerar URL
-    base_url = 'https://accounts.google.com/o/oauth2/auth'
+    base_url = "https://accounts.google.com/o/oauth2/auth"
     url_params = urllib.parse.urlencode(params)
     auth_url = f"{base_url}?{url_params}"
 
@@ -46,6 +47,7 @@ def gerar_url_oauth():
     print("📋 Após autorização, você receberá uma URL como:")
     print("http://localhost:9090/?code=SEU_CODIGO_AQUI&scope=...")
     print("Copie apenas a parte SEU_CODIGO_AQUI")
+
 
 if __name__ == "__main__":
     gerar_url_oauth()

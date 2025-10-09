@@ -72,7 +72,11 @@ def check_travel_buffer_conflict(formador, municipio_evento, dt_inicio, dt_fim):
 
     # Buscar todas as solicitações aprovadas do formador para calcular gaps
     solicitacoes_proximas = (
-        Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
+        Solicitacao.objects.select_related(
+            "municipio", "projeto", "tipo_evento", "solicitante"
+        )
+        .prefetch_related("formadores")
+        .filter(
             status=SolicitacaoStatus.APROVADO,
             formadores=formador,
         )
@@ -130,14 +134,21 @@ def check_daily_capacity_conflict(formador, dt_inicio, dt_fim):
     # Buscar todos os eventos aprovados do formador no mesmo dia
     data_evento = dt_inicio.date()
 
-    eventos_do_dia = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-        status=SolicitacaoStatus.APROVADO,
-        formadores=formador,
-        data_inicio__date=data_evento,
-    ).exclude(
-        # Excluir o próprio evento se estiver editando
-        data_inicio=dt_inicio,
-        data_fim=dt_fim,
+    eventos_do_dia = (
+        Solicitacao.objects.select_related(
+            "municipio", "projeto", "tipo_evento", "solicitante"
+        )
+        .prefetch_related("formadores")
+        .filter(
+            status=SolicitacaoStatus.APROVADO,
+            formadores=formador,
+            data_inicio__date=data_evento,
+        )
+        .exclude(
+            # Excluir o próprio evento se estiver editando
+            data_inicio=dt_inicio,
+            data_fim=dt_fim,
+        )
     )
 
     # Calcular total de horas já ocupadas no dia
@@ -207,7 +218,11 @@ def check_conflicts(formadores_qs, dt_inicio, dt_fim, municipio_evento=None):
     # RD-07.2: Prioridade 2 - Conflitos por eventos aprovados (RD-01)
     if formadores_ids:  # Só procurar se houver formadores
         solicitacoes = (
-            Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(
                 status=SolicitacaoStatus.APROVADO,
                 data_inicio__lt=dt_fim,
                 data_fim__gt=dt_inicio,

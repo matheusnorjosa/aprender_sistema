@@ -3,36 +3,39 @@
 Comando Django para limpar usuários duplicados e centralizar tudo no Docker
 """
 
+import re
+from collections import defaultdict
+
+from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from core.models import Usuario, Formador, FormadoresSolicitacao
-from django.contrib.auth.models import Group
-from collections import defaultdict
-import re
+
+from core.models import Formador, FormadoresSolicitacao, Usuario
+
 
 class Command(BaseCommand):
-    help = 'Limpa usuários duplicados mantendo apenas emails reais e centralizando no Docker'
+    help = "Limpa usuários duplicados mantendo apenas emails reais e centralizando no Docker"
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Executa simulação sem salvar alterações'
+            "--dry-run",
+            action="store_true",
+            help="Executa simulação sem salvar alterações",
         )
         parser.add_argument(
-            '--confirmar-limpeza',
-            action='store_true',
-            help='Confirma que quer executar a limpeza (obrigatório para execução real)'
+            "--confirmar-limpeza",
+            action="store_true",
+            help="Confirma que quer executar a limpeza (obrigatório para execução real)",
         )
 
     def handle(self, *args, **options):
-        if not options['dry_run'] and not options['confirmar_limpeza']:
+        if not options["dry_run"] and not options["confirmar_limpeza"]:
             raise CommandError(
                 "Para executar a limpeza real, use: --confirmar-limpeza\n"
                 "Para simular, use: --dry-run"
             )
 
-        self.dry_run = options['dry_run']
+        self.dry_run = options["dry_run"]
 
         if self.dry_run:
             self.stdout.write("=== MODO SIMULAÇÃO - NENHUMA ALTERAÇÃO SERÁ SALVA ===")
@@ -41,9 +44,12 @@ class Command(BaseCommand):
 
         # Verificar ambiente
         from django.db import connection
-        db_engine = connection.settings_dict['ENGINE']
-        if 'postgresql' not in db_engine:
-            raise CommandError("Este comando deve ser executado APENAS com PostgreSQL Docker!")
+
+        db_engine = connection.settings_dict["ENGINE"]
+        if "postgresql" not in db_engine:
+            raise CommandError(
+                "Este comando deve ser executado APENAS com PostgreSQL Docker!"
+            )
 
         self.stdout.write(f"Banco em uso: {db_engine}")
         self.stdout.write(f"Host: {connection.settings_dict.get('HOST', 'localhost')}")
@@ -60,7 +66,9 @@ class Command(BaseCommand):
             if self.dry_run:
                 # Rollback em modo simulação
                 transaction.set_rollback(True)
-                self.stdout.write("\n=== SIMULAÇÃO CONCLUÍDA - NENHUMA ALTERAÇÃO SALVA ===")
+                self.stdout.write(
+                    "\n=== SIMULAÇÃO CONCLUÍDA - NENHUMA ALTERAÇÃO SALVA ==="
+                )
             else:
                 self.stdout.write("\n=== LIMPEZA CONCLUÍDA COM SUCESSO ===")
 
@@ -70,13 +78,23 @@ class Command(BaseCommand):
         self.stdout.write("=" * 50)
 
         total = Usuario.objects.count()
-        emails_planilha = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(email__contains='planilha.').count()
-        emails_sistema = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(email__contains='sistema.local').count()
-        emails_reais = Usuario.objects.exclude(
-            email__contains='planilha.'
-        ).exclude(
-            email__contains='sistema.local'
-        ).count()
+        emails_planilha = (
+            Usuario.objects.select_related("municipio", "projeto")
+            .prefetch_related("groups", "user_permissions")
+            .filter(email__contains="planilha.")
+            .count()
+        )
+        emails_sistema = (
+            Usuario.objects.select_related("municipio", "projeto")
+            .prefetch_related("groups", "user_permissions")
+            .filter(email__contains="sistema.local")
+            .count()
+        )
+        emails_reais = (
+            Usuario.objects.exclude(email__contains="planilha.")
+            .exclude(email__contains="sistema.local")
+            .count()
+        )
 
         self.stdout.write(f"Total de usuários: {total}")
         self.stdout.write(f"Emails @planilha.*: {emails_planilha}")
@@ -95,7 +113,9 @@ class Command(BaseCommand):
         # Agrupar por primeiro nome (case-insensitive)
         grupos_nome = defaultdict(list)
 
-        for usuario in Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions"):
+        for usuario in Usuario.objects.select_related(
+            "municipio", "projeto"
+        ).prefetch_related("groups", "user_permissions"):
             nome_normalizado = self.normalizar_nome(usuario.first_name)
             if nome_normalizado:
                 grupos_nome[nome_normalizado].append(usuario)
@@ -107,7 +127,9 @@ class Command(BaseCommand):
                 self.duplicados[nome] = usuarios
 
         self.stdout.write(f"Nomes com duplicações: {len(self.duplicados)}")
-        self.stdout.write(f"Usuários afetados: {sum(len(usuarios) for usuarios in self.duplicados.values())}")
+        self.stdout.write(
+            f"Usuários afetados: {sum(len(usuarios) for usuarios in self.duplicados.values())}"
+        )
 
         # Mostrar alguns exemplos
         count = 0
@@ -131,20 +153,20 @@ class Command(BaseCommand):
         # Remove acentos e converte para minúsculo
         nome = nome.lower().strip()
         # Remove caracteres especiais
-        nome = re.sub(r'[^\w\s]', '', nome)
+        nome = re.sub(r"[^\w\s]", "", nome)
         return nome
 
     def classificar_email(self, email):
         """Classifica tipo de email"""
         email = email.lower()
-        if 'planilha.' in email:
-            return 'PLANILHA'
-        elif 'sistema.local' in email:
-            return 'SISTEMA'
-        elif '@gmail.com' in email or '@aprendereditora.com.br' in email:
-            return 'REAL'
+        if "planilha." in email:
+            return "PLANILHA"
+        elif "sistema.local" in email:
+            return "SISTEMA"
+        elif "@gmail.com" in email or "@aprendereditora.com.br" in email:
+            return "REAL"
         else:
-            return 'OUTRO'
+            return "OUTRO"
 
     def limpar_emails_genericos(self):
         """Remove usuários com emails genéricos que têm equivalente real"""
@@ -156,13 +178,21 @@ class Command(BaseCommand):
 
         for nome, usuarios in self.duplicados.items():
             # Separar por tipo de email
-            usuarios_reais = [u for u in usuarios if self.classificar_email(u.email) == 'REAL']
-            usuarios_genericos = [u for u in usuarios if self.classificar_email(u.email) in ['PLANILHA', 'SISTEMA']]
+            usuarios_reais = [
+                u for u in usuarios if self.classificar_email(u.email) == "REAL"
+            ]
+            usuarios_genericos = [
+                u
+                for u in usuarios
+                if self.classificar_email(u.email) in ["PLANILHA", "SISTEMA"]
+            ]
 
             if usuarios_reais and usuarios_genericos:
                 # Tem tanto real quanto genérico - remover genéricos
                 for u in usuarios_genericos:
-                    self.stdout.write(f"Removendo: {u.username} ({u.email}) - tem equivalente real")
+                    self.stdout.write(
+                        f"Removendo: {u.username} ({u.email}) - tem equivalente real"
+                    )
 
                     # Transferir relacionamentos antes de remover
                     self.transferir_relacionamentos(u, usuarios_reais[0])
@@ -176,7 +206,9 @@ class Command(BaseCommand):
                 principal = usuarios_genericos[0]
                 outros = usuarios_genericos[1:]
 
-                self.stdout.write(f"Preservando: {principal.username} (único disponível)")
+                self.stdout.write(
+                    f"Preservando: {principal.username} (único disponível)"
+                )
                 preservados += 1
 
                 for u in outros:
@@ -195,7 +227,11 @@ class Command(BaseCommand):
 
         # Transferir FormadoresSolicitacao
         if not self.dry_run:
-            FormadoresSolicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(usuario=usuario_origem).update(usuario=usuario_destino)
+            FormadoresSolicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            ).prefetch_related("formadores").filter(usuario=usuario_origem).update(
+                usuario=usuario_destino
+            )
 
         # Transferir formadores
         try:
@@ -231,7 +267,9 @@ class Command(BaseCommand):
         consolidados = 0
 
         for nome, usuarios in self.duplicados.items():
-            usuarios_reais = [u for u in usuarios if self.classificar_email(u.email) == 'REAL']
+            usuarios_reais = [
+                u for u in usuarios if self.classificar_email(u.email) == "REAL"
+            ]
 
             if len(usuarios_reais) > 1:
                 # Múltiplos usuários reais com mesmo nome
@@ -239,7 +277,9 @@ class Command(BaseCommand):
                 outros = [u for u in usuarios_reais if u.id != principal.id]
 
                 self.stdout.write(f"\nConsolidando '{nome}':")
-                self.stdout.write(f"  Principal: {principal.username} ({principal.email})")
+                self.stdout.write(
+                    f"  Principal: {principal.username} ({principal.email})"
+                )
 
                 for u in outros:
                     self.stdout.write(f"  Mesclando: {u.username} ({u.email})")
@@ -260,17 +300,17 @@ class Command(BaseCommand):
             score = 0
 
             # Email corporativo tem prioridade
-            if '@aprendereditora.com.br' in usuario.email:
+            if "@aprendereditora.com.br" in usuario.email:
                 score += 100
-            elif '@gmail.com' in usuario.email:
+            elif "@gmail.com" in usuario.email:
                 score += 50
 
             # Usuário com formador tem prioridade
-            if hasattr(usuario, 'formador'):
+            if hasattr(usuario, "formador"):
                 score += 20
 
             # Mais antigo tem prioridade
-            score += (10000 - usuario.id)  # IDs menores = mais antigos
+            score += 10000 - usuario.id  # IDs menores = mais antigos
 
             return score
 
@@ -282,13 +322,23 @@ class Command(BaseCommand):
         self.stdout.write("=" * 50)
 
         total = Usuario.objects.count()
-        emails_planilha = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(email__contains='planilha.').count()
-        emails_sistema = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(email__contains='sistema.local').count()
-        emails_reais = Usuario.objects.exclude(
-            email__contains='planilha.'
-        ).exclude(
-            email__contains='sistema.local'
-        ).count()
+        emails_planilha = (
+            Usuario.objects.select_related("municipio", "projeto")
+            .prefetch_related("groups", "user_permissions")
+            .filter(email__contains="planilha.")
+            .count()
+        )
+        emails_sistema = (
+            Usuario.objects.select_related("municipio", "projeto")
+            .prefetch_related("groups", "user_permissions")
+            .filter(email__contains="sistema.local")
+            .count()
+        )
+        emails_reais = (
+            Usuario.objects.exclude(email__contains="planilha.")
+            .exclude(email__contains="sistema.local")
+            .count()
+        )
 
         self.stdout.write(f"Total de usuários após limpeza: {total}")
         self.stdout.write(f"Emails @planilha.*: {emails_planilha}")
@@ -297,12 +347,18 @@ class Command(BaseCommand):
 
         # Verificar duplicações restantes
         grupos_nome = defaultdict(list)
-        for usuario in Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions"):
+        for usuario in Usuario.objects.select_related(
+            "municipio", "projeto"
+        ).prefetch_related("groups", "user_permissions"):
             nome_normalizado = self.normalizar_nome(usuario.first_name)
             if nome_normalizado:
                 grupos_nome[nome_normalizado].append(usuario)
 
-        duplicados_restantes = {nome: usuarios for nome, usuarios in grupos_nome.items() if len(usuarios) > 1}
+        duplicados_restantes = {
+            nome: usuarios
+            for nome, usuarios in grupos_nome.items()
+            if len(usuarios) > 1
+        }
 
         self.stdout.write(f"Duplicações restantes: {len(duplicados_restantes)}")
 

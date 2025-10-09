@@ -32,57 +32,53 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--from',
+            "--from",
             type=str,
-            choices=['sheets', 'csv'],
-            default='sheets',
-            help='Fonte dos dados: sheets (Google Sheets) ou csv (arquivo local)'
+            choices=["sheets", "csv"],
+            default="sheets",
+            help="Fonte dos dados: sheets (Google Sheets) ou csv (arquivo local)",
         )
         parser.add_argument(
-            '--csv-file',
-            type=str,
-            help='Caminho para arquivo CSV (quando --from=csv)'
+            "--csv-file", type=str, help="Caminho para arquivo CSV (quando --from=csv)"
         )
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Execução de teste sem salvar no banco'
+            "--dry-run",
+            action="store_true",
+            help="Execução de teste sem salvar no banco",
         )
         parser.add_argument(
-            '--clear',
-            action='store_true',
-            help='Limpar usuários existentes antes da importação'
+            "--clear",
+            action="store_true",
+            help="Limpar usuários existentes antes da importação",
         )
         parser.add_argument(
-            '--verbose',
-            action='store_true',
-            help='Mostrar informações detalhadas'
+            "--verbose", action="store_true", help="Mostrar informações detalhadas"
         )
 
     def handle(self, *args, **options):
-        self.dry_run = options['dry_run']
-        self.verbose = options['verbose']
-        self.clear = options['clear']
-        self.source = options['from']
-        self.csv_file = options['csv_file']
+        self.dry_run = options["dry_run"]
+        self.verbose = options["verbose"]
+        self.clear = options["clear"]
+        self.source = options["from"]
+        self.csv_file = options["csv_file"]
 
         if self.verbose:
             logging.basicConfig(level=logging.DEBUG)
 
         self.stdout.write(
-            self.style.SUCCESS('🚀 Iniciando importação canônica de usuários...')
+            self.style.SUCCESS("🚀 Iniciando importação canônica de usuários...")
         )
 
         try:
-            if self.source == 'sheets':
+            if self.source == "sheets":
                 self._import_from_sheets()
-            elif self.source == 'csv':
+            elif self.source == "csv":
                 if not self.csv_file:
                     raise CommandError("--csv-file é obrigatório quando --from=csv")
                 self._import_from_csv(self.csv_file)
 
             self.stdout.write(
-                self.style.SUCCESS('✅ Importação de usuários concluída com sucesso!')
+                self.style.SUCCESS("✅ Importação de usuários concluída com sucesso!")
             )
 
         except Exception as e:
@@ -94,8 +90,8 @@ class Command(BaseCommand):
         try:
             from core.services.google_sheets_service import google_sheets_service
 
-            spreadsheet_id = sheets_config.get_spreadsheet_id('usuarios')
-            abas = sheets_config.get_abas('usuarios')
+            spreadsheet_id = sheets_config.get_spreadsheet_id("usuarios")
+            abas = sheets_config.get_abas("usuarios")
 
             self.stdout.write(f"📊 Importando da planilha: {spreadsheet_id}")
 
@@ -109,7 +105,9 @@ class Command(BaseCommand):
 
                 if not data:
                     self.stdout.write(
-                        self.style.WARNING(f"⚠️  Aba '{sheet_name}' vazia ou inacessível")
+                        self.style.WARNING(
+                            f"⚠️  Aba '{sheet_name}' vazia ou inacessível"
+                        )
                     )
                     continue
 
@@ -124,7 +122,7 @@ class Command(BaseCommand):
     def _import_from_csv(self, csv_file: str):
         """Importa usuários de arquivo CSV"""
         try:
-            with open(csv_file, 'r', encoding='utf-8') as file:
+            with open(csv_file, "r", encoding="utf-8") as file:
                 reader = csv.DictReader(file)
                 data = list(reader)
 
@@ -149,16 +147,14 @@ class Command(BaseCommand):
         for row_num, row in enumerate(data, 1):
             try:
                 result = self._create_or_update_user(row, source, row_num)
-                if result == 'created':
+                if result == "created":
                     created_count += 1
-                elif result == 'updated':
+                elif result == "updated":
                     updated_count += 1
 
             except Exception as e:
                 error_count += 1
-                self.stdout.write(
-                    self.style.ERROR(f"❌ Erro na linha {row_num}: {e}")
-                )
+                self.stdout.write(self.style.ERROR(f"❌ Erro na linha {row_num}: {e}"))
                 if self.verbose:
                     logger.error(f"Erro linha {row_num}: {e}")
 
@@ -166,9 +162,9 @@ class Command(BaseCommand):
         if not self.dry_run:
             LogAuditoria.objects.create(
                 usuario=None,  # Sistema
-                acao='RF01',  # Importação de usuários
+                acao="RF01",  # Importação de usuários
                 detalhes=f"Importação canônica: {created_count} criados, {updated_count} atualizados, {error_count} erros",
-                origem=source
+                origem=source,
             )
 
         self.stdout.write(
@@ -180,11 +176,11 @@ class Command(BaseCommand):
     def _create_or_update_user(self, row: Dict, source: str, row_num: int) -> str:
         """Cria ou atualiza um usuário"""
         # Mapeamento de campos (ajustar conforme estrutura da planilha)
-        cpf = row.get('CPF', '').strip()
-        nome = row.get('Nome', '').strip()
-        email = row.get('Email', '').strip()
-        setor_nome = row.get('Setor', '').strip()
-        papel = row.get('Papel', '').strip()
+        cpf = row.get("CPF", "").strip()
+        nome = row.get("Nome", "").strip()
+        email = row.get("Email", "").strip()
+        setor_nome = row.get("Setor", "").strip()
+        papel = row.get("Papel", "").strip()
 
         if not cpf or not nome:
             raise ValueError("CPF e Nome são obrigatórios")
@@ -198,21 +194,20 @@ class Command(BaseCommand):
         setor = None
         if setor_nome:
             setor, _ = Setor.objects.get_or_create(
-                nome=setor_nome,
-                defaults={'descricao': f'Setor {setor_nome}'}
+                nome=setor_nome, defaults={"descricao": f"Setor {setor_nome}"}
             )
 
         # Buscar usuário existente
         try:
             usuario = Usuario.objects.get(username=cpf)
-            action = 'updated'
+            action = "updated"
         except Usuario.DoesNotExist:
             usuario = Usuario(username=cpf)
-            action = 'created'
+            action = "created"
 
         # Atualizar dados
-        usuario.first_name = nome.split()[0] if nome else ''
-        usuario.last_name = ' '.join(nome.split()[1:]) if len(nome.split()) > 1 else ''
+        usuario.first_name = nome.split()[0] if nome else ""
+        usuario.last_name = " ".join(nome.split()[1:]) if len(nome.split()) > 1 else ""
         usuario.email = email
         usuario.setor = setor
         usuario.is_active = True

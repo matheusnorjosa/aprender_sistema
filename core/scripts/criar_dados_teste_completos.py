@@ -97,7 +97,9 @@ def run():
     print(f"\n📊 Resumo dos dados de teste criados:")
     print(f"   🔒 Bloqueios criados: {bloqueios_criados}")
     print(f"   ✅ Solicitações aprovadas: {aprovadas}")
-    print(f"   👥 Formadores ativos: {FormadorService.get_formadores_queryset().count()}")
+    print(
+        f"   👥 Formadores ativos: {FormadorService.get_formadores_queryset().count()}"
+    )
     print(f"   📅 Total de solicitações: {Solicitacao.objects.count()}")
     print(
         f"   🗓️ Solicitações aprovadas: {Solicitacao.objects.filter(status=SolicitacaoStatus.APROVADO).count()}"

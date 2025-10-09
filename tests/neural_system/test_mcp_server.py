@@ -1,6 +1,7 @@
 """
 Testes para o servidor MCP do Sistema APRENDER
 """
+
 import pytest
 import asyncio
 import tempfile
@@ -14,9 +15,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "neural_system"))
 
 # Import do servidor MCP
 try:
-    from mcp_server_aprender import server, _read_documentation_file, _extract_section_from_content
+    from mcp_server_aprender import (
+        server,
+        _read_documentation_file,
+        _extract_section_from_content,
+    )
 except ImportError:
     pytest.skip("MCP server module not available", allow_module_level=True)
+
 
 class TestMCPServer:
     """Test suite para funcionalidade do servidor MCP."""
@@ -38,7 +44,7 @@ class TestMCPServer:
             "validate_code_pattern",
             "check_security_vulnerabilities",
             "get_system_context",
-            "get_project_structure"
+            "get_project_structure",
         ]
 
         for tool in essential_tools:
@@ -49,7 +55,7 @@ class TestMCPServer:
         # Criar arquivo de teste temporário
         test_content = "# Documento de Teste\nEste é um teste."
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
             f.write(test_content)
             temp_file = f.name
 
@@ -88,7 +94,9 @@ Conteúdo diferente.
         """Testa obtenção de padrões de arquitetura."""
         mock_content = "# Padrões de Arquitetura\nConteúdo de teste"
 
-        with patch('mcp_server_aprender._read_documentation_file', return_value=mock_content):
+        with patch(
+            "mcp_server_aprender._read_documentation_file", return_value=mock_content
+        ):
             result = await server.call_tool("get_architecture_patterns", {})
 
             assert len(result) == 1
@@ -106,10 +114,9 @@ def evento_detail_view(request, evento_id: int) -> HttpResponse:
     return render(request, 'core/evento_detail.html', {'evento': evento})
 '''
 
-        result = await server.call_tool("validate_code_pattern", {
-            "code": good_code,
-            "context": "view"
-        })
+        result = await server.call_tool(
+            "validate_code_pattern", {"code": good_code, "context": "view"}
+        )
 
         assert len(result) == 1
         assert result[0]["type"] == "text"
@@ -118,17 +125,16 @@ def evento_detail_view(request, evento_id: int) -> HttpResponse:
     @pytest.mark.asyncio
     async def test_validate_code_pattern_bad_django_code(self):
         """Testa validação de código Django com problemas."""
-        bad_code = '''
+        bad_code = """
 def bad_view(request):
     print(f"User accessed view")
     user_id = request.GET['user_id']
     return HttpResponse("Done")
-'''
+"""
 
-        result = await server.call_tool("validate_code_pattern", {
-            "code": bad_code,
-            "context": "view"
-        })
+        result = await server.call_tool(
+            "validate_code_pattern", {"code": bad_code, "context": "view"}
+        )
 
         assert len(result) == 1
         assert result[0]["type"] == "text"
@@ -138,7 +144,7 @@ def bad_view(request):
     @pytest.mark.asyncio
     async def test_validate_django_model_pattern(self):
         """Testa validação específica para models Django."""
-        model_code = '''
+        model_code = """
 class Evento(models.Model):
     nome = models.CharField(max_length=200)
     data_inicio = models.DateTimeField()
@@ -146,12 +152,11 @@ class Evento(models.Model):
     class Meta:
         verbose_name = "Evento"
         verbose_name_plural = "Eventos"
-'''
+"""
 
-        result = await server.call_tool("validate_code_pattern", {
-            "code": model_code,
-            "context": "model"
-        })
+        result = await server.call_tool(
+            "validate_code_pattern", {"code": model_code, "context": "model"}
+        )
 
         assert len(result) == 1
         assert result[0]["type"] == "text"
@@ -161,7 +166,7 @@ class Evento(models.Model):
     @pytest.mark.asyncio
     async def test_check_security_vulnerabilities_safe_code(self):
         """Testa verificação de segurança com código seguro."""
-        safe_code = '''
+        safe_code = """
 @login_required
 @permission_required('core.view_evento')
 def evento_list(request):
@@ -170,11 +175,11 @@ def evento_list(request):
         evento = form.save()
         return redirect('evento_detail', evento.pk)
     return render(request, 'core/evento_form.html', {'form': form})
-'''
+"""
 
-        result = await server.call_tool("check_security_vulnerabilities", {
-            "code": safe_code
-        })
+        result = await server.call_tool(
+            "check_security_vulnerabilities", {"code": safe_code}
+        )
 
         assert len(result) == 1
         assert result[0]["type"] == "text"
@@ -183,30 +188,33 @@ def evento_list(request):
     @pytest.mark.asyncio
     async def test_check_security_vulnerabilities_unsafe_code(self):
         """Testa verificação de segurança com código vulnerável."""
-        unsafe_code = '''
+        unsafe_code = """
 def unsafe_view(request):
     user_id = request.GET['user_id']
     query = "SELECT * FROM auth_user WHERE id = %s" % user_id
     api_key = "hardcoded-secret-key-123"
     return execute_query(query)
-'''
+"""
 
-        result = await server.call_tool("check_security_vulnerabilities", {
-            "code": unsafe_code
-        })
+        result = await server.call_tool(
+            "check_security_vulnerabilities", {"code": unsafe_code}
+        )
 
         assert len(result) == 1
         assert result[0]["type"] == "text"
         assert "RISCO" in result[0]["text"]
         # Deve detectar SQL injection e hardcoded secret
-        assert "injection" in result[0]["text"].lower() or "segredo" in result[0]["text"].lower()
+        assert (
+            "injection" in result[0]["text"].lower()
+            or "segredo" in result[0]["text"].lower()
+        )
 
     @pytest.mark.asyncio
     async def test_get_business_rules_availability(self):
         """Testa obtenção de regras de negócio de disponibilidade."""
-        result = await server.call_tool("get_business_rules", {
-            "rule_category": "availability"
-        })
+        result = await server.call_tool(
+            "get_business_rules", {"rule_category": "availability"}
+        )
 
         assert len(result) == 1
         assert result[0]["type"] == "text"
@@ -217,9 +225,9 @@ def unsafe_view(request):
     @pytest.mark.asyncio
     async def test_get_business_rules_calendar(self):
         """Testa obtenção de regras de integração com Google Calendar."""
-        result = await server.call_tool("get_business_rules", {
-            "rule_category": "calendar"
-        })
+        result = await server.call_tool(
+            "get_business_rules", {"rule_category": "calendar"}
+        )
 
         assert len(result) == 1
         assert result[0]["type"] == "text"
@@ -251,7 +259,7 @@ def unsafe_view(request):
     @pytest.mark.asyncio
     async def test_validate_django_command_pattern(self):
         """Testa validação específica para Django management commands."""
-        command_code = '''
+        command_code = """
 from django.core.management.base import BaseCommand
 
 class Command(BaseCommand):
@@ -259,12 +267,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write("Importando dados...")
-'''
+"""
 
-        result = await server.call_tool("validate_code_pattern", {
-            "code": command_code,
-            "context": "command"
-        })
+        result = await server.call_tool(
+            "validate_code_pattern", {"code": command_code, "context": "command"}
+        )
 
         assert len(result) == 1
         assert result[0]["type"] == "text"
@@ -274,7 +281,7 @@ class Command(BaseCommand):
     @pytest.mark.asyncio
     async def test_validate_django_form_pattern(self):
         """Testa validação específica para Django forms."""
-        form_code = '''
+        form_code = """
 from django import forms
 from django.core.exceptions import ValidationError
 
@@ -284,12 +291,11 @@ class EventoForm(forms.ModelForm):
         if data < timezone.now():
             raise ValidationError("Data deve ser no futuro")
         return data
-'''
+"""
 
-        result = await server.call_tool("validate_code_pattern", {
-            "code": form_code,
-            "context": "form"
-        })
+        result = await server.call_tool(
+            "validate_code_pattern", {"code": form_code, "context": "form"}
+        )
 
         assert len(result) == 1
         assert result[0]["type"] == "text"

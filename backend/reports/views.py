@@ -149,7 +149,8 @@ def kpis(request):
         by_status = {str(k): int(v) for k, v in by_status_rows}
 
         # Conflitos (pares únicos)
-        cur.execute("""
+        cur.execute(
+            """
             WITH pairs AS (
               SELECT DISTINCT LEAST(s1.id,s2.id) a, GREATEST(s1.id,s2.id) b
               FROM core_solicitacao s1
@@ -159,11 +160,13 @@ def kpis(request):
               JOIN core_formadoressolicitacao f2 ON f2.solicitacao_id=s2.id AND f2.usuario_id=f1.usuario_id
             )
             SELECT COUNT(*) FROM pairs
-        """)
+        """
+        )
         conflitos = cur.fetchone()[0]
 
         # Overload (>=110h/mês últimos 3 meses)
-        cur.execute("""
+        cur.execute(
+            """
             WITH h AS (
               SELECT sf.usuario_id,
                      date_trunc('month', s.data_inicio) AS mes,
@@ -178,7 +181,8 @@ def kpis(request):
                 AND ch >= 110
               GROUP BY usuario_id
             ) q
-        """)
+        """
+        )
         overload_users = cur.fetchone()[0]
 
         # Dimensionais
@@ -198,16 +202,18 @@ def kpis(request):
         except Exception:
             pass
 
-    return JsonResponse({
-        "total_solicitacoes": total,
-        "by_status": by_status,
-        "conflitos_total": conflitos,
-        "overload_users": overload_users,
-        "usuarios_total": usuarios,
-        "municipios_total": municipios,
-        "projetos_total": projetos,
-        "disp_staging_total": disp_staging,
-    })
+    return JsonResponse(
+        {
+            "total_solicitacoes": total,
+            "by_status": by_status,
+            "conflitos_total": conflitos,
+            "overload_users": overload_users,
+            "usuarios_total": usuarios,
+            "municipios_total": municipios,
+            "projetos_total": projetos,
+            "disp_staging_total": disp_staging,
+        }
+    )
 
 
 @login_required
@@ -225,7 +231,8 @@ def series(request):
         return JsonResponse({"error": "missing from/to (YYYY-MM)"}, status=400)
 
     with connection.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
           SELECT to_char(date_trunc('month', s.data_inicio),'YYYY-MM') AS mes,
                  status,
                  COUNT(*)
@@ -233,7 +240,9 @@ def series(request):
           WHERE date_trunc('month', s.data_inicio) BETWEEN to_date(%s,'YYYY-MM') AND to_date(%s,'YYYY-MM')
           GROUP BY 1,2
           ORDER BY 1 ASC
-        """, [from_param, to_param])
+        """,
+            [from_param, to_param],
+        )
         rows = cur.fetchall()
 
     # Pivot leve

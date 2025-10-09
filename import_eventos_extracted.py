@@ -15,18 +15,23 @@ import django
 from datetime import datetime, time
 
 # Configuração do Django
-sys.path.append('.')
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
+sys.path.append(".")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from core.models import (
-    Municipio, Projeto, TipoEvento, Solicitacao,
-    SolicitacaoStatus, Setor
+    Municipio,
+    Projeto,
+    TipoEvento,
+    Solicitacao,
+    SolicitacaoStatus,
+    Setor,
 )
 
 User = get_user_model()
+
 
 def normalizar_data(data_str, hora_str="08:00"):
     """Converter data DD/MM/YYYY + hora HH:MM para datetime"""
@@ -54,6 +59,7 @@ def normalizar_data(data_str, hora_str="08:00"):
         print(f"❌ Erro ao processar data '{data_str}' + hora '{hora_str}': {e}")
         return None
 
+
 def obter_ou_criar_municipio(nome):
     """Obter ou criar município"""
     if not nome or nome.strip() == "":
@@ -68,12 +74,11 @@ def obter_ou_criar_municipio(nome):
 
     # Criar novo município (assumir CE como padrão)
     municipio = Municipio.objects.create(
-        nome=nome,
-        uf="CE",  # Padrão baseado nos dados existentes
-        ativo=True
+        nome=nome, uf="CE", ativo=True  # Padrão baseado nos dados existentes
     )
     print(f"✅ Município criado: {nome}/CE")
     return municipio
+
 
 def obter_ou_criar_projeto(nome):
     """Obter ou criar projeto"""
@@ -88,12 +93,10 @@ def obter_ou_criar_projeto(nome):
         return projeto
 
     # Criar novo projeto
-    projeto = Projeto.objects.create(
-        nome=nome,
-        ativo=True
-    )
+    projeto = Projeto.objects.create(nome=nome, ativo=True)
     print(f"✅ Projeto criado: {nome}")
     return projeto
+
 
 def obter_ou_criar_tipo_evento(nome):
     """Obter ou criar tipo de evento"""
@@ -108,7 +111,7 @@ def obter_ou_criar_tipo_evento(nome):
         "MAT": "Matemática",
         "FORM": "Formação",
         "Presencial": "Presencial",
-        "Online": "Online"
+        "Online": "Online",
     }
     nome = mapeamento.get(nome, nome)
 
@@ -117,12 +120,11 @@ def obter_ou_criar_tipo_evento(nome):
         return tipo
 
     tipo = TipoEvento.objects.create(
-        nome=nome,
-        online=(nome.lower() == "online"),
-        ativo=True
+        nome=nome, online=(nome.lower() == "online"), ativo=True
     )
     print(f"✅ Tipo evento criado: {nome}")
     return tipo
+
 
 def buscar_formador(nome):
     """Buscar formador por nome"""
@@ -133,19 +135,19 @@ def buscar_formador(nome):
 
     # Buscar por nome completo ou parcial
     user = User.objects.filter(
-        first_name__icontains=nome.split()[0],
-        formador_ativo=True
+        first_name__icontains=nome.split()[0], formador_ativo=True
     ).first()
 
     return user
+
 
 def importar_aba(dados_aba, nome_aba):
     """Importar uma aba específica"""
     print(f"\n🚀 Importando aba: {nome_aba}")
     print(f"📊 Registros válidos: {dados_aba.get('registros_validos', 0)}")
 
-    registros = dados_aba.get('registros', [])
-    cabecalhos = dados_aba.get('cabecalhos', [])
+    registros = dados_aba.get("registros", [])
+    cabecalhos = dados_aba.get("cabecalhos", [])
 
     if not registros:
         print("❌ Nenhum registro encontrado")
@@ -200,7 +202,7 @@ def importar_aba(dados_aba, nome_aba):
                 numero_encontro_formativo=registro[5] if len(registro) > 5 else "1",
                 coordenador_acompanha=True,
                 observacoes=f"Importado da aba {nome_aba}",
-                status=SolicitacaoStatus.APROVADO  # Dados históricos já aprovados
+                status=SolicitacaoStatus.APROVADO,  # Dados históricos já aprovados
             )
 
             # Tentar associar formador se encontrado
@@ -221,6 +223,7 @@ def importar_aba(dados_aba, nome_aba):
     print(f"✅ Aba {nome_aba}: {contador} solicitações importadas, {erros} erros")
     return contador
 
+
 def main():
     """Função principal"""
     print("🚀 INICIANDO IMPORTAÇÃO DE EVENTOS DOS DADOS EXTRAÍDOS")
@@ -234,13 +237,13 @@ def main():
 
     print(f"📂 Carregando dados de: {arquivo_dados}")
 
-    with open(arquivo_dados, 'r', encoding='utf-8') as f:
+    with open(arquivo_dados, "r", encoding="utf-8") as f:
         dados = json.load(f)
 
     # Encontrar planilha de agenda
     planilha_agenda = None
-    for nome, planilha in dados.get('planilhas', {}).items():
-        if 'Acompanhamento' in nome and 'Agenda' in nome:
+    for nome, planilha in dados.get("planilhas", {}).items():
+        if "Acompanhamento" in nome and "Agenda" in nome:
             planilha_agenda = planilha
             break
 
@@ -252,12 +255,12 @@ def main():
     print(f"📋 Total de abas: {planilha_agenda.get('total_abas', 0)}")
 
     # Importar abas priorizadas
-    abas_importar = ['Super', 'ACerta', 'Outros', 'Brincando', 'Vidas']
+    abas_importar = ["Super", "ACerta", "Outros", "Brincando", "Vidas"]
     total_importado = 0
 
     with transaction.atomic():
-        for aba_config in planilha_agenda.get('abas', []):
-            nome_aba = aba_config.get('nome')
+        for aba_config in planilha_agenda.get("abas", []):
+            nome_aba = aba_config.get("nome")
 
             if nome_aba in abas_importar:
                 total_importado += importar_aba(aba_config, nome_aba)
@@ -272,6 +275,7 @@ def main():
     print(f"🏛️ Projetos: {Projeto.objects.count()}")
     print(f"⭐ Tipos Evento: {TipoEvento.objects.count()}")
     print(f"📋 Solicitações: {Solicitacao.objects.count()}")
+
 
 if __name__ == "__main__":
     main()

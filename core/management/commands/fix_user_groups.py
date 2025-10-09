@@ -40,7 +40,11 @@ class Command(BaseCommand):
         try:
             with transaction.atomic():
                 # Buscar usuários sem grupo
-                usuarios_sem_grupo = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(groups__isnull=True)
+                usuarios_sem_grupo = (
+                    Usuario.objects.select_related("municipio", "projeto")
+                    .prefetch_related("groups", "user_permissions")
+                    .filter(groups__isnull=True)
+                )
 
                 self.stdout.write(f"Usuários sem grupo: {usuarios_sem_grupo.count()}")
 
@@ -212,5 +216,10 @@ class Command(BaseCommand):
             count = group.user_set.count()
             self.stdout.write(f"{group.name}: {count} usuários")
 
-        sem_grupo = Usuario.objects.select_related("municipio", "projeto").prefetch_related("groups", "user_permissions").filter(groups__isnull=True).count()
+        sem_grupo = (
+            Usuario.objects.select_related("municipio", "projeto")
+            .prefetch_related("groups", "user_permissions")
+            .filter(groups__isnull=True)
+            .count()
+        )
         self.stdout.write(f"Sem grupo: {sem_grupo} usuários")

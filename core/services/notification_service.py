@@ -5,7 +5,8 @@ Serviço de notificações com diferenciação de coordenadores por vinculação
 
 from django.db import transaction
 from django.utils import timezone
-from ..models import Usuario, Notificacao, LogComunicacao
+
+from ..models import LogComunicacao, Notificacao, Usuario
 
 
 class NotificationService:
@@ -19,7 +20,11 @@ class NotificationService:
 
     @staticmethod
     def notificar_coordenadores_superintendencia(
-        titulo, mensagem, tipo_notificacao="sistema_atualizacao", link_acao=None, entidade_id=None
+        titulo,
+        mensagem,
+        tipo_notificacao="sistema_atualizacao",
+        link_acao=None,
+        entidade_id=None,
     ):
         """
         Envia notificação apenas para coordenadores vinculados à superintendência.
@@ -46,7 +51,7 @@ class NotificationService:
                     titulo=titulo,
                     mensagem=mensagem,
                     link_acao=link_acao,
-                    entidade_relacionada_id=entidade_id
+                    entidade_relacionada_id=entidade_id,
                 )
                 notificacoes_criadas.append(notificacao)
 
@@ -60,14 +65,18 @@ class NotificationService:
                     status_envio="enviado",
                     enviado_em=timezone.now(),
                     entidade_relacionada_id=entidade_id,
-                    entidade_relacionada_tipo="notificacao"
+                    entidade_relacionada_tipo="notificacao",
                 )
 
         return len(notificacoes_criadas)
 
     @staticmethod
     def notificar_coordenadores_outros_setores(
-        titulo, mensagem, tipo_notificacao="sistema_atualizacao", link_acao=None, entidade_id=None
+        titulo,
+        mensagem,
+        tipo_notificacao="sistema_atualizacao",
+        link_acao=None,
+        entidade_id=None,
     ):
         """
         Envia notificação apenas para coordenadores de outros setores (não-superintendência).
@@ -94,7 +103,7 @@ class NotificationService:
                     titulo=titulo,
                     mensagem=mensagem,
                     link_acao=link_acao,
-                    entidade_relacionada_id=entidade_id
+                    entidade_relacionada_id=entidade_id,
                 )
                 notificacoes_criadas.append(notificacao)
 
@@ -108,14 +117,18 @@ class NotificationService:
                     status_envio="enviado",
                     enviado_em=timezone.now(),
                     entidade_relacionada_id=entidade_id,
-                    entidade_relacionada_tipo="notificacao"
+                    entidade_relacionada_tipo="notificacao",
                 )
 
         return len(notificacoes_criadas)
 
     @staticmethod
     def notificar_todos_coordenadores(
-        titulo, mensagem, tipo_notificacao="sistema_atualizacao", link_acao=None, entidade_id=None
+        titulo,
+        mensagem,
+        tipo_notificacao="sistema_atualizacao",
+        link_acao=None,
+        entidade_id=None,
     ):
         """
         Envia notificação para todos os coordenadores, independente da vinculação.
@@ -145,7 +158,7 @@ class NotificationService:
                     titulo=titulo,
                     mensagem=mensagem,
                     link_acao=link_acao,
-                    entidade_relacionada_id=entidade_id
+                    entidade_relacionada_id=entidade_id,
                 )
 
                 LogComunicacao.objects.create(
@@ -157,7 +170,7 @@ class NotificationService:
                     status_envio="enviado",
                     enviado_em=timezone.now(),
                     entidade_relacionada_id=entidade_id,
-                    entidade_relacionada_tipo="notificacao"
+                    entidade_relacionada_tipo="notificacao",
                 )
                 total_super += 1
 
@@ -169,7 +182,7 @@ class NotificationService:
                     titulo=titulo,
                     mensagem=mensagem,
                     link_acao=link_acao,
-                    entidade_relacionada_id=entidade_id
+                    entidade_relacionada_id=entidade_id,
                 )
 
                 LogComunicacao.objects.create(
@@ -181,20 +194,24 @@ class NotificationService:
                     status_envio="enviado",
                     enviado_em=timezone.now(),
                     entidade_relacionada_id=entidade_id,
-                    entidade_relacionada_tipo="notificacao"
+                    entidade_relacionada_tipo="notificacao",
                 )
                 total_outros += 1
 
         return {
-            'total': total_super + total_outros,
-            'superintendencia': total_super,
-            'outros_setores': total_outros
+            "total": total_super + total_outros,
+            "superintendencia": total_super,
+            "outros_setores": total_outros,
         }
 
     @staticmethod
     def notificar_por_vinculacao(
-        superintendencia_only, titulo, mensagem, tipo_notificacao="sistema_atualizacao",
-        link_acao=None, entidade_id=None
+        superintendencia_only,
+        titulo,
+        mensagem,
+        tipo_notificacao="sistema_atualizacao",
+        link_acao=None,
+        entidade_id=None,
     ):
         """
         Método unificado para notificar coordenadores baseado na vinculação.
@@ -217,19 +234,19 @@ class NotificationService:
             count = NotificationService.notificar_coordenadores_superintendencia(
                 titulo, mensagem, tipo_notificacao, link_acao, entidade_id
             )
-            return {'tipo': 'superintendencia', 'total': count}
+            return {"tipo": "superintendencia", "total": count}
 
         elif superintendencia_only is False:
             count = NotificationService.notificar_coordenadores_outros_setores(
                 titulo, mensagem, tipo_notificacao, link_acao, entidade_id
             )
-            return {'tipo': 'outros_setores', 'total': count}
+            return {"tipo": "outros_setores", "total": count}
 
         else:
             stats = NotificationService.notificar_todos_coordenadores(
                 titulo, mensagem, tipo_notificacao, link_acao, entidade_id
             )
-            return {'tipo': 'todos', **stats}
+            return {"tipo": "todos", **stats}
 
     @staticmethod
     def get_estatisticas_coordenadores():
@@ -243,28 +260,28 @@ class NotificationService:
         coordenadores_outros = Usuario.get_coordenadores_outros_setores()
 
         return {
-            'superintendencia': {
-                'total': coordenadores_super.count(),
-                'coordenadores': [
+            "superintendencia": {
+                "total": coordenadores_super.count(),
+                "coordenadores": [
                     {
-                        'id': str(c.id),
-                        'nome': c.nome_completo,
-                        'setor': c.setor_nome,
-                        'email': c.email
+                        "id": str(c.id),
+                        "nome": c.nome_completo,
+                        "setor": c.setor_nome,
+                        "email": c.email,
                     }
                     for c in coordenadores_super
-                ]
+                ],
             },
-            'outros_setores': {
-                'total': coordenadores_outros.count(),
-                'coordenadores': [
+            "outros_setores": {
+                "total": coordenadores_outros.count(),
+                "coordenadores": [
                     {
-                        'id': str(c.id),
-                        'nome': c.nome_completo,
-                        'setor': c.setor_nome,
-                        'email': c.email
+                        "id": str(c.id),
+                        "nome": c.nome_completo,
+                        "setor": c.setor_nome,
+                        "email": c.email,
                     }
                     for c in coordenadores_outros
-                ]
-            }
+                ],
+            },
         }

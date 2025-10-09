@@ -68,7 +68,9 @@ class Command(BaseCommand):
 
             if not gid:
                 self.stdout.write(
-                    self.style.WARNING("⚠️  GID 'Anual' não configurado - tentando outros formatos")
+                    self.style.WARNING(
+                        "⚠️  GID 'Anual' não configurado - tentando outros formatos"
+                    )
                 )
                 # Fallback: tentar primeira aba disponível
                 if sheets_config.ABAS_DISPONIBILIDADE:
@@ -78,11 +80,15 @@ class Command(BaseCommand):
 
             if not gid:
                 self.stdout.write(
-                    self.style.ERROR("❌ Nenhum GID configurado em ABAS_DISPONIBILIDADE")
+                    self.style.ERROR(
+                        "❌ Nenhum GID configurado em ABAS_DISPONIBILIDADE"
+                    )
                 )
                 return 1
 
-            self.stdout.write(f"📊 Usando Google Sheets: {sheets_config.DISPONIBILIDADE_2025_ID}")
+            self.stdout.write(
+                f"📊 Usando Google Sheets: {sheets_config.DISPONIBILIDADE_2025_ID}"
+            )
             rows_iter = adapter.rows(sheets_config.DISPONIBILIDADE_2025_ID, gid)
         else:
             # CSV local
@@ -115,7 +121,9 @@ class Command(BaseCommand):
                 if tipo.upper() == "MENSAL":
                     if verbose:
                         self.stdout.write(
-                            self.style.WARNING(f"   ⏭️  Ignorando MENSAL para {formador}")
+                            self.style.WARNING(
+                                f"   ⏭️  Ignorando MENSAL para {formador}"
+                            )
                         )
                     skipped += 1
                     continue

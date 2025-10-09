@@ -6,9 +6,10 @@ Verifica compatibilidade e identifica arquivos que precisam ser atualizados.
 import os
 import re
 from pathlib import Path
-from django.core.management.base import BaseCommand
+
 from django.apps import apps
 from django.conf import settings
+from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
@@ -65,7 +66,7 @@ class Command(BaseCommand):
         self.stdout.write(f"\n📋 VALIDANDO MODELOS...")
 
         try:
-            from core.models import Usuario, Formador
+            from core.models import Formador, Usuario
 
             # Verificar se Usuario tem campos de formador
             usuario_fields = [f.name for f in Usuario._meta.fields]

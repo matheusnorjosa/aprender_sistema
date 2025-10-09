@@ -42,10 +42,8 @@ app_name = "api"
 urlpatterns = [
     # API Root (informações sobre endpoints)
     path("", api_root, name="api_root"),
-
     # Health check (público) - para Docker healthcheck
     path("health/", api_health, name="api_health"),
-
     # Roteamento automático da API
     path("v1/", include(router.urls)),
 ]
@@ -56,7 +54,9 @@ if obtain_auth_token:
 
 # Endpoint de API browsable (desenvolvimento)
 try:
-    urlpatterns.append(path("auth/", include("rest_framework.urls", namespace="rest_framework")))
+    urlpatterns.append(
+        path("auth/", include("rest_framework.urls", namespace="rest_framework"))
+    )
 except ImportError:
     pass
 

@@ -11,13 +11,14 @@ import requests
 from datetime import datetime
 
 # Setup Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 django.setup()
 
 from django.test import Client
 from django.contrib.auth.models import User
 from core.models import Usuario
+
 
 def test_dashboard_endpoints():
     """Testa todos os endpoints críticos do dashboard"""
@@ -44,16 +45,19 @@ def test_dashboard_endpoints():
 
     # Lista de endpoints para testar
     endpoints = [
-        ('/diretoria/dashboard/', 'Dashboard Principal'),
-        ('/api/dashboard/stats/', 'API Stats'),
-        ('/api/dashboard/charts/?chart=monthly_evolution', 'API Charts - Monthly'),
-        ('/api/dashboard/charts/?chart=top_formadores', 'API Charts - Formadores'),
-        ('/api/dashboard/charts/?chart=distribuicao_setores', 'API Charts - Setores'),
-        ('/api/dashboard/charts/?chart=municipios_atendidos', 'API Charts - Municípios'),
-        ('/api/dashboard/charts/?chart=tipos_evento', 'API Charts - Tipos'),
-        ('/api/dashboard/charts/?chart=projetos_stats', 'API Charts - Projetos'),
-        ('/api/dashboard/cursos/', 'API Cursos'),
-        ('/api/dashboard/coordenadores/', 'API Coordenadores'),
+        ("/diretoria/dashboard/", "Dashboard Principal"),
+        ("/api/dashboard/stats/", "API Stats"),
+        ("/api/dashboard/charts/?chart=monthly_evolution", "API Charts - Monthly"),
+        ("/api/dashboard/charts/?chart=top_formadores", "API Charts - Formadores"),
+        ("/api/dashboard/charts/?chart=distribuicao_setores", "API Charts - Setores"),
+        (
+            "/api/dashboard/charts/?chart=municipios_atendidos",
+            "API Charts - Municípios",
+        ),
+        ("/api/dashboard/charts/?chart=tipos_evento", "API Charts - Tipos"),
+        ("/api/dashboard/charts/?chart=projetos_stats", "API Charts - Projetos"),
+        ("/api/dashboard/cursos/", "API Cursos"),
+        ("/api/dashboard/coordenadores/", "API Coordenadores"),
     ]
 
     results = {}
@@ -70,14 +74,15 @@ def test_dashboard_endpoints():
                 print(f"   ✅ Status: {status_code} OK")
 
                 # Para APIs JSON, verificar estrutura
-                if endpoint.startswith('/api/'):
+                if endpoint.startswith("/api/"):
                     try:
                         import json
+
                         data = json.loads(response.content)
 
-                        if 'success' in data:
+                        if "success" in data:
                             print(f"   ✅ JSON válido com success: {data['success']}")
-                        elif 'data' in data:
+                        elif "data" in data:
                             print(f"   ✅ JSON válido com data")
                         else:
                             print(f"   ⚠️  JSON válido mas estrutura inesperada")
@@ -85,30 +90,30 @@ def test_dashboard_endpoints():
                     except json.JSONDecodeError:
                         print(f"   ❌ Resposta não é JSON válido")
 
-                results[endpoint] = 'OK'
+                results[endpoint] = "OK"
 
             elif status_code == 500:
                 print(f"   ❌ Status: {status_code} ERRO INTERNO")
-                results[endpoint] = 'ERRO_500'
+                results[endpoint] = "ERRO_500"
 
             elif status_code == 404:
                 print(f"   ❌ Status: {status_code} NÃO ENCONTRADO")
-                results[endpoint] = 'ERRO_404'
+                results[endpoint] = "ERRO_404"
 
             else:
                 print(f"   ⚠️  Status: {status_code}")
-                results[endpoint] = f'STATUS_{status_code}'
+                results[endpoint] = f"STATUS_{status_code}"
 
         except Exception as e:
             print(f"   ❌ Exceção: {str(e)[:100]}...")
-            results[endpoint] = f'EXCEÇÃO: {str(e)[:50]}'
+            results[endpoint] = f"EXCEÇÃO: {str(e)[:50]}"
 
     # Relatório final
     print("\n" + "=" * 60)
     print("📊 RELATÓRIO FINAL DOS TESTES")
     print("=" * 60)
 
-    success_count = sum(1 for result in results.values() if result == 'OK')
+    success_count = sum(1 for result in results.values() if result == "OK")
     total_count = len(results)
 
     print(f"\n✅ Sucessos: {success_count}/{total_count}")
@@ -120,14 +125,16 @@ def test_dashboard_endpoints():
     else:
         print(f"\n⚠️  {total_count - success_count} endpoints com problemas:")
         for endpoint, result in results.items():
-            if result != 'OK':
+            if result != "OK":
                 print(f"   - {endpoint}: {result}")
         return False
+
 
 def check_database_connectivity():
     """Verifica conectividade com o banco"""
     try:
         from django.db import connection
+
         cursor = connection.cursor()
         cursor.execute("SELECT 1")
         print("✅ Conectividade com banco PostgreSQL: OK")
@@ -135,6 +142,7 @@ def check_database_connectivity():
     except Exception as e:
         print(f"❌ Erro de conectividade: {e}")
         return False
+
 
 def check_models_integrity():
     """Verifica integridade dos modelos após unificação"""
@@ -154,8 +162,8 @@ def check_models_integrity():
 
         # Testar query com novo campo usuario
         try:
-            test_query = FormadoresSolicitacao.objects.select_related('usuario').first()
-            if test_query and hasattr(test_query, 'usuario'):
+            test_query = FormadoresSolicitacao.objects.select_related("usuario").first()
+            if test_query and hasattr(test_query, "usuario"):
                 print("   ✅ Campo 'usuario' acessível em FormadoresSolicitacao")
             else:
                 print("   ❌ Campo 'usuario' não encontrado em FormadoresSolicitacao")
@@ -171,7 +179,8 @@ def check_models_integrity():
         print(f"❌ Erro na verificação dos modelos: {e}")
         return False
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     print(f"🚀 Iniciando validação completa - {datetime.now().strftime('%H:%M:%S')}")
 
     # Verificações preliminares
@@ -186,7 +195,9 @@ if __name__ == '__main__':
     dashboard_ok = test_dashboard_endpoints()
 
     if dashboard_ok:
-        print(f"\n🎉 VALIDAÇÃO COMPLETA FINALIZADA COM SUCESSO - {datetime.now().strftime('%H:%M:%S')}")
+        print(
+            f"\n🎉 VALIDAÇÃO COMPLETA FINALIZADA COM SUCESSO - {datetime.now().strftime('%H:%M:%S')}"
+        )
         sys.exit(0)
     else:
         print(f"\n❌ VALIDAÇÃO FALHOU - {datetime.now().strftime('%H:%M:%S')}")

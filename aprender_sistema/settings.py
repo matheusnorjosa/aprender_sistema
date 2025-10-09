@@ -15,6 +15,13 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ========================================
+# DOCUMENTATION ROOT
+# ========================================
+# Diretório centralizado para toda documentação gerada
+DOCS_ROOT = Path(os.getenv("DOCS_ROOT", BASE_DIR / "docs"))
+DOCS_ROOT.mkdir(parents=True, exist_ok=True)
+
+# ========================================
 # ENVIRONMENT CONFIGURATION
 # ========================================
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
@@ -31,7 +38,8 @@ SECRET_KEY = os.getenv(
 
 DEBUG = os.getenv("DEBUG", "True") == "True" if IS_DEVELOPMENT else False
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0").split(",")
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+CSRF_TRUSTED_ORIGINS = ["http://localhost", "http://127.0.0.1"]
 
 # ========================================
 # APPLICATION DEFINITION
@@ -52,6 +60,7 @@ INSTALLED_APPS = [
     "core",
     "api",
     "ingestao",  # Canonical import commands (Hotfix Dia 3)
+    "dashboard",  # KPIs canônicos (Auditoria Full)
 ]
 
 # Custom User Model
@@ -136,7 +145,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # INTERNATIONALIZATION
 # ========================================
 LANGUAGE_CODE = "pt-br"
-TIME_ZONE = "America/Sao_Paulo"
+TIME_ZONE = "America/Fortaleza"
 USE_I18N = True
 USE_TZ = True
 
@@ -393,3 +402,24 @@ if IS_DEVELOPMENT and DEBUG:
     print(f"  ANALYTICS_ENABLED: {ANALYTICS_ENABLED}")
     print(f"  EXPERIMENTAL_APIS_ENABLED: {EXPERIMENTAL_APIS_ENABLED}")
     print("=" * 60 + "\n")
+
+# ========================================
+# FEATURE FLAGS (Hotfix 06/10)
+# ========================================
+FEATURE_SUPER_FALLBACK = (
+    False  # Mostra todos formadores+coordenadores atÃ© backfill de setores
+)
+FEATURE_MAP_DESLOCAMENTOS_ENABLED = (
+    True  # Desabilitado atÃ© migration de Deslocamento->Usuario
+)
+
+# ========================================
+# GOOGLE SHEETS INTEGRATION
+# ========================================
+# Caminho para Service Account (JSON)
+# Pode ser configurado via ENV ou usar o caminho padrão em /app/creds/
+import os as _os
+
+GSHEETS_SA_PATH = _os.getenv(
+    "GOOGLE_APPLICATION_CREDENTIALS", "/app/creds/gsheet_sa.json"
+)

@@ -79,7 +79,11 @@ class Command(BaseCommand):
 
         # Por padrão de nome
         for pattern in test_patterns:
-            projects = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(nome__startswith=pattern)
+            projects = (
+                Projeto.objects.select_related("setor")
+                .prefetch_related("solicitacao_set")
+                .filter(nome__startswith=pattern)
+            )
             for project in projects:
                 if project not in test_projects:
                     test_projects.append(project)
@@ -94,17 +98,20 @@ class Command(BaseCommand):
                 continue
 
         # Adicional: projetos sem produtos E que não são dos setores específicos
-        projetos_sem_produto = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(
-            codigo_produto__isnull=True
-        ).exclude(
-            nome__in=[
-                # Manter esses mesmo sem produtos por serem organizacionais
-                "AMMA",
-                "CATAVENTOS",
-                "MIUDEZAS",
-                "UNI DUNI TÊ",
-                "IDEB 10",
-            ]
+        projetos_sem_produto = (
+            Projeto.objects.select_related("setor")
+            .prefetch_related("solicitacao_set")
+            .filter(codigo_produto__isnull=True)
+            .exclude(
+                nome__in=[
+                    # Manter esses mesmo sem produtos por serem organizacionais
+                    "AMMA",
+                    "CATAVENTOS",
+                    "MIUDEZAS",
+                    "UNI DUNI TÊ",
+                    "IDEB 10",
+                ]
+            )
         )
 
         for project in projetos_sem_produto:
@@ -121,14 +128,26 @@ class Command(BaseCommand):
         # Mostrar quais serão removidos
         for project in test_projects:
             setor_nome = project.setor.nome if project.setor else "SEM SETOR"
-            solicitacoes = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(projeto=project).count()
+            solicitacoes = (
+                Solicitacao.objects.select_related(
+                    "municipio", "projeto", "tipo_evento", "solicitante"
+                )
+                .prefetch_related("formadores")
+                .filter(projeto=project)
+                .count()
+            )
             self.stdout.write(
                 f"• {project.nome} ({setor_nome}) - {solicitacoes} solicitações"
             )
 
         # Verificar impacto nas solicitações
         total_solicitacoes = sum(
-            Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(projeto=project).count()
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(projeto=project)
+            .count()
             for project in test_projects
         )
         self.stdout.write(f"\nTotal solicitações afetadas: {total_solicitacoes}")
@@ -140,7 +159,13 @@ class Command(BaseCommand):
 
             for project in test_projects:
                 # Contar e deletar solicitações primeiro
-                solicitacoes = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(projeto=project)
+                solicitacoes = (
+                    Solicitacao.objects.select_related(
+                        "municipio", "projeto", "tipo_evento", "solicitante"
+                    )
+                    .prefetch_related("formadores")
+                    .filter(projeto=project)
+                )
                 solicitacoes_count = solicitacoes.count()
 
                 if solicitacoes_count > 0:
@@ -166,7 +191,13 @@ class Command(BaseCommand):
         """Remove solicitações órfãs (sem projeto)"""
         self.stdout.write("\n=== VERIFICANDO SOLICITAÇÕES ÓRFÃS ===")
 
-        orphaned = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(projeto__isnull=True)
+        orphaned = (
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(projeto__isnull=True)
+        )
         count = orphaned.count()
 
         if count > 0:
@@ -185,7 +216,12 @@ class Command(BaseCommand):
         from core.models import Setor
 
         for setor in Setor.objects.all().order_by("nome"):
-            count = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(setor=setor).count()
+            count = (
+                Projeto.objects.select_related("setor")
+                .prefetch_related("solicitacao_set")
+                .filter(setor=setor)
+                .count()
+            )
             if count > 0:
                 status = (
                     "REQUER APROVAÇÃO"

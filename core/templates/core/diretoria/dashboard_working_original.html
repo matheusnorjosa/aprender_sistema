@@ -606,31 +606,31 @@
         max-height: 400px;
         padding: 1rem;
       }
-      
+
       .coordenadores-municipio {
         grid-template-columns: 1fr;
         gap: 0.5rem;
         padding: 0.5rem;
       }
-      
+
       .municipio-header {
         padding: 0.5rem 0.75rem;
         font-size: 0.85rem;
       }
-      
+
       .municipio-header h3 {
         font-size: 0.9rem;
       }
-      
+
       .coordenador-card {
         padding: 0.5rem;
         min-height: 60px;
       }
-      
+
       .coordenador-card strong {
         font-size: 0.8rem;
       }
-      
+
       .coordenador-card .badge {
         font-size: 0.65rem;
         padding: 0.15rem 0.4rem;
@@ -642,18 +642,18 @@
         max-height: 350px;
         padding: 0.75rem;
       }
-      
+
       .municipio-group {
         margin-bottom: 0.25rem;
       }
-      
+
       .municipio-header {
         padding: 0.5rem;
         flex-direction: column;
         align-items: flex-start;
         gap: 0.25rem;
       }
-      
+
       .municipio-stats {
         font-size: 0.75rem;
       }
@@ -840,7 +840,7 @@
             <div id="mapLegend" hidden></div>
           </div>
         </div>
-        
+
         <!-- Painel lateral de detalhes do estado -->
         <div class="state-detail hidden" id="stateDetail">
           <h3>Detalhes do Estado</h3>
@@ -854,7 +854,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- Tooltip para o mapa avançado -->
       <div class="tooltip" id="tooltip"></div>
     </section>
@@ -1011,8 +1011,8 @@
         'metric-total-pendentes': 0, // Não temos dados de pendentes
         'metric-total-reprovadas': 0, // Não temos dados de reprovadas
         'metric-municipios-ativos': summary.municipios_com_projetos,
-        'metric-coordenadores-ativos': 0, // Não temos dados de coordenadores
-        'metric-formadores-ativos': 0, // Não temos dados de formadores
+        'metric-coordenadores-ativos': summary.coordenadores_ativos || 0,
+        'metric-formadores-ativos': summary.formadores_envolvidos || 0,
       };
 
       Object.entries(map).forEach(([id, value]) => {
@@ -1114,22 +1114,22 @@
     async function loadProjectData() {
       try {
         console.log('🔄 Carregando dados reais do banco...');
-        
+
         const response = await fetch('/api/mapa/dados/');
         if (!response.ok) {
           throw new Error(`Erro HTTP: ${response.status}`);
         }
-        
+
         projectData = await response.json();
         console.log(`✅ Dados carregados: ${Object.keys(projectData).length} estados com projetos`);
-        
+
         // Carregar estatísticas
         const statsResponse = await fetch('/api/mapa/estatisticas/');
         if (statsResponse.ok) {
           estatisticas = await statsResponse.json();
           console.log(`📊 Estatísticas: ${estatisticas.municipios_com_projetos} municípios, ${estatisticas.total_solicitacoes} solicitações`);
         }
-        
+
         return projectData;
       } catch (error) {
         console.error('❌ Erro ao carregar dados:', error);
@@ -1140,17 +1140,17 @@
     // Função para selecionar estado
     function selectState(stateName, stateData) {
       console.log(`🖱️ Estado selecionado: ${stateName}`);
-      
+
       // Remover seleção anterior
       states.classed('selected', false);
-      
+
       // Selecionar novo estado
       states.filter(d => (d.properties.name || d.properties.NAME) === stateName)
         .classed('selected', true);
-      
+
       // Atualizar detalhes do estado
       updateStateDetail(stateName);
-      
+
       // Zoom no estado
       zoomToState(stateData);
     }
@@ -1162,20 +1162,20 @@
       const stateNameEl = document.getElementById('stateName');
       const stateUFEl = document.getElementById('stateUF');
       const municipalityList = document.getElementById('municipalityList');
-      
+
       if (stateData) {
         console.log(`📊 Estado ${stateName}: ${stateData.projects} projetos, ${stateData.solicitacoes} solicitações`);
-        
+
         // Mostrar painel lateral
         stateDetail.classList.remove('hidden');
-        
+
         // Atualizar informações do estado
         stateNameEl.textContent = stateName;
         stateUFEl.textContent = stateData.uf;
-        
+
         // Atualizar lista de municípios
         municipalityList.innerHTML = '';
-        
+
         if (stateData.municipalities && stateData.municipalities.length > 0) {
           stateData.municipalities.forEach(municipality => {
             const item = document.createElement('div');
@@ -1203,28 +1203,28 @@
     // Função para zoom no estado
     function zoomToState(stateData) {
       if (isAnimating) return;
-      
+
       isAnimating = true;
       svg.style('cursor', 'wait');
       console.log('🔍 Fazendo zoom no estado selecionado');
-      
+
       // Calcular centro do estado
       const centroid = d3.geoCentroid(stateData);
-      
+
       // Criar nova projeção para o estado
       const newProjection = d3.geoMercator()
         .scale(2000)
         .center(centroid)
         .translate([500, 400]);
-      
+
       const newPath = d3.geoPath().projection(newProjection);
-      
+
       // Aplicar transição suave com easing aos estados
       states.transition()
         .duration(600)
         .ease(d3.easeCubicInOut)
         .attr('d', newPath);
-      
+
       // Adicionar botão de reset após a transição
       setTimeout(() => {
         addResetButton();
@@ -1237,12 +1237,12 @@
     function addResetButton() {
       // Remover botão anterior se existir
       d3.select('#resetButton').remove();
-      
+
       // Adicionar botão de reset
       const resetButton = svg.append('g')
         .attr('id', 'resetButton')
         .style('cursor', 'pointer');
-      
+
       resetButton.append('rect')
         .attr('x', 1020) // Canto superior direito ajustado
         .attr('y', 20)
@@ -1250,7 +1250,7 @@
         .attr('height', 40)
         .attr('fill', '#007bff')
         .attr('rx', 6);
-      
+
       resetButton.append('text')
         .attr('x', 1090) // Centro do botão no canto direito
         .attr('y', 42)
@@ -1259,45 +1259,45 @@
         .attr('font-size', '14px')
         .attr('font-weight', 'bold')
         .text('Voltar ao Brasil');
-      
+
       resetButton.on('click', resetZoom);
     }
 
     // Função para resetar zoom
     function resetZoom() {
       if (isAnimating) return;
-      
+
       isAnimating = true;
       svg.style('cursor', 'wait');
       console.log('🔄 Resetando zoom para visualização completa');
-      
+
       // Remover botão de reset
       d3.select('#resetButton').remove();
-      
+
       // Resetar projeção para a original
       projection = d3.geoMercator()
         .scale(originalProjection.scale)
         .center(originalProjection.center)
         .translate(originalProjection.translate);
-      
+
       path = d3.geoPath().projection(projection);
-      
+
       // Aplicar transição suave com easing aos estados
       states.transition()
         .duration(600)
         .ease(d3.easeCubicInOut)
         .attr('d', path);
-      
+
       // Remover seleção
       states.classed('selected', false);
       selectedState = null;
-      
+
       // Esconder painel lateral
       const stateDetail = document.getElementById('stateDetail');
       if (stateDetail) {
         stateDetail.classList.add('hidden');
       }
-      
+
       setTimeout(() => {
         svg.style('cursor', 'default');
         isAnimating = false;
@@ -1307,55 +1307,55 @@
     async function drawMap(geoData) {
       try {
         console.log('🔄 Carregando mapa avançado...');
-        
+
         // Carregar dados reais
         await loadProjectData();
-        
+
         const mapContainer = d3.select('#brasilMap');
         const wrapper = mapContainer.node();
         const width = wrapper.clientWidth || 720;
         const height = 520;
-        
+
         // Configurar SVG
         svg = mapContainer
           .attr('viewBox', '0 0 1200 600'); // Aumentado para mostrar o Brasil completo
-        
+
         console.log('📐 SVG configurado');
-        
+
         // Criar projeção Mercator manual (mais confiável)
         console.log('🎯 Criando projeção Mercator manual...');
-        
+
         projection = d3.geoMercator()
           .scale(600)
           .center([-54, -14])
           .translate([600, 300]);
-        
+
         // Salvar projeção original
         originalProjection = {
           scale: projection.scale(),
           center: projection.center(),
           translate: projection.translate()
         };
-        
+
         path = d3.geoPath().projection(projection);
-        
+
         console.log('✅ Projeção Mercator criada com sucesso');
         console.log('✅ Path generator criado com projeção Mercator');
-        
+
         // Carregar dados do GeoJSON
         const geoDataResponse = await fetch('/static/brazil-real.geojson');
         if (!geoDataResponse.ok) {
           throw new Error(`Erro ao carregar GeoJSON: ${geoDataResponse.status}`);
         }
-        
+
         const geoData = await geoDataResponse.json();
         console.log('✅ Arquivo GeoJSON carregado com sucesso');
         console.log('📊 GeoJSON parseado:', geoData.type);
         console.log('🗺️ Features encontradas:', geoData.features.length);
-        
+
         // Criar tooltip
         tooltip = d3.select('#tooltip');
-        
+
         // Renderizar estados
         states = svg.selectAll('path.state')
           .data(geoData.features)
@@ -1382,7 +1382,7 @@
           .on('mouseover', function(event, d) {
             const stateName = d.properties.name || d.properties.NAME || 'Estado';
             const stateData = projectData[stateName];
-            
+
             tooltip
               .html(`
                 <strong>${stateName}</strong><br/>
@@ -1399,15 +1399,15 @@
             const stateName = d.properties.name || d.properties.NAME || 'Estado';
             selectState(stateName, d);
           });
-        
+
         console.log(`🎨 ${states.size()} estados renderizados`);
-        
+
         // Atualizar tooltip de município selelecionado
         const chartMeta = document.getElementById('chartMeta');
         chartMeta.textContent = `${estatisticas.total_solicitacoes || 0} solicitações aprovadas`;
-        
+
         console.log('🎉 Mapa avançado renderizado com sucesso!');
-        
+
       } catch (error) {
         console.error(`❌ Erro ao carregar mapa: ${error.message}`);
       }
@@ -1499,39 +1499,39 @@
       data.municipios.forEach(entry => {
         // Criar grupo do município
         const municipioGroup = municipioGroupTemplate.content.cloneNode(true);
-        
+
         // Configurar cabeçalho do município (sem pin e sem repetir UF)
         const municipioNome = municipioGroup.querySelector('.municipio-nome');
         municipioNome.textContent = `${entry.municipio} - ${entry.uf}`;
-        
+
         const municipioStats = municipioGroup.querySelector('.municipio-stats');
         municipioStats.textContent = `${entry.total_eventos_municipio} eventos • ${entry.total_coordenadores} coordenadores`;
-        
+
         // Container para coordenadores do município
         const coordenadoresContainer = municipioGroup.querySelector('.coordenadores-municipio');
-        
+
         // Adicionar coordenadores do município
         entry.coordenadores.forEach(coord => {
           const clone = coordTemplate.content.cloneNode(true);
-          
+
           // Melhorar espaçamento entre nomes múltiplos
           const nomeElement = clone.querySelector('.coordenador-nome');
           const nomeCompleto = coord.nome || 'Coordenador';
-          
+
           // Se há múltiplos nomes separados por " - ", adicionar quebras de linha
           if (nomeCompleto.includes(' - ')) {
             nomeElement.innerHTML = nomeCompleto.split(' - ').join('<br>');
           } else {
             nomeElement.textContent = nomeCompleto;
           }
-          
+
           clone.querySelector('.coordenador-eventos').textContent = `${coord.eventos} eventos`;
           coordenadoresContainer.appendChild(clone);
         });
-        
+
         wrapper.appendChild(municipioGroup);
       });
-      
+
       // Detectar se há scroll e mostrar indicador
       const coordenadoresCard = document.querySelector('.coordenadores-card');
       if (coordenadoresCard) {
@@ -1539,7 +1539,7 @@
           const isScrollable = coordenadoresCard.scrollHeight > coordenadoresCard.clientHeight;
           coordenadoresCard.classList.toggle('scrollable', isScrollable);
         };
-        
+
         checkScroll();
         coordenadoresCard.addEventListener('scroll', checkScroll);
         window.addEventListener('resize', checkScroll);
@@ -1554,7 +1554,7 @@
         console.log('✅ Dados de estatísticas recebidos:', statsData);
         updateStats(statsData);
         updateActiveFilters();
-        
+
         // Carregar dados do mapa separadamente
         const mapData = await fetchJSON('/api/mapa/dados/', buildParams());
         console.log('✅ Dados do mapa recebidos:', mapData);
@@ -1570,13 +1570,15 @@
     }
 
     async function loadCursos() {
-      const data = await fetchJSON(endpoints.cursos, buildParams());
-      updateChart(data);
+      const response = await fetchJSON(endpoints.cursos, buildParams());
+      // BaseAPIView retorna { success, data, message, timestamp }
+      updateChart(response.data || response);
     }
 
     async function loadCoordenadores() {
-      const data = await fetchJSON(endpoints.coordenadores, buildParams());
-      renderCoordenadores(data);
+      const response = await fetchJSON(endpoints.coordenadores, buildParams());
+      // BaseAPIView retorna { success, data, message, timestamp }
+      renderCoordenadores(response.data || response);
     }
 
     async function refreshDashboard() {
@@ -1646,26 +1648,26 @@
 
       async fetchData(url, params = {}) {
         const cacheKey = `${url}?${new URLSearchParams(params).toString()}`;
-        
+
         if (this.cache.has(cacheKey)) {
           return this.cache.get(cacheKey);
         }
-        
+
         console.log(`🌐 Fazendo requisição para: ${url}`);
-        
+
         try {
           const response = await fetch(`${url}?${new URLSearchParams(params).toString()}`);
-          
+
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
-          
+
           const data = await response.json();
           console.log(`✅ Resposta recebida de ${url}:`, data);
-          
+
           this.cache.set(cacheKey, data);
           return data;
-          
+
         } catch (error) {
           console.error(`❌ Erro na requisição para ${url}:`, error);
           throw error;

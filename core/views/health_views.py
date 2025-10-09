@@ -14,18 +14,19 @@ from datetime import datetime, timedelta
 
 try:
     import psutil
+
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
-from django.http import JsonResponse, HttpResponse
 from django.conf import settings
-from django.db import connection, connections
 from django.core.cache import cache
+from django.db import connection, connections
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
 from django.views.decorators.cache import never_cache
-from core.services import UsuarioService
+from django.views.decorators.http import require_http_methods
 
+from core.services import UsuarioService
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +44,8 @@ def health_check(request):
     health_status = {
         "status": "healthy",
         "timestamp": timezone.now().isoformat(),
-        "environment": getattr(settings, 'ENVIRONMENT', 'unknown'),
-        "checks": {}
+        "environment": getattr(settings, "ENVIRONMENT", "unknown"),
+        "checks": {},
     }
 
     overall_healthy = True
@@ -55,14 +56,11 @@ def health_check(request):
             cursor.execute("SELECT 1")
             health_status["checks"]["database"] = {
                 "status": "healthy",
-                "response_time_ms": 0  # Poderia medir tempo real
+                "response_time_ms": 0,  # Poderia medir tempo real
             }
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
-        health_status["checks"]["database"] = {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        health_status["checks"]["database"] = {"status": "unhealthy", "error": str(e)}
         overall_healthy = False
 
     # Check 2: Cache
@@ -78,16 +76,14 @@ def health_check(request):
 
     except Exception as e:
         logger.error(f"Cache health check failed: {e}")
-        health_status["checks"]["cache"] = {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        health_status["checks"]["cache"] = {"status": "unhealthy", "error": str(e)}
         overall_healthy = False
 
     # Check 3: Google Calendar (se configurado)
-    if getattr(settings, 'FEATURE_GOOGLE_SYNC', False):
+    if getattr(settings, "FEATURE_GOOGLE_SYNC", False):
         try:
             from core.services.integrations.google_calendar import GoogleCalendarService
+
             cal_service = GoogleCalendarService()
             # Test básico de conectividade (sem criar eventos)
             cal_service.get_calendar()
@@ -96,21 +92,21 @@ def health_check(request):
             logger.warning(f"Google Calendar health check failed: {e}")
             health_status["checks"]["google_calendar"] = {
                 "status": "warning",
-                "error": str(e)
+                "error": str(e),
             }
             # Google Calendar não é crítico para operação básica
 
     # Check 4: File System
     try:
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
             tmp_file.write(b"health_check_test")
             tmp_file.flush()
 
             # Verificar se consegue ler
-            with open(tmp_file.name, 'rb') as read_file:
+            with open(tmp_file.name, "rb") as read_file:
                 content = read_file.read()
                 if content == b"health_check_test":
                     health_status["checks"]["filesystem"] = {"status": "healthy"}
@@ -119,10 +115,7 @@ def health_check(request):
 
     except Exception as e:
         logger.error(f"Filesystem health check failed: {e}")
-        health_status["checks"]["filesystem"] = {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        health_status["checks"]["filesystem"] = {"status": "unhealthy", "error": str(e)}
         overall_healthy = False
 
     # Status final
@@ -151,10 +144,10 @@ def detailed_health(request):
 
     detailed_status = {
         "timestamp": timezone.now().isoformat(),
-        "environment": getattr(settings, 'ENVIRONMENT', 'unknown'),
+        "environment": getattr(settings, "ENVIRONMENT", "unknown"),
         "system_metrics": {},
         "application_metrics": {},
-        "database_metrics": {}
+        "database_metrics": {},
     }
 
     # System Metrics
@@ -164,8 +157,10 @@ def detailed_health(request):
             detailed_status["system_metrics"] = {
                 "cpu_percent": psutil.cpu_percent(interval=1),
                 "memory_percent": psutil.virtual_memory().percent,
-                "disk_usage_percent": psutil.disk_usage('/').percent,
-                "load_average": list(psutil.getloadavg()) if hasattr(psutil, 'getloadavg') else None,
+                "disk_usage_percent": psutil.disk_usage("/").percent,
+                "load_average": (
+                    list(psutil.getloadavg()) if hasattr(psutil, "getloadavg") else None
+                ),
             }
         else:
             detailed_status["system_metrics"] = {
@@ -177,16 +172,19 @@ def detailed_health(request):
 
     # Application Metrics
     try:
-        from core.models import Usuario, Solicitacao, LogAuditoria
+        from core.models import LogAuditoria, Solicitacao, Usuario
 
         # Contadores básicos
         detailed_status["application_metrics"] = {
             "total_users": Usuario.objects.count(),
             "active_users": UsuarioService.ativos().count(),
             "total_solicitacoes": Solicitacao.objects.count(),
-            "solicitacoes_pendentes": Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-                status='pendente'
-            ).count(),
+            "solicitacoes_aguardando": Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(status__in=["CRIADO", "APROVADO"])
+            .count(),
             "recent_audit_logs": LogAuditoria.objects.filter(
                 timestamp__gte=timezone.now() - timedelta(hours=24)
             ).count(),
@@ -195,13 +193,18 @@ def detailed_health(request):
         # Estatísticas dos últimos 7 dias
         week_ago = timezone.now() - timedelta(days=7)
         detailed_status["application_metrics"]["weekly_stats"] = {
-            "new_solicitacoes": Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-                data_criacao__gte=week_ago
-            ).count(),
-            "approved_solicitacoes": Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(
-                status='aprovado',
-                data_criacao__gte=week_ago
-            ).count(),
+            "new_solicitacoes": Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(data_criacao__gte=week_ago)
+            .count(),
+            "approved_solicitacoes": Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(status="aprovado", data_criacao__gte=week_ago)
+            .count(),
         }
 
     except Exception as e:
@@ -218,14 +221,16 @@ def detailed_health(request):
                 conn = connections[alias]
                 with conn.cursor() as cursor:
                     # PostgreSQL específico
-                    if 'postgresql' in conn.settings_dict['ENGINE']:
-                        cursor.execute("""
+                    if "postgresql" in conn.settings_dict["ENGINE"]:
+                        cursor.execute(
+                            """
                             SELECT
                                 count(*) as active_connections,
                                 sum(CASE WHEN state = 'active' THEN 1 ELSE 0 END) as active_queries
                             FROM pg_stat_activity
                             WHERE datname = current_database()
-                        """)
+                        """
+                        )
                         row = cursor.fetchone()
                         db_metrics[alias] = {
                             "active_connections": row[0] if row else 0,
@@ -262,6 +267,7 @@ def readiness_check(request):
     # Database deve estar acessível
     try:
         from core.models import Usuario
+
         Usuario.objects.exists()  # Query simples
         checks.append({"name": "database", "status": "ready"})
     except Exception as e:
@@ -271,18 +277,20 @@ def readiness_check(request):
     # Migrations devem estar aplicadas
     try:
         from django.core.management import execute_from_command_line
-        from django.db.migrations.executor import MigrationExecutor
         from django.db import DEFAULT_DB_ALIAS
+        from django.db.migrations.executor import MigrationExecutor
 
         executor = MigrationExecutor(connections[DEFAULT_DB_ALIAS])
         plan = executor.migration_plan(executor.loader.graph.leaf_nodes())
 
         if plan:
-            checks.append({
-                "name": "migrations",
-                "status": "not_ready",
-                "error": f"{len(plan)} migrations pending"
-            })
+            checks.append(
+                {
+                    "name": "migrations",
+                    "status": "not_ready",
+                    "error": f"{len(plan)} migrations pending",
+                }
+            )
             ready = False
         else:
             checks.append({"name": "migrations", "status": "ready"})
@@ -294,7 +302,7 @@ def readiness_check(request):
     response_data = {
         "ready": ready,
         "checks": checks,
-        "timestamp": timezone.now().isoformat()
+        "timestamp": timezone.now().isoformat(),
     }
 
     status_code = 200 if ready else 503

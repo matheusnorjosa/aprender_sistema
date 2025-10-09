@@ -10,15 +10,16 @@ Author: Claude Code
 Date: Setembro 2025
 """
 
-import os
-import sys
 import logging
+import os
 import re
+import sys
 from pathlib import Path
 
 # Configurar Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
 import django
+
 django.setup()
 
 from django.core.management.base import BaseCommand

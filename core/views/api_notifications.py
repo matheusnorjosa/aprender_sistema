@@ -1,4 +1,9 @@
-from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+from core.services import (
+    FormadorService,
+    MunicipioService,
+    ProjetoService,
+    UsuarioService,
+)
 
 """
 APIs de Notificações em Tempo Real

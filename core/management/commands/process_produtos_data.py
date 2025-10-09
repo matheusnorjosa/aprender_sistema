@@ -187,7 +187,12 @@ class Command(BaseCommand):
             # Mostrar resumo por setor
             self.stdout.write("\n=== PROJETOS POR SETOR ===")
             for setor in Setor.objects.all().order_by("nome"):
-                count = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(setor=setor).count()
+                count = (
+                    Projeto.objects.select_related("setor")
+                    .prefetch_related("solicitacao_set")
+                    .filter(setor=setor)
+                    .count()
+                )
                 status = (
                     "REQUER APROVAÇÃO"
                     if setor.vinculado_superintendencia

@@ -6,8 +6,9 @@ IMPORTANTE: A diferenciação é APENAS para backend/permissões.
 Para a empresa, todos são coordenadores normalmente.
 """
 
-from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.test import TestCase
+
 from core.models import Setor, Usuario
 
 
@@ -22,21 +23,17 @@ class CoordenadorDiferenciacaoTestCase(TestCase):
     def setUp(self):
         # Criar setores de teste
         self.setor_superintendencia = Setor.objects.create(
-            nome="Superintendência",
-            sigla="SUPER",
-            vinculado_superintendencia=True
+            nome="Superintendência", sigla="SUPER", vinculado_superintendencia=True
         )
 
         self.setor_vidas = Setor.objects.create(
-            nome="Vidas",
-            sigla="VIDAS",
-            vinculado_superintendencia=False
+            nome="Vidas", sigla="VIDAS", vinculado_superintendencia=False
         )
 
         self.setor_brincando = Setor.objects.create(
             nome="Brincando e Aprendendo",
             sigla="BRINC",
-            vinculado_superintendencia=False
+            vinculado_superintendencia=False,
         )
 
         # Criar coordenadores de teste
@@ -46,7 +43,7 @@ class CoordenadorDiferenciacaoTestCase(TestCase):
             cargo="coordenador",
             setor=self.setor_superintendencia,
             first_name="Maria",
-            last_name="Superintendente"
+            last_name="Superintendente",
         )
 
         self.coord_vidas = Usuario.objects.create_user(
@@ -55,7 +52,7 @@ class CoordenadorDiferenciacaoTestCase(TestCase):
             cargo="coordenador",
             setor=self.setor_vidas,
             first_name="João",
-            last_name="Vidas"
+            last_name="Vidas",
         )
 
         self.coord_brincando = Usuario.objects.create_user(
@@ -64,7 +61,7 @@ class CoordenadorDiferenciacaoTestCase(TestCase):
             cargo="coordenador",
             setor=self.setor_brincando,
             first_name="Ana",
-            last_name="Brincando"
+            last_name="Brincando",
         )
 
         # Usuário não-coordenador
@@ -74,7 +71,7 @@ class CoordenadorDiferenciacaoTestCase(TestCase):
             cargo="formador",
             setor=self.setor_vidas,
             first_name="Carlos",
-            last_name="Formador"
+            last_name="Formador",
         )
 
     def test_todos_sao_coordenadores_externamente(self):
@@ -134,18 +131,24 @@ class CoordenadorDiferenciacaoTestCase(TestCase):
         Usado para controle interno de permissões.
         """
         # Apenas superintendência
-        coords_super = Usuario.get_coordenadores_por_vinculacao(superintendencia_only=True)
+        coords_super = Usuario.get_coordenadores_por_vinculacao(
+            superintendencia_only=True
+        )
         self.assertEqual(coords_super.count(), 1)
         self.assertIn(self.coord_super, coords_super)
 
         # Apenas outros setores
-        coords_outros = Usuario.get_coordenadores_por_vinculacao(superintendencia_only=False)
+        coords_outros = Usuario.get_coordenadores_por_vinculacao(
+            superintendencia_only=False
+        )
         self.assertEqual(coords_outros.count(), 2)
         self.assertIn(self.coord_vidas, coords_outros)
         self.assertIn(self.coord_brincando, coords_outros)
 
         # Todos os coordenadores
-        coords_todos = Usuario.get_coordenadores_por_vinculacao(superintendencia_only=None)
+        coords_todos = Usuario.get_coordenadores_por_vinculacao(
+            superintendencia_only=None
+        )
         self.assertEqual(coords_todos.count(), 3)
         self.assertIn(self.coord_super, coords_todos)
         self.assertIn(self.coord_vidas, coords_todos)
@@ -160,7 +163,9 @@ class CoordenadorDiferenciacaoTestCase(TestCase):
 
         # Coordenadores outros setores
         self.assertEqual(self.coord_vidas.tipo_coordenador, "Setor Vidas")
-        self.assertEqual(self.coord_brincando.tipo_coordenador, "Setor Brincando e Aprendendo")
+        self.assertEqual(
+            self.coord_brincando.tipo_coordenador, "Setor Brincando e Aprendendo"
+        )
 
         # Não-coordenador
         self.assertIsNone(self.formador.tipo_coordenador)
@@ -208,7 +213,7 @@ class CoordenadorDiferenciacaoTestCase(TestCase):
             cargo="coordenador",
             setor=None,  # Sem setor
             first_name="Pedro",
-            last_name="Sem Setor"
+            last_name="Sem Setor",
         )
 
         # É coordenador
@@ -226,17 +231,17 @@ class CoordenadorDiferenciacaoTestCase(TestCase):
         Testa que a implementação mantém compatibilidade com código existente.
         """
         # Métodos antigos continuam funcionando
-        self.assertTrue(hasattr(self.coord_super, 'can_create_requests'))
-        self.assertTrue(hasattr(self.coord_super, 'can_approve_requests'))
-        self.assertTrue(hasattr(self.coord_super, 'setor_nome'))
-        self.assertTrue(hasattr(self.coord_super, 'cargo_display'))
+        self.assertTrue(hasattr(self.coord_super, "can_create_requests"))
+        self.assertTrue(hasattr(self.coord_super, "can_approve_requests"))
+        self.assertTrue(hasattr(self.coord_super, "setor_nome"))
+        self.assertTrue(hasattr(self.coord_super, "cargo_display"))
 
         # Novos métodos estão disponíveis
-        self.assertTrue(hasattr(self.coord_super, 'is_coordenador_superintendencia'))
-        self.assertTrue(hasattr(self.coord_super, 'is_coordenador_outros_setores'))
-        self.assertTrue(hasattr(self.coord_super, 'tipo_coordenador'))
+        self.assertTrue(hasattr(self.coord_super, "is_coordenador_superintendencia"))
+        self.assertTrue(hasattr(self.coord_super, "is_coordenador_outros_setores"))
+        self.assertTrue(hasattr(self.coord_super, "tipo_coordenador"))
 
         # Métodos de classe funcionam
-        self.assertTrue(hasattr(Usuario, 'get_coordenadores_superintendencia'))
-        self.assertTrue(hasattr(Usuario, 'get_coordenadores_outros_setores'))
-        self.assertTrue(hasattr(Usuario, 'get_coordenadores_por_vinculacao'))
+        self.assertTrue(hasattr(Usuario, "get_coordenadores_superintendencia"))
+        self.assertTrue(hasattr(Usuario, "get_coordenadores_outros_setores"))
+        self.assertTrue(hasattr(Usuario, "get_coordenadores_por_vinculacao"))

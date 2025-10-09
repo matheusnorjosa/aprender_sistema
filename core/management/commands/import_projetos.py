@@ -433,7 +433,12 @@ class Command(BaseCommand):
                             self.stdout.write(f"  [=] Ja existe: {nome}")
                 else:
                     # Simular criação (dry-run)
-                    exists = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(nome=nome).exists()
+                    exists = (
+                        Projeto.objects.select_related("setor")
+                        .prefetch_related("solicitacao_set")
+                        .filter(nome=nome)
+                        .exists()
+                    )
                     if exists:
                         if update_existing:
                             resultado["atualizados"] += 1

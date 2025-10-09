@@ -21,28 +21,28 @@ from .diretoria_views import (
     DiretoriaAPIMetricsView,
     DiretoriaExecutiveDashboardView,
     DiretoriaRelatoriosView,
-    TestMapView,
-    TestMapSimpleView,
-    TestMapFinalView,
     TestMapAdvancedView,
+    TestMapFinalView,
+    TestMapSimpleView,
+    TestMapView,
 )
 from .formador_views import BloqueioCreateView, FormadorEventosView
 
 # Imports das views principais
 from .home_views import HomeView, home
-from .solicitacao_views import SolicitacaoCreateView, SolicitacaoOKView
 
 # Imports das views de importação
 from .importacao_views import (
-    CursosCSVUploadView,
-    CursosCSVProcessarView,
     CursosCSVPreviewView,
-    VinculosProjetoCursoListView,
+    CursosCSVProcessarView,
+    CursosCSVUploadView,
     CursosSemVinculoListView,
-    VincularCursoProjetoView,
     DesvincularCursoView,
     ReprocessarVinculacaoAutomaticaView,
+    VincularCursoProjetoView,
+    VinculosProjetoCursoListView,
 )
+from .solicitacao_views import SolicitacaoCreateView, SolicitacaoOKView
 
 # Lista para facilitar importação
 __all__ = [

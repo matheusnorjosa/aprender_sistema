@@ -1,4 +1,9 @@
-from core.services import FormadorService, UsuarioService, ProjetoService, MunicipioService
+from core.services import (
+    FormadorService,
+    MunicipioService,
+    ProjetoService,
+    UsuarioService,
+)
 
 """
 Views relacionadas ao perfil de Coordenador.
@@ -16,15 +21,25 @@ class CoordenadorMeusEventosView(LoginRequiredMixin, PermissionRequiredMixin, Li
 
     def get_queryset(self):
         qs = (
-            Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(usuario_solicitante=self.request.user)
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(usuario_solicitante=self.request.user)
             .select_related("projeto", "municipio", "tipo_evento", "usuario_aprovador")
             .prefetch_related("formadores")
             .order_by("-data_solicitacao")
         )
 
-        # Filtro por status
+        # Filtro por status (apenas canônicos)
         status = self.request.GET.get("status")
-        if status and status in ["PENDENTE", "APROVADO", "REPROVADO"]:
+        if status and status in [
+            "CRIADO",
+            "APROVADO",
+            "AGENDADO",
+            "REALIZADO",
+            "CANCELADO",
+        ]:
             qs = qs.filter(status=status)
 
         # Filtro por período
@@ -52,17 +67,21 @@ class CoordenadorMeusEventosView(LoginRequiredMixin, PermissionRequiredMixin, Li
         context = super().get_context_data(**kwargs)
 
         # Estatísticas do coordenador
-        user_eventos = Solicitacao.objects.select_related("municipio", "projeto", "tipo_evento", "solicitante").prefetch_related("formadores").filter(usuario_solicitante=self.request.user)
+        user_eventos = (
+            Solicitacao.objects.select_related(
+                "municipio", "projeto", "tipo_evento", "solicitante"
+            )
+            .prefetch_related("formadores")
+            .filter(usuario_solicitante=self.request.user)
+        )
 
         total_solicitacoes = user_eventos.count()
-        eventos_pendentes = user_eventos.filter(
-            status=SolicitacaoStatus.PENDENTE
-        ).count()
+        eventos_criados = user_eventos.filter(status=SolicitacaoStatus.CRIADO).count()
         eventos_aprovados = user_eventos.filter(
             status=SolicitacaoStatus.APROVADO
         ).count()
-        eventos_reprovados = user_eventos.filter(
-            status=SolicitacaoStatus.REPROVADO
+        eventos_cancelados = user_eventos.filter(
+            status=SolicitacaoStatus.CANCELADO
         ).count()
 
         # Taxa de aprovação
@@ -85,9 +104,11 @@ class CoordenadorMeusEventosView(LoginRequiredMixin, PermissionRequiredMixin, Li
 
         filter_options = {
             "status_choices": [
-                ("PENDENTE", "Pendente"),
+                ("CRIADO", "Criado"),
                 ("APROVADO", "Aprovado"),
-                ("REPROVADO", "Reprovado"),
+                ("AGENDADO", "Agendado"),
+                ("REALIZADO", "Realizado"),
+                ("CANCELADO", "Cancelado"),
             ],
             "periodo_choices": [
                 ("7", "Últimos 7 dias"),
@@ -100,9 +121,9 @@ class CoordenadorMeusEventosView(LoginRequiredMixin, PermissionRequiredMixin, Li
 
         stats = {
             "total_solicitacoes": total_solicitacoes,
-            "eventos_pendentes": eventos_pendentes,
+            "eventos_criados": eventos_criados,
             "eventos_aprovados": eventos_aprovados,
-            "eventos_reprovados": eventos_reprovados,
+            "eventos_cancelados": eventos_cancelados,
         }
 
         context.update(

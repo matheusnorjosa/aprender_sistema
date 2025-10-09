@@ -233,9 +233,9 @@ class SuperintendenciaSetorRequiredMixin(UserPassesTestMixin):
 
         # Verificar se o usuário tem setor vinculado à superintendência
         return (
-            hasattr(user, 'setor') 
-            and user.setor 
-            and getattr(user.setor, 'vinculado_superintendencia', False)
+            hasattr(user, "setor")
+            and user.setor
+            and getattr(user.setor, "vinculado_superintendencia", False)
         )
 
 
@@ -256,9 +256,9 @@ class FormadorOwnerMixin(UserPassesTestMixin):
 
         # Superintendência tem acesso a tudo
         if (
-            hasattr(user, 'setor') 
-            and user.setor 
-            and getattr(user.setor, 'vinculado_superintendencia', False)
+            hasattr(user, "setor")
+            and user.setor
+            and getattr(user.setor, "vinculado_superintendencia", False)
         ):
             return True
 

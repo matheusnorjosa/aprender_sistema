@@ -128,7 +128,11 @@ class Command(BaseCommand):
             setor_super = Setor.objects.get(nome="Superintendência")
 
             # Projetos sem setor definido
-            projetos_sem_setor = Projeto.objects.select_related("setor").prefetch_related("solicitacao_set").filter(setor__isnull=True)
+            projetos_sem_setor = (
+                Projeto.objects.select_related("setor")
+                .prefetch_related("solicitacao_set")
+                .filter(setor__isnull=True)
+            )
 
             if projetos_sem_setor.exists():
                 count = projetos_sem_setor.update(setor=setor_super)

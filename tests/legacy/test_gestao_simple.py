@@ -4,7 +4,7 @@ import sys
 import django
 
 # Configure Django settings
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aprender_sistema.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
 from django.contrib.auth import get_user_model
@@ -18,7 +18,7 @@ print()
 
 # 1. Verificar usuário admin
 try:
-    admin_user = User.objects.get(username='admin')
+    admin_user = User.objects.get(username="admin")
     print(f"[OK] Usuario admin encontrado: {admin_user.username}")
     print(f"   is_staff: {admin_user.is_staff}")
     print(f"   is_superuser: {admin_user.is_superuser}")
@@ -42,11 +42,11 @@ print()
 # 3. Verificar URLs de gestão
 print("VERIFICACAO DE URLs:")
 urls_gestao = [
-    'core:gestao_dashboard',
-    'core:gestao_formadores',
-    'core:gestao_municipios', 
-    'core:gestao_projetos',
-    'core:gestao_tipos_evento'
+    "core:gestao_dashboard",
+    "core:gestao_formadores",
+    "core:gestao_municipios",
+    "core:gestao_projetos",
+    "core:gestao_tipos_evento",
 ]
 
 for url_name in urls_gestao:
@@ -61,11 +61,11 @@ print()
 # 4. Verificar templates
 print("VERIFICACAO DE TEMPLATES:")
 templates_required = [
-    'core/templates/core/gestao/dashboard.html',
-    'core/templates/core/gestao/formadores/list.html',
-    'core/templates/core/gestao/municipios/list.html',
-    'core/templates/core/gestao/projetos/list.html',
-    'core/templates/core/gestao/tipos_evento/list.html'
+    "core/templates/core/gestao/dashboard.html",
+    "core/templates/core/gestao/formadores/list.html",
+    "core/templates/core/gestao/municipios/list.html",
+    "core/templates/core/gestao/projetos/list.html",
+    "core/templates/core/gestao/tipos_evento/list.html",
 ]
 
 for template_path in templates_required:
@@ -81,11 +81,24 @@ print("VERIFICACAO DE VIEWS:")
 try:
     from core.views.gestao_views import (
         GestaoDashboardView,
-        FormadorListView, FormadorCreateView, FormadorUpdateView, FormadorDeleteView,
-        MunicipioListView, MunicipioCreateView, MunicipioUpdateView, MunicipioDeleteView,
-        ProjetoListView, ProjetoCreateView, ProjetoUpdateView, ProjetoDeleteView,
-        TipoEventoListView, TipoEventoCreateView, TipoEventoUpdateView, TipoEventoDeleteView
+        FormadorListView,
+        FormadorCreateView,
+        FormadorUpdateView,
+        FormadorDeleteView,
+        MunicipioListView,
+        MunicipioCreateView,
+        MunicipioUpdateView,
+        MunicipioDeleteView,
+        ProjetoListView,
+        ProjetoCreateView,
+        ProjetoUpdateView,
+        ProjetoDeleteView,
+        TipoEventoListView,
+        TipoEventoCreateView,
+        TipoEventoUpdateView,
+        TipoEventoDeleteView,
     )
+
     print("   [OK] Todas as views de gestao importadas com sucesso")
 except ImportError as e:
     print(f"   [ERRO] Erro na importacao das views: {e}")
@@ -96,6 +109,7 @@ print()
 print("VERIFICACAO DE FORMULARIOS:")
 try:
     from core.forms import FormadorForm, MunicipioForm, ProjetoForm, TipoEventoForm
+
     print("   [OK] Todos os formularios de gestao importados com sucesso")
 except ImportError as e:
     print(f"   [ERRO] Erro na importacao dos formularios: {e}")

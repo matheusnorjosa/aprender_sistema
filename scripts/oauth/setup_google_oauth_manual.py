@@ -8,23 +8,24 @@ import json
 import requests
 from urllib.parse import parse_qs, urlparse
 
+
 def setup_oauth_manual():
     """Configura OAuth2 manualmente sem browser"""
 
     # Carregar credenciais
-    with open('credentials.json', 'r') as f:
+    with open("credentials.json", "r") as f:
         creds = json.load(f)
 
-    client_config = creds['installed']
-    client_id = client_config['client_id']
-    client_secret = client_config['client_secret']
+    client_config = creds["installed"]
+    client_id = client_config["client_id"]
+    client_secret = client_config["client_secret"]
 
     # Escopos necessários
     scopes = [
-        'https://www.googleapis.com/auth/spreadsheets.readonly',
-        'https://www.googleapis.com/auth/drive.readonly'
+        "https://www.googleapis.com/auth/spreadsheets.readonly",
+        "https://www.googleapis.com/auth/drive.readonly",
     ]
-    scope_string = ' '.join(scopes)
+    scope_string = " ".join(scopes)
 
     # Gerar URL de autorização
     auth_url = (
@@ -58,11 +59,11 @@ def setup_oauth_manual():
     # Trocar código por token
     token_url = "https://oauth2.googleapis.com/token"
     token_data = {
-        'client_id': client_id,
-        'client_secret': client_secret,
-        'code': auth_code,
-        'grant_type': 'authorization_code',
-        'redirect_uri': 'http://localhost'
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "code": auth_code,
+        "grant_type": "authorization_code",
+        "redirect_uri": "http://localhost",
     }
 
     try:
@@ -75,12 +76,12 @@ def setup_oauth_manual():
         authorized_user_info = {
             "client_id": client_id,
             "client_secret": client_secret,
-            "refresh_token": token_info.get('refresh_token'),
-            "access_token": token_info.get('access_token'),
-            "type": "authorized_user"
+            "refresh_token": token_info.get("refresh_token"),
+            "access_token": token_info.get("access_token"),
+            "type": "authorized_user",
         }
 
-        with open('token.json', 'w') as f:
+        with open("token.json", "w") as f:
             json.dump(authorized_user_info, f, indent=2)
 
         print("✅ Token salvo em token.json")
@@ -91,6 +92,7 @@ def setup_oauth_manual():
     except Exception as e:
         print(f"❌ Erro ao obter token: {e}")
         return False
+
 
 if __name__ == "__main__":
     setup_oauth_manual()

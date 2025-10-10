@@ -26,4 +26,3 @@
 - `gcal_results.csv` - Todos os resultados
 - `gcal_errors.csv` - Apenas erros
 - `gcal_audit.md` - Este relatório
-

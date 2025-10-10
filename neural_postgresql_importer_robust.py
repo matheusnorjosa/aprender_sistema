@@ -10,12 +10,12 @@ Author: Claude Code
 Date: Setembro 2025
 """
 
-import os
-import sys
 import json
 import logging
+import os
+import sys
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 # Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
@@ -23,17 +23,18 @@ import django
 
 django.setup()
 
-from django.db import transaction, IntegrityError
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
+
 from core.models import (
-    Usuario,
-    Setor,
-    Municipio,
-    Projeto,
-    TipoEvento,
-    Solicitacao,
     Aprovacao,
     DisponibilidadeFormadores,
+    Municipio,
+    Projeto,
+    Setor,
+    Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 
 # Configurar logging

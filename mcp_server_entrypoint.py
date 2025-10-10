@@ -11,13 +11,13 @@ Author: Claude Code
 Date: Janeiro 2025
 """
 
+import asyncio
+import json
+import logging
 import os
 import sys
-import asyncio
-import logging
-import json
-from typing import Dict, List, Any
 from pathlib import Path
+from typing import Any, Dict, List
 
 # Adicionar path da aplicação Django
 sys.path.insert(0, "/app")
@@ -29,16 +29,17 @@ import django
 
 django.setup()
 
+from django.contrib.auth import get_user_model
+
 # Agora importar módulos Django
 from django.db import connection
-from django.contrib.auth import get_user_model
 
 # Imports MCP
 try:
     from fastmcp import FastMCP
+    from fastmcp.prompts import Prompt
     from fastmcp.resources import Resource
     from fastmcp.tools import Tool
-    from fastmcp.prompts import Prompt
 
     FASTMCP_AVAILABLE = True
 except ImportError:
@@ -47,21 +48,21 @@ except ImportError:
 
 # Imports dos módulos MCP do projeto
 try:
-    from core.services.fastmcp_integration import AprenderSistemaMCP
     from core.mcp_tools import FormadorQueryTool
+    from core.services.fastmcp_integration import AprenderSistemaMCP
 
     MCP_TOOLS_AVAILABLE = True
 except ImportError as e:
     print(f"⚠️  MCP tools não disponíveis: {e}")
     MCP_TOOLS_AVAILABLE = False
 from core.models import (
+    Aprovacao,
+    DisponibilidadeFormadores,
     Formador,
     Municipio,
     Projeto,
-    TipoEvento,
     Solicitacao,
-    Aprovacao,
-    DisponibilidadeFormadores,
+    TipoEvento,
 )
 
 # Configuração de logging
@@ -90,6 +91,7 @@ class DockerizedMCPServer:
         """Verifica conexão com PostgreSQL via Docker network"""
         try:
             from django.db import connection
+
             from asgiref.sync import sync_to_async
 
             @sync_to_async

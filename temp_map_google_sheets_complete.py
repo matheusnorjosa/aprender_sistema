@@ -1,12 +1,14 @@
 #!/usr/bin/env python
+import json
 import os
 import sys
+from collections import defaultdict
+from datetime import datetime
+
 import django
+
 import gspread
 import pandas as pd
-from collections import defaultdict
-import json
-from datetime import datetime
 
 # Setup Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")

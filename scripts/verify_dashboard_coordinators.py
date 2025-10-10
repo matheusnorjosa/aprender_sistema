@@ -9,17 +9,18 @@ Author: Claude Code
 Date: Setembro 2025
 """
 
+import json
 import os
 import sys
-import json
-import django
 from pathlib import Path
+
+import django
 
 # Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from core.models import Usuario, Setor, Municipio, Projeto, TipoEvento, Solicitacao
+from core.models import Municipio, Projeto, Setor, Solicitacao, TipoEvento, Usuario
 from core.services.data_services import DashboardService
 
 

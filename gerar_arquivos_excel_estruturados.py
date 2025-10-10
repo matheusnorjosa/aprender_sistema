@@ -5,10 +5,11 @@ Script para gerar arquivos Excel estruturados com os dados tratados e organizado
 
 import json
 import os
-import pandas as pd
 from datetime import datetime
+
+import pandas as pd
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
 
 

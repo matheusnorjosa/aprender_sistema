@@ -2,9 +2,9 @@
 """
 Script para extrair dados da planilha "Disponibilidade | 2025" - aba "MENSAL"
 """
+import json
 import os
 import sys
-import json
 from datetime import date, timedelta
 
 # Configurar Django
@@ -14,8 +14,9 @@ import django
 
 django.setup()
 
-from core.models import Formador, DisponibilidadeFormadores, Solicitacao, Deslocamento
 from django.contrib.auth import get_user_model
+
+from core.models import Deslocamento, DisponibilidadeFormadores, Formador, Solicitacao
 
 
 def extrair_dados_planilha_disponibilidade():

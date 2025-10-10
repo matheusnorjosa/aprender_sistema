@@ -61,9 +61,9 @@ class ClaudeCodeService:
 
         prompt = f"""
         Generate a Django model for the {app_name} app with the following requirements:
-        
+
         {description}
-        
+
         Requirements:
         - Use proper Django field types
         - Include appropriate Meta class options
@@ -108,7 +108,7 @@ class ClaudeCodeService:
 
         prompt = f"""
         Generate Django {view_type} views for the {model_name} model.
-        
+
         Requirements:
         - Use class-based views (CBV)
         - Include proper permissions and authentication
@@ -154,7 +154,7 @@ class ClaudeCodeService:
 
         prompt = f"""
         Generate Django {test_type} tests for: {component_description}
-        
+
         Requirements:
         - Use Django TestCase or appropriate test classes
         - Include setUp and tearDown methods
@@ -206,12 +206,12 @@ class ClaudeCodeService:
         - Best practice violations
         - Potential bugs
         - Optimization opportunities
-        
+
         Code to analyze:
         ```
         {code}
         ```
-        
+
         Return analysis as JSON with:
         - issues: list of problems found
         - suggestions: list of improvements
@@ -268,12 +268,12 @@ class ClaudeCodeService:
 
         prompt = f"""
         Generate {doc_type} documentation for the following Django component:
-        
+
         File: {component_path}
         ```
         {code_content}
         ```
-        
+
         Requirements:
         - Use Markdown format
         - Include clear descriptions

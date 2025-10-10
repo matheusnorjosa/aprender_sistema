@@ -2,13 +2,14 @@
 Testes para o servidor MCP do Sistema APRENDER
 """
 
-import pytest
 import asyncio
+import os
+import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
-import sys
-import os
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 # Adicionar o diretório neural_system ao path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "neural_system"))
@@ -16,9 +17,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "neural_system"))
 # Import do servidor MCP
 try:
     from mcp_server_aprender import (
-        server,
-        _read_documentation_file,
         _extract_section_from_content,
+        _read_documentation_file,
+        server,
     )
 except ImportError:
     pytest.skip("MCP server module not available", allow_module_level=True)

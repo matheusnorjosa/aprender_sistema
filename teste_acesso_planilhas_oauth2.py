@@ -3,11 +3,12 @@
 Teste de acesso às planilhas Google Sheets usando OAuth2
 """
 
+import json
 import os
+
 import gspread
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
-import json
 
 
 def teste_acesso_oauth2():

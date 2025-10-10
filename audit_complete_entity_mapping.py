@@ -20,11 +20,11 @@ Author: Claude Code
 Date: Setembro 2025
 """
 
+import logging
 import os
 import sys
-import logging
 from pathlib import Path
-from typing import Dict, List, Set, Any
+from typing import Any, Dict, List, Set
 
 # Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
@@ -32,17 +32,18 @@ import django
 
 django.setup()
 
-from django.db import connection
 from django.core.management import call_command
+from django.db import connection
+
 from core.models import (
-    Usuario,
-    Setor,
-    Municipio,
-    Projeto,
-    TipoEvento,
-    Solicitacao,
     EventoGoogleCalendar,
     LogAuditoria,
+    Municipio,
+    Projeto,
+    Setor,
+    Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 
 # Configurar logging
@@ -445,9 +446,9 @@ class CompleteEntityMappingAuditor:
                 # Listar todas as tabelas
                 cursor.execute(
                     """
-                    SELECT table_name 
-                    FROM information_schema.tables 
-                    WHERE table_schema = 'public' 
+                    SELECT table_name
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
                     AND table_type = 'BASE TABLE'
                     ORDER BY table_name;
                 """
@@ -556,13 +557,13 @@ class CompleteEntityMappingAuditor:
         try:
             # Verificar se existem services para todas as entidades
             from core.services import (
-                UsuarioService,
-                FormadorService,
                 CoordinatorService,
                 DashboardService,
+                FormadorService,
                 MunicipioService,
                 SetorService,
                 TipoEventoService,
+                UsuarioService,
             )
 
             services_status = {

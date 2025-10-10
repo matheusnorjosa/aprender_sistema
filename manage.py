@@ -2,6 +2,10 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
+
+if os.environ.get("REQUIRE_DOCKER") == "1" and not Path("/.dockerenv").exists():
+    sys.exit("Execute via Docker (container web).")
 
 
 def main():

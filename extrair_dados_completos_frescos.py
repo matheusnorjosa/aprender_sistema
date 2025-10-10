@@ -6,6 +6,7 @@ Script para extrair dados completos e frescos das planilhas Google Sheets
 import json
 import os
 from datetime import datetime
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
-import json
+import difflib
 import hashlib
+import json
+import os
 from datetime import datetime
 from pathlib import Path
-import difflib
 
 
 def calcular_hash_arquivo(caminho_arquivo):

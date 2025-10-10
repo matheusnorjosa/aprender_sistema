@@ -5,8 +5,8 @@ Script para comparar dados frescos extraídos com a análise anterior
 
 import json
 import os
-from datetime import datetime
 from collections import defaultdict
+from datetime import datetime
 
 
 class ComparadorDados:

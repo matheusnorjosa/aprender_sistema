@@ -21,6 +21,7 @@ Script para finalizar configuração OAuth2 com código de autorização
 """
 
 import json
+
 import requests
 
 

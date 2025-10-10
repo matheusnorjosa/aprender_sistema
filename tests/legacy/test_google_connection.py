@@ -12,6 +12,7 @@ python test_google_connection.py
 
 import os
 import sys
+
 import django
 
 # Setup Django

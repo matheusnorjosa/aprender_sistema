@@ -10,11 +10,11 @@ Author: Claude Code
 Date: Setembro 2025
 """
 
+import logging
 import os
 import sys
-import logging
 from pathlib import Path
-from typing import Dict, List, Set, Any
+from typing import Any, Dict, List, Set
 
 # Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
@@ -23,15 +23,16 @@ import django
 django.setup()
 
 from django.db import connection
-from core.models import Usuario, Setor, Municipio, Projeto, TipoEvento, Solicitacao
+
+from core.models import Municipio, Projeto, Setor, Solicitacao, TipoEvento, Usuario
 from core.services import (
-    UsuarioService,
-    FormadorService,
     CoordinatorService,
     DashboardService,
+    FormadorService,
     MunicipioService,
     SetorService,
     TipoEventoService,
+    UsuarioService,
 )
 from core.services.data_master_service import ProjetoService
 

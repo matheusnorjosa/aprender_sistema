@@ -4,11 +4,12 @@ Script para upload de documentação do Sistema APRENDER para o Claude
 Adaptado para estrutura existente do projeto.
 """
 
-import os
 import base64
+import os
 from pathlib import Path
-import anthropic
 from typing import List
+
+import anthropic
 
 # Configuração da API do Claude
 # NOTA: Configure sua API key como variável de ambiente

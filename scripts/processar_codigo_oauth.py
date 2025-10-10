@@ -4,6 +4,7 @@ Processa código OAuth2 e gera token para acesso às planilhas
 """
 
 import json
+
 import requests
 from google.oauth2.credentials import Credentials
 

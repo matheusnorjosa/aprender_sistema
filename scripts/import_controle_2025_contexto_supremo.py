@@ -20,31 +20,33 @@ Autor: Claude Code
 Data: Janeiro 2025
 """
 
-import os
-import sys
-import django
 import json
 import logging
-from datetime import datetime, time, date
-from typing import Dict, List, Any, Optional
+import os
+import sys
+from datetime import date, datetime, time
+from typing import Any, Dict, List, Optional
+
+import django
 
 # Configurar Django
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from django.db import transaction
 from django.contrib.auth import get_user_model
+from django.db import transaction
+
 from core.models import (
-    Usuario,
+    Formador,
+    FormadoresSolicitacao,
     Municipio,
     Projeto,
-    TipoEvento,
+    Setor,
     Solicitacao,
     SolicitacaoStatus,
-    Setor,
-    FormadoresSolicitacao,
-    Formador,
+    TipoEvento,
+    Usuario,
 )
 
 # Configurar logging

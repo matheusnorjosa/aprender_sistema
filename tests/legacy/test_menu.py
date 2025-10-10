@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 import os
 import sys
+
 import django
 
 # Configure Django settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from django.template import Template, Context
 from django.contrib.auth import get_user_model
+from django.template import Context, Template
 from django.test import RequestFactory
 
 User = get_user_model()

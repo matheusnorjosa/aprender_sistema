@@ -11,14 +11,14 @@ Author: Claude Code
 Date: Janeiro 2025
 """
 
-import os
-import json
-import subprocess
 import hashlib
-from pathlib import Path
-from datetime import datetime
-from collections import defaultdict
+import json
+import os
 import re
+import subprocess
+from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
 
 
 class GitHubRepositoryAnalyzer:

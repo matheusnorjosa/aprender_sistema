@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("core", "0040_sync_marcador_and_usuario_fields"),
+        ("core", "0039_usuario_not_null"),
     ]
 
     operations = [

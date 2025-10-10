@@ -2,8 +2,8 @@
 Script simplificado para renovar autenticação Google OAuth2
 """
 
-import os
 import json
+import os
 import webbrowser
 from urllib.parse import urlencode
 

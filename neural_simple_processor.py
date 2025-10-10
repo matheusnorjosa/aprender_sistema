@@ -6,10 +6,10 @@ Processador direto e eficiente para dados do Google Sheets
 
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Set
-import re
+from typing import Any, Dict, List, Set
 
 # Configuração de logging
 logging.basicConfig(

@@ -21,11 +21,16 @@ def forwards(apps, schema_editor):
             END $$;
         """)
 
-        # Criar VIEW compatível
+        # Criar VIEW compatível (apenas se tabela archive existir)
         cursor.execute("""
-            DROP VIEW IF EXISTS public.ingestao_disp_staging;
-            CREATE VIEW public.ingestao_disp_staging AS
-              SELECT * FROM public.ingestao_disp_staging_archive_20251005;
+            DO $$
+            BEGIN
+              IF to_regclass('public.ingestao_disp_staging_archive_20251005') IS NOT NULL THEN
+                DROP VIEW IF EXISTS public.ingestao_disp_staging;
+                CREATE VIEW public.ingestao_disp_staging AS
+                  SELECT * FROM public.ingestao_disp_staging_archive_20251005;
+              END IF;
+            END $$;
         """)
 
 

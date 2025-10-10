@@ -23,81 +23,85 @@ class Migration(migrations.Migration):
         #     model_name="marcadorplanilha",
         #     name="solicitacao",
         # ),
-        migrations.AddField(
-            model_name="marcadorplanilha",
-            name="entidade_id",
-            field=models.UUIDField(
-                blank=True,
-                help_text="ID da entidade vinculada (se aplicável)",
-                null=True,
-            ),
-        ),
-        migrations.AddField(
-            model_name="marcadorplanilha",
-            name="raw_data",
-            field=models.JSONField(
-                default=dict, help_text="Dados brutos da importação"
-            ),
-        ),
-        migrations.AddField(
-            model_name="marcadorplanilha",
-            name="tipo_entidade",
-            field=models.CharField(
-                blank=True,
-                default="",
-                help_text="Tipo de entidade (usuario, solicitacao, disponibilidade, etc.)",
-                max_length=50,
-            ),
-        ),
-        migrations.AlterField(
-            model_name="marcadorplanilha",
-            name="external_hash",
-            field=models.CharField(
-                db_index=True,
-                help_text="Hash SHA1 para garantir idempotência da importação",
-                max_length=40,
-                unique=True,
-            ),
-        ),
-        migrations.AlterField(
-            model_name="marcadorplanilha",
-            name="gid",
-            field=models.CharField(
-                blank=True,
-                default="",
-                help_text="ID da linha na planilha (Google Sheets gid)",
-                max_length=32,
-            ),
-        ),
-        migrations.AlterField(
-            model_name="marcadorplanilha",
-            name="id",
-            field=models.BigAutoField(primary_key=True, serialize=False),
-        ),
-        migrations.AlterField(
-            model_name="marcadorplanilha",
-            name="linha",
-            field=models.CharField(
-                blank=True,
-                help_text="Número da linha na planilha",
-                max_length=20,
-                null=True,
-            ),
-        ),
-        migrations.AlterField(
-            model_name="marcadorplanilha",
-            name="origem",
-            field=models.CharField(
-                default="",
-                help_text="Fonte da importação (sheets:aba ou csv:arquivo)",
-                max_length=32,
-            ),
-        ),
-        migrations.AlterField(
-            model_name="marcadorplanilha",
-            name="origem_aba",
-            field=models.CharField(
-                default="", help_text="Nome da aba de origem", max_length=50
-            ),
-        ),
+        # NOTA: entidade_id já foi adicionado em 0032_add_canonical_models_and_fields.py
+        # migrations.AddField(
+        #     model_name="marcadorplanilha",
+        #     name="entidade_id",
+        #     field=models.UUIDField(
+        #         blank=True,
+        #         help_text="ID da entidade vinculada (se aplicável)",
+        #         null=True,
+        #     ),
+        # ),
+        # NOTA: raw_data já foi adicionado em 0032_add_canonical_models_and_fields.py
+        # migrations.AddField(
+        #     model_name="marcadorplanilha",
+        #     name="raw_data",
+        #     field=models.JSONField(
+        #         default=dict, help_text="Dados brutos da importação"
+        #     ),
+        # ),
+        # NOTA: tipo_entidade já foi adicionado em 0032_add_canonical_models_and_fields.py
+        # migrations.AddField(
+        #     model_name="marcadorplanilha",
+        #     name="tipo_entidade",
+        #     field=models.CharField(
+        #         blank=True,
+        #         default="",
+        #         help_text="Tipo de entidade (usuario, solicitacao, disponibilidade, etc.)",
+        #         max_length=50,
+        #     ),
+        # ),
+        # NOTA: Os AlterField abaixo foram comentados pois os campos não existem no modelo original
+        # migrations.AlterField(
+        #     model_name="marcadorplanilha",
+        #     name="external_hash",
+        #     field=models.CharField(
+        #         db_index=True,
+        #         help_text="Hash SHA1 para garantir idempotência da importação",
+        #         max_length=40,
+        #         unique=True,
+        #     ),
+        # ),
+        # migrations.AlterField(
+        #     model_name="marcadorplanilha",
+        #     name="gid",
+        #     field=models.CharField(
+        #         blank=True,
+        #         default="",
+        #         help_text="ID da linha na planilha (Google Sheets gid)",
+        #         max_length=32,
+        #     ),
+        # ),
+        # migrations.AlterField(
+        #     model_name="marcadorplanilha",
+        #     name="id",
+        #     field=models.BigAutoField(primary_key=True, serialize=False),
+        # ),
+        # migrations.AlterField(
+        #     model_name="marcadorplanilha",
+        #     name="linha",
+        #     field=models.CharField(
+        #         blank=True,
+        #         help_text="Número da linha na planilha",
+        #         max_length=20,
+        #         null=True,
+        #     ),
+        # ),
+        # migrations.AlterField(
+        #     model_name="marcadorplanilha",
+        #     name="origem",
+        #     field=models.CharField(
+        #         default="",
+        #         help_text="Fonte da importação (sheets:aba ou csv:arquivo)",
+        #         max_length=32,
+        #     ),
+        # ),
+        # migrations.AlterField(
+        #     model_name="marcadorplanilha",
+        #     name="origem_aba",
+        #     field=models.CharField(
+        #         default="", help_text="Nome da aba de origem", max_length=50
+        #     ),
+        # ),
     ]

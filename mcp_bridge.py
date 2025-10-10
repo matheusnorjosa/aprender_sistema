@@ -20,7 +20,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 # Configurar Django para acessar banco Docker
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
@@ -40,19 +40,20 @@ try:
     django.setup()
 
     # Imports Django após setup
-    from core.models import (
-        Usuario,
-        Formador,
-        Municipio,
-        Projeto,
-        TipoEvento,
-        Solicitacao,
-        Aprovacao,
-        LogAuditoria,
-        SolicitacaoStatus,
-    )
     from django.db import connection
     from django.utils import timezone
+
+    from core.models import (
+        Aprovacao,
+        Formador,
+        LogAuditoria,
+        Municipio,
+        Projeto,
+        Solicitacao,
+        SolicitacaoStatus,
+        TipoEvento,
+        Usuario,
+    )
 
     DJANGO_AVAILABLE = True
 
@@ -451,8 +452,9 @@ async def get_formadores_info_real(limit: int, status: str) -> List[Dict[str, An
 async def get_solicitacoes_stats_real(periodo: str) -> List[Dict[str, Any]]:
     """Estatísticas reais das solicitações"""
     try:
-        from asgiref.sync import sync_to_async
         from datetime import timedelta
+
+        from asgiref.sync import sync_to_async
 
         @sync_to_async
         def get_stats():
@@ -651,8 +653,9 @@ async def analyze_approval_flow_real() -> List[Dict[str, Any]]:
 
         @sync_to_async
         def analyze_flow():
-            from django.db.models import Avg, Count
             from datetime import timedelta
+
+            from django.db.models import Avg, Count
 
             # Análise das aprovações
             total_solicitacoes = Solicitacao.objects.count()

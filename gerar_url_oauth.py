@@ -3,8 +3,8 @@
 Gera URL para autorização OAuth2 manual
 """
 
-import json
 import base64
+import json
 import urllib.parse
 
 

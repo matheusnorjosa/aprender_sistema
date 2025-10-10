@@ -4,6 +4,7 @@ Script para validação da integridade dos dados extraídos
 """
 import os
 import sys
+
 import django
 
 # Configure Django
@@ -11,8 +12,9 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 sys.path.append("/app")
 django.setup()
 
-from core.models import *
 from django.contrib.auth.models import Group
+
+from core.models import *
 
 
 def main():

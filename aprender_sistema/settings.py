@@ -9,7 +9,16 @@ Para mais informações: docs/DOCKER_CENTRALIZED.md
 """
 
 import os
+import sys
 from pathlib import Path
+
+# ========================================
+# DOCKER ENFORCEMENT (REQUIRE_DOCKER=1)
+# ========================================
+if os.environ.get("REQUIRE_DOCKER") == "1" and not Path("/.dockerenv").exists():
+    sys.exit(
+        "🚫 Execute via Docker (container web). Use: docker compose exec -T web python manage.py <command>"
+    )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -61,6 +70,7 @@ INSTALLED_APPS = [
     "api",
     "ingestao",  # Canonical import commands (Hotfix Dia 3)
     "dashboard",  # KPIs canônicos (Auditoria Full)
+    "dat_ingest",  # Data Lake staging para CSVs ETL (DAT-P01 a P04)
 ]
 
 # Custom User Model

@@ -3,8 +3,8 @@
 Script para configurar OAuth2 especificamente para aprender-sistema@aprendereditora.com.br
 """
 
-import os
 import json
+import os
 import webbrowser
 from urllib.parse import parse_qs, urlparse
 

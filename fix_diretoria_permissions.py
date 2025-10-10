@@ -5,6 +5,7 @@ Script para corrigir permissões dos grupos para acessar páginas da diretoria.
 
 import os
 import sys
+
 import django
 
 # Configuração do Django

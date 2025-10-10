@@ -5,6 +5,7 @@ Teste simples para verificar acesso à planilha do Google Sheets
 
 import os
 import sys
+
 import django
 
 # Configurar Django

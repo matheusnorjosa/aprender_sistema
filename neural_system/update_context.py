@@ -4,14 +4,15 @@ Script para atualização contínua do contexto do Claude e MCP
 Adaptado para estrutura existente do Sistema APRENDER.
 """
 
-import os
-import json
 import hashlib
+import json
+import os
 import subprocess
-import requests
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Optional
+
+import requests
 
 # Configurações
 DOCS_DIR = Path(__file__).parent.parent

@@ -4,10 +4,11 @@ Analisador completo das planilhas - Mapeia TODAS as relações organizacionais
 """
 
 import json
+import re
+from collections import Counter, defaultdict
+
 import gspread
 from google.oauth2.credentials import Credentials
-from collections import defaultdict, Counter
-import re
 
 
 class AnalisadorCompletoOrganizacional:

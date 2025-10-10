@@ -3,9 +3,9 @@
 Script simples para configurar OAuth2 no Docker
 """
 
+import json
 import os
 import sys
-import json
 
 # Configurar Django
 sys.path.append(".")

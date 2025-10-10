@@ -4,14 +4,15 @@ ESTRATÉGIA COMPLETA DE ANÁLISE DAS PLANILHAS GOOGLE SHEETS
 Senior Data Analyst Approach - Extração, Tratamento e Comparação
 """
 
-import os
-import sys
 import json
-import pandas as pd
-from datetime import datetime
-from collections import defaultdict, Counter
+import os
 import re
-from typing import Dict, List, Any, Optional
+import sys
+from collections import Counter, defaultdict
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 
 class GoogleSheetsDataAnalyst:

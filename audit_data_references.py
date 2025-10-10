@@ -10,9 +10,9 @@ Author: Claude Code
 Date: Setembro 2025
 """
 
+import logging
 import os
 import sys
-import logging
 
 # Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
@@ -21,7 +21,8 @@ import django
 django.setup()
 
 from django.db import connection
-from core.models import Usuario, Setor, Municipio, Projeto, TipoEvento
+
+from core.models import Municipio, Projeto, Setor, TipoEvento, Usuario
 
 # Configurar logging
 logging.basicConfig(
@@ -219,10 +220,10 @@ class DataReferencesAuditor:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT cpf, COUNT(*) 
-                FROM core_usuario 
+                SELECT cpf, COUNT(*)
+                FROM core_usuario
                 WHERE cpf IS NOT NULL AND cpf != ''
-                GROUP BY cpf 
+                GROUP BY cpf
                 HAVING COUNT(*) > 1
             """
             )
@@ -240,10 +241,10 @@ class DataReferencesAuditor:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT email, COUNT(*) 
-                FROM core_usuario 
+                SELECT email, COUNT(*)
+                FROM core_usuario
                 WHERE email IS NOT NULL AND email != ''
-                GROUP BY email 
+                GROUP BY email
                 HAVING COUNT(*) > 1
             """
             )

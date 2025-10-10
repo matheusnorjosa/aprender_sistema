@@ -4,15 +4,17 @@ Dashboard Streamlit como alternativa ao dashboard Django
 Execute com: streamlit run dashboard_streamlit.py
 """
 
-import streamlit as st
+import os
+from datetime import datetime, timedelta
+
+import django
+from django.db import models
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import streamlit as st
 from plotly.subplots import make_subplots
-import os
-import django
-from datetime import datetime, timedelta
-from django.db import models
 
 # Configurar Django para usar PostgreSQL Docker (mesmo que o servidor web)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
@@ -24,7 +26,7 @@ os.environ.setdefault("DB_USER", "adm_aprender")
 os.environ.setdefault("DB_PASSWORD", "aprender123456")
 django.setup()
 
-from core.models import Solicitacao, Formador, SolicitacaoStatus, FormadoresSolicitacao
+from core.models import Formador, FormadoresSolicitacao, Solicitacao, SolicitacaoStatus
 
 # Configuração da página
 st.set_page_config(
@@ -343,13 +345,13 @@ st.sidebar.markdown("### 📋 Sobre o Dashboard")
 st.sidebar.info(
     """
     **Streamlit Dashboard**
-    
+
     ✅ Gráficos interativos
     ✅ Dados em tempo real
     ✅ Fácil manutenção
     ✅ Deploy simples
     ✅ Responsivo
-    
+
     **Como usar:**
     ```bash
     pip install streamlit plotly

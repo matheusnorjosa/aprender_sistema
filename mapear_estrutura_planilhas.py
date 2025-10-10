@@ -4,6 +4,7 @@ Mapeia estrutura das planilhas Google Sheets de forma rápida
 """
 
 import json
+
 import gspread
 from google.oauth2.credentials import Credentials
 

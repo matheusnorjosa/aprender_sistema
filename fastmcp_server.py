@@ -10,10 +10,10 @@ Author: Claude Code
 Date: Janeiro 2025
 """
 
-import os
-import sys
 import asyncio
 import logging
+import os
+import sys
 from pathlib import Path
 
 # Configurar Django
@@ -25,6 +25,7 @@ django.setup()
 
 # Imports FastMCP
 from fastmcp import FastMCP
+
 from core.services.fastmcp_integration import AprenderSistemaMCP
 
 # Configurar logging

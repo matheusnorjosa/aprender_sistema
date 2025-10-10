@@ -3,9 +3,10 @@
 Acesso simples à planilha usando gspread com credenciais existentes
 """
 
+import json
 import os
 import sys
-import json
+
 import django
 
 # Configurar Django

@@ -9,27 +9,28 @@ Author: Claude Code
 Date: Setembro 2025
 """
 
-import os
-import sys
-import django
 import json
+import os
 import random
+import sys
 from datetime import datetime, timedelta
-from django.utils import timezone
+
+import django
 from django.db import transaction
+from django.utils import timezone
 
 # Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
 from core.models import (
-    Usuario,
-    Setor,
     Municipio,
     Projeto,
-    TipoEvento,
+    Setor,
     Solicitacao,
     SolicitacaoStatus,
+    TipoEvento,
+    Usuario,
 )
 
 

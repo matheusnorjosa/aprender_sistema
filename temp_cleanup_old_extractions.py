@@ -3,8 +3,8 @@
 Script para remover extrações locais antigas e desnecessárias
 Foco: Manter apenas arquivos essenciais e remover temporários
 """
-import os
 import glob
+import os
 from datetime import datetime
 
 

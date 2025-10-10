@@ -119,7 +119,7 @@ class Command(BaseCommand):
             self.stdout.write("Testing prompt registration...")
 
             test_prompt = """
-            You are a test assistant. 
+            You are a test assistant.
             Context: {{context}}
             Task: {{task}}
             Please provide a helpful response.

@@ -16,13 +16,14 @@ Autor: Claude Code
 Data: Janeiro 2025
 """
 
-import os
-import sys
-import django
 import json
 import logging
+import os
+import sys
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
+
+import django
 
 # Configurar Django
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))

@@ -1,16 +1,18 @@
 #!/usr/bin/env python
 import os
 import sys
+
 import django
 
 # Configure Django settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from django.template import Template, Context
 from django.contrib.auth import get_user_model
+from django.template import Context, Template
 from django.test import RequestFactory
 from django.urls import reverse
+
 from core.models import Formador, Municipio, Projeto, TipoEvento
 
 User = get_user_model()
@@ -109,23 +111,23 @@ print()
 print("🏗️ VERIFICAÇÃO DE VIEWS:")
 try:
     from core.views.gestao_views import (
-        GestaoDashboardView,
-        FormadorListView,
         FormadorCreateView,
-        FormadorUpdateView,
         FormadorDeleteView,
-        MunicipioListView,
+        FormadorListView,
+        FormadorUpdateView,
+        GestaoDashboardView,
         MunicipioCreateView,
-        MunicipioUpdateView,
         MunicipioDeleteView,
-        ProjetoListView,
+        MunicipioListView,
+        MunicipioUpdateView,
         ProjetoCreateView,
-        ProjetoUpdateView,
         ProjetoDeleteView,
-        TipoEventoListView,
+        ProjetoListView,
+        ProjetoUpdateView,
         TipoEventoCreateView,
-        TipoEventoUpdateView,
         TipoEventoDeleteView,
+        TipoEventoListView,
+        TipoEventoUpdateView,
     )
 
     print("   ✅ Todas as views de gestão importadas com sucesso")

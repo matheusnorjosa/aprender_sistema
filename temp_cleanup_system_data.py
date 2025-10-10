@@ -5,15 +5,16 @@ Foco: Remover todos os dados para implementação limpa
 """
 import os
 import sys
+
 import django
-from django.db import transaction
 from django.core.management import call_command
+from django.db import transaction
 
 # Setup Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from core.models import Usuario, Projeto, Municipio, TipoEvento, Setor, Solicitacao
+from core.models import Municipio, Projeto, Setor, Solicitacao, TipoEvento, Usuario
 
 
 def cleanup_system_data():

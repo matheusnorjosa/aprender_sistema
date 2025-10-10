@@ -9,13 +9,14 @@ Author: Claude Code
 Date: Setembro 2025
 """
 
+import json
 import os
 import sys
-import json
+from datetime import datetime
+from pathlib import Path
+
 import gspread
 from google.oauth2.credentials import Credentials
-from pathlib import Path
-from datetime import datetime
 
 
 def access_all_sheets():

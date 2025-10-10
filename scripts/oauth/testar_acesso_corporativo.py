@@ -3,8 +3,9 @@
 Script para testar acesso à planilha usando diferentes métodos
 """
 
-import requests
 import json
+
+import requests
 
 
 def testar_acesso_publico():

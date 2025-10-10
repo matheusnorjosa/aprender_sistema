@@ -11,6 +11,7 @@ Date: Setembro 2025
 
 import os
 import sys
+
 import django
 
 # Configurar Django

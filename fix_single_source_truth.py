@@ -10,10 +10,10 @@ Author: Claude Code
 Date: Setembro 2025
 """
 
-import os
-import sys
-import re
 import logging
+import os
+import re
+import sys
 from pathlib import Path
 from typing import Dict, List
 

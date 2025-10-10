@@ -19,9 +19,10 @@ import ijson
 import numpy as np
 import orjson
 import pandas as pd
+from mistletoe import Document
+
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mistletoe import Document
 
 # ========================================
 # FEATURE FLAG VALIDATION

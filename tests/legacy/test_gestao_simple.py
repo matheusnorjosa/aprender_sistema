@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import sys
+
 import django
 
 # Configure Django settings
@@ -9,6 +10,7 @@ django.setup()
 
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+
 from core.models import Formador, Municipio, Projeto, TipoEvento
 
 User = get_user_model()
@@ -80,23 +82,23 @@ print()
 print("VERIFICACAO DE VIEWS:")
 try:
     from core.views.gestao_views import (
-        GestaoDashboardView,
-        FormadorListView,
         FormadorCreateView,
-        FormadorUpdateView,
         FormadorDeleteView,
-        MunicipioListView,
+        FormadorListView,
+        FormadorUpdateView,
+        GestaoDashboardView,
         MunicipioCreateView,
-        MunicipioUpdateView,
         MunicipioDeleteView,
-        ProjetoListView,
+        MunicipioListView,
+        MunicipioUpdateView,
         ProjetoCreateView,
-        ProjetoUpdateView,
         ProjetoDeleteView,
-        TipoEventoListView,
+        ProjetoListView,
+        ProjetoUpdateView,
         TipoEventoCreateView,
-        TipoEventoUpdateView,
         TipoEventoDeleteView,
+        TipoEventoListView,
+        TipoEventoUpdateView,
     )
 
     print("   [OK] Todas as views de gestao importadas com sucesso")

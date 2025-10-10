@@ -6,17 +6,20 @@ Testa todos os endpoints críticos do dashboard executivo
 
 import os
 import sys
-import django
-import requests
 from datetime import datetime
+
+import django
+
+import requests
 
 # Setup Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 django.setup()
 
-from django.test import Client
 from django.contrib.auth.models import User
+from django.test import Client
+
 from core.models import Usuario
 
 
@@ -147,7 +150,7 @@ def check_database_connectivity():
 def check_models_integrity():
     """Verifica integridade dos modelos após unificação"""
     try:
-        from core.models import Usuario, Solicitacao, FormadoresSolicitacao
+        from core.models import FormadoresSolicitacao, Solicitacao, Usuario
 
         print("\n🔍 Verificando integridade dos modelos...")
 

@@ -142,7 +142,7 @@ class Command(BaseCommand):
                 # Obter todas as sequências
                 cursor.execute(
                     """
-                    SELECT sequence_name FROM information_schema.sequences 
+                    SELECT sequence_name FROM information_schema.sequences
                     WHERE sequence_schema = 'public'
                 """
                 )

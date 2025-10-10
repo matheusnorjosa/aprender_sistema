@@ -10,20 +10,20 @@ Autor: Claude Code
 Data: Setembro 2025
 """
 
+import argparse
 import json
 import os
 import sys
-from datetime import datetime, date
-from typing import Dict, List, Any
-import argparse
+from datetime import date, datetime
+from typing import Any, Dict, List
 
 try:
     import openpyxl
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.chart import BarChart, Reference
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils.dataframe import dataframe_to_rows
     from openpyxl.worksheet.table import Table, TableStyleInfo
-    from openpyxl.chart import BarChart, Reference
 except ImportError:
     print("ERRO: openpyxl não encontrado. Instale com: pip install openpyxl")
     sys.exit(1)

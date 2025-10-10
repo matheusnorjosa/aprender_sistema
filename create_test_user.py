@@ -5,6 +5,7 @@ Script para criar usuário de teste da diretoria e testar APIs.
 
 import os
 import sys
+
 import django
 
 # Configuração do Django
@@ -12,6 +13,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
 from django.contrib.auth.models import Group
+
 from core.models import Usuario
 
 

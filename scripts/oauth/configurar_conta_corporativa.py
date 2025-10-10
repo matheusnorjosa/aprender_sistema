@@ -4,12 +4,13 @@ Script para configurar acesso à planilha usando a conta corporativa
 aprender-sistema@aprendereditora.com.br
 """
 
-import gspread
 import json
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-import pickle
 import os
+import pickle
+
+import gspread
+from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
 
 
 def configurar_conta_corporativa():

@@ -27,18 +27,38 @@ cd aprender_sistema
 cp .env.example .env
 # Edite .env com suas configurações
 
-# 3. Execute com Docker Compose
-docker-compose up -d
+# 3. Execute em modo desenvolvimento (runserver)
+make dev
 
-# 4. Execute as migrações
-docker-compose exec web python manage.py migrate
+# OU execute em modo produção (Gunicorn)
+make prod
 
-# 5. Crie um superusuário
-docker-compose exec web python manage.py createsuperuser
-
-# 6. Acesse o sistema
+# 4. Acesse o sistema
 # http://localhost:8000 - Sistema principal
 # http://localhost:8000/admin - Painel administrativo
+# http://localhost:8000/healthz/ - Health check
+```
+
+## Stack & Containers (centralizado)
+
+- Docker único (`docker-compose.yml`) controla **dev** e **prod** via `RUN_MODE`.
+- Healthcheck: `GET /healthz/` → `{"status":"ok","db":"ok"}`.
+
+### Primeira execução (dev)
+
+```bash
+cp .env.example .env
+make dev
+curl http://localhost:8000/healthz/
+```
+
+### Alternar para prod-like (Gunicorn)
+
+```bash
+RUN_MODE=prod make up
+# ou
+make prod
+curl http://localhost:8000/healthz/
 ```
 
 ### 💻 Setup Local (Desenvolvimento)
@@ -185,6 +205,302 @@ graph LR
 | 🏢 **Superintendência** | Aprovar/reprovar solicitações |
 | 📊 **Diretoria** | Dashboards, relatórios executivos |
 | ⚙️ **Admin** | Gestão completa do sistema |
+
+## 🔐 RBAC (Role-Based Access Control)
+
+O sistema utiliza Django Groups para controle de acesso baseado em papéis (RBAC).
+
+### Grupos Canônicos
+
+| Grupo | Código | Permissões |
+|-------|--------|-----------|
+| **Coordenador** | `coordenador` | Criar solicitações de eventos |
+| **Formador** | `formador` | Visualizar próprios eventos, bloquear agenda |
+| **Controle** | `controle` | Gerenciar pré-agenda, sincronizar Google Calendar |
+| **Gerente Super** | `gerente_super` | Aprovar/reprovar solicitações da Superintendência |
+| **DAT** | `dat` | Ingerir dados, visualizar dashboards QA |
+| **Admin Ops** | `admin_ops` | Acesso administrativo completo |
+
+### Bootstrap do Sistema RBAC
+
+Após configurar o banco de dados, execute o comando para criar grupos e permissões:
+
+```bash
+# Via Docker (recomendado)
+make bootstrap-rbac
+
+# Ou diretamente
+docker compose exec -T web python manage.py bootstrap_rbac --verbose
+
+# Ou local (sem Docker)
+python manage.py bootstrap_rbac --verbose
+```
+
+**Saída esperada:**
+```
+=== BOOTSTRAP RBAC SYSTEM ===
+
+[1/3] Creating canonical groups...
+  ✓ Created: coordenador
+  ✓ Created: formador
+  ✓ Created: controle
+  ✓ Created: gerente_super
+  ✓ Created: dat
+  ✓ Created: admin_ops
+
+[2/3] Assigning native model permissions...
+[3/3] Assigning custom permissions...
+
+=== SUMMARY ===
+Groups created: 6
+Native permissions assigned: 42
+Custom permissions assigned: 8
+
+✓ RBAC bootstrap completed successfully!
+```
+
+### Atribuir Grupos a Usuários
+
+Via Django Admin (`/admin/`):
+1. Acesse **Usuários**
+2. Selecione o usuário
+3. Na seção **Permissões**, adicione grupos em **groups**
+4. Salve
+
+Via Django Shell:
+```python
+from django.contrib.auth import get_user_model
+from core.rbac import assign_user_to_group, CONTROLE, DAT
+
+User = get_user_model()
+user = User.objects.get(username='johndoe')
+
+# Adicionar aos grupos
+assign_user_to_group(user, CONTROLE)
+assign_user_to_group(user, DAT)
+
+# Verificar grupos
+print(user.groups.values_list('name', flat=True))
+# Output: <QuerySet ['controle', 'dat']>
+```
+
+### Endpoints da API
+
+**GET /api/me/** - Informações do usuário autenticado
+```json
+{
+  "username": "johndoe",
+  "email": "johndoe@example.com",
+  "first_name": "John",
+  "last_name": "Doe",
+  "is_staff": true,
+  "is_superuser": false,
+  "groups": ["controle", "dat"]
+}
+```
+
+**GET /api/ingest/health/** - Health check (requer DAT, Controle ou Admin Ops)
+```json
+{
+  "eventos": {"count": 1234, "last_updated": "2025-01-15T10:30:00Z"},
+  "pessoas": {"count": 5678, "last_updated": "2025-01-15T10:30:00Z"},
+  ...
+}
+```
+
+### Uso em Views Django
+
+```python
+from core.rbac import require_groups, CONTROLE, ADMIN_OPS
+
+@require_groups(CONTROLE, ADMIN_OPS)
+def controle_dashboard(request):
+    return render(request, 'dashboard.html')
+```
+
+### Uso em DRF ViewSets
+
+```python
+from rest_framework import viewsets
+from core.rbac import IsControle, IsDat
+
+class DataViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsControle | IsDat]
+    # ...
+```
+
+## 📅 Google Calendar Sync (DAT-P04-GCAL-v2)
+
+Sistema de sincronização idempotente entre pré-agenda e Google Calendar.
+
+### Pré-requisitos
+
+1. **Calendar ID**: Obtenha o ID do calendário Google "Formações"
+   - Acesse Google Calendar → Configurações
+   - Copie o ID do calendário (formato: `c_xxxxx@group.calendar.google.com`)
+
+2. **Credenciais de Autenticação** (escolha uma):
+
+   **Opção A - Service Account (Recomendado para produção)**:
+   ```bash
+   # 1. Crie Service Account no Google Cloud Console
+   # 2. Baixe o arquivo JSON
+   # 3. Configure variável de ambiente:
+   export GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
+   ```
+
+   **Opção B - OAuth Client (Desenvolvimento)**:
+   ```bash
+   # 1. Configure OAuth no Google Cloud Console
+   # 2. Baixe credentials.json
+   # 3. Execute fluxo OAuth uma vez:
+   python scripts/oauth/configurar_oauth.py
+   # 4. Token salvo em .gcal_token.json automaticamente
+   ```
+
+### Configuração de Ambiente
+
+Adicione ao `.env` ou `docker-compose.yml`:
+
+```bash
+# ID do calendário Google
+GCAL_CALENDAR_ID=c_xxxxx@group.calendar.google.com
+
+# Service Account JSON (inline ou path)
+GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+
+# OU OAuth (fallback)
+GOOGLE_OAUTH_CLIENT_ID=xxxxx.apps.googleusercontent.com
+GOOGLE_OAUTH_CLIENT_SECRET=xxxxx
+
+# Timezone
+TZ=America/Fortaleza
+```
+
+### Uso
+
+**Dry-run (simulação sem criar eventos)**:
+```bash
+# Via Makefile
+make preagenda-dryrun
+
+# Ou diretamente
+docker compose exec -T web python manage.py preagenda_to_gcal --dry-run
+```
+
+**Sincronização real**:
+```bash
+# Via Makefile
+make preagenda-sync
+
+# Ou diretamente
+docker compose exec -T web python manage.py preagenda_to_gcal
+```
+
+**Com limite (testes)**:
+```bash
+docker compose exec -T web python manage.py preagenda_to_gcal --dry-run --limit 10
+```
+
+### Idempotência
+
+O sistema garante que **eventos não sejam duplicados** usando `external_hash` (SHA1):
+
+- **1ª execução**: Evento criado no Google Calendar
+- **2ª execução**: Evento atualizado (se houve mudanças) ou ignorado (sem mudanças)
+- **Múltiplas execuções**: Sempre idempotente
+
+```bash
+# Executar 3 vezes seguidas:
+make preagenda-sync  # → 50 eventos criados
+make preagenda-sync  # → 50 eventos ignorados (sem mudanças)
+make preagenda-sync  # → 50 eventos ignorados (sem mudanças)
+```
+
+### Relatórios
+
+Após cada execução, relatórios são gerados em `./out_gcal/`:
+
+- **`gcal_results.csv`**: Todos os resultados (created, updated, skipped, etc.)
+- **`gcal_errors.csv`**: Apenas eventos com erro
+- **`gcal_audit.md`**: Resumo executivo da execução
+
+**Exemplo de `gcal_audit.md`**:
+```markdown
+# Google Calendar Sync Report
+
+**Run ID**: `550e8400-e29b-41d4-a716-446655440000`
+**Data/Hora**: 2025-01-15 14:30:00
+**Modo**: PRODUÇÃO
+
+---
+
+## Resumo
+
+| Métrica              | Quantidade |
+|----------------------|------------|
+| Total processado     | 50         |
+| ✓ Criados           | 45         |
+| ↻ Atualizados       | 3          |
+| – Ignorados         | 2          |
+| ⚠ Duplicados remotos | 0          |
+| ✗ Erros             | 0          |
+```
+
+### Logs de Auditoria
+
+Todas as operações são registradas no banco de dados (`CalendarSyncLog`):
+
+```python
+from core.models import CalendarSyncLog
+
+# Ver últimas sincronizações
+logs = CalendarSyncLog.objects.all()[:10]
+
+# Filtrar por run_id (batch)
+run_id = "550e8400-e29b-41d4-a716-446655440000"
+logs = CalendarSyncLog.objects.filter(run_id=run_id)
+
+# Ver apenas erros
+errors = CalendarSyncLog.objects.filter(action="error")
+```
+
+### RBAC
+
+Apenas usuários com permissões adequadas podem executar:
+- ✅ **Controle**: Pode sincronizar
+- ✅ **Admin Ops**: Pode sincronizar
+- ✅ **Superuser**: Pode sincronizar
+- ❌ Outros perfis: Acesso negado
+
+### Troubleshooting
+
+**❌ Erro: `GCAL_CALENDAR_ID not found`**
+```bash
+# Configurar variável de ambiente
+export GCAL_CALENDAR_ID=c_xxxxx@group.calendar.google.com
+```
+
+**❌ Erro: `No credentials found`**
+```bash
+# Verificar Service Account
+echo $GOOGLE_SERVICE_ACCOUNT_JSON
+
+# Ou verificar OAuth token
+ls -la .gcal_token.json
+```
+
+**❌ Erro: `HTTP 403 Forbidden`**
+```bash
+# Verificar permissões do Service Account no Google Calendar
+# O Service Account deve ter permissão "Make changes to events" no calendário
+```
+
+**❌ Erro: `HTTP 429 Rate Limit`**
+```bash
+# O sistema já implementa retry automático com backoff exponencial
+# Aguardar alguns segundos e tentar novamente
+```
 
 ## 🧪 Testes
 

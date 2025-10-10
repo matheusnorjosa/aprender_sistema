@@ -2,10 +2,10 @@
 Script para renovar autenticação do Google Calendar com escopos corretos.
 """
 
-import os
 import json
+import os
 import webbrowser
-from urllib.parse import urlencode, urlparse, parse_qs
+from urllib.parse import parse_qs, urlencode, urlparse
 
 # Configurações OAuth
 CLIENT_ID = "619322948464-esh8d0nrbnbeo9skr2vhr0ev64e1vrto.apps.googleusercontent.com"

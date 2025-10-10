@@ -8,26 +8,28 @@ do arquivo mapeamento_completo_google_sheets_20250923_220315.json
 Importará aproximadamente 6.000+ registros de eventos.
 """
 
+import json
 import os
 import sys
-import json
-import django
 from datetime import datetime, time
+
+import django
 
 # Configuração do Django
 sys.path.append(".")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from django.db import transaction
 from django.contrib.auth import get_user_model
+from django.db import transaction
+
 from core.models import (
     Municipio,
     Projeto,
-    TipoEvento,
+    Setor,
     Solicitacao,
     SolicitacaoStatus,
-    Setor,
+    TipoEvento,
 )
 
 User = get_user_model()

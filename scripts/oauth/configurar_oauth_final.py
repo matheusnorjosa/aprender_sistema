@@ -3,9 +3,10 @@
 Configuração final de OAuth2 para acessar planilha do domínio Aprender Editora
 """
 
+import json
 import os
 import sys
-import json
+
 import django
 
 # Configurar Django

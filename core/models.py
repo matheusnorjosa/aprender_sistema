@@ -1895,3 +1895,96 @@ class StagingBloqueio(models.Model):
     fim = models.DateTimeField(null=True, blank=True)
     motivo = models.CharField(max_length=255, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+# =========================
+# GOOGLE CALENDAR SYNC LOG (DAT-P04-GCAL-v2)
+# =========================
+
+
+class CalendarSyncLog(models.Model):
+    """
+    Log de sincronização com Google Calendar - DAT-P04-GCAL-v2
+
+    Registra todas as operações de criação/atualização de eventos
+    no Google Calendar com rastreamento completo para auditoria.
+    """
+
+    # Hash único SHA1 para idempotência (40 chars)
+    external_hash = models.CharField(
+        max_length=40,
+        db_index=True,
+        verbose_name="Hash Externo",
+        help_text="Hash SHA1 do evento para garantir idempotência",
+    )
+
+    # Ação realizada
+    ACTION_CHOICES = [
+        ("created", "Criado"),
+        ("updated", "Atualizado"),
+        ("skipped", "Ignorado (sem mudanças)"),
+        ("duplicado_remoto", "Duplicado remoto detectado"),
+        ("error", "Erro"),
+    ]
+    action = models.CharField(
+        max_length=20, choices=ACTION_CHOICES, verbose_name="Ação"
+    )
+
+    # ID do evento no Google Calendar (null se erro)
+    event_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="ID do Evento",
+        help_text="ID do evento no Google Calendar",
+    )
+
+    # Dados básicos do evento
+    summary = models.CharField(max_length=255, verbose_name="Título")
+    start_iso = models.CharField(
+        max_length=50,
+        verbose_name="Início (ISO)",
+        help_text="Data/hora início em formato ISO 8601",
+    )
+    end_iso = models.CharField(
+        max_length=50,
+        verbose_name="Fim (ISO)",
+        help_text="Data/hora fim em formato ISO 8601",
+    )
+
+    # Rastreamento de lotes (batch)
+    run_id = models.UUIDField(
+        default=uuid.uuid4,
+        db_index=True,
+        verbose_name="ID da Execução",
+        help_text="UUID único para rastrear lotes de sincronização",
+    )
+
+    # Mensagem de erro (se houver)
+    error_message = models.TextField(
+        blank=True, null=True, verbose_name="Mensagem de Erro"
+    )
+
+    # Timestamp
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
+
+    class Meta:
+        verbose_name = "Log de Sincronização Google Calendar"
+        verbose_name_plural = "Logs de Sincronização Google Calendar"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["external_hash"]),
+            models.Index(fields=["run_id", "-created_at"]),
+            models.Index(fields=["action", "-created_at"]),
+            models.Index(fields=["-created_at"]),
+        ]
+
+    def __str__(self):
+        action_icon = {
+            "created": "✓",
+            "updated": "↻",
+            "skipped": "–",
+            "duplicado_remoto": "⚠",
+            "error": "✗",
+        }.get(self.action, "?")
+        return f"{action_icon} {self.summary[:50]} ({self.get_action_display()})"

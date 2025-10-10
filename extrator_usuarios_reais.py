@@ -4,22 +4,25 @@ Extrator de usuários reais das planilhas para o sistema Django existente
 """
 
 import json
+import os
+import re
+import sys
+
+import django
+
 import gspread
 import pandas as pd
-import re
 from google.oauth2.credentials import Credentials
-import os
-import sys
-import django
 
 # Configurar Django
 sys.path.append("/app")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from core.models import Usuario, Setor
 from django.contrib.auth.models import Group
 from django.db import transaction
+
+from core.models import Setor, Usuario
 
 
 class ExtratorUsuariosReais:

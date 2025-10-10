@@ -10,16 +10,17 @@ Date: Setembro 2025
 """
 
 import os
-import sys
-import django
 import re
+import sys
+
+import django
 from django.db import transaction
 
 # Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from core.models import Usuario, Setor, Municipio, Projeto, TipoEvento, Solicitacao
+from core.models import Municipio, Projeto, Setor, Solicitacao, TipoEvento, Usuario
 
 
 def generate_username(first_name, last_name):

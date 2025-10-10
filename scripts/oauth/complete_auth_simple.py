@@ -2,11 +2,12 @@
 Script para completar autenticação Google OAuth2 (versão simples)
 """
 
-import os
 import json
+import os
 import sys
+from urllib.parse import parse_qs, urlparse
+
 import requests
-from urllib.parse import urlparse, parse_qs
 
 # Configurações OAuth
 CLIENT_ID = "619322948464-esh8d0nrbnbeo9skr2vhr0ev64e1vrto.apps.googleusercontent.com"

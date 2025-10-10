@@ -10,9 +10,9 @@ Author: Claude Code
 Date: Setembro 2025
 """
 
+import logging
 import os
 import sys
-import logging
 
 # Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
@@ -21,6 +21,7 @@ import django
 django.setup()
 
 from django.db.models import QuerySet
+
 from core.models import Setor, TipoEvento
 
 # Configurar logging
@@ -56,23 +57,23 @@ class SetorService(BaseService):
     """
     Service para Setores - FONTE ÚNICA
     """
-    
+
     @classmethod
     def get_base_queryset(cls) -> QuerySet:
         """QuerySet base otimizado para setores"""
         from core.models import Setor
         return Setor.objects.all().order_by('nome')
-    
+
     @classmethod
     def ativos(cls) -> QuerySet:
         """Setores ativos"""
         return cls.get_base_queryset().filter(ativo=True)
-    
+
     @classmethod
     def superintendencia(cls) -> QuerySet:
         """Setor superintendência"""
         return cls.ativos().filter(vinculado_superintendencia=True)
-    
+
     @classmethod
     def outros_setores(cls) -> QuerySet:
         """Outros setores (não superintendência)"""
@@ -95,28 +96,28 @@ class TipoEventoService(BaseService):
     """
     Service para Tipos de Evento - FONTE ÚNICA
     """
-    
+
     @classmethod
     def get_base_queryset(cls) -> QuerySet:
         """QuerySet base otimizado para tipos de evento"""
         from core.models import TipoEvento
         return TipoEvento.objects.all().order_by('nome')
-    
+
     @classmethod
     def ativos(cls) -> QuerySet:
         """Tipos de evento ativos"""
         return cls.get_base_queryset().filter(ativo=True)
-    
+
     @classmethod
     def online(cls) -> QuerySet:
         """Tipos de evento online"""
         return cls.ativos().filter(online=True)
-    
+
     @classmethod
     def presenciais(cls) -> QuerySet:
         """Tipos de evento presenciais"""
         return cls.ativos().filter(online=False)
-    
+
     @classmethod
     def para_formulario(cls) -> QuerySet:
         """Tipos de evento para uso em formulários"""

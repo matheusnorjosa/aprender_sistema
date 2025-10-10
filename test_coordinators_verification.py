@@ -6,17 +6,20 @@ após a correção das solicitações importadas.
 
 import os
 import sys
-import django
-import requests
 from datetime import datetime
+
+import django
+
+import requests
 
 # Setup Django
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from core.models import Usuario, Solicitacao
 from django.db.models import Count
+
+from core.models import Solicitacao, Usuario
 
 
 def test_dashboard_coordinators():

@@ -5,8 +5,10 @@ Processa callback OAuth2 e finaliza configuração
 
 import os
 import sys
+from urllib.parse import parse_qs, urlparse
+
 import django
-from urllib.parse import urlparse, parse_qs
+
 from google_auth_oauthlib.flow import InstalledAppFlow
 
 # Configurar Django

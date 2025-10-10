@@ -4,8 +4,9 @@ Script simplificado para gerar arquivos Excel dos dados tratados
 """
 
 import json
-import pandas as pd
 from datetime import datetime
+
+import pandas as pd
 
 
 def carregar_dados():

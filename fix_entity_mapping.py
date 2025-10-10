@@ -10,9 +10,9 @@ Author: Claude Code
 Date: Setembro 2025
 """
 
+import logging
 import os
 import sys
-import logging
 
 # Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
@@ -21,7 +21,8 @@ import django
 django.setup()
 
 from django.db import transaction
-from core.models import Usuario, Setor, Municipio, Projeto, TipoEvento
+
+from core.models import Municipio, Projeto, Setor, TipoEvento, Usuario
 
 # Configurar logging
 logging.basicConfig(

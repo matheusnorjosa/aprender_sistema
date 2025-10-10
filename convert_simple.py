@@ -9,7 +9,7 @@ from datetime import datetime
 try:
     import openpyxl
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 except ImportError:
     print("ERRO: openpyxl nao encontrado. Instale com: pip install openpyxl")
     sys.exit(1)

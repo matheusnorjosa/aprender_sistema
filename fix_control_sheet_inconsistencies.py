@@ -9,18 +9,19 @@ Author: Claude Code
 Date: Setembro 2025
 """
 
+import json
 import os
 import sys
-import json
-import django
 from pathlib import Path
+
+import django
 from django.db import transaction
 
 # Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from core.models import Usuario, Setor, Municipio, Projeto, TipoEvento, Solicitacao
+from core.models import Municipio, Projeto, Setor, Solicitacao, TipoEvento, Usuario
 
 
 def load_control_sheet_data():
@@ -278,8 +279,9 @@ def create_relationships(control_data):
 
         # Criar solicitação de exemplo para estabelecer o relacionamento
         try:
-            from django.utils import timezone
             from datetime import timedelta
+
+            from django.utils import timezone
 
             solicitacao, created = Solicitacao.objects.get_or_create(
                 titulo_evento=f"Relacionamento {municipio.nome} - {projeto.nome}",

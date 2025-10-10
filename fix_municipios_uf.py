@@ -4,8 +4,9 @@ Script para corrigir as UFs incorretas dos municípios
 Todos estão com UF='CE' por padrão, mas devem extrair a UF do próprio nome
 """
 import os
-import django
 import re
+
+import django
 
 # Setup Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")

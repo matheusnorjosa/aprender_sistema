@@ -11,17 +11,18 @@ Este extrator implementa:
 - Tratamento de exceções específicas
 """
 
-import os
-import sys
+import hashlib
 import json
 import logging
-import pandas as pd
-import numpy as np
+import os
+import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
-import re
-import hashlib
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
 
 # Configuração de logging seguindo padrões do Sistema APRENDER
 logging.basicConfig(

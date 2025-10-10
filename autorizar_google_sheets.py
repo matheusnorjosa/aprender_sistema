@@ -3,11 +3,12 @@
 Script para autorizar acesso às planilhas Google Sheets - Execute LOCALMENTE
 """
 
+import json
 import os
+
 import gspread
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
-import json
 
 
 def autorizar_google_sheets():

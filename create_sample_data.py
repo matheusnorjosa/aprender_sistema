@@ -5,25 +5,27 @@ Script para criar dados de exemplo para testar os gráficos do dashboard.
 
 import os
 import sys
-import django
 from datetime import datetime, timedelta
 from random import choice, randint
+
+import django
 
 # Configuração do Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
 from django.utils import timezone
+
 from core.models import (
-    Usuario,
     Formador,
+    FormadoresSolicitacao,
     Municipio,
     Projeto,
-    TipoEvento,
     Setor,
     Solicitacao,
     SolicitacaoStatus,
-    FormadoresSolicitacao,
+    TipoEvento,
+    Usuario,
 )
 
 

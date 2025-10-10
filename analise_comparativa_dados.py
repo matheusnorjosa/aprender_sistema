@@ -4,14 +4,15 @@ ANÁLISE COMPARATIVA COMPLETA DOS DADOS
 Senior Data Analyst Approach - Comparação entre dados extraídos e fonte única
 """
 
-import os
-import sys
 import json
-import pandas as pd
-from datetime import datetime
-from collections import defaultdict, Counter
+import os
 import re
-from typing import Dict, List, Any, Optional
+import sys
+from collections import Counter, defaultdict
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 
 class DataComparisonAnalyst:

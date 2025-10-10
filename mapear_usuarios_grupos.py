@@ -6,6 +6,7 @@ Mapear usuários para grupos corretos e criar registros de Formador
 import json
 import os
 import sys
+
 import django
 
 # Configurar Django
@@ -13,9 +14,10 @@ sys.path.append("/app")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from core.models import Usuario, Formador, Municipio
 from django.contrib.auth.models import Group
 from django.db import transaction
+
+from core.models import Formador, Municipio, Usuario
 
 
 class MapeadorUsuariosGrupos:

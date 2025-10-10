@@ -3,10 +3,10 @@
 Script para configurar OAuth2 para acesso ao Google Sheets
 """
 
-import os
-import sys
 import json
+import os
 import pickle
+import sys
 from pathlib import Path
 
 # Configurar Django

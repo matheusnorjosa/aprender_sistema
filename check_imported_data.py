@@ -12,7 +12,7 @@ import django
 
 django.setup()
 
-from core.models import Usuario, Setor, Municipio, Projeto, TipoEvento
+from core.models import Municipio, Projeto, Setor, TipoEvento, Usuario
 
 
 def main():

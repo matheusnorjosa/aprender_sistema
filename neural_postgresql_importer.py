@@ -4,16 +4,17 @@
 Importa dados processados para PostgreSQL seguindo as diretrizes do sistema neural
 """
 
-import os
-import sys
 import json
 import logging
+import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import pandas as pd
 
 # Configuração de logging
 logging.basicConfig(

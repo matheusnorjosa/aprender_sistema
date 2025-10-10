@@ -5,8 +5,9 @@ Gera URL de autorização e permite inserir código manualmente
 """
 
 import json
-import requests
 from urllib.parse import parse_qs, urlparse
+
+import requests
 
 
 def setup_oauth_manual():

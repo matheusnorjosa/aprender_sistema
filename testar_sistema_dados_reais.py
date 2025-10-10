@@ -6,17 +6,19 @@ Teste completo do sistema com dados reais
 import json
 import os
 import sys
-import django
 from datetime import datetime, timedelta
+
+import django
 
 # Configurar Django
 sys.path.append("/app")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from core.models import Usuario, Formador, Municipio, Projeto
 from django.contrib.auth.models import Group
 from django.db import connection
+
+from core.models import Formador, Municipio, Projeto, Usuario
 
 
 class TestadorSistemaReal:

@@ -12,6 +12,8 @@ except ImportError:
     obtain_auth_token = None
 from rest_framework.routers import DefaultRouter
 
+from core.views_me import api_me
+
 from . import views
 from .views_health import api_health, api_root
 
@@ -44,6 +46,8 @@ urlpatterns = [
     path("", api_root, name="api_root"),
     # Health check (público) - para Docker healthcheck
     path("health/", api_health, name="api_health"),
+    # User profile endpoint (RBAC - DAT-P08-v2)
+    path("me/", api_me, name="api_me"),
     # Roteamento automático da API
     path("v1/", include(router.urls)),
 ]

@@ -4,13 +4,13 @@ Script de validação do sistema neural do Sistema APRENDER
 Verifica se todos os componentes estão funcionando corretamente.
 """
 
-import os
-import sys
-import json
 import asyncio
+import json
+import os
 import subprocess
+import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 # Adicionar diretório atual ao path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -52,10 +52,10 @@ def check_mcp_server() -> Tuple[bool, List[str]]:
     try:
         # Tentar importar o módulo do servidor MCP
         from mcp_server_aprender import (
-            server,
             _read_documentation_file,
-            handle_list_tools,
             handle_call_tool,
+            handle_list_tools,
+            server,
         )
 
         # Verificar se o servidor tem as ferramentas esperadas

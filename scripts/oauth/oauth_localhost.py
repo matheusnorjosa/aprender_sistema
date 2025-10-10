@@ -5,14 +5,16 @@ OAuth2 com servidor localhost temporário
 
 import os
 import sys
-import django
-import webbrowser
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
-from google_auth_oauthlib.flow import InstalledAppFlow
+import webbrowser
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
+
+import django
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
 
 # Configurar Django
 sys.path.append(".")

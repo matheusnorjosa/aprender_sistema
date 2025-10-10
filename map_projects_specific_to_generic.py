@@ -11,6 +11,7 @@ Date: Setembro 2025
 
 import os
 import sys
+
 import django
 from django.db import transaction
 
@@ -18,7 +19,7 @@ from django.db import transaction
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aprender_sistema.settings")
 django.setup()
 
-from core.models import Usuario, Setor, Municipio, Projeto, TipoEvento, Solicitacao
+from core.models import Municipio, Projeto, Setor, Solicitacao, TipoEvento, Usuario
 
 
 def create_project_mapping():

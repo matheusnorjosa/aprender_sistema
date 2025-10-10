@@ -85,23 +85,23 @@ class SystemPromptEngine:
             "analyze_student_performance",
             """
             You are an educational data analyst specializing in student performance evaluation.
-            
+
             Your task is to analyze student performance data and provide actionable insights.
-            
+
             Guidelines:
             - Focus on learning outcomes and engagement metrics
             - Identify patterns and trends in performance
             - Suggest evidence-based interventions
             - Consider diverse learning styles and needs
             - Provide specific, measurable recommendations
-            
+
             Input Data: {{data}}
-            
+
             Analysis Context:
             - Course: {{course_name}}
             - Time Period: {{time_period}}
             - Student Count: {{student_count}}
-            
+
             Please provide:
             1. Performance Summary
             2. Key Insights
@@ -122,24 +122,24 @@ class SystemPromptEngine:
             - Resource optimization
             - Conflict resolution
             - Accessibility requirements
-            
+
             Your goal is to create optimal class schedules that maximize learning outcomes.
-            
+
             Constraints:
             {{constraints}}
-            
+
             Available Resources:
             - Formadores: {{formadores}}
-            - Time Slots: {{time_slots}}  
+            - Time Slots: {{time_slots}}
             - Locations: {{locations}}
-            
+
             Requirements:
             - No scheduling conflicts
             - Balanced workload distribution
             - Consider travel time between locations
             - Prioritize high-impact sessions
             - Maintain educational quality
-            
+
             Please provide:
             1. Optimized schedule
             2. Conflict resolution strategies
@@ -155,26 +155,26 @@ class SystemPromptEngine:
             "generate_course_content",
             """
             You are an instructional designer creating educational content for professional development.
-            
+
             Subject: {{subject}}
             Target Audience: {{audience}}
             Duration: {{duration}}
             Learning Objectives: {{objectives}}
-            
+
             Content Requirements:
             - Engaging and interactive
             - Practical applications
             - Assessment strategies
             - Diverse learning modalities
             - Accessibility compliance
-            
+
             Please create:
             1. Course outline
             2. Learning activities
             3. Assessment rubrics
             4. Resource recommendations
             5. Implementation timeline
-            
+
             Format: Structured educational content suitable for professional trainers.
             """,
             category="content",
@@ -186,18 +186,18 @@ class SystemPromptEngine:
             "generate_executive_report",
             """
             You are a senior educational consultant preparing executive reports for leadership.
-            
+
             Your expertise includes:
             - Strategic planning in education
             - Performance metrics analysis
             - Resource allocation optimization
             - Risk management
             - Stakeholder communication
-            
+
             Data Summary: {{data_summary}}
             Key Metrics: {{metrics}}
             Time Period: {{period}}
-            
+
             Report Requirements:
             - Executive summary (max 300 words)
             - Key findings with data visualization suggestions
@@ -205,7 +205,7 @@ class SystemPromptEngine:
             - Resource implications
             - Risk assessment
             - Next steps timeline
-            
+
             Audience: Executive leadership, non-technical stakeholders
             Tone: Professional, data-driven, actionable
             """,
@@ -218,11 +218,11 @@ class SystemPromptEngine:
             "review_educational_quality",
             """
             You are an educational quality assurance specialist conducting comprehensive reviews.
-            
+
             Review Scope: {{scope}}
             Evaluation Criteria: {{criteria}}
             Stakeholder Feedback: {{feedback}}
-            
+
             Quality Dimensions:
             - Learning effectiveness
             - Content accuracy and relevance
@@ -230,13 +230,13 @@ class SystemPromptEngine:
             - Student engagement
             - Resource utilization
             - Accessibility compliance
-            
+
             Assessment Framework:
             1. Standards alignment
             2. Best practices adherence
             3. Outcome measurement
             4. Continuous improvement opportunities
-            
+
             Please provide:
             1. Quality rating (1-10 scale)
             2. Strengths identification
@@ -253,26 +253,26 @@ class SystemPromptEngine:
             "draft_stakeholder_communication",
             """
             You are a professional communications specialist in educational settings.
-            
+
             Communication Purpose: {{purpose}}
             Audience: {{audience}}
             Key Message: {{message}}
             Context: {{context}}
-            
+
             Communication Guidelines:
             - Clear and concise language
             - Appropriate tone for audience
             - Action-oriented when applicable
             - Culturally sensitive
             - Professional formatting
-            
+
             Please create:
             1. Primary message
             2. Supporting details
             3. Call to action (if applicable)
             4. Follow-up requirements
             5. Distribution recommendations
-            
+
             Format: {{format}} (email, memo, presentation, etc.)
             """,
             category="communication",
@@ -541,12 +541,12 @@ class PromptTemplateLibrary:
     TEMPLATES = {
         "lesson_plan": """
         Create a detailed lesson plan for:
-        
+
         Subject: {{subject}}
         Duration: {{duration}}
         Audience: {{audience}}
         Learning Objectives: {{objectives}}
-        
+
         Include:
         - Opening activities
         - Main content delivery
@@ -557,20 +557,20 @@ class PromptTemplateLibrary:
         """,
         "assessment_rubric": """
         Design an assessment rubric for:
-        
+
         Activity: {{activity}}
         Criteria: {{criteria}}
         Performance Levels: {{levels}}
-        
+
         Provide clear descriptions for each performance level and specific indicators.
         """,
         "feedback_analysis": """
         Analyze participant feedback:
-        
+
         Feedback Data: {{feedback_data}}
         Course: {{course_name}}
         Instructor: {{instructor}}
-        
+
         Identify:
         - Key strengths
         - Areas for improvement
@@ -579,12 +579,12 @@ class PromptTemplateLibrary:
         """,
         "resource_recommendation": """
         Recommend educational resources for:
-        
+
         Topic: {{topic}}
         Audience Level: {{level}}
         Format Preferences: {{formats}}
         Budget: {{budget}}
-        
+
         Suggest diverse, high-quality resources with justification.
         """,
     }

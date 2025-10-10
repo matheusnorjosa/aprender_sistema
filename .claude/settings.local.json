@@ -13,7 +13,10 @@
       "Bash(timeout 15 docker compose exec -T web python manage.py check --deploy)",
       "Bash(docker volume:*)",
       "Bash(sed:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(mkdir:*)",
+      "Bash(tree:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

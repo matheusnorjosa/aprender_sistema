@@ -2,21 +2,13 @@
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
-      "Bash(pre-commit run:*)",
-      "Bash(pip install:*)",
-      "Bash(python3 -m pip install:*)",
-      "Bash(git checkout:*)",
-      "Bash(python:*)",
-      "Bash(rm:*)",
-      "Bash(git fetch:*)",
-      "Bash(git rev-parse:*)",
-      "Bash(timeout 15 docker compose exec -T web python manage.py check --deploy)",
-      "Bash(docker volume:*)",
-      "Bash(sed:*)",
-      "Bash(mv:*)",
+      "Bash(done)",
+      "Bash(for f in v2/docs/*.md)",
+      "Bash(do echo \"=== $f ===\")",
+      "Bash(gh:*)",
       "Bash(mkdir:*)",
-      "Bash(tree:*)",
-      "Bash(cat:*)"
+      "Bash(chmod:*)",
+      "Bash(touch:*)"
     ],
     "deny": [],
     "ask": []

@@ -68,7 +68,7 @@ services:
     command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-4} --threads 2 --timeout 60 --access-logfile - --error-logfile -
     environment:
       # Django
-      DJANGO_SETTINGS_MODULE: config.settings.${ENVIRONMENT:-development}
+      DJANGO_SETTINGS_MODULE: config.settings
       SECRET_KEY: ${SECRET_KEY:-insecure-dev-key-change-in-production}
       DEBUG: ${DEBUG:-0}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
@@ -134,7 +134,7 @@ services:
     command: celery -A config worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-4}
     environment:
       # Django
-      DJANGO_SETTINGS_MODULE: config.settings.${ENVIRONMENT:-development}
+      DJANGO_SETTINGS_MODULE: config.settings
       SECRET_KEY: ${SECRET_KEY:-insecure-dev-key-change-in-production}
 
       # Database
@@ -185,7 +185,7 @@ services:
     command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     environment:
       # Django
-      DJANGO_SETTINGS_MODULE: config.settings.${ENVIRONMENT:-development}
+      DJANGO_SETTINGS_MODULE: config.settings
       SECRET_KEY: ${SECRET_KEY:-insecure-dev-key-change-in-production}
 
       # Database

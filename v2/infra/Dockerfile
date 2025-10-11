@@ -31,7 +31,7 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copiar requirements
-COPY requirements.txt /tmp/requirements.txt
+COPY backend/requirements-minimal.txt /tmp/requirements.txt
 
 # Instalar dependências Python
 RUN pip install --upgrade pip setuptools wheel && \
@@ -64,6 +64,8 @@ ENV PYTHONUNBUFFERED=1 \
 # Instalar dependências de runtime (mínimas)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    postgresql-client \
+    redis-tools \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -85,8 +87,8 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR ${APP_HOME}
 
 # Copiar código da aplicação
-COPY --chown=${APP_USER}:${APP_GROUP} ./backend ${APP_HOME}/
-COPY --chown=${APP_USER}:${APP_GROUP} ./infra/entrypoint.sh ${APP_HOME}/entrypoint.sh
+COPY --chown=${APP_USER}:${APP_GROUP} backend/ ${APP_HOME}/
+COPY --chown=${APP_USER}:${APP_GROUP} infra/entrypoint.sh ${APP_HOME}/entrypoint.sh
 
 # Dar permissão de execução ao entrypoint
 RUN chmod +x ${APP_HOME}/entrypoint.sh
@@ -108,7 +110,7 @@ USER ${APP_USER}
 EXPOSE 8000
 
 # Entrypoint
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Comando padrão (pode ser sobrescrito)
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4", "--threads", "2", "--timeout", "60", "--access-logfile", "-", "--error-logfile", "-"]

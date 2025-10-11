@@ -10,7 +10,16 @@
       "Bash(chmod:*)",
       "Bash(touch:*)",
       "Bash(cmd.exe /c \"where gh\")",
-      "Bash(cmd.exe /c \"gh --version && exit\")"
+      "Bash(cmd.exe /c \"gh --version && exit\")",
+      "Bash(docker:*)",
+      "Bash(ForEach-Object { docker rmi -f $_ })",
+      "Bash(xargs -r docker rmi -f)",
+      "Bash(xargs -r docker rm -f)",
+      "Bash(cp:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

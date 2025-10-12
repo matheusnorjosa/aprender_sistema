@@ -1,11 +1,12 @@
 from django.contrib import admin
+
 from .models import (
-    Usuario,
+    AvailabilityBlock,
     Municipio,
     Projeto,
-    TipoEvento,
-    AvailabilityBlock,
     Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 
 

@@ -215,17 +215,40 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",
+        "user": "1000/hour",
+        "availability_check": "60/min",  # 60 requests por minuto para availability check
+    },
 }
 
 # ================================================================
 # CELERY
 # ================================================================
-CELERY_BROKER_URL = f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}/1"
+CELERY_BROKER_URL = (
+    f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}/1"
+)
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_CACHE_BACKEND = "default"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+
+# Celery Beat Schedule (tarefas periódicas)
+CELERY_BEAT_SCHEDULE = {
+    "gcal-sync-every-5-minutes": {
+        "task": "apps.core.tasks.preview_then_apply_gcal",
+        "schedule": 300.0,  # 5 minutos (em segundos)
+        "options": {
+            "expires": 60.0,  # Tarefa expira após 60s se não iniciar
+        },
+    },
+}
 
 # ================================================================
 # LOGGING
@@ -268,6 +291,35 @@ LOGGING = {
 # ================================================================
 GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
 GCAL_CALENDAR_ID = os.getenv("GCAL_CALENDAR_ID", "")
+
+# Calendar client type: 'fake' (in-memory, safe) or 'google' (real API)
+# Default: 'fake' para evitar publicações acidentais até implementar GoogleCalendarClient
+GCAL_CLIENT = os.getenv("GCAL_CLIENT", "fake")
+
+# Google Calendar color mapping (optional)
+# Maps TipoEvento.nome → Google Calendar colorId (1-11)
+# https://developers.google.com/calendar/api/v3/reference/colors
+GCAL_COLOR_MAP = {
+    # Example mappings (customize as needed):
+    # "Formação": 9,           # Blue
+    # "Acompanhamento": 10,    # Green
+    # "Reunião": 11,           # Red
+}
+
+# ================================================================
+# AVAILABILITY & ETL SETTINGS (Cláusulas Pétreas RD-01..RD-08)
+# ================================================================
+# RD-06: Timezone do projeto (America/Fortaleza)
+TZ_PROJECT = TIME_ZONE  # Herda do TIME_ZONE acima
+
+# RD-05: Limite diário de horas por formador (configurável)
+AVAILABILITY_DAILY_LIMIT_HOURS = int(os.getenv("AVAILABILITY_DAILY_LIMIT_HOURS", "8"))
+
+# RD-04: Buffer de deslocamento entre municípios distintos (minutos)
+TRAVEL_BUFFER_MINUTES = int(os.getenv("TRAVEL_BUFFER_MINUTES", "120"))
+
+# ETL: Diretório padrão para importação de arquivos
+DATA_IMPORT_DIR = os.getenv("DATA_IMPORT_DIR", "/app/data/csv-import")
 
 # ================================================================
 # SECURITY (Production)

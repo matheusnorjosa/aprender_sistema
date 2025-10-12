@@ -544,9 +544,244 @@ docker compose exec web python manage.py preagenda_to_gcal \
 
 ---
 
+## 🌐 Usar GoogleCalendarClient Real (PR 4/N)
+
+**IMPORTANTE**: GoogleCalendarClient agora está implementado! Esta seção documenta como usá-lo com segurança.
+
+### Pré-requisitos
+
+1. **Service Account configurada** no Google Cloud Console
+2. **Credenciais JSON** baixadas
+3. **Permissões** no calendário de destino: "Make changes to events"
+4. **GCAL_CLIENT ainda em fake** nos ambientes (não trocar sem validação)
+
+### Passo 1: Preparar Credenciais
+
+**1.1 Criar Service Account** (Google Cloud Console):
+```
+1. Acessar https://console.cloud.google.com/
+2. Navegar para "IAM & Admin" → "Service Accounts"
+3. Criar Service Account com nome: "aprender-sistema-calendar"
+4. Gerar JSON key e baixar para local seguro
+```
+
+**1.2 Compartilhar Calendário** com a Service Account:
+```
+1. Abrir Google Calendar (https://calendar.google.com/)
+2. Selecionar o calendário de destino
+3. Configurações → "Share with specific people"
+4. Adicionar email da Service Account (xxx@xxx.iam.gserviceaccount.com)
+5. Permissão: "Make changes to events"
+```
+
+**1.3 Montar credenciais no Docker**:
+```bash
+# Criar pasta de secrets
+mkdir -p v2/infra/secrets
+
+# Copiar arquivo de credenciais
+cp ~/Downloads/service-account.json v2/infra/secrets/
+
+# Adicionar ao docker-compose.yml (web service):
+volumes:
+  - ../backend:/app
+  - ./secrets:/app/secrets:ro  # Read-only mount
+```
+
+### Passo 2: Configurar Variáveis de Ambiente
+
+**2.1 Atualizar `.env` (staging/local APENAS para testes controlados)**:
+```bash
+# ⚠️ NÃO trocar em produção sem validação prévia!
+GCAL_CLIENT=google  # Ativa client real
+GCAL_CALENDAR_ID=c_XXXXXXXX@group.calendar.google.com  # ID real do calendário
+GOOGLE_SERVICE_ACCOUNT_JSON=/app/secrets/service-account.json
+```
+
+**2.2 Verificar que Docker montou os secrets**:
+```bash
+cd v2/infra
+docker compose restart web
+docker compose exec -T web ls -la /app/secrets/
+# Deve mostrar: service-account.json
+```
+
+### Passo 3: Dry-Run Seguro (SEMPRE primeiro!)
+
+**3.1 Preview com dry-run + JSON**:
+```bash
+docker compose exec -T web python manage.py preagenda_to_gcal \
+  --client=google \
+  --dry-run \
+  --json | python -m json.tool
+```
+
+**Validação esperada**:
+```json
+{
+  "meta": {
+    "calendar_id": "c_XXXXXXXX@group.calendar.google.com",
+    "client": "google",
+    "dry_run": true,
+    ...
+  },
+  "totals": {
+    "CREATE": N,
+    "UPDATE": M,
+    ...
+  }
+}
+```
+
+**3.2 Revisar diff**:
+- Verificar quantidades (CREATE, UPDATE, DELETE)
+- Conferir se IDs das solicitações estão corretos
+- Validar que external_event_id segue padrão `asv2-{id}`
+
+### Passo 4: Apply Real (após validação do preview)
+
+**4.1 Executar sync real** (⚠️ modifica Google Calendar):
+```bash
+docker compose exec -T web python manage.py preagenda_to_gcal \
+  --client=google \
+  --json | python -m json.tool
+```
+
+**4.2 Validar no Google Calendar**:
+```
+1. Abrir https://calendar.google.com/
+2. Selecionar o calendário usado
+3. Verificar que eventos foram criados com IDs no formato "asv2-X"
+4. Conferir que detalhes (título, horário, descrição) estão corretos
+```
+
+**4.3 Verificar no DB**:
+```python
+from apps.core.models import Solicitacao
+
+# Listar solicitações com external_event_id preenchido
+sols = Solicitacao.objects.filter(
+    status='aprovado',
+    external_event_id__isnull=False
+).values('id', 'external_event_id', 'updated_at')[:10]
+
+for s in sols:
+    print(f"ID: {s['id']}, EventID: {s['external_event_id']}, Updated: {s['updated_at']}")
+```
+
+### Passo 5: Teste de Idempotência
+
+**5.1 Segunda rodada** (deve atualizar, não criar):
+```bash
+docker compose exec -T web python manage.py preagenda_to_gcal \
+  --client=google \
+  --json | python -m json.tool
+```
+
+**Validação esperada**:
+```json
+{
+  "totals": {
+    "CREATE": 0,
+    "UPDATE": N,  // Mesma quantidade do primeiro sync
+    "ADOPT": 0,
+    "DELETE": 0,
+    "SKIP": M
+  }
+}
+```
+
+### Passo 6: Rollback (se necessário)
+
+**6.1 Desativar client real**:
+```bash
+# .env
+GCAL_CLIENT=fake  # Volta para modo seguro
+```
+
+**6.2 Limpar external_event_id do DB** (se sync foi indevido):
+```python
+from apps.core.models import Solicitacao
+
+# Backup antes de limpar
+bad_syncs = Solicitacao.objects.filter(
+    external_event_id__startswith='asv2-',
+    status='aprovado'
+)
+
+print(f"Total a limpar: {bad_syncs.count()}")
+
+# Limpar (só se tiver certeza!)
+bad_syncs.update(external_event_id=None)
+```
+
+**6.3 Deletar eventos do Google Calendar**:
+```bash
+# Usar API para deletar eventos em lote
+docker compose exec -T web python manage.py shell -c "
+from apps.core.services.gcal_google_client import GoogleCalendarClient
+from apps.core.models import Solicitacao
+
+client = GoogleCalendarClient()
+calendar_id = 'c_XXXXXXXX@group.calendar.google.com'
+
+bad_events = Solicitacao.objects.filter(
+    external_event_id__startswith='asv2-',
+    status='reprovado'  # ou qualquer outro critério
+)
+
+for sol in bad_events:
+    try:
+        client.delete(calendar_id, sol.external_event_id)
+        print(f'Deleted: {sol.external_event_id}')
+    except Exception as e:
+        print(f'Error deleting {sol.external_event_id}: {e}')
+"
+```
+
+### Checklist de Segurança
+
+- [ ] **Dry-run executado** e revisado antes de apply
+- [ ] **Preview JSON válido** e quantidades corretas
+- [ ] **Service Account** com permissões mínimas (apenas Calendar API)
+- [ ] **sendUpdates='none'** verificado (não envia emails)
+- [ ] **eventId determinístico** (asv2-{id}) confirmado
+- [ ] **Idempotência testada** (segunda rodada não duplica)
+- [ ] **Rollback plan** definido (GCAL_CLIENT=fake + limpar DB)
+- [ ] **Backup do Postgres** feito antes de sync real em produção
+
+### Erros Comuns
+
+**Erro: "Credentials file not found"**
+```
+Causa: GOOGLE_SERVICE_ACCOUNT_JSON apontando para arquivo inexistente
+Solução: Verificar path e montagem do volume Docker
+```
+
+**Erro: "403 Forbidden" ao criar evento**
+```
+Causa: Service Account sem permissão no calendário
+Solução: Compartilhar calendário com SA ("Make changes to events")
+```
+
+**Erro: "401 Unauthorized"**
+```
+Causa: Credenciais inválidas ou expiradas
+Solução: Gerar novo JSON key para Service Account
+```
+
+**Erro: "eventId validation failed"**
+```
+Causa: eventId menor que 5 chars ou com caracteres inválidos
+Solução: Já corrigido (asv2-{id} garante mínimo 6 chars)
+```
+
+---
+
 ## 📚 Referências
 
 - **CLAUDE.md**: Cláusulas Pétreas (PA-01, RD-01 a RD-08)
 - **BLUEPRINT.md**: Arquitetura e roadmap
 - **Test Suite**: `apps/core/tests/test_gcal_sync_dryrun.py` (11 testes)
 - **Google Calendar API**: https://developers.google.com/calendar/api/v3/reference
+- **Service Account Setup**: https://developers.google.com/identity/protocols/oauth2/service-account

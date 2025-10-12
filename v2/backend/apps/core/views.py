@@ -7,18 +7,20 @@ PA-05: Registrar usuário, data/hora e justificativa em LogAuditoria.
 """
 
 import logging
+
 from django.http import JsonResponse
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.views import APIView
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from .models import Solicitacao, AvailabilityBlock, Usuario, Municipio
-from .serializers import SolicitacaoSerializer, AvailabilityBlockSerializer
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from .models import AvailabilityBlock, Municipio, Solicitacao, Usuario
 from .permissions import IsSuperintendencia
+from .serializers import AvailabilityBlockSerializer, SolicitacaoSerializer
 from .services.availability_service import check_conflicts
 
 # Logger estruturado para auditoria

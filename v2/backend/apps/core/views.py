@@ -202,6 +202,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
     ViewSet para Bloqueios de Disponibilidade.
 
     Formadores podem criar bloqueios para si mesmos.
+    Usuario é preenchido automaticamente com request.user.
     """
 
     queryset = AvailabilityBlock.objects.all()
@@ -215,6 +216,43 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         if self.request.user.groups.filter(name="Superintendência").exists():
             return AvailabilityBlock.objects.all()
         return AvailabilityBlock.objects.filter(usuario=self.request.user)
+
+    def perform_create(self, serializer):
+        """
+        Preenche usuario automaticamente com request.user ao criar bloqueio.
+        """
+        serializer.save(usuario=self.request.user)
+
+
+class CurrentUserView(APIView):
+    """
+    Endpoint que retorna informações do usuário autenticado.
+
+    GET /api/me/
+    Retorna:
+        {
+            "id": int,
+            "username": str,
+            "email": str,
+            "first_name": str,
+            "last_name": str
+        }
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        return Response(
+            {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class AvailabilityCheckView(APIView):

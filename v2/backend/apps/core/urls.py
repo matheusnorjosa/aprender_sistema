@@ -20,6 +20,7 @@ router.register(
 
 urlpatterns = [
     path("", views.api_root, name="api-root"),
+    path("me/", views.CurrentUserView.as_view(), name="current-user"),
     path(
         "availability/check/",
         views.AvailabilityCheckView.as_view(),

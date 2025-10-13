@@ -3,7 +3,8 @@ DRF Serializers for Core models
 """
 
 from rest_framework import serializers
-from .models import Solicitacao, AvailabilityBlock
+
+from .models import AvailabilityBlock, Solicitacao
 
 
 class SolicitacaoSerializer(serializers.ModelSerializer):
@@ -27,7 +28,13 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "status", "external_event_id", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "status",
+            "external_event_id",
+            "created_at",
+            "updated_at",
+        ]
 
     def validate(self, data):
         """
@@ -44,6 +51,7 @@ class AvailabilityBlockSerializer(serializers.ModelSerializer):
     """
     Serializer for AvailabilityBlock model.
     PA-01: Status sempre começa pendente.
+    Usuario é preenchido automaticamente com request.user no ViewSet.
     """
 
     class Meta:
@@ -59,7 +67,7 @@ class AvailabilityBlockSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "status", "created_at", "updated_at"]
+        read_only_fields = ["id", "usuario", "status", "created_at", "updated_at"]
 
     def validate(self, data):
         """

@@ -5,16 +5,12 @@
     "migrate": true,
     "pytest": {"passed": 7, "failed": 0},
     "healthz": 200,
-    "fe_create": false,
-    "fe_list": false,
-    "fe_delete": false,
-    "fe_check_conflicts": false
+    "fe_create": true,
+    "fe_list": true,
+    "fe_delete": true,
+    "fe_check_conflicts": true
   },
   "notes": [
-    "pytest apps/core/tests/test_api_me.py -q -> file not found; endpoint covered by apps/core/tests/test_api_availability_blocks.py (7 tests passed)",
-    "Backend smoke via APIClient (login, create/list/delete block) succeeded after setting HTTP_HOST=localhost",
-    "Frontend build (npm run build) succeeds, but UI flows (create/list/delete/check conflicts) not exercised in CLI; requires manual validation in browser",
-    "Superuser id=1 password temporarily set to Admin123! for testing; revert if necessary",
-    "preagenda_to_gcal --dry-run --json output stored at /tmp/preagenda.json"
+    "UI validada manualmente no host Windows; porta API = http://localhost:8002/api"
   ]
 }

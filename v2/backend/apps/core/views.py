@@ -14,9 +14,11 @@ from django.utils.dateparse import parse_datetime
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import AvailabilityBlock, Municipio, Solicitacao, Usuario
 from .permissions import IsSuperintendencia
@@ -73,19 +75,40 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     PA-01: Status sempre começa pendente.
     PA-02: Apenas Superintendência pode aprovar/reprovar.
+
+    Filtros disponíveis:
+    - status: exato (pendente/aprovado/reprovado)
+    - search: busca textual em usuario, municipio, motivo, observacoes
+    - ordering: inicio, fim, id
     """
 
-    queryset = Solicitacao.objects.all()
+    queryset = Solicitacao.objects.select_related("usuario", "municipio", "tipo_evento")
     serializer_class = SolicitacaoSerializer
     permission_classes = [IsAuthenticated]
+
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["status"]
+    search_fields = [
+        "usuario__username",
+        "usuario__first_name",
+        "usuario__last_name",
+        "municipio__nome",
+        "observacoes",
+    ]
+    ordering_fields = ["inicio", "fim", "id"]
+    ordering = ["-inicio"]  # default ordering
 
     def get_queryset(self):
         """
         Filtrar solicitações por usuário (exceto Superintendência que vê todas).
         """
         if self.request.user.groups.filter(name="Superintendência").exists():
-            return Solicitacao.objects.all()
-        return Solicitacao.objects.filter(usuario=self.request.user)
+            return Solicitacao.objects.select_related(
+                "usuario", "municipio", "tipo_evento"
+            )
+        return Solicitacao.objects.filter(usuario=self.request.user).select_related(
+            "usuario", "municipio", "tipo_evento"
+        )
 
     @action(
         detail=True,
@@ -235,7 +258,9 @@ class CurrentUserView(APIView):
             "username": str,
             "email": str,
             "first_name": str,
-            "last_name": str
+            "last_name": str,
+            "groups": list[str],
+            "is_superintendencia": bool
         }
     """
 
@@ -243,6 +268,9 @@ class CurrentUserView(APIView):
 
     def get(self, request):
         user = request.user
+        groups = list(user.groups.values_list("name", flat=True))
+        is_superintendencia = "Superintendência" in groups
+
         return Response(
             {
                 "id": user.id,
@@ -250,6 +278,8 @@ class CurrentUserView(APIView):
                 "email": user.email,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
+                "groups": groups,
+                "is_superintendencia": is_superintendencia,
             },
             status=status.HTTP_200_OK,
         )

@@ -283,35 +283,62 @@ class AvailabilityCheckView(APIView):
     throttle_scope = "availability_check"
 
     def get(self, request):
-        # Extrair parâmetros
-        usuario_id = request.query_params.get("usuario_id")
-        inicio_s = request.query_params.get("inicio")
-        fim_s = request.query_params.get("fim")
-        municipio_id = request.query_params.get("municipio_id")
-
-        # Validar parâmetros obrigatórios
-        if not (usuario_id and inicio_s and fim_s):
+        # Extrair e validar usuario_id
+        usuario_id_raw = request.query_params.get("usuario_id")
+        if not usuario_id_raw:
             return Response(
-                {"detail": "usuario_id, inicio, fim são obrigatórios."},
+                {"detail": "usuario_id é obrigatório."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Buscar usuário
         try:
-            usuario = Usuario.objects.get(id=usuario_id)
+            usuario_id = int(usuario_id_raw)
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "usuario_id inválido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            usuario = Usuario.objects.get(pk=usuario_id)
         except Usuario.DoesNotExist:
             return Response(
-                {"detail": f"Usuário {usuario_id} não encontrado."},
+                {"detail": "Usuário não encontrado."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Parsear datas
-        inicio = parse_datetime(inicio_s)
-        fim = parse_datetime(fim_s)
+        # municipio_id é opcional
+        municipio_id_raw = request.query_params.get("municipio_id")
+        municipio = None
+        if municipio_id_raw:
+            try:
+                municipio_id = int(municipio_id_raw)
+            except (TypeError, ValueError):
+                return Response(
+                    {"detail": "municipio_id inválido."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            municipio = Municipio.objects.filter(pk=municipio_id).first()
 
+        # datas
+        inicio_raw = request.query_params.get("inicio")
+        fim_raw = request.query_params.get("fim")
+        if not inicio_raw or not fim_raw:
+            return Response(
+                {"detail": "inicio e fim são obrigatórios."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        inicio = parse_datetime(inicio_raw)
+        fim = parse_datetime(fim_raw)
         if not inicio or not fim:
             return Response(
-                {"detail": "inicio e fim devem estar em formato ISO8601."},
+                {"detail": "Datas inválidas. Use ISO8601."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if fim <= inicio:
+            return Response(
+                {"detail": "fim deve ser posterior a inicio."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -320,17 +347,6 @@ class AvailabilityCheckView(APIView):
             inicio = timezone.make_aware(inicio, timezone.utc)
         if timezone.is_naive(fim):
             fim = timezone.make_aware(fim, timezone.utc)
-
-        # Buscar município (opcional)
-        municipio = None
-        if municipio_id:
-            try:
-                municipio = Municipio.objects.get(id=municipio_id)
-            except Municipio.DoesNotExist:
-                return Response(
-                    {"detail": f"Município {municipio_id} não encontrado."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
 
         # Executar checagem
         result = check_conflicts(

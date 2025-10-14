@@ -36,15 +36,23 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-    def validate(self, data):
+    def validate(self, attrs):
         """
-        Validação: fim > inicio
+        Permite PATCH parcial: se apenas um dos campos vier no payload,
+        usa o valor atual da instância para validar o intervalo.
         """
-        if data["fim"] <= data["inicio"]:
-            raise serializers.ValidationError(
-                {"fim": "O fim do evento deve ser posterior ao início."}
-            )
-        return data
+        instance = getattr(self, "instance", None)
+        inicio = attrs.get("inicio", getattr(instance, "inicio", None))
+        fim = attrs.get("fim", getattr(instance, "fim", None))
+
+        # só valida se os dois forem conhecidos
+        if inicio is not None and fim is not None:
+            if fim <= inicio:
+                raise serializers.ValidationError(
+                    {"fim": "O fim do evento deve ser posterior ao início."}
+                )
+
+        return super().validate(attrs)
 
 
 class AvailabilityBlockSerializer(serializers.ModelSerializer):
@@ -69,12 +77,18 @@ class AvailabilityBlockSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "usuario", "status", "created_at", "updated_at"]
 
-    def validate(self, data):
+    def validate(self, attrs):
         """
-        Validação: fim > inicio
+        Aceita updates parciais sem estourar KeyError.
         """
-        if data["fim"] <= data["inicio"]:
-            raise serializers.ValidationError(
-                {"fim": "O fim do bloqueio deve ser posterior ao início."}
-            )
-        return data
+        instance = getattr(self, "instance", None)
+        inicio = attrs.get("inicio", getattr(instance, "inicio", None))
+        fim = attrs.get("fim", getattr(instance, "fim", None))
+
+        if inicio is not None and fim is not None:
+            if fim <= inicio:
+                raise serializers.ValidationError(
+                    {"fim": "O fim do bloqueio deve ser posterior ao início."}
+                )
+
+        return super().validate(attrs)

@@ -22,6 +22,7 @@ import {
   Spin,
   Card,
   Descriptions,
+  Alert,
 } from 'antd';
 import {
   CheckOutlined,
@@ -84,21 +85,28 @@ function Solicitacoes() {
   // Usuário atual
   const [currentUser, setCurrentUser] = useState(null);
   const [isSuperintendencia, setIsSuperintendencia] = useState(false);
+  const [loadingUser, setLoadingUser] = useState(true);
 
   /**
-   * Busca informações do usuário atual
+   * Busca informações do usuário atual e verifica permissão PA-06
    */
   useEffect(() => {
     async function fetchCurrentUser() {
       try {
         const user = await getMe();
         setCurrentUser(user);
-        // TODO: Verificar se usuário pertence ao grupo Superintendência
-        // Por enquanto, assumimos que sim se estiver autenticado
-        setIsSuperintendencia(true);
+
+        // PA-06: Verificar se usuário pertence ao grupo "Superintendência"
+        const isSuper =
+          user?.is_superintendencia ||
+          user?.groups?.includes('Superintendência') ||
+          false;
+        setIsSuperintendencia(isSuper);
       } catch (error) {
         console.error('Erro ao buscar usuário:', error);
         setIsSuperintendencia(false);
+      } finally {
+        setLoadingUser(false);
       }
     }
     fetchCurrentUser();
@@ -326,6 +334,17 @@ function Solicitacoes() {
           )
         }
       >
+        {/* Aviso para usuários não-autorizados (PA-06) */}
+        {!loadingUser && !isSuperintendencia && (
+          <Alert
+            type="warning"
+            message="Acesso restrito à Superintendência"
+            description="Você pode visualizar as solicitações, mas não tem permissão para aprovar ou reprovar. Apenas usuários do grupo Superintendência podem realizar estas ações."
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
         {/* Filtros */}
         <Space style={{ marginBottom: 16 }} wrap>
           <Input

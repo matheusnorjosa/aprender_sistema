@@ -203,18 +203,13 @@ function Solicitacoes() {
   };
 
   /**
-   * Reprova solicitação com justificativa
+   * Reprova solicitação com justificativa (opcional)
    */
   const handleReject = async (values) => {
-    if (!values.justificativa || values.justificativa.trim() === '') {
-      message.error('Justificativa é obrigatória para reprovar.');
-      return;
-    }
-
     setProcessingAction(true);
     try {
       await rejectSolicitacao(selectedSolicitacao.id, {
-        justificativa: values.justificativa,
+        justificativa: values.justificativa || '',
       });
       message.success('Solicitação reprovada.');
       setRejectModalVisible(false);
@@ -466,15 +461,11 @@ function Solicitacoes() {
         <Form form={rejectForm} onFinish={handleReject} layout="vertical">
           <Form.Item
             name="justificativa"
-            label="Justificativa"
-            rules={[
-              { required: true, message: 'Justificativa é obrigatória' },
-              { min: 10, message: 'Justificativa deve ter pelo menos 10 caracteres' },
-            ]}
+            label="Justificativa (opcional)"
           >
             <TextArea
               rows={4}
-              placeholder="Descreva o motivo da reprovação..."
+              placeholder="Descreva o motivo da reprovação (opcional)..."
               maxLength={500}
               showCount
             />

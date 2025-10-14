@@ -197,7 +197,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ================================================================
 CORS_ALLOWED_ORIGINS = os.getenv(
     "CORS_ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:5173,http://localhost:8000",
+    "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:8000",
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
@@ -206,7 +206,7 @@ CORS_ALLOW_CREDENTIALS = True
 # ================================================================
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",
-    "http://localhost:3000,http://localhost:5173,http://localhost:8000",
+    "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:8000",
 ).split(",")
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read CSRF token

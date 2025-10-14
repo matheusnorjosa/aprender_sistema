@@ -9,8 +9,10 @@ from rest_framework import permissions
 
 class IsSuperintendencia(permissions.BasePermission):
     """
-    Permissão: apenas usuários do grupo 'Superintendência' podem executar.
+    Permissão: apenas usuários do grupo 'Superintendência' ou superusers podem executar.
     PA-02: Aprovação/reprovação restrita à Superintendência.
+
+    Nota: Superusers sempre têm acesso completo.
     """
 
     message = "Apenas usuários da Superintendência podem realizar esta ação."
@@ -19,5 +21,8 @@ class IsSuperintendencia(permissions.BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.groups.filter(name="Superintendência").exists()
+            and (
+                request.user.is_superuser
+                or request.user.groups.filter(name="Superintendência").exists()
+            )
         )

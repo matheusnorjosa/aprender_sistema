@@ -100,9 +100,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Filtrar solicitações por usuário (exceto Superintendência que vê todas).
+        Filtrar solicitações por usuário (exceto Superintendência/superuser que vê todas).
         """
-        if self.request.user.groups.filter(name="Superintendência").exists():
+        if self.request.user.is_superuser or self.request.user.groups.filter(name="Superintendência").exists():
             return Solicitacao.objects.select_related(
                 "usuario", "municipio", "tipo_evento"
             )
@@ -234,9 +234,9 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Filtrar bloqueios por usuário (exceto Superintendência que vê todos).
+        Filtrar bloqueios por usuário (exceto Superintendência/superuser que vê todos).
         """
-        if self.request.user.groups.filter(name="Superintendência").exists():
+        if self.request.user.is_superuser or self.request.user.groups.filter(name="Superintendência").exists():
             return AvailabilityBlock.objects.all()
         return AvailabilityBlock.objects.filter(usuario=self.request.user)
 
@@ -269,7 +269,8 @@ class CurrentUserView(APIView):
     def get(self, request):
         user = request.user
         groups = list(user.groups.values_list("name", flat=True))
-        is_superintendencia = "Superintendência" in groups
+        # Superusers sempre têm acesso completo
+        is_superintendencia = user.is_superuser or ("Superintendência" in groups)
 
         return Response(
             {
@@ -279,6 +280,7 @@ class CurrentUserView(APIView):
                 "first_name": user.first_name,
                 "last_name": user.last_name,
                 "groups": groups,
+                "is_superuser": user.is_superuser,
                 "is_superintendencia": is_superintendencia,
             },
             status=status.HTTP_200_OK,

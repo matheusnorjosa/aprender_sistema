@@ -110,3 +110,24 @@ def test_me_no_groups_returns_empty_list():
 
     assert data["groups"] == []
     assert data["is_superintendencia"] is False
+
+
+def test_superuser_always_has_access():
+    """
+    Superusers sempre têm is_superintendencia=True, mesmo sem grupo.
+    """
+    user = Usuario.objects.create_superuser(
+        username="admin", email="admin@x.com", password="x", cpf="55555555555"
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("core:current-user")
+    res = client.get(url)
+
+    assert res.status_code == 200
+    data = res.json()
+
+    assert data["is_superuser"] is True
+    assert data["is_superintendencia"] is True, "Superuser should always have access"

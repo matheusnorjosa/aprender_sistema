@@ -96,8 +96,9 @@ function Solicitacoes() {
         const user = await getMe();
         setCurrentUser(user);
 
-        // PA-06: Verificar se usuário pertence ao grupo "Superintendência"
+        // PA-06: Verificar se usuário pertence ao grupo "Superintendência" ou é superuser
         const isSuper =
+          user?.is_superuser ||
           user?.is_superintendencia ||
           user?.groups?.includes('Superintendência') ||
           false;

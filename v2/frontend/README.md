@@ -6,6 +6,7 @@ Interface React para gerenciamento de disponibilidade no sistema Aprender Sistem
 
 - **React 18** + **Vite** - Build tool moderno e rápido
 - **Ant Design** - Biblioteca de componentes UI
+- **React Router** - Roteamento entre páginas
 - **Axios** - Cliente HTTP (configurado com CSRF)
 - **Day.js** - Manipulação de datas
 
@@ -78,13 +79,15 @@ O frontend utiliza **sessão/cookie do Django** para autenticação. Para testar
 v2/frontend/
 ├── src/
 │   ├── api/              # Clientes de API
-│   │   └── availability.js
+│   │   ├── availability.js
+│   │   └── solicitacoes.js
 │   ├── components/       # Componentes reutilizáveis
 │   │   ├── BlockForm.jsx
 │   │   └── MyBlocksTable.jsx
 │   ├── pages/            # Páginas/rotas
-│   │   └── Disponibilidade.jsx
-│   ├── App.jsx           # Componente raiz
+│   │   ├── Disponibilidade.jsx
+│   │   └── Solicitacoes.jsx
+│   ├── App.jsx           # Componente raiz (com roteamento)
 │   └── main.jsx          # Entry point
 ├── .env.example          # Exemplo de variáveis de ambiente
 ├── .env                  # Variáveis de ambiente (local)
@@ -94,9 +97,9 @@ v2/frontend/
 
 ## 📱 Funcionalidades
 
-### Página de Disponibilidade
+### Página de Disponibilidade (Formadores)
 
-**URL**: `/` (raiz)
+**URL**: `/disponibilidade`
 
 **Recursos**:
 
@@ -111,7 +114,39 @@ v2/frontend/
 - Campos obrigatórios: `inicio`, `fim`, `tipo`
 - Tipo de bloqueio: `T` (Total) ou `P` (Parcial)
 
+### Página de Solicitações (Superintendência)
+
+**URL**: `/solicitacoes`
+
+**Acesso**: Apenas usuários do grupo **Superintendência**
+
+**Recursos**:
+
+- ✅ **Listar Solicitações**: Tabela paginada com todas as solicitações
+- ✅ **Filtros**:
+  - Por status (pendente/aprovado/reprovado/todos)
+  - Por texto (busca em usuário/município/tipo evento)
+- ✅ **Ver Detalhes**: Drawer com informações completas da solicitação
+- ✅ **Aprovar**: Aprovar solicitação pendente com confirmação
+- ✅ **Reprovar**: Reprovar solicitação com justificativa obrigatória (mínimo 10 caracteres)
+
+**Controle de Permissões**:
+
+- Botões "Aprovar" e "Reprovar" só aparecem para:
+  - Usuários do grupo **Superintendência**
+  - Solicitações com `status=pendente`
+- Alinhado com **PA-06** (Política de Aprovação Manual)
+
+**Validações**:
+
+- Justificativa obrigatória para reprovar (mínimo 10, máximo 500 caracteres)
+- Confirmação antes de aprovar
+- Feedback visual de sucesso/erro
+- Recarga automática da lista após ações
+
 ## 🔗 Endpoints Consumidos
+
+### Disponibilidade (Formadores)
 
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
@@ -119,7 +154,21 @@ v2/frontend/
 | POST | `/api/availability-blocks/` | Cria novo bloqueio |
 | DELETE | `/api/availability-blocks/{id}/` | Remove bloqueio (apenas pendente) |
 | GET | `/api/availability/check/` | Checagem consultiva de conflitos |
-| GET | `/api/me/` | Informações do usuário atual (fallback se não existir) |
+
+### Solicitações (Superintendência)
+
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/api/solicitacoes/` | Lista solicitações com filtros (status, page, search) |
+| GET | `/api/solicitacoes/{id}/` | Busca detalhes de uma solicitação específica |
+| PATCH | `/api/solicitacoes/{id}/approve/` | Aprova solicitação pendente |
+| PATCH | `/api/solicitacoes/{id}/reject/` | Reprova solicitação (requer justificativa) |
+
+### Autenticação
+
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/api/me/` | Informações do usuário atual |
 
 ## 🎨 Componentes Principais
 
@@ -173,8 +222,9 @@ VITE_API_URL=http://localhost:8002/api
 
 ## 📝 Próximos Passos (TODO)
 
-- [ ] Implementar roteamento com React Router
-- [ ] Adicionar página de solicitações de eventos
+- [x] Implementar roteamento com React Router
+- [x] Adicionar página de solicitações de eventos (Superintendência)
+- [ ] Adicionar página de criação de solicitações (Coordenadores)
 - [ ] Criar página de mapa mensal de disponibilidade
 - [ ] Implementar testes (Vitest + React Testing Library)
 - [ ] Adicionar modo escuro

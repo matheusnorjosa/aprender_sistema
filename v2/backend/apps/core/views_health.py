@@ -53,13 +53,18 @@ def features(request):
         "apply_blocked": true,
         "ENVIRONMENT": "staging"
     }
+
+    Security: apply_blocked is true when GCAL_CLIENT != "google"
+    to prevent accidental calendar operations with fake client.
     """
     gcal_client = os.getenv("GCAL_CLIENT", "fake")
-    preview_only = os.getenv("PREVIEW_ONLY", "false").lower() == "true"
     environment = os.getenv("ENVIRONMENT", "dev")
+
+    # Security: block apply operations when not using real Google Calendar client
+    apply_blocked = gcal_client != "google"
 
     return JsonResponse({
         "GCAL_CLIENT": gcal_client,
-        "apply_blocked": preview_only,
+        "apply_blocked": apply_blocked,
         "ENVIRONMENT": environment,
     })

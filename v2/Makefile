@@ -34,10 +34,10 @@ seed-demo:
 	$(WEB) python manage.py seed_demo_users --verbose
 
 readyz:
-	curl -fsS http://localhost:8000/api/readyz/ || true
+	curl -fsS http://localhost:8002/api/readyz/ || true
 
 healthz:
-	curl -fsS http://localhost:8000/healthz/ || true
+	curl -fsS http://localhost:8002/healthz/ || true
 
 preview-json:
 	$(WEB) sh -c 'python manage.py preagenda_to_gcal --dry-run --json > /tmp/preagenda.json 2>&1 || true'

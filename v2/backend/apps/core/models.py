@@ -51,7 +51,27 @@ class Municipio(models.Model):
 class Projeto(models.Model):
     """SSOT: Substitui IMPORTRANGE de Projetos"""
 
+    FLUXO_CHOICES = [
+        ('SUPER', 'Superintendência'),
+        ('NAO_SUPER', 'Não-Super'),
+    ]
+
     nome = models.CharField(max_length=200, unique=True, db_index=True)
+    codigo = models.CharField(
+        max_length=50,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Código único do projeto (ex: ACERTA, NLENDO)"
+    )
+    fluxo = models.CharField(
+        max_length=12,
+        choices=FLUXO_CHOICES,
+        default='NAO_SUPER',
+        db_index=True,
+        help_text="SUPER: requer aprovação da Superintendência. NAO_SUPER: auto-aprovado."
+    )
     descricao = models.TextField(blank=True)
     ativo = models.BooleanField(default=True)
 
@@ -165,6 +185,14 @@ class Solicitacao(models.Model):
         null=True,
         blank=True,
         help_text="Município onde ocorrerá o evento",
+    )
+    projeto = models.ForeignKey(
+        Projeto,
+        on_delete=models.PROTECT,
+        related_name="solicitacoes",
+        null=True,
+        blank=True,
+        help_text="Projeto associado ao evento (determina fluxo de aprovação)",
     )
     tipo_evento = models.ForeignKey(
         TipoEvento, on_delete=models.PROTECT, related_name="solicitacoes"

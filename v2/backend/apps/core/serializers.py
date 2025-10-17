@@ -19,6 +19,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "id",
             "usuario",
             "municipio",
+            "projeto",
             "tipo_evento",
             "inicio",
             "fim",

@@ -26,3 +26,23 @@ class IsSuperintendencia(permissions.BasePermission):
                 or request.user.groups.filter(name="Superintendência").exists()
             )
         )
+
+
+class IsCoordenadorOrDAT(permissions.BasePermission):
+    """
+    Permissão: apenas Coordenadores ou DAT podem criar solicitações.
+
+    Nota: Superusers sempre têm acesso completo.
+    """
+
+    message = "Apenas Coordenadores ou DAT podem criar solicitações."
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                request.user.is_superuser
+                or request.user.groups.filter(name__in=["Coordenador", "DAT"]).exists()
+            )
+        )

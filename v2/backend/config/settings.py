@@ -28,6 +28,7 @@ if REQUIRE_DOCKER and not os.path.exists("/.dockerenv"):
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 DEBUG = os.getenv("DEBUG", "0") == "1"
 
+print("AS v2 inicializado; legado arquivado e bloqueado")
 # ================================================================
 # SECRET KEY
 # ================================================================

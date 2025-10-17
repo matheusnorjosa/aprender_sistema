@@ -325,3 +325,105 @@ class Config(models.Model):
 
     def __str__(self):
         return f"{self.key} (updated: {self.updated_at.strftime('%Y-%m-%d %H:%M')})"
+
+
+class Compra(models.Model):
+    """
+    Registro de compras de materiais/produtos para projetos.
+
+    - Idempotência: external_hash (SHA256 da linha normalizada)
+    - Chave natural: (codigo + municipio + projeto + data)
+    - Import: Suporta CSV/XLSX via import_compras service
+    """
+
+    codigo = models.CharField(
+        max_length=50,
+        db_index=True,
+        help_text="Código da compra (ex: COMP-001)"
+    )
+    projeto = models.ForeignKey(
+        Projeto,
+        on_delete=models.PROTECT,
+        related_name="compras",
+        help_text="Projeto vinculado à compra"
+    )
+    municipio = models.ForeignKey(
+        Municipio,
+        on_delete=models.PROTECT,
+        related_name="compras",
+        help_text="Município destino da compra"
+    )
+    quantidade = models.IntegerField(
+        help_text="Quantidade de itens comprados"
+    )
+    data = models.DateField(
+        help_text="Data da compra"
+    )
+    uso = models.TextField(
+        help_text="Uso/finalidade da compra (ex: Formação inicial)"
+    )
+    external_hash = models.CharField(
+        max_length=64,
+        db_index=True,
+        help_text="Hash SHA256 para idempotência de import"
+    )
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "core_compra"
+        verbose_name = "Compra"
+        verbose_name_plural = "Compras"
+        ordering = ["-data", "-created_at"]
+        indexes = [
+            models.Index(fields=["codigo", "data"]),
+            models.Index(fields=["projeto", "municipio"]),
+            models.Index(fields=["external_hash"]),
+        ]
+
+    def __str__(self):
+        return f"{self.codigo} - {self.projeto.nome} ({self.data.strftime('%d/%m/%Y')})"
+
+
+class AuditLog(models.Model):
+    """
+    Log de auditoria para rastreamento de operações críticas.
+
+    - Registra ações como: CELERY_GCAL_SYNC, approve, reject, create, update, delete
+    - Details: JSON com contexto da operação (status, applied, reason, etc.)
+    - PA-05: Obrigatório para aprovações/reprovações
+    """
+
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="audit_logs",
+        help_text="Usuário que executou a ação (se aplicável)"
+    )
+    action = models.CharField(
+        max_length=50,
+        db_index=True,
+        help_text="Ação executada (ex: CELERY_GCAL_SYNC, approve, reject)"
+    )
+    details = models.JSONField(
+        default=dict,
+        help_text="Detalhes da operação (status, applied, reason, etc.)"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "core_audit_log"
+        verbose_name = "Log de Auditoria"
+        verbose_name_plural = "Logs de Auditoria"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["action", "created_at"]),
+            models.Index(fields=["usuario", "created_at"]),
+        ]
+
+    def __str__(self):
+        usuario_str = self.usuario.get_full_name() if self.usuario else "Sistema"
+        return f"{usuario_str} - {self.action} ({self.created_at.strftime('%d/%m/%Y %H:%M')})"

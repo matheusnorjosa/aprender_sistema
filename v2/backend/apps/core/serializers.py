@@ -4,7 +4,7 @@ DRF Serializers for Core models
 
 from rest_framework import serializers
 
-from .models import AvailabilityBlock, Solicitacao
+from .models import AvailabilityBlock, Solicitacao, Compra, AuditLog
 
 
 class SolicitacaoSerializer(serializers.ModelSerializer):
@@ -93,3 +93,43 @@ class AvailabilityBlockSerializer(serializers.ModelSerializer):
                 )
 
         return super().validate(attrs)
+
+
+class CompraSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Compra model (basic CRUD).
+    """
+
+    class Meta:
+        model = Compra
+        fields = [
+            "id",
+            "codigo",
+            "projeto",
+            "municipio",
+            "quantidade",
+            "data",
+            "uso",
+            "external_hash",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    """
+    Serializer for AuditLog model (read-only).
+    PA-05: Usado para rastrear aprovações/reprovações.
+    """
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            "id",
+            "usuario",
+            "action",
+            "details",
+            "created_at",
+        ]
+        read_only_fields = ["id", "usuario", "action", "details", "created_at"]

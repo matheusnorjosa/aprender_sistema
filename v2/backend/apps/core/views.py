@@ -41,11 +41,11 @@ from .serializers import (
     ProjetoSerializer,
     SolicitacaoSerializer,
     TipoEventoOptionSerializer,
-    UsuarioAdminSerializer,
+    # UsuarioAdminSerializer,  # TODO: serializer não implementado (GAP-004)
     UsuarioOptionSerializer,
 )
 from .services.availability_service import check_conflicts
-from .services.import_compras import import_compras_from_file
+# from .services.import_compras import import_compras_from_file  # TODO: service depende de modelo Compra (GAP-004)
 
 # Logger estruturado para auditoria
 logger = logging.getLogger(__name__)
@@ -619,7 +619,11 @@ class ProjetoViewSet(viewsets.ModelViewSet):
     ordering = ["nome"]
 
 
-class CompraViewSet(viewsets.ModelViewSet):
+# ==========================
+# TODO(GAP-004): Views comentadas até modelos serem implementados
+# ==========================
+
+# class CompraViewSet(viewsets.ModelViewSet):
     """
     ViewSet para CRUD de Compras.
 

@@ -7,6 +7,7 @@ from rest_framework.routers import DefaultRouter
 
 # Imports de módulos isolados (GAP-001 fix)
 from .views_basic import CurrentUserView, api_root
+from .views_health import features, readyz
 from .views_solicitacao import SolicitacaoViewSet
 from .views_availability import (
     AvailabilityBlockViewSet,
@@ -25,6 +26,8 @@ router.register(
 
 urlpatterns = [
     path("", api_root, name="api-root"),
+    path("readyz/", readyz, name="readyz"),
+    path("features/", features, name="features"),
     path("me/", CurrentUserView.as_view(), name="current-user"),
     path(
         "availability/check/",

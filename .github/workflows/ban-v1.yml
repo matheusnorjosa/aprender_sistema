@@ -44,6 +44,21 @@ jobs:
             echo "Referência v1 detectada" >&2
             exit 1
           fi
+      - name: Create CI .env
+        run: |
+          cat > infra/.env <<EOF
+          POSTGRES_USER=aprender_user
+          POSTGRES_PASSWORD=aprender_password
+          POSTGRES_DB=aprender_db
+          DB_HOST=db
+          DB_PORT=5432
+          SECRET_KEY=test-secret-key-for-ci-only
+          DEBUG=1
+          ENVIRONMENT=development
+          REDIS_HOST=redis
+          REDIS_PORT=6379
+          REQUIRE_DOCKER=1
+          EOF
       - name: Docker up
         run: make up
       - name: readyz

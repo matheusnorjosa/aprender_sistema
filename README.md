@@ -93,6 +93,8 @@ aprender_sistema/
 │   └── scripts/             # Scripts de automação
 ├── 📖 Documentação
 │   ├── docs/                # Documentação técnica
+│   │   ├── RUNBOOK.md      # Guia operacional (Docker, Celery, troubleshooting)
+│   │   └── ...
 │   └── README.md           # Este arquivo
 └── 🔧 Configuração
     ├── .env.example        # Template de variáveis de ambiente
@@ -312,6 +314,20 @@ docs: atualizar README com instruções de deploy
 chore: atualizar dependências do Django para 5.2.4
 test: adicionar testes para módulo de calendário
 ```
+
+## 📚 Documentação Operacional
+
+### 📖 RUNBOOK - Guia Operacional
+
+Para operações do dia a dia (Docker, Celery, troubleshooting), consulte: **[v2/docs/RUNBOOK.md](v2/docs/RUNBOOK.md)**
+
+Tópicos cobertos:
+- ✅ **Recarregar variáveis de ambiente** (`.env`) corretamente
+- ✅ **Operações Celery** (worker/beat: subir, parar, logs)
+- ✅ **Health checks** e validações
+- ✅ **Troubleshooting** comum (Redis, containers, etc.)
+- ✅ **Portas HOST vs CONTAINER** (5432/5434, 6379/6380, 8000/8002)
+- ✅ **Cheat sheet** de comandos rápidos
 
 ## 📊 Monitoramento
 

@@ -16,14 +16,28 @@ Trabalhe sempre dentro de `v2/`:
 
 ```bash
 cd v2
-make up            # sobe o stack as_v2
+make up            # sobe o stack aprender_v2
 make readyz        # health check
 make down          # derruba os containers
 ```
 
 Compose oficial: `v2/infra/docker-compose.yml` com
-`COMPOSE_PROJECT_NAME=as_v2`. O script `make ban-v1` remove quaisquer
+`COMPOSE_PROJECT_NAME=aprender_v2`. O script `make ban-v1` remove quaisquer
 containers/redes/volumes antigos com o label `aprendersistema`.
+
+## 📚 Documentação Operacional
+
+### 📖 RUNBOOK - Guia Operacional
+
+Para operações do dia a dia (Docker, Celery, troubleshooting), consulte: **[v2/docs/RUNBOOK.md](v2/docs/RUNBOOK.md)**
+
+Tópicos cobertos:
+- ✅ **Recarregar variáveis de ambiente** (`.env`) corretamente
+- ✅ **Operações Celery** (worker/beat: subir, parar, logs)
+- ✅ **Health checks** e validações
+- ✅ **Troubleshooting** comum (Redis, containers, etc.)
+- ✅ **Portas HOST vs CONTAINER** (5432/5434, 6379/6380, 8000/8002)
+- ✅ **Cheat sheet** de comandos rápidos
 
 ## Legado (v1)
 

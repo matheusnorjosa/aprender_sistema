@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     AvailabilityBlock,
     Municipio,
+    Participation,
     Projeto,
     Solicitacao,
     TipoEvento,
@@ -67,3 +68,18 @@ class SolicitacaoAdmin(admin.ModelAdmin):
     list_filter = ("status", "tipo_evento", "created_at")
     readonly_fields = ("created_at", "updated_at", "external_event_id")
     date_hierarchy = "inicio"
+
+
+@admin.register(Participation)
+class ParticipationAdmin(admin.ModelAdmin):
+    list_display = ("solicitacao", "usuario", "role", "ch_horas", "created_at")
+    list_filter = ("role",)
+    search_fields = (
+        "usuario__email",
+        "usuario__first_name",
+        "usuario__last_name",
+        "guest_email",
+        "solicitacao__id",
+    )
+    autocomplete_fields = ("usuario", "solicitacao")
+    list_select_related = ("solicitacao", "usuario")

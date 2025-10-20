@@ -408,6 +408,13 @@ class AuditLog(models.Model):
         db_index=True,
         help_text="Ação executada (ex: CELERY_GCAL_SYNC, approve, reject)"
     )
+    model_name = models.CharField(
+        max_length=60,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Nome do modelo relacionado (opcional, ex: Solicitacao, Compra)"
+    )
     details = models.JSONField(
         default=dict,
         help_text="Detalhes da operação (status, applied, reason, etc.)"

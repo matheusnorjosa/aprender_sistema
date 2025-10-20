@@ -1,4 +1,4 @@
-# Aprender Sistema — Plataforma v2
+# Aprender Sistema
 
 Este repositório armazena apenas a estrutura **v2** do Sistema Aprender.
 Todo o código/documentação da versão anterior (v1) foi movido para
@@ -43,3 +43,5 @@ Tópicos cobertos:
 
 O material arquivado tem README próprio em `archive/v1_legado/README.md`.
 Não execute scripts ou compose fora de `v2/`.
+
+Desenvolvido por Matheus Norjosa

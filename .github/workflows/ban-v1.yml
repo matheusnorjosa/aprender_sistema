@@ -30,7 +30,7 @@ jobs:
             BASE=$(git merge-base HEAD origin/main)
           fi
           echo "base_commit=$BASE" >> "$GITHUB_OUTPUT"
-          git diff --name-only "$BASE"...HEAD > ../changed.txt
+          git diff --name-only "$BASE"..HEAD > ../changed.txt
       - name: Forbid legacy edits
         run: |
           if grep -q '^archive/v1_legado/' ../changed.txt; then
@@ -39,7 +39,7 @@ jobs:
           fi
       - name: Forbid legacy strings
         run: |
-          if git diff "${{ steps.diff.outputs.base_commit }}"...HEAD | \
+          if git diff "${{ steps.diff.outputs.base_commit }}"..HEAD | \
              grep -E '(aprendersistema|web-1|db-1|redis-1|docker-compose.*v1)'; then
             echo "Referência v1 detectada" >&2
             exit 1

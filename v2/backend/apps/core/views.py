@@ -657,28 +657,29 @@ class ProjetoViewSet(viewsets.ModelViewSet):
         return [IsDAT()]
 
 
-class UsuarioAdminViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet para CRUD de Usuários (apenas DAT).
-
-    Permite criar/atualizar usuários, atribuir grupos, setar senhas.
-
-    Filtros disponíveis:
-    - is_active: booleano
-    - is_staff: booleano
-    - search: busca em username, email, first_name, last_name, cpf
-    - ordering: username, email, date_joined, id
-    """
-
-    queryset = Usuario.objects.prefetch_related("groups").all()
-    serializer_class = UsuarioAdminSerializer
-    permission_classes = [IsDAT]
-
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["is_active", "is_staff", "is_superuser"]
-    search_fields = ["username", "email", "first_name", "last_name", "cpf"]
-    ordering_fields = ["username", "email", "date_joined", "id"]
-    ordering = ["username"]
+# TODO(GAP-004): UsuarioAdminViewSet requer UsuarioAdminSerializer não implementado
+# class UsuarioAdminViewSet(viewsets.ModelViewSet):
+#     """
+#     ViewSet para CRUD de Usuários (apenas DAT).
+#
+#     Permite criar/atualizar usuários, atribuir grupos, setar senhas.
+#
+#     Filtros disponíveis:
+#     - is_active: booleano
+#     - is_staff: booleano
+#     - search: busca em username, email, first_name, last_name, cpf
+#     - ordering: username, email, date_joined, id
+#     """
+#
+#     queryset = Usuario.objects.prefetch_related("groups").all()
+#     serializer_class = UsuarioAdminSerializer
+#     permission_classes = [IsDAT]
+#
+#     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+#     filterset_fields = ["is_active", "is_staff", "is_superuser"]
+#     search_fields = ["username", "email", "first_name", "last_name", "cpf"]
+#     ordering_fields = ["username", "email", "date_joined", "id"]
+#     ordering = ["username"]
 
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
@@ -706,6 +707,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ["-created_at"]
 
 
+# TODO(GAP-004): ImportComprasView requer import_compras_from_file não implementado
 class ImportComprasView(APIView):
     """
     Endpoint de importação de Compras via CSV/XLSX.
@@ -735,109 +737,18 @@ class ImportComprasView(APIView):
     - Transacional: rollback em caso de erro crítico
     - Salva resultado em out/etl/last_run.json
     - Cria entrada em AuditLog
+
+    NOTA: Temporariamente desabilitado até implementação de import_compras_from_file
     """
 
     permission_classes = [IsControleOrDAT]
 
     def post(self, request):
-        import json
-        import os
-        from pathlib import Path
-
-        # Validar upload de arquivo
-        if "file" not in request.FILES:
-            return Response(
-                {"detail": "Campo 'file' é obrigatório."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        uploaded_file = request.FILES["file"]
-        filename = uploaded_file.name
-
-        # Validar formato
-        ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
-        if ext not in ["csv", "xlsx", "xls"]:
-            return Response(
-                {
-                    "detail": f"Formato de arquivo não suportado: '{ext}'. Use CSV ou XLSX."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Dry-run mode
-        dry_run = request.query_params.get("dry_run", "false").lower() == "true"
-
-        try:
-            # Executar importação
-            result = import_compras_from_file(
-                file=uploaded_file.file, filename=filename, dry_run=dry_run
-            )
-
-            # Salvar resultado em arquivo JSON (PR 7.1/N: path v2/out/etl/)
-            if not dry_run:
-                out_dir = Path("v2/out/etl")
-                out_dir.mkdir(parents=True, exist_ok=True)
-                result_path = out_dir / "last_run.json"
-
-                result_data = {
-                    "timestamp": timezone.now().isoformat(),
-                    "filename": filename,
-                    "user": request.user.username,
-                    "result": result.to_dict(),
-                }
-
-                with open(result_path, "w", encoding="utf-8") as f:
-                    json.dump(result_data, f, indent=2, ensure_ascii=False)
-
-                logger.info(f"Resultado salvo em {result_path}")
-
-            # Criar log de auditoria
-            if not dry_run:
-                from .models import AuditLog
-
-                AuditLog.objects.create(
-                    usuario=request.user,
-                    action="IMPORT",
-                    model_name="Compra",
-                    details={
-                        "filename": filename,
-                        "inserted": result.inserted,
-                        "updated": result.updated,
-                        "skipped": result.skipped,
-                        "rejected": result.rejected,
-                        "errors_count": len(result.errors),
-                    },
-                    justificativa=f"Import de {filename}",
-                    ip_address=_get_client_ip(request),
-                    user_agent=request.META.get("HTTP_USER_AGENT", "")[:200],
-                )
-
-            # Retornar resultado
-            return Response(
-                {
-                    "success": result.rejected == 0 and len(result.errors) == 0,
-                    "result": result.to_dict(),
-                    "dry_run": dry_run,
-                },
-                status=(
-                    status.HTTP_200_OK
-                    if result.rejected == 0
-                    else status.HTTP_207_MULTI_STATUS
-                ),
-            )
-
-        except ValueError as e:
-            # Erro de validação
-            logger.warning(f"Erro de validação no import: {e}")
-            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-        except Exception as e:
-            # Erro inesperado
-            logger.error(f"Erro crítico no import: {e}", exc_info=True)
-            return Response(
-                {"detail": f"Erro ao processar arquivo: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        # TODO(GAP-004): Implementar import_compras_from_file antes de habilitar
+        return Response(
+            {"detail": "Import de compras temporariamente desabilitado (GAP-004)"},
+            status=status.HTTP_501_NOT_IMPLEMENTED
+        )
 
 
 # ==========================

@@ -103,6 +103,19 @@ jobs:
     - name: Test Docker health
       run: |
         cd v2/infra
+        cat > .env <<EOF
+        POSTGRES_USER=aprender_user
+        POSTGRES_PASSWORD=aprender_password
+        POSTGRES_DB=aprender_db
+        DB_HOST=db
+        DB_PORT=5432
+        SECRET_KEY=test-secret-key-for-ci-only
+        DEBUG=1
+        ENVIRONMENT=development
+        REDIS_HOST=redis
+        REDIS_PORT=6379
+        REQUIRE_DOCKER=1
+        EOF
         docker compose up -d db redis
         sleep 5
         docker compose run --rm web python manage.py check

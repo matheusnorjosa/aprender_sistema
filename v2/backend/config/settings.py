@@ -337,7 +337,7 @@ DATA_IMPORT_DIR = os.getenv("DATA_IMPORT_DIR", "/app/data/csv-import")
 # SECURITY (Production)
 # ================================================================
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    SECURE_SSL_REDIRECT = ENVIRONMENT != "testing"  # Disable in tests to avoid 301 redirects
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True

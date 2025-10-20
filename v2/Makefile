@@ -1,9 +1,9 @@
-DC = COMPOSE_PROJECT_NAME=as_v2 docker compose -f infra/docker-compose.yml
+DC = COMPOSE_PROJECT_NAME=aprender_v2 docker compose -f infra/docker-compose.yml
 WEB = $(DC) exec -T web
 
 .PHONY: up down build logs shell migrate collect seed seed-demo readyz healthz \
         preview-json apply-json flags-fake flags-google preview-on preview-off \
-        ban-v1
+        ban-v1 up-worker up-beat logs-worker logs-beat logs-worker-last logs-beat-last help
 
 up:
 	$(DC) up -d --build
@@ -61,3 +61,72 @@ preview-off:
 
 ban-v1:
 	./scripts/ban_v1.sh
+
+# ════════════════════════════════════════════════════════════════════════════
+# Celery Worker & Beat
+# ════════════════════════════════════════════════════════════════════════════
+
+up-worker:
+	$(DC) up -d worker
+
+up-beat:
+	$(DC) up -d beat
+
+logs-worker:
+	$(DC) logs -f worker
+
+logs-beat:
+	$(DC) logs -f beat
+
+logs-worker-last:
+	$(DC) logs --tail=200 worker
+
+logs-beat-last:
+	$(DC) logs --tail=200 beat
+
+# ════════════════════════════════════════════════════════════════════════════
+# Help
+# ════════════════════════════════════════════════════════════════════════════
+
+help:
+	@echo "════════════════════════════════════════════════════════════════════════════"
+	@echo "  Aprender Sistema v2 — Makefile Targets"
+	@echo "════════════════════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "Stack Management:"
+	@echo "  make up                    Start all services (with rebuild)"
+	@echo "  make down                  Stop and remove all services"
+	@echo "  make build                 Rebuild images (no cache)"
+	@echo "  make logs                  Follow web logs"
+	@echo ""
+	@echo "Django:"
+	@echo "  make shell                 Open bash in web container"
+	@echo "  make migrate               Run migrations + collectstatic"
+	@echo "  make collect               Collect static files"
+	@echo "  make seed                  Seed RBAC data"
+	@echo "  make seed-demo             Seed demo users"
+	@echo ""
+	@echo "Celery (Worker & Beat):"
+	@echo "  make up-worker             Start worker"
+	@echo "  make up-beat               Start beat"
+	@echo "  make logs-worker           Follow worker logs (Ctrl+C to exit)"
+	@echo "  make logs-beat             Follow beat logs (Ctrl+C to exit)"
+	@echo "  make logs-worker-last      Show last 200 lines of worker logs"
+	@echo "  make logs-beat-last        Show last 200 lines of beat logs"
+	@echo ""
+	@echo "Health Checks:"
+	@echo "  make readyz                Check /api/readyz/ (db + redis)"
+	@echo "  make healthz               Check /healthz/ (app health)"
+	@echo ""
+	@echo "Preview & Apply (Google Calendar):"
+	@echo "  make preview-json          Preview events (dry-run, JSON output)"
+	@echo "  make apply-json            Apply events to Google Calendar"
+	@echo "  make flags-fake            Instructions for fake client"
+	@echo "  make flags-google          Instructions for Google client"
+	@echo "  make preview-on            Enable preview mode"
+	@echo "  make preview-off           Disable preview mode"
+	@echo ""
+	@echo "Security:"
+	@echo "  make ban-v1                Run v1 ban script"
+	@echo ""
+	@echo "════════════════════════════════════════════════════════════════════════════"

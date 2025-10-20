@@ -1,0 +1,39 @@
+# Python/Django
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.log
+*.pot
+.env
+.env.*
+!.env.example
+backend/.pytest_cache/
+backend/staticfiles/
+backend/media/*
+!backend/media/.gitkeep
+backend/logs/
+backend/out/
+backend/csv-import/*.tmp
+backend/service_account.json
+
+# Node/React
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Agents/outputs
+.agents/
+!/.agents/outbox/.gitkeep
+
+# Windows artefacts
+nul/
+frontend/nul/
+backend/C:/

@@ -1,0 +1,16 @@
+{
+  "task": "pr-5.1n-align-fe-be",
+  "status": "fail",
+  "checks": {
+    "migrate": true,
+    "pytest": {"passed": 7, "failed": 0},
+    "healthz": 200,
+    "fe_create": true,
+    "fe_list": true,
+    "fe_delete": true,
+    "fe_check_conflicts": true
+  },
+  "notes": [
+    "UI validada manualmente no host Windows; porta API = http://localhost:8002/api"
+  ]
+}

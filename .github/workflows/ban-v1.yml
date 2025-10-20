@@ -19,8 +19,14 @@ jobs:
       - name: Collect changed files
         id: diff
         run: |
-          git fetch origin main --depth=1
-          BASE=$(git merge-base HEAD origin/main)
+          # Use PR base SHA when available (in pull_request events)
+          # Fall back to merge-base for push events
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            git fetch origin main --depth=1
+            BASE=$(git merge-base HEAD origin/main)
+          fi
           echo "base_commit=$BASE" >> "$GITHUB_OUTPUT"
           git diff --name-only "$BASE"...HEAD > ../changed.txt
       - name: Forbid legacy edits

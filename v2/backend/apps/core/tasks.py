@@ -19,6 +19,42 @@ from django.core.management import call_command
 from celery import shared_task
 
 
+@shared_task(bind=True)
+def debug_task(self):
+    """
+    Debug task para testar o setup do Celery.
+
+    Uso:
+        from apps.core.tasks import debug_task
+        debug_task.delay()
+
+    Returns:
+        str: "ok"
+    """
+    print(f"Request: {self.request!r}")
+    return "ok"
+
+
+@shared_task
+def gcal_sync_task():
+    """
+    Tarefa stub para sincronização futura com Google Calendar.
+
+    TODO: Implementar lógica de sincronização.
+
+    Possíveis implementações:
+    - Sincronizar eventos pendentes
+    - Atualizar eventos modificados
+    - Remover eventos cancelados
+    - Integrar com preview_then_apply_gcal
+
+    Returns:
+        dict: Resultado da sincronização (quando implementado)
+    """
+    # TODO: Implementar lógica de sincronização
+    pass
+
+
 @shared_task(name="apps.core.tasks.preview_then_apply_gcal")
 def preview_then_apply_gcal():
     """

@@ -1,0 +1,552 @@
+# Runbook: Validação End-to-End — Google Calendar Sync
+
+## Objetivo
+Validar fluxo completo de solicitação → aprovação → sincronização com Google Calendar usando FakeCalendarClient (sem publicar no Google real).
+
+---
+
+## 🔧 Pré-requisitos
+
+- Sistema rodando em Docker (`cd v2/infra && docker compose up -d`)
+- Usuário admin criado
+- Grupo "Superintendência" configurado
+- PostgreSQL operacional
+
+---
+
+## 📋 Etapas de Validação
+
+### 1. Preparar Dados Base
+
+```bash
+# Entrar no shell Django
+docker compose exec web python manage.py shell
+```
+
+```python
+from apps.core.models import Usuario, Municipio, TipoEvento, Projeto
+from django.contrib.auth.models import Group
+
+# Criar grupo Superintendência (se não existir)
+superintendencia, _ = Group.objects.get_or_create(name="Superintendência")
+
+# Criar usuários
+# Usuário comum (coordenador)
+user_coord = Usuario.objects.create_user(
+    username="coord1",
+    email="coord1@example.com",
+    password="senha123",
+    cpf="12345678901",
+)
+
+# Usuário superintendência
+user_super = Usuario.objects.create_user(
+    username="super1",
+    email="super1@example.com",
+    password="senha123",
+    cpf="98765432100",
+)
+user_super.groups.add(superintendencia)
+
+# Criar município
+municipio = Municipio.objects.create(
+    nome="Fortaleza",
+    uf="CE",
+)
+
+# Criar tipo de evento
+tipo_evento = TipoEvento.objects.create(
+    nome="Formação",
+    descricao="Formação pedagógica",
+)
+
+print("✅ Dados base criados com sucesso!")
+```
+
+### 2. Criar Solicitação via API
+
+```bash
+# Obter token/session do coordenador
+# (ou usar Django Admin para criar solicitação)
+
+# POST /api/solicitacoes/ com autenticação
+curl -X POST http://localhost:8000/api/solicitacoes/ \
+  -H "Content-Type: application/json" \
+  -u coord1:senha123 \
+  -d '{
+    "usuario": 1,
+    "municipio": 1,
+    "tipo_evento": 1,
+    "inicio": "2025-10-20T09:00:00-03:00",
+    "fim": "2025-10-20T12:00:00-03:00",
+    "observacoes": "Teste E2E de sincronização"
+  }'
+```
+
+**Validação esperada:**
+- Status code: `201 Created`
+- Response inclui `"status": "pendente"` (PA-01: nunca auto-aprova)
+- `external_event_id` é `null`
+
+### 3. Verificar Disponibilidade (Opcional)
+
+```bash
+# GET /api/availability/check/
+curl -G http://localhost:8000/api/availability/check/ \
+  -u coord1:senha123 \
+  --data-urlencode "usuario_id=1" \
+  --data-urlencode "inicio=2025-10-20T09:00:00-03:00" \
+  --data-urlencode "fim=2025-10-20T12:00:00-03:00" \
+  --data-urlencode "municipio_id=1"
+```
+
+**Validação esperada:**
+- `{"ok": true, "conflicts": []}` (sem conflitos)
+- Ou lista de conflitos se houver (RD-01 a RD-08)
+
+### 4. Aprovar Solicitação (Superintendência)
+
+```bash
+# PATCH /api/solicitacoes/<id>/approve/
+curl -X PATCH http://localhost:8000/api/solicitacoes/1/approve/ \
+  -u super1:senha123
+```
+
+**Validação esperada:**
+- Status code: `200 OK`
+- Response: `{"detail": "Solicitação aprovada com sucesso."}`
+
+**Tentar com usuário sem permissão (deve falhar):**
+```bash
+curl -X PATCH http://localhost:8000/api/solicitacoes/1/approve/ \
+  -u coord1:senha123
+```
+
+**Validação esperada:**
+- Status code: `403 Forbidden` (PA-02: apenas Superintendência)
+
+### 5. Dry-Run de Sincronização
+
+**Modo Human-Readable (padrão):**
+```bash
+# Executar command em modo dry-run (não altera DB/Calendar)
+docker compose exec web python manage.py preagenda_to_gcal \
+  --calendar-id test-calendar \
+  --client=fake \
+  --dry-run \
+  --verbose
+```
+
+**Validação esperada:**
+```
+[CLIENT: fake] Usando FakeCalendarClient (in-memory, sem side effects)
+[DRY-RUN MODE] Nenhuma alteração será feita
+Processando 1 solicitações...
+Calendário: test-calendar
+Período: 2025-07-13 a 2026-04-09
+
+✓ CREATE   #   1 → Fortaleza - CE — Formação — coord1
+
+============================================================
+RESUMO
+============================================================
+Total processado: 1
+  CREATE:     1 (novos eventos)
+  UPDATE:     0 (eventos atualizados)
+  ADOPT:      0 (eventos adotados)
+  DELETE:     0 (eventos removidos)
+  SKIP:       0 (não processados)
+
+Nenhuma alteração foi feita (modo dry-run). Execute sem --dry-run para aplicar.
+```
+
+**Modo JSON (para automação/Celery):**
+```bash
+# Executar com --json (apenas JSON em stdout)
+docker compose exec web python manage.py preagenda_to_gcal \
+  --calendar-id test-calendar \
+  --client=fake \
+  --dry-run \
+  --json
+```
+
+**Validação esperada (JSON puro em stdout):**
+```json
+{
+  "meta": {
+    "calendar_id": "test-calendar",
+    "client": "fake",
+    "since": "2025-07-13T00:00:00+00:00",
+    "until": "2026-04-09T23:59:59+00:00",
+    "dry_run": true,
+    "batch_size": 200,
+    "run_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "started_at": "2025-10-12T10:30:00+00:00",
+    "finished_at": "2025-10-12T10:30:05+00:00",
+    "duration_ms": 5234
+  },
+  "totals": {
+    "CREATE": 1,
+    "UPDATE": 0,
+    "ADOPT": 0,
+    "DELETE": 0,
+    "SKIP": 0,
+    "total": 1
+  }
+}
+```
+
+### 6. Sincronização Real (FakeClient)
+
+```bash
+# Executar sem --dry-run (altera DB, mas usa FakeClient = sem efeito no Google real)
+docker compose exec web python manage.py preagenda_to_gcal \
+  --calendar-id test-calendar \
+  --client=fake \
+  --verbose
+```
+
+**Validação esperada:**
+- Mesma saída, mas sem aviso de dry-run
+- `CREATE: 1`
+
+**Verificar no DB:**
+```python
+from apps.core.models import Solicitacao
+
+sol = Solicitacao.objects.get(id=1)
+print(f"Status: {sol.status}")  # Deve ser "aprovado"
+print(f"External Event ID: {sol.external_event_id}")  # Deve ser "asv2-1" (novo padrão)
+```
+
+### 7. Idempotência (Segunda Rodada)
+
+```bash
+# Executar novamente o mesmo comando
+docker compose exec web python manage.py preagenda_to_gcal \
+  --calendar-id test-calendar \
+  --client=fake \
+  --verbose
+```
+
+**Validação esperada:**
+- `UPDATE: 1` (segunda rodada não duplica, apenas atualiza)
+- `CREATE: 0`
+- Total processado: 1
+
+### 8. Reprovar e Deletar Evento
+
+```bash
+# Reprovar solicitação
+curl -X PATCH http://localhost:8000/api/solicitacoes/1/reject/ \
+  -H "Content-Type: application/json" \
+  -u super1:senha123 \
+  -d '{"justificativa": "Teste de reprovação"}'
+```
+
+**Sincronizar novamente:**
+```bash
+docker compose exec web python manage.py preagenda_to_gcal \
+  --calendar-id test-calendar \
+  --client=fake \
+  --verbose
+```
+
+**Validação esperada:**
+- `DELETE: 1` (evento removido)
+- `external_event_id` limpo no DB (`null`)
+
+### 9. Testar Flag `--no-delete`
+
+```bash
+# Aprovar novamente
+curl -X PATCH http://localhost:8000/api/solicitacoes/1/approve/ \
+  -u super1:senha123
+
+# Sincronizar
+docker compose exec web python manage.py preagenda_to_gcal \
+  --calendar-id test-calendar \
+  --client=fake
+
+# Reprovar
+curl -X PATCH http://localhost:8000/api/solicitacoes/1/reject/ \
+  -u super1:senha123 \
+  -d '{"justificativa": "Teste no-delete"}'
+
+# Sincronizar com --no-delete
+docker compose exec web python manage.py preagenda_to_gcal \
+  --calendar-id test-calendar \
+  --client=fake \
+  --no-delete \
+  --verbose
+```
+
+**Validação esperada:**
+- `SKIP: 1` (não deleta por causa de `--no-delete`)
+- Evento continua no "calendar" (FakeClient)
+
+### 10. Testar Filtros
+
+**Por IDs específicos:**
+```bash
+docker compose exec web python manage.py preagenda_to_gcal \
+  --calendar-id test-calendar \
+  --client=fake \
+  --ids 1 \
+  --dry-run
+```
+
+**Por janela temporal:**
+```bash
+docker compose exec web python manage.py preagenda_to_gcal \
+  --calendar-id test-calendar \
+  --client=fake \
+  --since 2025-10-01T00:00:00 \
+  --until 2025-10-31T23:59:59 \
+  --dry-run
+```
+
+**Validação esperada:**
+- Apenas solicitações no range especificado são processadas
+
+### 11. Testar Batch Processing (Chunking)
+
+**Para grandes volumes de dados (evitar lock timeout):**
+```bash
+# Processar em chunks de 50 registros por vez
+docker compose exec web python manage.py preagenda_to_gcal \
+  --calendar-id test-calendar \
+  --client=fake \
+  --batch-size 50 \
+  --verbose
+```
+
+**Validação esperada:**
+- Lock renovado automaticamente a cada chunk (via `cache.touch()`)
+- Mensagem `[LOCK RENEWED] X processados` quando verbose ativo
+- Fallback graceful se cache backend não suporta `touch()`
+
+**Observação:**
+- `--batch-size=0`: Processa todos de uma vez (legacy mode)
+- `--batch-size=200`: Padrão (compromisso entre performance e lock safety)
+- Lock TTL: 5 minutos (300s)
+
+### 12. Testar Celery Preview-Then-Apply
+
+**Executar task manualmente:**
+```bash
+docker compose exec web python manage.py shell
+```
+
+```python
+from apps.core.tasks import preview_then_apply_gcal
+
+# Executar de forma síncrona (para debug)
+result = preview_then_apply_gcal()
+print(result)
+```
+
+**Validação esperada:**
+```python
+{
+    "preview": {
+        "meta": {...},
+        "totals": {"CREATE": 1, ...}
+    },
+    "apply": {
+        "meta": {...},
+        "totals": {"CREATE": 1, ...}
+    },
+    "applied": True,
+    "reason": "Applied 1 changes"
+}
+```
+
+**Se sem mudanças (total_changes == 0):**
+```python
+{
+    "preview": {...},
+    "applied": False,
+    "reason": "No changes detected (total_changes == 0)"
+}
+```
+
+**Celery Beat (automático a cada 5 minutos):**
+```bash
+# Verificar que beat está configurado
+docker compose exec web python manage.py shell
+```
+
+```python
+from django.conf import settings
+print(settings.CELERY_BEAT_SCHEDULE)
+# Deve mostrar: {'gcal-sync-every-5-minutes': {...}}
+```
+
+### 13. Testar Config Mutável (DB-based Settings)
+
+**Criar config via Django shell:**
+```python
+from apps.core.models import Config
+from django.utils import timezone
+
+# Criar config para availability
+Config.objects.create(
+    key="availability",
+    value={
+        "TRAVEL_BUFFER_MINUTES": 90,
+        "AVAILABILITY_DAILY_LIMIT_HOURS": 6
+    },
+    effective_at=timezone.now()
+)
+```
+
+**Verificar uso do config:**
+```python
+from apps.core.services.config_service import get_cfg
+
+cfg = get_cfg("availability", {})
+print(cfg)  # Deve retornar: {'TRAVEL_BUFFER_MINUTES': 90, ...}
+
+# Teste de cache (segunda leitura não bate DB)
+cfg2 = get_cfg("availability", {})
+print(cfg2)  # Mesmo resultado, mas do cache (5min TTL)
+```
+
+**Invalidar cache manualmente:**
+```python
+from apps.core.services.config_service import bust_cfg
+
+bust_cfg("availability")
+# Próxima leitura vai no DB novamente
+```
+
+**Observação:**
+- Cache TTL: 5 minutos (300s)
+- Auto-invalidação via signal `post_save(Config)`
+- Fallback para `settings.py` se Config não existir
+- Usado em `availability_service.py` para RD-04/RD-05
+
+---
+
+## ❌ Erros Esperados (Comportamento Correto)
+
+### Tentar usar `--client=google` sem implementação:
+
+```bash
+docker compose exec web python manage.py preagenda_to_gcal \
+  --calendar-id test-calendar \
+  --client=google
+```
+
+**Saída esperada:**
+```
+GoogleCalendarClient ainda não implementado. Use FakeCalendarClient (--client=fake) ou aguarde PR 4/N.
+
+💡 Solução temporária: use --client=fake para validar fluxo
+   ou aguarde implementação do GoogleCalendarClient (PR 4/N)
+```
+
+### Sem `GCAL_CALENDAR_ID` configurado:
+
+```bash
+docker compose exec web python manage.py preagenda_to_gcal
+```
+
+**Saída esperada:**
+```
+GCAL_CALENDAR_ID não configurado e --calendar-id não informado.
+Configure GCAL_CALENDAR_ID no .env ou use --calendar-id
+```
+
+---
+
+## ✅ Checklist de Validação
+
+**Fluxo Base:**
+- [ ] Solicitação criada com `status=pendente` (PA-01)
+- [ ] Coordenador **não consegue** aprovar (PA-02, retorna 403)
+- [ ] Superintendência **consegue** aprovar (PA-02, retorna 200)
+- [ ] Disponibilidade checada corretamente (RD-01 a RD-08)
+- [ ] Dry-run não altera DB nem Calendar
+- [ ] Primeira sincronização: `CREATE`
+- [ ] Segunda sincronização: `UPDATE` (idempotência)
+- [ ] Reprovar → sincronizar: `DELETE`
+- [ ] Flag `--no-delete` protege de DELETE → `SKIP`
+- [ ] Filtros `--ids`, `--since`, `--until` funcionam
+- [ ] `--client=google` mostra erro amigável
+- [ ] FakeClient não publica no Google real
+
+**Novos Recursos (Seção 4 - PR 3/3):**
+- [ ] `--json` retorna JSON válido (sem texto em stdout)
+- [ ] EventId usa padrão `asv2-{id}` (mínimo 6 chars)
+- [ ] `--batch-size` processa em chunks corretamente
+- [ ] Lock renovado via `cache.touch()` com fallback graceful
+- [ ] Config model criado e migração aplicada
+- [ ] `get_cfg()` funciona com cache de 5min
+- [ ] Cache invalidado automaticamente via signal
+- [ ] Celery task `preview_then_apply_gcal` criado
+- [ ] CELERY_BEAT_SCHEDULE configurado (5min interval)
+- [ ] Preview-then-apply só executa apply se total_changes > 0
+
+---
+
+## 🚀 Próximo Passo: GoogleCalendarClient Real
+
+Quando implementar `GoogleCalendarClient` (PR 4/N):
+
+1. **Trocar** `--client=fake` por `--client=google`
+2. **Configurar** `GCAL_CALENDAR_ID` real no `.env`
+3. **Adicionar** credenciais OAuth2/Service Account
+4. **Executar** com dados de produção
+5. **Verificar** eventos criados no Google Calendar real
+
+**Exemplo:**
+```bash
+docker compose exec web python manage.py preagenda_to_gcal \
+  --client=google \
+  --calendar-id c_1234567890abcdef@group.calendar.google.com \
+  --since 2025-10-01T00:00:00 \
+  --until 2025-10-31T23:59:59 \
+  --verbose
+```
+
+---
+
+## 📊 Métricas de Sucesso
+
+- **0 erros** durante validação
+- **100% dos testes** passando (39/39)
+- **Idempotência** garantida (segunda rodada não duplica)
+- **RBAC** funcionando (403 para não-super)
+- **PA-01** respeitado (nunca auto-aprova)
+- **Dry-run** seguro (sem side effects)
+
+---
+
+## 🆘 Troubleshooting
+
+### Erro: "No module named 'apps.core.services.gcal_google_client'"
+**Causa:** Arquivo não existe ou não foi commitado
+**Solução:** Verificar que `apps/core/services/gcal_google_client.py` existe
+
+### Erro: "GCAL_CALENDAR_ID não configurado"
+**Causa:** Variável de ambiente não definida
+**Solução:** Usar `--calendar-id test-calendar` ou configurar no `.env`
+
+### Erro: "Não encontrei grupo 'Superintendência'"
+**Causa:** Grupo não foi criado
+**Solução:** Executar etapa 1 do runbook
+
+### Erro: AttributeError: 'int' object has no attribute 'endswith'
+**Causa:** Command retornando int ao invés de usar sys.exit()
+**Solução:** Já corrigido (todos `return X` substituídos por `sys.exit(X)`)
+
+---
+
+## 📚 Referências
+
+- **CLAUDE.md**: Cláusulas Pétreas (PA-01, RD-01 a RD-08)
+- **BLUEPRINT.md**: Arquitetura e roadmap
+- **Test Suite**: `apps/core/tests/test_gcal_sync_dryrun.py` (11 testes)
+- **Google Calendar API**: https://developers.google.com/calendar/api/v3/reference

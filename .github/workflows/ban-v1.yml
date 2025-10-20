@@ -1,0 +1,49 @@
+name: ban-v1
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: v2
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect changed files
+        id: diff
+        run: |
+          git fetch origin main --depth=1
+          BASE=$(git merge-base HEAD origin/main)
+          echo "base_commit=$BASE" >> "$GITHUB_OUTPUT"
+          git diff --name-only "$BASE"...HEAD > ../changed.txt
+      - name: Forbid legacy edits
+        run: |
+          if grep -q '^archive/v1_legado/' ../changed.txt; then
+            echo "archive/v1_legado é apenas consulta" >&2
+            exit 1
+          fi
+      - name: Forbid legacy strings
+        run: |
+          if git diff "${{ steps.diff.outputs.base_commit }}"...HEAD | \
+             grep -E '(aprendersistema|web-1|db-1|redis-1|docker-compose.*v1)'; then
+            echo "Referência v1 detectada" >&2
+            exit 1
+          fi
+      - name: Docker up
+        run: make up
+      - name: readyz
+        run: make readyz
+      - name: healthz
+        run: make healthz
+      - name: docker ps
+        run: docker compose -f infra/docker-compose.yml ps
+      - name: Tear down
+        if: always()
+        run: make down || true

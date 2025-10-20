@@ -8,6 +8,7 @@ Cláusulas Pétreas:
 """
 
 from django.contrib.auth.models import AbstractUser
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -434,3 +435,94 @@ class AuditLog(models.Model):
     def __str__(self):
         usuario_str = self.usuario.get_full_name() if self.usuario else "Sistema"
         return f"{usuario_str} - {self.action} ({self.created_at.strftime('%d/%m/%Y %H:%M')})"
+
+
+class Participation(models.Model):
+    """
+    Participação de usuários em eventos (Solicitações).
+
+    Permite representar múltiplos papéis:
+    - COORDENADOR: Coordenador do evento
+    - FORMADOR: Formador/instrutor do evento
+    - COORD_ACOMPANHA: Coordenador que acompanha (não coordena)
+    - CONVIDADO: Convidado/participante
+
+    Unicidade: (solicitacao, usuario, role)
+    """
+
+    class Role(models.TextChoices):
+        COORDENADOR = "COORDENADOR", "Coordenador"
+        FORMADOR = "FORMADOR", "Formador"
+        COORD_ACOMPANHA = "COORD_ACOMPANHA", "Coord. Acompanha"
+        CONVIDADO = "CONVIDADO", "Convidado"
+
+    solicitacao = models.ForeignKey(
+        "core.Solicitacao",
+        on_delete=models.CASCADE,
+        related_name="participations",
+        verbose_name="Solicitação",
+    )
+    # Usuário é obrigatório para todos os papéis, exceto CONVIDADO
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="event_participations",
+        null=True,
+        blank=True,
+        verbose_name="Usuário",
+    )
+    # Convidado externo identificado por e-mail quando não há usuário cadastrado
+    guest_email = models.EmailField(null=True, blank=True, verbose_name="E-mail do convidado")
+    role = models.CharField(
+        max_length=20,
+        choices=Role.choices,
+        verbose_name="Papel",
+    )
+    ch_horas = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="CH (horas)"
+    )
+    observacao = models.TextField(null=True, blank=True, verbose_name="Observação")
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+
+    class Meta:
+        db_table = "core_participation"
+        verbose_name = "Participação"
+        verbose_name_plural = "Participações"
+        ordering = ["solicitacao_id", "role", "usuario_id"]
+        constraints = [
+            # Pelo menos um entre usuário ou guest_email deve estar preenchido
+            models.CheckConstraint(
+                name="core_participation_user_or_email",
+                check=(models.Q(usuario__isnull=False) | models.Q(guest_email__isnull=False)),
+            ),
+            # Se não for convidado, usuário é obrigatório
+            models.CheckConstraint(
+                name="core_participation_user_required_when_not_guest",
+                check=(
+                    models.Q(role="CONVIDADO")
+                    | (models.Q(role__in=["COORDENADOR", "FORMADOR", "COORD_ACOMPANHA"]) & models.Q(usuario__isnull=False))
+                ),
+            ),
+            # Unicidade por usuário (quando usuário existe)
+            models.UniqueConstraint(
+                fields=["solicitacao", "usuario", "role"],
+                name="core_participation_unique_user",
+                condition=models.Q(usuario__isnull=False),
+            ),
+            # Unicidade por convidado externo (quando email de convidado existe)
+            models.UniqueConstraint(
+                fields=["solicitacao", "guest_email", "role"],
+                name="core_participation_unique_guest",
+                condition=models.Q(guest_email__isnull=False),
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["solicitacao", "role"]),
+            models.Index(fields=["usuario", "role"]),
+            models.Index(fields=["guest_email"]),
+        ]
+
+    def __str__(self):
+        return f"{self.solicitacao_id} — {self.usuario or self.guest_email} ({self.get_role_display()})"

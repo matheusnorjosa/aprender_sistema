@@ -701,9 +701,9 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["action", "usuario", "model_name"]
-    search_fields = ["justificativa", "model_name", "object_id"]
-    ordering_fields = ["timestamp", "action", "id"]
-    ordering = ["-timestamp"]
+    search_fields = ["action", "model_name"]
+    ordering_fields = ["created_at", "action", "id"]
+    ordering = ["-created_at"]
 
 
 class ImportComprasView(APIView):

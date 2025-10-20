@@ -142,11 +142,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         ):
             return Solicitacao.objects.select_related(
                 "usuario", "municipio", "tipo_evento", "projeto"
-            ).prefetch_related("formadores")
+            ).prefetch_related("participations__usuario")
         return (
             Solicitacao.objects.filter(usuario=self.request.user)
             .select_related("usuario", "municipio", "tipo_evento", "projeto")
-            .prefetch_related("formadores")
+            .prefetch_related("participations__usuario")
         )
 
     def perform_create(self, serializer):

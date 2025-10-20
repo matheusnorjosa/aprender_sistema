@@ -1,0 +1,70 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server","--appendonly","no"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      target: runtime
+    working_dir: /app
+    command: ["bash","-lc","./entrypoint.sh"]
+    environment:
+      DJANGO_DEBUG: "${DJANGO_DEBUG:-1}"
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-*}"
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      TZ: America/Fortaleza
+      RUN_MODE: "${RUN_MODE:-dev}"   # dev (runserver) | prod (gunicorn)
+      REQUIRE_DOCKER: "1"
+      GCAL_CALENDAR_ID: "c_3381579109915e33c06be465adfbd9a31aaf4205c0bd45aa050c5a18be99fe15@group.calendar.google.com"
+      GOOGLE_SERVICE_ACCOUNT_PATH: "/app/service_account.json"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - ./csv-import:/app/data/csv-import:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/healthz/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  pgdata:

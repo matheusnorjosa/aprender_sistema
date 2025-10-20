@@ -1,0 +1,463 @@
+"""
+Google Calendar Sync Service - Sincronização idempotente de pré-agenda
+
+Sincroniza Solicitações aprovadas com Google Calendar.
+Suporta CREATE, UPDATE, ADOPT, DELETE e SKIP.
+
+Regras:
+- Somente Solicitacao.status == "aprovado" é candidata
+- eventId determinístico: as-{solicitacao.id}
+- Idempotência via external_event_id
+- Sem regras de disponibilidade (já no AvailabilityService)
+- PA-01: Não auto-aprova nada
+"""
+
+from dataclasses import dataclass
+from datetime import timezone as dt_timezone
+from typing import Literal, Optional
+
+from django.conf import settings
+from django.utils import timezone
+
+from apps.core.models import Solicitacao
+
+Action = Literal["CREATE", "UPDATE", "DELETE", "ADOPT", "SKIP"]
+
+
+@dataclass
+class SyncOutcome:
+    """
+    Resultado de uma operação de sincronização.
+
+    action: Tipo de ação executada
+    solicitation_id: ID da solicitação
+    external_event_id: ID do evento no Calendar (ou None)
+    summary: Resumo do evento
+    """
+
+    action: Action
+    solicitation_id: int
+    external_event_id: Optional[str]
+    summary: str
+
+
+class CalendarClientAdapter:
+    """
+    Interface para clientes de Calendar.
+
+    Implementações:
+    - FakeCalendarClient: in-memory para testes
+    - GoogleCalendarClient: real Google API (futuro)
+    """
+
+    def get(self, calendar_id: str, event_id: str) -> Optional[dict]:
+        """
+        Busca evento por ID.
+
+        Returns:
+            dict com dados do evento, ou None se não existe
+        """
+        raise NotImplementedError
+
+    def insert(self, calendar_id: str, event_id: str, payload: dict) -> dict:
+        """
+        Cria novo evento.
+
+        Args:
+            calendar_id: ID do calendário
+            event_id: ID determinístico do evento
+            payload: Dados do evento (summary, start, end, etc)
+
+        Returns:
+            dict com evento criado (incluindo "id")
+        """
+        raise NotImplementedError
+
+    def update(self, calendar_id: str, event_id: str, payload: dict) -> dict:
+        """
+        Atualiza evento existente.
+
+        Args:
+            calendar_id: ID do calendário
+            event_id: ID do evento
+            payload: Novos dados do evento
+
+        Returns:
+            dict com evento atualizado
+        """
+        raise NotImplementedError
+
+    def delete(self, calendar_id: str, event_id: str) -> None:
+        """
+        Deleta evento.
+
+        Args:
+            calendar_id: ID do calendário
+            event_id: ID do evento
+        """
+        raise NotImplementedError
+
+
+def _validate_event_id(event_id: str) -> bool:
+    """
+    Valida eventId conforme especificação Google Calendar API.
+
+    Regras:
+    - Comprimento: 5-1024 caracteres
+    - Caracteres permitidos: a-z, 0-9, - (hífen), _ (underscore)
+    - Deve ser lowercase
+
+    Args:
+        event_id: ID do evento a validar
+
+    Returns:
+        bool: True se válido, False caso contrário
+
+    Raises:
+        ValueError: Se eventId inválido (com mensagem descritiva)
+    """
+    import re
+
+    if not event_id:
+        raise ValueError("eventId não pode ser vazio")
+
+    if len(event_id) < 5:
+        raise ValueError(f"eventId muito curto: {len(event_id)} chars (mínimo: 5)")
+
+    if len(event_id) > 1024:
+        raise ValueError(f"eventId muito longo: {len(event_id)} chars (máximo: 1024)")
+
+    # Verificar caracteres permitidos (a-z, 0-9, -, _)
+    if not re.match(r"^[a-z0-9_-]+$", event_id):
+        raise ValueError(
+            f"eventId contém caracteres inválidos: {event_id}. "
+            "Permitido: a-z, 0-9, -, _"
+        )
+
+    return True
+
+
+def _event_id_for(s: Solicitacao) -> str:
+    """
+    Gera eventId determinístico para uma Solicitacao.
+
+    Format: asv2-{id} (lowercase, a-z0-9-, mínimo 6 chars)
+
+    Args:
+        s: Solicitacao
+
+    Returns:
+        str: Event ID determinístico (validado)
+
+    Raises:
+        ValueError: Se ID gerado for inválido
+    """
+    event_id = f"asv2-{s.id}"
+
+    # Validar antes de retornar
+    _validate_event_id(event_id)
+
+    return event_id
+
+
+def _build_payload(s: Solicitacao) -> dict:
+    """
+    Constrói payload do evento para Google Calendar API.
+
+    Args:
+        s: Solicitacao aprovada
+
+    Returns:
+        dict: Payload compatível com Google Calendar API
+    """
+    # Converter para UTC (Google aceita ISO8601 com Z)
+    start_iso = s.inicio.astimezone(dt_timezone.utc).isoformat()
+    end_iso = s.fim.astimezone(dt_timezone.utc).isoformat()
+
+    # Extrair atributos (podem ser None)
+    municipio = getattr(s, "municipio", None)
+    tipo = getattr(s, "tipo_evento", None)
+    usuario = getattr(s, "usuario", None)
+
+    # Construir summary: "Município - UF — Tipo — Usuário"
+    parts = []
+
+    if municipio:
+        nome_mun = getattr(municipio, "nome", "")
+        uf_mun = getattr(municipio, "uf", "")
+        if nome_mun:
+            parts.append(f"{nome_mun}{' - ' + uf_mun if uf_mun else ''}")
+
+    if tipo:
+        nome_tipo = getattr(tipo, "nome", "")
+        if nome_tipo:
+            parts.append(nome_tipo)
+
+    if usuario:
+        nome_user = getattr(usuario, "get_full_name", lambda: "")() or getattr(
+            usuario, "username", ""
+        )
+        if nome_user:
+            parts.append(nome_user)
+
+    summary = " — ".join(parts) if parts else f"Solicitação #{s.id}"
+
+    # ================================================================
+    # DEFENSIVE TRUNCATION (Google Calendar limits)
+    # ================================================================
+    # Summary: ≤1000 chars. Se exceder, move excess para description.
+    # Description: ≤5000 chars total.
+    summary_excess = ""
+    if len(summary) > 1000:
+        summary_excess = f"\n\n[Título completo]\n{summary}\n"
+        summary_trimmed = summary[:997] + "..."
+    else:
+        summary_trimmed = summary
+
+    # Description base + excess do summary (se houver) + observações
+    description_parts = [f"AS v2 • Solicitação #{s.id}"]
+    if summary_excess:
+        description_parts.append(summary_excess.strip())
+    if s.observacoes:
+        description_parts.append(s.observacoes.strip())
+
+    description = "\n\n".join(description_parts).strip()
+
+    # Limitar description a 5000 chars
+    if len(description) > 5000:
+        description_trimmed = description[:4997] + "..."
+    else:
+        description_trimmed = description
+
+    # Construir payload
+    payload = {
+        "summary": summary_trimmed,
+        "description": description_trimmed,
+        "start": {"dateTime": start_iso, "timeZone": "UTC"},
+        "end": {"dateTime": end_iso, "timeZone": "UTC"},
+        "location": getattr(municipio, "nome", None) if municipio else None,
+        "conferenceData": None,  # Reservado para Meet (futuro)
+        # Metadados para auditoria e reconciliação
+        "extendedProperties": {
+            "private": {
+                "solicitation_id": str(s.id),
+                "ssot_version": "v2",
+                "last_updated": (
+                    s.updated_at.isoformat()
+                    if hasattr(s, "updated_at") and s.updated_at
+                    else ""
+                ),
+            }
+        },
+    }
+
+    # Attendees (se usuário tiver email)
+    if usuario and hasattr(usuario, "email") and usuario.email:
+        payload["attendees"] = [{"email": usuario.email}]
+    else:
+        payload["attendees"] = []
+
+    # Color mapping (opcional)
+    color_map = getattr(settings, "GCAL_COLOR_MAP", None)
+    if color_map and tipo:
+        tipo_nome = getattr(tipo, "nome", None)
+        if tipo_nome and tipo_nome in color_map:
+            payload["colorId"] = str(color_map[tipo_nome])
+
+    return payload
+
+
+def upsert_one(
+    *,
+    client: CalendarClientAdapter,
+    calendar_id: str,
+    s: Solicitacao,
+    dry_run: bool = False,
+    no_delete: bool = False,
+) -> SyncOutcome:
+    """
+    Sincroniza uma Solicitacao com o Google Calendar (idempotente).
+
+    Lógica:
+    1. Se status != "aprovado" e tem external_event_id → DELETE (ou SKIP se no_delete)
+    2. Se não aprovado → SKIP
+    3. Se aprovado:
+       - Se evento não existe no Calendar → CREATE
+       - Se evento existe mas DB não tem external_event_id → ADOPT + UPDATE
+       - Se evento existe e DB tem external_event_id → UPDATE
+
+    Args:
+        client: Adaptador de Calendar
+        calendar_id: ID do calendário Google
+        s: Solicitacao a sincronizar
+        dry_run: Se True, não altera DB nem Calendar
+        no_delete: Se True, não deleta eventos de solicitações não-aprovadas
+
+    Returns:
+        SyncOutcome com ação executada
+    """
+    action: Optional[Action] = None
+    error_msg: Optional[str] = None
+    external_event_id: Optional[str] = None
+
+    try:
+        # ================================================================
+        # CONCURRENCY SAFETY: Uso recomendado com update_fields
+        # ================================================================
+        # Nota: Para produção, chamar dentro de transaction.atomic() e iterar
+        # sobre queryset com select_for_update() no command:
+        # qs = Solicitacao.objects.select_for_update().filter(...)
+        # for s in qs:
+        #     upsert_one(client, calendar_id, s, dry_run, no_delete)
+        # Caso 1: Não aprovado com evento vinculado → DELETE (ou SKIP)
+        if s.status != "aprovado":
+            if s.external_event_id:
+                if no_delete:
+                    action = "SKIP"
+                    external_event_id = s.external_event_id
+                    return SyncOutcome(
+                        action,
+                        s.id,
+                        external_event_id,
+                        f"Solicitação #{s.id} (no-delete)",
+                    )
+
+                eid = s.external_event_id
+                if not dry_run:
+                    try:
+                        client.delete(calendar_id, eid)
+                    except Exception as e:
+                        # Ignora se evento já foi deletado, mas registra outros erros
+                        if "404" not in str(e):
+                            error_msg = f"Erro ao deletar: {str(e)}"
+
+                    s.external_event_id = None
+                    s.last_synced_at = timezone.now()
+                    s.last_sync_action = "DELETE"
+                    s.last_sync_error = error_msg
+                    s.save(
+                        update_fields=[
+                            "external_event_id",
+                            "last_synced_at",
+                            "last_sync_action",
+                            "last_sync_error",
+                        ]
+                    )
+
+                action = "DELETE"
+                return SyncOutcome(action, s.id, None, f"Solicitação #{s.id}")
+
+            # Não aprovado sem evento vinculado → SKIP
+            action = "SKIP"
+            return SyncOutcome(
+                action, s.id, None, f"Solicitação #{s.id} (não aprovado)"
+            )
+
+        # Caso 2: Aprovado → CREATE/UPDATE/ADOPT
+        deterministic_eid = _event_id_for(s)
+        payload = _build_payload(s)
+
+        # Verificar se evento já existe no Calendar
+        existing = None
+        if s.external_event_id:
+            # Tentar buscar pelo ID armazenado no DB
+            try:
+                existing = client.get(calendar_id, s.external_event_id)
+            except Exception as e:
+                error_msg = f"Erro ao buscar evento: {str(e)}"
+
+        if existing is None:
+            # Tentar adotar evento com eventId determinístico
+            try:
+                existing = client.get(calendar_id, deterministic_eid)
+            except Exception as e:
+                if error_msg is None:
+                    error_msg = f"Erro ao buscar evento determinístico: {str(e)}"
+
+        if existing is None:
+            # CREATE: Evento não existe
+            action = "CREATE"
+            external_event_id = deterministic_eid
+
+            if not dry_run:
+                try:
+                    created = client.insert(calendar_id, deterministic_eid, payload)
+                    s.external_event_id = created.get("id") or deterministic_eid
+                    s.last_synced_at = timezone.now()
+                    s.last_sync_action = action
+                    s.last_sync_error = None
+                    s.save(
+                        update_fields=[
+                            "external_event_id",
+                            "last_synced_at",
+                            "last_sync_action",
+                            "last_sync_error",
+                        ]
+                    )
+                except Exception as e:
+                    error_msg = f"Erro ao criar evento: {str(e)}"
+                    s.last_synced_at = timezone.now()
+                    s.last_sync_action = action
+                    s.last_sync_error = error_msg
+                    s.save(
+                        update_fields=[
+                            "last_synced_at",
+                            "last_sync_action",
+                            "last_sync_error",
+                        ]
+                    )
+                    raise
+
+            return SyncOutcome(action, s.id, external_event_id, payload["summary"])
+
+        else:
+            # UPDATE ou ADOPT
+            action = "UPDATE"
+            external_event_id = deterministic_eid
+
+            if not s.external_event_id:
+                # DB não tinha o ID, mas evento existe → ADOPT
+                action = "ADOPT"
+
+            if not dry_run:
+                try:
+                    client.update(calendar_id, deterministic_eid, payload)
+                    if not s.external_event_id:
+                        s.external_event_id = deterministic_eid
+                    s.last_synced_at = timezone.now()
+                    s.last_sync_action = action
+                    s.last_sync_error = None
+                    s.save(
+                        update_fields=[
+                            "external_event_id",
+                            "last_synced_at",
+                            "last_sync_action",
+                            "last_sync_error",
+                        ]
+                    )
+                except Exception as e:
+                    error_msg = f"Erro ao atualizar evento: {str(e)}"
+                    s.last_synced_at = timezone.now()
+                    s.last_sync_action = action
+                    s.last_sync_error = error_msg
+                    s.save(
+                        update_fields=[
+                            "last_synced_at",
+                            "last_sync_action",
+                            "last_sync_error",
+                        ]
+                    )
+                    raise
+
+            return SyncOutcome(action, s.id, external_event_id, payload["summary"])
+
+    except Exception as e:
+        # Captura qualquer erro não tratado
+        if action and not dry_run:
+            s.last_synced_at = timezone.now()
+            s.last_sync_action = action or "ERROR"
+            s.last_sync_error = str(e)[:500]  # Limitar tamanho do erro
+            s.save(
+                update_fields=["last_synced_at", "last_sync_action", "last_sync_error"]
+            )
+        raise

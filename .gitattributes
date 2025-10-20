@@ -67,3 +67,6 @@ docker-compose*.yml text eol=lf
 *.p12 binary
 service-account*.json binary
 *credentials*.json binary
+
+# archive v1 não incluso em releases
+archive/** export-ignore

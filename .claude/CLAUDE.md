@@ -5,6 +5,90 @@
 - Stack: **Python 3.13 + Django 5.2 + PostgreSQL 15**, containers via **Docker + docker-compose**.
 - Fuso horário padrão: `America/Fortaleza`.
 
+---
+
+## ⚖️ CLÁUSULAS PÉTREAS — IMUTÁVEIS
+
+### 🐳 CP-01: REQUIRE_DOCKER=1 (v2 ONLY)
+- **v2 DEVE rodar APENAS em Docker.** Nenhuma exceção.
+- Validação obrigatória em `config/settings.py`:
+  ```python
+  REQUIRE_DOCKER = os.getenv("REQUIRE_DOCKER", "0") == "1"
+  if REQUIRE_DOCKER and not os.path.exists("/.dockerenv"):
+      print("❌ ERRO: v2 deve rodar apenas em Docker", file=sys.stderr)
+      sys.exit(1)
+  ```
+- Comando correto: `cd v2/infra && docker-compose up`
+- **v1 pode rodar local** (legacy support), mas **v2 = Docker obrigatório**.
+
+### 🔒 CP-02: Política de Aprovação Manual (PA-01 a PA-07)
+Estas regras estão definidas em `.claude/CLAUDE.md` e são **imutáveis**:
+
+- **PA-01**: Sem auto-aprovação. Uma Solicitação **nunca** muda para "Aprovada" automaticamente.
+- **PA-02**: Apenas usuários com perfil **Superintendência** (ou Admin delegado) podem aprovar/reprovar.
+- **PA-03**: Integrações externas (Google Calendar, etc.) só executam **após** aprovação manual concluída.
+- **PA-04**: Toda solicitação nasce com `status = pendente`.
+- **PA-05**: Registrar usuário, data/hora e justificativa em `Aprovacao` e `LogAuditoria`.
+- **PA-06**: UI/UX: esconder botões de ação para perfis sem permissão (ISO 9241-110).
+- **PA-07**: Testes obrigatórios:
+  - `test_never_auto_approves_on_clean_or_save`
+  - `test_only_superintendencia_can_approve_or_reject`
+  - `test_calendar_integration_not_called_before_approval`
+  - `test_approval_flow_records_audit_log`
+  - `test_non_privileged_user_gets_403_on_approval_endpoint`
+
+### 📅 CP-03: Regras de Disponibilidade (RD-01 a RD-08)
+Estas regras estão definidas em `.claude/CLAUDE.md` e são **imutáveis**:
+
+- **RD-01**: Não-sobreposição (overlap ≥ 1 minuto = conflito; borda `fim == início` = OK).
+- **RD-02**: Bloqueio total (T) impede quaisquer eventos no intervalo.
+- **RD-03**: Bloqueio parcial (P) impede eventos dentro do subintervalo bloqueado.
+- **RD-04**: Buffer de deslocamento (D) entre municípios distintos (60–120 min configurável).
+- **RD-05**: Capacidade diária (M) — limite de horas por dia por formador.
+- **RD-06**: Timezone `America/Fortaleza` (aware), armazenar UTC.
+- **RD-07**: Prioridade de checagem: (1) Bloqueios, (2) Conflitos, (3) Buffer, (4) Limite diário.
+- **RD-08**: Mensagens de conflito devem listar formador(es), data/intervalo, tipo (E/M/D/P/T/X).
+
+### 🔄 CP-04: Workflow de Sub-Agents
+Ordem obrigatória de trabalho para agentes autônomos:
+1. **Entender** → Ler código, docs, issues
+2. **Planejar** → Escrever plano passo a passo (usar `/permissions plan`)
+3. **Implementar** → PRs pequenos e atômicos
+4. **Testar** → Testes unitários/integração/end-to-end (Playwright MCP)
+5. **Infra** → Docker/CI/CD (se aplicável)
+6. **ETL** → Importação de dados (se aplicável)
+7. **UI/UX** → Templates/views (se aplicável)
+
+**Nunca pular etapas.** Sempre documentar no `CLAUDE.md` o que foi feito.
+
+### 🚫 CP-05: Nunca Tocar v1 Sem Aprovação
+- **v1 está congelado** (tag: `v1-freeze`, branch: `main-v1`).
+- Qualquer mudança em v1 **exige**:
+  1. Branch `fix/v1-<nome>` ou `hotfix/v1-<nome>`
+  2. PR para `main-v1`
+  3. Aprovação de 1+ reviewer
+  4. CI verde
+- **v2 não modifica v1.** São sistemas isolados.
+
+### 📝 CP-06: Padrões de Commit, Branch e PR
+**Commits:**
+- Convenção: `<type>(<scope>): <message>`
+- Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `style`, `perf`
+- Exemplo: `feat(v2): add Django project structure + CI`
+
+**Branches:**
+- Padrão: `<type>/<nome>`
+- v1: `fix/v1-<nome>`, `hotfix/v1-<nome>`
+- v2: `feat/v2-<nome>`, `fix/v2-<nome>`, `chore/v2-<nome>`
+
+**PRs:**
+- Base: `main-v1` (para v1) ou `main-v2` (futuro, para v2)
+- Compare: `<type>/<nome>`
+- Require: 1+ approval, CI verde, branch up-to-date
+- Merge strategy: **Squash and merge** recomendado
+
+---
+
 ## ✅ SESSÃO ATUAL: Centralização Docker e Otimização Completa (Setembro 2025)
 
 ### 🎯 AUDITORIA E CENTRALIZAÇÃO COMPLETA:

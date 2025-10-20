@@ -181,6 +181,7 @@ exclude: |
     ^\.venv/|
     ^node_modules/|
     ^\.git/|
+    ^archive/|
     ^backups/|
     ^test_reports/|
     ^lint_reports/|

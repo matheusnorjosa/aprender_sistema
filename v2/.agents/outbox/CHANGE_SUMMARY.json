@@ -1,0 +1,282 @@
+{
+  "pr": "6/N - UI de Solicitações (Aprovação)",
+  "branch": "feat/pr6-solicitacoes-ui",
+  "date": "2025-10-13T21:00:00-03:00",
+  "author": "Claude Code",
+  "base_branch": "wf/backend/hardening-alpha1-hotfix",
+
+  "summary": {
+    "description": "Implementação completa da interface de usuário para que a Superintendência possa visualizar, aprovar e reprovar solicitações de eventos, com controle de permissões e auditoria.",
+    "impact": "Frontend",
+    "breaking_changes": false,
+    "dependencies_added": ["react-router-dom@7.9.4"],
+    "files_created": 5,
+    "files_modified": 2,
+    "lines_added": 735,
+    "lines_removed": 11
+  },
+
+  "files": [
+    {
+      "path": "v2/frontend/src/api/solicitacoes.js",
+      "status": "created",
+      "category": "API Client",
+      "lines_added": 130,
+      "description": "Cliente API completo para consumo dos endpoints de solicitações",
+      "functions": [
+        "getCSRFToken() - Extrai token CSRF do cookie",
+        "fetchAPI(url, options) - Wrapper genérico com CSRF e credentials",
+        "listSolicitacoes({status, page, search}) - Lista solicitações com filtros",
+        "approveSolicitacao(id) - Aprova solicitação pendente",
+        "rejectSolicitacao(id, {justificativa}) - Reprova com justificativa",
+        "getSolicitacao(id) - Busca detalhes de uma solicitação"
+      ],
+      "technical_notes": [
+        "Extração automática de CSRF token via cookies",
+        "Header X-CSRFToken adicionado automaticamente em métodos mutantes",
+        "credentials: 'include' em todas as requisições",
+        "Tratamento de erros com mensagens amigáveis",
+        "Suporte a query params para filtros e paginação DRF"
+      ]
+    },
+    {
+      "path": "v2/frontend/src/pages/Solicitacoes.jsx",
+      "status": "created",
+      "category": "UI Component",
+      "lines_added": 469,
+      "description": "Página completa para gestão de solicitações pela Superintendência",
+      "components": [
+        "Table - Lista paginada de solicitações com filtros",
+        "Drawer - Detalhes completos da solicitação selecionada",
+        "Modal - Confirmação de aprovação",
+        "Modal - Reprovação com justificativa obrigatória"
+      ],
+      "features": [
+        "Filtro de status (pendente/aprovado/reprovado/todos) com padrão 'pendente'",
+        "Busca por texto (usuário/município/tipo evento)",
+        "Paginação automática (DRF PageNumberPagination)",
+        "Botões Aprovar/Reprovar só aparecem para Superintendência + status pendente",
+        "Validação: justificativa obrigatória com mínimo 10 caracteres",
+        "Feedback visual: loading states, success/error messages",
+        "Recarga automática da lista após ações"
+      ],
+      "state_management": [
+        "solicitacoes[] - Lista de solicitações",
+        "loading - Loading durante fetch",
+        "pagination - Controle de paginação DRF",
+        "statusFilter - Filtro de status atual",
+        "searchTerm - Termo de busca",
+        "drawerVisible - Controle do drawer de detalhes",
+        "selectedSolicitacao - Solicitação selecionada",
+        "rejectModalVisible - Controle do modal de reprovação",
+        "processingAction - Loading durante approve/reject",
+        "currentUser - Usuário autenticado",
+        "isSuperintendencia - Flag de permissão"
+      ],
+      "technical_notes": [
+        "Alinhado com PA-06 (Política de Aprovação Manual)",
+        "useEffect para recarregar ao mudar filtros",
+        "Formatação de datas: DD/MM/YYYY HH:mm via dayjs",
+        "Tratamento de objetos/strings nos campos relacionados",
+        "Ant Design components (Table, Drawer, Modal, Form, Tag, etc.)"
+      ]
+    },
+    {
+      "path": "v2/frontend/src/App.jsx",
+      "status": "modified",
+      "category": "Routing",
+      "lines_added": 40,
+      "lines_removed": 11,
+      "description": "Adicionado roteamento com React Router e menu de navegação",
+      "changes": [
+        "Instalado react-router-dom@7.9.4",
+        "Implementado BrowserRouter com rotas",
+        "Criado menu horizontal no header",
+        "Adicionado Layout Ant Design (Header + Content)",
+        "Rota / redireciona para /disponibilidade",
+        "Rota /solicitacoes para nova página",
+        "Menu com ícones (CalendarOutlined, CheckCircleOutlined)"
+      ],
+      "routes": [
+        "/ → Navigate to /disponibilidade",
+        "/disponibilidade → Disponibilidade page (existing)",
+        "/solicitacoes → Solicitacoes page (new)"
+      ]
+    },
+    {
+      "path": "v2/frontend/package.json",
+      "status": "modified",
+      "category": "Dependencies",
+      "lines_added": 1,
+      "lines_removed": 0,
+      "description": "Adicionada dependência react-router-dom",
+      "dependencies_added": [
+        "react-router-dom@7.9.4"
+      ]
+    },
+    {
+      "path": "v2/docs/VALIDATION_BRIEF.md",
+      "status": "created",
+      "category": "Documentation",
+      "lines_added": 350,
+      "description": "Documentação completa do que mudou e como testar",
+      "sections": [
+        "Objetivo",
+        "Alterações Realizadas (detalhadas)",
+        "Como Testar (10 casos de teste)",
+        "Critérios de Aceitação (13 critérios)",
+        "Checklist de Validação",
+        "Arquivos Alterados/Criados",
+        "Próximos Passos",
+        "Referências"
+      ]
+    },
+    {
+      "path": "v2/.agents/outbox/VALIDATION_REQUEST.json",
+      "status": "created",
+      "category": "Validation",
+      "lines_added": 250,
+      "description": "Checklist estruturado com 40 verificações organizadas por categoria",
+      "categories": [
+        "Setup (4 checks)",
+        "Navegação (3 checks)",
+        "UI - Listagem (5 checks)",
+        "UI - Detalhes (3 checks)",
+        "UI - Permissões (2 checks)",
+        "Funcionalidade - Aprovar (4 checks)",
+        "Funcionalidade - Reprovar (6 checks)",
+        "Segurança - CSRF/Credentials/Autorização (3 checks)",
+        "UX - Loading/Erros/Paginação (4 checks)",
+        "Responsividade (1 check)",
+        "Console (1 check)",
+        "Documentação (1 check)",
+        "Evidências (1 check)",
+        "Git (2 checks)",
+        "Pull Request (1 check)"
+      ],
+      "critical_checks": 7,
+      "estimated_time": "60-90 minutes"
+    },
+    {
+      "path": "v2/.agents/outbox/CHANGE_SUMMARY.json",
+      "status": "created",
+      "category": "Documentation",
+      "description": "Este arquivo - resumo estruturado de todas as mudanças"
+    }
+  ],
+
+  "technical_details": {
+    "frontend_stack": {
+      "framework": "React 19.1.1",
+      "build_tool": "Vite 7.1.7",
+      "ui_library": "Ant Design 5.27.4",
+      "routing": "react-router-dom 7.9.4",
+      "date_handling": "dayjs 1.11.18",
+      "http_client": "native fetch API"
+    },
+    "api_integration": {
+      "authentication": "Django Session (cookie-based)",
+      "csrf_protection": "X-CSRFToken header (extracted from csrftoken cookie)",
+      "credentials": "include (sends cookies cross-origin)",
+      "base_url": "http://localhost:8002/api",
+      "endpoints_consumed": [
+        "GET /api/me/ - Current user info",
+        "GET /api/solicitacoes/ - List solicitações with filters",
+        "GET /api/solicitacoes/{id}/ - Get solicitação details",
+        "PATCH /api/solicitacoes/{id}/approve/ - Approve",
+        "PATCH /api/solicitacoes/{id}/reject/ - Reject with justification"
+      ]
+    },
+    "permission_control": {
+      "check": "getMe() verifica se usuário pertence ao grupo Superintendência",
+      "ui_impact": "Botões Aprovar/Reprovar só aparecem se isSuperintendencia && status === 'pendente'",
+      "backend_enforcement": "Backend deve validar permissões com 403 Forbidden para não autorizados",
+      "policy_alignment": "PA-06 (Política de Aprovação Manual)"
+    }
+  },
+
+  "testing_strategy": {
+    "manual_testing": {
+      "priority_high": [
+        "TC-01: Navegação entre páginas",
+        "TC-02: Listagem de solicitações com filtros",
+        "TC-04: Ver detalhes no drawer",
+        "TC-05: Aprovar solicitação (Superintendência)",
+        "TC-06: Reprovar com justificativa (Superintendência)",
+        "TC-07: Permissões (não-Superintendência não vê botões)",
+        "TC-08: CSRF token enviado automaticamente"
+      ],
+      "priority_medium": [
+        "TC-03: Busca por texto",
+        "TC-09: Responsividade",
+        "TC-10: Tratamento de erros"
+      ]
+    },
+    "required_screenshots": [
+      "Menu de navegação funcionando",
+      "Tabela com filtro pendente",
+      "Drawer de detalhes aberto",
+      "Modal de confirmação de aprovação",
+      "Modal de reprovação com justificativa e validação",
+      "Mensagem de sucesso após ação",
+      "DevTools Network tab mostrando CSRF token"
+    ]
+  },
+
+  "risks_and_mitigations": {
+    "risk_1": {
+      "description": "Backend endpoints não implementados ou com formato diferente",
+      "probability": "low",
+      "impact": "high",
+      "mitigation": "Validar endpoints no backend antes de testar frontend (verificar v2/backend/apps/core/views.py)"
+    },
+    "risk_2": {
+      "description": "Grupo 'Superintendência' não existe no Django",
+      "probability": "medium",
+      "impact": "high",
+      "mitigation": "Criar grupo via Django Admin ou shell: Group.objects.get_or_create(name='Superintendência')"
+    },
+    "risk_3": {
+      "description": "CSRF token não sendo enviado (configuração do backend)",
+      "probability": "low",
+      "impact": "critical",
+      "mitigation": "Verificar settings.py: CSRF_COOKIE_HTTPONLY=False, CSRF_TRUSTED_ORIGINS inclui localhost:5173"
+    },
+    "risk_4": {
+      "description": "Dados de teste insuficientes (poucas ou nenhuma solicitação)",
+      "probability": "high",
+      "impact": "medium",
+      "mitigation": "Criar solicitações de teste via Django Admin ou shell antes de validar UI"
+    }
+  },
+
+  "next_steps": [
+    "Atualizar v2/frontend/README.md com documentação da página Solicitações",
+    "Executar todos os casos de teste do VALIDATION_BRIEF.md",
+    "Capturar screenshots de cada fluxo",
+    "Corrigir bugs encontrados (se houver)",
+    "Commitar mudanças: git add . && git commit -m 'feat(frontend): add Solicitações page with approve/reject UI'",
+    "Push para branch: git push origin feat/pr6-solicitacoes-ui",
+    "Abrir Pull Request com evidências e links para documentação"
+  ],
+
+  "references": {
+    "policies": [
+      "PA-01 a PA-07 (Política de Aprovação Manual) em .claude/CLAUDE.md"
+    ],
+    "backend": [
+      "v2/backend/apps/core/views.py - ViewSets e endpoints",
+      "v2/backend/apps/core/models.py - Modelos Solicitacao, Usuario, Municipio, etc.",
+      "v2/backend/apps/core/serializers.py - Serializers DRF"
+    ],
+    "frontend": [
+      "v2/frontend/src/pages/Disponibilidade.jsx - Referência de estilo/estrutura",
+      "v2/frontend/src/api/availability.js - Padrão de API client"
+    ],
+    "external": [
+      "Ant Design Components - https://ant.design/components/overview/",
+      "React Router - https://reactrouter.com/",
+      "Django REST Framework - https://www.django-rest-framework.org/"
+    ]
+  }
+}

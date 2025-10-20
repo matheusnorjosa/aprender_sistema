@@ -2,16 +2,53 @@
 DRF Serializers for Core models
 """
 
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import AvailabilityBlock, Solicitacao, Compra, AuditLog
+from .models import AvailabilityBlock, Participation, Solicitacao, Compra, AuditLog
+
+
+class UserSlimSerializer(serializers.ModelSerializer):
+    """
+    Serializer slim para Usuario (usado em aninhamentos).
+    Retorna apenas id, nome e email.
+    """
+
+    class Meta:
+        model = get_user_model()
+        fields = ("id", "first_name", "last_name", "email")
+
+
+class ParticipationNestedSerializer(serializers.ModelSerializer):
+    """
+    Serializer aninhado para Participation (read-only).
+    Usado em SolicitacaoSerializer para expor participations.
+    """
+
+    usuario = UserSlimSerializer(read_only=True)
+    email = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Participation
+        fields = ("usuario", "guest_email", "email", "role", "ch_horas", "observacao")
+
+    def get_email(self, obj):
+        user_email = getattr(getattr(obj, "usuario", None), "email", None)
+        return user_email or getattr(obj, "guest_email", None)
 
 
 class SolicitacaoSerializer(serializers.ModelSerializer):
     """
     Serializer for Solicitacao model.
     PA-01: Status sempre começa pendente.
+
+    Inclui campo participations (read-only, aninhado) para expor
+    múltiplos participantes com seus papéis.
     """
+
+    participations = ParticipationNestedSerializer(
+        many=True, read_only=True
+    )
 
     class Meta:
         model = Solicitacao
@@ -28,6 +65,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "external_event_id",
             "created_at",
             "updated_at",
+            "participations",
         ]
         read_only_fields = [
             "id",

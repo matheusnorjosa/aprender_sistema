@@ -93,7 +93,7 @@ def task_publish_solicitacao_to_gcal(
                 action="PUBLISH_GCAL",
                 model_name="Solicitacao",
                 details={
-                    "solicitation_id": s.id,
+                    "solicitacao_id": s.id,
                     "action": outcome.action,
                     "external_event_id": outcome.external_event_id,
                     "summary": outcome.summary,

@@ -61,6 +61,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     ordering = ["-inicio"]
 
     def get_permissions(self):
+        # Actions approve, reject, preview_gcal, publish têm permission_classes específicas
+        # Não sobrescrever nesses casos
+        if self.action in ["approve", "reject", "preview_gcal", "publish"]:
+            return super().get_permissions()
         if self.action == "create":
             return [IsCoordenadorOrDAT()]
         return [IsAuthenticated()]
@@ -167,4 +171,123 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "solicitacao": SolicitacaoSerializer(solicitacao).data,
             },
             status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsSuperintendencia],
+        url_path="preview-gcal",
+    )
+    def preview_gcal(self, request, pk=None):
+        """Preview do payload GCal sem publicar (PA-02: apenas Superintendência)."""
+        from apps.core.services.gcal_sync_service import build_preview_for_solicitacao
+        from apps.core.models import AuditLog
+
+        solicitacao = self.get_object()
+
+        # Gerar preview
+        preview = build_preview_for_solicitacao(solicitacao)
+
+        # AuditLog
+        client_ip = _get_client_ip(request)
+        AuditLog.objects.create(
+            usuario=request.user,
+            action="PREVIEW_GCAL",
+            model_name="Solicitacao",
+            details={
+                "solicitation_id": solicitacao.id,
+                "event_id": preview["event_id"],
+                "summary": preview["payload"].get("summary", ""),
+                "ip_address": client_ip,
+            },
+        )
+
+        logger.info(
+            "preview_gcal",
+            extra={
+                "event": "preview_gcal",
+                "user_id": request.user.id,
+                "username": request.user.username,
+                "solicitation_id": solicitacao.id,
+                "event_id": preview["event_id"],
+                "ip_address": client_ip,
+                "timestamp": timezone.now().isoformat(),
+            },
+        )
+
+        return Response(
+            {
+                "detail": "Preview gerado com sucesso.",
+                "preview": preview,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsSuperintendencia],
+        url_path="publish",
+    )
+    def publish(self, request, pk=None):
+        """Publica solicitação no Google Calendar via Celery (PA-02: apenas Superintendência)."""
+        from apps.core.tasks import task_publish_solicitacao_to_gcal
+        from apps.core.models import AuditLog
+
+        solicitacao = self.get_object()
+
+        # Verificar se já está aprovada
+        if solicitacao.status != "aprovado":
+            return Response(
+                {"detail": "Apenas solicitações aprovadas podem ser publicadas no Google Calendar."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Parâmetros opcionais
+        dry_run = request.data.get("dry_run", False)
+        apply_blocked = request.data.get("apply_blocked", False)
+
+        # Disparar task Celery (assíncrona)
+        task = task_publish_solicitacao_to_gcal.delay(
+            solicitacao.id, dry_run=dry_run, apply_blocked=apply_blocked
+        )
+
+        # AuditLog
+        client_ip = _get_client_ip(request)
+        AuditLog.objects.create(
+            usuario=request.user,
+            action="PUBLISH_GCAL_REQUESTED",
+            model_name="Solicitacao",
+            details={
+                "solicitation_id": solicitacao.id,
+                "task_id": task.id,
+                "dry_run": dry_run,
+                "apply_blocked": apply_blocked,
+                "ip_address": client_ip,
+            },
+        )
+
+        logger.info(
+            "publish_gcal_requested",
+            extra={
+                "event": "publish_gcal_requested",
+                "user_id": request.user.id,
+                "username": request.user.username,
+                "solicitation_id": solicitacao.id,
+                "task_id": task.id,
+                "dry_run": dry_run,
+                "apply_blocked": apply_blocked,
+                "ip_address": client_ip,
+                "timestamp": timezone.now().isoformat(),
+            },
+        )
+
+        return Response(
+            {
+                "detail": "Publicação solicitada com sucesso (processando em background).",
+                "task_id": task.id,
+                "solicitacao_id": solicitacao.id,
+            },
+            status=status.HTTP_202_ACCEPTED,
         )

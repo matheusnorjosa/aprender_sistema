@@ -19,7 +19,7 @@ from typing import Literal, Optional
 from django.conf import settings
 from django.utils import timezone
 
-from apps.core.models import Solicitacao
+from apps.core.models import Solicitacao, Participation
 
 Action = Literal["CREATE", "UPDATE", "DELETE", "ADOPT", "SKIP"]
 
@@ -160,6 +160,125 @@ def _event_id_for(s: Solicitacao) -> str:
     return event_id
 
 
+def build_attendees_for_solicitacao(s: Solicitacao) -> list[dict]:
+    """
+    Extrai attendees (participantes) de uma Solicitacao.
+
+    Inclui apenas roles: COORDENADOR, FORMADOR, COORD_ACOMPANHA.
+    Para cada participação:
+    - Se usuario existe, usa usuario.email
+    - Se guest_email existe, usa guest_email
+
+    Args:
+        s: Solicitacao
+
+    Returns:
+        list[dict]: Lista de attendees no formato Google Calendar
+                    [{"email": "..."}, ...]
+    """
+    # Roles que devem ser incluídos como attendees
+    attendee_roles = ["COORDENADOR", "FORMADOR", "COORD_ACOMPANHA"]
+
+    # Buscar participações com prefetch do usuário
+    participations = s.participations.filter(role__in=attendee_roles).select_related(
+        "usuario"
+    )
+
+    emails = set()
+    for p in participations:
+        email = None
+        if p.usuario and p.usuario.email:
+            email = p.usuario.email
+        elif p.guest_email:
+            email = p.guest_email
+
+        if email:
+            emails.add(email.strip().lower())
+
+    # Retornar lista de dicts no formato Google Calendar
+    return [{"email": email} for email in sorted(emails)]
+
+
+def build_preview_for_solicitacao(s: Solicitacao) -> dict:
+    """
+    Constrói preview do payload GCal sem publicar.
+
+    Args:
+        s: Solicitacao
+
+    Returns:
+        dict: {
+            "event_id": str,
+            "payload": dict (Google Calendar API format)
+        }
+    """
+    return {
+        "event_id": _event_id_for(s),
+        "payload": _build_payload(s),
+    }
+
+
+def apply_one_solicitacao(
+    s: Solicitacao, *, dry_run: bool = False, apply_blocked: bool = False
+) -> SyncOutcome:
+    """
+    Aplica uma Solicitacao ao Google Calendar (wrapper sobre upsert_one).
+
+    Lógica apply_blocked:
+    - Se settings.GCAL_CLIENT está configurado, sempre aplica
+    - Se settings.GCAL_CLIENT NÃO está configurado:
+      - Se apply_blocked=True, aplica mesmo assim (para testes)
+      - Se apply_blocked=False, retorna SKIP
+
+    Args:
+        s: Solicitacao a aplicar
+        dry_run: Se True, não persiste mudanças no DB/Calendar
+        apply_blocked: Se True, aplica mesmo sem GCAL_CLIENT configurado
+
+    Returns:
+        SyncOutcome com ação executada
+
+    Raises:
+        ValueError: Se GCAL_CLIENT não configurado e apply_blocked=False
+    """
+    # Verificar se GCAL_CLIENT está configurado
+    gcal_client_enabled = getattr(settings, "GCAL_CLIENT", None) is not None
+
+    if not gcal_client_enabled and not apply_blocked:
+        # Retornar SKIP sem tentar aplicar
+        return SyncOutcome(
+            action="SKIP",
+            solicitation_id=s.id,
+            external_event_id=s.external_event_id,
+            summary=f"Solicitação #{s.id} (GCAL_CLIENT não configurado)",
+        )
+
+    # Importar cliente (pode ser FakeCalendarClient para testes)
+    # TODO: Implementar lógica de obtenção do client real quando GCAL_CLIENT estiver pronto
+    # Por enquanto, vamos usar FakeCalendarClient como fallback
+    try:
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+
+        client = FakeCalendarClient()
+    except ImportError:
+        # Se FakeCalendarClient não existir, levantar erro
+        raise ValueError(
+            "GCAL_CLIENT não configurado e FakeCalendarClient não disponível"
+        )
+
+    # Calendar ID (pode vir de settings ou ser fixo)
+    calendar_id = getattr(settings, "GCAL_CALENDAR_ID", "primary")
+
+    # Chamar upsert_one
+    return upsert_one(
+        client=client,
+        calendar_id=calendar_id,
+        s=s,
+        dry_run=dry_run,
+        no_delete=False,
+    )
+
+
 def _build_payload(s: Solicitacao) -> dict:
     """
     Constrói payload do evento para Google Calendar API.
@@ -251,11 +370,8 @@ def _build_payload(s: Solicitacao) -> dict:
         },
     }
 
-    # Attendees (se usuário tiver email)
-    if usuario and hasattr(usuario, "email") and usuario.email:
-        payload["attendees"] = [{"email": usuario.email}]
-    else:
-        payload["attendees"] = []
+    # Attendees (via Participation: COORDENADOR, FORMADOR, COORD_ACOMPANHA)
+    payload["attendees"] = build_attendees_for_solicitacao(s)
 
     # Color mapping (opcional)
     color_map = getattr(settings, "GCAL_COLOR_MAP", None)

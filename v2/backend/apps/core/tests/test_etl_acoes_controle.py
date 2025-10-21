@@ -11,6 +11,7 @@ Valida:
 
 import csv
 import json
+import tempfile
 import pytest
 from datetime import date
 from pathlib import Path
@@ -25,9 +26,20 @@ User = get_user_model()
 pytestmark = pytest.mark.django_db
 
 
-@pytest.fixture
-def setup_dependencies():
-    """Cria dependências necessárias para o ETL."""
+def _create_csv_file(rows, fieldnames):
+    """Helper para criar arquivo CSV temporário."""
+    tmp = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8", newline="")
+    writer = csv.DictWriter(tmp, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(row)
+    tmp.close()
+    return tmp.name
+
+
+def test_import_creates_acao_controle():
+    """Importação cria AcaoControle com todas as datas parseadas."""
+    # Criar dependências diretamente
     coord = User.objects.create_user(
         username="coord1",
         email="coord@example.com",
@@ -36,33 +48,12 @@ def setup_dependencies():
         first_name="Maria",
         last_name="Silva",
     )
-
     municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
     projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
-    return {"coord": coord, "municipio": municipio, "projeto": projeto}
-
-
-@pytest.fixture
-def csv_valid(tmp_path, setup_dependencies):
-    """Cria CSV válido com headers flexíveis."""
-    csv_file = tmp_path / "acoes_controle.csv"
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=[
-                "Município",
-                "Projeto",
-                "Coordenador",
-                "Data Entrega",
-                "Data Carta",
-                "Contato Inicial",
-                "Data Reunião",
-                "Observação",
-            ],
-        )
-        writer.writeheader()
-        writer.writerow({
+    # Criar CSV temporário
+    csv_file = _create_csv_file(
+        rows=[{
             "Município": "Fortaleza",
             "Projeto": "ACerta",
             "Coordenador": "coord@example.com",
@@ -71,33 +62,15 @@ def csv_valid(tmp_path, setup_dependencies):
             "Contato Inicial": "44951",  # Excel serial for 2025-01-20
             "Data Reunião": "2025-02-01",
             "Observação": "Teste observação",
-        })
+        }],
+        fieldnames=[
+            "Município", "Projeto", "Coordenador",
+            "Data Entrega", "Data Carta", "Contato Inicial",
+            "Data Reunião", "Observação"
+        ]
+    )
 
-    return str(csv_file)
-
-
-@pytest.fixture
-def csv_with_missing_fk(tmp_path):
-    """CSV com município inexistente."""
-    csv_file = tmp_path / "acoes_missing.csv"
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=["Município", "Projeto", "Data Entrega"],
-        )
-        writer.writeheader()
-        writer.writerow({
-            "Município": "Município Inexistente",
-            "Projeto": "ACerta",
-            "Data Entrega": "2025-01-01",
-        })
-
-    return str(csv_file)
-
-
-def test_import_creates_acao_controle(csv_valid):
-    """Importação cria AcaoControle com todas as datas parseadas."""
-    report = import_acoes_controle(csv_valid, dry_run=False)
+    report = import_acoes_controle(csv_file, dry_run=False)
 
     assert report["stats"]["created"] == 1
     assert report["stats"]["skipped"]["municipio"] == 0
@@ -115,14 +88,26 @@ def test_import_creates_acao_controle(csv_valid):
     assert acao.external_hash is not None
 
 
-def test_idempotency_no_duplicates(csv_valid):
+def test_idempotency_no_duplicates():
     """Rodar ETL 2x não duplica registros (external_hash)."""
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[{
+            "Município": "Fortaleza",
+            "Projeto": "ACerta",
+            "Data Entrega": "2025-01-15",
+        }],
+        fieldnames=["Município", "Projeto", "Data Entrega"]
+    )
+
     # Primeira rodada
-    report1 = import_acoes_controle(csv_valid, dry_run=False)
+    report1 = import_acoes_controle(csv_file, dry_run=False)
     assert report1["stats"]["created"] == 1
 
     # Segunda rodada (idempotência)
-    report2 = import_acoes_controle(csv_valid, dry_run=False)
+    report2 = import_acoes_controle(csv_file, dry_run=False)
     assert report2["stats"]["unchanged"] == 1
     assert report2["stats"]["created"] == 0
 
@@ -130,9 +115,21 @@ def test_idempotency_no_duplicates(csv_valid):
     assert AcaoControle.objects.count() == 1
 
 
-def test_dry_run_does_not_commit(csv_valid):
+def test_dry_run_does_not_commit():
     """Dry-run não persiste dados no banco."""
-    report = import_acoes_controle(csv_valid, dry_run=True)
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[{
+            "Município": "Fortaleza",
+            "Projeto": "ACerta",
+            "Data Entrega": "2025-01-15",
+        }],
+        fieldnames=["Município", "Projeto", "Data Entrega"]
+    )
+
+    report = import_acoes_controle(csv_file, dry_run=True)
 
     assert report["stats"]["created"] == 1
     assert report["dry_run"] is True
@@ -141,9 +138,20 @@ def test_dry_run_does_not_commit(csv_valid):
     assert AcaoControle.objects.count() == 0
 
 
-def test_skip_missing_municipio(csv_with_missing_fk):
+def test_skip_missing_municipio():
     """Registros com município inexistente são pulados."""
-    report = import_acoes_controle(csv_with_missing_fk, dry_run=False)
+    Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[{
+            "Município": "Município Inexistente",
+            "Projeto": "ACerta",
+            "Data Entrega": "2025-01-01",
+        }],
+        fieldnames=["Município", "Projeto", "Data Entrega"]
+    )
+
+    report = import_acoes_controle(csv_file, dry_run=False)
 
     assert report["stats"]["created"] == 0
     assert report["stats"]["skipped"]["municipio"] == 1
@@ -153,9 +161,21 @@ def test_skip_missing_municipio(csv_with_missing_fk):
     assert pendencias[0]["nome"] == "Município Inexistente"
 
 
-def test_report_saved_to_out_etl(csv_valid):
+def test_report_saved_to_out_etl():
     """Relatório é salvo em out_etl/import_acoes_controle_report.json."""
-    import_acoes_controle(csv_valid, dry_run=False)
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[{
+            "Município": "Fortaleza",
+            "Projeto": "ACerta",
+            "Data Entrega": "2025-01-15",
+        }],
+        fieldnames=["Município", "Projeto", "Data Entrega"]
+    )
+
+    import_acoes_controle(csv_file, dry_run=False)
 
     report_path = Path(settings.BASE_DIR) / "out_etl" / "import_acoes_controle_report.json"
     assert report_path.exists()
@@ -170,21 +190,21 @@ def test_report_saved_to_out_etl(csv_valid):
     assert report["stats"]["created"] >= 0
 
 
-def test_coordenador_optional(tmp_path, setup_dependencies):
+def test_coordenador_optional():
     """Coordenador é opcional - registro criado mesmo se não encontrado."""
-    csv_file = tmp_path / "acoes_no_coord.csv"
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["Município", "Projeto", "Data Entrega"]
-        )
-        writer.writeheader()
-        writer.writerow({
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[{
             "Município": "Fortaleza",
             "Projeto": "ACerta",
             "Data Entrega": "2025-01-01",
-        })
+        }],
+        fieldnames=["Município", "Projeto", "Data Entrega"]
+    )
 
-    report = import_acoes_controle(str(csv_file), dry_run=False)
+    report = import_acoes_controle(csv_file, dry_run=False)
 
     assert report["stats"]["created"] == 1
 
@@ -192,40 +212,37 @@ def test_coordenador_optional(tmp_path, setup_dependencies):
     assert acao.coordenador is None  # Opcional, não bloqueia criação
 
 
-def test_update_existing_record(tmp_path, setup_dependencies):
+def test_update_existing_record():
     """Atualiza registro existente se dados mudarem."""
-    csv_file = tmp_path / "acoes_update.csv"
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     # Criar inicial
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["Município", "Projeto", "Data Entrega", "Observação"]
-        )
-        writer.writeheader()
-        writer.writerow({
+    csv_file = _create_csv_file(
+        rows=[{
             "Município": "Fortaleza",
             "Projeto": "ACerta",
             "Data Entrega": "2025-01-01",
             "Observação": "Versão 1",
-        })
+        }],
+        fieldnames=["Município", "Projeto", "Data Entrega", "Observação"]
+    )
 
-    report1 = import_acoes_controle(str(csv_file), dry_run=False)
+    report1 = import_acoes_controle(csv_file, dry_run=False)
     assert report1["stats"]["created"] == 1
 
     # Atualizar observação
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["Município", "Projeto", "Data Entrega", "Observação"]
-        )
-        writer.writeheader()
-        writer.writerow({
+    csv_file2 = _create_csv_file(
+        rows=[{
             "Município": "Fortaleza",
             "Projeto": "ACerta",
             "Data Entrega": "2025-01-01",
             "Observação": "Versão 2 - atualizada",
-        })
+        }],
+        fieldnames=["Município", "Projeto", "Data Entrega", "Observação"]
+    )
 
-    report2 = import_acoes_controle(str(csv_file), dry_run=False)
+    report2 = import_acoes_controle(csv_file2, dry_run=False)
     assert report2["stats"]["updated"] == 1
 
     acao = AcaoControle.objects.first()

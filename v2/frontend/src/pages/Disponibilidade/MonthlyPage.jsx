@@ -140,8 +140,14 @@ export default function MonthlyPage() {
           </div>
         ) : formadores.error ? (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800">
-              Erro: {formadores.error}
+            <p className="text-sm text-red-800 font-medium mb-2">
+              Erro ao carregar formadores
+            </p>
+            <p className="text-xs text-red-700">
+              {formadores.error}
+            </p>
+            <p className="text-xs text-red-600 mt-3">
+              💡 Verifique se o backend está rodando (porta 8002) e se você está autenticado.
             </p>
           </div>
         ) : formadores.data ? (
@@ -190,8 +196,14 @@ export default function MonthlyPage() {
           </div>
         ) : coordenadores.error ? (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800">
-              Erro: {coordenadores.error}
+            <p className="text-sm text-red-800 font-medium mb-2">
+              Erro ao carregar coordenadores
+            </p>
+            <p className="text-xs text-red-700">
+              {coordenadores.error}
+            </p>
+            <p className="text-xs text-red-600 mt-3">
+              💡 Verifique se o backend está rodando (porta 8002) e se você está autenticado.
             </p>
           </div>
         ) : coordenadores.data ? (

@@ -12,6 +12,7 @@ from .views_solicitacao import SolicitacaoViewSet
 from .views_availability import (
     AvailabilityBlockViewSet,
     AvailabilityCheckView,
+    AvailabilityCheckManyView,
 )
 from .views_availability_monthly import MonthlyAvailabilityView
 from .views_controle_imports import ImportComprasView
@@ -35,6 +36,11 @@ urlpatterns = [
         "availability/check/",
         AvailabilityCheckView.as_view(),
         name="availability-check",
+    ),
+    path(
+        "availability/check-many/",
+        AvailabilityCheckManyView.as_view(),
+        name="availability-check-many",
     ),
     path(
         "availability/monthly/",

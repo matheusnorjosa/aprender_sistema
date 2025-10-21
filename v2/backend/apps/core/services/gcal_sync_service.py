@@ -253,21 +253,10 @@ def apply_one_solicitacao(
             summary=f"Solicitação #{s.id} (GCAL_CLIENT não configurado)",
         )
 
-    # Importar cliente (pode ser FakeCalendarClient para testes)
-    # TODO: Implementar lógica de obtenção do client real quando GCAL_CLIENT estiver pronto
-    # Por enquanto, vamos usar FakeCalendarClient como fallback
-    try:
-        from apps.core.services.gcal_fake_client import FakeCalendarClient
+    # Obter cliente via factory (fake ou google baseado em settings)
+    from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
 
-        client = FakeCalendarClient()
-    except ImportError:
-        # Se FakeCalendarClient não existir, levantar erro
-        raise ValueError(
-            "GCAL_CLIENT não configurado e FakeCalendarClient não disponível"
-        )
-
-    # Calendar ID (pode vir de settings ou ser fixo)
-    calendar_id = getattr(settings, "GCAL_CALENDAR_ID", "primary")
+    client, calendar_id = get_gcal_client_and_calendar_id()
 
     # Chamar upsert_one
     return upsert_one(

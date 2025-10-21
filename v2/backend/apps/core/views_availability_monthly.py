@@ -73,7 +73,7 @@ class MonthlyAvailabilityView(APIView):
         q = request.GET.get("q", None)
 
         # Cache key
-        cache_key = f"monthly:v1:{year}:{month}:{role}:{sector or '*'}:{(q or '').strip().lower()}"
+        cache_key = f"monthly:v2:{year}:{month}:{role}:{sector or '*'}:{(q or '').strip().lower()}"
 
         # Tentar buscar do cache
         cached_data = cache.get(cache_key)

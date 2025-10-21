@@ -151,35 +151,54 @@ class Command(BaseCommand):
         """
         Normaliza headers do CSV/XLSX para padrão interno.
 
-        Mapeamento flexível:
-        - email/usuario/user → email
+        Mapeamento flexível com heurística para usuario/user:
+        - email/e-mail/mail → email (sempre)
+        - usuario/user: se contiver '@' → email; senão → name
+        - name/nome/display_name → name
         - start/start_date/inicio/data_inicio → start
         - end/end_date/fim/data_fim → end
         - origem/origin → origem
         - destino/destination/dest → destino
         - obs/observacao/observacoes/notes → obs
-        - name/nome → name (fallback se sem email)
+
+        Heurística: Colunas "usuario"/"user" são tratadas como email se o valor
+        contiver "@"; caso contrário, são tratadas como name.
         """
         normalized = {}
 
         # Criar mapa lower → original key
         lower_map = {k.strip().lower(): k for k in row.keys()}
 
-        # Email
-        for key in ["email", "usuario", "user", "e-mail"]:
+        # Email (apenas chaves claramente de email)
+        for key in ["email", "e-mail", "mail"]:
             if key in lower_map:
                 normalized["email"] = str(row[lower_map[key]]).strip() if row[lower_map[key]] else ""
                 break
         else:
             normalized["email"] = ""
 
-        # Name (fallback)
+        # Name (chaves de nome/usuário)
         for key in ["name", "nome", "display_name", "usuario_nome"]:
             if key in lower_map:
                 normalized["name"] = str(row[lower_map[key]]).strip() if row[lower_map[key]] else ""
                 break
         else:
             normalized["name"] = ""
+
+        # Heurística para "usuario"/"user": se tem "@" → email, senão → name
+        for key in ["usuario", "user", "usuário"]:
+            if key in lower_map:
+                value = str(row[lower_map[key]]).strip() if row[lower_map[key]] else ""
+                if value:
+                    if "@" in value:
+                        # Contém "@" → é email
+                        if not normalized["email"]:  # Só sobrescreve se email ainda vazio
+                            normalized["email"] = value
+                    else:
+                        # Não contém "@" → é nome
+                        if not normalized["name"]:  # Só sobrescreve se name ainda vazio
+                            normalized["name"] = value
+                break
 
         # Start date
         for key in ["start", "start_date", "inicio", "data_inicio", "início"]:

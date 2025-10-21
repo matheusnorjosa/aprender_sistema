@@ -14,7 +14,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
 
 from .models import Solicitacao, AuditLog
-from .permissions import IsCoordenadorOrDAT, IsSuperintendencia
+from .permissions import IsCoordenadorOrDAT, IsSuperintendencia, IsControleOrSuper
 from .serializers import SolicitacaoSerializer
 
 logger = logging.getLogger(__name__)
@@ -211,11 +211,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["post"],
-        permission_classes=[IsSuperintendencia],
+        permission_classes=[IsControleOrSuper],
         url_path="preview-gcal",
     )
     def preview_gcal(self, request, pk=None):
-        """Preview do payload GCal sem publicar (PA-02: apenas Superintendência)."""
+        """Preview do payload GCal sem publicar (Controle ou Superintendência)."""
         from apps.core.services.gcal_sync_service import build_preview_for_solicitacao
         from apps.core.models import AuditLog
 
@@ -262,11 +262,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["post"],
-        permission_classes=[IsSuperintendencia],
+        permission_classes=[IsControleOrSuper],
         url_path="publish",
     )
     def publish(self, request, pk=None):
-        """Publica solicitação no Google Calendar via Celery (PA-02: apenas Superintendência)."""
+        """Publica solicitação no Google Calendar via Celery (Controle ou Superintendência)."""
         from apps.core.tasks import task_publish_solicitacao_to_gcal
         from apps.core.models import AuditLog
 

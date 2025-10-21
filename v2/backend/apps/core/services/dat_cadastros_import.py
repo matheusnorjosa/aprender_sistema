@@ -6,8 +6,10 @@ Lê CSV/XLSX e cria/atualiza AcaoDAT por external_hash único.
 Regras de negócio:
 - Município/Projeto resolvidos por nome (norm_text)
 - Responsável resolvido por email > nome
-- Datas parseadas: ISO, dd/mm/yyyy, Excel serial
-- Idempotência: SHA1(municipio_id|projeto_id|tipo_acao|data_registro)
+- Datas parseadas: ISO, dd/mm/yyyy, dd/mm/yy, Excel serial
+- Idempotência: SHA1(municipio_id|projeto_id|tipo_acao|responsavel_id)
+  - external_hash baseado em identidade estável
+  - Dados variáveis (data_registro/obs) atualizam o mesmo registro
 - Relatório em out_etl/import_dat_cadastros_report.json
 """
 
@@ -238,88 +240,95 @@ def _process_row(row: Dict[str, Any], idx: int, stats: dict, pendencias: dict) -
     # Parsear data de registro
     data_registro = _parse_date(norm["data_registro"])
 
-    # Criar external_hash
-    hash_key = f"{municipio.id}|{projeto.id}|{tipo_acao}|{data_registro}"
+    # Normalizar tipo_acao para hash consistente
+    tipo_norm = norm_text(tipo_acao)
+
+    # Criar external_hash (baseado em identidade estável)
+    # external_hash baseado em identidade (município, projeto, tipo_acao, responsável).
+    # Dados variáveis (data_registro/obs) atualizam o mesmo registro.
+    resp_id = getattr(responsavel, "id", "NA")
+    hash_key = f"{municipio.id}|{projeto.id}|{tipo_norm}|{resp_id}"
     external_hash = hashlib.sha1(hash_key.encode()).hexdigest()
 
-    # Upsert
+    # Verificar se já existe registro com este external_hash
+    existing = AcaoDAT.objects.filter(external_hash=external_hash).first()
+
+    # Preparar campos para criação/atualização
     defaults = {
+        "municipio": municipio,
+        "projeto": projeto,
+        "tipo_acao": tipo_acao,
         "responsavel": responsavel,
         "observacao": norm["observacao"],
         "data_registro": data_registro,
     }
 
-    obj, created = AcaoDAT.objects.update_or_create(
-        external_hash=external_hash,
-        defaults={
-            **defaults,
-            "municipio": municipio,
-            "projeto": projeto,
-            "tipo_acao": tipo_acao,
-        },
-    )
+    if existing:
+        # Detectar mudanças comparando campos
+        changed = any(getattr(existing, k) != v for k, v in defaults.items())
 
-    if created:
-        stats["created"] += 1
-    else:
-        # Verificar se houve mudança
-        changed = False
-        for k, v in defaults.items():
-            if getattr(obj, k) != v:
-                changed = True
-                break
-        if changed or obj.municipio != municipio or obj.projeto != projeto or obj.tipo_acao != tipo_acao:
+        if changed:
+            # Atualizar campos modificados
+            for k, v in defaults.items():
+                setattr(existing, k, v)
+            existing.save(update_fields=list(defaults.keys()))
             stats["updated"] += 1
         else:
             stats["unchanged"] += 1
+    else:
+        # Criar novo registro
+        AcaoDAT.objects.create(external_hash=external_hash, **defaults)
+        stats["created"] += 1
 
     return None
 
 
 def _parse_date(val: Any) -> Optional[date]:
     """
-    Tenta parsear data de múltiplos formatos.
+    Tenta parsear data de múltiplos formatos (robusto).
 
     Suporta:
     - None/vazio → None
     - date object → retorna direto
     - datetime object → .date()
-    - int (Excel serial) → conversão
-    - str ISO → yyyy-mm-dd
-    - str BR → dd/mm/yyyy
+    - int/float (Excel serial) → conversão
+    - str numérica (Excel serial) → conversão
+    - str ISO → yyyy-mm-dd[THH:MM:SS]
+    - str BR → dd/mm/yyyy ou dd/mm/yy
     """
-    if val is None or val == "":
+    if val is None:
         return None
 
-    if isinstance(val, date):
+    # date object (não datetime)
+    if isinstance(val, date) and not isinstance(val, datetime):
         return val
 
+    # datetime object
     if isinstance(val, datetime):
         return val.date()
 
-    # Excel serial number
-    if isinstance(val, (int, float)):
-        try:
-            return datetime(1899, 12, 30) + timedelta(days=int(val))
-        except Exception:
-            return None
-
     # String
-    if isinstance(val, str):
-        val = val.strip()
-        if not val:
-            return None
+    s = str(val).strip()
+    if not s:
+        return None
 
-        # ISO: yyyy-mm-dd
+    # ISO (YYYY-MM-DD[THH:MM:SS])
+    try:
+        return datetime.fromisoformat(s).date()
+    except Exception:
+        pass
+
+    # dd/mm/YYYY ou dd/mm/YY
+    for fmt in ("%d/%m/%Y", "%d/%m/%y"):
         try:
-            return datetime.fromisoformat(val).date()
+            return datetime.strptime(s, fmt).date()
         except Exception:
             pass
 
-        # BR: dd/mm/yyyy
-        try:
-            return datetime.strptime(val, "%d/%m/%Y").date()
-        except Exception:
-            pass
-
-    return None
+    # Excel serial (float ou string numérica)
+    try:
+        n = float(s)
+        base = datetime(1899, 12, 30)
+        return (base + timedelta(days=int(n))).date()
+    except Exception:
+        return None

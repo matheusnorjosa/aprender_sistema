@@ -59,7 +59,7 @@ def test_import_creates_acao_controle():
             "Coordenador": "coord@example.com",
             "Data Entrega": "2025-01-15",
             "Data Carta": "15/01/2025",
-            "Contato Inicial": "44951",  # Excel serial for 2025-01-20
+            "Contato Inicial": "45677",  # Excel serial for 2025-01-20
             "Data Reunião": "2025-02-01",
             "Observação": "Teste observação",
         }],

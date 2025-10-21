@@ -11,7 +11,9 @@
 1. [Recarregar Variáveis de Ambiente (.env)](#recarregar-variáveis-de-ambiente-env)
 2. [Operações Celery (Worker/Beat)](#operações-celery-workerbeat)
 3. [Health Checks e Validações](#health-checks-e-validações)
-4. [Troubleshooting Comum](#troubleshooting-comum)
+4. [ETL: Importação de Ações (Controle e DAT)](#etl-importação-de-ações-controle-e-dat)
+5. [APIs REST: Ações (Controle e DAT)](#apis-rest-ações-controle-e-dat)
+6. [Troubleshooting Comum](#troubleshooting-comum)
 
 ---
 
@@ -756,4 +758,455 @@ python manage.py preagenda_to_gcal \
 - **Google Calendar API:** https://developers.google.com/calendar/api/quickstart/python
 - **Service Accounts:** https://cloud.google.com/iam/docs/service-accounts
 - **OAuth 2.0:** https://developers.google.com/identity/protocols/oauth2
+
+---
+
+## 📊 ETL: Importação de Ações (Controle e DAT)
+
+### **Visão Geral**
+
+O sistema oferece importação idempotente de **Ações de Controle** e **Cadastros DAT** via CSV/XLSX.
+
+**Características:**
+- ✅ **Idempotência via `external_hash`** (SHA1): rodar 2x não duplica
+- ✅ **Resolução automática de FKs**: Município, Projeto, Coordenador/Responsável
+- ✅ **Parsing flexível de datas**: ISO (yyyy-mm-dd), BR (dd/mm/yyyy), Excel serial
+- ✅ **Headers flexíveis**: case-insensitive, múltiplos aliases
+- ✅ **Relatórios JSON** em `out_etl/`
+
+**Permissões:**
+- `IsControleOrSuper` para importação de **Ações de Controle**
+- `IsDATOrSuper` para importação de **Cadastros DAT**
+
+---
+
+### **ETL 1: Ações de Controle**
+
+**Modelo:** `AcaoControle`
+**Campos:**
+- `municipio` (obrigatório)
+- `projeto` (obrigatório)
+- `coordenador` (opcional, resolvido por email ou nome)
+- `data_entrega`, `data_carta`, `contato_inicial`, `data_reuniao` (datas opcionais)
+- `observacao` (opcional)
+
+**Hash de idempotência:**
+```
+SHA1(municipio_id|projeto_id|data_entrega|data_reuniao)
+```
+
+#### **Preparar CSV/XLSX**
+
+Headers aceitos (case-insensitive):
+- `municipio` ou `município`
+- `projeto`
+- `coordenador`, `email`, `responsavel`, `responsável`
+- `data_entrega` ou `data entrega`
+- `data_carta` ou `data carta`
+- `contato_inicial` ou `contato inicial`
+- `data_reuniao`, `data_reunião` ou `data reunião`
+- `observacao`, `observação` ou `obs`
+
+**Exemplo CSV:**
+```csv
+Município,Projeto,Coordenador,Data Entrega,Data Reunião,Observação
+Fortaleza,ACerta,coord@example.com,2025-01-15,2025-02-01,Entrega confirmada
+Maracanaú,ACerta,maria.silva@example.com,15/01/2025,,Aguardando reunião
+```
+
+#### **Comandos de Importação**
+
+**Preview (dry-run):**
+```bash
+cd v2
+
+# Via Makefile (recomendado)
+make etl-acoes-dry FILE=/app/data/acoes_controle.csv
+
+# OU diretamente via Docker
+docker compose exec -T web python manage.py etl_import_acoes_controle \
+  /app/data/acoes_controle.csv --dry-run
+```
+
+**Aplicar (persistir no banco):**
+```bash
+# Via Makefile
+make etl-acoes-apply FILE=/app/data/acoes_controle.xlsx
+
+# OU diretamente
+docker compose exec -T web python manage.py etl_import_acoes_controle \
+  /app/data/acoes_controle.xlsx
+```
+
+#### **Relatório de Importação**
+
+Arquivo salvo em: `out_etl/import_acoes_controle_report.json`
+
+**Estrutura:**
+```json
+{
+  "stats": {
+    "created": 10,
+    "updated": 2,
+    "unchanged": 5,
+    "skipped": {
+      "municipio": 1,
+      "projeto": 0,
+      "coordenador": 3,
+      "dates": 0,
+      "other": 0
+    }
+  },
+  "pendencias": {
+    "municipios": [{"linha": 15, "nome": "Município Inexistente"}],
+    "projetos": [],
+    "coordenadores": [{"linha": 20, "valor": "email@invalido.com"}],
+    "outros": []
+  },
+  "dry_run": false,
+  "file": "/app/data/acoes_controle.csv"
+}
+```
+
+#### **Validar Resultado**
+
+```bash
+# Entrar no shell Django
+make shell
+
+# Contar registros importados
+python -c "from apps.core.models import AcaoControle; print(AcaoControle.objects.count())"
+
+# Ver últimos 5 registros
+python manage.py shell -c "
+from apps.core.models import AcaoControle
+for a in AcaoControle.objects.all()[:5]:
+    print(f'{a.municipio.nome} | {a.projeto.nome} | {a.data_reuniao}')
+"
+```
+
+---
+
+### **ETL 2: Cadastros DAT**
+
+**Modelo:** `AcaoDAT`
+**Campos:**
+- `municipio` (obrigatório)
+- `projeto` (obrigatório)
+- `tipo_acao` (obrigatório, texto livre)
+- `responsavel` (opcional, resolvido por email ou nome)
+- `data_registro` (opcional)
+- `observacao` (opcional)
+
+**Hash de idempotência:**
+```
+SHA1(municipio_id|projeto_id|tipo_acao|data_registro)
+```
+
+#### **Preparar CSV/XLSX**
+
+Headers aceitos (case-insensitive):
+- `municipio` ou `município`
+- `projeto`
+- `tipo_acao`, `tipo acao`, `tipo de acao`, `tipo`, etc.
+- `responsavel`, `responsável`, `email`
+- `data_registro`, `data registro`, `data`
+- `observacao`, `observação`, `obs`
+
+**Exemplo CSV:**
+```csv
+Município,Projeto,Tipo de Ação,Responsável,Data Registro,Observação
+Fortaleza,ACerta,Cadastro INEP,resp@example.com,2025-01-20,Concluído
+Maracanaú,ACerta,Cadastro SIGPEC,joao.silva@example.com,25/01/2025,Pendente validação
+```
+
+#### **Comandos de Importação**
+
+**Preview (dry-run):**
+```bash
+cd v2
+
+# Via Makefile
+make etl-dat-dry FILE=/app/data/dat_cadastros.csv
+
+# OU diretamente
+docker compose exec -T web python manage.py etl_import_dat_cadastros \
+  /app/data/dat_cadastros.csv --dry-run
+```
+
+**Aplicar:**
+```bash
+# Via Makefile
+make etl-dat-apply FILE=/app/data/dat_cadastros.xlsx
+
+# OU diretamente
+docker compose exec -T web python manage.py etl_import_dat_cadastros \
+  /app/data/dat_cadastros.xlsx
+```
+
+#### **Relatório de Importação**
+
+Arquivo salvo em: `out_etl/import_dat_cadastros_report.json`
+
+**Estrutura:**
+```json
+{
+  "stats": {
+    "created": 8,
+    "updated": 1,
+    "unchanged": 3,
+    "skipped": {
+      "municipio": 0,
+      "projeto": 0,
+      "tipo_acao": 2,
+      "responsavel": 1,
+      "other": 0
+    }
+  },
+  "pendencias": {
+    "municipios": [],
+    "projetos": [],
+    "tipo_acao": [{"linha": 10, "valor": null}],
+    "responsaveis": [{"linha": 15, "valor": "usuario@invalido.com"}],
+    "outros": []
+  },
+  "dry_run": false,
+  "file": "/app/data/dat_cadastros.csv"
+}
+```
+
+---
+
+## 🔌 APIs REST: Ações (Controle e DAT)
+
+### **Visão Geral**
+
+Endpoints RESTful para consulta e criação de ações com **RBAC** (Role-Based Access Control).
+
+**Base URL:** `http://localhost:8002/api/`
+
+**Autenticação:** Session-based (Django Auth)
+
+---
+
+### **API 1: Ações de Controle**
+
+**Endpoint:** `GET /api/controle/acoes/`
+
+**Permissão:** `IsControleOrSuper` (grupos: Controle ou Superintendência)
+
+**Descrição:** Lista ações do setor Controle com filtros opcionais de data.
+
+#### **Query Parameters**
+
+| Parâmetro | Tipo | Descrição | Exemplo |
+|-----------|------|-----------|---------|
+| `data_inicio` | `YYYY-MM-DD` | Filtra por qualquer data >= data_inicio | `2025-01-01` |
+| `data_fim` | `YYYY-MM-DD` | Filtra por qualquer data <= data_fim | `2025-12-31` |
+
+**Comportamento do filtro:**
+- Considera **todas as datas** do modelo: `data_entrega`, `data_carta`, `contato_inicial`, `data_reuniao`
+- Retorna ação se **pelo menos uma** das datas estiver no intervalo
+- Usa `Q()` do Django para OR lógico
+
+#### **Exemplo de Requisição**
+
+```bash
+# Listar todas as ações
+curl -X GET http://localhost:8002/api/controle/acoes/ \
+  -H "Cookie: sessionid=<seu-session-id>"
+
+# Filtrar por intervalo de datas
+curl -X GET "http://localhost:8002/api/controle/acoes/?data_inicio=2025-01-01&data_fim=2025-03-31" \
+  -H "Cookie: sessionid=<seu-session-id>"
+```
+
+#### **Resposta (200 OK)**
+
+```json
+[
+  {
+    "id": 1,
+    "municipio": "Fortaleza",
+    "projeto": "ACerta",
+    "coordenador": "Maria Silva",
+    "data_entrega": "2025-01-15",
+    "data_carta": "2025-01-10",
+    "contato_inicial": "2025-01-20",
+    "data_reuniao": "2025-02-01",
+    "observacao": "Entrega confirmada",
+    "external_hash": "a1b2c3d4e5f6...",
+    "created_at": "2025-01-01T10:00:00Z",
+    "updated_at": "2025-01-01T10:00:00Z"
+  }
+]
+```
+
+**Notas:**
+- FKs retornados como **strings** via `StringRelatedField` (ex: "Fortaleza", não ID)
+- Ordenação padrão: `-data_reuniao`, `-data_entrega`
+
+---
+
+### **API 2: Cadastros DAT (Leitura)**
+
+**Endpoint:** `GET /api/dat/acoes/`
+
+**Permissão:** `IsDATOrSuper` (grupos: DAT ou Superintendência/superuser)
+
+**Descrição:** Lista cadastros do setor DAT com filtros opcionais.
+
+#### **Query Parameters**
+
+| Parâmetro | Tipo | Descrição | Exemplo |
+|-----------|------|-----------|---------|
+| `projeto` | `int` | ID do projeto | `1` |
+| `municipio` | `int` | ID do município | `5` |
+| `tipo_acao` | `string` | Filtro parcial (icontains) no tipo de ação | `INEP` |
+| `data_inicio` | `YYYY-MM-DD` | Filtra data_registro >= data_inicio | `2025-01-01` |
+| `data_fim` | `YYYY-MM-DD` | Filtra data_registro <= data_fim | `2025-12-31` |
+
+#### **Exemplo de Requisição**
+
+```bash
+# Listar todos os cadastros
+curl -X GET http://localhost:8002/api/dat/acoes/ \
+  -H "Cookie: sessionid=<seu-session-id>"
+
+# Filtrar por tipo de ação
+curl -X GET "http://localhost:8002/api/dat/acoes/?tipo_acao=Cadastro%20INEP" \
+  -H "Cookie: sessionid=<seu-session-id>"
+
+# Filtrar por projeto e intervalo de datas
+curl -X GET "http://localhost:8002/api/dat/acoes/?projeto=1&data_inicio=2025-01-01&data_fim=2025-03-31" \
+  -H "Cookie: sessionid=<seu-session-id>"
+```
+
+#### **Resposta (200 OK)**
+
+```json
+[
+  {
+    "id": 1,
+    "municipio": "Fortaleza",
+    "projeto": "ACerta",
+    "tipo_acao": "Cadastro INEP",
+    "responsavel": "João Silva",
+    "observacao": "Cadastro concluído",
+    "data_registro": "2025-01-20",
+    "external_hash": "x1y2z3a4b5c6...",
+    "created_at": "2025-01-01T12:00:00Z",
+    "updated_at": "2025-01-01T12:00:00Z"
+  }
+]
+```
+
+---
+
+### **API 3: Cadastros DAT (Criação)**
+
+**Endpoint:** `POST /api/dat/acoes/`
+
+**Permissão:** `IsDATOrSuper`
+
+**Descrição:** Cria nova ação DAT.
+
+#### **Body (JSON)**
+
+```json
+{
+  "municipio": 1,
+  "projeto": 1,
+  "tipo_acao": "Novo Cadastro",
+  "responsavel": 5,
+  "data_registro": "2025-03-01",
+  "observacao": "Observação opcional"
+}
+```
+
+**Campos obrigatórios:**
+- `municipio` (ID)
+- `projeto` (ID)
+- `tipo_acao` (string)
+
+**Campos opcionais:**
+- `responsavel` (ID do usuário)
+- `data_registro` (YYYY-MM-DD)
+- `observacao` (texto)
+
+#### **Exemplo de Requisição**
+
+```bash
+curl -X POST http://localhost:8002/api/dat/acoes/ \
+  -H "Content-Type: application/json" \
+  -H "Cookie: sessionid=<seu-session-id>" \
+  -d '{
+    "municipio": 1,
+    "projeto": 1,
+    "tipo_acao": "Cadastro SIGPEC",
+    "responsavel": 3,
+    "data_registro": "2025-03-15"
+  }'
+```
+
+#### **Resposta (201 Created)**
+
+```json
+{
+  "id": 10,
+  "municipio": "Fortaleza",
+  "projeto": "ACerta",
+  "tipo_acao": "Cadastro SIGPEC",
+  "responsavel": "Maria Silva",
+  "observacao": null,
+  "data_registro": "2025-03-15",
+  "external_hash": "g7h8i9j0k1l2...",
+  "created_at": "2025-03-01T14:30:00Z",
+  "updated_at": "2025-03-01T14:30:00Z"
+}
+```
+
+**Nota:** Response usa serializer de **leitura** (StringRelatedField), enquanto request aceita IDs.
+
+---
+
+### **Erros Comuns**
+
+#### **403 Forbidden**
+
+**Causa:** Usuário sem permissão (grupo incorreto).
+
+**Solução:**
+```bash
+# Verificar grupos do usuário
+make shell
+python manage.py shell -c "
+from django.contrib.auth import get_user_model
+u = get_user_model().objects.get(username='seu_usuario')
+print(u.groups.values_list('name', flat=True))
+"
+
+# Adicionar ao grupo correto
+python manage.py shell -c "
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+u = get_user_model().objects.get(username='seu_usuario')
+g = Group.objects.get(name='Controle')  # ou 'DAT'
+u.groups.add(g)
+"
+```
+
+#### **400 Bad Request (campo obrigatório faltando)**
+
+**Exemplo:**
+```json
+{
+  "municipio": ["This field is required."],
+  "tipo_acao": ["This field is required."]
+}
+```
+
+**Solução:** Incluir todos os campos obrigatórios no body da requisição.
+
+---
 

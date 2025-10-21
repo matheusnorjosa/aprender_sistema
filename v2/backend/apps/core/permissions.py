@@ -46,3 +46,24 @@ class IsCoordenadorOrDAT(permissions.BasePermission):
                 or request.user.groups.filter(name__in=["Coordenador", "DAT"]).exists()
             )
         )
+
+
+class IsControleOrSuper(permissions.BasePermission):
+    """
+    Permissão: apenas usuários do grupo 'Controle' ou 'Superintendência' podem executar.
+
+    Usado para operações de importação e controle de dados.
+    Nota: Superusers sempre têm acesso completo.
+    """
+
+    message = "Apenas Controle ou Superintendência podem realizar esta ação."
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                request.user.is_superuser
+                or request.user.groups.filter(name__in=["Controle", "Superintendência"]).exists()
+            )
+        )

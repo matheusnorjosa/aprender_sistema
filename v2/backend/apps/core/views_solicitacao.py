@@ -70,18 +70,59 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
+        # Base queryset (permissões)
         if (
             self.request.user.is_superuser
             or self.request.user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
         ):
-            return Solicitacao.objects.select_related(
+            qs = Solicitacao.objects.select_related(
                 "usuario", "municipio", "tipo_evento", "projeto"
             ).prefetch_related("participations__usuario")
-        return (
-            Solicitacao.objects.filter(usuario=self.request.user)
-            .select_related("usuario", "municipio", "tipo_evento", "projeto")
-            .prefetch_related("participations__usuario")
-        )
+        else:
+            qs = (
+                Solicitacao.objects.filter(usuario=self.request.user)
+                .select_related("usuario", "municipio", "tipo_evento", "projeto")
+                .prefetch_related("participations__usuario")
+            )
+
+        # Filtros adicionais via query params
+        sector = self.request.query_params.get("sector")
+        date_from = self.request.query_params.get("date_from")
+        date_to = self.request.query_params.get("date_to")
+        q = self.request.query_params.get("q")
+
+        if sector:
+            qs = qs.filter(projeto__nome__icontains=sector)
+
+        if date_from:
+            try:
+                from datetime import date
+                date_from_parsed = date.fromisoformat(date_from)
+                qs = qs.filter(inicio__date__gte=date_from_parsed)
+            except (ValueError, TypeError):
+                pass  # Ignore invalid date format
+
+        if date_to:
+            try:
+                from datetime import date
+                date_to_parsed = date.fromisoformat(date_to)
+                qs = qs.filter(inicio__date__lte=date_to_parsed)
+            except (ValueError, TypeError):
+                pass  # Ignore invalid date format
+
+        if q:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(municipio__nome__icontains=q)
+                | Q(projeto__nome__icontains=q)
+                | Q(tipo_evento__nome__icontains=q)
+                | Q(observacoes__icontains=q)
+                | Q(usuario__first_name__icontains=q)
+                | Q(usuario__last_name__icontains=q)
+                | Q(usuario__username__icontains=q)
+            )
+
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(usuario=self.request.user)

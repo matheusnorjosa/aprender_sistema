@@ -8,7 +8,7 @@ Valida:
 - POST /api/solicitacoes/{id}/preview-gcal/ (preview sem publicar)
 - POST /api/solicitacoes/{id}/publish/ (publicação assíncrona via Celery)
 - AuditLog para ambas as ações
-- Permissões (apenas Superintendência)
+- Permissões (Controle ou Superintendência)
 """
 
 import pytest
@@ -293,7 +293,7 @@ def test_preview_gcal_api_permission_denied(api_client, user_coord, setup_solici
     """
     Testa POST /api/solicitacoes/{id}/preview-gcal/ sem permissão.
 
-    Coordenador não deve ter acesso (apenas Superintendência).
+    Coordenador não deve ter acesso (apenas Controle ou Superintendência).
     """
     sol = setup_solicitacao["solicitacao"]
 
@@ -388,7 +388,7 @@ def test_publish_gcal_api_permission_denied(api_client, user_coord, setup_solici
     """
     Testa POST /api/solicitacoes/{id}/publish/ sem permissão.
 
-    Coordenador não deve ter acesso (apenas Superintendência).
+    Coordenador não deve ter acesso (apenas Controle ou Superintendência).
     """
     sol = setup_solicitacao["solicitacao"]
 

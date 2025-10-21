@@ -1,7 +1,8 @@
 DC = COMPOSE_PROJECT_NAME=aprender_v2 docker compose -f infra/docker-compose.yml
 WEB = $(DC) exec -T web
 
-.PHONY: up down build logs shell migrate collect seed seed-demo readyz healthz \
+.PHONY: up down build logs shell migrate collect seed seed-demo seed-rbac \
+        etl-acomp-dry etl-acomp-apply readyz healthz \
         preview-json apply-json flags-fake flags-google preview-on preview-off \
         ban-v1 up-worker up-beat logs-worker logs-beat logs-worker-last logs-beat-last help
 
@@ -32,6 +33,20 @@ seed:
 
 seed-demo:
 	$(WEB) python manage.py seed_demo_users --verbose
+
+seed-rbac:
+	$(WEB) python manage.py seed_rbac
+
+etl-acomp-dry:
+	$(WEB) python manage.py etl_upsert_acompanhamento \
+		--events-csv /app/data/csv-import/etl_eventos_normalizados.csv \
+		--participants-csv /app/data/csv-import/etl_participantes_normalizados.csv \
+		--dry-run
+
+etl-acomp-apply:
+	$(WEB) python manage.py etl_upsert_acompanhamento \
+		--events-csv /app/data/csv-import/etl_eventos_normalizados.csv \
+		--participants-csv /app/data/csv-import/etl_participantes_normalizados.csv
 
 readyz:
 	curl -fsS http://localhost:8002/api/readyz/ || true
@@ -105,6 +120,11 @@ help:
 	@echo "  make collect               Collect static files"
 	@echo "  make seed                  Seed RBAC data"
 	@echo "  make seed-demo             Seed demo users"
+	@echo "  make seed-rbac             Seed RBAC groups/permissions (idempotent)"
+	@echo ""
+	@echo "ETL:"
+	@echo "  make etl-acomp-dry         Preview ETL acompanhamento (dry-run)"
+	@echo "  make etl-acomp-apply       Apply ETL acompanhamento"
 	@echo ""
 	@echo "Celery (Worker & Beat):"
 	@echo "  make up-worker             Start worker"

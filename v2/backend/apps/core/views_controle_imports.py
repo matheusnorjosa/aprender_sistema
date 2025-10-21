@@ -10,9 +10,9 @@ POST /api/controle/import-compras/
 import os
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
+from apps.core.permissions import IsControleOrSuper
 from apps.core.services.controle_imports import import_compras_from_file
 
 
@@ -22,6 +22,8 @@ DEFAULT_DIR = "/app/data/csv-import"
 class ImportComprasView(APIView):
     """
     Importa Compras de CSV/XLSX.
+
+    Requer permissão: IsControleOrSuper (grupos Controle ou Superintendência)
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -45,7 +47,7 @@ class ImportComprasView(APIView):
             "ts": "2025-10-21T..."
         }
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsControleOrSuper]
 
     def post(self, request):
         # Parse dry_run query param

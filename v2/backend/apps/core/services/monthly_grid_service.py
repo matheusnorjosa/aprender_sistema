@@ -4,12 +4,16 @@ Service para compor grade mensal de disponibilidade.
 Retorna uma grade mensal (ano/mês) com códigos por dia/pessoa:
 - E: 1 evento
 - 2: ≥2 eventos
-- P: bloqueio parcial (sem evento)
-- T: bloqueio total (sem evento)
-- X: evento + bloqueio
+- P: bloqueio parcial (sem evento, sem deslocamento)
+- T: bloqueio total (sem evento, sem deslocamento)
+- X: evento + bloqueio (com ou sem deslocamento)
+- D: deslocamento apenas (sem eventos, sem bloqueios)
+- D1: evento + deslocamento (sem bloqueio)
+
+Precedência: X > D1 > 2 > E > T/P > D
 
 Calcula CH mês/ano, ranking por CH mês (denso).
-Details_index para dias com E/2/X (lista de eventos).
+Details_index para dias com E/2/X/D1 (lista de eventos).
 """
 
 from datetime import date, datetime, timedelta
@@ -17,7 +21,7 @@ from typing import Optional
 from django.utils import timezone
 from django.db.models import Q, Prefetch
 
-from apps.core.models import Usuario, Solicitacao, AvailabilityBlock, Participation
+from apps.core.models import Usuario, Solicitacao, AvailabilityBlock, Participation, Deslocamento
 
 
 def build_monthly_grid(
@@ -138,6 +142,15 @@ def build_monthly_grid(
         ).select_related("usuario")
     )
 
+    # 3.5. Deslocamentos do mês
+    deslocamentos = list(
+        Deslocamento.objects.filter(
+            usuario_id__in=user_ids,
+            start_date__lte=last_day,
+            end_date__gte=first_day,
+        ).select_related("usuario")
+    )
+
     # 4. Estruturas para acumular dados por user_id
     user_data = {uid: _init_user_data(year, month, days_in_month) for uid in user_ids}
 
@@ -207,6 +220,25 @@ def build_monthly_grid(
 
             current += timedelta(days=1)
 
+    # 6.5. Distribuir deslocamentos por dia/pessoa
+    for desloc in deslocamentos:
+        uid = desloc.usuario_id
+        if uid not in user_data:
+            continue
+
+        # Dias tocados pelo deslocamento (start_date até end_date)
+        current = desloc.start_date
+        end_date = desloc.end_date
+
+        while current <= end_date:
+            day_num = current.day
+
+            # Verificar se o dia está dentro do mês atual
+            if current.month == month and current.year == year:
+                user_data[uid]["deslocamentos_by_day"][day_num].append(desloc)
+
+            current += timedelta(days=1)
+
     # 7. People com CH mês/ano (ordenar PRIMEIRO)
     users = Usuario.objects.filter(id__in=user_ids)
     user_map = {u.id: u for u in users}
@@ -245,27 +277,39 @@ def build_monthly_grid(
             col_idx = day_num - 1  # Dia 1 → coluna 0
             events_day = data["events_by_day"][day_num]
             blocks_day = data["blocks_by_day"][day_num]
+            deslocamentos_day = data["deslocamentos_by_day"][day_num]
 
             has_event = len(events_day) > 0
             has_block = len(blocks_day) > 0
+            has_desloc = len(deslocamentos_day) > 0
 
+            # Precedência: X > D1 > 2 > E > T/P > D
             code = ""
             if has_event and has_block:
+                # X: evento + bloqueio (com ou sem deslocamento)
                 code = "X"
+            elif has_event and has_desloc:
+                # D1: evento + deslocamento (sem bloqueio)
+                code = "D1"
             elif len(events_day) >= 2:
+                # 2: múltiplos eventos
                 code = "2"
             elif len(events_day) == 1:
+                # E: 1 evento
                 code = "E"
             elif has_block:
-                # Verificar se é T ou P
+                # T/P: bloqueio apenas (sem evento, sem deslocamento)
                 # Se qualquer bloqueio for T, código é T; senão P
                 has_total = any(b.tipo == "T" for b in blocks_day)
                 code = "T" if has_total else "P"
+            elif has_desloc:
+                # D: deslocamento apenas (sem evento, sem bloqueio)
+                code = "D"
 
             cells[row_idx][col_idx] = code
 
-            # Details para E/2/X com chave "row:col" (0-based)
-            if code in ["E", "2", "X"]:
+            # Details para E/2/X/D1 com chave "row:col" (0-based)
+            if code in ["E", "2", "X", "D1"]:
                 detail_key = f"{row_idx}:{col_idx}"
                 details_index[detail_key] = [
                     _event_to_detail(e, tz) for e in events_day
@@ -304,6 +348,7 @@ def _init_user_data(year: int, month: int, days_in_month: int) -> dict:
         "ch_year": 0.0,
         "events_by_day": {day: [] for day in range(1, days_in_month + 1)},
         "blocks_by_day": {day: [] for day in range(1, days_in_month + 1)},
+        "deslocamentos_by_day": {day: [] for day in range(1, days_in_month + 1)},
     }
 
 
@@ -373,4 +418,6 @@ def _build_legend() -> dict:
         "P": "Bloqueio parcial",
         "T": "Bloqueio total",
         "X": "Evento + bloqueio",
+        "D": "Deslocamento",
+        "D1": "Evento + deslocamento",
     }

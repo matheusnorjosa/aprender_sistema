@@ -13,6 +13,7 @@ from .views_availability import (
     AvailabilityBlockViewSet,
     AvailabilityCheckView,
 )
+from .views_availability_monthly import MonthlyAvailabilityView
 
 app_name = "core"
 
@@ -33,6 +34,11 @@ urlpatterns = [
         "availability/check/",
         AvailabilityCheckView.as_view(),
         name="availability-check",
+    ),
+    path(
+        "availability/monthly/",
+        MonthlyAvailabilityView.as_view(),
+        name="availability-monthly",
     ),
     path("", include(router.urls)),
 ]

@@ -12,6 +12,7 @@ Valida:
 
 import csv
 import json
+import tempfile
 import pytest
 from datetime import date
 from pathlib import Path
@@ -26,9 +27,19 @@ User = get_user_model()
 pytestmark = pytest.mark.django_db
 
 
-@pytest.fixture
-def setup_dependencies():
-    """Cria dependências necessárias para o ETL."""
+def _create_csv_file(rows, fieldnames):
+    """Helper para criar arquivo CSV temporário."""
+    tmp = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8", newline="")
+    writer = csv.DictWriter(tmp, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(row)
+    tmp.close()
+    return tmp.name
+
+
+def test_import_creates_acao_dat():
+    """Importação cria AcaoDAT com todos os campos."""
     responsavel = User.objects.create_user(
         username="resp1",
         email="resp@example.com",
@@ -37,64 +48,25 @@ def setup_dependencies():
         first_name="João",
         last_name="Responsável",
     )
-
     municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
     projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
-    return {"responsavel": responsavel, "municipio": municipio, "projeto": projeto}
-
-
-@pytest.fixture
-def csv_valid(tmp_path, setup_dependencies):
-    """Cria CSV válido com headers flexíveis."""
-    csv_file = tmp_path / "dat_cadastros.csv"
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=[
-                "Município",
-                "Projeto",
-                "Tipo de Ação",
-                "Responsável",
-                "Data Registro",
-                "Observação",
-            ],
-        )
-        writer.writeheader()
-        writer.writerow({
+    csv_file = _create_csv_file(
+        rows=[{
             "Município": "Fortaleza",
             "Projeto": "ACerta",
             "Tipo de Ação": "Cadastro INEP",
             "Responsável": "resp@example.com",
             "Data Registro": "2025-01-15",
             "Observação": "Cadastro realizado",
-        })
+        }],
+        fieldnames=[
+            "Município", "Projeto", "Tipo de Ação",
+            "Responsável", "Data Registro", "Observação"
+        ]
+    )
 
-    return str(csv_file)
-
-
-@pytest.fixture
-def csv_missing_tipo_acao(tmp_path, setup_dependencies):
-    """CSV sem tipo de ação (obrigatório)."""
-    csv_file = tmp_path / "dat_missing_tipo.csv"
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=["Município", "Projeto", "Data Registro"],
-        )
-        writer.writeheader()
-        writer.writerow({
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Data Registro": "2025-01-01",
-        })
-
-    return str(csv_file)
-
-
-def test_import_creates_acao_dat(csv_valid):
-    """Importação cria AcaoDAT com todos os campos."""
-    report = import_dat_cadastros(csv_valid, dry_run=False)
+    report = import_dat_cadastros(csv_file, dry_run=False)
 
     assert report["stats"]["created"] == 1
     assert report["stats"]["skipped"]["municipio"] == 0
@@ -110,14 +82,27 @@ def test_import_creates_acao_dat(csv_valid):
     assert acao.external_hash is not None
 
 
-def test_idempotency_no_duplicates(csv_valid):
+def test_idempotency_no_duplicates():
     """Rodar ETL 2x não duplica registros (external_hash)."""
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[{
+            "Município": "Fortaleza",
+            "Projeto": "ACerta",
+            "Tipo de Ação": "Cadastro INEP",
+            "Data Registro": "2025-01-15",
+        }],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
+    )
+
     # Primeira rodada
-    report1 = import_dat_cadastros(csv_valid, dry_run=False)
+    report1 = import_dat_cadastros(csv_file, dry_run=False)
     assert report1["stats"]["created"] == 1
 
     # Segunda rodada (idempotência)
-    report2 = import_dat_cadastros(csv_valid, dry_run=False)
+    report2 = import_dat_cadastros(csv_file, dry_run=False)
     assert report2["stats"]["unchanged"] == 1
     assert report2["stats"]["created"] == 0
 
@@ -125,9 +110,22 @@ def test_idempotency_no_duplicates(csv_valid):
     assert AcaoDAT.objects.count() == 1
 
 
-def test_dry_run_does_not_commit(csv_valid):
+def test_dry_run_does_not_commit():
     """Dry-run não persiste dados no banco."""
-    report = import_dat_cadastros(csv_valid, dry_run=True)
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[{
+            "Município": "Fortaleza",
+            "Projeto": "ACerta",
+            "Tipo de Ação": "Cadastro INEP",
+            "Data Registro": "2025-01-15",
+        }],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
+    )
+
+    report = import_dat_cadastros(csv_file, dry_run=True)
 
     assert report["stats"]["created"] == 1
     assert report["dry_run"] is True
@@ -136,9 +134,21 @@ def test_dry_run_does_not_commit(csv_valid):
     assert AcaoDAT.objects.count() == 0
 
 
-def test_skip_missing_tipo_acao(csv_missing_tipo_acao):
+def test_skip_missing_tipo_acao():
     """Registros sem tipo de ação são pulados (campo obrigatório)."""
-    report = import_dat_cadastros(csv_missing_tipo_acao, dry_run=False)
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[{
+            "Município": "Fortaleza",
+            "Projeto": "ACerta",
+            "Data Registro": "2025-01-01",
+        }],
+        fieldnames=["Município", "Projeto", "Data Registro"]
+    )
+
+    report = import_dat_cadastros(csv_file, dry_run=False)
 
     assert report["stats"]["created"] == 0
     assert report["stats"]["skipped"]["tipo_acao"] == 1
@@ -147,9 +157,21 @@ def test_skip_missing_tipo_acao(csv_missing_tipo_acao):
     assert len(pendencias) == 1
 
 
-def test_report_saved_to_out_etl(csv_valid):
+def test_report_saved_to_out_etl():
     """Relatório é salvo em out_etl/import_dat_cadastros_report.json."""
-    import_dat_cadastros(csv_valid, dry_run=False)
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[{
+            "Município": "Fortaleza",
+            "Projeto": "ACerta",
+            "Tipo de Ação": "Cadastro INEP",
+        }],
+        fieldnames=["Município", "Projeto", "Tipo de Ação"]
+    )
+
+    import_dat_cadastros(csv_file, dry_run=False)
 
     report_path = Path(settings.BASE_DIR) / "out_etl" / "import_dat_cadastros_report.json"
     assert report_path.exists()
@@ -164,22 +186,22 @@ def test_report_saved_to_out_etl(csv_valid):
     assert report["stats"]["created"] >= 0
 
 
-def test_responsavel_optional(tmp_path, setup_dependencies):
+def test_responsavel_optional():
     """Responsável é opcional - registro criado mesmo se não encontrado."""
-    csv_file = tmp_path / "dat_no_resp.csv"
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
-        )
-        writer.writeheader()
-        writer.writerow({
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[{
             "Município": "Fortaleza",
             "Projeto": "ACerta",
             "Tipo de Ação": "Cadastro SIGPEC",
             "Data Registro": "2025-01-01",
-        })
+        }],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
+    )
 
-    report = import_dat_cadastros(str(csv_file), dry_run=False)
+    report = import_dat_cadastros(csv_file, dry_run=False)
 
     assert report["stats"]["created"] == 1
 
@@ -188,44 +210,39 @@ def test_responsavel_optional(tmp_path, setup_dependencies):
     assert acao.tipo_acao == "Cadastro SIGPEC"
 
 
-def test_update_existing_record(tmp_path, setup_dependencies):
+def test_update_existing_record():
     """Atualiza registro existente se dados mudarem."""
-    csv_file = tmp_path / "dat_update.csv"
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     # Criar inicial
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro", "Observação"],
-        )
-        writer.writeheader()
-        writer.writerow({
+    csv_file = _create_csv_file(
+        rows=[{
             "Município": "Fortaleza",
             "Projeto": "ACerta",
             "Tipo de Ação": "Cadastro Teste",
             "Data Registro": "2025-01-01",
             "Observação": "Versão 1",
-        })
+        }],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro", "Observação"]
+    )
 
-    report1 = import_dat_cadastros(str(csv_file), dry_run=False)
+    report1 = import_dat_cadastros(csv_file, dry_run=False)
     assert report1["stats"]["created"] == 1
 
     # Atualizar observação
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro", "Observação"],
-        )
-        writer.writeheader()
-        writer.writerow({
+    csv_file2 = _create_csv_file(
+        rows=[{
             "Município": "Fortaleza",
             "Projeto": "ACerta",
             "Tipo de Ação": "Cadastro Teste",
             "Data Registro": "2025-01-01",
             "Observação": "Versão 2 - atualizada",
-        })
+        }],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro", "Observação"]
+    )
 
-    report2 = import_dat_cadastros(str(csv_file), dry_run=False)
+    report2 = import_dat_cadastros(csv_file2, dry_run=False)
     assert report2["stats"]["updated"] == 1
 
     acao = AcaoDAT.objects.first()
@@ -233,63 +250,65 @@ def test_update_existing_record(tmp_path, setup_dependencies):
     assert AcaoDAT.objects.count() == 1  # Não duplicou
 
 
-def test_external_hash_includes_tipo_acao(tmp_path, setup_dependencies):
+def test_external_hash_includes_tipo_acao():
     """external_hash inclui tipo_acao, diferenciando ações do mesmo projeto/município/data."""
-    csv_file = tmp_path / "dat_multiple.csv"
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     # Criar 2 ações diferentes (mesmo município/projeto/data, tipo_acao diferente)
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
-        )
-        writer.writeheader()
-        writer.writerow({
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Tipo de Ação": "Cadastro INEP",
-            "Data Registro": "2025-01-01",
-        })
-        writer.writerow({
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Tipo de Ação": "Cadastro SIGPEC",
-            "Data Registro": "2025-01-01",
-        })
+    csv_file = _create_csv_file(
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": "Cadastro INEP",
+                "Data Registro": "2025-01-01",
+            },
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": "Cadastro SIGPEC",
+                "Data Registro": "2025-01-01",
+            },
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
+    )
 
-    report = import_dat_cadastros(str(csv_file), dry_run=False)
+    report = import_dat_cadastros(csv_file, dry_run=False)
 
     assert report["stats"]["created"] == 2  # Ambas criadas (hashes diferentes)
     assert AcaoDAT.objects.count() == 2
 
-    acoes = AcaoDAT.objects.all()
+    acoes = list(AcaoDAT.objects.all())
     assert acoes[0].external_hash != acoes[1].external_hash  # Hashes diferentes
 
 
-def test_date_parsing_formats(tmp_path, setup_dependencies):
+def test_date_parsing_formats():
     """Testa parsing de múltiplos formatos de data."""
-    csv_file = tmp_path / "dat_dates.csv"
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
-        )
-        writer.writeheader()
-        # ISO format
-        writer.writerow({
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Tipo de Ação": "Teste ISO",
-            "Data Registro": "2025-01-15",
-        })
-        # dd/mm/yyyy format
-        writer.writerow({
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Tipo de Ação": "Teste BR",
-            "Data Registro": "20/01/2025",
-        })
+    csv_file = _create_csv_file(
+        rows=[
+            # ISO format
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": "Teste ISO",
+                "Data Registro": "2025-01-15",
+            },
+            # dd/mm/yyyy format
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": "Teste BR",
+                "Data Registro": "20/01/2025",
+            },
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
+    )
 
-    report = import_dat_cadastros(str(csv_file), dry_run=False)
+    report = import_dat_cadastros(csv_file, dry_run=False)
 
     assert report["stats"]["created"] == 2
 

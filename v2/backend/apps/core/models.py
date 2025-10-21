@@ -221,6 +221,16 @@ class Solicitacao(models.Model):
         help_text="ID do evento no Google Calendar (para idempotência)",
     )
 
+    # Hash único para idempotência de ETL (importação de planilhas)
+    external_hash = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        unique=True,
+        db_index=True,
+        help_text="Hash SHA1 para identificar evento de fonte externa (ETL)",
+    )
+
     # Observabilidade de sincronização (para debugging e monitoramento)
     last_synced_at = models.DateTimeField(
         null=True,

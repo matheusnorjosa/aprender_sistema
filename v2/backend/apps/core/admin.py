@@ -1,6 +1,8 @@
 from django.contrib import admin
 
 from .models import (
+    AcaoControle,
+    AcaoDAT,
     AvailabilityBlock,
     Compra,
     Deslocamento,
@@ -105,3 +107,37 @@ class DeslocamentoAdmin(admin.ModelAdmin):
     autocomplete_fields = ("usuario",)
     list_select_related = ("usuario",)
     date_hierarchy = "start_date"
+
+
+@admin.register(AcaoControle)
+class AcaoControleAdmin(admin.ModelAdmin):
+    list_display = (
+        "municipio",
+        "projeto",
+        "coordenador",
+        "data_entrega",
+        "data_carta",
+        "contato_inicial",
+        "data_reuniao",
+    )
+    list_filter = ("projeto",)
+    search_fields = (
+        "municipio__nome",
+        "projeto__nome",
+        "coordenador__email",
+        "coordenador__first_name",
+        "coordenador__last_name",
+    )
+    autocomplete_fields = ("municipio", "projeto", "coordenador")
+    list_select_related = ("municipio", "projeto", "coordenador")
+    date_hierarchy = "data_reuniao"
+
+
+@admin.register(AcaoDAT)
+class AcaoDATAdmin(admin.ModelAdmin):
+    list_display = ("municipio", "projeto", "tipo_acao", "responsavel", "data_registro")
+    list_filter = ("projeto", "tipo_acao")
+    search_fields = ("municipio__nome", "projeto__nome", "tipo_acao", "responsavel__email")
+    autocomplete_fields = ("municipio", "projeto", "responsavel")
+    list_select_related = ("municipio", "projeto", "responsavel")
+    date_hierarchy = "data_registro"

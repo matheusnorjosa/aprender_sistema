@@ -165,6 +165,18 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
     normalized = [normalize_row(r) for r in rows]
 
     # Resolver municípios e projetos
+    def _build_ext_key(r: Dict[str, Any]) -> str:
+        """Constrói chave para external_hash (mesma lógica em dry-run e apply)."""
+        return "|".join([
+            str(r["municipio_obj"].id),
+            str(r["projeto_obj"].id),
+            r["codigo"],
+            r["produto_norm"],
+            str(r["quantidade"]),
+            str(r["data"]),
+            r["uso_norm"],
+        ])
+
     resolved: List[Dict[str, Any]] = []
     for i, r in enumerate(normalized, start=2):
         # Validar campos obrigatórios
@@ -210,16 +222,8 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
     if not dry_run:
         with transaction.atomic():
             for r in resolved:
-                # Gerar external_hash determinístico
-                ext_key = "|".join([
-                    str(r["municipio_obj"].id),
-                    str(r["projeto_obj"].id),
-                    r["codigo"],
-                    r["produto_norm"],
-                    str(r["quantidade"]),
-                    str(r["data"]),
-                    r["uso_norm"],
-                ])
+                # Gerar external_hash determinístico (mesma lógica do dry-run)
+                ext_key = _build_ext_key(r)
                 ext_hash = sha1_str(ext_key)
 
                 defaults = dict(
@@ -247,17 +251,9 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
                     else:
                         stats.skipped += 1
     else:
-        # Simulação: verificar se já existe sem persistir
+        # Simulação: verificar se já existe sem persistir (mesma lógica do apply)
         for r in resolved:
-            ext_key = "|".join([
-                str(r["municipio_obj"].id),
-                str(r["projeto_obj"].id),
-                r["codigo"],
-                r["produto_norm"],
-                str(r["quantidade"]),
-                str(r["data"]),
-                r["uso_norm"],
-            ])
+            ext_key = _build_ext_key(r)
             ext_hash = sha1_str(ext_key)
             exists = Compra.objects.filter(external_hash=ext_hash).exists()
             if exists:

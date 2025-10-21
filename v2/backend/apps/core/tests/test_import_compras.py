@@ -291,3 +291,92 @@ COMP-888,PRODUTO DESCONHECIDO,5,Acarape,CE,2025-04-01,Teste
         assert "DESCONHECIDO" in report["pendencias"]["projetos"][0]["produto"]
     finally:
         Path(tmp.name).unlink(missing_ok=True)
+
+
+def test_import_compras_requires_controle_group():
+    """
+    Testa que endpoint exige grupo Controle ou Superintendência.
+
+    - Usuário sem grupo → 403 Forbidden
+    """
+    # Criar usuário sem grupo Controle/Superintendência
+    user = Usuario.objects.create_user(
+        username="formador",
+        email="formador@test.com",
+        password="testpass",
+        cpf="22222222222",
+    )
+    # Adicionar a um grupo diferente (Formador)
+    group, _ = Group.objects.get_or_create(name="Formador")
+    user.groups.add(group)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    # Tentar importar
+    response = client.post(
+        "/api/controle/import-compras/?dry_run=true",
+        data={"path": "/app/data/csv-import/compras.csv"}
+    )
+
+    # Deve retornar 403 Forbidden
+    assert response.status_code == 403
+    assert "Controle ou Superintendência" in str(response.data)
+
+
+def test_import_compras_allowed_for_controle():
+    """
+    Testa que grupo Controle pode importar.
+
+    - Usuário do grupo Controle → 200 ou 400 (não 403)
+    """
+    # Criar usuário do grupo Controle
+    user = Usuario.objects.create_user(
+        username="controle2",
+        email="controle2@test.com",
+        password="testpass",
+        cpf="33333333333",
+    )
+    group, _ = Group.objects.get_or_create(name="Controle")
+    user.groups.add(group)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    # Tentar importar (arquivo não existe, mas não deve dar 403)
+    response = client.post(
+        "/api/controle/import-compras/?dry_run=true",
+        data={"path": "/app/data/csv-import/compras_nao_existe.csv"}
+    )
+
+    # Deve retornar 400 (arquivo não encontrado) ou 200, mas NÃO 403
+    assert response.status_code in (200, 400)
+
+
+def test_import_compras_allowed_for_superintendencia():
+    """
+    Testa que grupo Superintendência pode importar.
+
+    - Usuário do grupo Superintendência → 200 ou 400 (não 403)
+    """
+    # Criar usuário do grupo Superintendência
+    user = Usuario.objects.create_user(
+        username="super",
+        email="super@test.com",
+        password="testpass",
+        cpf="44444444444",
+    )
+    group, _ = Group.objects.get_or_create(name="Superintendência")
+    user.groups.add(group)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    # Tentar importar (arquivo não existe, mas não deve dar 403)
+    response = client.post(
+        "/api/controle/import-compras/?dry_run=true",
+        data={"path": "/app/data/csv-import/compras_nao_existe.csv"}
+    )
+
+    # Deve retornar 400 (arquivo não encontrado) ou 200, mas NÃO 403
+    assert response.status_code in (200, 400)

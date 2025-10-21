@@ -68,8 +68,9 @@ def test_controle_user_can_list():
     response = client.get("/api/controle/acoes/")
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.data) == 1
-    assert response.data[0]["observacao"] == "Teste controle"
+    assert response.data["count"] == 1
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["observacao"] == "Teste controle"
 
 
 def test_regular_user_cannot_list_controle_acoes():
@@ -145,8 +146,9 @@ def test_filter_by_date_range():
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.data) == 1
-    assert response.data[0]["observacao"] == "Dentro do intervalo"
+    assert response.data["count"] == 1
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["observacao"] == "Dentro do intervalo"
 
 
 def test_controle_serializer_uses_string_related_field():
@@ -173,7 +175,8 @@ def test_controle_serializer_uses_string_related_field():
     response = client.get("/api/controle/acoes/")
 
     assert response.status_code == status.HTTP_200_OK
-    data = response.data[0]
+    assert response.data["count"] == 1
+    data = response.data["results"][0]
 
     # StringRelatedField retorna __str__ do modelo
     assert isinstance(data["municipio"], str)
@@ -210,8 +213,9 @@ def test_dat_user_can_list():
     response = client.get("/api/dat/acoes/")
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.data) == 1
-    assert response.data[0]["tipo_acao"] == "Cadastro INEP"
+    assert response.data["count"] == 1
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["tipo_acao"] == "Cadastro INEP"
 
 
 def test_regular_user_cannot_list_dat_acoes():
@@ -269,8 +273,9 @@ def test_filter_by_projeto():
     response = client.get("/api/dat/acoes/", {"projeto": projeto1.id})
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.data) == 1
-    assert response.data[0]["tipo_acao"] == "Cadastro INEP"
+    assert response.data["count"] == 1
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["tipo_acao"] == "Cadastro INEP"
 
 
 def test_filter_by_tipo_acao():
@@ -303,8 +308,9 @@ def test_filter_by_tipo_acao():
     response = client.get("/api/dat/acoes/", {"tipo_acao": "INEP"})
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.data) == 1
-    assert response.data[0]["tipo_acao"] == "Cadastro INEP"
+    assert response.data["count"] == 1
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["tipo_acao"] == "Cadastro INEP"
 
 
 # ════════════════════════════════════════════════════════════════════════════

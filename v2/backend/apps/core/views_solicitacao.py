@@ -72,7 +72,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if (
             self.request.user.is_superuser
-            or self.request.user.groups.filter(name="Superintendência").exists()
+            or self.request.user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
         ):
             return Solicitacao.objects.select_related(
                 "usuario", "municipio", "tipo_evento", "projeto"
@@ -231,7 +231,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             action="PREVIEW_GCAL",
             model_name="Solicitacao",
             details={
-                "solicitation_id": solicitacao.id,
+                "solicitacao_id": solicitacao.id,
                 "event_id": preview["event_id"],
                 "summary": preview["payload"].get("summary", ""),
                 "ip_address": client_ip,
@@ -267,6 +267,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     )
     def publish(self, request, pk=None):
         """Publica solicitação no Google Calendar via Celery (Controle ou Superintendência)."""
+        from django.conf import settings
         from apps.core.tasks import task_publish_solicitacao_to_gcal
         from apps.core.models import AuditLog
 
@@ -283,6 +284,20 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         dry_run = request.data.get("dry_run", False)
         apply_blocked = request.data.get("apply_blocked", False)
 
+        # Verificar se apply está bloqueado (GCAL_CLIENT != "google")
+        gcal_client = getattr(settings, "GCAL_CLIENT", None)
+        features_apply_blocked = gcal_client != "google"
+
+        if features_apply_blocked and not apply_blocked:
+            return Response(
+                {
+                    "detail": "Publicação bloqueada: GCAL_CLIENT não está configurado como 'google'.",
+                    "hint": "Para forçar publicação em modo de teste, envie apply_blocked=true no corpo da requisição.",
+                    "features_apply_blocked": True,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         # Disparar task Celery (assíncrona)
         task = task_publish_solicitacao_to_gcal.delay(
             solicitacao.id, dry_run=dry_run, apply_blocked=apply_blocked
@@ -295,7 +310,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             action="PUBLISH_GCAL_REQUESTED",
             model_name="Solicitacao",
             details={
-                "solicitation_id": solicitacao.id,
+                "solicitacao_id": solicitacao.id,
                 "task_id": task.id,
                 "dry_run": dry_run,
                 "apply_blocked": apply_blocked,

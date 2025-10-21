@@ -286,7 +286,7 @@ def test_preview_gcal_api_success(api_client, user_super, setup_solicitacao):
     ).first()
     assert audit_log is not None
     assert audit_log.usuario == user_super
-    assert audit_log.details["solicitation_id"] == sol.id
+    assert audit_log.details["solicitacao_id"] == sol.id
 
 
 def test_preview_gcal_api_permission_denied(api_client, user_coord, setup_solicitacao):
@@ -361,7 +361,7 @@ def test_publish_gcal_api_success(mock_task_delay, api_client, user_super, setup
     ).first()
     assert audit_log is not None
     assert audit_log.usuario == user_super
-    assert audit_log.details["solicitation_id"] == sol.id
+    assert audit_log.details["solicitacao_id"] == sol.id
     assert audit_log.details["task_id"] == "task-123-456"
 
 

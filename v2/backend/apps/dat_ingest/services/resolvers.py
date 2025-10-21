@@ -58,29 +58,36 @@ def resolve_user_by_name(name: str) -> Optional[User]:
 
     name_norm = norm_text(name)
 
-    # Tenta match exato em nome completo
-    users = User.objects.annotate(
-        full_name_lower=Q(
-            Q(first_name__isnull=False) & Q(last_name__isnull=False),
-            then=Q(first_name__iexact=name_norm) | Q(last_name__iexact=name_norm),
-        )
-    ).filter(full_name_lower=True)
+    # Tentativa 1: Match exato em first_name ou last_name
+    user = User.objects.filter(
+        Q(first_name__iexact=name_norm) | Q(last_name__iexact=name_norm)
+    ).first()
 
-    if users.exists():
-        return users.first()
+    if user:
+        return user
 
-    # Fallback: tenta por partes do nome
+    # Tentativa 2: Match por partes do nome (heurística)
     parts = name_norm.split()
     if len(parts) >= 2:
         first_part = parts[0]
         last_part = parts[-1]
 
-        users = User.objects.filter(
-            Q(first_name__icontains=first_part) & Q(last_name__icontains=last_part)
-        )
+        # Tenta primeiro nome + último nome
+        user = User.objects.filter(
+            first_name__icontains=first_part,
+            last_name__icontains=last_part
+        ).first()
 
-        if users.exists():
-            return users.first()
+        if user:
+            return user
+
+        # Tentativa 3: Match mais relaxado (qualquer parte em qualquer nome)
+        user = User.objects.filter(
+            Q(first_name__icontains=first_part) | Q(last_name__icontains=last_part)
+        ).first()
+
+        if user:
+            return user
 
     return None
 

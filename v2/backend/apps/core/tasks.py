@@ -134,16 +134,59 @@ def preview_then_apply_gcal():
     Preview-then-apply pattern para sync com Google Calendar.
 
     Workflow:
-    1. Roda dry-run (preview) com --json
-    2. Se total > 0 (há mudanças):
-       - Roda efetivo (apply) com --json
+    1. Verifica feature flags (GCAL_MODE, GCAL_CALENDAR_ID)
+    2. Roda dry-run (preview) com --json
+    3. Se preview retornar erro, aborta sem apply
+    4. Se total > 0 (há mudanças):
+       - Se PREVIEW_ONLY não estiver ativo, roda efetivo (apply) com --json
        - Retorna resultado do apply
-    3. Se total == 0 (sem mudanças):
+    5. Se total == 0 (sem mudanças):
        - Retorna resultado do preview (noop)
+    6. Registra AuditLog em todos os fluxos
 
     Returns:
-        dict: Resultado JSON (meta + totals)
+        dict: Resultado JSON (meta + totals + status)
     """
+    from django.conf import settings
+    from apps.core.models import AuditLog
+
+    # ================================================================
+    # GUARDA 1: Verificar GCAL_MODE
+    # ================================================================
+    feature_flags = getattr(settings, "FEATURE_FLAGS", {})
+    gcal_mode = feature_flags.get("GCAL_MODE", "google")
+
+    if gcal_mode != "google":
+        result = {
+            "status": "SKIPPED",
+            "reason": f"GCAL_MODE={gcal_mode} (esperado: 'google')",
+        }
+        AuditLog.objects.create(
+            usuario=None,
+            action="CELERY_GCAL_SYNC",
+            model_name=None,
+            details=result,
+        )
+        return result
+
+    # ================================================================
+    # GUARDA 2: Verificar GCAL_CALENDAR_ID
+    # ================================================================
+    gcal_calendar_id = getattr(settings, "GCAL_CALENDAR_ID", "")
+
+    if not gcal_calendar_id:
+        result = {
+            "status": "SKIPPED",
+            "reason": "GCAL_CALENDAR_ID não configurado",
+        }
+        AuditLog.objects.create(
+            usuario=None,
+            action="CELERY_GCAL_SYNC",
+            model_name=None,
+            details=result,
+        )
+        return result
+
     # ================================================================
     # PASSO 1: PREVIEW (dry-run)
     # ================================================================
@@ -157,6 +200,22 @@ def preview_then_apply_gcal():
     preview_output = preview_stdout.getvalue()
     preview_result = json.loads(preview_output)
 
+    # Verificar se preview retornou erro
+    if preview_result.get("error") is True:
+        result = {
+            "status": "ERROR",
+            "phase": "preview",
+            "error": True,
+            "message": preview_result.get("message", "Erro desconhecido no preview"),
+        }
+        AuditLog.objects.create(
+            usuario=None,
+            action="CELERY_GCAL_SYNC",
+            model_name=None,
+            details=result,
+        )
+        return result
+
     # Verificar se há mudanças
     totals = preview_result.get("totals", {})
     total_changes = (
@@ -168,11 +227,40 @@ def preview_then_apply_gcal():
 
     # Se sem mudanças, retornar preview (noop)
     if total_changes == 0:
-        return {
+        result = {
+            "status": "NOOP",
             "preview": preview_result,
             "applied": False,
             "reason": "No changes detected (total_changes == 0)",
         }
+        AuditLog.objects.create(
+            usuario=None,
+            action="CELERY_GCAL_SYNC",
+            model_name=None,
+            details=result,
+        )
+        return result
+
+    # ================================================================
+    # GUARDA 3: Verificar PREVIEW_ONLY
+    # ================================================================
+    preview_only = feature_flags.get("PREVIEW_ONLY", False)
+
+    if preview_only:
+        result = {
+            "status": "SUCCESS",
+            "preview": preview_result,
+            "applied": False,
+            "total_changes": total_changes,
+            "reason": f"{total_changes} mudanças detectadas, mas PREVIEW_ONLY bloqueou apply",
+        }
+        AuditLog.objects.create(
+            usuario=None,
+            action="CELERY_GCAL_SYNC",
+            model_name=None,
+            details=result,
+        )
+        return result
 
     # ================================================================
     # PASSO 2: APPLY (efetivo)
@@ -186,9 +274,36 @@ def preview_then_apply_gcal():
     apply_output = apply_stdout.getvalue()
     apply_result = json.loads(apply_output)
 
-    return {
+    # Verificar se apply retornou erro
+    if apply_result.get("error") is True:
+        result = {
+            "status": "ERROR",
+            "phase": "apply",
+            "error": True,
+            "applied": False,
+            "message": apply_result.get("message", "Erro desconhecido no apply"),
+            "preview": preview_result,
+        }
+        AuditLog.objects.create(
+            usuario=None,
+            action="CELERY_GCAL_SYNC",
+            model_name=None,
+            details=result,
+        )
+        return result
+
+    result = {
+        "status": "APPLIED",
         "preview": preview_result,
         "apply": apply_result,
         "applied": True,
+        "total_changes": total_changes,
         "reason": f"Applied {total_changes} changes",
     }
+    AuditLog.objects.create(
+        usuario=None,
+        action="CELERY_GCAL_SYNC",
+        model_name=None,
+        details=result,
+    )
+    return result

@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     AvailabilityBlock,
     Compra,
+    Deslocamento,
     Municipio,
     Participation,
     Projeto,
@@ -94,3 +95,13 @@ class CompraAdmin(admin.ModelAdmin):
     autocomplete_fields = ("municipio", "projeto")
     list_select_related = ("municipio", "projeto")
     date_hierarchy = "data"
+
+
+@admin.register(Deslocamento)
+class DeslocamentoAdmin(admin.ModelAdmin):
+    list_display = ("usuario", "origem", "destino", "start_date", "end_date")
+    list_filter = ("usuario", "start_date")
+    search_fields = ("origem", "destino", "usuario__username")
+    autocomplete_fields = ("usuario",)
+    list_select_related = ("usuario",)
+    date_hierarchy = "start_date"

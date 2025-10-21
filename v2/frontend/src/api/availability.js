@@ -188,7 +188,12 @@ export async function getMonthly(params) {
   const response = await fetch(url, { credentials: 'include' });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    const text = await response.text();
+    // Se resposta parece HTML (erro de proxy/roteamento), simplificar mensagem
+    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+    throw new Error(text);
   }
 
   return response.json();

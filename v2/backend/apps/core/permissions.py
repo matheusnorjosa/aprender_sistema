@@ -67,3 +67,24 @@ class IsControleOrSuper(permissions.BasePermission):
                 or request.user.groups.filter(name__in=["Controle", "Superintendência"]).exists()
             )
         )
+
+
+class IsDATOrSuper(permissions.BasePermission):
+    """
+    Permissão: apenas usuários do grupo 'DAT' ou superusers podem executar.
+
+    Usado para operações de cadastro e gerenciamento de dados do DAT.
+    Nota: Superusers sempre têm acesso completo.
+    """
+
+    message = "Apenas usuários do grupo DAT ou superusers podem realizar esta ação."
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                request.user.is_superuser
+                or request.user.groups.filter(name="DAT").exists()
+            )
+        )

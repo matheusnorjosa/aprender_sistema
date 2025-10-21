@@ -216,7 +216,7 @@ def test_monthly_availability_codes(api_client, user_auth, setup_data):
     data = response.json()
 
     # Validar estrutura
-    assert data["days"] == 31
+    assert data["days"] == list(range(1, 32))  # [1, 2, 3, ..., 31]
     assert "legend" in data
     assert "people" in data
     assert "cells" in data
@@ -226,38 +226,37 @@ def test_monthly_availability_codes(api_client, user_auth, setup_data):
     people = data["people"]
     assert len(people) == 2
 
-    # Encontrar Ana e Bruno
-    ana = setup_data["ana"]
-    bruno = setup_data["bruno"]
+    # Encontrar row index por email (ordenação alfabética: Ana = row 0, Bruno = row 1)
+    # People está ordenado por nome: ["Ana Silva", "Bruno Costa"]
+    assert people[0]["email"] == "ana@example.com"
+    assert people[1]["email"] == "bruno@example.com"
 
-    ana_data = next((p for p in people if p["id"] == ana.id), None)
-    bruno_data = next((p for p in people if p["id"] == bruno.id), None)
+    ana_row = 0
+    bruno_row = 1
 
-    assert ana_data is not None
-    assert bruno_data is not None
-    assert ana_data["name"] == "Ana Silva"
-    assert bruno_data["name"] == "Bruno Costa"
+    # Validar cells (matriz 2D: cells[row][col] onde col = day-1)
+    cells = data["cells"]
+    assert len(cells) == 2  # 2 pessoas (rows)
+    assert len(cells[ana_row]) == 31  # 31 dias (cols)
 
-    # Validar cells para Ana (JSON serializa chaves int como str)
-    ana_cells = data["cells"][str(ana.id)]
-    assert ana_cells[str(3)] == "E"  # 03/out: 1 evento
-    assert ana_cells[str(8)] == "2"  # 08/out: 2 eventos
-    assert ana_cells[str(5)] == "P"  # 05/out: bloqueio parcial
-    assert ana_cells[str(20)] == "X"  # 20/out: evento + bloqueio
+    # Ana: dia 3 (col 2), dia 8 (col 7), dia 5 (col 4), dia 20 (col 19)
+    assert cells[ana_row][2] == "E"  # 03/out: 1 evento
+    assert cells[ana_row][7] == "2"  # 08/out: 2 eventos
+    assert cells[ana_row][4] == "P"  # 05/out: bloqueio parcial
+    assert cells[ana_row][19] == "X"  # 20/out: evento + bloqueio
 
-    # Validar cells para Bruno
-    bruno_cells = data["cells"][str(bruno.id)]
-    assert bruno_cells[str(1)] == "E"  # 01/out: 1 evento
+    # Bruno: dia 1 (col 0)
+    assert cells[bruno_row][0] == "E"  # 01/out: 1 evento
 
-    # Validar details_index (JSON serializa chaves int como str)
-    ana_details = data["details_index"][str(ana.id)]
-    assert str(3) in ana_details  # Dia 03 (E)
-    assert str(8) in ana_details  # Dia 08 (2)
-    assert str(20) in ana_details  # Dia 20 (X)
-    assert len(ana_details[str(8)]) == 2  # 2 eventos no dia 8
+    # Validar details_index (chave "row:day")
+    details_index = data["details_index"]
+    assert "0:3" in details_index  # Ana, dia 03 (E)
+    assert "0:8" in details_index  # Ana, dia 08 (2)
+    assert "0:20" in details_index  # Ana, dia 20 (X)
+    assert len(details_index["0:8"]) == 2  # 2 eventos no dia 8
 
     # Validar formato de detalhe
-    detail = ana_details[str(3)][0]
+    detail = details_index["0:3"][0]
     assert "id" in detail
     assert detail["municipio"] == "Fortaleza"
     assert detail["data"] == "2025-10-03"
@@ -289,13 +288,16 @@ def test_monthly_availability_ch_and_ranking(api_client, user_auth, setup_data):
 
     people = data["people"]
 
-    # Buscar por email (IDs podem variar entre testes devido a banco compartilhado)
-    ana_data = next((p for p in people if p["email"] == "ana@example.com"), None)
-    bruno_data = next((p for p in people if p["email"] == "bruno@example.com"), None)
+    # Buscar por email (ordenação alfabética: Ana=row 0, Bruno=row 1)
+    assert len(people) == 2
+    ana_data = people[0]  # Ana Silva (alfabeticamente primeiro)
+    bruno_data = people[1]  # Bruno Costa (alfabeticamente segundo)
 
-    # Validar presença
-    assert ana_data is not None, "Ana (ana@example.com) não encontrada em people"
-    assert bruno_data is not None, "Bruno (bruno@example.com) não encontrado em people"
+    # Validar emails
+    assert ana_data["email"] == "ana@example.com"
+    assert bruno_data["email"] == "bruno@example.com"
+
+    # Validar CH mês
     assert ana_data["ch_month"] == 12.0
     assert bruno_data["ch_month"] == 4.0
 

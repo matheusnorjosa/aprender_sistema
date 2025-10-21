@@ -40,11 +40,11 @@ def build_monthly_grid(
 
     Returns:
         {
-            "days": int (número de dias do mês),
+            "days": [1, 2, 3, ..., ND] (lista de dias do mês),
             "legend": {...},
             "people": [{"id", "name", "email", "ch_month", "ch_year", "position_month"}],
-            "cells": {user_id: {day: code}},
-            "details_index": {user_id: {day: [{event_data}]}}
+            "cells": [[code_row0_day1, ...], [code_row1_day1, ...]] (matriz 2D),
+            "details_index": {"row:day": [{event_data}]}
         }
     """
     tz = timezone.get_current_timezone()
@@ -95,10 +95,10 @@ def build_monthly_grid(
     if not user_ids:
         # Sem usuários, retorna vazio
         return {
-            "days": days_in_month,
+            "days": list(range(1, days_in_month + 1)),
             "legend": _build_legend(),
             "people": [],
-            "cells": {},
+            "cells": [],
             "details_index": {},
         }
 
@@ -207,15 +207,20 @@ def build_monthly_grid(
 
             current += timedelta(days=1)
 
-    # 7. Gerar códigos por dia/pessoa (precedência)
-    cells = {}
+    # 7. Gerar códigos por dia/pessoa (precedência) - MATRIZ 2D
+    # Criar mapeamento user_id -> row_index para manter consistência
+    user_id_to_row = {uid: idx for idx, uid in enumerate(user_ids)}
+
+    # Inicializar matriz cells (rows x cols)
+    num_rows = len(user_ids)
+    cells = [["" for _ in range(days_in_month)] for _ in range(num_rows)]
     details_index = {}
 
     for uid, data in user_data.items():
-        cells[uid] = {}
-        details_index[uid] = {}
+        row_idx = user_id_to_row[uid]
 
         for day_num in range(1, days_in_month + 1):
+            col_idx = day_num - 1  # Dia 1 → coluna 0
             events_day = data["events_by_day"][day_num]
             blocks_day = data["blocks_by_day"][day_num]
 
@@ -235,11 +240,12 @@ def build_monthly_grid(
                 has_total = any(b.tipo == "T" for b in blocks_day)
                 code = "T" if has_total else "P"
 
-            cells[uid][day_num] = code
+            cells[row_idx][col_idx] = code
 
-            # Details para E/2/X
+            # Details para E/2/X com chave "row:day"
             if code in ["E", "2", "X"]:
-                details_index[uid][day_num] = [
+                detail_key = f"{row_idx}:{day_num}"
+                details_index[detail_key] = [
                     _event_to_detail(e, tz) for e in events_day
                 ]
 
@@ -284,7 +290,7 @@ def build_monthly_grid(
                 break
 
     return {
-        "days": days_in_month,
+        "days": list(range(1, days_in_month + 1)),
         "legend": _build_legend(),
         "people": people,
         "cells": cells,

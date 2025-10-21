@@ -201,6 +201,59 @@ class TestGoogleCalendarClient(TestCase):
             calendarId="primary", eventId="test-event-1", sendUpdates="none"
         )
 
+    @patch("os.getenv")
+    @patch("google.oauth2.service_account.Credentials.from_service_account_info")
+    @patch("apps.core.services.gcal_google_client.build")
+    def test_get_returns_none_on_404(self, mock_build, mock_creds, mock_getenv):
+        """
+        Get retorna None quando evento não existe (404).
+
+        Cenário:
+        - get() em evento que não existe (404)
+        - Deve retornar None (não levanta erro)
+
+        Complementa simetria com delete_idempotent_on_404.
+        """
+        from apps.core.services.gcal_google_client import GoogleCalendarClient
+
+        # Mock env vars
+        def getenv_side_effect(key, default=None):
+            if key == "GOOGLE_SERVICE_ACCOUNT_JSON":
+                return '{"type": "service_account", "project_id": "test"}'
+            return default
+
+        mock_getenv.side_effect = getenv_side_effect
+
+        # Mock credentials (from_service_account_info already patched)
+        mock_creds.return_value = MagicMock()
+
+        # Mock service with consistent events() return
+        mock_service = MagicMock()
+        mock_build.return_value = mock_service
+
+        # Create a consistent mock for events()
+        mock_events_api = MagicMock()
+        mock_service.events.return_value = mock_events_api
+
+        # Mock get() to return a request object that raises 404 on execute()
+        mock_get_request = MagicMock()
+        mock_get_request.execute.side_effect = HttpError(
+            resp=Mock(status=404), content=b"Not Found"
+        )
+        mock_events_api.get.return_value = mock_get_request
+
+        # Criar client com credentials mockadas
+        client = GoogleCalendarClient()
+
+        # Testar get (deve retornar None em 404, sem levantar erro)
+        result = client.get("primary", "nonexistent-event-id")
+        assert result is None
+
+        # Validar que get foi chamado com parâmetros corretos
+        mock_events_api.get.assert_called_once_with(
+            calendarId="primary", eventId="nonexistent-event-id"
+        )
+
 
 @pytest.mark.django_db
 class TestGcalClientFactory(TestCase):

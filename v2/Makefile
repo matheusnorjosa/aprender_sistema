@@ -2,7 +2,7 @@ DC = COMPOSE_PROJECT_NAME=aprender_v2 docker compose -f infra/docker-compose.yml
 WEB = $(DC) exec -T web
 
 .PHONY: up down build logs shell migrate collect seed seed-demo seed-rbac \
-        etl-acomp-dry etl-acomp-apply readyz healthz \
+        etl-acomp-dry etl-acomp-apply etl-desloc-dry etl-desloc-apply readyz healthz \
         preview-json apply-json flags-fake flags-google preview-on preview-off \
         ban-v1 up-worker up-beat logs-worker logs-beat logs-worker-last logs-beat-last help
 
@@ -47,6 +47,24 @@ etl-acomp-apply:
 	$(WEB) python manage.py etl_upsert_acompanhamento \
 		--events-csv /app/data/csv-import/etl_eventos_normalizados.csv \
 		--participants-csv /app/data/csv-import/etl_participantes_normalizados.csv
+
+etl-desloc-dry:
+	@echo "⚙️  Uso: make etl-desloc-dry FILE=/app/data/deslocamentos.csv"
+	@if [ -z "$(FILE)" ]; then \
+		echo "❌ Erro: Variável FILE não definida"; \
+		echo "   Exemplo: make etl-desloc-dry FILE=/app/data/deslocamentos.xlsx"; \
+		exit 1; \
+	fi
+	$(WEB) python manage.py etl_upsert_deslocamento --file "$(FILE)" --dry-run
+
+etl-desloc-apply:
+	@echo "⚙️  Uso: make etl-desloc-apply FILE=/app/data/deslocamentos.csv"
+	@if [ -z "$(FILE)" ]; then \
+		echo "❌ Erro: Variável FILE não definida"; \
+		echo "   Exemplo: make etl-desloc-apply FILE=/app/data/deslocamentos.xlsx"; \
+		exit 1; \
+	fi
+	$(WEB) python manage.py etl_upsert_deslocamento --file "$(FILE)"
 
 readyz:
 	curl -fsS http://localhost:8002/api/readyz/ || true
@@ -125,6 +143,8 @@ help:
 	@echo "ETL:"
 	@echo "  make etl-acomp-dry         Preview ETL acompanhamento (dry-run)"
 	@echo "  make etl-acomp-apply       Apply ETL acompanhamento"
+	@echo "  make etl-desloc-dry FILE=...   Preview ETL deslocamentos (dry-run)"
+	@echo "  make etl-desloc-apply FILE=... Apply ETL deslocamentos"
 	@echo ""
 	@echo "Celery (Worker & Beat):"
 	@echo "  make up-worker             Start worker"

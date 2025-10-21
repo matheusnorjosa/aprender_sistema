@@ -392,9 +392,79 @@ class Compra(models.Model):
             models.Index(fields=["projeto", "municipio"]),
             models.Index(fields=["external_hash"]),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["external_hash"],
+                name="core_compra_external_hash_unique",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.codigo} - {self.projeto.nome} ({self.data.strftime('%d/%m/%Y')})"
+
+
+class Deslocamento(models.Model):
+    """
+    Registro de deslocamentos de usuários entre municípios.
+
+    Utilizado para:
+    - Marcar períodos em que um usuário está em trânsito
+    - Exibir código "D" na grade mensal
+    - Precedência "D1" quando há evento + deslocamento
+    - Import via ETL (CSV/XLSX)
+    """
+
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.PROTECT,
+        related_name="deslocamentos",
+        help_text="Usuário que realizou o deslocamento"
+    )
+    origem = models.CharField(
+        max_length=200,
+        help_text="Município/local de origem"
+    )
+    destino = models.CharField(
+        max_length=200,
+        help_text="Município/local de destino"
+    )
+    start_date = models.DateField(
+        help_text="Data de início do deslocamento"
+    )
+    end_date = models.DateField(
+        help_text="Data de fim do deslocamento"
+    )
+    observacao = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Observações sobre o deslocamento"
+    )
+    external_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Hash SHA1 para idempotência de import"
+    )
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "core_deslocamento"
+        verbose_name = "Deslocamento"
+        verbose_name_plural = "Deslocamentos"
+        ordering = ["usuario_id", "start_date", "end_date"]
+        indexes = [
+            models.Index(fields=["usuario", "start_date", "end_date"]),
+            models.Index(fields=["external_hash"]),
+        ]
+
+    def __str__(self):
+        start_fmt = self.start_date.strftime('%d/%m/%Y')
+        end_fmt = self.end_date.strftime('%d/%m/%Y')
+        return f"{self.usuario_id} {start_fmt}→{end_fmt} {self.origem}->{self.destino}"
 
 
 class AuditLog(models.Model):

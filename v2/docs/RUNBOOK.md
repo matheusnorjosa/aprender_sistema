@@ -517,3 +517,243 @@ curl http://localhost:8002/api/features/
 - `POST /api/solicitacoes/{id}/preview-gcal/` (PR #4): Preview sem publicar
 - `POST /api/solicitacoes/{id}/publish/` (PR #4): Publicação via Celery (respeit apply_blocked)
 
+---
+
+## 📅 Google Calendar — Service Account (cliente real)
+
+### **Visão Geral**
+
+O sistema suporta dois modos de cliente do Google Calendar:
+- **fake** (padrão): Cliente in-memory, safe, sem side effects. Usado para desenvolvimento e testes.
+- **google**: Cliente real conectado à Google Calendar API via Service Account.
+
+### **Pré-requisitos**
+
+1. **Projeto no Google Cloud Console**
+   - Criar projeto (ou usar existente)
+   - Habilitar **Google Calendar API**
+   - Criar Service Account com credenciais JSON
+
+2. **Compartilhar Calendário com Service Account**
+   - Abrir Google Calendar
+   - Ir em Settings → Calendários → [Seu calendário]
+   - "Share with specific people"
+   - Adicionar o email da Service Account (ex: `aprender-sa@project.iam.gserviceaccount.com`)
+   - Permissão: **"Make changes to events"** (Fazer alterações em eventos)
+
+3. **Obter Credenciais JSON**
+   - No Google Cloud Console → IAM & Admin → Service Accounts
+   - Selecionar a Service Account
+   - Keys → Add Key → Create new key → JSON
+   - Baixar arquivo (ex: `sa-aprender.json`)
+
+### **Configuração no Sistema**
+
+#### **Opção 1: Arquivo de Credenciais (recomendado)**
+
+```bash
+# 1. Copiar arquivo JSON para secrets/
+cd v2/infra
+mkdir -p secrets
+cp /path/to/sa-aprender.json secrets/sa.json
+
+# 2. Editar .env
+nano .env
+
+# Adicionar/alterar:
+GCAL_CLIENT=google
+GCAL_CALENDAR_ID=primary  # ou ID específico do calendário (ex: abc123@group.calendar.google.com)
+GOOGLE_SERVICE_ACCOUNT_FILE=/run/secrets/sa.json
+```
+
+#### **Opção 2: JSON Inline (não recomendado para produção)**
+
+```bash
+# Editar .env
+nano .env
+
+# Adicionar/alterar:
+GCAL_CLIENT=google
+GCAL_CALENDAR_ID=primary
+GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"...","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"aprender-sa@project.iam.gserviceaccount.com","client_id":"...","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"..."}'
+```
+
+**⚠️ Importante:** Ao usar JSON inline, escape aspas duplas se necessário e mantenha em uma linha.
+
+### **Recarregar Configuração**
+
+```bash
+cd v2
+
+# Recriar containers para carregar novas variáveis .env
+docker compose -p aprender_v2 -f infra/docker-compose.yml up -d web worker beat
+
+# Verificar logs
+docker compose -p aprender_v2 -f infra/docker-compose.yml logs -f web | grep -i google
+```
+
+**Logs esperados:**
+```
+GoogleCalendarClient initialized with Service Account
+```
+
+### **Verificação**
+
+#### **1. Verificar Features**
+
+```bash
+curl http://localhost:8002/api/features/
+```
+
+**Resposta esperada:**
+```json
+{
+  "GCAL_CLIENT": "google",
+  "apply_blocked": false,
+  "ENVIRONMENT": "staging"
+}
+```
+
+- `GCAL_CLIENT: "google"` → Cliente real ativo
+- `apply_blocked: false` → Publicações permitidas
+
+#### **2. Testar Preview (sem publicar)**
+
+```bash
+# Obter ID de uma solicitação aprovada
+curl http://localhost:8002/admin/  # Login e verificar Admin
+
+# Preview
+curl -X POST http://localhost:8002/api/solicitacoes/1/preview-gcal/ \
+  -H "Content-Type: application/json"
+```
+
+**Resposta esperada:**
+```json
+{
+  "id": "aprender-sol-1-...",
+  "summary": "Evento Teste",
+  "start": {"dateTime": "2025-10-21T10:00:00-03:00"},
+  "end": {"dateTime": "2025-10-21T12:00:00-03:00"},
+  ...
+}
+```
+
+#### **3. Testar Publicação (com calendário real)**
+
+```bash
+# Publicar (assíncrono via Celery)
+curl -X POST http://localhost:8002/api/solicitacoes/1/publish/ \
+  -H "Content-Type: application/json"
+```
+
+**Resposta esperada:**
+```json
+{
+  "message": "publish_to_gcal enqueued",
+  "task_id": "abc123-...",
+  "solicitation_id": 1
+}
+```
+
+**Verificar no Google Calendar:**
+- Abrir o calendário compartilhado
+- Verificar se evento foi criado
+- Evento deve ter link do Google Meet gerado automaticamente
+
+#### **4. Logs de Auditoria**
+
+```bash
+docker compose -p aprender_v2 exec -T web python manage.py shell -c "
+from apps.core.models import AuditLog
+logs = AuditLog.objects.filter(action__in=['PREVIEW_GCAL', 'PUBLISH_GCAL']).order_by('-created_at')[:5]
+for log in logs:
+    print(f'{log.created_at} - {log.action} - {log.usuario or \"Sistema\"} - {log.details}')"
+```
+
+### **Troubleshooting**
+
+#### **Erro 403: Forbidden**
+
+**Causa:** Service Account não tem permissão no calendário.
+
+**Solução:**
+1. Verificar se calendário foi compartilhado com o email da Service Account
+2. Permissão deve ser **"Make changes to events"**
+3. Aguardar alguns minutos para propagação (pode demorar até 5min)
+
+#### **Erro 404: Calendar not found**
+
+**Causa:** `GCAL_CALENDAR_ID` incorreto.
+
+**Solução:**
+1. Verificar ID do calendário no Google Calendar Settings
+2. Se usar calendário principal da Service Account, use `primary`
+3. Para calendários compartilhados, use o ID completo (ex: `abc123@group.calendar.google.com`)
+
+#### **Erro: Service Account credentials not found**
+
+**Causa:** Variáveis `GOOGLE_SERVICE_ACCOUNT_FILE` ou `GOOGLE_SERVICE_ACCOUNT_JSON` não configuradas.
+
+**Solução:**
+```bash
+# Verificar variáveis no container
+docker compose -p aprender_v2 exec -T web printenv | grep GOOGLE
+
+# Recriar container se necessário
+docker compose -p aprender_v2 -f infra/docker-compose.yml up -d web worker beat
+```
+
+#### **Erro: Rate limit exceeded (429)**
+
+**Causa:** Muitas requisições simultâneas à Google Calendar API.
+
+**Comportamento esperado:**
+- Cliente implementa retry com exponential backoff (1s, 2s, 4s)
+- Até 3 tentativas automáticas
+- Se continuar falhando, revisar batch_size em comandos de sync
+
+### **Comandos de Sync com Cliente Real**
+
+#### **Preview (dry-run) sem publicar**
+
+```bash
+cd v2
+make shell
+
+# Dentro do shell Django
+python manage.py preagenda_to_gcal --client=google --dry-run --verbose
+```
+
+#### **Publicar intervalo específico**
+
+```bash
+python manage.py preagenda_to_gcal \
+  --client=google \
+  --since 2025-10-01T00:00:00 \
+  --until 2025-10-31T23:59:59 \
+  --verbose
+```
+
+#### **IDs específicos**
+
+```bash
+python manage.py preagenda_to_gcal \
+  --client=google \
+  --ids 1,2,3 \
+  --verbose
+```
+
+### **Segurança**
+
+- **NUNCA** commitar arquivo `.env` ou credenciais JSON
+- Arquivo `secrets/sa.json` está no `.gitignore`
+- Em produção, usar **Google Secret Manager** ou **Docker Secrets**
+- Rotacionar chaves periodicamente
+
+### **Referências**
+
+- **Google Calendar API:** https://developers.google.com/calendar/api/quickstart/python
+- **Service Accounts:** https://cloud.google.com/iam/docs/service-accounts
+- **OAuth 2.0:** https://developers.google.com/identity/protocols/oauth2
+

@@ -204,21 +204,10 @@ class Command(BaseCommand):
         client_type = options["client"] or getattr(settings, "GCAL_CLIENT", "fake")
 
         if client_type == "google":
-            # Cliente real Google Calendar API (TODO: implementar)
+            # Cliente real Google Calendar API
             from apps.core.services.gcal_google_client import GoogleCalendarClient
 
-            try:
-                client = GoogleCalendarClient()
-            except NotImplementedError as e:
-                self.stderr.write(self.style.ERROR(str(e)))
-                self.stderr.write("")
-                self.stderr.write(
-                    "💡 Solução temporária: use --client=fake para validar fluxo"
-                )
-                self.stderr.write(
-                    "   ou aguarde implementação do GoogleCalendarClient (PR 4/N)"
-                )
-                sys.exit(2)
+            client = GoogleCalendarClient()
         else:
             # Cliente fake (in-memory, safe para testes e validação de fluxo)
             client = FakeCalendarClient()

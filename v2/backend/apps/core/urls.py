@@ -14,6 +14,7 @@ from .views_availability import (
     AvailabilityCheckView,
 )
 from .views_availability_monthly import MonthlyAvailabilityView
+from .views_controle_imports import ImportComprasView
 
 app_name = "core"
 
@@ -39,6 +40,11 @@ urlpatterns = [
         "availability/monthly/",
         MonthlyAvailabilityView.as_view(),
         name="availability-monthly",
+    ),
+    path(
+        "controle/import-compras/",
+        ImportComprasView.as_view(),
+        name="controle-import-compras",
     ),
     path("", include(router.urls)),
 ]

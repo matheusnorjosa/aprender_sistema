@@ -2,8 +2,9 @@ DC = COMPOSE_PROJECT_NAME=aprender_v2 docker compose -f infra/docker-compose.yml
 WEB = $(DC) exec -T web
 
 .PHONY: up down build logs shell migrate collect seed seed-demo seed-rbac \
-        etl-acomp-dry etl-acomp-apply etl-desloc-dry etl-desloc-apply readyz healthz \
-        preview-json apply-json flags-fake flags-google preview-on preview-off \
+        etl-acomp-dry etl-acomp-apply etl-desloc-dry etl-desloc-apply \
+        etl-acoes-dry etl-acoes-apply etl-dat-dry etl-dat-apply \
+        readyz healthz preview-json apply-json flags-fake flags-google preview-on preview-off \
         ban-v1 up-worker up-beat logs-worker logs-beat logs-worker-last logs-beat-last help
 
 up:
@@ -65,6 +66,42 @@ etl-desloc-apply:
 		exit 1; \
 	fi
 	$(WEB) python manage.py etl_upsert_deslocamento --file "$(FILE)"
+
+etl-acoes-dry:
+	@echo "⚙️  Uso: make etl-acoes-dry FILE=/app/data/acoes_controle.csv"
+	@if [ -z "$(FILE)" ]; then \
+		echo "❌ Erro: Variável FILE não definida"; \
+		echo "   Exemplo: make etl-acoes-dry FILE=/app/data/acoes_controle.xlsx"; \
+		exit 1; \
+	fi
+	$(WEB) python manage.py etl_import_acoes_controle "$(FILE)" --dry-run
+
+etl-acoes-apply:
+	@echo "⚙️  Uso: make etl-acoes-apply FILE=/app/data/acoes_controle.csv"
+	@if [ -z "$(FILE)" ]; then \
+		echo "❌ Erro: Variável FILE não definida"; \
+		echo "   Exemplo: make etl-acoes-apply FILE=/app/data/acoes_controle.xlsx"; \
+		exit 1; \
+	fi
+	$(WEB) python manage.py etl_import_acoes_controle "$(FILE)"
+
+etl-dat-dry:
+	@echo "⚙️  Uso: make etl-dat-dry FILE=/app/data/dat_cadastros.csv"
+	@if [ -z "$(FILE)" ]; then \
+		echo "❌ Erro: Variável FILE não definida"; \
+		echo "   Exemplo: make etl-dat-dry FILE=/app/data/dat_cadastros.xlsx"; \
+		exit 1; \
+	fi
+	$(WEB) python manage.py etl_import_dat_cadastros "$(FILE)" --dry-run
+
+etl-dat-apply:
+	@echo "⚙️  Uso: make etl-dat-apply FILE=/app/data/dat_cadastros.csv"
+	@if [ -z "$(FILE)" ]; then \
+		echo "❌ Erro: Variável FILE não definida"; \
+		echo "   Exemplo: make etl-dat-apply FILE=/app/data/dat_cadastros.xlsx"; \
+		exit 1; \
+	fi
+	$(WEB) python manage.py etl_import_dat_cadastros "$(FILE)"
 
 readyz:
 	curl -fsS http://localhost:8002/api/readyz/ || true
@@ -145,6 +182,10 @@ help:
 	@echo "  make etl-acomp-apply       Apply ETL acompanhamento"
 	@echo "  make etl-desloc-dry        Preview ETL deslocamentos (use FILE=/path/to/file.{csv|xlsx})"
 	@echo "  make etl-desloc-apply      Apply ETL deslocamentos (use FILE=/path/to/file.{csv|xlsx})"
+	@echo "  make etl-acoes-dry         Preview ETL ações controle (use FILE=/path/to/file.{csv|xlsx})"
+	@echo "  make etl-acoes-apply       Apply ETL ações controle (use FILE=/path/to/file.{csv|xlsx})"
+	@echo "  make etl-dat-dry           Preview ETL DAT cadastros (use FILE=/path/to/file.{csv|xlsx})"
+	@echo "  make etl-dat-apply         Apply ETL DAT cadastros (use FILE=/path/to/file.{csv|xlsx})"
 	@echo ""
 	@echo "Celery (Worker & Beat):"
 	@echo "  make up-worker             Start worker"

@@ -5,7 +5,15 @@ DRF Serializers for Core models
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import AvailabilityBlock, Participation, Solicitacao, Compra, AuditLog
+from .models import (
+    AvailabilityBlock,
+    Participation,
+    Solicitacao,
+    Compra,
+    AuditLog,
+    AcaoControle,
+    AcaoDAT,
+)
 
 
 class UserSlimSerializer(serializers.ModelSerializer):
@@ -171,3 +179,82 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "usuario", "action", "details", "created_at"]
+
+
+class AcaoControleSerializer(serializers.ModelSerializer):
+    """
+    Serializer for AcaoControle model (read operations).
+    Uses StringRelatedField for readable FK representation.
+    """
+
+    municipio = serializers.StringRelatedField()
+    projeto = serializers.StringRelatedField()
+    coordenador = serializers.StringRelatedField()
+
+    class Meta:
+        model = AcaoControle
+        fields = [
+            "id",
+            "municipio",
+            "projeto",
+            "coordenador",
+            "data_entrega",
+            "data_carta",
+            "contato_inicial",
+            "data_reuniao",
+            "observacao",
+            "external_hash",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "external_hash", "created_at", "updated_at"]
+
+
+class AcaoDATSerializer(serializers.ModelSerializer):
+    """
+    Serializer for AcaoDAT model (read operations).
+    Uses StringRelatedField for readable FK representation.
+    """
+
+    municipio = serializers.StringRelatedField()
+    projeto = serializers.StringRelatedField()
+    responsavel = serializers.StringRelatedField()
+
+    class Meta:
+        model = AcaoDAT
+        fields = [
+            "id",
+            "municipio",
+            "projeto",
+            "tipo_acao",
+            "responsavel",
+            "observacao",
+            "data_registro",
+            "external_hash",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "external_hash", "created_at", "updated_at"]
+
+
+class AcaoDATCreateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for AcaoDAT model (write operations).
+    Uses native ForeignKey IDs for creation.
+    """
+
+    class Meta:
+        model = AcaoDAT
+        fields = [
+            "id",
+            "municipio",
+            "projeto",
+            "tipo_acao",
+            "responsavel",
+            "observacao",
+            "data_registro",
+            "external_hash",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "external_hash", "created_at", "updated_at"]

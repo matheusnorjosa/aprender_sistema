@@ -207,12 +207,34 @@ def build_monthly_grid(
 
             current += timedelta(days=1)
 
-    # 7. Gerar códigos por dia/pessoa (precedência) - MATRIZ 2D
-    # Criar mapeamento user_id -> row_index para manter consistência
-    user_id_to_row = {uid: idx for idx, uid in enumerate(user_ids)}
+    # 7. People com CH mês/ano (ordenar PRIMEIRO)
+    users = Usuario.objects.filter(id__in=user_ids)
+    user_map = {u.id: u for u in users}
 
-    # Inicializar matriz cells (rows x cols)
-    num_rows = len(user_ids)
+    people = []
+    for uid in user_ids:
+        user = user_map.get(uid)
+        if not user:
+            continue
+
+        people.append(
+            {
+                "id": uid,
+                "name": user.get_full_name() or user.username,
+                "email": user.email,
+                "ch_month": round(user_data[uid]["ch_month"], 2),
+                "ch_year": round(user_data[uid]["ch_year"], 2),
+            }
+        )
+
+    # Ordenar por nome (DETERMINÍSTICO)
+    people.sort(key=lambda p: p["name"])
+
+    # 8. Derivar user_id_to_row DE people (já ordenado)
+    user_id_to_row = {p["id"]: idx for idx, p in enumerate(people)}
+
+    # 9. Gerar códigos por dia/pessoa (precedência) - MATRIZ 2D
+    num_rows = len(people)
     cells = [["" for _ in range(days_in_month)] for _ in range(num_rows)]
     details_index = {}
 
@@ -242,37 +264,14 @@ def build_monthly_grid(
 
             cells[row_idx][col_idx] = code
 
-            # Details para E/2/X com chave "row:day"
+            # Details para E/2/X com chave "row:col" (0-based)
             if code in ["E", "2", "X"]:
-                detail_key = f"{row_idx}:{day_num}"
+                detail_key = f"{row_idx}:{col_idx}"
                 details_index[detail_key] = [
                     _event_to_detail(e, tz) for e in events_day
                 ]
 
-    # 8. People com CH mês/ano e ranking
-    users = Usuario.objects.filter(id__in=user_ids)
-    user_map = {u.id: u for u in users}
-
-    people = []
-    for uid in user_ids:
-        user = user_map.get(uid)
-        if not user:
-            continue
-
-        people.append(
-            {
-                "id": uid,
-                "name": user.get_full_name() or user.username,
-                "email": user.email,
-                "ch_month": round(user_data[uid]["ch_month"], 2),
-                "ch_year": round(user_data[uid]["ch_year"], 2),
-            }
-        )
-
-    # Ordenar por nome
-    people.sort(key=lambda p: p["name"])
-
-    # Ranking denso por CH mês (desc)
+    # 10. Ranking denso por CH mês (desc)
     people_sorted_by_ch = sorted(people, key=lambda p: p["ch_month"], reverse=True)
     rank = 0
     last_ch = None

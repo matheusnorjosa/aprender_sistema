@@ -248,15 +248,15 @@ def test_monthly_availability_codes(api_client, user_auth, setup_data):
     # Bruno: dia 1 (col 0)
     assert cells[bruno_row][0] == "E"  # 01/out: 1 evento
 
-    # Validar details_index (chave "row:day")
+    # Validar details_index (chave "row:col" 0-based)
     details_index = data["details_index"]
-    assert "0:3" in details_index  # Ana, dia 03 (E)
-    assert "0:8" in details_index  # Ana, dia 08 (2)
-    assert "0:20" in details_index  # Ana, dia 20 (X)
-    assert len(details_index["0:8"]) == 2  # 2 eventos no dia 8
+    assert "0:2" in details_index  # Ana, dia 03 (col 2)
+    assert "0:7" in details_index  # Ana, dia 08 (col 7)
+    assert "0:19" in details_index  # Ana, dia 20 (col 19)
+    assert len(details_index["0:7"]) == 2  # 2 eventos no dia 8
 
     # Validar formato de detalhe
-    detail = details_index["0:3"][0]
+    detail = details_index["0:2"][0]
     assert "id" in detail
     assert detail["municipio"] == "Fortaleza"
     assert detail["data"] == "2025-10-03"

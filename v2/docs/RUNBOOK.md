@@ -414,3 +414,106 @@ docker compose -p aprender_v2 exec web python manage.py shell
 **Autor:** Equipe Aprender Sistema
 **Projeto:** `aprender_v2`
 **Stack:** Django 5.1.2 + PostgreSQL 15 + Redis 7 + Celery 5.4.0
+
+---
+
+## 📦 ETL e Seeds
+
+### Seeds RBAC
+
+Cria grupos e permissões mínimas (idempotente):
+
+```bash
+# Via Makefile
+make seed-rbac
+
+# Via Docker diretamente
+docker compose -p aprender_v2 exec -T web python manage.py seed_rbac
+```
+
+**Grupos criados:**
+- Superintendência
+- Coordenador
+- Formador
+- Controle
+- DAT
+- Gerência
+
+**Permissões atribuídas:** view/add/change para Solicitacao conforme grupo.
+
+### ETL Acompanhamento
+
+Importa eventos e participantes de CSVs normalizados.
+
+**Preparação:**
+1. Colocar arquivos em `v2/data/csv-import/`:
+   - `etl_eventos_normalizados.csv`
+   - `etl_participantes_normalizados.csv`
+
+2. Preview (dry-run):
+```bash
+make etl-acomp-dry
+```
+
+3. Aplicar:
+```bash
+make etl-acomp-apply
+```
+
+**Bind mount:** `../data/csv-import:/app/data/csv-import:ro` (read-only).
+
+---
+
+## 🔒 AuditLog
+
+**Ações logadas:**
+- `APPROVE`: Aprovação de solicitação
+- `REJECT`: Rejeição de solicitação
+- `PREVIEW_GCAL`: Preview de publicação GCal
+- `PUBLISH_GCAL_REQUESTED`: Publicação solicitada (via Celery)
+- `PUBLISH_GCAL`: Publicação executada
+
+**Campos registrados:**
+- `usuario`: Usuário que executou a ação (ou NULL para tasks assíncronas)
+- `action`: Tipo de ação
+- `model_name`: Modelo relacionado (ex: "Solicitacao")
+- `details`: JSON com contexto (solicitation_id, prev_status, new_status, ip_address, etc)
+- `created_at`: Timestamp da ação
+
+**Consultar logs:**
+```bash
+docker compose -p aprender_v2 exec -T web python manage.py shell -c "
+from apps.core.models import AuditLog
+logs = AuditLog.objects.order_by('-created_at')[:10]
+for log in logs:
+    print(f'{log.created_at} - {log.action} - {log.usuario or \"Sistema\"}')" 
+```
+
+---
+
+## 🎛️ Features Flags
+
+Consultar configurações ativas:
+
+```bash
+curl http://localhost:8002/api/features/
+```
+
+**Resposta:**
+```json
+{
+  "GCAL_CLIENT": "fake",
+  "apply_blocked": true,
+  "ENVIRONMENT": "staging"
+}
+```
+
+**apply_blocked:**
+- `true`: Operações de publish bloqueadas (GCAL_CLIENT != "google")
+- `false`: Publicações permitidas (GCAL_CLIENT == "google")
+
+**Uso em workflows:**
+- `/api/availability/monthly` (PR #3): Grade mensal de disponibilidade
+- `POST /api/solicitacoes/{id}/preview-gcal/` (PR #4): Preview sem publicar
+- `POST /api/solicitacoes/{id}/publish/` (PR #4): Publicação via Celery (respeit apply_blocked)
+

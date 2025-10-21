@@ -13,7 +13,7 @@ from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
 
-from .models import Solicitacao
+from .models import Solicitacao, AuditLog
 from .permissions import IsCoordenadorOrDAT, IsSuperintendencia
 from .serializers import SolicitacaoSerializer
 
@@ -102,10 +102,27 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Capturar status anterior
+        prev_status = solicitacao.status
+
         solicitacao.status = "aprovado"
         solicitacao.save()
 
         client_ip = _get_client_ip(request)
+
+        # Persistir AuditLog
+        AuditLog.objects.create(
+            usuario=request.user,
+            action="APPROVE",
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": solicitacao.id,
+                "prev_status": prev_status,
+                "new_status": solicitacao.status,
+                "ip_address": client_ip,
+            },
+        )
+
         logger.info(
             "solicitacao_approved",
             extra={
@@ -146,10 +163,28 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Capturar status anterior
+        prev_status = solicitacao.status
+
         solicitacao.status = "reprovado"
         solicitacao.save()
 
         client_ip = _get_client_ip(request)
+
+        # Persistir AuditLog
+        AuditLog.objects.create(
+            usuario=request.user,
+            action="REJECT",
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": solicitacao.id,
+                "prev_status": prev_status,
+                "new_status": solicitacao.status,
+                "justificativa": justificativa,
+                "ip_address": client_ip,
+            },
+        )
+
         logger.info(
             "solicitacao_rejected",
             extra={

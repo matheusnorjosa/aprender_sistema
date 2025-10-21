@@ -25,6 +25,8 @@ services:
       - redis
     ports:
       - "8002:8000"
+    volumes:
+      - ../data/csv-import:/app/data/csv-import:ro
 
   worker:
     build:
@@ -36,6 +38,8 @@ services:
       - db
       - redis
     restart: unless-stopped
+    volumes:
+      - ../data/csv-import:/app/data/csv-import:ro
 
   beat:
     build:
@@ -47,6 +51,8 @@ services:
       - db
       - redis
     restart: unless-stopped
+    volumes:
+      - ../data/csv-import:/app/data/csv-import:ro
 
 volumes:
   db_data:

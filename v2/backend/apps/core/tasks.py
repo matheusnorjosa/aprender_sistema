@@ -55,6 +55,79 @@ def gcal_sync_task():
     pass
 
 
+@shared_task(name="apps.core.tasks.task_publish_solicitacao_to_gcal")
+def task_publish_solicitacao_to_gcal(
+    solicitation_id: int, dry_run: bool = False, apply_blocked: bool = False
+):
+    """
+    Publica uma Solicitacao no Google Calendar (via Celery).
+
+    Args:
+        solicitation_id: ID da Solicitacao a publicar
+        dry_run: Se True, não persiste mudanças no DB/Calendar
+        apply_blocked: Se True, aplica mesmo sem GCAL_CLIENT configurado
+
+    Returns:
+        dict: {
+            "action": str (CREATE/UPDATE/DELETE/ADOPT/SKIP),
+            "solicitation_id": int,
+            "external_event_id": str | None,
+            "summary": str,
+            "error": str | None
+        }
+    """
+    from apps.core.models import Solicitacao, AuditLog
+    from apps.core.services.gcal_sync_service import apply_one_solicitacao
+
+    try:
+        # Buscar solicitação
+        s = Solicitacao.objects.get(id=solicitation_id)
+
+        # Aplicar publicação
+        outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked)
+
+        # Criar AuditLog (apenas se não for dry_run)
+        if not dry_run:
+            AuditLog.objects.create(
+                usuario=None,  # Task assíncrona, sem usuário direto
+                action="PUBLISH_GCAL",
+                model_name="Solicitacao",
+                details={
+                    "solicitation_id": s.id,
+                    "action": outcome.action,
+                    "external_event_id": outcome.external_event_id,
+                    "summary": outcome.summary,
+                    "dry_run": dry_run,
+                    "apply_blocked": apply_blocked,
+                },
+            )
+
+        return {
+            "action": outcome.action,
+            "solicitation_id": outcome.solicitation_id,
+            "external_event_id": outcome.external_event_id,
+            "summary": outcome.summary,
+            "error": None,
+        }
+
+    except Solicitacao.DoesNotExist:
+        return {
+            "action": "ERROR",
+            "solicitation_id": solicitation_id,
+            "external_event_id": None,
+            "summary": f"Solicitação #{solicitation_id} não encontrada",
+            "error": "DoesNotExist",
+        }
+    except Exception as e:
+        return {
+            "action": "ERROR",
+            "solicitation_id": solicitation_id,
+            "external_event_id": None,
+            "summary": f"Erro ao publicar: {str(e)}",
+            "error": str(e)[:500],
+        }
+
+
 @shared_task(name="apps.core.tasks.preview_then_apply_gcal")
 def preview_then_apply_gcal():
     """

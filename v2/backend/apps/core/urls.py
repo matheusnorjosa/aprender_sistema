@@ -16,6 +16,7 @@ from .views_availability import (
 )
 from .views_availability_monthly import MonthlyAvailabilityView
 from .views_controle_imports import ImportComprasView
+from .views_controle_dat import ControleAcoesListView, DATAcoesListCreateView
 
 app_name = "core"
 
@@ -51,6 +52,16 @@ urlpatterns = [
         "controle/import-compras/",
         ImportComprasView.as_view(),
         name="controle-import-compras",
+    ),
+    path(
+        "controle/acoes/",
+        ControleAcoesListView.as_view(),
+        name="controle-acoes-list",
+    ),
+    path(
+        "dat/acoes/",
+        DATAcoesListCreateView.as_view(),
+        name="dat-acoes-list-create",
     ),
     path("", include(router.urls)),
 ]

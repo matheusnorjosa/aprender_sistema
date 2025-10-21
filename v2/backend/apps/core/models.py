@@ -467,6 +467,132 @@ class Deslocamento(models.Model):
         return f"{self.usuario_id} {start_fmt}→{end_fmt} {self.origem}->{self.destino}"
 
 
+class AcaoControle(models.Model):
+    """
+    Ações do setor Controle: acompanhamento de entregas, cartas, reuniões.
+
+    Campos:
+    - municipio, projeto, coordenador
+    - datas: data_entrega, data_carta, contato_inicial, data_reuniao
+    - observacao, external_hash (idempotência ETL)
+    """
+
+    municipio = models.ForeignKey(
+        "Municipio",
+        on_delete=models.PROTECT,
+        related_name="acoes_controle",
+        verbose_name="Município",
+    )
+    projeto = models.ForeignKey(
+        "Projeto",
+        on_delete=models.PROTECT,
+        related_name="acoes_controle",
+        verbose_name="Projeto",
+    )
+    coordenador = models.ForeignKey(
+        "Usuario",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="acoes_controle",
+        verbose_name="Coordenador",
+    )
+    data_entrega = models.DateField(
+        null=True, blank=True, verbose_name="Data da Entrega"
+    )
+    data_carta = models.DateField(null=True, blank=True, verbose_name="Data da Carta")
+    contato_inicial = models.DateField(
+        null=True, blank=True, verbose_name="Contato inicial"
+    )
+    data_reuniao = models.DateField(
+        null=True, blank=True, verbose_name="Data Reunião Alinhamento"
+    )
+    observacao = models.TextField(null=True, blank=True, verbose_name="Observação")
+    external_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="External Hash",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "core_acao_controle"
+        ordering = ["-data_reuniao", "-data_entrega", "municipio_id"]
+        indexes = [
+            models.Index(fields=["municipio", "projeto"]),
+            models.Index(fields=["coordenador"]),
+            models.Index(fields=["external_hash"]),
+        ]
+
+    def __str__(self):
+        data_display = (
+            self.data_entrega or self.data_reuniao or ""
+        )
+        return f"{self.municipio_id} | {self.projeto_id} | {data_display}"
+
+
+class AcaoDAT(models.Model):
+    """
+    Ações do setor DAT: cadastros diversos por município/projeto.
+
+    Campos:
+    - municipio, projeto, tipo_acao, responsavel
+    - data_registro, observacao, external_hash (idempotência ETL)
+    """
+
+    municipio = models.ForeignKey(
+        "Municipio",
+        on_delete=models.PROTECT,
+        related_name="acoes_dat",
+        verbose_name="Município",
+    )
+    projeto = models.ForeignKey(
+        "Projeto",
+        on_delete=models.PROTECT,
+        related_name="acoes_dat",
+        verbose_name="Projeto",
+    )
+    tipo_acao = models.CharField(max_length=120, verbose_name="Tipo de ação")
+    responsavel = models.ForeignKey(
+        "Usuario",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="acoes_dat",
+        verbose_name="Responsável",
+    )
+    observacao = models.TextField(null=True, blank=True, verbose_name="Observação")
+    data_registro = models.DateField(
+        null=True, blank=True, verbose_name="Data de registro"
+    )
+    external_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="External Hash",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "core_acao_dat"
+        ordering = ["-data_registro", "municipio_id"]
+        indexes = [
+            models.Index(fields=["municipio", "projeto"]),
+            models.Index(fields=["tipo_acao"]),
+            models.Index(fields=["external_hash"]),
+        ]
+
+    def __str__(self):
+        return f"{self.municipio_id} | {self.projeto_id} | {self.tipo_acao}"
+
+
 class AuditLog(models.Model):
     """
     Log de auditoria para rastreamento de operações críticas.

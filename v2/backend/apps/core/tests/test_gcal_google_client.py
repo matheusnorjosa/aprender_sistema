@@ -283,3 +283,41 @@ class TestGcalClientFactory(TestCase):
 
         # Validar tipo
         assert client.__class__.__name__ == "FakeCalendarClient"
+
+    @override_settings(GCAL_CLIENT="Google", GCAL_CALENDAR_ID="test-cal")
+    @patch("os.getenv")
+    @patch("google.oauth2.service_account.Credentials.from_service_account_info")
+    @patch("apps.core.services.gcal_google_client.build")
+    def test_factory_normalizes_case(self, mock_build, mock_creds, mock_getenv):
+        """
+        Factory normaliza GCAL_CLIENT para lowercase.
+
+        Cenário:
+        - GCAL_CLIENT='Google' (capitalized)
+
+        Expectativa:
+        - Factory normaliza para 'google' e retorna GoogleCalendarClient
+        """
+        from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
+
+        # Mock env vars
+        def getenv_side_effect(key, default=None):
+            if key == "GOOGLE_SERVICE_ACCOUNT_JSON":
+                return '{"type": "service_account", "project_id": "test"}'
+            return default
+
+        mock_getenv.side_effect = getenv_side_effect
+
+        # Mock credentials e build
+        mock_creds.return_value = MagicMock()
+        mock_build.return_value = MagicMock()
+
+        # Obter client (GCAL_CLIENT='Google' via override_settings)
+        with override_settings(
+            GOOGLE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": "test"}'
+        ):
+            client, calendar_id = get_gcal_client_and_calendar_id()
+
+        # Validar que retorna GoogleCalendarClient mesmo com case diferente
+        assert client.__class__.__name__ == "GoogleCalendarClient"
+        assert calendar_id == "test-cal"

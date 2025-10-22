@@ -1,14 +1,16 @@
 /**
- * Página de Controle - Gestão de Compras e Importações
+ * Página de Controle - Gestão de COMPRAS e AÇÕES
  *
  * Features:
- * - Upload de arquivos (COMPRAS, AÇÕES, CADASTROS)
+ * - Upload de COMPRAS (import-compras)
+ * - Upload de AÇÕES (import-acoes)
  * - Listagem de COMPRAS com filtros
  * - Campos corretos: Data, Município, UF, Projeto, Código, Quant., Uso
  */
 
 import { useState, useEffect } from 'react';
-import { importCompras, importAcoes, importCadastros, listCompras } from '../../api/ops';
+import { importCompras, importAcoes, listCompras } from '../../api/ops';
+import ImportUploader from '../../components/ImportUploader';
 
 export default function ControlePage() {
   const [compras, setCompras] = useState([]);
@@ -42,56 +44,18 @@ export default function ControlePage() {
   };
 
   /**
-   * Handler de upload de arquivo.
-   *
-   * @param {string} type - Tipo: 'compras', 'acoes', 'cadastros'
-   * @param {File} file - Arquivo selecionado
-   * @param {boolean} dryRun - Se true, apenas preview
-   */
-  const handleUpload = async (type, file, dryRun = true) => {
-    if (!file) {
-      alert('Selecione um arquivo');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      let result;
-
-      if (type === 'compras') {
-        result = await importCompras(file, dryRun);
-      } else if (type === 'acoes') {
-        result = await importAcoes(file, dryRun);
-      } else if (type === 'cadastros') {
-        result = await importCadastros(file, dryRun);
-      }
-
-      alert(
-        `Importação ${dryRun ? 'simulada' : 'concluída'}!\n\n` +
-        `Criados: ${result.stats?.created || 0}\n` +
-        `Atualizados: ${result.stats?.updated || 0}\n` +
-        `Pulados: ${JSON.stringify(result.stats?.skipped || {})}`
-      );
-
-      // Recarregar lista se aplicou mudanças
-      if (!dryRun && type === 'compras') {
-        await fetchCompras();
-      }
-    } catch (err) {
-      setError(err.message);
-      alert(`Erro: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
    * Handler de mudança de filtros.
    */
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  /**
+   * Callback após apply bem-sucedido.
+   */
+  const handleAfterApply = () => {
+    // Recarregar lista de compras
+    fetchCompras();
   };
 
   /**
@@ -107,74 +71,34 @@ export default function ControlePage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Controle</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Gestão de compras, ações e importações
+          Gestão de compras e ações de controle
         </p>
       </div>
 
       {/* Cards de Upload */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Upload COMPRAS */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">
-            Importar COMPRAS
-          </h3>
-          <input
-            type="file"
-            accept=".csv,.xlsx"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleUpload('compras', file, true);
-            }}
-            className="text-sm"
-            disabled={loading}
-          />
-          <p className="text-xs text-gray-500 mt-2">
-            CSV/XLSX com colunas: codigo, produto, quant, municipio, uf, data, uso
-          </p>
-        </div>
+        <ImportUploader
+          label="Importar COMPRAS"
+          description="CSV/XLSX com colunas: codigo, produto, quant, municipio, uf, data, uso"
+          onDryRun={(file) => importCompras(file, true)}
+          onApply={async (file) => {
+            const result = await importCompras(file, false);
+            handleAfterApply();
+            return result;
+          }}
+        />
 
         {/* Upload AÇÕES */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">
-            Importar AÇÕES
-          </h3>
-          <input
-            type="file"
-            accept=".csv,.xlsx"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleUpload('acoes', file, true);
-            }}
-            className="text-sm"
-            disabled={loading}
-          />
-          <p className="text-xs text-gray-500 mt-2">
-            CSV/XLSX de Ações de Controle
-          </p>
-        </div>
-
-        {/* Upload CADASTROS */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">
-            Importar CADASTROS (DAT)
-          </h3>
-          <input
-            type="file"
-            accept=".csv,.xlsx"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleUpload('cadastros', file, true);
-            }}
-            className="text-sm"
-            disabled={loading}
-          />
-          <p className="text-xs text-gray-500 mt-2">
-            CSV/XLSX de Cadastros DAT
-          </p>
-        </div>
+        <ImportUploader
+          label="Importar AÇÕES"
+          description="CSV/XLSX de Ações de Controle (Município, Projeto, Coordenador, Datas, Observação)"
+          onDryRun={(file) => importAcoes(file, true)}
+          onApply={(file) => importAcoes(file, false)}
+        />
       </div>
 
-      {/* Filtros */}
+      {/* Filtros de COMPRAS */}
       <div className="bg-white rounded-lg shadow p-4">
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           Filtros de COMPRAS
@@ -185,42 +109,42 @@ export default function ControlePage() {
             placeholder="Município"
             value={filters.municipio}
             onChange={(e) => handleFilterChange('municipio', e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded"
+            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
             type="text"
             placeholder="Projeto"
             value={filters.projeto}
             onChange={(e) => handleFilterChange('projeto', e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded"
+            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
             type="text"
             placeholder="UF"
             value={filters.uf}
             onChange={(e) => handleFilterChange('uf', e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded"
+            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
             type="date"
             placeholder="De"
             value={filters.from}
             onChange={(e) => handleFilterChange('from', e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded"
+            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
             type="date"
             placeholder="Até"
             value={filters.to}
             onChange={(e) => handleFilterChange('to', e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded"
+            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
             type="text"
             placeholder="Buscar uso/código"
             value={filters.q}
             onChange={(e) => handleFilterChange('q', e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded"
+            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
@@ -236,6 +160,9 @@ export default function ControlePage() {
         {error && (
           <div className="p-4 bg-red-50 border-b border-red-200">
             <p className="text-sm text-red-800">Erro: {error}</p>
+            <p className="text-xs text-red-600 mt-1">
+              💡 Verifique se o backend está rodando e se você está autenticado.
+            </p>
           </div>
         )}
 

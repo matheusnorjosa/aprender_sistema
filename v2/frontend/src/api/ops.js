@@ -7,9 +7,10 @@
  * - CADASTROS (DAT)
  *
  * IMPORTANTE: Todas as rotas usam trailing slash (/)
+ * Usa proxy do Vite em dev (/api → http://localhost:8002/api)
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8002/api';
+const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 /**
  * Helper para upload de arquivo (multipart/form-data).
@@ -23,7 +24,7 @@ async function postMultipart(url, file, dryRun = true) {
   const formData = new FormData();
   formData.append('file', file);
 
-  const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
   const queryParam = dryRun ? '?dry_run=true' : '?dry_run=false';
 
   const response = await fetch(`${fullUrl}${queryParam}`, {
@@ -48,7 +49,7 @@ async function postMultipart(url, file, dryRun = true) {
  * @returns {Promise<object>} Relatório com stats e pendências
  */
 export async function importCompras(file, dryRun = true) {
-  return await postMultipart('/controle/import-compras/', file, dryRun);
+  return await postMultipart('/api/controle/import-compras/', file, dryRun);
 }
 
 /**
@@ -59,7 +60,7 @@ export async function importCompras(file, dryRun = true) {
  * @returns {Promise<object>} Relatório com stats e pendências
  */
 export async function importAcoes(file, dryRun = true) {
-  return await postMultipart('/controle/import-acoes/', file, dryRun);
+  return await postMultipart('/api/controle/import-acoes/', file, dryRun);
 }
 
 /**
@@ -70,7 +71,7 @@ export async function importAcoes(file, dryRun = true) {
  * @returns {Promise<object>} Relatório com stats e pendências
  */
 export async function importCadastros(file, dryRun = true) {
-  return await postMultipart('/dat/import-cadastros/', file, dryRun);
+  return await postMultipart('/api/dat/import-cadastros/', file, dryRun);
 }
 
 /**
@@ -92,8 +93,8 @@ export async function listCompras(filters = {}) {
     if (value) params.append(key, value);
   });
 
-  const url = `/controle/compras/?${params.toString()}`;
-  const response = await fetch(`${API_URL}${url}`, {
+  const url = `/api/controle/compras/?${params.toString()}`;
+  const response = await fetch(`${API_BASE}${url}`, {
     credentials: 'include',
   });
 
@@ -101,7 +102,10 @@ export async function listCompras(filters = {}) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+
+  // Lidar com paginação DRF (results) ou array direto
+  return data.results || data;
 }
 
 /**
@@ -117,8 +121,8 @@ export async function listAcoes(filters = {}) {
     if (value) params.append(key, value);
   });
 
-  const url = `/controle/acoes/?${params.toString()}`;
-  const response = await fetch(`${API_URL}${url}`, {
+  const url = `/api/controle/acoes/?${params.toString()}`;
+  const response = await fetch(`${API_BASE}${url}`, {
     credentials: 'include',
   });
 
@@ -126,7 +130,10 @@ export async function listAcoes(filters = {}) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+
+  // Lidar com paginação DRF (results) ou array direto
+  return data.results || data;
 }
 
 /**
@@ -142,8 +149,8 @@ export async function listCadastros(filters = {}) {
     if (value) params.append(key, value);
   });
 
-  const url = `/dat/acoes/?${params.toString()}`;
-  const response = await fetch(`${API_URL}${url}`, {
+  const url = `/api/dat/acoes/?${params.toString()}`;
+  const response = await fetch(`${API_BASE}${url}`, {
     credentials: 'include',
   });
 
@@ -151,5 +158,8 @@ export async function listCadastros(filters = {}) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+
+  // Lidar com paginação DRF (results) ou array direto
+  return data.results || data;
 }

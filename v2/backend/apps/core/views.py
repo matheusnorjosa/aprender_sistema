@@ -177,13 +177,17 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        prev_status = solicitacao.status
         solicitacao.status = "aprovado"
         solicitacao.save()
 
         # ================================================================
-        # PA-05: Log estruturado de auditoria
+        # PA-05: Log estruturado de auditoria + AuditLog persistente
         # ================================================================
         client_ip = _get_client_ip(request)
+        justificativa = request.data.get("justificativa", "")
+
+        # Logger estruturado (para monitoramento em tempo real)
         logger.info(
             "solicitacao_approved",
             extra={
@@ -194,8 +198,23 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "action": "approve",
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-                "justificativa": request.data.get("justificativa", ""),
+                "justificativa": justificativa,
                 "timestamp": timezone.now().isoformat(),
+            },
+        )
+
+        # AuditLog persistente (para rastreabilidade e compliance)
+        AuditLog.objects.create(
+            usuario=request.user,
+            action="APPROVE",
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": solicitacao.id,
+                "prev_status": prev_status,
+                "new_status": "aprovado",
+                "justificativa": justificativa,
+                "ip_address": client_ip,
+                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
             },
         )
 
@@ -229,13 +248,16 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        prev_status = solicitacao.status
         solicitacao.status = "reprovado"
         solicitacao.save()
 
         # ================================================================
-        # PA-05: Log estruturado de auditoria
+        # PA-05: Log estruturado de auditoria + AuditLog persistente
         # ================================================================
         client_ip = _get_client_ip(request)
+
+        # Logger estruturado (para monitoramento em tempo real)
         logger.info(
             "solicitacao_rejected",
             extra={
@@ -248,6 +270,21 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
                 "justificativa": justificativa,
                 "timestamp": timezone.now().isoformat(),
+            },
+        )
+
+        # AuditLog persistente (para rastreabilidade e compliance)
+        AuditLog.objects.create(
+            usuario=request.user,
+            action="REJECT",
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": solicitacao.id,
+                "prev_status": prev_status,
+                "new_status": "reprovado",
+                "justificativa": justificativa,
+                "ip_address": client_ip,
+                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
             },
         )
 

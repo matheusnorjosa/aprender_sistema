@@ -13,6 +13,9 @@ from .models import (
     AuditLog,
     AcaoControle,
     AcaoDAT,
+    Municipio,
+    Projeto,
+    TipoEvento,
 )
 
 
@@ -57,6 +60,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     participations = ParticipationNestedSerializer(
         many=True, read_only=True
     )
+    fluxo = serializers.SerializerMethodField()
 
     class Meta:
         model = Solicitacao
@@ -66,6 +70,11 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "municipio",
             "projeto",
             "tipo_evento",
+            "tipo",
+            "encontro",
+            "segmento",
+            "coordenador_acompanha",
+            "coordenador",
             "inicio",
             "fim",
             "status",
@@ -74,14 +83,32 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "participations",
+            "fluxo",
+            # PR14: Campos GCal para rastreamento de sincronização
+            "gcal_status",
+            "gcal_last_sync_at",
+            "gcal_last_error",
+            "gcal_payload_hash",
         ]
         read_only_fields = [
             "id",
+            "usuario",
             "status",
             "external_event_id",
             "created_at",
             "updated_at",
+            # PR14: Campos GCal são gerenciados pelo sistema
+            "gcal_status",
+            "gcal_last_sync_at",
+            "gcal_last_error",
+            "gcal_payload_hash",
         ]
+
+    def get_fluxo(self, obj):
+        """Retorna fluxo do projeto (SUPER ou NAO_SUPER), fallback para NAO_SUPER."""
+        if obj.projeto:
+            return obj.projeto.fluxo
+        return 'NAO_SUPER'  # PR15: Fallback para solicitações sem projeto
 
     def validate(self, attrs):
         """
@@ -161,6 +188,12 @@ class CompraSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate_quantidade(self, value):
+        """Quantidade não pode ser negativa."""
+        if value < 0:
+            raise serializers.ValidationError("Quantidade não pode ser negativa.")
+        return value
 
 
 class AuditLogSerializer(serializers.ModelSerializer):
@@ -258,3 +291,115 @@ class AcaoDATCreateSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "external_hash", "created_at", "updated_at"]
+
+
+class MunicipioSerializer(serializers.ModelSerializer):
+    """
+    Full serializer for Municipio model (Admin CRUD).
+    """
+
+    class Meta:
+        model = Municipio
+        fields = ["id", "nome", "uf", "ibge_code", "ativo"]
+        read_only_fields = ["id"]
+
+
+class MunicipioOptionSerializer(serializers.ModelSerializer):
+    """
+    Minimal serializer for Municipio (dropdowns/selects).
+    """
+
+    class Meta:
+        model = Municipio
+        fields = ["id", "nome", "uf"]
+
+
+class ProjetoSerializer(serializers.ModelSerializer):
+    """
+    Full serializer for Projeto model (Admin CRUD).
+    """
+
+    class Meta:
+        model = Projeto
+        fields = ["id", "nome", "codigo", "fluxo", "ativo"]
+        read_only_fields = ["id"]
+
+
+class ProjetoOptionSerializer(serializers.ModelSerializer):
+    """
+    Minimal serializer for Projeto (dropdowns/selects).
+    """
+
+    class Meta:
+        model = Projeto
+        fields = ["id", "nome", "codigo"]
+
+
+class TipoEventoOptionSerializer(serializers.ModelSerializer):
+    """
+    Minimal serializer for TipoEvento (dropdowns/selects).
+    """
+
+    class Meta:
+        model = TipoEvento
+        fields = ["id", "nome"]
+
+
+class UsuarioOptionSerializer(serializers.ModelSerializer):
+    """
+    Minimal serializer for Usuario (dropdowns/selects).
+    """
+
+    class Meta:
+        model = get_user_model()
+        fields = ["id", "first_name", "last_name", "email"]
+
+
+class UsuarioAdminSerializer(serializers.ModelSerializer):
+    """
+    Full serializer for Usuario (Admin CRUD).
+    Includes groups and permissions for DAT admin operations.
+    """
+
+    groups = serializers.StringRelatedField(many=True, read_only=True)
+    password = serializers.CharField(write_only=True, required=False)
+
+    class Meta:
+        model = get_user_model()
+        fields = [
+            "id",
+            "username",
+            "email",
+            "password",
+            "first_name",
+            "last_name",
+            "cpf",
+            "is_active",
+            "is_staff",
+            "is_superuser",
+            "groups",
+            "date_joined",
+            "last_login",
+        ]
+        read_only_fields = ["id", "date_joined", "last_login", "groups"]
+        extra_kwargs = {
+            "password": {"write_only": True}
+        }
+
+    def create(self, validated_data):
+        """Create user with hashed password."""
+        password = validated_data.pop("password", None)
+        user = super().create(validated_data)
+        if password:
+            user.set_password(password)
+            user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        """Update user and hash password if provided."""
+        password = validated_data.pop("password", None)
+        user = super().update(instance, validated_data)
+        if password:
+            user.set_password(password)
+            user.save()
+        return user

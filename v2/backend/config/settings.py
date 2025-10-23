@@ -43,6 +43,28 @@ SECRET_KEY = os.getenv(
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 # ================================================================
+# PRODUCTION GUARD RAILS (P1.4)
+# ================================================================
+# Bloquear configurações inseguras em produção
+if ENVIRONMENT == "production":
+    # CRITICAL: DEBUG=True em produção
+    if DEBUG:
+        print("❌ ERRO CRÍTICO: DEBUG=True em produção é inseguro", file=sys.stderr)
+        print("   Configure DEBUG=0 em produção", file=sys.stderr)
+        sys.exit(1)
+
+    # CRITICAL: ALLOWED_HOSTS vazio ou wildcard em produção
+    if not ALLOWED_HOSTS or ALLOWED_HOSTS == ["*"]:
+        print("❌ ERRO CRÍTICO: ALLOWED_HOSTS=['*'] em produção é inseguro", file=sys.stderr)
+        print("   Configure ALLOWED_HOSTS com domínios específicos", file=sys.stderr)
+        sys.exit(1)
+
+    # WARNING: SECRET_KEY muito curta
+    if len(SECRET_KEY) < 50:
+        print("⚠️  WARNING: SECRET_KEY muito curta (recomendado: 50+ caracteres)", file=sys.stderr)
+        print("   Gere uma chave mais segura para produção", file=sys.stderr)
+
+# ================================================================
 # INSTALLED APPS
 # ================================================================
 INSTALLED_APPS = [

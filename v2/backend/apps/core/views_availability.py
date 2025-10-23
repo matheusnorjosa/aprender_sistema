@@ -15,6 +15,17 @@ from .serializers import AvailabilityBlockSerializer
 from .services.availability_service import check_conflicts
 
 
+def is_privileged_user(user):
+    """
+    Verifica se o usuário tem permissão para acessar dados de outros usuários.
+    Privilegiados: superuser, Superintendência, Controle
+    """
+    return (
+        user.is_superuser
+        or user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
+    )
+
+
 class AvailabilityBlockViewSet(viewsets.ModelViewSet):
     """
     ViewSet para Bloqueios de Disponibilidade.
@@ -77,6 +88,13 @@ class AvailabilityCheckView(APIView):
             return Response(
                 {"detail": "Usuário não encontrado."},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Verificar permissão: só pode consultar próprio ou se for privilegiado
+        if usuario_id != request.user.id and not is_privileged_user(request.user):
+            return Response(
+                {"detail": "Você não tem permissão para consultar a disponibilidade de outros usuários."},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         # municipio_id é opcional
@@ -152,6 +170,17 @@ class AvailabilityCheckManyView(APIView):
                 {"detail": "usuarios_ids deve ser uma lista não-vazia."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Verificar permissão: filtrar IDs para apenas os permitidos
+        privileged = is_privileged_user(request.user)
+        if not privileged:
+            # Usuário não-privilegiado só pode consultar ele mesmo
+            unauthorized_ids = [uid for uid in usuarios_ids if uid != request.user.id]
+            if unauthorized_ids:
+                return Response(
+                    {"detail": "Você não tem permissão para consultar a disponibilidade de outros usuários."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         inicio_raw = request.data.get("inicio")
         fim_raw = request.data.get("fim")

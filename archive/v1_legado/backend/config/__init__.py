@@ -1,3 +1,0 @@
-"""
-Backend configuration package.
-"""

@@ -1,3 +1,0 @@
-# Cleanup
-
-Relatórios de limpeza

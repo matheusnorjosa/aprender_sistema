@@ -42,6 +42,10 @@ SECRET_KEY = os.getenv(
 # ================================================================
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
+# Add 'testserver' for Django tests
+if "test" in sys.argv or os.getenv("DJANGO_SETTINGS_MODULE", "").endswith("test"):
+    ALLOWED_HOSTS.append("testserver")
+
 # ================================================================
 # PRODUCTION GUARD RAILS (P1.4)
 # ================================================================

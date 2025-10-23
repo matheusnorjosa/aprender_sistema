@@ -8,7 +8,7 @@
  * - Modal para reprovação com justificativa obrigatória
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   Card,
@@ -62,11 +62,7 @@ export default function ApprovalsPage() {
   const [rejectId, setRejectId] = useState(null);
   const [rejectForm] = Form.useForm();
 
-  useEffect(() => {
-    loadData();
-  }, [statusFilter, searchTerm]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const filters = { flow: 'SUPER', status: statusFilter || 'pending', q: searchTerm };
@@ -79,7 +75,11 @@ export default function ApprovalsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, searchTerm]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handlePreview = async (id) => {
     try {

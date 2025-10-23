@@ -1,99 +1,72 @@
 /**
- * PR16: API helpers para Lookup (Autocomplete) e Validação
+ * API Client - Lookup (Autocomplete) e Validação
  *
- * Endpoints:
- * - GET /api/lookup/municipios/?q=...
- * - GET /api/lookup/projetos/?q=...
- * - GET /api/lookup/tipos-evento/?q=...
- * - GET /api/lookup/usuarios/?q=...&role=...
- * - POST /api/solicitacoes/validate/
+ * Endpoints para autocomplete de municípios, projetos, tipos de evento, usuários
+ * e validação de solicitações.
  */
 
-const API_BASE = '/api';
-
-/**
- * Helper genérico para fetch com credentials
- */
-async function fetchAPI(url, options = {}) {
-  const response = await fetch(url, {
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Erro desconhecido' }));
-    throw new Error(error.detail || `HTTP ${response.status}`);
-  }
-
-  return response.json();
-}
+import { fetchAPI, buildUrl } from './config';
 
 /**
  * Buscar municípios (autocomplete)
+ *
  * @param {string} q - Query string
  * @returns {Promise<Array<{id, label, kind}>>}
  */
 export async function lookupMunicipios(q = '') {
-  const params = new URLSearchParams();
-  if (q) params.append('q', q);
-
-  const url = `${API_BASE}/lookup/municipios/?${params.toString()}`;
+  const url = buildUrl('/lookup/municipios/', { q });
   return await fetchAPI(url);
 }
 
 /**
  * Buscar projetos (autocomplete)
+ *
  * @param {string} q - Query string
  * @returns {Promise<Array<{id, label, kind}>>}
  */
 export async function lookupProjetos(q = '') {
-  const params = new URLSearchParams();
-  if (q) params.append('q', q);
-
-  const url = `${API_BASE}/lookup/projetos/?${params.toString()}`;
+  const url = buildUrl('/lookup/projetos/', { q });
   return await fetchAPI(url);
 }
 
 /**
  * Buscar tipos de evento (autocomplete)
+ *
  * @param {string} q - Query string
  * @returns {Promise<Array<{id, label, kind}>>}
  */
 export async function lookupTiposEvento(q = '') {
-  const params = new URLSearchParams();
-  if (q) params.append('q', q);
-
-  const url = `${API_BASE}/lookup/tipos-evento/?${params.toString()}`;
+  const url = buildUrl('/lookup/tipos-evento/', { q });
   return await fetchAPI(url);
 }
 
 /**
  * Buscar usuários (autocomplete)
+ *
  * @param {string} q - Query string
  * @param {string} role - Filtro por role/grupo (opcional)
  * @returns {Promise<Array<{id, label, kind, email}>>}
  */
 export async function lookupUsuarios(q = '', role = '') {
-  const params = new URLSearchParams();
-  if (q) params.append('q', q);
-  if (role) params.append('role', role);
-
-  const url = `${API_BASE}/lookup/usuarios/?${params.toString()}`;
+  const url = buildUrl('/lookup/usuarios/', { q, role });
   return await fetchAPI(url);
 }
 
 /**
  * Validar dados de solicitação antes do submit
+ *
  * @param {Object} payload - Dados da solicitação
+ * @param {string|object} payload.municipio - Nome ou {id}
+ * @param {string|object} payload.projeto - Nome ou {id}
+ * @param {string|object} payload.tipo_evento - Nome ou {id}
+ * @param {string} payload.date - Data (YYYY-MM-DD)
+ * @param {string} payload.start - Horário início (HH:MM)
+ * @param {string} payload.end - Horário fim (HH:MM)
+ * @param {object} payload.participants - {coordenador, formadores[], coord_acompanha[]}
  * @returns {Promise<{ok: boolean, errors: Array, canonical: Object}>}
  */
 export async function validateSolic(payload) {
-  const url = `${API_BASE}/solicitacoes/validate/`;
-  return await fetchAPI(url, {
+  return await fetchAPI('/solicitacoes/validate/', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

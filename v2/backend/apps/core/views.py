@@ -41,7 +41,7 @@ from .serializers import (
     ProjetoSerializer,
     SolicitacaoSerializer,
     TipoEventoOptionSerializer,
-    # UsuarioAdminSerializer,  # TODO: serializer não implementado (GAP-004)
+    UsuarioAdminSerializer,
     UsuarioOptionSerializer,
 )
 from .services.availability_service import check_conflicts
@@ -623,7 +623,7 @@ class ProjetoViewSet(viewsets.ModelViewSet):
 # TODO(GAP-004): Views comentadas até modelos serem implementados
 # ==========================
 
-# class CompraViewSet(viewsets.ModelViewSet):
+class CompraViewSet(viewsets.ModelViewSet):
     """
     ViewSet para CRUD de Compras.
 

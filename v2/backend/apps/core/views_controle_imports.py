@@ -3,20 +3,19 @@ Endpoints DRF para importação de Compras.
 
 POST /api/controle/import-compras/
 - Query param: dry_run=true|false (default: true)
-- Body: {file: upload} ou {path: "/path/to/file.csv"}
+- Body (multipart/form-data): {file: upload}
 - Returns: Relatório com stats, pendências e IDs criados
 """
 
+import tempfile
 import os
+from django.utils.datastructures import MultiValueDictKeyError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
 from apps.core.permissions import IsControleOrSuper
 from apps.core.services.controle_imports import import_compras_from_file
-
-
-DEFAULT_DIR = "/app/data/csv-import"
 
 
 class ImportComprasView(APIView):
@@ -28,14 +27,12 @@ class ImportComprasView(APIView):
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
 
-    Body (form-data):
-        file: Arquivo CSV/XLSX (upload)
-        OU
-        path: Caminho para arquivo (default: /app/data/csv-import/compras.csv)
+    Body (multipart/form-data):
+        file: Arquivo CSV/XLSX (upload obrigatório)
 
     Returns:
         {
-            "path": "/tmp/compras.csv",
+            "path": "/tmp/xyz.csv",
             "dry_run": true,
             "stats": {"created": 10, "updated": 5, "skipped": 2, "errors": 0},
             "pendencias": {
@@ -54,29 +51,40 @@ class ImportComprasView(APIView):
         dry_run_param = str(request.query_params.get("dry_run", "true")).lower()
         dry_run = dry_run_param in {"1", "true", "t", "yes", "y"}
 
-        # Obter arquivo: upload ou path
-        upload = request.FILES.get("file")
-        if upload:
-            # Salvar upload em /tmp
-            tmp_path = f"/tmp/{upload.name}"
-            with open(tmp_path, "wb") as f:
-                for chunk in upload.chunks():
-                    f.write(chunk)
-            path = tmp_path
-        else:
-            # Usar path fornecido ou default
-            path = request.data.get("path") or os.path.join(DEFAULT_DIR, "compras.csv")
-
+        # Verificar arquivo
         try:
-            report = import_compras_from_file(path=path, dry_run=dry_run)
-            return Response(report, status=status.HTTP_200_OK)
-        except FileNotFoundError as e:
+            upload = request.FILES["file"]
+        except (KeyError, MultiValueDictKeyError):
             return Response(
-                {"detail": f"Arquivo não encontrado: {path}"},
+                {"detail": "Campo 'file' é obrigatório."},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Salvar upload em /tmp via tempfile
+        temp_file = None
+        try:
+            # Criar arquivo temporário com sufixo baseado no nome original
+            suffix = os.path.splitext(upload.name)[1] or ".csv"
+            temp_file = tempfile.NamedTemporaryFile(mode="wb", suffix=suffix, delete=False)
+
+            for chunk in upload.chunks():
+                temp_file.write(chunk)
+            temp_file.close()
+
+            # Executar import
+            report = import_compras_from_file(path=temp_file.name, dry_run=dry_run)
+
+            return Response(report, status=status.HTTP_200_OK)
+
         except Exception as e:
             return Response(
-                {"detail": str(e)},
+                {"detail": f"Erro ao processar arquivo: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        finally:
+            # Sempre remover arquivo temporário
+            if temp_file and os.path.exists(temp_file.name):
+                try:
+                    os.unlink(temp_file.name)
+                except Exception:
+                    pass

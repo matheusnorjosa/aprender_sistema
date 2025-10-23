@@ -13,6 +13,29 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 /**
+ * Extrai token CSRF do cookie.
+ *
+ * @returns {string|null} CSRF token ou null se não encontrado
+ */
+function getCSRFToken() {
+  const name = 'csrftoken';
+  let cookieValue = null;
+
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+
+  return cookieValue;
+}
+
+/**
  * Helper para upload de arquivo (multipart/form-data).
  *
  * @param {string} url - URL do endpoint (com trailing slash)
@@ -27,8 +50,16 @@ async function postMultipart(url, file, dryRun = true) {
   const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
   const queryParam = dryRun ? '?dry_run=true' : '?dry_run=false';
 
+  // Obter token CSRF
+  const csrfToken = getCSRFToken();
+  const headers = {};
+  if (csrfToken) {
+    headers['X-CSRFToken'] = csrfToken;
+  }
+
   const response = await fetch(`${fullUrl}${queryParam}`, {
     method: 'POST',
+    headers: headers,
     body: formData,
     credentials: 'include', // Incluir cookies de sessão
   });

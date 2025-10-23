@@ -31,6 +31,7 @@ def build_monthly_grid(
     role: str,
     sector: Optional[str] = None,
     q: Optional[str] = None,
+    allowed_user_ids: Optional[list] = None,
 ) -> dict:
     """
     Compõe grade mensal de disponibilidade por pessoa (role).
@@ -41,6 +42,7 @@ def build_monthly_grid(
         role: "FORMADOR" ou "COORDENADOR"
         sector: Filtro opcional por setor (projeto.nome)
         q: Filtro opcional por nome/email (icontains)
+        allowed_user_ids: Lista de IDs de usuários permitidos (None = todos)
 
     Returns:
         {
@@ -95,6 +97,10 @@ def build_monthly_grid(
 
     # Get distinct user IDs
     user_ids = list(set(participations_qs.values_list("usuario_id", flat=True)))
+
+    # Filtrar por IDs permitidos (se fornecido)
+    if allowed_user_ids is not None:
+        user_ids = [uid for uid in user_ids if uid in allowed_user_ids]
 
     if not user_ids:
         # Sem usuários, retorna vazio

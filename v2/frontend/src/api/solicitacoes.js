@@ -69,20 +69,45 @@ async function fetchAPI(url, options = {}) {
   return response.json();
 }
 
+// PR15: Mapeamento de aliases de status (inglês → português)
+const STATUS_MAP = {
+  pending: 'pendente',
+  approved: 'aprovado',
+  rejected: 'reprovado',
+};
+
 /**
  * Lista solicitações de eventos com filtros.
  *
  * @param {object} params - Parâmetros de filtro
- * @param {string} params.status - Filtro por status ('pendente', 'aprovado', 'reprovado')
+ * @param {string} params.status - Filtro por status (EN: 'pending'/'approved'/'rejected' ou PT direto)
+ * @param {string} params.mine - Forçar filtro por usuário ('true' para minhas solicitações)
+ * @param {string} params.flow - Filtro por fluxo ('SUPER' ou 'NAO_SUPER')
+ * @param {string} params.q - Busca textual multi-campo
+ * @param {string} params.sector - Filtro por setor/projeto (nome parcial)
+ * @param {string} params.date_from - Data inicial (YYYY-MM-DD)
+ * @param {string} params.date_to - Data final (YYYY-MM-DD)
  * @param {number} params.page - Número da página (default: 1)
- * @param {string} params.search - Busca por usuário/município/tipo
+ * @param {string} params.search - Busca por usuário/município/tipo (alias de q)
  * @returns {Promise<object>} Resultado paginado { results: [...], count: N }
  */
-export async function listSolicitacoes({ status = 'pendente', page = 1, search = '' } = {}) {
+export async function listSolicitacoes(filters = {}) {
   const params = new URLSearchParams();
-  if (status) params.append('status', status);
-  if (page) params.append('page', page);
-  if (search) params.append('search', search);
+
+  // PR15: Mapear status alias
+  if (filters.status) {
+    const mappedStatus = STATUS_MAP[filters.status] ?? filters.status;
+    params.append('status', mappedStatus);
+  }
+
+  if (filters.mine) params.append('mine', filters.mine);
+  if (filters.flow) params.append('flow', filters.flow);
+  if (filters.q) params.append('q', filters.q);
+  if (filters.search) params.append('search', filters.search);
+  if (filters.sector) params.append('sector', filters.sector);
+  if (filters.date_from) params.append('date_from', filters.date_from);
+  if (filters.date_to) params.append('date_to', filters.date_to);
+  if (filters.page) params.append('page', filters.page);
 
   const url = `/solicitacoes/?${params.toString()}`;
   const data = await fetchAPI(url);
@@ -92,14 +117,29 @@ export async function listSolicitacoes({ status = 'pendente', page = 1, search =
 }
 
 /**
+ * Cria uma nova solicitação de evento.
+ *
+ * @param {object} body - Dados da solicitação
+ * @returns {Promise<object>} Solicitação criada
+ */
+export async function createSolicitacao(body) {
+  return await fetchAPI('/solicitacoes/', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/**
  * Aprova uma solicitação pendente.
  *
  * @param {number} id - ID da solicitação
+ * @param {string} reason - Motivo/justificativa (opcional)
  * @returns {Promise<object>} Solicitação atualizada
  */
-export async function approveSolicitacao(id) {
+export async function approveSolicitacao(id, reason = '') {
   return await fetchAPI(`/solicitacoes/${id}/approve/`, {
     method: 'PATCH',
+    body: JSON.stringify(reason ? { reason } : {}),
   });
 }
 
@@ -107,14 +147,13 @@ export async function approveSolicitacao(id) {
  * Reprova uma solicitação pendente.
  *
  * @param {number} id - ID da solicitação
- * @param {object} data - Dados da reprovação
- * @param {string} data.justificativa - Justificativa obrigatória para reprovação
+ * @param {string} reason - Motivo/justificativa (obrigatório)
  * @returns {Promise<object>} Solicitação atualizada
  */
-export async function rejectSolicitacao(id, { justificativa }) {
+export async function rejectSolicitacao(id, reason) {
   return await fetchAPI(`/solicitacoes/${id}/reject/`, {
     method: 'PATCH',
-    body: JSON.stringify({ justificativa }),
+    body: JSON.stringify({ reason }),
   });
 }
 
@@ -127,3 +166,76 @@ export async function rejectSolicitacao(id, { justificativa }) {
 export async function getSolicitacao(id) {
   return await fetchAPI(`/solicitacoes/${id}/`);
 }
+
+/**
+ * Preview do payload GCal de uma solicitação.
+ *
+ * @param {number} id - ID da solicitação
+ * @returns {Promise<object>} Payload GCal
+ */
+export async function previewSolicitacao(id) {
+  return await fetchAPI(`/solicitacoes/${id}/preview-gcal/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+/**
+ * Publica solicitação no Google Calendar.
+ *
+ * @param {number} id - ID da solicitação
+ * @param {object} body - Opções (dry_run, apply_blocked, etc.)
+ * @returns {Promise<object>} Resultado da publicação
+ */
+export async function publishSolicitacao(id, body = {}) {
+  return await fetchAPI(`/solicitacoes/${id}/publish/`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+// ========================================
+// Endpoints de opções (dropdowns/selects)
+// ========================================
+
+/**
+ * Lista municípios para seleção.
+ *
+ * @returns {Promise<Array>} Lista de municípios { id, nome, uf }
+ */
+export async function listMunicipiosOptions() {
+  return await fetchAPI('/options/municipios/');
+}
+
+/**
+ * Lista projetos para seleção.
+ *
+ * @returns {Promise<Array>} Lista de projetos { id, nome, codigo }
+ */
+export async function listProjetosOptions() {
+  return await fetchAPI('/options/projetos/');
+}
+
+/**
+ * Lista tipos de evento para seleção.
+ *
+ * @returns {Promise<Array>} Lista de tipos { id, nome }
+ */
+export async function listTiposEventoOptions() {
+  return await fetchAPI('/options/tipos-evento/');
+}
+
+/**
+ * Lista usuários para seleção.
+ *
+ * @param {object} params - Parâmetros opcionais (ex: search)
+ * @returns {Promise<Array>} Lista de usuários { id, first_name, last_name, email }
+ */
+export async function listUsuariosOptions(params = {}) {
+  const query = new URLSearchParams(params);
+  const queryString = query.toString();
+  return await fetchAPI(`/options/usuarios/${queryString ? `?${queryString}` : ''}`);
+}
+
+// Re-exportar checkAvailability de availability.js
+export { checkAvailability } from './availability.js';

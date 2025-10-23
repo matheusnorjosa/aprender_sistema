@@ -264,6 +264,7 @@ def test_preview_gcal_api_success(api_client, user_super, setup_solicitacao):
     Testa POST /api/solicitacoes/{id}/preview-gcal/.
 
     Deve gerar preview e criar AuditLog.
+    PR14: Deve incluir payload_hash.
     """
     sol = setup_solicitacao["solicitacao"]
     api_client.force_authenticate(user=user_super)
@@ -280,6 +281,11 @@ def test_preview_gcal_api_success(api_client, user_super, setup_solicitacao):
     assert preview["event_id"] == f"asv2-{sol.id}"
     assert "payload" in preview
 
+    # PR14: Validar que payload_hash está presente
+    assert "payload_hash" in preview
+    assert preview["payload_hash"] is not None
+    assert len(preview["payload_hash"]) == 40  # SHA1 hex = 40 chars
+
     # Validar AuditLog
     audit_log = AuditLog.objects.filter(
         action="PREVIEW_GCAL", model_name="Solicitacao"
@@ -287,6 +293,8 @@ def test_preview_gcal_api_success(api_client, user_super, setup_solicitacao):
     assert audit_log is not None
     assert audit_log.usuario == user_super
     assert audit_log.details["solicitacao_id"] == sol.id
+    # PR14: Validar que payload_hash foi registrado no AuditLog
+    assert "payload_hash" in audit_log.details
 
 
 def test_preview_gcal_api_permission_denied(api_client, user_coord, setup_solicitacao):
@@ -328,6 +336,7 @@ def test_publish_gcal_api_success(mock_task_delay, api_client, user_super, setup
     Testa POST /api/solicitacoes/{id}/publish/.
 
     Deve disparar task Celery e criar AuditLog.
+    PR14: Deve marcar gcal_status como PENDING.
     """
     sol = setup_solicitacao["solicitacao"]
     api_client.force_authenticate(user=user_super)
@@ -354,6 +363,10 @@ def test_publish_gcal_api_success(mock_task_delay, api_client, user_super, setup
     mock_task_delay.assert_called_once_with(
         sol.id, dry_run=False, apply_blocked=True
     )
+
+    # PR14: Validar que gcal_status foi marcado como PENDING
+    sol.refresh_from_db()
+    assert sol.gcal_status == "PENDING"
 
     # Validar AuditLog
     audit_log = AuditLog.objects.filter(

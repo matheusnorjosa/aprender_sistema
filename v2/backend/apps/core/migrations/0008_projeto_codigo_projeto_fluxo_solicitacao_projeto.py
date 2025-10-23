@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='projeto',
             name='fluxo',
-            field=models.CharField(choices=[('SUPER', 'Superintendência'), ('NAO_SUPER', 'Não-Super')], db_index=True, default='NAO_SUPER', help_text='SUPER: requer aprovação da Superintendência. NAO_SUPER: auto-aprovado.', max_length=12),
+            field=models.CharField(choices=[('SUPER', 'Superintendência'), ('OUTROS', 'Outros')], db_index=True, default='OUTROS', help_text='SUPER: requer aprovação da Superintendência. OUTROS: auto-aprovado.', max_length=12),
         ),
         migrations.AddField(
             model_name='solicitacao',

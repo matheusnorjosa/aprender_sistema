@@ -5,6 +5,7 @@ WEB = $(DC) exec -T web
         etl-acomp-dry etl-acomp-apply etl-desloc-dry etl-desloc-apply \
         etl-acoes-dry etl-acoes-apply etl-dat-dry etl-dat-apply \
         import-compras-dry import-acoes-dry import-cadastros-dry \
+        solic-pend-super solic-approve solic-reject \
         readyz healthz preview-json apply-json flags-fake flags-google preview-on preview-off \
         ban-v1 up-worker up-beat logs-worker logs-beat logs-worker-last logs-beat-last help
 
@@ -147,6 +148,37 @@ import-cadastros-dry:
 		-F "file=@$(FILE)" \
 		-b cookies.txt -c cookies.txt || true
 
+# ════════════════════════════════════════════════════════════════════════════
+# PR15: Solicitações (Fluxo Coordenador → Superintendência → Controle)
+# ════════════════════════════════════════════════════════════════════════════
+
+solic-pend-super:
+	@echo "📋 GET /api/solicitacoes/?status=pending&flow=SUPER"
+	curl -s -b cookies.txt "http://localhost:8002/api/solicitacoes/?status=pending&flow=SUPER" | jq .
+
+solic-approve:
+	@echo "⚙️  Uso: make solic-approve ID=123"
+	@if [ -z "$(ID)" ]; then \
+		echo "❌ Erro: Variável ID não definida"; \
+		echo "   Exemplo: make solic-approve ID=42"; \
+		exit 1; \
+	fi
+	@echo "✅ PATCH /api/solicitacoes/$(ID)/approve/"
+	curl -s -X PATCH -b cookies.txt -H "Content-Type: application/json" \
+		"http://localhost:8002/api/solicitacoes/$(ID)/approve/" | jq .
+
+solic-reject:
+	@echo "⚙️  Uso: make solic-reject ID=123 REASON='conflito de agenda'"
+	@if [ -z "$(ID)" ] || [ -z "$(REASON)" ]; then \
+		echo "❌ Erro: Variáveis ID e REASON obrigatórias"; \
+		echo "   Exemplo: make solic-reject ID=42 REASON='Conflito com evento existente'"; \
+		exit 1; \
+	fi
+	@echo "❌ PATCH /api/solicitacoes/$(ID)/reject/"
+	curl -s -X PATCH -b cookies.txt -H "Content-Type: application/json" \
+		-d '{"reason":"$(REASON)"}' \
+		"http://localhost:8002/api/solicitacoes/$(ID)/reject/" | jq .
+
 readyz:
 	curl -fsS http://localhost:8002/api/readyz/ || true
 
@@ -236,6 +268,11 @@ help:
 	@echo "  make import-acoes-dry      POST /api/controle/import-acoes/ (use FILE=...)"
 	@echo "  make import-cadastros-dry  POST /api/dat/import-cadastros/ (use FILE=...)"
 	@echo "  Nota: Relatórios salvos em out_etl/"
+	@echo ""
+	@echo "PR15 - Solicitações (via API HTTP):"
+	@echo "  make solic-pend-super      GET /api/solicitacoes/?status=pending&flow=SUPER"
+	@echo "  make solic-approve         PATCH /api/solicitacoes/{ID}/approve/ (use ID=...)"
+	@echo "  make solic-reject          PATCH /api/solicitacoes/{ID}/reject/ (use ID=... REASON=...)"
 	@echo ""
 	@echo "Celery (Worker & Beat):"
 	@echo "  make up-worker             Start worker"

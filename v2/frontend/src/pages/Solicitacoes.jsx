@@ -7,7 +7,7 @@
  * - Vejam detalhes completos de cada solicitação
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   Tag,
@@ -83,7 +83,6 @@ function Solicitacoes() {
   const [processingAction, setProcessingAction] = useState(false);
 
   // Usuário atual
-  const [currentUser, setCurrentUser] = useState(null);
   const [isSuperintendencia, setIsSuperintendencia] = useState(false);
   const [loadingUser, setLoadingUser] = useState(true);
 
@@ -94,7 +93,6 @@ function Solicitacoes() {
     async function fetchCurrentUser() {
       try {
         const user = await getMe();
-        setCurrentUser(user);
 
         // PA-06: Verificar se usuário pertence ao grupo "Superintendência" ou é superuser
         const isSuper =
@@ -116,7 +114,7 @@ function Solicitacoes() {
   /**
    * Carrega solicitações com filtros e paginação
    */
-  const fetchSolicitacoes = async (page = 1) => {
+  const fetchSolicitacoes = useCallback(async (page = 1) => {
     setLoading(true);
     try {
       const data = await listSolicitacoes({
@@ -136,14 +134,14 @@ function Solicitacoes() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, searchTerm]);
 
   /**
    * Recarrega quando filtros mudam
    */
   useEffect(() => {
     fetchSolicitacoes(1);
-  }, [statusFilter, searchTerm]);
+  }, [fetchSolicitacoes]);
 
   /**
    * Mudança de página

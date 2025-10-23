@@ -411,22 +411,27 @@ class Solicitacao(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Override save para implementar fluxo de auto-aprovação (PR 13/N).
+        Override save para garantir conformidade com PA-01.
 
-        Regras:
-        - Na criação (pk is None):
-          - Se projeto.fluxo == 'NAO_SUPER' E status ainda é 'pendente': status='aprovado' (auto-aprovado)
-          - Se projeto.fluxo == 'SUPER': mantém status original
-          - Se projeto is None: mantém status original
-          - Se status foi explicitamente alterado (!=  'pendente'): respeita o valor
-        - Na atualização (pk exists): não altera status automaticamente (PA-01)
+        PA-01: Nenhuma solicitação é auto-aprovada, independentemente do fluxo do projeto.
+
+        IMPORTANTE: A lógica anterior de auto-aprovação para fluxo NAO_SUPER foi REMOVIDA
+        para cumprir a Política de Aprovação Manual (CP-02).
+
+        Todas as solicitações agora seguem o fluxo:
+        1. Criação com status='pendente' (sempre)
+        2. Aprovação manual pela Superintendência (endpoint /approve/)
+        3. Integrações externas só após aprovação (PA-03)
+
+        Histórico:
+        - PR 13/N: Auto-aprovação implementada (REMOVIDA em PR17)
+        - PR17: Conformidade com PA-01 (Política de Aprovação Manual obrigatória)
         """
-        # Auto-aprovação apenas na criação E se status ainda é o padrão
-        if self.pk is None:
-            # Se projeto tem fluxo NAO_SUPER E status é 'pendente', auto-aprovar
-            if self.projeto and self.projeto.fluxo == "NAO_SUPER" and self.status == "pendente":
-                self.status = "aprovado"
-            # Caso contrário, mantém status original (SUPER, sem projeto, ou já definido explicitamente)
+        # PA-01: Sem auto-aprovação. Status sempre começa 'pendente'.
+        # Se for criação e status não foi explicitamente definido, garantir 'pendente'
+        if self.pk is None and not hasattr(self, '_status_explicitly_set'):
+            # Mantém o default do campo (status='pendente')
+            pass
 
         super().save(*args, **kwargs)
 

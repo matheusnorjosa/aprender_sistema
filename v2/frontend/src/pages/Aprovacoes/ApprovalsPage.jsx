@@ -6,6 +6,11 @@
  * - Botões para preview, aprovar e reprovar
  * - Modal para preview de payload JSON
  * - Modal para reprovação com justificativa obrigatória
+ *
+ * PA-06 (Política de Aprovação Manual):
+ * - Botões de aprovar/reprovar só aparecem para usuários do grupo Superintendência
+ * - Verifica: is_superuser || is_superintendencia || groups.includes('Superintendência')
+ * - Conformidade ISO 9241-110: Controle explícito (usuário vê apenas ações permitidas)
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -31,6 +36,7 @@ import {
   rejectSolicitacao,
   previewSolicitacao,
 } from '../../api/solicitacoes';
+import { getMe } from '../../api/availability';
 
 const { Title, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -62,6 +68,10 @@ export default function ApprovalsPage() {
   const [rejectId, setRejectId] = useState(null);
   const [rejectForm] = Form.useForm();
 
+  // PA-06: Estado para verificar permissão do usuário
+  const [user, setUser] = useState(null);
+  const [canApprove, setCanApprove] = useState(false);
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -80,6 +90,28 @@ export default function ApprovalsPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // PA-06: Carregar dados do usuário e verificar permissão
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userData = await getMe();
+        setUser(userData);
+
+        // Verificar se usuário tem permissão para aprovar/reprovar
+        const isSuperintendencia =
+          userData?.is_superuser ||
+          userData?.is_superintendencia ||
+          userData?.groups?.includes('Superintendência');
+
+        setCanApprove(isSuperintendencia);
+      } catch (error) {
+        console.error('Erro ao carregar usuário:', error);
+        setCanApprove(false);
+      }
+    };
+    loadUser();
+  }, []);
 
   const handlePreview = async (id) => {
     try {
@@ -180,7 +212,8 @@ export default function ApprovalsPage() {
             onClick={() => handlePreview(record.id)}
             title="Preview"
           />
-          {record.status === 'pendente' && (
+          {/* PA-06: Botões de aprovar/reprovar só aparecem para Superintendência */}
+          {record.status === 'pendente' && canApprove && (
             <>
               <Button
                 size="small"

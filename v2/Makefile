@@ -4,6 +4,7 @@ WEB = $(DC) exec -T web
 .PHONY: up down build logs shell migrate collect seed seed-demo seed-rbac \
         etl-acomp-dry etl-acomp-apply etl-desloc-dry etl-desloc-apply \
         etl-acoes-dry etl-acoes-apply etl-dat-dry etl-dat-apply \
+        import-compras-dry import-acoes-dry import-cadastros-dry \
         readyz healthz preview-json apply-json flags-fake flags-google preview-on preview-off \
         ban-v1 up-worker up-beat logs-worker logs-beat logs-worker-last logs-beat-last help
 
@@ -103,6 +104,49 @@ etl-dat-apply:
 	fi
 	$(WEB) python manage.py etl_import_dat_cadastros "$(FILE)"
 
+# ════════════════════════════════════════════════════════════════════════════
+# API HTTP Imports (via curl - requer autenticação)
+# ════════════════════════════════════════════════════════════════════════════
+
+import-compras-dry:
+	@echo "⚙️  Uso: make import-compras-dry FILE=/path/to/compras.csv"
+	@if [ -z "$(FILE)" ]; then \
+		echo "❌ Erro: Variável FILE não definida"; \
+		echo "   Exemplo: make import-compras-dry FILE=./data/compras.csv"; \
+		exit 1; \
+	fi
+	@echo "📤 POST /api/controle/import-compras/?dry_run=true"
+	curl -X POST "http://localhost:8002/api/controle/import-compras/?dry_run=true" \
+		-H "Content-Type: multipart/form-data" \
+		-F "file=@$(FILE)" \
+		-b cookies.txt -c cookies.txt || true
+
+import-acoes-dry:
+	@echo "⚙️  Uso: make import-acoes-dry FILE=/path/to/acoes.csv"
+	@if [ -z "$(FILE)" ]; then \
+		echo "❌ Erro: Variável FILE não definida"; \
+		echo "   Exemplo: make import-acoes-dry FILE=./data/acoes_controle.csv"; \
+		exit 1; \
+	fi
+	@echo "📤 POST /api/controle/import-acoes/?dry_run=true"
+	curl -X POST "http://localhost:8002/api/controle/import-acoes/?dry_run=true" \
+		-H "Content-Type: multipart/form-data" \
+		-F "file=@$(FILE)" \
+		-b cookies.txt -c cookies.txt || true
+
+import-cadastros-dry:
+	@echo "⚙️  Uso: make import-cadastros-dry FILE=/path/to/cadastros.csv"
+	@if [ -z "$(FILE)" ]; then \
+		echo "❌ Erro: Variável FILE não definida"; \
+		echo "   Exemplo: make import-cadastros-dry FILE=./data/dat_cadastros.csv"; \
+		exit 1; \
+	fi
+	@echo "📤 POST /api/dat/import-cadastros/?dry_run=true"
+	curl -X POST "http://localhost:8002/api/dat/import-cadastros/?dry_run=true" \
+		-H "Content-Type: multipart/form-data" \
+		-F "file=@$(FILE)" \
+		-b cookies.txt -c cookies.txt || true
+
 readyz:
 	curl -fsS http://localhost:8002/api/readyz/ || true
 
@@ -177,7 +221,7 @@ help:
 	@echo "  make seed-demo             Seed demo users"
 	@echo "  make seed-rbac             Seed RBAC groups/permissions (idempotent)"
 	@echo ""
-	@echo "ETL:"
+	@echo "ETL (via management commands):"
 	@echo "  make etl-acomp-dry         Preview ETL acompanhamento (dry-run)"
 	@echo "  make etl-acomp-apply       Apply ETL acompanhamento"
 	@echo "  make etl-desloc-dry        Preview ETL deslocamentos (use FILE=/path/to/file.{csv|xlsx})"
@@ -186,6 +230,12 @@ help:
 	@echo "  make etl-acoes-apply       Apply ETL ações controle (use FILE=/path/to/file.{csv|xlsx})"
 	@echo "  make etl-dat-dry           Preview ETL DAT cadastros (use FILE=/path/to/file.{csv|xlsx})"
 	@echo "  make etl-dat-apply         Apply ETL DAT cadastros (use FILE=/path/to/file.{csv|xlsx})"
+	@echo ""
+	@echo "Import via API HTTP (porta 8002, trailing slashes):"
+	@echo "  make import-compras-dry    POST /api/controle/import-compras/ (use FILE=...)"
+	@echo "  make import-acoes-dry      POST /api/controle/import-acoes/ (use FILE=...)"
+	@echo "  make import-cadastros-dry  POST /api/dat/import-cadastros/ (use FILE=...)"
+	@echo "  Nota: Relatórios salvos em out_etl/"
 	@echo ""
 	@echo "Celery (Worker & Beat):"
 	@echo "  make up-worker             Start worker"

@@ -17,6 +17,7 @@ import json
 from dataclasses import dataclass
 from datetime import timezone as dt_timezone
 from typing import Literal, Optional
+from uuid import uuid4
 
 from django.conf import settings
 from django.utils import timezone
@@ -330,12 +331,13 @@ def apply_one_solicitacao(
         raise
 
 
-def _build_payload(s: Solicitacao) -> dict:
+def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
     """
     Constrói payload do evento para Google Calendar API.
 
     Args:
         s: Solicitacao aprovada
+        enable_meet: Se True, adiciona conferenceData para Google Meet (RF06)
 
     Returns:
         dict: Payload compatível com Google Calendar API
@@ -399,6 +401,19 @@ def _build_payload(s: Solicitacao) -> dict:
     else:
         description_trimmed = description
 
+    # RF06: Google Meet conferenceData
+    conference_data = None
+    if enable_meet:
+        # Gera requestId único e determinístico para idempotência
+        # Formato: meet-{solicitation_id}-{random_8chars}
+        request_id = f"meet-{s.id}-{uuid4().hex[:8]}"
+        conference_data = {
+            "createRequest": {
+                "requestId": request_id,
+                "conferenceSolutionKey": {"type": "hangoutsMeet"},
+            }
+        }
+
     # Construir payload
     payload = {
         "summary": summary_trimmed,
@@ -406,7 +421,7 @@ def _build_payload(s: Solicitacao) -> dict:
         "start": {"dateTime": start_iso, "timeZone": "UTC"},
         "end": {"dateTime": end_iso, "timeZone": "UTC"},
         "location": getattr(municipio, "nome", None) if municipio else None,
-        "conferenceData": None,  # Reservado para Meet (futuro)
+        "conferenceData": conference_data,  # RF06: Google Meet link
         # Metadados para auditoria e reconciliação
         "extendedProperties": {
             "private": {
@@ -434,17 +449,18 @@ def _build_payload(s: Solicitacao) -> dict:
     return payload
 
 
-def build_event_payload(s: Solicitacao) -> dict:
+def build_event_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
     """
-    Wrapper público para _build_payload (PR14).
+    Wrapper público para _build_payload (PR14, PR19).
 
     Args:
         s: Solicitacao
+        enable_meet: Se True, adiciona conferenceData para Google Meet (RF06)
 
     Returns:
         dict: Payload para Google Calendar API
     """
-    return _build_payload(s)
+    return _build_payload(s, enable_meet=enable_meet)
 
 
 def compute_payload_hash(s: Solicitacao) -> str:
@@ -469,9 +485,10 @@ def upsert_one(
     dry_run: bool = False,
     no_delete: bool = False,
     payload: Optional[dict] = None,
+    enable_meet: bool = False,
 ) -> SyncOutcome:
     """
-    Sincroniza uma Solicitacao com o Google Calendar (idempotente) - PR14.
+    Sincroniza uma Solicitacao com o Google Calendar (idempotente) - PR14, PR19.
 
     Lógica:
     1. Se status != "aprovado" e tem external_event_id → DELETE (ou SKIP se no_delete)
@@ -488,6 +505,7 @@ def upsert_one(
         dry_run: Se True, não altera DB nem Calendar
         no_delete: Se True, não deleta eventos de solicitações não-aprovadas
         payload: Payload pré-calculado (opcional, default recalcula via _build_payload)
+        enable_meet: Se True, adiciona conferenceData para Google Meet (RF06)
 
     Returns:
         SyncOutcome com ação executada
@@ -552,9 +570,9 @@ def upsert_one(
         # Caso 2: Aprovado → CREATE/UPDATE/ADOPT
         deterministic_eid = _event_id_for(s)
 
-        # Usar payload fornecido ou recalcular (PR14)
+        # Usar payload fornecido ou recalcular (PR14, PR19)
         if payload is None:
-            payload = _build_payload(s)
+            payload = _build_payload(s, enable_meet=enable_meet)
 
         # Verificar se evento já existe no Calendar
         existing = None
@@ -582,17 +600,26 @@ def upsert_one(
                 try:
                     created = client.insert(calendar_id, deterministic_eid, payload)
                     s.external_event_id = created.get("id") or deterministic_eid
+
+                    # RF06: Extrair hangoutLink se disponível
+                    hangout_link = created.get("hangoutLink")
+                    if hangout_link:
+                        s.meet_link = hangout_link
+
                     s.last_synced_at = timezone.now()
                     s.last_sync_action = action
                     s.last_sync_error = None
-                    s.save(
-                        update_fields=[
-                            "external_event_id",
-                            "last_synced_at",
-                            "last_sync_action",
-                            "last_sync_error",
-                        ]
-                    )
+
+                    update_fields = [
+                        "external_event_id",
+                        "last_synced_at",
+                        "last_sync_action",
+                        "last_sync_error",
+                    ]
+                    if hangout_link:
+                        update_fields.append("meet_link")
+
+                    s.save(update_fields=update_fields)
                 except Exception as e:
                     error_msg = f"Erro ao criar evento: {str(e)}"
                     s.last_synced_at = timezone.now()
@@ -620,20 +647,29 @@ def upsert_one(
 
             if not dry_run:
                 try:
-                    client.update(calendar_id, deterministic_eid, payload)
+                    updated = client.update(calendar_id, deterministic_eid, payload)
                     if not s.external_event_id:
                         s.external_event_id = deterministic_eid
+
+                    # RF06: Extrair hangoutLink se disponível
+                    hangout_link = updated.get("hangoutLink") if updated else None
+                    if hangout_link:
+                        s.meet_link = hangout_link
+
                     s.last_synced_at = timezone.now()
                     s.last_sync_action = action
                     s.last_sync_error = None
-                    s.save(
-                        update_fields=[
-                            "external_event_id",
-                            "last_synced_at",
-                            "last_sync_action",
-                            "last_sync_error",
-                        ]
-                    )
+
+                    update_fields = [
+                        "external_event_id",
+                        "last_synced_at",
+                        "last_sync_action",
+                        "last_sync_error",
+                    ]
+                    if hangout_link:
+                        update_fields.append("meet_link")
+
+                    s.save(update_fields=update_fields)
                 except Exception as e:
                     error_msg = f"Erro ao atualizar evento: {str(e)}"
                     s.last_synced_at = timezone.now()

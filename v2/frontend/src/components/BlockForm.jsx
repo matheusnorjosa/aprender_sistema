@@ -69,7 +69,7 @@ export default function BlockForm({ onSubmit }) {
       // Limpar form após sucesso
       form.resetFields();
       setConflicts(null);
-    } catch (error) {
+    } catch {
       // Erro já tratado no parent (Disponibilidade.jsx)
     } finally {
       setLoading(false);
@@ -79,7 +79,7 @@ export default function BlockForm({ onSubmit }) {
   /**
    * Valida que início < fim.
    */
-  const validateDateRange = (_, value) => {
+  const validateDateRange = () => {
     const inicio = form.getFieldValue('inicio');
     const fim = form.getFieldValue('fim');
 

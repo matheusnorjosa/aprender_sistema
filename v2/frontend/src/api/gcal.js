@@ -1,63 +1,10 @@
 /**
- * API Client - Google Calendar Dashboard (PR14)
+ * API Client - Google Calendar Dashboard
  *
  * Endpoints para painel de publicação GCal.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8002/api';
-
-/**
- * Extrai token CSRF do cookie.
- */
-function getCSRFToken() {
-  const name = 'csrftoken';
-  let cookieValue = null;
-
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-
-  return cookieValue;
-}
-
-/**
- * Wrapper genérico para fetch com autenticação e CSRF.
- */
-async function fetchAPI(url, options = {}) {
-  const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
-
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
-
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method?.toUpperCase())) {
-    const csrfToken = getCSRFToken();
-    if (csrfToken) {
-      headers['X-CSRFToken'] = csrfToken;
-    }
-  }
-
-  const response = await fetch(fullUrl, {
-    ...options,
-    headers,
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(error.detail || `HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  return response.json();
-}
+import { fetchAPI, buildUrl } from './config';
 
 /**
  * Busca resumo de status do GCal (contadores).
@@ -66,63 +13,55 @@ async function fetchAPI(url, options = {}) {
  * @returns {Promise<object>} { counts: { NONE, PENDING, PUBLISHED, ERROR }, total }
  */
 export async function getStatusSummary(filters = {}) {
-  const params = new URLSearchParams();
-
-  if (filters.date_from) params.append('date_from', filters.date_from);
-  if (filters.date_to) params.append('date_to', filters.date_to);
-  if (filters.sector) params.append('sector', filters.sector);
-  if (filters.q) params.append('q', filters.q);
-  if (filters.status) params.append('status', filters.status);
-
-  const url = `/gcal/status-summary/?${params.toString()}`;
+  const url = buildUrl('/gcal/status-summary/', filters);
   return await fetchAPI(url);
 }
 
 /**
- * Lista solicitações com campos GCal.
+ * Lista solicitações aprovadas com status GCal.
  *
- * @param {object} filters - Filtros opcionais
- * @returns {Promise<object>} { results: [...], count: N }
+ * @param {object} filters - Filtros (date_from, date_to, sector, gcal_status, q)
+ * @returns {Promise<object>} Resultado paginado { results: [...], count: N }
  */
-export async function getGCalList(filters = {}) {
-  const params = new URLSearchParams();
-
-  if (filters.date_from) params.append('date_from', filters.date_from);
-  if (filters.date_to) params.append('date_to', filters.date_to);
-  if (filters.sector) params.append('sector', filters.sector);
-  if (filters.q) params.append('q', filters.q);
-  if (filters.status) params.append('status', filters.status);
-
-  const url = `/gcal/list/?${params.toString()}`;
+export async function listApprovedWithGCalStatus(filters = {}) {
+  const url = buildUrl('/gcal/approved/', filters);
   return await fetchAPI(url);
 }
 
 /**
- * Detecta drift (solicitações publicadas com payload alterado).
+ * Publica múltiplas solicitações em lote no Google Calendar.
  *
- * @param {object} filters - Filtros opcionais
- * @returns {Promise<object>} { count: N, items: [...] }
+ * @param {object} body - { solicitacao_ids: [...], dry_run: bool, apply_blocked: bool }
+ * @returns {Promise<object>} Resultado da operação em lote
  */
-export async function getGCalDrift(filters = {}) {
-  const params = new URLSearchParams();
-
-  if (filters.date_from) params.append('date_from', filters.date_from);
-  if (filters.date_to) params.append('date_to', filters.date_to);
-  if (filters.sector) params.append('sector', filters.sector);
-  if (filters.q) params.append('q', filters.q);
-
-  const url = `/gcal/drift/?${params.toString()}`;
-  return await fetchAPI(url);
+export async function publishBatch(body) {
+  return await fetchAPI('/gcal/publish-batch/', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 /**
- * Reenfileira publicação em lote.
+ * Remove múltiplas solicitações do Google Calendar (unpublish).
  *
- * @param {object} body - { ids: [...], dry_run: boolean }
- * @returns {Promise<object>} { queued: N, errors: [...], dry_run: boolean }
+ * @param {object} body - { solicitacao_ids: [...] }
+ * @returns {Promise<object>} Resultado da operação em lote
  */
-export async function bulkReapply(body) {
-  return await fetchAPI('/gcal/reapply/', {
+export async function unpublishBatch(body) {
+  return await fetchAPI('/gcal/unpublish-batch/', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Sincroniza solicitações bloqueadas (marca como PENDING no GCal).
+ *
+ * @param {object} body - { solicitacao_ids: [...] }
+ * @returns {Promise<object>} Resultado da sincronização
+ */
+export async function syncBlocked(body) {
+  return await fetchAPI('/gcal/sync-blocked/', {
     method: 'POST',
     body: JSON.stringify(body),
   });

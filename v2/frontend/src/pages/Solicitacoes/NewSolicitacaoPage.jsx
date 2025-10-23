@@ -375,9 +375,9 @@ export default function NewSolicitacaoPage() {
                           <div style={{ paddingLeft: 16, fontSize: '12px', color: '#666' }}>
                             <Text type="secondary">Conflitos detectados:</Text>
                             <ul style={{ margin: '4px 0', paddingLeft: 20 }}>
-                              {item.conflitos.map((conflito, idx) => (
+                              {item.conflitos.map((conflict, idx) => (
                                 <li key={idx}>
-                                  {conflito.tipo}: {conflito.mensagem}
+                                  [{conflict.code}] {conflict.title}: {conflict.detail}
                                 </li>
                               ))}
                             </ul>

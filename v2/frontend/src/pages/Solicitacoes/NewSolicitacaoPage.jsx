@@ -25,7 +25,16 @@ import {
   List,
   Tag,
 } from 'antd';
-import { CheckCircleOutlined, WarningOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import {
+  CheckCircleOutlined,
+  WarningOutlined,
+  ArrowLeftOutlined,
+  CloseCircleOutlined,
+  StopOutlined,
+  MinusCircleOutlined,
+  CarOutlined,
+  ClockCircleOutlined,
+} from '@ant-design/icons';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -48,6 +57,34 @@ dayjs.tz.setDefault('America/Fortaleza');
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
+
+/**
+ * Mapeia código de conflito para ícone (ISO 9241-110: auto-descritividade)
+ */
+function getConflictIcon(code) {
+  const icons = {
+    X: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,      // Sobreposição - vermelho
+    T: <StopOutlined style={{ color: '#ff4d4f' }} />,             // Bloqueio Total - vermelho
+    P: <MinusCircleOutlined style={{ color: '#fa8c16' }} />,      // Bloqueio Parcial - laranja
+    D: <CarOutlined style={{ color: '#fa8c16' }} />,              // Deslocamento - laranja
+    M: <ClockCircleOutlined style={{ color: '#faad14' }} />,      // Capacidade - dourado
+  };
+  return icons[code] || <WarningOutlined style={{ color: '#d9d9d9' }} />;
+}
+
+/**
+ * Mapeia código de conflito para cor da tag
+ */
+function getConflictColor(code) {
+  const colors = {
+    X: 'red',      // Sobreposição - bloqueante
+    T: 'red',      // Bloqueio Total - bloqueante
+    P: 'orange',   // Bloqueio Parcial - atenção
+    D: 'orange',   // Deslocamento - atenção
+    M: 'gold',     // Capacidade - aviso
+  };
+  return colors[code] || 'default';
+}
 
 export default function NewSolicitacaoPage() {
   const navigate = useNavigate();
@@ -372,15 +409,23 @@ export default function NewSolicitacaoPage() {
                           <Text>Formador ID: {item.formadorId}</Text>
                         </Space>
                         {!item.disponivel && item.conflitos.length > 0 && (
-                          <div style={{ paddingLeft: 16, fontSize: '12px', color: '#666' }}>
-                            <Text type="secondary">Conflitos detectados:</Text>
-                            <ul style={{ margin: '4px 0', paddingLeft: 20 }}>
-                              {item.conflitos.map((conflito, idx) => (
-                                <li key={idx}>
-                                  {conflito.tipo}: {conflito.mensagem}
-                                </li>
+                          <div style={{ paddingLeft: 16 }}>
+                            <Text type="secondary" style={{ fontSize: '12px' }}>Conflitos detectados:</Text>
+                            <Space direction="vertical" size="small" style={{ marginTop: 8, width: '100%' }}>
+                              {item.conflitos.map((conflict, idx) => (
+                                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                  {getConflictIcon(conflict.code)}
+                                  <div style={{ flex: 1 }}>
+                                    <Tag color={getConflictColor(conflict.code)} style={{ marginBottom: 4 }}>
+                                      {conflict.code}
+                                    </Tag>
+                                    <Text strong style={{ fontSize: '13px' }}>{conflict.title}</Text>
+                                    <br />
+                                    <Text type="secondary" style={{ fontSize: '12px' }}>{conflict.detail}</Text>
+                                  </div>
+                                </div>
                               ))}
-                            </ul>
+                            </Space>
                           </div>
                         )}
                       </Space>

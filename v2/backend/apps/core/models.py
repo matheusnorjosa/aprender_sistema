@@ -37,6 +37,15 @@ class Municipio(models.Model):
 
     nome = models.CharField(max_length=100, unique=True, db_index=True)
     uf = models.CharField(max_length=2)
+    ibge_code = models.CharField(
+        max_length=7,
+        null=True,
+        blank=True,
+        unique=True,
+        db_index=True,
+        verbose_name="Código IBGE",
+        help_text="Código IBGE de 7 dígitos do município"
+    )
     ativo = models.BooleanField(default=True)
 
     class Meta:
@@ -54,7 +63,7 @@ class Projeto(models.Model):
 
     FLUXO_CHOICES = [
         ('SUPER', 'Superintendência'),
-        ('NAO_SUPER', 'Não-Super'),
+        ('NAO_SUPER', 'Não-Superintendência'),
     ]
 
     nome = models.CharField(max_length=200, unique=True, db_index=True)
@@ -176,6 +185,13 @@ class Solicitacao(models.Model):
         ("reprovado", "Reprovado"),
     ]
 
+    class GCalStatus(models.TextChoices):
+        """Status de sincronização com Google Calendar."""
+        NONE = "NONE", "Não publicado"
+        PENDING = "PENDING", "Aguardando publicação"
+        PUBLISHED = "PUBLISHED", "Publicado"
+        ERROR = "ERROR", "Erro na publicação"
+
     usuario = models.ForeignKey(
         Usuario, on_delete=models.PROTECT, related_name="solicitacoes"
     )
@@ -256,6 +272,72 @@ class Solicitacao(models.Model):
         help_text="Mensagem de erro da última tentativa de sync (se houver)",
     )
 
+    # Campos de negócio adicionais (PR-08)
+    tipo = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="Tipo de solicitação (ex: evento, reunião)",
+    )
+    encontro = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="Identificação do encontro (ex: Encontro 1)",
+    )
+    segmento = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="Segmento educacional (ex: Fundamental I, Fundamental II)",
+    )
+    coordenador_acompanha = models.BooleanField(
+        default=False,
+        help_text="Indica se o coordenador acompanha o evento",
+    )
+    coordenador = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="eventos_coordenados",
+        help_text="Coordenador responsável pelo evento",
+    )
+    formadores = models.ManyToManyField(
+        Usuario,
+        blank=True,
+        related_name="eventos_como_formador",
+        help_text="Formadores que participam do evento",
+    )
+
+    # Campos de rastreamento de publicação Google Calendar (PR14)
+    gcal_status = models.CharField(
+        max_length=16,
+        choices=GCalStatus.choices,
+        default=GCalStatus.NONE,
+        db_index=True,
+        verbose_name="Status GCal",
+        help_text="Status de sincronização com Google Calendar",
+    )
+    gcal_last_sync_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Último sync GCal",
+        help_text="Timestamp da última tentativa de sincronização com GCal",
+    )
+    gcal_last_error = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="Último erro GCal",
+        help_text="Mensagem de erro da última tentativa de publicação",
+    )
+    gcal_payload_hash = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="SHA1 do payload aplicado no GCal (drift detection)",
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -273,6 +355,8 @@ class Solicitacao(models.Model):
             models.Index(fields=["status", "inicio", "fim", "updated_at"]),
             # Índice para queries de sync incremental por timestamp
             models.Index(fields=["updated_at", "last_synced_at"]),
+            # Índice composto para queries do painel GCal (PR14)
+            models.Index(fields=["gcal_status", "status"]),
         ]
         constraints = [
             models.CheckConstraint(
@@ -283,6 +367,68 @@ class Solicitacao(models.Model):
 
     def __str__(self):
         return f"{self.usuario.get_full_name()} - {self.tipo_evento.nome} ({self.inicio.strftime('%d/%m/%Y %H:%M')})"
+
+    def mark_gcal(
+        self,
+        *,
+        status: str,
+        payload_hash: str | None = None,
+        error: str | None = None,
+        sync_at=None,
+    ):
+        """
+        Atualiza campos de rastreamento GCal (PR14).
+
+        Args:
+            status: Um dos valores de GCalStatus (NONE, PENDING, PUBLISHED, ERROR)
+            payload_hash: SHA1 do payload aplicado (opcional)
+            error: Mensagem de erro (truncada para 500 chars)
+            sync_at: Timestamp do sync (default: timezone.now())
+
+        Usage:
+            solicitacao.mark_gcal(
+                status=Solicitacao.GCalStatus.PUBLISHED,
+                payload_hash="abc123...",
+                error=""
+            )
+        """
+        if sync_at is None:
+            sync_at = timezone.now()
+
+        self.gcal_status = status
+        self.gcal_payload_hash = payload_hash
+        self.gcal_last_error = error[:500] if error else ""
+        self.gcal_last_sync_at = sync_at
+
+        self.save(
+            update_fields=[
+                "gcal_status",
+                "gcal_payload_hash",
+                "gcal_last_error",
+                "gcal_last_sync_at",
+            ]
+        )
+
+    def save(self, *args, **kwargs):
+        """
+        Override save para implementar fluxo de auto-aprovação (PR 13/N).
+
+        Regras:
+        - Na criação (pk is None):
+          - Se projeto.fluxo == 'NAO_SUPER' E status ainda é 'pendente': status='aprovado' (auto-aprovado)
+          - Se projeto.fluxo == 'SUPER': mantém status original
+          - Se projeto is None: mantém status original
+          - Se status foi explicitamente alterado (!=  'pendente'): respeita o valor
+        - Na atualização (pk exists): não altera status automaticamente (PA-01)
+        """
+        # Auto-aprovação apenas na criação E se status ainda é o padrão
+        if self.pk is None:
+            # Se projeto tem fluxo NAO_SUPER E status é 'pendente', auto-aprovar
+            if self.projeto and self.projeto.fluxo == "NAO_SUPER" and self.status == "pendente":
+                self.status = "aprovado"
+            # Caso contrário, mantém status original (SUPER, sem projeto, ou já definido explicitamente)
+
+        super().save(*args, **kwargs)
 
 
 class Config(models.Model):

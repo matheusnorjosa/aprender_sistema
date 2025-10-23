@@ -2,22 +2,75 @@
  * App Principal - AS v2 Frontend
  *
  * Roteamento para todas as páginas do sistema.
+ * PR15: RBAC e menu dinâmico por perfil
  */
 
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { ConfigProvider, Layout, Menu } from 'antd';
-import { CalendarOutlined, CheckCircleOutlined, TableOutlined, ShoppingOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { ConfigProvider, Layout, Menu, Spin, Result } from 'antd';
+import {
+  CalendarOutlined,
+  CheckCircleOutlined,
+  TableOutlined,
+  ShoppingOutlined,
+  DatabaseOutlined,
+  FileTextOutlined,
+  SafetyOutlined,
+  CloudUploadOutlined,
+} from '@ant-design/icons';
 import ptBR from 'antd/locale/pt_BR';
 import DisponibilidadeBlocks from './pages/Disponibilidade';
 import MonthlyPage from './pages/Disponibilidade/MonthlyPage';
 import Solicitacoes from './pages/Solicitacoes';
 import ControlePage from './pages/Controle/ControlePage';
 import DATPage from './pages/DAT/DATPage';
+import NewSolicitacaoPage from './pages/Solicitacoes/NewSolicitacaoPage';
+import MySolicitacoesPage from './pages/Solicitacoes/MySolicitacoesPage';
+import ApprovalsPage from './pages/Aprovacoes/ApprovalsPage';
+import PreAgendaPage from './pages/PreAgenda/PreAgendaPage';
+import { getMe } from './api/availability';
 import './App.css';
 
 const { Header, Content } = Layout;
+const { SubMenu } = Menu;
+
+// Componente 403 Forbidden
+function Forbidden() {
+  return <Result status="403" title="Sem permissão" subTitle="Você não tem permissão para acessar esta página." />;
+}
 
 function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Carregar dados do usuário
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userData = await getMe();
+        setUser(userData);
+      } catch (error) {
+        console.error('Erro ao carregar usuário:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadUser();
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Spin size="large" tip="Carregando..." />
+      </div>
+    );
+  }
+
+  // Calcular flags de permissão
+  const canCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('DAT');
+  const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
+  const canControle = user?.is_superuser || user?.groups?.includes('Controle');
+
   return (
     <ConfigProvider locale={ptBR}>
       <Router>
@@ -38,14 +91,55 @@ function App() {
               <Menu.Item key="bloqueios" icon={<CalendarOutlined />}>
                 <Link to="/bloqueios">Bloqueios</Link>
               </Menu.Item>
-              <Menu.Item key="solicitacoes" icon={<CheckCircleOutlined />}>
-                <Link to="/solicitacoes">Solicitações</Link>
-              </Menu.Item>
-              <Menu.Item key="controle" icon={<ShoppingOutlined />}>
-                <Link to="/controle">Controle</Link>
-              </Menu.Item>
-              <Menu.Item key="dat" icon={<DatabaseOutlined />}>
-                <Link to="/dat">DAT</Link>
+
+              {/* Submenu Solicitações (Coordenador + DAT) */}
+              {canCoordenador && (
+                <SubMenu key="solicitacoes-submenu" icon={<FileTextOutlined />} title="Solicitações">
+                  <Menu.Item key="minhas-solicitacoes">
+                    <Link to="/solicitacoes/minhas">Minhas Solicitações</Link>
+                  </Menu.Item>
+                  <Menu.Item key="nova-solicitacao">
+                    <Link to="/solicitacoes/nova">Nova Solicitação</Link>
+                  </Menu.Item>
+                </SubMenu>
+              )}
+
+              {/* Aprovações (Superintendência) */}
+              {canSuper && (
+                <Menu.Item key="aprovacoes" icon={<SafetyOutlined />}>
+                  <Link to="/aprovacoes">Aprovações</Link>
+                </Menu.Item>
+              )}
+
+              {/* Pré-agenda (Controle) */}
+              {canControle && (
+                <Menu.Item key="pre-agenda" icon={<CheckCircleOutlined />}>
+                  <Link to="/pre-agenda">Pré-agenda</Link>
+                </Menu.Item>
+              )}
+
+              {/* Publicação GCal (Controle) */}
+              {canControle && (
+                <Menu.Item key="publicacao" icon={<CloudUploadOutlined />}>
+                  <Link to="/publicacao">Publicação GCal</Link>
+                </Menu.Item>
+              )}
+
+              {/* Ops Panels (Controle) */}
+              {canControle && (
+                <SubMenu key="ops-submenu" icon={<ShoppingOutlined />} title="Ops">
+                  <Menu.Item key="controle">
+                    <Link to="/controle">Controle</Link>
+                  </Menu.Item>
+                  <Menu.Item key="dat">
+                    <Link to="/dat">DAT</Link>
+                  </Menu.Item>
+                </SubMenu>
+              )}
+
+              {/* Fallback: Antigas páginas */}
+              <Menu.Item key="solicitacoes-old" icon={<CheckCircleOutlined />}>
+                <Link to="/solicitacoes">Solicitações (Old)</Link>
               </Menu.Item>
             </Menu>
           </Header>
@@ -54,6 +148,30 @@ function App() {
               <Route path="/" element={<Navigate to="/disponibilidade" replace />} />
               <Route path="/disponibilidade" element={<MonthlyPage />} />
               <Route path="/bloqueios" element={<DisponibilidadeBlocks />} />
+
+              {/* PR15: Novas rotas de solicitações */}
+              <Route
+                path="/solicitacoes/minhas"
+                element={canCoordenador ? <MySolicitacoesPage /> : <Forbidden />}
+              />
+              <Route
+                path="/solicitacoes/nova"
+                element={canCoordenador ? <NewSolicitacaoPage /> : <Forbidden />}
+              />
+
+              {/* PR15: Rota de aprovações */}
+              <Route
+                path="/aprovacoes"
+                element={canSuper ? <ApprovalsPage /> : <Forbidden />}
+              />
+
+              {/* PR15: Rota de pré-agenda */}
+              <Route
+                path="/pre-agenda"
+                element={canControle ? <PreAgendaPage /> : <Forbidden />}
+              />
+
+              {/* Antigas rotas (manter compatibilidade) */}
               <Route path="/solicitacoes" element={<Solicitacoes />} />
               <Route path="/controle" element={<ControlePage />} />
               <Route path="/dat" element={<DATPage />} />

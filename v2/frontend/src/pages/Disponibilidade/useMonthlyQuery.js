@@ -4,7 +4,7 @@
  * Encapsula a lógica de fetch, loading e error para reutilização.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getMonthly } from '../../api/availability';
 
 /**
@@ -23,7 +23,7 @@ export default function useMonthlyQuery(params) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -36,11 +36,11 @@ export default function useMonthlyQuery(params) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params]);
 
   useEffect(() => {
     fetchData();
-  }, [params.year, params.month, params.role, params.sector, params.q]);
+  }, [fetchData]);
 
   return {
     data,

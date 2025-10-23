@@ -5,17 +5,14 @@
  * - COMPRAS (Controle)
  * - AÇÕES (Controle)
  * - CADASTROS (DAT)
- *
- * IMPORTANTE: Todas as rotas usam trailing slash (/)
- * Usa proxy do Vite em dev (/api → http://localhost:8002/api)
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+import { API_BASE, getCsrfToken, fetchAPI, buildUrl } from './config';
 
 /**
  * Helper para upload de arquivo (multipart/form-data).
  *
- * @param {string} url - URL do endpoint (com trailing slash)
+ * @param {string} url - URL do endpoint (relativo, ex: '/controle/import-compras/')
  * @param {File} file - Arquivo a enviar
  * @param {boolean} dryRun - Se true, apenas preview (não aplica)
  * @returns {Promise<object>} Relatório de import
@@ -27,10 +24,21 @@ async function postMultipart(url, file, dryRun = true) {
   const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
   const queryParam = dryRun ? '?dry_run=true' : '?dry_run=false';
 
+  // Obter token CSRF
+  const csrfToken = getCsrfToken();
+  const headers = {};
+  if (csrfToken) {
+    headers['X-CSRFToken'] = csrfToken;
+  } else {
+    console.error('CSRF token não encontrado para upload multipart!');
+    throw new Error('CSRF token ausente. Faça login novamente.');
+  }
+
   const response = await fetch(`${fullUrl}${queryParam}`, {
     method: 'POST',
+    headers: headers,
     body: formData,
-    credentials: 'include', // Incluir cookies de sessão
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -49,7 +57,7 @@ async function postMultipart(url, file, dryRun = true) {
  * @returns {Promise<object>} Relatório com stats e pendências
  */
 export async function importCompras(file, dryRun = true) {
-  return await postMultipart('/api/controle/import-compras/', file, dryRun);
+  return await postMultipart('/controle/import-compras/', file, dryRun);
 }
 
 /**
@@ -60,7 +68,7 @@ export async function importCompras(file, dryRun = true) {
  * @returns {Promise<object>} Relatório com stats e pendências
  */
 export async function importAcoes(file, dryRun = true) {
-  return await postMultipart('/api/controle/import-acoes/', file, dryRun);
+  return await postMultipart('/controle/import-acoes/', file, dryRun);
 }
 
 /**
@@ -71,7 +79,7 @@ export async function importAcoes(file, dryRun = true) {
  * @returns {Promise<object>} Relatório com stats e pendências
  */
 export async function importCadastros(file, dryRun = true) {
-  return await postMultipart('/api/dat/import-cadastros/', file, dryRun);
+  return await postMultipart('/dat/import-cadastros/', file, dryRun);
 }
 
 /**
@@ -87,24 +95,8 @@ export async function importCadastros(file, dryRun = true) {
  * @returns {Promise<Array>} Lista de compras
  */
 export async function listCompras(filters = {}) {
-  const params = new URLSearchParams();
-
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value) params.append(key, value);
-  });
-
-  const url = `/api/controle/compras/?${params.toString()}`;
-  const response = await fetch(`${API_BASE}${url}`, {
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-
-  // Lidar com paginação DRF (results) ou array direto
+  const url = buildUrl('/controle/compras/', filters);
+  const data = await fetchAPI(url);
   return data.results || data;
 }
 
@@ -115,24 +107,8 @@ export async function listCompras(filters = {}) {
  * @returns {Promise<Array>} Lista de ações
  */
 export async function listAcoes(filters = {}) {
-  const params = new URLSearchParams();
-
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value) params.append(key, value);
-  });
-
-  const url = `/api/controle/acoes/?${params.toString()}`;
-  const response = await fetch(`${API_BASE}${url}`, {
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-
-  // Lidar com paginação DRF (results) ou array direto
+  const url = buildUrl('/controle/acoes/', filters);
+  const data = await fetchAPI(url);
   return data.results || data;
 }
 
@@ -143,23 +119,7 @@ export async function listAcoes(filters = {}) {
  * @returns {Promise<Array>} Lista de cadastros
  */
 export async function listCadastros(filters = {}) {
-  const params = new URLSearchParams();
-
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value) params.append(key, value);
-  });
-
-  const url = `/api/dat/acoes/?${params.toString()}`;
-  const response = await fetch(`${API_BASE}${url}`, {
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-
-  // Lidar com paginação DRF (results) ou array direto
+  const url = buildUrl('/dat/acoes/', filters);
+  const data = await fetchAPI(url);
   return data.results || data;
 }

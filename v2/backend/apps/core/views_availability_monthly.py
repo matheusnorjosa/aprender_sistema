@@ -21,6 +21,17 @@ from django.core.cache import cache
 from apps.core.services.monthly_grid_service import build_monthly_grid
 
 
+def is_privileged_user(user):
+    """
+    Verifica se o usuário tem permissão para acessar dados de outros usuários.
+    Privilegiados: superuser, Superintendência, Controle
+    """
+    return (
+        user.is_superuser
+        or user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
+    )
+
+
 class MonthlyAvailabilityView(APIView):
     """
     API para consultar grade mensal de disponibilidade.
@@ -72,8 +83,13 @@ class MonthlyAvailabilityView(APIView):
         sector = request.GET.get("sector", None)
         q = request.GET.get("q", None)
 
-        # Cache key
-        cache_key = f"monthly:v2:{year}:{month}:{role}:{sector or '*'}:{(q or '').strip().lower()}"
+        # Determinar IDs permitidos baseado em permissões
+        privileged = is_privileged_user(request.user)
+        allowed_user_ids = None if privileged else [request.user.id]
+
+        # Cache key (incluindo privilégio para diferenciar)
+        cache_suffix = "all" if privileged else f"user{request.user.id}"
+        cache_key = f"monthly:v2:{year}:{month}:{role}:{sector or '*'}:{(q or '').strip().lower()}:{cache_suffix}"
 
         # Tentar buscar do cache
         cached_data = cache.get(cache_key)
@@ -83,7 +99,7 @@ class MonthlyAvailabilityView(APIView):
         # Compor grade
         try:
             data = build_monthly_grid(
-                year=year, month=month, role=role, sector=sector, q=q
+                year=year, month=month, role=role, sector=sector, q=q, allowed_user_ids=allowed_user_ids
             )
         except Exception as e:
             return Response(

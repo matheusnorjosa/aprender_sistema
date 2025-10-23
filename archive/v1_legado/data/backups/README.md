@@ -1,3 +1,0 @@
-# Backups
-
-Backups de dados

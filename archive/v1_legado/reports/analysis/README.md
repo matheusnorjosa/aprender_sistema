@@ -1,3 +1,0 @@
-# Analysis
-
-Relatórios de análise

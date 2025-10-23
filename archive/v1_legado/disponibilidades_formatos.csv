@@ -1,4 +1,0 @@
-formador,data,hora_inicio,hora_fim,tipo,motivo
-Joao Silva,15/12/2025,08:00,12:00,Teste formato BR,Teste formato brasileiro dd/mm/yyyy
-Maria Educadora Silva,2025-12-16,14:00,17:00,Teste formato ISO,Teste formato ISO yyyy-mm-dd
-Joao Silva,17-12-2025,10:00,11:30,Teste formato traço,Teste formato com traço dd-mm-yyyy

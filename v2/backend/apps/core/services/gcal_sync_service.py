@@ -14,9 +14,11 @@ Regras:
 
 import hashlib
 import json
+import logging
+import time
 from dataclasses import dataclass
 from datetime import timezone as dt_timezone
-from typing import Literal, Optional
+from typing import Callable, Literal, Optional, TypeVar
 from uuid import uuid4
 
 from django.conf import settings
@@ -24,7 +26,140 @@ from django.utils import timezone
 
 from apps.core.models import Solicitacao, Participation
 
+logger = logging.getLogger(__name__)
+
+# Type variable para retry genérico
+T = TypeVar('T')
+
 Action = Literal["CREATE", "UPDATE", "DELETE", "ADOPT", "SKIP"]
+
+
+def _retry_with_backoff(
+    func: Callable[[], T],
+    *,
+    operation_name: str = "operation",
+    max_retries: int = 3,
+    initial_delay: float = 1.0,
+) -> T:
+    """
+    Executa função com retry e backoff exponencial (RF05 - PR19).
+
+    Estratégia:
+    - 1 tentativa inicial + até 3 retries (total: 4 tentativas)
+    - Backoff: 1s, 2s, 4s
+    - Retry apenas em: 429 (rate limit), 5xx (server errors)
+    - Não retry em: 4xx (exceto 429)
+    - Respeita Retry-After header se presente
+    - Trata 409/412 como sucesso (idempotência)
+
+    Args:
+        func: Função a executar (sem argumentos, use lambda se necessário)
+        operation_name: Nome da operação (para logs)
+        max_retries: Número máximo de retries (default: 3)
+        initial_delay: Delay inicial em segundos (default: 1.0)
+
+    Returns:
+        Resultado da função
+
+    Raises:
+        Exception: Última exceção após esgotar retries
+    """
+    attempt = 0
+    last_exception = None
+
+    while attempt <= max_retries:
+        try:
+            result = func()
+
+            # Sucesso na tentativa
+            if attempt > 0:
+                logger.info(
+                    f"{operation_name} succeeded after {attempt} retries"
+                )
+            return result
+
+        except Exception as e:
+            last_exception = e
+            error_str = str(e).lower()
+
+            # Extrair código de status HTTP se disponível
+            status_code = None
+            retry_after = None
+
+            # Tentar extrair status code de exceções comuns
+            if hasattr(e, 'resp') and hasattr(e.resp, 'status'):
+                # googleapiclient.errors.HttpError
+                status_code = e.resp.status
+
+                # Extrair Retry-After header
+                if hasattr(e.resp, 'get'):
+                    retry_after = e.resp.get('Retry-After')
+            elif '429' in error_str:
+                status_code = 429
+            elif '500' in error_str or '502' in error_str or '503' in error_str or '504' in error_str:
+                status_code = 500  # Genérico para 5xx
+            elif '409' in error_str:
+                status_code = 409
+            elif '412' in error_str:
+                status_code = 412
+
+            # VERIFICAR IDEMPOTÊNCIA PRIMEIRO (409/412 = sucesso)
+            if status_code in (409, 412):
+                logger.info(
+                    f"{operation_name}: {status_code} treated as success (idempotency)"
+                )
+                return None  # Retorna None mas não falha
+
+            # Decidir se deve retentar
+            should_retry = False
+
+            if status_code == 429:
+                # Rate limit → sempre retry
+                should_retry = True
+                logger.warning(
+                    f"{operation_name}: Rate limit (429), attempt {attempt + 1}/{max_retries + 1}"
+                )
+            elif status_code and status_code >= 500:
+                # Server error → retry
+                should_retry = True
+                logger.warning(
+                    f"{operation_name}: Server error ({status_code}), attempt {attempt + 1}/{max_retries + 1}"
+                )
+            elif status_code and 400 <= status_code < 500:
+                # Client error (exceto 429) → não retry
+                logger.error(
+                    f"{operation_name}: Client error ({status_code}), aborting without retry"
+                )
+                raise
+            else:
+                # Erro desconhecido → retry conservador
+                should_retry = True
+                logger.warning(
+                    f"{operation_name}: Unknown error, attempt {attempt + 1}/{max_retries + 1}: {error_str[:100]}"
+                )
+
+            # Se não deve retentar ou esgotou tentativas, lança exceção
+            if not should_retry or attempt >= max_retries:
+                logger.error(
+                    f"{operation_name}: Failed after {attempt + 1} attempts. Last error: {error_str[:200]}"
+                )
+                raise
+
+            # Calcular delay
+            if retry_after:
+                try:
+                    delay = float(retry_after)
+                except (ValueError, TypeError):
+                    delay = initial_delay * (2 ** attempt)
+            else:
+                delay = initial_delay * (2 ** attempt)
+
+            logger.info(f"{operation_name}: Retrying in {delay:.1f}s...")
+            time.sleep(delay)
+            attempt += 1
+
+    # Nunca deve chegar aqui, mas por segurança
+    raise last_exception or Exception(f"{operation_name}: Unexpected retry loop exit")
 
 
 def _payload_hash(payload: dict) -> str:
@@ -539,7 +674,11 @@ def upsert_one(
                 eid = s.external_event_id
                 if not dry_run:
                     try:
-                        client.delete(calendar_id, eid)
+                        # RF05: Retry com backoff exponencial (PR19)
+                        _retry_with_backoff(
+                            lambda: client.delete(calendar_id, eid),
+                            operation_name=f"GCal DELETE #{s.id}",
+                        )
                     except Exception as e:
                         # Ignora se evento já foi deletado, mas registra outros erros
                         if "404" not in str(e):
@@ -598,11 +737,15 @@ def upsert_one(
 
             if not dry_run:
                 try:
-                    created = client.insert(calendar_id, deterministic_eid, payload)
-                    s.external_event_id = created.get("id") or deterministic_eid
+                    # RF05: Retry com backoff exponencial (PR19)
+                    created = _retry_with_backoff(
+                        lambda: client.insert(calendar_id, deterministic_eid, payload),
+                        operation_name=f"GCal INSERT #{s.id}",
+                    )
+                    s.external_event_id = created.get("id") or deterministic_eid if created else deterministic_eid
 
                     # RF06: Extrair hangoutLink se disponível
-                    hangout_link = created.get("hangoutLink")
+                    hangout_link = created.get("hangoutLink") if created else None
                     if hangout_link:
                         s.meet_link = hangout_link
 
@@ -647,7 +790,11 @@ def upsert_one(
 
             if not dry_run:
                 try:
-                    updated = client.update(calendar_id, deterministic_eid, payload)
+                    # RF05: Retry com backoff exponencial (PR19)
+                    updated = _retry_with_backoff(
+                        lambda: client.update(calendar_id, deterministic_eid, payload),
+                        operation_name=f"GCal UPDATE #{s.id}",
+                    )
                     if not s.external_event_id:
                         s.external_event_id = deterministic_eid
 

@@ -149,3 +149,52 @@ export async function checkAvailability({ usuario_id, inicio, fim, municipio_id 
   const url = `/availability/check/?${params.toString()}`;
   return await fetchAPI(url);
 }
+
+/**
+ * Busca grade mensal de disponibilidade.
+ *
+ * @param {object} params - Parâmetros da consulta
+ * @param {number} params.year - Ano (YYYY)
+ * @param {number} params.month - Mês (1..12)
+ * @param {string} params.role - Role ("FORMADOR" | "COORDENADOR")
+ * @param {string} params.sector - Filtro por setor (opcional)
+ * @param {string} params.q - Filtro por nome/email (opcional)
+ * @returns {Promise<object>} Grade mensal { days, legend, people, cells, details_index }
+ */
+export async function getMonthlyAvailability({ year, month, role, sector, q }) {
+  const params = new URLSearchParams();
+  params.append('year', year);
+  params.append('month', month);
+  params.append('role', role);
+  if (sector) params.append('sector', sector);
+  if (q) params.append('q', q);
+
+  const url = `/availability/monthly/?${params.toString()}`;
+  return await fetchAPI(url);
+}
+
+/**
+ * Busca grade mensal de disponibilidade (versão genérica).
+ *
+ * @param {Record<string, string | number>} params - Parâmetros da consulta
+ * @returns {Promise<object>} Grade mensal { days, legend, people, cells, details_index }
+ */
+export async function getMonthly(params) {
+  const qs = new URLSearchParams(
+    Object.entries(params).map(([k, v]) => [k, String(v)])
+  );
+
+  const url = `/availability/monthly/?${qs.toString()}`;
+  const response = await fetch(url, { credentials: 'include' });
+
+  if (!response.ok) {
+    const text = await response.text();
+    // Se resposta parece HTML (erro de proxy/roteamento), simplificar mensagem
+    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+    throw new Error(text);
+  }
+
+  return response.json();
+}

@@ -49,7 +49,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["status"]
+    filterset_fields = []  # PR15: status handled manually in get_queryset with alias mapping
     search_fields = [
         "usuario__username",
         "usuario__first_name",
@@ -70,8 +70,18 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
+        # PR15: Filtro mine força filtro por usuário (mesmo para superusers)
+        mine = self.request.query_params.get("mine")
+
         # Base queryset (permissões)
-        if (
+        if mine == "true":
+            # Forçar filtro por usuário atual
+            qs = (
+                Solicitacao.objects.filter(usuario=self.request.user)
+                .select_related("usuario", "municipio", "tipo_evento", "projeto")
+                .prefetch_related("participations__usuario")
+            )
+        elif (
             self.request.user.is_superuser
             or self.request.user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
         ):
@@ -85,11 +95,29 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 .prefetch_related("participations__usuario")
             )
 
-        # Filtros adicionais via query params
+        # PR15: Filtros adicionais via query params
         sector = self.request.query_params.get("sector")
         date_from = self.request.query_params.get("date_from")
         date_to = self.request.query_params.get("date_to")
         q = self.request.query_params.get("q")
+        flow = self.request.query_params.get("flow")  # PR15: SUPER ou NAO_SUPER
+        status_filter = self.request.query_params.get("status")  # PR15: alias em inglês
+
+        # PR15: Mapear status alias (inglês → português)
+        STATUS_MAP = {
+            "pending": "pendente",
+            "approved": "aprovado",
+            "rejected": "reprovado"
+        }
+
+        if status_filter:
+            # Aceitar tanto alias em inglês quanto português
+            mapped_status = STATUS_MAP.get(status_filter, status_filter)
+            qs = qs.filter(status=mapped_status)
+
+        # PR15: Filtro por fluxo do projeto
+        if flow:
+            qs = qs.filter(projeto__fluxo=flow)
 
         if sector:
             qs = qs.filter(projeto__nome__icontains=sector)
@@ -125,7 +153,111 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(usuario=self.request.user)
+        """
+        Cria solicitação e define status baseado no fluxo do projeto:
+        - SUPER: status='pendente' (requer aprovação manual)
+        - NAO_SUPER: status='aprovado' (auto-aprovado)
+
+        PR15: Suporta extra_participants para criar Participation automaticamente.
+        """
+        from .models import Participation
+
+        # PR15: Salvar instance - o model.save() gerencia auto-aprovação baseado em projeto.fluxo
+        instance = serializer.save(usuario=self.request.user)
+
+        # PR15: Processar extra_participants
+        extra_participants = self.request.data.get('extra_participants', {})
+        if extra_participants:
+            self._create_participants(instance, extra_participants)
+
+    def _create_participants(self, solicitacao, extra):
+        """
+        PR15: Cria Participation entries baseado em extra_participants.
+
+        IMPORTANTE: Mantemos o role original (FORMADOR, COORD_ACOMPANHA) mesmo para
+        guest emails, pois build_attendees_for_solicitacao só considera esses roles
+        ao montar a lista de participantes do Google Calendar.
+
+        Formato esperado:
+        {
+            "coordenador_id": int,  # sempre o request.user, mas pode ser explícito
+            "formador_ids": [int, ...],
+            "formador_emails": [str, ...],
+            "coord_acompanha_ids": [int, ...],
+            "coord_acompanha_emails": [str, ...]
+        }
+        """
+        from .models import Participation, Usuario
+
+        # Sempre criar participação do coordenador (request.user)
+        Participation.objects.get_or_create(
+            solicitacao=solicitacao,
+            usuario=self.request.user,
+            defaults={'role': 'COORDENADOR'}
+        )
+
+        # Formadores por ID
+        for formador_id in extra.get('formador_ids', []):
+            if formador_id:
+                try:
+                    usuario = Usuario.objects.get(id=formador_id)
+                    Participation.objects.get_or_create(
+                        solicitacao=solicitacao,
+                        usuario=usuario,
+                        defaults={'role': 'FORMADOR'}
+                    )
+                except Usuario.DoesNotExist:
+                    pass
+
+        # Formadores por email (guest)
+        for email in extra.get('formador_emails', []):
+            if email and email.strip():
+                # Tentar resolver email → Usuario
+                try:
+                    usuario = Usuario.objects.get(email__iexact=email.strip())
+                    Participation.objects.get_or_create(
+                        solicitacao=solicitacao,
+                        usuario=usuario,
+                        defaults={'role': 'FORMADOR'}
+                    )
+                except Usuario.DoesNotExist:
+                    # Criar como guest_email mantendo role=FORMADOR para GCal
+                    Participation.objects.get_or_create(
+                        solicitacao=solicitacao,
+                        guest_email=email.strip().lower(),
+                        defaults={'role': 'FORMADOR'}
+                    )
+
+        # Coordenadores acompanhantes por ID
+        for coord_id in extra.get('coord_acompanha_ids', []):
+            if coord_id:
+                try:
+                    usuario = Usuario.objects.get(id=coord_id)
+                    Participation.objects.get_or_create(
+                        solicitacao=solicitacao,
+                        usuario=usuario,
+                        defaults={'role': 'COORD_ACOMPANHA'}
+                    )
+                except Usuario.DoesNotExist:
+                    pass
+
+        # Coordenadores acompanhantes por email (guest)
+        for email in extra.get('coord_acompanha_emails', []):
+            if email and email.strip():
+                try:
+                    usuario = Usuario.objects.get(email__iexact=email.strip())
+                    Participation.objects.get_or_create(
+                        solicitacao=solicitacao,
+                        usuario=usuario,
+                        defaults={'role': 'COORD_ACOMPANHA'}
+                    )
+                except Usuario.DoesNotExist:
+                    # Criar como guest_email mantendo role=COORD_ACOMPANHA para GCal
+                    Participation.objects.get_or_create(
+                        solicitacao=solicitacao,
+                        guest_email=email.strip().lower(),
+                        defaults={'role': 'COORD_ACOMPANHA'}
+                    )
 
     @action(
         detail=True,
@@ -142,6 +274,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 {"detail": "Solicitação já está aprovada."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # PR15: Accept 'reason' as alias for 'justificativa'
+        justificativa = request.data.get("reason") or request.data.get("justificativa", "")
 
         # Capturar status anterior
         prev_status = solicitacao.status
@@ -174,7 +309,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "action": "approve",
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-                "justificativa": request.data.get("justificativa", ""),
+                "justificativa": justificativa,
                 "timestamp": timezone.now().isoformat(),
             },
         )
@@ -196,7 +331,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     def reject(self, request, pk=None):
         """Reprovar solicitação (PA-02: apenas Superintendência)."""
         solicitacao = self.get_object()
-        justificativa = request.data.get("justificativa", "")
+
+        # PR15: Accept 'reason' as alias for 'justificativa'
+        justificativa = request.data.get("reason") or request.data.get("justificativa", "")
 
         if solicitacao.status == "reprovado":
             return Response(
@@ -265,7 +402,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # Gerar preview
         preview = build_preview_for_solicitacao(solicitacao)
 
-        # AuditLog
+        # AuditLog (PR14: incluir payload_hash)
         client_ip = _get_client_ip(request)
         AuditLog.objects.create(
             usuario=request.user,
@@ -275,6 +412,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "solicitacao_id": solicitacao.id,
                 "event_id": preview["event_id"],
                 "summary": preview["payload"].get("summary", ""),
+                "payload_hash": preview.get("payload_hash", ""),
                 "ip_address": client_ip,
             },
         )
@@ -337,6 +475,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                     "features_apply_blocked": True,
                 },
                 status=status.HTTP_409_CONFLICT,
+            )
+
+        # PR14: Marcar como PENDING antes de enfileirar (se não for dry-run)
+        if not dry_run:
+            solicitacao.mark_gcal(
+                status=Solicitacao.GCalStatus.PENDING,
+                payload_hash=None,
+                error=""
             )
 
         # Disparar task Celery (assíncrona)

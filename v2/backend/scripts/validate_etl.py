@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
-from django.db.models import Count, Q
+from django.db.models import Count, Q, F
 from apps.core.models import (
     Usuario, Municipio, Projeto, TipoEvento,
     Solicitacao, Participation, AvailabilityBlock, Deslocamento
@@ -146,7 +146,7 @@ def validate_business_rules():
     all_ok = True
 
     # 1. Datas inválidas (fim < início)
-    invalid_dates = Solicitacao.objects.filter(fim__lt=Q(inicio=Q(inicio))).count()
+    invalid_dates = Solicitacao.objects.filter(fim__lt=F('inicio')).count()
     if invalid_dates > 0:
         print(f"❌ {invalid_dates} Solicitações com data fim < início")
         all_ok = False

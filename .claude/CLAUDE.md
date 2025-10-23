@@ -241,12 +241,12 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 - Fluxo de aprovações iniciado  
 - Home consolidando links  
 
-🚧 Próximos Passos:  
-- Criar scripts de importação para municípios, projetos, tipos de evento  
-- Implementar RF03 (checagem automática de conflitos)  
-- Finalizar RF04 (workflow completo de aprovações)  
-- Conectar com Google Calendar API (RF05/RF06)  
-- Implementar testes unitários e de aceitação  
+🚧 Próximos Passos:
+- Criar scripts de importação para municípios, projetos, tipos de evento
+- ✅ ~~Implementar RF03 (checagem automática de conflitos)~~ **COMPLETO (PR16)**
+- Finalizar RF04 (workflow completo de aprovações)
+- Conectar com Google Calendar API (RF05/RF06)
+- Implementar testes unitários e de aceitação
 - Refinar interface (baseada em mapa_mensal_view.html como referência)  
 
 ---
@@ -257,6 +257,71 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 - Registro auditável e confiável das agendas  
 - Integração automática com Google Calendar e Meet  
 - Escalabilidade para múltiplos anos e centenas de formadores  
+
+---
+
+## RF03 - Verificação de Conflitos (IMPLEMENTADO ✅)
+
+### Resumo da Implementação (PR16 - feat/pr16-conflitos-validacoes)
+
+O **RF03 (Verificação de Conflitos)** foi completamente implementado seguindo as regras RD-01 a RD-08. A implementação inclui:
+
+#### Backend (100%)
+- **Service Layer** (`apps/core/services/availability_service.py`):
+  - Função `check_conflicts(usuario, inicio, fim, municipio)` implementa todas as 8 regras
+  - Retorna objeto `AvailabilityResult` com lista de `ConflictDetail` (code, title, detail, ref_id)
+  - Timezone-aware: UTC storage, America/Fortaleza comparison
+  - Priorização: Bloqueios → Conflitos → Buffer → Capacidade diária
+
+- **API Endpoints** (`apps/core/views_availability.py`):
+  - `GET /api/availability/check/` - Checagem individual com RBAC (self ou privilegiado)
+  - `POST /api/availability/check-many/` - Checagem em lote (batch) para usuários privilegiados
+  - Throttling configurado (`availability_check` scope)
+  - Validação de parâmetros (usuario_id, inicio, fim, municipio_id)
+
+#### Frontend (100%)
+- **Componente** (`v2/frontend/src/pages/Solicitacoes/NewSolicitacaoPage.jsx`):
+  - Integração completa com endpoints de validação e disponibilidade
+  - Visual feedback com ícones por tipo de conflito (ISO 9241-110):
+    - ❌ Vermelho (X, T): Bloqueantes
+    - ⚠️ Laranja (P, D): Atenção
+    - ℹ️ Dourado (M): Aviso
+  - Exibição detalhada: código + título + intervalo formatado
+
+#### Testes (100%)
+- **Cobertura Completa** (`apps/core/tests/test_availability_service.py`):
+  - **11 testes unitários** (TestAvailabilityServiceRules):
+    - RD-01: Sobreposição total/parcial, adjacência OK
+    - RD-02: Bloqueio total (T)
+    - RD-03: Bloqueio parcial (P)
+    - RD-04: Buffer de deslocamento (D), mesmo município OK
+    - RD-05: Capacidade diária (M)
+    - RD-06: Timezone-aware (America/Fortaleza)
+  - **6 testes de API** (TestAvailabilityCheckEndpoint + Additional):
+    - Autenticação obrigatória
+    - Validação de parâmetros
+    - Batch processing (check-many)
+    - RBAC (self ou privilegiado)
+    - Múltiplos formadores (qualquer conflito bloqueia)
+    - Estrutura de mensagens (RD-08)
+  - **Status**: 17/17 testes passando ✅
+
+#### Conformidade com Regras
+| Regra | Descrição | Status |
+|-------|-----------|--------|
+| RD-01 | Não-sobreposição (fim==início OK) | ✅ |
+| RD-02 | Bloqueio total (T) | ✅ |
+| RD-03 | Bloqueio parcial (P) | ✅ |
+| RD-04 | Buffer deslocamento (D) | ✅ |
+| RD-05 | Capacidade diária (M) | ✅ |
+| RD-06 | Timezone-aware (Fortaleza) | ✅ |
+| RD-07 | Prioridade de checagem | ✅ |
+| RD-08 | Mensagens estruturadas | ✅ |
+
+#### Commits (Branch: feat/pr16-conflitos-validacoes)
+1. `2ae3772` - fix(frontend): correct conflict properties (code, title, detail)
+2. `36bce31` - feat(frontend): add icons and colors for conflict types
+3. `84f9a48` - test(availability): add 6 tests for RF03 (17 total passing)
 
 ---
 

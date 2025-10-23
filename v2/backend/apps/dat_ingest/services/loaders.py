@@ -79,17 +79,24 @@ def parse_usuarios(filepath: Path) -> list[dict[str, Any]]:
         if not row or len(row) < 4:
             continue
 
-        nome = normalize_str(row[0]) if len(row) > 0 else ""
-        cpf = normalize_cpf(row[1]) if len(row) > 1 else ""
-        telefone = normalize_telefone(row[2]) if len(row) > 2 else ""
-        email = normalize_email(row[3]) if len(row) > 3 else ""
-        perfil = normalize_str(row[4]) if len(row) > 4 else "Formador"
-        superintendencia = normalize_str(row[5]) if len(row) > 5 else ""
-        ativo = parse_bool(row[6], default=True) if len(row) > 6 else True
+        # Estrutura real: A=Nome curto, B=Nome Completo, C=CPF, D=Tel, E=Email, F=Cargo, G=Gerência
+        nome_curto = normalize_str(row[0]) if len(row) > 0 else ""  # Ignorar
+        nome = normalize_str(row[1]) if len(row) > 1 else ""  # Nome Completo
+        cpf = normalize_cpf(row[2]) if len(row) > 2 else ""  # CPF (CORRIGIDO!)
+        telefone = normalize_telefone(row[3]) if len(row) > 3 else ""
+        email = normalize_email(row[4]) if len(row) > 4 else ""
+        cargo = normalize_str(row[5]) if len(row) > 5 else "Formador"
+        gerencia = normalize_str(row[6]) if len(row) > 6 else ""
+        ativo = parse_bool(row[7], default=True) if len(row) > 7 else True
 
-        # Detecta se é superintendência pelo campo ou pelo perfil
-        if "superintend" in perfil.lower() or "superintend" in superintendencia.lower():
+        # Mapear cargo para perfil
+        perfil = cargo if cargo else "Formador"
+        if "superintend" in perfil.lower() or "superintend" in gerencia.lower():
             perfil = "Superintendência"
+        elif "coordenador" in perfil.lower():
+            perfil = "Coordenador"
+        elif "formador" in perfil.lower():
+            perfil = "Formador"
 
         # Validação mínima: precisa ter nome e email
         if not nome or not email:
@@ -113,10 +120,12 @@ def parse_usuarios(filepath: Path) -> list[dict[str, Any]]:
 
 def parse_municipios(filepath: Path) -> list[dict[str, Any]]:
     """
-    Parse planilha de municípios
+    Parse municípios da aba FILTRO_PROD. da Planilha de Controle
 
-    Estrutura esperada:
-    | Nome | UF | Ativo |
+    Estrutura real:
+    Aba: ℹ️ FILTRO_PROD.
+    Col A: Índice
+    Col B: Município - UF ("SOBRAL - CE", "FORTALEZA - CE", "AMIGOS DO BEM")
 
     Args:
         filepath: Caminho do arquivo Excel
@@ -126,36 +135,54 @@ def parse_municipios(filepath: Path) -> list[dict[str, Any]]:
     """
     wb = load_workbook(filepath, data_only=True)
 
-    # Tenta várias abas possíveis
-    sheet_names = ["Municípios", "Municipios", "Cidades", "Sheet1"]
-    ws = None
-    for name in sheet_names:
-        if name in wb.sheetnames:
-            ws = wb[name]
+    # Procurar aba com nome fuzzy (pode ter emojis)
+    aba_filtro = None
+    for nome in wb.sheetnames:
+        # Procurar por "FILTRO" e "PROD" no nome
+        if 'FILTRO' in nome.upper() and 'PROD' in nome.upper():
+            aba_filtro = nome
             break
 
-    if ws is None:
+    if not aba_filtro:
         return []
 
+    ws = wb[aba_filtro]
     municipios = []
+    municipios_vistos = set()  # Evitar duplicatas
+
     for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not row or len(row) < 2:
             continue
 
-        nome = normalize_str(row[0]) if len(row) > 0 else ""
-        uf = normalize_uf(row[1]) if len(row) > 1 else ""
-        ativo = parse_bool(row[2], default=True) if len(row) > 2 else True
+        municipio_uf = normalize_str(row[1]) if len(row) > 1 else ""  # Col B
+
+        if not municipio_uf or municipio_uf in municipios_vistos:
+            continue
+
+        # Separar "SOBRAL - CE" → nome="SOBRAL", uf="CE"
+        if " - " in municipio_uf:
+            partes = municipio_uf.split(" - ", 1)
+            nome = partes[0].strip()
+            uf = partes[1].strip() if len(partes) > 1 else ""
+        else:
+            nome = municipio_uf.strip()
+            uf = ""  # Ou "CE" como padrão se quiser
+
+        # Normalizar UF
+        uf_normalizado = normalize_uf(uf) if uf else ""
 
         # Validação mínima
-        if not nome or not uf:
+        if not nome:
             continue
+
+        municipios_vistos.add(municipio_uf)
 
         municipios.append(
             {
                 "nome": titlecase(nome),
-                "uf": uf.upper(),
-                "ativo": ativo,
-                "src": f"{filepath.name}/Municipios",
+                "uf": uf_normalizado.upper() if uf_normalizado else "",
+                "ativo": True,
+                "src": f"{filepath.name}/FILTRO_PROD",
                 "rownum": i,
             }
         )
@@ -165,10 +192,11 @@ def parse_municipios(filepath: Path) -> list[dict[str, Any]]:
 
 def parse_projetos(filepath: Path) -> list[dict[str, Any]]:
     """
-    Parse planilha de projetos
+    Parse projetos da aba FILTRO_PROD. da Planilha de Controle
 
-    Estrutura esperada:
-    | Nome | Descrição | Ativo |
+    Estrutura real:
+    Aba: ℹ️ FILTRO_PROD.
+    Col E: Projeto ("ACERTA MATEMÁTICA", "LENDO E ESCREVENDO", ...)
 
     Args:
         filepath: Caminho do arquivo Excel
@@ -178,36 +206,41 @@ def parse_projetos(filepath: Path) -> list[dict[str, Any]]:
     """
     wb = load_workbook(filepath, data_only=True)
 
-    # Tenta várias abas possíveis
-    sheet_names = ["Projetos", "Projects", "Sheet1"]
-    ws = None
-    for name in sheet_names:
-        if name in wb.sheetnames:
-            ws = wb[name]
+    # Procurar aba FILTRO_PROD.
+    aba_filtro = None
+    for nome in wb.sheetnames:
+        if 'FILTRO' in nome.upper() and 'PROD' in nome.upper():
+            aba_filtro = nome
             break
 
-    if ws is None:
+    if not aba_filtro:
         return []
 
+    ws = wb[aba_filtro]
     projetos = []
+    projetos_vistos = set()  # Evitar duplicatas
+
     for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-        if not row or len(row) < 1:
+        if not row or len(row) < 5:
             continue
 
-        nome = normalize_str(row[0]) if len(row) > 0 else ""
-        descricao = normalize_str(row[1]) if len(row) > 1 else ""
-        ativo = parse_bool(row[2], default=True) if len(row) > 2 else True
+        nome_projeto = normalize_str(row[4]) if len(row) > 4 else ""  # Col E (índice 4)
 
-        # Validação mínima
-        if not nome:
+        if not nome_projeto or nome_projeto in projetos_vistos:
             continue
+
+        # Normalizar nomes especiais
+        if "IDEB" in nome_projeto.upper() or "IDEB10" in nome_projeto.upper():
+            nome_projeto = "Gestão Escolar"
+
+        projetos_vistos.add(nome_projeto)
 
         projetos.append(
             {
-                "nome": nome,
-                "descricao": descricao,
-                "ativo": ativo,
-                "src": f"{filepath.name}/Projetos",
+                "nome": nome_projeto,
+                "descricao": "",
+                "ativo": True,
+                "src": f"{filepath.name}/FILTRO_PROD",
                 "rownum": i,
             }
         )

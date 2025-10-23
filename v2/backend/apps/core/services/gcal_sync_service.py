@@ -12,6 +12,8 @@ Regras:
 - PA-01: Não auto-aprova nada
 """
 
+import hashlib
+import json
 from dataclasses import dataclass
 from datetime import timezone as dt_timezone
 from typing import Literal, Optional
@@ -22,6 +24,20 @@ from django.utils import timezone
 from apps.core.models import Solicitacao, Participation
 
 Action = Literal["CREATE", "UPDATE", "DELETE", "ADOPT", "SKIP"]
+
+
+def _payload_hash(payload: dict) -> str:
+    """
+    Calcula SHA1 hash determinístico do payload (PR14).
+
+    Args:
+        payload: Dicionário com dados do evento
+
+    Returns:
+        str: Hash SHA1 hex (40 chars)
+    """
+    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(serialized.encode("utf-8")).hexdigest()
 
 
 @dataclass
@@ -201,7 +217,7 @@ def build_attendees_for_solicitacao(s: Solicitacao) -> list[dict]:
 
 def build_preview_for_solicitacao(s: Solicitacao) -> dict:
     """
-    Constrói preview do payload GCal sem publicar.
+    Constrói preview do payload GCal sem publicar (PR14).
 
     Args:
         s: Solicitacao
@@ -209,12 +225,15 @@ def build_preview_for_solicitacao(s: Solicitacao) -> dict:
     Returns:
         dict: {
             "event_id": str,
-            "payload": dict (Google Calendar API format)
+            "payload": dict (Google Calendar API format),
+            "payload_hash": str (SHA1 hex)
         }
     """
+    payload = _build_payload(s)
     return {
         "event_id": _event_id_for(s),
-        "payload": _build_payload(s),
+        "payload": payload,
+        "payload_hash": _payload_hash(payload),
     }
 
 
@@ -222,13 +241,15 @@ def apply_one_solicitacao(
     s: Solicitacao, *, dry_run: bool = False, apply_blocked: bool = False
 ) -> SyncOutcome:
     """
-    Aplica uma Solicitacao ao Google Calendar (wrapper sobre upsert_one).
+    Aplica uma Solicitacao ao Google Calendar (wrapper sobre upsert_one) - PR14.
 
     Lógica apply_blocked:
     - Se settings.GCAL_CLIENT está configurado, sempre aplica
     - Se settings.GCAL_CLIENT NÃO está configurado:
       - Se apply_blocked=True, aplica mesmo assim (para testes)
-      - Se apply_blocked=False, retorna SKIP
+      - Se apply_blocked=False, marca ERROR e retorna SKIP
+
+    PR14: Atualiza gcal_status/payload_hash conforme resultado.
 
     Args:
         s: Solicitacao a aplicar
@@ -239,13 +260,18 @@ def apply_one_solicitacao(
         SyncOutcome com ação executada
 
     Raises:
-        ValueError: Se GCAL_CLIENT não configurado e apply_blocked=False
+        Exception: Propaga exceções de upsert_one (após marcar ERROR)
     """
     # Verificar se GCAL_CLIENT está configurado
     gcal_client_enabled = getattr(settings, "GCAL_CLIENT", None) is not None
 
     if not gcal_client_enabled and not apply_blocked:
-        # Retornar SKIP sem tentar aplicar
+        # Marcar erro e retornar SKIP (PR14)
+        if not dry_run:
+            s.mark_gcal(
+                status=Solicitacao.GCalStatus.ERROR,
+                error="GCAL_CLIENT não configurado",
+            )
         return SyncOutcome(
             action="SKIP",
             solicitation_id=s.id,
@@ -253,19 +279,55 @@ def apply_one_solicitacao(
             summary=f"Solicitação #{s.id} (GCAL_CLIENT não configurado)",
         )
 
+    # Construir payload antecipadamente para calcular hash (PR14)
+    payload = None
+    payload_hash = None
+    if s.status == "aprovado":
+        payload = build_event_payload(s)
+        payload_hash = _payload_hash(payload)
+
     # Obter cliente via factory (fake ou google baseado em settings)
     from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
 
     client, calendar_id = get_gcal_client_and_calendar_id()
 
-    # Chamar upsert_one
-    return upsert_one(
-        client=client,
-        calendar_id=calendar_id,
-        s=s,
-        dry_run=dry_run,
-        no_delete=False,
-    )
+    try:
+        # Chamar upsert_one com payload pré-calculado (PR14)
+        outcome = upsert_one(
+            client=client,
+            calendar_id=calendar_id,
+            s=s,
+            dry_run=dry_run,
+            no_delete=False,
+            payload=payload,
+        )
+
+        # Marcar status baseado na ação (PR14)
+        if not dry_run:
+            if outcome.action in {"CREATE", "UPDATE", "ADOPT"}:
+                s.mark_gcal(
+                    status=Solicitacao.GCalStatus.PUBLISHED,
+                    payload_hash=payload_hash,
+                    error="",
+                )
+            elif outcome.action == "DELETE":
+                s.mark_gcal(
+                    status=Solicitacao.GCalStatus.NONE,
+                    payload_hash=None,
+                    error="",
+                )
+            # SKIP: não altera status
+
+        return outcome
+
+    except Exception as e:
+        # Marcar erro antes de relançar (PR14)
+        if not dry_run:
+            s.mark_gcal(
+                status=Solicitacao.GCalStatus.ERROR,
+                error=str(e),
+            )
+        raise
 
 
 def _build_payload(s: Solicitacao) -> dict:
@@ -372,6 +434,33 @@ def _build_payload(s: Solicitacao) -> dict:
     return payload
 
 
+def build_event_payload(s: Solicitacao) -> dict:
+    """
+    Wrapper público para _build_payload (PR14).
+
+    Args:
+        s: Solicitacao
+
+    Returns:
+        dict: Payload para Google Calendar API
+    """
+    return _build_payload(s)
+
+
+def compute_payload_hash(s: Solicitacao) -> str:
+    """
+    Calcula hash do payload de uma solicitação (PR14).
+
+    Args:
+        s: Solicitacao
+
+    Returns:
+        str: SHA1 hash hex (40 chars)
+    """
+    payload = build_event_payload(s)
+    return _payload_hash(payload)
+
+
 def upsert_one(
     *,
     client: CalendarClientAdapter,
@@ -379,9 +468,10 @@ def upsert_one(
     s: Solicitacao,
     dry_run: bool = False,
     no_delete: bool = False,
+    payload: Optional[dict] = None,
 ) -> SyncOutcome:
     """
-    Sincroniza uma Solicitacao com o Google Calendar (idempotente).
+    Sincroniza uma Solicitacao com o Google Calendar (idempotente) - PR14.
 
     Lógica:
     1. Se status != "aprovado" e tem external_event_id → DELETE (ou SKIP se no_delete)
@@ -397,6 +487,7 @@ def upsert_one(
         s: Solicitacao a sincronizar
         dry_run: Se True, não altera DB nem Calendar
         no_delete: Se True, não deleta eventos de solicitações não-aprovadas
+        payload: Payload pré-calculado (opcional, default recalcula via _build_payload)
 
     Returns:
         SyncOutcome com ação executada
@@ -460,7 +551,10 @@ def upsert_one(
 
         # Caso 2: Aprovado → CREATE/UPDATE/ADOPT
         deterministic_eid = _event_id_for(s)
-        payload = _build_payload(s)
+
+        # Usar payload fornecido ou recalcular (PR14)
+        if payload is None:
+            payload = _build_payload(s)
 
         # Verificar se evento já existe no Calendar
         existing = None

@@ -8,7 +8,7 @@
  * - Campos corretos: Data, Município, UF, Projeto, Código, Quant., Uso
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { importCompras, importAcoes, listCompras } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
 
@@ -29,7 +29,7 @@ export default function ControlePage() {
   /**
    * Carrega lista de compras.
    */
-  const fetchCompras = async () => {
+  const fetchCompras = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -41,7 +41,7 @@ export default function ControlePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   /**
    * Handler de mudança de filtros.
@@ -63,7 +63,7 @@ export default function ControlePage() {
    */
   useEffect(() => {
     fetchCompras();
-  }, [filters]);
+  }, [fetchCompras]);
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">

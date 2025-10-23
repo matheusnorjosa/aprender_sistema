@@ -2,104 +2,69 @@
  * API Client - Solicitações
  *
  * Consome endpoints do backend AS v2 para gerenciar solicitações de eventos.
- *
- * Autenticação: sessão/cookie do Django (credentials: 'include')
- * CSRF: header X-CSRFToken (lido do cookie csrftoken)
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8002/api';
+import { fetchAPI, buildUrl } from './config';
 
-/**
- * Extrai token CSRF do cookie.
- *
- * @returns {string|null} CSRF token ou null se não encontrado
- */
-function getCSRFToken() {
-  const name = 'csrftoken';
-  let cookieValue = null;
-
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-
-  return cookieValue;
-}
-
-/**
- * Wrapper genérico para fetch com autenticação e CSRF.
- *
- * @param {string} url - URL relativa ou absoluta
- * @param {object} options - Opções do fetch
- * @returns {Promise<object>} Response JSON
- */
-async function fetchAPI(url, options = {}) {
-  const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
-
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
-
-  // Adicionar CSRF para métodos mutantes
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method?.toUpperCase())) {
-    const csrfToken = getCSRFToken();
-    if (csrfToken) {
-      headers['X-CSRFToken'] = csrfToken;
-    }
-  }
-
-  const response = await fetch(fullUrl, {
-    ...options,
-    headers,
-    credentials: 'include', // Incluir cookies de sessão
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(error.detail || `HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  return response.json();
-}
+// Mapeamento de aliases de status (inglês → português)
+// Mantido para compatibilidade com código legado
+const STATUS_MAP = {
+  pending: 'pendente',
+  approved: 'aprovado',
+  rejected: 'reprovado',
+};
 
 /**
  * Lista solicitações de eventos com filtros.
  *
- * @param {object} params - Parâmetros de filtro
- * @param {string} params.status - Filtro por status ('pendente', 'aprovado', 'reprovado')
- * @param {number} params.page - Número da página (default: 1)
- * @param {string} params.search - Busca por usuário/município/tipo
+ * @param {object} filters - Parâmetros de filtro
+ * @param {string} filters.status - Filtro por status (aceita EN ou PT)
+ * @param {string} filters.mine - Forçar filtro por usuário ('true' para minhas solicitações)
+ * @param {string} filters.flow - Filtro por fluxo ('SUPER' ou 'NAO_SUPER')
+ * @param {string} filters.q - Busca textual multi-campo
+ * @param {string} filters.sector - Filtro por setor/projeto (nome parcial)
+ * @param {string} filters.date_from - Data inicial (YYYY-MM-DD)
+ * @param {string} filters.date_to - Data final (YYYY-MM-DD)
+ * @param {number} filters.page - Número da página (default: 1)
+ * @param {string} filters.search - Busca por usuário/município/tipo (alias de q)
  * @returns {Promise<object>} Resultado paginado { results: [...], count: N }
  */
-export async function listSolicitacoes({ status = 'pendente', page = 1, search = '' } = {}) {
-  const params = new URLSearchParams();
-  if (status) params.append('status', status);
-  if (page) params.append('page', page);
-  if (search) params.append('search', search);
+export async function listSolicitacoes(filters = {}) {
+  // Mapear status aliases (inglês→português) se necessário
+  const normalizedFilters = { ...filters };
 
-  const url = `/solicitacoes/?${params.toString()}`;
-  const data = await fetchAPI(url);
+  if (normalizedFilters.status) {
+    normalizedFilters.status = STATUS_MAP[normalizedFilters.status] ?? normalizedFilters.status;
+  }
 
-  // DRF retorna { results: [...], count: N } quando paginado
-  return data;
+  const url = buildUrl('/solicitacoes/', normalizedFilters);
+  return await fetchAPI(url);
+}
+
+/**
+ * Cria uma nova solicitação de evento.
+ *
+ * @param {object} body - Dados da solicitação
+ * @returns {Promise<object>} Solicitação criada
+ */
+export async function createSolicitacao(body) {
+  return await fetchAPI('/solicitacoes/', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 /**
  * Aprova uma solicitação pendente.
  *
  * @param {number} id - ID da solicitação
+ * @param {string} reason - Motivo/justificativa (opcional)
  * @returns {Promise<object>} Solicitação atualizada
  */
-export async function approveSolicitacao(id) {
+export async function approveSolicitacao(id, reason = '') {
   return await fetchAPI(`/solicitacoes/${id}/approve/`, {
     method: 'PATCH',
+    body: JSON.stringify(reason ? { reason } : {}),
   });
 }
 
@@ -107,14 +72,13 @@ export async function approveSolicitacao(id) {
  * Reprova uma solicitação pendente.
  *
  * @param {number} id - ID da solicitação
- * @param {object} data - Dados da reprovação
- * @param {string} data.justificativa - Justificativa obrigatória para reprovação
+ * @param {string} reason - Motivo/justificativa (obrigatório)
  * @returns {Promise<object>} Solicitação atualizada
  */
-export async function rejectSolicitacao(id, { justificativa }) {
+export async function rejectSolicitacao(id, reason) {
   return await fetchAPI(`/solicitacoes/${id}/reject/`, {
     method: 'PATCH',
-    body: JSON.stringify({ justificativa }),
+    body: JSON.stringify({ reason }),
   });
 }
 
@@ -127,3 +91,75 @@ export async function rejectSolicitacao(id, { justificativa }) {
 export async function getSolicitacao(id) {
   return await fetchAPI(`/solicitacoes/${id}/`);
 }
+
+/**
+ * Preview do payload GCal de uma solicitação.
+ *
+ * @param {number} id - ID da solicitação
+ * @returns {Promise<object>} Payload GCal
+ */
+export async function previewSolicitacao(id) {
+  return await fetchAPI(`/solicitacoes/${id}/preview-gcal/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+/**
+ * Publica solicitação no Google Calendar.
+ *
+ * @param {number} id - ID da solicitação
+ * @param {object} body - Opções (dry_run, apply_blocked, etc.)
+ * @returns {Promise<object>} Resultado da publicação
+ */
+export async function publishSolicitacao(id, body = {}) {
+  return await fetchAPI(`/solicitacoes/${id}/publish/`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+// ========================================
+// Endpoints de opções (dropdowns/selects)
+// ========================================
+
+/**
+ * Lista municípios para seleção.
+ *
+ * @returns {Promise<Array>} Lista de municípios { id, nome, uf }
+ */
+export async function listMunicipiosOptions() {
+  return await fetchAPI('/options/municipios/');
+}
+
+/**
+ * Lista projetos para seleção.
+ *
+ * @returns {Promise<Array>} Lista de projetos { id, nome, codigo }
+ */
+export async function listProjetosOptions() {
+  return await fetchAPI('/options/projetos/');
+}
+
+/**
+ * Lista tipos de evento para seleção.
+ *
+ * @returns {Promise<Array>} Lista de tipos { id, nome }
+ */
+export async function listTiposEventoOptions() {
+  return await fetchAPI('/options/tipos-evento/');
+}
+
+/**
+ * Lista usuários para seleção.
+ *
+ * @param {object} params - Parâmetros opcionais (ex: search)
+ * @returns {Promise<Array>} Lista de usuários { id, first_name, last_name, email }
+ */
+export async function listUsuariosOptions(params = {}) {
+  const url = buildUrl('/options/usuarios/', params);
+  return await fetchAPI(url);
+}
+
+// Re-exportar checkAvailability de availability.js
+export { checkAvailability } from './availability.js';

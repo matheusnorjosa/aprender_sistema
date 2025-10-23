@@ -6,10 +6,13 @@
 
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { ConfigProvider, Layout, Menu } from 'antd';
-import { CalendarOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { CalendarOutlined, CheckCircleOutlined, TableOutlined, ShoppingOutlined, DatabaseOutlined } from '@ant-design/icons';
 import ptBR from 'antd/locale/pt_BR';
-import Disponibilidade from './pages/Disponibilidade';
+import DisponibilidadeBlocks from './pages/Disponibilidade';
+import MonthlyPage from './pages/Disponibilidade/MonthlyPage';
 import Solicitacoes from './pages/Solicitacoes';
+import ControlePage from './pages/Controle/ControlePage';
+import DATPage from './pages/DAT/DATPage';
 import './App.css';
 
 const { Header, Content } = Layout;
@@ -29,19 +32,31 @@ function App() {
               defaultSelectedKeys={['disponibilidade']}
               style={{ flex: 1, minWidth: 0 }}
             >
-              <Menu.Item key="disponibilidade" icon={<CalendarOutlined />}>
-                <Link to="/disponibilidade">Disponibilidade</Link>
+              <Menu.Item key="grade-mensal" icon={<TableOutlined />}>
+                <Link to="/disponibilidade">Grade Mensal</Link>
+              </Menu.Item>
+              <Menu.Item key="bloqueios" icon={<CalendarOutlined />}>
+                <Link to="/bloqueios">Bloqueios</Link>
               </Menu.Item>
               <Menu.Item key="solicitacoes" icon={<CheckCircleOutlined />}>
                 <Link to="/solicitacoes">Solicitações</Link>
+              </Menu.Item>
+              <Menu.Item key="controle" icon={<ShoppingOutlined />}>
+                <Link to="/controle">Controle</Link>
+              </Menu.Item>
+              <Menu.Item key="dat" icon={<DatabaseOutlined />}>
+                <Link to="/dat">DAT</Link>
               </Menu.Item>
             </Menu>
           </Header>
           <Content style={{ padding: '0' }}>
             <Routes>
               <Route path="/" element={<Navigate to="/disponibilidade" replace />} />
-              <Route path="/disponibilidade" element={<Disponibilidade />} />
+              <Route path="/disponibilidade" element={<MonthlyPage />} />
+              <Route path="/bloqueios" element={<DisponibilidadeBlocks />} />
               <Route path="/solicitacoes" element={<Solicitacoes />} />
+              <Route path="/controle" element={<ControlePage />} />
+              <Route path="/dat" element={<DATPage />} />
             </Routes>
           </Content>
         </Layout>

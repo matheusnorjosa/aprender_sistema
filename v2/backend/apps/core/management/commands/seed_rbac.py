@@ -9,13 +9,20 @@ Grupos criados:
 - DAT
 - Gerência
 
-Permissões atribuídas por grupo para modelo Solicitacao.
+Permissões atribuídas por grupo conforme PR 12/N.
 """
 
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
-from apps.core.models import Solicitacao
+from apps.core.models import (
+    Solicitacao,
+    Usuario,
+    Municipio,
+    Projeto,
+    Compra,
+    AvailabilityBlock,
+)
 
 GROUPS = [
     "Superintendência",
@@ -27,11 +34,54 @@ GROUPS = [
 ]
 
 PERMS_BY_GROUP = {
-    "Controle": [("view", Solicitacao), ("change", Solicitacao)],
-    "Superintendência": [("view", Solicitacao), ("change", Solicitacao)],
-    "Coordenador": [("view", Solicitacao), ("add", Solicitacao)],
-    "Formador": [("view", Solicitacao)],
-    "DAT": [("view", Solicitacao)],
+    # DAT: Admin completo em Usuario, Municipio; view+add em Solicitacao
+    "DAT": [
+        ("add", Usuario),
+        ("change", Usuario),
+        ("delete", Usuario),
+        ("view", Usuario),
+        ("add", Municipio),
+        ("change", Municipio),
+        ("delete", Municipio),
+        ("view", Municipio),
+        ("view", Solicitacao),
+        ("add", Solicitacao),
+    ],
+    # Controle: Import e pré-agenda
+    "Controle": [
+        ("view", Municipio),
+        ("view", Projeto),
+        ("view", Compra),
+        ("add", Compra),
+        ("add", AvailabilityBlock),
+        ("change", AvailabilityBlock),
+        ("delete", AvailabilityBlock),
+        ("view", AvailabilityBlock),
+    ],
+    # Superintendência: Aprovar/reprovar + read references
+    "Superintendência": [
+        ("view", Solicitacao),
+        ("change", Solicitacao),
+        ("view", Usuario),
+        ("view", Municipio),
+        ("view", Projeto),
+    ],
+    # Coordenador: Nova solicitação + read references
+    "Coordenador": [
+        ("add", Solicitacao),
+        ("view", Solicitacao),
+        ("view", Municipio),
+        ("view", Projeto),
+    ],
+    # Formador: Bloqueio de agenda + read solicitações
+    "Formador": [
+        ("add", AvailabilityBlock),
+        ("change", AvailabilityBlock),
+        ("delete", AvailabilityBlock),
+        ("view", AvailabilityBlock),
+        ("view", Solicitacao),
+    ],
+    # Gerência: view solicitações (legacy)
     "Gerência": [("view", Solicitacao)],
 }
 

@@ -2,7 +2,8 @@
 
 ## Contexto do Projeto
 - Objetivo: Substituir planilhas pelo **AS** para solicitação → aprovação → criação de eventos (Google Calendar), com verificação de conflitos e logs de auditoria.
-- Stack: **Python 3.13 + Django 5.2 + PostgreSQL 15**, containers via **Docker + docker-compose**.
+- Stack: **Python 3.11 + Django 5.1.x + DRF + Celery + PostgreSQL 15 + Redis 7**, containers via **Docker + Docker Compose** (`v2/infra/docker-compose.yml`).
+- Frontend: **React (Vite) + Tailwind + Ant Design**, dev server com proxy `/api → http://localhost:8002` e chamadas com `credentials: 'include'`.
 - Fuso horário padrão: `America/Fortaleza`.
 
 ---
@@ -18,7 +19,7 @@
       print("❌ ERRO: v2 deve rodar apenas em Docker", file=sys.stderr)
       sys.exit(1)
   ```
-- Comando correto: `cd v2/infra && docker-compose up`
+- Comando recomendado: `cd v2 && make up` (wrap em `COMPOSE_PROJECT_NAME=aprender_v2 docker compose -f infra/docker-compose.yml`)
 - **v1 pode rodar local** (legacy support), mas **v2 = Docker obrigatório**.
 
 ### 🔒 CP-02: Política de Aprovação Manual (PA-01 a PA-07)
@@ -152,13 +153,20 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 ### 2. O Novo Sistema (Aprender Sistema - AS)
 
 #### 2.1 Tecnologias
-- **Backend**: Python 3.13 + Django 5.2  
+- **Backend**: Python 3.11 (imagem base) + Django 5.1.x + DRF + Celery (worker e beat)  
 - **Banco de Dados**: PostgreSQL 15  
-- **Infraestrutura**: Docker + Docker Compose  
-- **Front**: HTML + Bootstrap/Tailwind (templates Django) + fetch/JS para consumo de JSON  
+- **Cache & Filas**: Redis 7 (cache e broker Celery)  
+- **Infraestrutura**: Docker + Docker Compose (`v2/infra/docker-compose.yml`) orquestrado via `make`  
+- **Frontend**: React (Vite) + Tailwind + Ant Design; build Docker-first e dev server com proxy `/api`  
 
 #### 2.2 Estrutura de Código
-- **App principal**: core  
+- **Backend (`v2/backend`)**
+  - Apps: `apps.core` (domínio principal) e `apps.dat_ingest` (ETLs e ingestão)
+  - Configurações Django em `config/`
+  - Comandos ETL em `apps/dat_ingest/management/commands`
+- **Frontend (`v2/frontend`)**
+  - Projeto React com Vite, Tailwind e Ant Design
+  - Páginas: Pré-agenda, Grade Mensal (Formadores/Coordenadores), painéis Controle/DAT
 
 **Modelos principais**:  
 - Usuario → usuários do sistema  
@@ -172,28 +180,15 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 - DisponibilidadeFormador → agenda consolidada  
 - LogAuditoria → rastreamento de ações  
 
-**Scripts de Importação**:  
-- Pronto: `import_formadores.py`  
-- Pendente: `import_municipios.py`, `import_projetos.py`, `import_tipos_evento.py`  
-
-**Templates criados**:  
-- `home.html` → menu principal  
-- `mapa_mensal_view.html` → página HTML que consome API JSON  
-- `mapa_mensal.html` → base de layout do mapa  
-- `aprovacoes_pendentes.html`, `aprovacao_detail.html`  
-- `solicitacao_form.html`, `solicitacao_ok.html`  
-- `bloqueio_form.html`, `bloqueio_ok.html`  
+**ETLs**: Management commands para Acompanhamento, Deslocamento, Ações (Controle) e Cadastros (DAT) com suporte a `--dry-run` e relatórios em `out_etl/`
 
 #### 2.3 Funcionalidades Atuais
-- Autenticação via Django Admin  
-- Importação inicial de formadores já carregada no banco  
-- **Mapa Mensal de Disponibilidade**:  
-  - Endpoint JSON `/mapa-mensal/?ano=YYYY&mes=MM` retorna a disponibilidade consolidada por formador  
-  - Página HTML `/disponibilidade/` exibe a grade colorida equivalente às planilhas  
-- Cadastro de Bloqueios `/bloqueios/novo/`  
-- Solicitações de eventos `/solicitar/`  
-- Aprovações pendentes `/aprovacoes/pendentes/`  
-- Logs de Auditoria para rastrear mudanças  
+- Autenticação e RBAC via Django (grupos: Superintendência, Controle, Coordenador, Formador, DAT, Gerência)  
+- API REST: `/api/solicitacoes/`, `/api/availability/monthly/`, `/api/controle/acoes/`, `/api/dat/acoes/`, `/api/features/`, `/api/me/`  
+- Pré-agenda React: fluxo de approve/reject (Superintendência) e preview/publish (Controle) respeitando `apply_blocked`  
+- Grade Mensal React com duas grades (Formadores/Coordenadores), filtros compartilhados, detalhes por célula e export CSV  
+- ETLs CSV/XLSX com relatórios em `out_etl/*.json` e idempotência por `external_hash`  
+- Integração Google Calendar real (`asv2-{id}`, `sendUpdates='none'`) com fallback fake controlado por feature flags  
 
 ---
 
@@ -353,7 +348,7 @@ Todo o sistema deve seguir os princípios ergonômicos para design de sistemas i
 7. **Adequação à aprendizagem**
 
 ### Diretrizes visuais complementares
-- Uso consistente de **Bootstrap 5.3** para responsividade.  
+- Uso consistente de componentes **Ant Design** e utilitários Tailwind para responsividade.  
 - Paleta de cores e tipografia padronizadas.  
 - Destaque visual para ações primárias.  
 - Layouts limpos, com hierarquia visual clara.  

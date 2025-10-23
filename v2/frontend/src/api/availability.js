@@ -2,77 +2,14 @@
  * API Client - Availability Blocks
  *
  * Consome endpoints do backend AS v2 para gerenciar bloqueios de disponibilidade.
- *
- * Autenticação: sessão/cookie do Django (credentials: 'include')
- * CSRF: header X-CSRFToken (lido do cookie csrftoken)
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8002/api';
-
-/**
- * Extrai token CSRF do cookie.
- *
- * @returns {string|null} CSRF token ou null se não encontrado
- */
-function getCSRFToken() {
-  const name = 'csrftoken';
-  let cookieValue = null;
-
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-
-  return cookieValue;
-}
-
-/**
- * Wrapper genérico para fetch com autenticação e CSRF.
- *
- * @param {string} url - URL relativa ou absoluta
- * @param {object} options - Opções do fetch
- * @returns {Promise<object>} Response JSON
- */
-async function fetchAPI(url, options = {}) {
-  const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
-
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
-
-  // Adicionar CSRF para métodos mutantes
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method?.toUpperCase())) {
-    const csrfToken = getCSRFToken();
-    if (csrfToken) {
-      headers['X-CSRFToken'] = csrfToken;
-    }
-  }
-
-  const response = await fetch(fullUrl, {
-    ...options,
-    headers,
-    credentials: 'include', // Incluir cookies de sessão
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(error.detail || `HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  return response.json();
-}
+import { fetchAPI, buildUrl } from './config';
 
 /**
  * Busca informações do usuário atual.
  *
- * @returns {Promise<object>} Dados do usuário (id, username, email, first_name, last_name)
+ * @returns {Promise<object>} Dados do usuário (id, username, email, first_name, last_name, groups, is_superuser, etc.)
  */
 export async function getMe() {
   return await fetchAPI('/me/');
@@ -86,14 +23,10 @@ export async function getMe() {
  * @returns {Promise<Array>} Lista de bloqueios (extrai 'results' da paginação DRF)
  */
 export async function getBlocks({ owner = 'me' } = {}) {
-  const params = new URLSearchParams();
-  if (owner) params.append('owner', owner);
-
-  const url = `/availability-blocks/?${params.toString()}`;
+  const url = buildUrl('/availability-blocks/', { owner });
   const data = await fetchAPI(url);
 
   // DRF retorna { results: [...], count: N } quando paginado
-  // Se results existe, retorna ele; senão retorna data como array
   return data.results || data;
 }
 
@@ -140,13 +73,47 @@ export async function deleteBlock(id) {
  * @returns {Promise<object>} Resultado { ok: bool, conflicts: [{code, title, detail, ref_id}] }
  */
 export async function checkAvailability({ usuario_id, inicio, fim, municipio_id }) {
-  const params = new URLSearchParams();
-  params.append('usuario_id', usuario_id);
-  params.append('inicio', inicio);
-  params.append('fim', fim);
-  if (municipio_id) params.append('municipio_id', municipio_id);
+  const url = buildUrl('/availability/check/', {
+    usuario_id,
+    inicio,
+    fim,
+    municipio_id,
+  });
 
-  const url = `/availability/check/?${params.toString()}`;
+  return await fetchAPI(url);
+}
+
+/**
+ * Busca grade mensal de disponibilidade.
+ *
+ * @param {object} params - Parâmetros da consulta
+ * @param {number} params.year - Ano (YYYY)
+ * @param {number} params.month - Mês (1..12)
+ * @param {string} params.role - Role ("FORMADOR" | "COORDENADOR")
+ * @param {string} params.sector - Filtro por setor (opcional)
+ * @param {string} params.q - Filtro por nome/email (opcional)
+ * @returns {Promise<object>} Grade mensal { days, legend, people, cells, details_index }
+ */
+export async function getMonthlyAvailability({ year, month, role, sector, q }) {
+  const url = buildUrl('/availability/monthly/', {
+    year,
+    month,
+    role,
+    sector,
+    q,
+  });
+
+  return await fetchAPI(url);
+}
+
+/**
+ * Busca grade mensal de disponibilidade (versão genérica).
+ *
+ * @param {Record<string, string | number>} params - Parâmetros da consulta
+ * @returns {Promise<object>} Grade mensal { days, legend, people, cells, details_index }
+ */
+export async function getMonthly(params) {
+  const url = buildUrl('/availability/monthly/', params);
   return await fetchAPI(url);
 }
 

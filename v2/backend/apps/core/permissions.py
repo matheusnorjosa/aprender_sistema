@@ -88,3 +88,45 @@ class IsDATOrSuper(permissions.BasePermission):
                 or request.user.groups.filter(name="DAT").exists()
             )
         )
+
+
+class IsDAT(permissions.BasePermission):
+    """
+    Permissão: apenas usuários do grupo 'DAT' (sem incluir Super).
+
+    Usado para operações específicas do DAT.
+    Nota: Superusers sempre têm acesso completo.
+    """
+
+    message = "Apenas usuários do grupo DAT podem realizar esta ação."
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                request.user.is_superuser
+                or request.user.groups.filter(name="DAT").exists()
+            )
+        )
+
+
+class IsControleOrDAT(permissions.BasePermission):
+    """
+    Permissão: apenas usuários dos grupos 'Controle' ou 'DAT' podem executar.
+
+    Usado para operações de visualização e relatórios compartilhados.
+    Nota: Superusers sempre têm acesso completo.
+    """
+
+    message = "Apenas Controle ou DAT podem realizar esta ação."
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                request.user.is_superuser
+                or request.user.groups.filter(name__in=["Controle", "DAT", "Superintendência"]).exists()
+            )
+        )

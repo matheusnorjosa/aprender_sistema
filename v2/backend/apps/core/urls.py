@@ -16,6 +16,8 @@ from .views_availability import (
 )
 from .views_availability_monthly import MonthlyAvailabilityView
 from .views_controle_imports import ImportComprasView
+from .views_imports import ControleImportAcoesView, DATImportCadastrosView
+from .views_compras import ControleComprasListView
 from .views_controle_dat import ControleAcoesListView, DATAcoesListCreateView
 
 app_name = "core"
@@ -54,9 +56,24 @@ urlpatterns = [
         name="controle-import-compras",
     ),
     path(
+        "controle/import-acoes/",
+        ControleImportAcoesView.as_view(),
+        name="controle-import-acoes",
+    ),
+    path(
+        "controle/compras/",
+        ControleComprasListView.as_view(),
+        name="controle-compras-list",
+    ),
+    path(
         "controle/acoes/",
         ControleAcoesListView.as_view(),
         name="controle-acoes-list",
+    ),
+    path(
+        "dat/import-cadastros/",
+        DATImportCadastrosView.as_view(),
+        name="dat-import-cadastros",
     ),
     path(
         "dat/acoes/",

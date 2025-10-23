@@ -91,6 +91,8 @@ jobs:
     - name: Run tests
       run: |
         cd v2/backend
+        find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+        find . -type f -name "*.pyc" -delete 2>/dev/null || true
         pytest -q --tb=short
 
     - name: Build Docker image
@@ -101,6 +103,19 @@ jobs:
     - name: Test Docker health
       run: |
         cd v2/infra
+        cat > .env <<EOF
+        POSTGRES_USER=aprender_user
+        POSTGRES_PASSWORD=aprender_password
+        POSTGRES_DB=aprender_db
+        DB_HOST=db
+        DB_PORT=5432
+        SECRET_KEY=test-secret-key-for-ci-only
+        DEBUG=1
+        ENVIRONMENT=development
+        REDIS_HOST=redis
+        REDIS_PORT=6379
+        REQUIRE_DOCKER=1
+        EOF
         docker compose up -d db redis
         sleep 5
         docker compose run --rm web python manage.py check

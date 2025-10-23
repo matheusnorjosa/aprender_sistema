@@ -9,7 +9,7 @@
  * - Link para painel /publicacao para operações em lote
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Table,
@@ -63,11 +63,7 @@ export default function PreAgendaPage() {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewData, setPreviewData] = useState(null);
 
-  useEffect(() => {
-    loadData();
-  }, [searchTerm, sectorFilter, dateRange]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -95,7 +91,11 @@ export default function PreAgendaPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, sectorFilter, dateRange]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handlePreview = async (id) => {
     try {

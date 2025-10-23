@@ -8,8 +8,8 @@
  * - Botão para criar nova solicitação
  */
 
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Table, Card, Select, Input, Button, Space, Tag, Typography, message } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -31,7 +31,6 @@ const STATUS_LABELS = {
 };
 
 export default function MySolicitacoesPage() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -39,11 +38,7 @@ export default function MySolicitacoesPage() {
   const [statusFilter, setStatusFilter] = useState(''); // '' = Todas
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, [statusFilter, searchTerm]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const filters = { mine: 'true' };
@@ -58,7 +53,11 @@ export default function MySolicitacoesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, searchTerm]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const columns = [
     {
@@ -122,9 +121,9 @@ export default function MySolicitacoesPage() {
               placeholder="Status"
             >
               <Select.Option value="">Todas</Select.Option>
-              <Select.Option value="pending">Pendentes</Select.Option>
-              <Select.Option value="approved">Aprovadas</Select.Option>
-              <Select.Option value="rejected">Reprovadas</Select.Option>
+              <Select.Option value="pendente">Pendentes</Select.Option>
+              <Select.Option value="aprovado">Aprovadas</Select.Option>
+              <Select.Option value="reprovado">Reprovadas</Select.Option>
             </Select>
 
             <Input.Search

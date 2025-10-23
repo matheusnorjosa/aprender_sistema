@@ -6,7 +6,7 @@
  * - Listagem de CADASTROS com filtros
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { importCadastros, listCadastros } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
 
@@ -22,7 +22,7 @@ export default function DATPage() {
   /**
    * Carrega lista de cadastros.
    */
-  const fetchCadastros = async () => {
+  const fetchCadastros = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -34,7 +34,7 @@ export default function DATPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   /**
    * Handler de mudança de filtros.
@@ -56,7 +56,7 @@ export default function DATPage() {
    */
   useEffect(() => {
     fetchCadastros();
-  }, [filters]);
+  }, [fetchCadastros]);
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">

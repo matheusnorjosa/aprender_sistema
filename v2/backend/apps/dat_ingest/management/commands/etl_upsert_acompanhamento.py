@@ -32,6 +32,7 @@ from apps.dat_ingest.services.acompanhamento_normalize import (
     parse_time_iso,
     split_municipios_super,
 )
+from apps.dat_ingest.services.indicator_filter import should_create_participation
 from apps.dat_ingest.services.resolvers import (
     resolve_municipio,
     resolve_projeto,
@@ -438,6 +439,16 @@ class Command(BaseCommand):
             for p in grupo:
                 email = p.get("email", "").strip()
                 display_name = p.get("display_name", "").strip()
+
+                # FILTRO PR20: Skip indicadores (não-pessoas)
+                if not should_create_participation(display_name):
+                    self.stdout.write(
+                        f"      🚫 Indicador filtrado ({role}): {display_name}"
+                    )
+                    self.stats["skipped"]["indicators"] = (
+                        self.stats["skipped"].get("indicators", 0) + 1
+                    )
+                    continue
 
                 # Resolver usuário
                 user = resolve_user_by_email(email)

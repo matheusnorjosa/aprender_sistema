@@ -120,9 +120,42 @@ def resolve_municipio(nome: str) -> Optional[Municipio]:
         return Municipio.objects.filter(nome__iexact=nome).first()
 
 
+def normalize_projeto_name(nome: str) -> str:
+    """
+    Normaliza nome de projeto aplicando aliases (PR20 Task 3).
+
+    ALIASES:
+    - "IDEB" → "GESTÃO ESCOLAR"
+    - "IDEB10" → "GESTÃO ESCOLAR"
+    - "IDEB/IDEB10" → "GESTÃO ESCOLAR"
+    - "IDEB 10" → "GESTÃO ESCOLAR"
+
+    Args:
+        nome: Nome bruto do projeto
+
+    Returns:
+        Nome normalizado/mapeado
+    """
+    if not nome:
+        return nome
+
+    # Normalizar: lowercase, sem acentos, trim
+    nome_norm = norm_text(nome)
+
+    # Mapear aliases IDEB → GESTÃO ESCOLAR
+    ideb_patterns = ["ideb", "ideb10", "ideb/ideb10", "ideb 10", "ideb-10"]
+    if nome_norm in ideb_patterns:
+        return "GESTÃO ESCOLAR"
+
+    # Retornar nome original (não normalizado) para manter case
+    return nome
+
+
 def resolve_projeto(nome: str) -> Optional[Projeto]:
     """
     Resolve projeto por nome (setor canonizado).
+
+    Aplica aliases (IDEB → GESTÃO ESCOLAR) antes de resolver.
 
     Args:
         nome: Nome do projeto (setor normalizado)
@@ -133,10 +166,12 @@ def resolve_projeto(nome: str) -> Optional[Projeto]:
     if not nome:
         return None
 
-    nome_norm = norm_text(nome)
+    # PR20: Aplicar aliases antes de resolver
+    nome_mapped = normalize_projeto_name(nome)
+    nome_norm = norm_text(nome_mapped)
 
     try:
-        return Projeto.objects.get(nome__iexact=nome)
+        return Projeto.objects.get(nome__iexact=nome_mapped)
     except Projeto.DoesNotExist:
         # Tenta com nome normalizado
         projetos = Projeto.objects.all()
@@ -145,7 +180,7 @@ def resolve_projeto(nome: str) -> Optional[Projeto]:
                 return p
         return None
     except Projeto.MultipleObjectsReturned:
-        return Projeto.objects.filter(nome__iexact=nome).first()
+        return Projeto.objects.filter(nome__iexact=nome_mapped).first()
 
 
 def resolve_tipo_evento(nome: str) -> Optional[TipoEvento]:

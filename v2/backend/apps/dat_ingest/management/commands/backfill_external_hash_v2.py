@@ -225,7 +225,7 @@ class Command(BaseCommand):
         Args:
             collisions: Mapa de hash → list[Solicitacao IDs]
         """
-        outbox = Path("v2/.agents/outbox")
+        outbox = Path("/app/.agents/outbox")
         outbox.mkdir(parents=True, exist_ok=True)
 
         output_file = outbox / "external_hash_v2_collisions.json"

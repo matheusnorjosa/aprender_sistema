@@ -378,6 +378,25 @@ TRAVEL_BUFFER_MINUTES = int(os.getenv("TRAVEL_BUFFER_MINUTES", "120"))
 DATA_IMPORT_DIR = os.getenv("DATA_IMPORT_DIR", "/app/data/csv-import")
 
 # ================================================================
+# PR21: external_hash v2 + Data Quality Gates
+# ================================================================
+# Feature flag: usa hash v2 (17 campos) ao invés de v1 (8 campos)
+USE_EXTERNAL_HASH_V2 = os.getenv("USE_EXTERNAL_HASH_V2", "True") == "True"
+
+# Data Quality Gates: limites para abortar ETL apply
+ETL_MAX_DUPLICATES_PCT = float(os.getenv("ETL_MAX_DUPLICATES_PCT", "1.0"))  # 1.0% máximo de duplicatas
+
+ETL_MAX_UNKNOWN_USERS = int(os.getenv("ETL_MAX_UNKNOWN_USERS", "100"))  # Máximo de pessoas sem cadastro
+
+ETL_REQUIRE_ZERO_INVALID_INTERVALS = (
+    os.getenv("ETL_REQUIRE_ZERO_INVALID_INTERVALS", "True") == "True"
+)  # Se True, aborta se houver intervalos inválidos (fim <= início)
+
+ETL_REQUIRE_ZERO_INVALID_DATES = (
+    os.getenv("ETL_REQUIRE_ZERO_INVALID_DATES", "True") == "True"
+)  # Se True, aborta se houver datas/horas inválidas
+
+# ================================================================
 # SECURITY (Production)
 # ================================================================
 if not DEBUG:

@@ -52,7 +52,9 @@
       "Bash(make:*)",
       "Bash(test:*)",
       "Bash(git check-ignore:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(git merge:*)",
+      "Bash(export MSYS_NO_PATHCONV=1)"
     ],
     "deny": [],
     "ask": []

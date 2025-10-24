@@ -44,7 +44,7 @@ class TestBackfillExternalHashV2DryRun(TestCase):
 
         # Create test data
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
-        self.tipo = TipoEvento.objects.create(nome="Presencial", ativo=True)
+        self.tipo = TipoEvento.objects.create(nome="Presencial")
         self.projeto = Projeto.objects.create(
             nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True
         )
@@ -141,7 +141,7 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
         )
 
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
-        self.tipo = TipoEvento.objects.create(nome="Presencial", ativo=True)
+        self.tipo = TipoEvento.objects.create(nome="Presencial")
         self.projeto = Projeto.objects.create(
             nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True
         )
@@ -303,7 +303,7 @@ class TestBackfillCollisionsReport(TestCase):
         )
 
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
-        self.tipo = TipoEvento.objects.create(nome="Presencial", ativo=True)
+        self.tipo = TipoEvento.objects.create(nome="Presencial")
         self.projeto = Projeto.objects.create(
             nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True
         )

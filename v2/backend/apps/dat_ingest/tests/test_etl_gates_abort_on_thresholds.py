@@ -34,6 +34,7 @@ class TestETLGatesDuplicates(TestCase):
             email="coord@test.com",
             first_name="Coordenador",
             last_name="Test",
+            cpf="77777777777",
         )
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
         self.tipo = TipoEvento.objects.create(nome="Presencial", ativo=True)

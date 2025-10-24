@@ -48,7 +48,11 @@
       "WebFetch(domain:docs.google.com)",
       "Bash(timeout 120 docker compose exec:*)",
       "Bash(timeout 180 docker compose exec:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(make:*)",
+      "Bash(test:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

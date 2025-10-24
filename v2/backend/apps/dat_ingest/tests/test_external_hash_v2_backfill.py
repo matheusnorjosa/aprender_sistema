@@ -25,12 +25,13 @@ class TestBackfillExternalHashV2DryRun(TestCase):
 
     def setUp(self):
         """Setup test data."""
-        # Create test users
+        # Create test users with unique CPFs
         self.coord = Usuario.objects.create_user(
             username="coord_test",
             email="coord@test.com",
             first_name="Coordenador",
             last_name="Test",
+            cpf="11111111111",
         )
 
         self.formador = Usuario.objects.create_user(
@@ -38,6 +39,7 @@ class TestBackfillExternalHashV2DryRun(TestCase):
             email="form@test.com",
             first_name="Formador",
             last_name="Test",
+            cpf="22222222222",
         )
 
         # Create test data
@@ -127,6 +129,7 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
             email="coord@test.com",
             first_name="Coordenador",
             last_name="Test",
+            cpf="33333333333",
         )
 
         self.formador = Usuario.objects.create_user(
@@ -134,6 +137,7 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
             email="form@test.com",
             first_name="Formador",
             last_name="Test",
+            cpf="44444444444",
         )
 
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
@@ -287,6 +291,7 @@ class TestBackfillCollisionsReport(TestCase):
             email="coord@test.com",
             first_name="Coordenador",
             last_name="Test",
+            cpf="55555555555",
         )
 
         self.formador = Usuario.objects.create_user(
@@ -294,6 +299,7 @@ class TestBackfillCollisionsReport(TestCase):
             email="form@test.com",
             first_name="Formador",
             last_name="Test",
+            cpf="66666666666",
         )
 
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)

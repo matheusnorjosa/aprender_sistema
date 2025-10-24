@@ -21,12 +21,13 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
 from apps.core.models import Participation, Solicitacao
 from apps.dat_ingest.services.acompanhamento_normalize import (
+    hash_event_v2,
     normalize_sector,
     parse_date_iso,
     parse_time_iso,
@@ -66,13 +67,25 @@ class Command(BaseCommand):
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Simula execução sem writes no banco",
+            help="Simula execução sem writes no banco (mutually exclusive with --apply)",
+        )
+        parser.add_argument(
+            "--apply",
+            action="store_true",
+            help="Aplica writes no banco (com quality gates, mutually exclusive with --dry-run)",
         )
 
     def handle(self, *args, **options):
-        self.dry_run = options["dry_run"]
+        self.dry_run = options.get("dry_run", False)
+        self.apply = options.get("apply", False)
         self.events_csv = options["events_csv"]
         self.participants_csv = options["participants_csv"]
+
+        # Mutual exclusivity: default to dry-run if neither specified
+        if not self.dry_run and not self.apply:
+            self.dry_run = True
+        elif self.dry_run and self.apply:
+            raise CommandError("--dry-run and --apply are mutually exclusive")
 
         # Timezone e data de referência
         self.tz = timezone.get_current_timezone()  # America/Fortaleza
@@ -81,7 +94,7 @@ class Command(BaseCommand):
         else:
             self.today = timezone.localdate()
 
-        self.stdout.write(f"🚀 ETL Acompanhamento (dry_run={self.dry_run})")
+        self.stdout.write(f"🚀 ETL Acompanhamento (dry_run={self.dry_run}, apply={self.apply})")
         self.stdout.write(f"   TZ: {self.tz}")
         self.stdout.write(f"   Today: {self.today}")
         self.stdout.write(f"   Events CSV: {self.events_csv}")
@@ -91,7 +104,7 @@ class Command(BaseCommand):
         self.stats = {
             "solicitacoes": {"created": 0, "updated": 0, "unchanged": 0},
             "participations": {"created": 0, "updated": 0},
-            "skipped": {"autor": 0, "fk": 0, "intervalo_invalido": 0},
+            "skipped": {"autor": 0, "fk": 0, "intervalo_invalido": 0, "indicators": 0},
         }
         self.pendencias = {
             "usuarios": [],
@@ -108,6 +121,17 @@ class Command(BaseCommand):
 
         self.stdout.write(f"   {len(eventos)} eventos carregados")
         self.stdout.write(f"   {len(participantes_map)} grupos de participantes")
+
+        # PR21: Quality Gates - calcular métricas antes de processar
+        self.stdout.write("\n📊 Calculando métricas de qualidade...")
+        metrics = self.calculate_metrics(eventos, participantes_map)
+
+        # PR21: Check gates se apply=True
+        if self.apply:
+            self.check_gates(metrics)
+
+        # Sempre gerar relatório de métricas (dry-run ou apply)
+        self.generate_metrics_report(metrics)
 
         # Processar eventos
         self.stdout.write("\n⚙️  Processando eventos...")
@@ -155,17 +179,56 @@ class Command(BaseCommand):
 
         return participantes_map
 
-    def compute_external_hash(self, evento: Dict, coord_email: str, coord_name: str) -> str:
+    def compute_external_hash(self, evento: Dict, coord_email: str, coord_name: str, participantes: List[Dict] = None) -> str:
         """
         Gera external_hash SHA1 a partir de campos-chave do evento.
 
+        PR21: Usa hash_event_v2 (17 campos) se USE_EXTERNAL_HASH_V2=True,
+        caso contrário usa hash v1 (8 campos) para back-compat.
+
         Se event_hash vier do CSV, usa direto.
-        Senão, gera com: sector, município, tipo, data, hora_ini, hora_fim, coordenador, encontro.
         """
         if evento.get("event_hash"):
             return evento["event_hash"].strip()
 
-        # Gerar hash a partir dos campos
+        # PR21: Use hash v2 se flag ativada
+        if settings.USE_EXTERNAL_HASH_V2:
+            # Extrair formadores dos participantes
+            formadores = []
+            if participantes:
+                for p in participantes:
+                    if p.get("role") == "FORMADOR":
+                        email_or_name = p.get("email") or p.get("display_name", "")
+                        formadores.append(email_or_name)
+
+            # Preencher até 5 formadores
+            while len(formadores) < 5:
+                formadores.append("")
+
+            # Construir row para hash_event_v2
+            row = {
+                "source_sheet": evento.get("source_sheet", ""),
+                "municipio": evento.get("municipio", ""),
+                "encontro": evento.get("encontro", ""),
+                "tipo": evento.get("tipo", ""),
+                "data": evento.get("data", ""),
+                "hora_inicio": evento.get("hora_inicio", ""),
+                "hora_fim": evento.get("hora_fim", ""),
+                "projeto": evento.get("projeto", ""),
+                "segmento": evento.get("segmento", ""),
+                "coord_acompanha": evento.get("coord_acompanha", ""),
+                "coordenador": coord_email if coord_email else coord_name,
+                "formador1": formadores[0],
+                "formador2": formadores[1],
+                "formador3": formadores[2],
+                "formador4": formadores[3],
+                "formador5": formadores[4],
+                "aprovacao": evento.get("aprovacao", ""),
+            }
+
+            return hash_event_v2(row)
+
+        # Fallback: hash v1 (8 campos) para back-compat
         sector = normalize_sector(
             evento.get("source_sheet", ""), evento.get("projeto", "")
         )
@@ -348,7 +411,8 @@ class Command(BaseCommand):
             coord_email = coord.get("email", "")
             coord_name = coord.get("display_name", "")
 
-        base_hash = self.compute_external_hash(evento, coord_email, coord_name)
+        # PR21: Pass participantes to compute_external_hash for hash v2
+        base_hash = self.compute_external_hash(evento, coord_email, coord_name, participantes)
 
         # Se Super com múltiplos municípios, adicionar município ao hash
         source_sheet = evento.get("source_sheet", "").strip()
@@ -478,6 +542,195 @@ class Command(BaseCommand):
                     self.stats["participations"]["created"] += 1
                 else:
                     self.stats["participations"]["updated"] += 1
+
+    def calculate_metrics(self, eventos: List[Dict], participantes_map: Dict[str, List[Dict]]) -> Dict:
+        """
+        Calcula métricas de qualidade de dados para quality gates (PR21).
+
+        Returns:
+            Dict com métricas: total_events, duplicates_count, duplicates_pct,
+                               unknown_users_count, invalid_intervals_count, invalid_dates_count
+        """
+        total_events = len(eventos)
+        hashes_seen = {}
+        duplicates_count = 0
+        unknown_users = set()
+        invalid_intervals = 0
+        invalid_dates = 0
+
+        for evento in eventos:
+            # Calcular hash (simples para contagem de duplicatas)
+            event_id = evento.get("event_hash", "")
+            if not event_id:
+                # Generate simple hash for duplicate detection
+                simple_hash = f"{evento.get('data')}|{evento.get('hora_inicio')}|{evento.get('municipio')}|{evento.get('tipo')}"
+                event_id = simple_hash
+
+            if event_id in hashes_seen:
+                duplicates_count += 1
+            else:
+                hashes_seen[event_id] = True
+
+            # Unknown users
+            event_hash = evento.get("event_hash", "")
+            if event_hash in participantes_map:
+                for p in participantes_map[event_hash]:
+                    email = p.get("email", "")
+                    display_name = p.get("display_name", "")
+
+                    # Skip indicators
+                    if not should_create_participation(display_name):
+                        continue
+
+                    # Try to resolve user
+                    user = None
+                    if email:
+                        user = resolve_user_by_email(email)
+                    if not user and display_name:
+                        user = resolve_user_by_name(display_name)
+
+                    if not user:
+                        unknown_users.add(email or display_name)
+
+            # Invalid intervals (fim <= início)
+            data_str = evento.get("data", "")
+            hora_inicio_str = evento.get("hora_inicio", "")
+            hora_fim_str = evento.get("hora_fim", "")
+
+            data = parse_date_iso(data_str)
+            hora_inicio = parse_time_iso(hora_inicio_str)
+            hora_fim = parse_time_iso(hora_fim_str)
+
+            if not data or not hora_inicio or not hora_fim:
+                invalid_dates += 1
+            elif hora_fim <= hora_inicio:
+                invalid_intervals += 1
+
+        duplicates_pct = (duplicates_count / total_events * 100) if total_events > 0 else 0.0
+
+        metrics = {
+            "total_events": total_events,
+            "duplicates_count": duplicates_count,
+            "duplicates_pct": round(duplicates_pct, 2),
+            "unknown_users_count": len(unknown_users),
+            "invalid_intervals_count": invalid_intervals,
+            "invalid_dates_count": invalid_dates,
+        }
+
+        self.stdout.write(f"   Total eventos: {metrics['total_events']}")
+        self.stdout.write(f"   Duplicatas: {metrics['duplicates_count']} ({metrics['duplicates_pct']}%)")
+        self.stdout.write(f"   Usuários desconhecidos: {metrics['unknown_users_count']}")
+        self.stdout.write(f"   Intervalos inválidos: {metrics['invalid_intervals_count']}")
+        self.stdout.write(f"   Datas inválidas: {metrics['invalid_dates_count']}")
+
+        return metrics
+
+    def check_gates(self, metrics: Dict):
+        """
+        Valida métricas contra quality gates e aborta se violar (PR21).
+
+        Raises:
+            CommandError se algum gate for violado.
+        """
+        violations = []
+
+        # Gate 1: Duplicates percentage
+        if metrics["duplicates_pct"] > settings.ETL_MAX_DUPLICATES_PCT:
+            msg = (
+                f"Duplicates threshold violated: {metrics['duplicates_pct']}% > "
+                f"{settings.ETL_MAX_DUPLICATES_PCT}%"
+            )
+            violations.append({"gate": "ETL_MAX_DUPLICATES_PCT", "message": msg})
+
+        # Gate 2: Unknown users
+        if metrics["unknown_users_count"] > settings.ETL_MAX_UNKNOWN_USERS:
+            msg = (
+                f"Unknown users threshold violated: {metrics['unknown_users_count']} > "
+                f"{settings.ETL_MAX_UNKNOWN_USERS}"
+            )
+            violations.append({"gate": "ETL_MAX_UNKNOWN_USERS", "message": msg})
+
+        # Gate 3: Invalid intervals
+        if settings.ETL_REQUIRE_ZERO_INVALID_INTERVALS and metrics["invalid_intervals_count"] > 0:
+            msg = (
+                f"Invalid intervals detected: {metrics['invalid_intervals_count']} "
+                f"(ETL_REQUIRE_ZERO_INVALID_INTERVALS=True)"
+            )
+            violations.append({"gate": "ETL_REQUIRE_ZERO_INVALID_INTERVALS", "message": msg})
+
+        # Gate 4: Invalid dates
+        if settings.ETL_REQUIRE_ZERO_INVALID_DATES and metrics["invalid_dates_count"] > 0:
+            msg = (
+                f"Invalid dates detected: {metrics['invalid_dates_count']} "
+                f"(ETL_REQUIRE_ZERO_INVALID_DATES=True)"
+            )
+            violations.append({"gate": "ETL_REQUIRE_ZERO_INVALID_DATES", "message": msg})
+
+        # If violations, generate report and abort
+        if violations:
+            self.generate_violations_report(violations, metrics)
+            error_msg = f"❌ Quality gates violated ({len(violations)} gate(s)). Apply aborted.\n"
+            error_msg += "\n".join(f"  - {v['gate']}: {v['message']}" for v in violations)
+            raise CommandError(error_msg)
+
+        self.stdout.write(self.style.SUCCESS("   ✅ All quality gates passed"))
+
+    def generate_metrics_report(self, metrics: Dict):
+        """
+        Gera relatório JSON de métricas em v2/.agents/outbox/etl_metrics.json (PR21).
+        """
+        outbox = Path("/app/.agents/outbox")
+        outbox.mkdir(parents=True, exist_ok=True)
+
+        report_path = outbox / "etl_metrics.json"
+
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(metrics, f, indent=2, ensure_ascii=False)
+
+        self.stdout.write(f"   📄 Métricas salvas em: {report_path}")
+
+    def generate_violations_report(self, violations: List[Dict], metrics: Dict):
+        """
+        Gera relatório CSV de violações em v2/.agents/outbox/etl_violations.csv (PR21).
+        """
+        outbox = Path("/app/.agents/outbox")
+        outbox.mkdir(parents=True, exist_ok=True)
+
+        report_path = outbox / "etl_violations.csv"
+
+        with open(report_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=["gate", "message", "metric_value", "threshold"])
+            writer.writeheader()
+
+            for v in violations:
+                gate = v["gate"]
+                message = v["message"]
+
+                # Extract metric value and threshold from message
+                if gate == "ETL_MAX_DUPLICATES_PCT":
+                    metric_value = metrics["duplicates_pct"]
+                    threshold = settings.ETL_MAX_DUPLICATES_PCT
+                elif gate == "ETL_MAX_UNKNOWN_USERS":
+                    metric_value = metrics["unknown_users_count"]
+                    threshold = settings.ETL_MAX_UNKNOWN_USERS
+                elif gate == "ETL_REQUIRE_ZERO_INVALID_INTERVALS":
+                    metric_value = metrics["invalid_intervals_count"]
+                    threshold = 0
+                elif gate == "ETL_REQUIRE_ZERO_INVALID_DATES":
+                    metric_value = metrics["invalid_dates_count"]
+                    threshold = 0
+                else:
+                    metric_value = "N/A"
+                    threshold = "N/A"
+
+                writer.writerow({
+                    "gate": gate,
+                    "message": message,
+                    "metric_value": metric_value,
+                    "threshold": threshold,
+                })
+
+        self.stdout.write(f"   📄 Violações salvas em: {report_path}")
 
     def generate_report(self):
         """Gera relatório JSON de pendências."""

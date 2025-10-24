@@ -334,6 +334,24 @@ GCAL_CALENDAR_ID = os.getenv("GCAL_CALENDAR_ID", "")
 # Default: 'fake' para evitar publicações acidentais até implementar GoogleCalendarClient
 GCAL_CLIENT = os.getenv("GCAL_CLIENT", "fake")
 
+# Google Calendar sendUpdates parameter (RF05/RF06 - PR19)
+# Controls whether email notifications are sent to attendees:
+# - 'none': No emails (default, recommended for testing)
+# - 'all': Emails to all attendees
+# - 'externalOnly': Emails only to external attendees
+# https://developers.google.com/calendar/api/v3/reference/events/insert#parameters
+GCAL_SEND_UPDATES = os.getenv("GCAL_SEND_UPDATES", "none")
+
+# Validate GCAL_SEND_UPDATES
+_VALID_SEND_UPDATES = {"none", "all", "externalOnly"}
+if GCAL_SEND_UPDATES not in _VALID_SEND_UPDATES:
+    print(
+        f"❌ ERRO: GCAL_SEND_UPDATES='{GCAL_SEND_UPDATES}' inválido. "
+        f"Valores permitidos: {', '.join(_VALID_SEND_UPDATES)}",
+        file=sys.stderr
+    )
+    sys.exit(1)
+
 # Google Calendar color mapping (optional)
 # Maps TipoEvento.nome → Google Calendar colorId (1-11)
 # https://developers.google.com/calendar/api/v3/reference/colors

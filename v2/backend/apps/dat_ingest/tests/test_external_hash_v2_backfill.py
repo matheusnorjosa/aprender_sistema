@@ -8,7 +8,9 @@ Garante que:
 """
 
 import json
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.core.management import call_command
@@ -50,17 +52,17 @@ class TestBackfillExternalHashV2DryRun(TestCase):
         )
 
         # Create test solicitação
+        tz = ZoneInfo("America/Fortaleza")
         self.sol = Solicitacao.objects.create(
             coordenador=self.coord,
             municipio=self.municipio,
             tipo_evento=self.tipo,
             projeto=self.projeto,
-            data="2025-01-15",
-            hora_inicio="08:00",
-            hora_fim="12:00",
+            inicio=datetime(2025, 1, 15, 8, 0, tzinfo=tz),
+            fim=datetime(2025, 1, 15, 12, 0, tzinfo=tz),
             encontro="1",
             segmento="EI",
-            coord_acompanha=True,
+            coordenador_acompanha=True,
             status="pendente",
             external_hash="old_hash_v1",  # Old hash
         )
@@ -100,8 +102,8 @@ class TestBackfillExternalHashV2DryRun(TestCase):
                 tipo_evento=self.tipo,
                 projeto=self.projeto,
                 data=f"2025-01-{16+i}",
-                hora_inicio="08:00",
-                hora_fim="12:00",
+                # hora via inicio
+                fim=datetime(2025, 1, 15, 12, 0, tzinfo=ZoneInfo("America/Fortaleza")),
                 encontro=str(i+2),
                 segmento="EI",
                 status="pendente",
@@ -153,12 +155,12 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
             municipio=self.municipio,
             tipo_evento=self.tipo,
             projeto=self.projeto,
-            data="2025-01-15",
-            hora_inicio="08:00",
-            hora_fim="12:00",
+            inicio=datetime(2025, 1, 15, 8, 0, tzinfo=ZoneInfo("America/Fortaleza")),
+            # hora via inicio
+            fim=datetime(2025, 1, 15, 12, 0, tzinfo=ZoneInfo("America/Fortaleza")),
             encontro="1",
             segmento="EI",
-            coord_acompanha=True,
+            coordenador_acompanha=True,
             status="pendente",
             external_hash="old_hash_v1",
         )
@@ -184,12 +186,12 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
             municipio=self.municipio,
             tipo_evento=self.tipo,
             projeto=self.projeto,
-            data="2025-01-15",
-            hora_inicio="08:00",
-            hora_fim="12:00",
+            inicio=datetime(2025, 1, 15, 8, 0, tzinfo=ZoneInfo("America/Fortaleza")),
+            # hora via inicio
+            fim=datetime(2025, 1, 15, 12, 0, tzinfo=ZoneInfo("America/Fortaleza")),
             encontro="1",
             segmento="EI",
-            coord_acompanha=True,
+            coordenador_acompanha=True,
             status="pendente",
             external_hash="old_hash_1",
         )
@@ -200,12 +202,12 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
             municipio=self.municipio,
             tipo_evento=self.tipo,
             projeto=self.projeto,
-            data="2025-01-15",
-            hora_inicio="08:00",
-            hora_fim="12:00",
+            inicio=datetime(2025, 1, 15, 8, 0, tzinfo=ZoneInfo("America/Fortaleza")),
+            # hora via inicio
+            fim=datetime(2025, 1, 15, 12, 0, tzinfo=ZoneInfo("America/Fortaleza")),
             encontro="1",
             segmento="EI",
-            coord_acompanha=True,
+            coordenador_acompanha=True,
             status="pendente",
             external_hash="old_hash_2",
         )
@@ -234,12 +236,12 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
             municipio=self.municipio,
             tipo_evento=self.tipo,
             projeto=self.projeto,
-            data="2025-01-15",
-            hora_inicio="08:00",
-            hora_fim="12:00",
+            inicio=datetime(2025, 1, 15, 8, 0, tzinfo=ZoneInfo("America/Fortaleza")),
+            # hora via inicio
+            fim=datetime(2025, 1, 15, 12, 0, tzinfo=ZoneInfo("America/Fortaleza")),
             encontro="1",
             segmento="EI",
-            coord_acompanha=True,
+            coordenador_acompanha=True,
             status="pendente",
         )
         sol.formadores.add(self.formador)
@@ -322,9 +324,9 @@ class TestBackfillCollisionsReport(TestCase):
             municipio=self.municipio,
             tipo_evento=self.tipo,
             projeto=self.projeto,
-            data="2025-01-15",
-            hora_inicio="08:00",
-            hora_fim="12:00",
+            inicio=datetime(2025, 1, 15, 8, 0, tzinfo=ZoneInfo("America/Fortaleza")),
+            # hora via inicio
+            fim=datetime(2025, 1, 15, 12, 0, tzinfo=ZoneInfo("America/Fortaleza")),
             encontro="1",
             segmento="EI",
             status="pendente",
@@ -346,12 +348,12 @@ class TestBackfillCollisionsReport(TestCase):
             municipio=self.municipio,
             tipo_evento=self.tipo,
             projeto=self.projeto,
-            data="2025-01-15",
-            hora_inicio="08:00",
-            hora_fim="12:00",
+            inicio=datetime(2025, 1, 15, 8, 0, tzinfo=ZoneInfo("America/Fortaleza")),
+            # hora via inicio
+            fim=datetime(2025, 1, 15, 12, 0, tzinfo=ZoneInfo("America/Fortaleza")),
             encontro="1",
             segmento="EI",
-            coord_acompanha=True,
+            coordenador_acompanha=True,
             status="pendente",
         )
         sol1.formadores.add(self.formador)
@@ -361,12 +363,12 @@ class TestBackfillCollisionsReport(TestCase):
             municipio=self.municipio,
             tipo_evento=self.tipo,
             projeto=self.projeto,
-            data="2025-01-15",
-            hora_inicio="08:00",
-            hora_fim="12:00",
+            inicio=datetime(2025, 1, 15, 8, 0, tzinfo=ZoneInfo("America/Fortaleza")),
+            # hora via inicio
+            fim=datetime(2025, 1, 15, 12, 0, tzinfo=ZoneInfo("America/Fortaleza")),
             encontro="1",
             segmento="EI",
-            coord_acompanha=True,
+            coordenador_acompanha=True,
             status="pendente",
         )
         sol2.formadores.add(self.formador)

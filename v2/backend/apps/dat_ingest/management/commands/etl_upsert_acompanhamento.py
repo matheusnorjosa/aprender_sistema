@@ -27,6 +27,7 @@ from django.utils import timezone
 
 from apps.core.models import Participation, Solicitacao
 from apps.dat_ingest.services.acompanhamento_normalize import (
+    hash_event_v2,
     normalize_sector,
     parse_date_iso,
     parse_time_iso,
@@ -66,7 +67,12 @@ class Command(BaseCommand):
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Simula execução sem writes no banco",
+            help="Simula execução sem writes no banco (mutually exclusive with --apply)",
+        )
+        parser.add_argument(
+            "--apply",
+            action="store_true",
+            help="Aplica writes no banco (com quality gates, mutually exclusive with --dry-run)",
         )
 
     def handle(self, *args, **options):

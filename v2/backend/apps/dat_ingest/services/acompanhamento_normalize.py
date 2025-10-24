@@ -318,8 +318,14 @@ def hash_event_v2(row: Dict[str, str]) -> str:
     # 7. hora_fim (HH:MM)
     hora_fim_norm = normalize_time_field(row.get("hora_fim", ""))
 
-    # 8. projeto
-    projeto_norm = norm_text(row.get("projeto", ""))
+    # 8. projeto - aplicar aliases IDEB→Gestão Escolar para consistência
+    projeto_raw = row.get("projeto", "")
+    projeto_lower = norm_text(projeto_raw)
+    # Aplicar mesmo mapeamento de aliases que normalize_sector
+    if "ideb" in projeto_lower or ("gestao" in projeto_lower and "escolar" in projeto_lower):
+        projeto_norm = norm_text("Gestão Escolar")
+    else:
+        projeto_norm = projeto_lower
 
     # 9. segmento
     segmento_norm = norm_text(row.get("segmento", ""))

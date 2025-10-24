@@ -37,7 +37,7 @@ class TestETLGatesDuplicates(TestCase):
             cpf="77777777777",
         )
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
-        self.tipo = TipoEvento.objects.create(nome="Presencial", ativo=True)
+        self.tipo = TipoEvento.objects.create(nome="Presencial")
         self.projeto = Projeto.objects.create(
             nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True
         )

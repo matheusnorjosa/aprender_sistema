@@ -235,6 +235,17 @@ CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read CSRF token
 
 # ================================================================
+# SESSION COOKIE (Development - allow cross-port)
+# ================================================================
+if ENVIRONMENT == "development":
+    SESSION_COOKIE_SAMESITE = "None"  # Allow cross-origin (localhost:5173 → localhost:8002)
+    SESSION_COOKIE_SECURE = False      # Required False for SameSite=None without HTTPS
+    CSRF_COOKIE_SAMESITE = "None"      # Also relax CSRF cookie
+else:
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SAMESITE = "Lax"
+
+# ================================================================
 # REST FRAMEWORK
 # ================================================================
 REST_FRAMEWORK = {
@@ -260,6 +271,14 @@ REST_FRAMEWORK = {
         "availability_check": "60/min",  # 60 requests por minuto para availability check
     },
 }
+
+# Relax throttling in development
+if ENVIRONMENT == "development":
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+        "anon": "10000/hour",
+        "user": "100000/hour",
+        "availability_check": "600/min",  # 10x mais permissivo em dev
+    }
 
 # ================================================================
 # CELERY

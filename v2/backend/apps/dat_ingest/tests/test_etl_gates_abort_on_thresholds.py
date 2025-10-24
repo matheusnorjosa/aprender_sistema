@@ -32,7 +32,8 @@ class TestETLGatesDuplicates(TestCase):
         self.coord = Usuario.objects.create_user(
             username="coord_test",
             email="coord@test.com",
-            nome="Coordenador Test",
+            first_name="Coordenador",
+            last_name="Test",
         )
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
         self.tipo = TipoEvento.objects.create(nome="Presencial", ativo=True)
@@ -420,8 +421,8 @@ class TestETLGatesMetricsReporting(TestCase):
 
     def tearDown(self):
         """Clean up generated files."""
-        metrics_file = Path("v2/.agents/outbox/etl_metrics.json")
-        violations_file = Path("v2/.agents/outbox/etl_violations.csv")
+        metrics_file = Path("/app/.agents/outbox/etl_metrics.json")
+        violations_file = Path("/app/.agents/outbox/etl_violations.csv")
 
         if metrics_file.exists():
             metrics_file.unlink()
@@ -456,7 +457,7 @@ class TestETLGatesMetricsReporting(TestCase):
         call_command("etl_upsert_acompanhamento")
 
         # Metrics file should exist
-        metrics_file = Path("v2/.agents/outbox/etl_metrics.json")
+        metrics_file = Path("/app/.agents/outbox/etl_metrics.json")
         assert metrics_file.exists()
 
         # Validate JSON structure
@@ -505,7 +506,7 @@ class TestETLGatesMetricsReporting(TestCase):
         call_command("etl_upsert_acompanhamento")
 
         # Violations file should exist
-        violations_file = Path("v2/.agents/outbox/etl_violations.csv")
+        violations_file = Path("/app/.agents/outbox/etl_violations.csv")
         assert violations_file.exists()
 
         # Validate CSV has headers

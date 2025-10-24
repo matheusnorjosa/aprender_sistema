@@ -29,6 +29,7 @@ import {
   CloseOutlined,
   EyeOutlined,
   SearchOutlined,
+  VideoCameraOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -438,6 +439,19 @@ function Solicitacoes() {
             <Descriptions.Item label="Atualizado em">
               {formatDateTime(selectedSolicitacao.updated_at)}
             </Descriptions.Item>
+            {selectedSolicitacao.meet_link && (
+              <Descriptions.Item label="Reunião Online">
+                <Button
+                  type="primary"
+                  icon={<VideoCameraOutlined />}
+                  href={selectedSolicitacao.meet_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Entrar na reunião
+                </Button>
+              </Descriptions.Item>
+            )}
           </Descriptions>
         ) : null}
       </Drawer>

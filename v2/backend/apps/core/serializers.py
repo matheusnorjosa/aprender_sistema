@@ -89,6 +89,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "gcal_last_sync_at",
             "gcal_last_error",
             "gcal_payload_hash",
+            # PR19/RF06: Google Meet link
+            "meet_link",
         ]
         read_only_fields = [
             "id",
@@ -102,6 +104,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "gcal_last_sync_at",
             "gcal_last_error",
             "gcal_payload_hash",
+            # PR19/RF06: Google Meet link (gerado automaticamente)
+            "meet_link",
         ]
 
     def get_fluxo(self, obj):

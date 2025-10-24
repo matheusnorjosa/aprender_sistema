@@ -11,7 +11,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Table, Card, Select, Input, Button, Space, Tag, Typography, message } from 'antd';
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
 import { listSolicitacoes } from '../../api/solicitacoes';
@@ -93,6 +93,27 @@ export default function MySolicitacoesPage() {
         <Tag color={STATUS_COLORS[status]}>{STATUS_LABELS[status] || status}</Tag>
       ),
       width: 120,
+    },
+    {
+      title: 'Reunião',
+      dataIndex: 'meet_link',
+      key: 'meet_link',
+      render: (meet_link) =>
+        meet_link ? (
+          <Button
+            size="small"
+            type="link"
+            icon={<VideoCameraOutlined />}
+            href={meet_link}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Entrar
+          </Button>
+        ) : (
+          '-'
+        ),
+      width: 100,
     },
   ];
 

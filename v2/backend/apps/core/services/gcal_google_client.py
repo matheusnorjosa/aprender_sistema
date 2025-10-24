@@ -10,6 +10,7 @@ import os
 import time
 from typing import Optional
 
+from django.conf import settings
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -178,10 +179,18 @@ class GoogleCalendarClient(CalendarClientAdapter):
         # Garantir que o payload tenha o event_id
         body = {**payload, "id": event_id}
 
+        # RF05/RF06: Ler sendUpdates do settings (configurável via env)
+        send_updates = getattr(settings, "GCAL_SEND_UPDATES", "none")
+
         def _insert():
             return (
                 self.service.events()
-                .insert(calendarId=calendar_id, body=body, sendUpdates="none")
+                .insert(
+                    calendarId=calendar_id,
+                    body=body,
+                    sendUpdates=send_updates,
+                    conferenceDataVersion=1  # RF06: Necessário para criar Google Meet
+                )
                 .execute()
             )
 
@@ -202,11 +211,18 @@ class GoogleCalendarClient(CalendarClientAdapter):
         # Garantir que o payload tenha o event_id
         body = {**payload, "id": event_id}
 
+        # RF05/RF06: Ler sendUpdates do settings (configurável via env)
+        send_updates = getattr(settings, "GCAL_SEND_UPDATES", "none")
+
         def _update():
             return (
                 self.service.events()
                 .patch(
-                    calendarId=calendar_id, eventId=event_id, body=body, sendUpdates="none"
+                    calendarId=calendar_id,
+                    eventId=event_id,
+                    body=body,
+                    sendUpdates=send_updates,
+                    conferenceDataVersion=1  # RF06: Necessário para atualizar Google Meet
                 )
                 .execute()
             )
@@ -221,11 +237,13 @@ class GoogleCalendarClient(CalendarClientAdapter):
             calendar_id: ID do calendário
             event_id: ID do evento
         """
+        # RF05/RF06: Ler sendUpdates do settings (configurável via env)
+        send_updates = getattr(settings, "GCAL_SEND_UPDATES", "none")
 
         def _delete():
             return (
                 self.service.events()
-                .delete(calendarId=calendar_id, eventId=event_id, sendUpdates="none")
+                .delete(calendarId=calendar_id, eventId=event_id, sendUpdates=send_updates)
                 .execute()
             )
 

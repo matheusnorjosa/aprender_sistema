@@ -90,6 +90,26 @@ def normalize_sector(sheet_name: str, projeto_value: str) -> str:
         return "Outros"
 
 
+def normalize_project_alias(projeto: str) -> str:
+    """
+    Normaliza nome do projeto aplicando aliases (IDEB/IDEB10 → Gestão Escolar).
+
+    Args:
+        projeto: Nome do projeto
+
+    Returns:
+        Nome normalizado com aliases aplicados
+    """
+    projeto_norm = norm_text(projeto) if projeto else ""
+
+    # Aplicar aliases IDEB
+    if "ideb" in projeto_norm or ("gestao" in projeto_norm and "escolar" in projeto_norm):
+        return "Gestão Escolar"
+
+    # Retornar original se não houver alias
+    return projeto.strip() if projeto else ""
+
+
 def split_municipios_super(value: str) -> List[str]:
     """
     Split múltiplos municípios separados por ; , / |

@@ -4,7 +4,9 @@ Funções para resolver Foreign Keys (FKs) a partir de nomes/emails.
 Usado pelo ETL de Acompanhamento para encontrar objetos existentes no banco.
 """
 
-from typing import Optional
+import re
+import unicodedata
+from typing import Optional, Tuple
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -92,12 +94,64 @@ def resolve_user_by_name(name: str) -> Optional[User]:
     return None
 
 
+def _nfkd(value):
+    """
+    Normaliza string para comparação: NFKD + casefold + ASCII.
+
+    Remove acentos e converte para minúsculas.
+    """
+    if value is None:
+        return ""
+    v = str(value).strip()
+    v = " ".join(v.split())  # Collapse espaços
+    v = unicodedata.normalize("NFKD", v).encode("ASCII", "ignore").decode("ASCII")
+    return v.casefold()
+
+
+def _split_city_uf(raw: str) -> Tuple[str, Optional[str]]:
+    """
+    Separa município e UF de formatos variados:
+    - "Cidade - UF"
+    - "Cidade (UF)"
+    - "Cidade/UF"
+
+    Returns:
+        (nome_cidade, uf) ou (texto_original, None) se não separou
+    """
+    if raw is None:
+        return ("", None)
+
+    txt = str(raw).strip()
+    # Normaliza separadores (diferentes tipos de hífen)
+    txt = txt.replace("–", "-").replace("—", "-").replace("/", "-")
+    txt = re.sub(r"\s+", " ", txt)  # Collapse espaços
+
+    # Padrão 1: "Cidade - UF"
+    m = re.match(r"^(?P<nome>.+?)\s*-\s*(?P<uf>[A-Za-z]{2})$", txt)
+    if not m:
+        # Padrão 2: "Cidade (UF)"
+        m = re.match(r"^(?P<nome>.+?)\s*\((?P<uf>[A-Za-z]{2})\)\s*$", txt)
+
+    if m:
+        nome = m.group("nome").strip()
+        uf = m.group("uf").upper()
+        return (nome, uf)
+
+    return (txt, None)
+
+
 def resolve_municipio(nome: str) -> Optional[Municipio]:
     """
-    Resolve município por nome (normalizado).
+    Resolve município por nome, aceitando formatos variados:
+    - "Cidade" (apenas nome)
+    - "Cidade - UF"
+    - "Cidade (UF)"
+    - "Cidade/UF"
+
+    Normaliza com NFKD (remove acentos) para matching robusto.
 
     Args:
-        nome: Nome do município
+        nome: Nome do município (pode incluir UF)
 
     Returns:
         Municipio ou None se não encontrado
@@ -105,19 +159,34 @@ def resolve_municipio(nome: str) -> Optional[Municipio]:
     if not nome:
         return None
 
-    nome_norm = norm_text(nome)
+    # 1) Tentar separar Cidade/UF
+    cidade, uf = _split_city_uf(nome)
+    cidade_nfkd = _nfkd(cidade)
 
-    try:
-        return Municipio.objects.get(nome__iexact=nome)
-    except Municipio.DoesNotExist:
-        # Tenta com nome normalizado
-        municipios = Municipio.objects.all()
-        for m in municipios:
-            if norm_text(m.nome) == nome_norm:
-                return m
-        return None
-    except Municipio.MultipleObjectsReturned:
-        return Municipio.objects.filter(nome__iexact=nome).first()
+    qs = Municipio.objects.all()
+
+    # 2) Se UF veio, tentar match direto por (UF + nome case-insensitive)
+    if uf:
+        hit = qs.filter(uf=uf).filter(nome__iexact=cidade).first()
+        if hit:
+            return hit
+
+    # 3) Fallback: match por nome exato (case-insensitive), sem UF
+    hit = qs.filter(nome__iexact=cidade).first()
+    if hit:
+        return hit
+
+    # 4) Fallback: compare NFKD casefold em Python (para acentos)
+    for m in qs:
+        m_nfkd = _nfkd(m.nome)
+        if m_nfkd == cidade_nfkd:
+            # Se UF foi especificada, validar
+            if uf and m.uf != uf:
+                continue
+            return m
+
+    # Não encontrado
+    return None
 
 
 def normalize_projeto_name(nome: str) -> str:

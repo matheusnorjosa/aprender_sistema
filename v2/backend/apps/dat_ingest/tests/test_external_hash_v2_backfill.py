@@ -29,13 +29,15 @@ class TestBackfillExternalHashV2DryRun(TestCase):
         self.coord = Usuario.objects.create_user(
             username="coord_test",
             email="coord@test.com",
-            nome="Coordenador Test",
+            first_name="Coordenador",
+            last_name="Test",
         )
 
         self.formador = Usuario.objects.create_user(
             username="form_test",
             email="form@test.com",
-            nome="Formador Test",
+            first_name="Formador",
+            last_name="Test",
         )
 
         # Create test data
@@ -123,13 +125,15 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
         self.coord = Usuario.objects.create_user(
             username="coord_test",
             email="coord@test.com",
-            nome="Coordenador Test",
+            first_name="Coordenador",
+            last_name="Test",
         )
 
         self.formador = Usuario.objects.create_user(
             username="form_test",
             email="form@test.com",
-            nome="Formador Test",
+            first_name="Formador",
+            last_name="Test",
         )
 
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
@@ -281,13 +285,15 @@ class TestBackfillCollisionsReport(TestCase):
         self.coord = Usuario.objects.create_user(
             username="coord_test",
             email="coord@test.com",
-            nome="Coordenador Test",
+            first_name="Coordenador",
+            last_name="Test",
         )
 
         self.formador = Usuario.objects.create_user(
             username="form_test",
             email="form@test.com",
-            nome="Formador Test",
+            first_name="Formador",
+            last_name="Test",
         )
 
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
@@ -298,7 +304,7 @@ class TestBackfillCollisionsReport(TestCase):
 
     def tearDown(self):
         """Clean up collision file."""
-        collision_file = Path("v2/.agents/outbox/external_hash_v2_collisions.json")
+        collision_file = Path("/app/.agents/outbox/external_hash_v2_collisions.json")
         if collision_file.exists():
             collision_file.unlink()
 
@@ -323,7 +329,7 @@ class TestBackfillCollisionsReport(TestCase):
         call_command("backfill_external_hash_v2")
 
         # Collision file should NOT exist
-        collision_file = Path("v2/.agents/outbox/external_hash_v2_collisions.json")
+        collision_file = Path("/app/.agents/outbox/external_hash_v2_collisions.json")
         assert not collision_file.exists()
 
     def test_collision_file_generated_when_collisions_exist(self):
@@ -363,7 +369,7 @@ class TestBackfillCollisionsReport(TestCase):
         call_command("backfill_external_hash_v2")
 
         # Collision file SHOULD exist
-        collision_file = Path("v2/.agents/outbox/external_hash_v2_collisions.json")
+        collision_file = Path("/app/.agents/outbox/external_hash_v2_collisions.json")
         assert collision_file.exists()
 
         # Validate JSON structure

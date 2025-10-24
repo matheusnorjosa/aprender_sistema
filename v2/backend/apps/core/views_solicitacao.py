@@ -467,12 +467,15 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         gcal_client = getattr(settings, "GCAL_CLIENT", None)
         features_apply_blocked = gcal_client != "google"
 
-        if features_apply_blocked and not apply_blocked:
+        # RF05/PA-03: Bloquear apenas chamadas reais (dry_run=False) quando apply_blocked
+        # dry_run deve sempre funcionar, independente de GCAL_CLIENT
+        if features_apply_blocked and not apply_blocked and not dry_run:
             return Response(
                 {
                     "detail": "Publicação bloqueada: GCAL_CLIENT não está configurado como 'google'.",
                     "hint": "Para forçar publicação em modo de teste, envie apply_blocked=true no corpo da requisição.",
                     "features_apply_blocked": True,
+                    "dry_run_allowed": True,
                 },
                 status=status.HTTP_409_CONFLICT,
             )

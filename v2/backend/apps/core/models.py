@@ -337,6 +337,13 @@ class Solicitacao(models.Model):
         blank=True,
         help_text="SHA1 do payload aplicado no GCal (drift detection)",
     )
+    meet_link = models.URLField(
+        max_length=500,
+        null=True,
+        blank=True,
+        verbose_name="Link do Google Meet",
+        help_text="Link do Google Meet gerado automaticamente (RF06)",
+    )
 
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -375,20 +382,23 @@ class Solicitacao(models.Model):
         payload_hash: str | None = None,
         error: str | None = None,
         sync_at=None,
+        meet_link: str | None = None,
     ):
         """
-        Atualiza campos de rastreamento GCal (PR14).
+        Atualiza campos de rastreamento GCal (PR14, PR19).
 
         Args:
             status: Um dos valores de GCalStatus (NONE, PENDING, PUBLISHED, ERROR)
             payload_hash: SHA1 do payload aplicado (opcional)
             error: Mensagem de erro (truncada para 500 chars)
             sync_at: Timestamp do sync (default: timezone.now())
+            meet_link: URL do Google Meet gerado automaticamente (RF06, opcional)
 
         Usage:
             solicitacao.mark_gcal(
                 status=Solicitacao.GCalStatus.PUBLISHED,
                 payload_hash="abc123...",
+                meet_link="https://meet.google.com/abc-defg-hij",
                 error=""
             )
         """
@@ -400,14 +410,21 @@ class Solicitacao(models.Model):
         self.gcal_last_error = error[:500] if error else ""
         self.gcal_last_sync_at = sync_at
 
-        self.save(
-            update_fields=[
-                "gcal_status",
-                "gcal_payload_hash",
-                "gcal_last_error",
-                "gcal_last_sync_at",
-            ]
-        )
+        # RF06: Atualizar meet_link se fornecido
+        if meet_link is not None:
+            self.meet_link = meet_link
+
+        update_fields = [
+            "gcal_status",
+            "gcal_payload_hash",
+            "gcal_last_error",
+            "gcal_last_sync_at",
+        ]
+
+        if meet_link is not None:
+            update_fields.append("meet_link")
+
+        self.save(update_fields=update_fields)
 
     def save(self, *args, **kwargs):
         """

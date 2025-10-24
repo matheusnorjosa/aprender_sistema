@@ -31,6 +31,7 @@ import {
   EyeOutlined,
   CloudUploadOutlined,
   CalendarOutlined,
+  VideoCameraOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -181,6 +182,17 @@ export default function PreAgendaPage() {
             title="Publicar"
             disabled={record.gcal_status === 'PUBLISHED'}
           />
+          {record.meet_link && (
+            <Button
+              size="small"
+              type="link"
+              icon={<VideoCameraOutlined />}
+              href={record.meet_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Entrar na reunião"
+            />
+          )}
         </Space>
       ),
     },

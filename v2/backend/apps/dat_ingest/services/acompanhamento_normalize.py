@@ -76,7 +76,7 @@ def normalize_sector(sheet_name: str, projeto_value: str) -> str:
         return "Super"
     elif sheet_norm == "outros":
         # Map por Projeto
-        if "ideb" in projeto_norm:
+        if "ideb" in projeto_norm or ("gestao" in projeto_norm and "escolar" in projeto_norm):
             return "Gestão Escolar"
         elif "vidas l" in projeto_norm or "linguagem" in projeto_norm:
             return "Vida & Linguagem"

@@ -19,8 +19,9 @@ from typing import Dict, List
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 
-from apps.core.models import Solicitacao
+from apps.core.models import Solicitacao, Participation
 from apps.dat_ingest.services.acompanhamento_normalize import hash_event_v2
 
 
@@ -152,9 +153,16 @@ class Command(BaseCommand):
 
         self.stdout.write("\n✅ Backfill concluído!\n")
 
+    def _local_dt(self, dt):
+        """Converte datetime UTC para America/Fortaleza"""
+        if dt is None:
+            return None
+        return timezone.localtime(dt)
+
     def build_row_from_solicitacao(self, sol: Solicitacao) -> Dict[str, str]:
         """
         Constrói dicionário de dados para hash_event_v2 a partir de Solicitacao.
+        Garante normalização compatível com a pipeline do PR21.
 
         Args:
             sol: Instância de Solicitacao
@@ -162,34 +170,95 @@ class Command(BaseCommand):
         Returns:
             Dict com campos normalizados
         """
-        # Formadores (até 5)
-        formadores = list(sol.formadores.all())
-        formadores_emails = [f.email for f in formadores]
-        while len(formadores_emails) < 5:
-            formadores_emails.append("")
+        # Converter inicio/fim para timezone local
+        ini_local = self._local_dt(sol.inicio)
+        fim_local = self._local_dt(sol.fim)
 
-        # source_sheet: inferir a partir do projeto ou tipo
-        # (simplificação: usar projeto.nome como proxy)
+        data = ini_local.date().isoformat() if ini_local else ""
+        hora_inicio = ini_local.strftime("%H:%M") if ini_local else ""
+        hora_fim = fim_local.strftime("%H:%M") if fim_local else ""
+
+        # Projeto com alias IDEB
+        projeto_nome = (sol.projeto.nome or "").strip() if sol.projeto_id else ""
+        from apps.dat_ingest.services.acompanhamento_normalize import normalize_project_alias
+        projeto_normalizado = normalize_project_alias(projeto_nome)
+
+        # Fluxo SUPER x NAO_SUPER
+        fluxo = getattr(sol.projeto, "fluxo", "NAO_SUPER") or "NAO_SUPER"
+        aprovacao = "SIM" if (fluxo == "SUPER" and sol.status == "aprovado") else ""
+
+        # Coordenador (usuario da solicitação)
+        coord_email = (sol.usuario.email or "").strip().lower() if sol.usuario_id else ""
+        coord_name = ""
+        if sol.usuario_id:
+            fn = (sol.usuario.first_name or "").strip()
+            ln = (sol.usuario.last_name or "").strip()
+            coord_name = f"{fn} {ln}".strip()
+        coordenador = coord_email or coord_name
+
+        # Município
+        municipio = (sol.municipio.nome or "").strip() if sol.municipio_id else ""
+
+        # Tipo evento
+        tipo = (sol.tipo_evento.nome or "").strip() if sol.tipo_evento_id else ""
+
+        # Participations
+        parts = Participation.objects.filter(solicitacao=sol).select_related("usuario")
+        coord_acomp = []
+        formadores = []
+        convidados = []
+
+        for p in parts:
+            uemail = (getattr(p.usuario, "email", "") or "").strip().lower()
+            uname = ""
+            if p.usuario_id:
+                fn = (p.usuario.first_name or "").strip()
+                ln = (p.usuario.last_name or "").strip()
+                uname = f"{fn} {ln}".strip()
+            ident = uemail or uname
+            if not ident:
+                continue
+
+            if p.role == "COORD_ACOMPANHA":
+                coord_acomp.append(ident)
+            elif p.role == "FORMADOR":
+                formadores.append(ident)
+            elif p.role == "CONVIDADO":
+                convidados.append(ident)
+
+        # Ordenação determinística
+        coord_acomp = sorted(set(coord_acomp))
+        formadores = sorted(set(formadores))[:5]
+        while len(formadores) < 5:
+            formadores.append("")
+
+        convidados_s = ";".join(sorted(set([c for c in convidados if c])))
+
+        # Campos ausentes no modelo: usar vazio
+        encontro = sol.encontro or ""
+        segmento = sol.segmento or ""
+
+        # Source sheet inference
         source_sheet = self.infer_source_sheet(sol)
 
         return {
             "source_sheet": source_sheet,
-            "municipio": sol.municipio.nome if sol.municipio else "",
-            "encontro": sol.encontro or "",
-            "tipo": sol.tipo_evento.nome if sol.tipo_evento else "",
-            "data": sol.data.strftime("%Y-%m-%d") if sol.data else "",
-            "hora_inicio": sol.hora_inicio.strftime("%H:%M") if sol.hora_inicio else "",
-            "hora_fim": sol.hora_fim.strftime("%H:%M") if sol.hora_fim else "",
-            "projeto": sol.projeto.nome if sol.projeto else "",
-            "segmento": sol.segmento or "",
-            "coord_acompanha": "sim" if sol.coord_acompanha else "",
-            "coordenador": sol.coordenador.email if sol.coordenador else "",
-            "formador1": formadores_emails[0],
-            "formador2": formadores_emails[1],
-            "formador3": formadores_emails[2],
-            "formador4": formadores_emails[3],
-            "formador5": formadores_emails[4],
-            "aprovacao": sol.aprovacao if hasattr(sol, "aprovacao") else "",
+            "municipio": municipio,
+            "encontro": encontro,
+            "tipo": tipo,
+            "data": data,
+            "hora_inicio": hora_inicio,
+            "hora_fim": hora_fim,
+            "projeto": projeto_normalizado,
+            "segmento": segmento,
+            "coord_acompanha": ";".join(coord_acomp),
+            "coordenador": coordenador,
+            "formador1": formadores[0],
+            "formador2": formadores[1],
+            "formador3": formadores[2],
+            "formador4": formadores[3],
+            "formador5": formadores[4],
+            "aprovacao": aprovacao,
         }
 
     def infer_source_sheet(self, sol: Solicitacao) -> str:

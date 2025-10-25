@@ -563,6 +563,17 @@ test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 2. **Solicitação criada com `status='aprovado'` automaticamente**
 3. Vai direto para `/pre-agenda` (Controle cria evento no Google Calendar)
 
+### Mapeamento de Fluxos na Planilha Original
+**Arquivo**: `v2/backend/data/csv-import/Cópia de Acompanhamento de Agenda _ 2025.xlsx`
+
+O **nome da aba** define o fluxo dos projetos (coluna "K" - "projeto"):
+- **Aba "Super"** → Projetos são **SUPER** (requerem aprovação manual)
+  - 8 projetos: Cataventos, CIRANDAR, LENDO E ESCREVENDO, NOVO LENDO, PROJETO AMMA, PROJETO MIUDEZAS E DESCOBERTAS, TEMA, UNI DUNI TÊ
+- **Abas "ACerta", "Outros", "Brincando", "Vidas"** → Projetos são **NAO_SUPER** (auto-aprovados)
+  - Total: ~16 projetos + variantes
+
+**Nota**: Correção aplicada em 25/10/2025 - 8 projetos da aba "Super" foram atualizados de NAO_SUPER → SUPER no banco.
+
 ### Mudanças Implementadas
 
 **1. models.py - Restauração de Auto-Aprovação**

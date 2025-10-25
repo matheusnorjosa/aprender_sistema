@@ -1,0 +1,258 @@
+/**
+ * Home Dashboard - AS v2
+ *
+ * Design: paginainicial/screen.png
+ * - Cards organizados por nível de acesso (Administrator, Manager, General)
+ * - KPI badges com contagens
+ * - Links rápidos baseados em RBAC
+ */
+
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { Row, Col, Card, Typography, Badge, Space, Spin, Statistic } from 'antd';
+import {
+  UserOutlined,
+  SettingOutlined,
+  BarChartOutlined,
+  CheckCircleOutlined,
+  TeamOutlined,
+  DashboardOutlined,
+  FileTextOutlined,
+  ShoppingOutlined,
+  SafetyOutlined,
+} from '@ant-design/icons';
+import { getMe } from '../../api/availability';
+
+const { Title, Text } = Typography;
+
+/**
+ * Card de acesso rápido
+ */
+function AccessCard({ icon, title, description, link, badge, disabled = false }) {
+  const cardContent = (
+    <Card
+      hoverable={!disabled}
+      style={{
+        height: '100%',
+        opacity: disabled ? 0.5 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+      }}
+    >
+      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: '32px', color: '#1890ff' }}>
+            {icon}
+          </div>
+          {badge !== undefined && (
+            <Badge count={badge} overflowCount={999} style={{ backgroundColor: '#52c41a' }} />
+          )}
+        </div>
+        <div>
+          <Title level={5} style={{ marginBottom: 4 }}>{title}</Title>
+          <Text type="secondary">{description}</Text>
+        </div>
+      </Space>
+    </Card>
+  );
+
+  if (disabled || !link) {
+    return cardContent;
+  }
+
+  return <Link to={link}>{cardContent}</Link>;
+}
+
+export default function HomePage() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    pendingApprovals: 0,
+    myRequests: 0,
+    upcomingEvents: 0,
+  });
+
+  useEffect(() => {
+    const loadUserAndStats = async () => {
+      try {
+        const userData = await getMe();
+        setUser(userData);
+
+        // TODO: Carregar estatísticas reais da API
+        // Por enquanto, valores mockados
+        setStats({
+          pendingApprovals: 5,
+          myRequests: 3,
+          upcomingEvents: 12,
+        });
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserAndStats();
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ padding: '24px', textAlign: 'center' }}>
+        <Spin size="large" tip="Carregando..." />
+      </div>
+    );
+  }
+
+  // Calcular permissões
+  const isAdmin = user?.is_superuser || user?.groups?.includes('Superintendência') || user?.groups?.includes('Gerência');
+  const isManager = user?.groups?.includes('Controle') || user?.groups?.includes('Gerência');
+  const isCoordenador = user?.groups?.includes('Coordenador') || user?.groups?.includes('DAT');
+
+  return (
+    <div style={{ padding: '24px' }}>
+      <div style={{ marginBottom: 32 }}>
+        <Title level={2}>Home</Title>
+        <Text type="secondary">
+          Atalhos e KPIs resumidos para suas tarefas diárias.
+        </Text>
+      </div>
+
+      {/* Administrator Access */}
+      {isAdmin && (
+        <>
+          <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
+            Administrator Access
+          </Title>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={8}>
+              <AccessCard
+                icon={<UserOutlined />}
+                title="User Management"
+                description="Gerenciar usuários, grupos e permissões."
+                link="/admin/usuarios"
+                disabled={true}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <AccessCard
+                icon={<SettingOutlined />}
+                title="System Settings"
+                description="Configurar parâmetros do sistema."
+                link="/admin/settings"
+                disabled={true}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <AccessCard
+                icon={<BarChartOutlined />}
+                title="Analytics"
+                description="Visualizar relatórios detalhados e métricas do sistema."
+                link="/dashboards"
+                disabled={true}
+              />
+            </Col>
+          </Row>
+        </>
+      )}
+
+      {/* Manager Access */}
+      {isManager && (
+        <>
+          <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
+            Manager Access
+          </Title>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={8}>
+              <AccessCard
+                icon={<CheckCircleOutlined />}
+                title="Approval Requests"
+                description="Revisar e aprovar solicitações pendentes."
+                link="/aprovacoes"
+                badge={stats.pendingApprovals}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <AccessCard
+                icon={<TeamOutlined />}
+                title="Team Performance"
+                description="Monitorar métricas e desempenho da equipe."
+                link="/dashboards"
+                disabled={true}
+              />
+            </Col>
+          </Row>
+        </>
+      )}
+
+      {/* General Access */}
+      <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
+        General Access
+      </Title>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} md={8}>
+          <AccessCard
+            icon={<DashboardOutlined />}
+            title="My Dashboard"
+            description="Seu painel pessoal com informações-chave."
+            link="/disponibilidade"
+          />
+        </Col>
+        {isCoordenador && (
+          <>
+            <Col xs={24} sm={12} md={8}>
+              <AccessCard
+                icon={<FileTextOutlined />}
+                title="Submit Request"
+                description="Criar uma nova solicitação de evento."
+                link="/solicitacoes/nova"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <AccessCard
+                icon={<ShoppingOutlined />}
+                title="My Items"
+                description="Ver suas solicitações e itens submetidos."
+                link="/solicitacoes/minhas"
+                badge={stats.myRequests}
+              />
+            </Col>
+          </>
+        )}
+      </Row>
+
+      {/* KPIs Summary */}
+      <Card style={{ marginTop: 32 }}>
+        <Title level={4} style={{ marginBottom: 16 }}>
+          Resumo Rápido
+        </Title>
+        <Row gutter={16}>
+          <Col xs={24} sm={8}>
+            <Statistic
+              title="Eventos Futuros"
+              value={stats.upcomingEvents}
+              prefix={<SafetyOutlined />}
+            />
+          </Col>
+          {isCoordenador && (
+            <Col xs={24} sm={8}>
+              <Statistic
+                title="Minhas Solicitações"
+                value={stats.myRequests}
+                prefix={<FileTextOutlined />}
+              />
+            </Col>
+          )}
+          {isManager && (
+            <Col xs={24} sm={8}>
+              <Statistic
+                title="Aprovações Pendentes"
+                value={stats.pendingApprovals}
+                prefix={<CheckCircleOutlined />}
+                valueStyle={{ color: '#cf1322' }}
+              />
+            </Col>
+          )}
+        </Row>
+      </Card>
+    </div>
+  );
+}

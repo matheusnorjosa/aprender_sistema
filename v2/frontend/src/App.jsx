@@ -25,7 +25,7 @@ import MonthlyPage from './pages/Disponibilidade/MonthlyPage';
 import Solicitacoes from './pages/Solicitacoes';
 import ControlePage from './pages/Controle/ControlePage';
 import DATPage from './pages/DAT/DATPage';
-import NewSolicitacaoPage from './pages/Solicitacoes/NewSolicitacaoPage';
+import NewSolicitacaoWizard from './pages/Solicitacoes/NewSolicitacaoWizard';
 import MySolicitacoesPage from './pages/Solicitacoes/MySolicitacoesPage';
 import ApprovalsPage from './pages/Aprovacoes/ApprovalsPage';
 import PreAgendaPage from './pages/PreAgenda/PreAgendaPage';
@@ -209,7 +209,7 @@ function App() {
                 />
                 <Route
                   path="/solicitacoes/nova"
-                  element={canCoordenador ? <NewSolicitacaoPage /> : <Forbidden />}
+                  element={canCoordenador ? <NewSolicitacaoWizard /> : <Forbidden />}
                 />
 
                 {/* PR15: Rota de aprovações */}

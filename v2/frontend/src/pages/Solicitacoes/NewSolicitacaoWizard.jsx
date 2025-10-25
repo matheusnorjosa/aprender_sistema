@@ -59,6 +59,7 @@ import {
 import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
 import FormadoresPicker from '../../components/FormadoresPicker';
+import CoordenadoresPicker from '../../components/CoordenadoresPicker';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -149,7 +150,7 @@ export default function NewSolicitacaoWizard() {
     fim: null,
     // Passo 2
     formadores: [],
-    coordenadorAcompanha: false,
+    coordenadores: [],
     // Passo 3
     tipo: '',
     encontro: '',
@@ -189,7 +190,18 @@ export default function NewSolicitacaoWizard() {
   const handleSubmit = async () => {
     setLoading(true);
     try {
+      // Garantir que formadores é um array
+      const formadores = Array.isArray(formData.formadores) ? formData.formadores : [];
+
+      if (formadores.length === 0) {
+        message.error('Por favor, selecione pelo menos um formador');
+        setLoading(false);
+        return;
+      }
+
       // Validar dados completos
+      const coordenadores = Array.isArray(formData.coordenadores) ? formData.coordenadores : [];
+
       const payload = {
         municipio_id: formData.municipio.id,
         projeto_id: formData.projeto.id,
@@ -200,8 +212,9 @@ export default function NewSolicitacaoWizard() {
         encontro: formData.encontro,
         segmento: formData.segmento,
         observacoes: formData.observacoes,
-        coordenador_acompanha: formData.coordenadorAcompanha,
-        formador_ids: formData.formadores.map(f => f.id),
+        coordenador_acompanha: coordenadores.length > 0,
+        formador_ids: formadores.map(f => f.id),
+        coordenador_ids: coordenadores.map(c => c.id),
       };
 
       await createSolicitacao(payload);
@@ -318,13 +331,14 @@ export default function NewSolicitacaoWizard() {
             />
           </Form.Item>
 
-          <Form.Item name="coordenadorAcompanha" valuePropName="checked">
-            <Checkbox
-              checked={formData.coordenadorAcompanha}
-              onChange={(e) => setFormData({ ...formData, coordenadorAcompanha: e.target.checked })}
-            >
-              Coordenador acompanhará o evento
-            </Checkbox>
+          <Form.Item
+            label="Coordenadores Acompanhantes"
+            name="coordenadores"
+          >
+            <CoordenadoresPicker
+              value={formData.coordenadores}
+              onChange={(value) => setFormData({ ...formData, coordenadores: value })}
+            />
           </Form.Item>
 
           {formData.projeto && (
@@ -427,8 +441,10 @@ export default function NewSolicitacaoWizard() {
                 ? formData.formadores.map(f => f.label || f.name).join(', ')
                 : 'Nenhum'}
             </Descriptions.Item>
-            <Descriptions.Item label="Coordenador Acompanha">
-              {formData.coordenadorAcompanha ? 'Sim' : 'Não'}
+            <Descriptions.Item label="Coordenadores Acompanhantes">
+              {formData.coordenadores.length > 0
+                ? formData.coordenadores.map(c => c.label || c.name).join(', ')
+                : 'Nenhum'}
             </Descriptions.Item>
             {formData.tipo && (
               <Descriptions.Item label="Tipo">{formData.tipo}</Descriptions.Item>

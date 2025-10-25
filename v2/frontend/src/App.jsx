@@ -29,6 +29,7 @@ import NewSolicitacaoPage from './pages/Solicitacoes/NewSolicitacaoPage';
 import MySolicitacoesPage from './pages/Solicitacoes/MySolicitacoesPage';
 import ApprovalsPage from './pages/Aprovacoes/ApprovalsPage';
 import PreAgendaPage from './pages/PreAgenda/PreAgendaPage';
+import LoginPage from './pages/Auth/LoginPage';
 import { getMe } from './api/availability';
 import './App.css';
 
@@ -46,22 +47,33 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   // Carregar dados do usuário
+  const loadUser = async () => {
+    try {
+      const userData = await getMe();
+      setUser(userData);
+    } catch (error) {
+      console.error('Erro ao carregar usuário:', error);
+      setUser(null); // Explicitamente null se falhar
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await getMe();
-        setUser(userData);
-      } catch (error) {
-        console.error('Erro ao carregar usuário:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadUser();
   }, []);
 
   if (loading) {
     return <Spin size="large" tip="Carregando..." fullscreen />;
+  }
+
+  // Se não autenticado, mostrar página de login
+  if (!user) {
+    return (
+      <ConfigProvider locale={ptBR}>
+        <LoginPage onLoginSuccess={loadUser} />
+      </ConfigProvider>
+    );
   }
 
   // Calcular flags de permissão

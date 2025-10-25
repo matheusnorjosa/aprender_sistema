@@ -119,7 +119,9 @@ class AvailabilityBlock(models.Model):
     - Total (T): bloqueia qualquer evento no intervalo
     - Parcial (P): bloqueia apenas sub-janela especificada
 
-    PA-01: Status começa pendente, aprovação manual obrigatória.
+    IMPORTANTE: Bloqueios são auto-aprovados ao criar (informação factual).
+    O formador/coordenador sabe quando está indisponível, não requer autorização.
+
     RD-06: Armazena UTC, compara em America/Fortaleza.
     """
 

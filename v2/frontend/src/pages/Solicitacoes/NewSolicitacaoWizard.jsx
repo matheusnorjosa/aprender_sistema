@@ -58,7 +58,7 @@ import {
 } from '../../api/lookup';
 import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
-import PeoplePicker from '../../components/PeoplePicker';
+import FormadoresPicker from '../../components/FormadoresPicker';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -304,20 +304,16 @@ export default function NewSolicitacaoWizard() {
             name="formadores"
             rules={[{ required: true, message: 'Por favor selecione pelo menos um formador' }]}
           >
-            <PeoplePicker
-              multiple
+            <FormadoresPicker
               value={formData.formadores}
               onChange={(value) => setFormData({ ...formData, formadores: value })}
-              renderTag={(formador) => (
-                <Space>
-                  {formador.name}
-                  <AvailabilityBadge
-                    formador={formador}
-                    inicio={formData.inicio}
-                    fim={formData.fim}
-                    municipio={formData.municipio}
-                  />
-                </Space>
+              renderBadge={(formador) => (
+                <AvailabilityBadge
+                  formador={formador}
+                  inicio={formData.inicio}
+                  fim={formData.fim}
+                  municipio={formData.municipio}
+                />
               )}
             />
           </Form.Item>
@@ -428,7 +424,7 @@ export default function NewSolicitacaoWizard() {
             </Descriptions.Item>
             <Descriptions.Item label="Formadores">
               {formData.formadores.length > 0
-                ? formData.formadores.map(f => f.name).join(', ')
+                ? formData.formadores.map(f => f.label || f.name).join(', ')
                 : 'Nenhum'}
             </Descriptions.Item>
             <Descriptions.Item label="Coordenador Acompanha">

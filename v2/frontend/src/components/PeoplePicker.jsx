@@ -95,9 +95,9 @@ export default function PeoplePicker({
       onChange(updated);
     }
 
-    // Limpar busca
+    // Limpar busca mas manter as opções para próxima seleção
     setFormadorSearch('');
-    setFormadoresOptions([]);
+    // Não limpar formadoresOptions para permitir múltiplas seleções
   };
 
   const handleAddCoord = (selectedValue, option) => {
@@ -122,9 +122,9 @@ export default function PeoplePicker({
       onChange(updated);
     }
 
-    // Limpar busca
+    // Limpar busca mas manter as opções para próxima seleção
     setCoordSearch('');
-    setCoordOptions([]);
+    // Não limpar coordOptions para permitir múltiplas seleções
   };
 
   const handleRemoveFormador = (index) => {
@@ -172,6 +172,12 @@ export default function PeoplePicker({
               value={formadorSearch}
               options={formadoresOptions}
               onSearch={handleSearchFormadores}
+              onFocus={() => {
+                // Carregar lista inicial ao focar no campo (se ainda não carregou)
+                if (formadoresOptions.length === 0 && !loadingFormadores) {
+                  handleSearchFormadores('');
+                }
+              }}
               onSelect={handleAddFormador}
               onChange={setFormadorSearch}
               placeholder="Clique para ver lista ou digite para buscar..."
@@ -201,6 +207,12 @@ export default function PeoplePicker({
               value={coordSearch}
               options={coordOptions}
               onSearch={handleSearchCoord}
+              onFocus={() => {
+                // Carregar lista inicial ao focar no campo (se ainda não carregou)
+                if (coordOptions.length === 0 && !loadingCoord) {
+                  handleSearchCoord('');
+                }
+              }}
               onSelect={handleAddCoord}
               onChange={setCoordSearch}
               placeholder="Clique para ver lista ou digite para buscar..."

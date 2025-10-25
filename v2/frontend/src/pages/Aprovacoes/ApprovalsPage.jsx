@@ -58,7 +58,7 @@ export default function ApprovalsPage() {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
 
-  const [statusFilter, setStatusFilter] = useState('pending');
+  const [statusFilter, setStatusFilter] = useState('pendente');
   const [searchTerm, setSearchTerm] = useState('');
 
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -75,7 +75,7 @@ export default function ApprovalsPage() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const filters = { flow: 'SUPER', status: statusFilter || 'pending', q: searchTerm };
+      const filters = { flow: 'SUPER', status: statusFilter || 'pendente', q: searchTerm };
 
       const data = await listSolicitacoes(filters);
       setRows(data.results || data);
@@ -251,9 +251,9 @@ export default function ApprovalsPage() {
               style={{ width: 200 }}
               placeholder="Status"
             >
-              <Select.Option value="pending">Pendentes</Select.Option>
-              <Select.Option value="approved">Aprovadas</Select.Option>
-              <Select.Option value="rejected">Reprovadas</Select.Option>
+              <Select.Option value="pendente">Pendentes</Select.Option>
+              <Select.Option value="aprovado">Aprovadas</Select.Option>
+              <Select.Option value="reprovado">Reprovadas</Select.Option>
             </Select>
 
             <Input.Search
@@ -267,7 +267,7 @@ export default function ApprovalsPage() {
           </Space>
 
           {/* Contagem de pendentes */}
-          {statusFilter === 'pending' && total > 0 && (
+          {statusFilter === 'pendente' && total > 0 && (
             <Paragraph>
               <Tag color="orange">{total}</Tag> solicitações aguardando aprovação
             </Paragraph>

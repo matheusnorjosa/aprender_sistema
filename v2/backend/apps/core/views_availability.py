@@ -32,6 +32,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
 
     Formadores podem criar bloqueios para si mesmos.
     Usuario é preenchido automaticamente com request.user.
+    Status é auto-aprovado (bloqueios são informações factuais).
     """
 
     queryset = AvailabilityBlock.objects.all()
@@ -47,7 +48,15 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         return AvailabilityBlock.objects.filter(usuario=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(usuario=self.request.user)
+        """
+        Cria bloqueio e auto-aprova.
+
+        Bloqueios são informações factuais (formador sabe quando está indisponível)
+        e não requerem aprovação de terceiros. O status é definido como 'aprovado'
+        automaticamente para que o bloqueio seja considerado imediatamente nas
+        verificações de conflito (RD-02, RD-03).
+        """
+        serializer.save(usuario=self.request.user, status='aprovado')
 
 
 class AvailabilityCheckView(APIView):

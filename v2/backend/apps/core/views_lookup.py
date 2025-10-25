@@ -41,8 +41,8 @@ class MunicipioLookup(APIView):
         q = request.GET.get('q', '').strip()
 
         if not q:
-            # Retornar top 20 municípios mais recentes
-            qs = Municipio.objects.filter(ativo=True).order_by('-id')[:20]
+            # Retornar todos os municípios (max 100)
+            qs = Municipio.objects.filter(ativo=True).order_by('nome')[:100]
         else:
             # Normalizar query
             q_norm = norm_text(q)
@@ -75,7 +75,7 @@ class ProjetoLookup(APIView):
         q = request.GET.get('q', '').strip()
 
         if not q:
-            qs = Projeto.objects.filter(ativo=True).order_by('-id')[:20]
+            qs = Projeto.objects.filter(ativo=True).order_by('nome')[:50]
         else:
             q_norm = norm_text(q)
             qs = Projeto.objects.filter(
@@ -93,6 +93,7 @@ class ProjetoLookup(APIView):
                 'id': proj.id,
                 'label': label,
                 'kind': 'projeto',
+                'fluxo': proj.fluxo,
             })
 
         return Response(dedup_by_id(results))
@@ -109,7 +110,7 @@ class TipoEventoLookup(APIView):
         q = request.GET.get('q', '').strip()
 
         if not q:
-            qs = TipoEvento.objects.all().order_by('-id')[:20]
+            qs = TipoEvento.objects.all().order_by('nome')[:50]
         else:
             qs = TipoEvento.objects.filter(
                 nome__icontains=q

@@ -1,0 +1,125 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "São Paulo",
+        "sigla": "SP",
+        "regiao": "Sudeste"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-46.6333, -23.5505]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rio de Janeiro",
+        "sigla": "RJ",
+        "regiao": "Sudeste"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-43.1729, -22.9068]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Minas Gerais",
+        "sigla": "MG",
+        "regiao": "Sudeste"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-43.9378, -19.9167]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Bahia",
+        "sigla": "BA",
+        "regiao": "Nordeste"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-38.5108, -12.9714]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Ceará",
+        "sigla": "CE",
+        "regiao": "Nordeste"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-38.5434, -3.7172]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pernambuco",
+        "sigla": "PE",
+        "regiao": "Nordeste"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-34.8813, -8.0476]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Paraná",
+        "sigla": "PR",
+        "regiao": "Sul"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-49.2733, -25.4284]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rio Grande do Sul",
+        "sigla": "RS",
+        "regiao": "Sul"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-51.2177, -30.0346]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Goiás",
+        "sigla": "GO",
+        "regiao": "Centro-Oeste"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-49.2643, -16.6869]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Amazonas",
+        "sigla": "AM",
+        "regiao": "Norte"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-60.0217, -3.1190]
+      }
+    }
+  ]
+}

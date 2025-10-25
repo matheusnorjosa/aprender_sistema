@@ -87,7 +87,7 @@ function Solicitacoes() {
   const [dataFim, setDataFim] = useState(null);
   const [municipioFilter, setMunicipioFilter] = useState(null);
   const [projetoFilter, setProjetoFilter] = useState(null);
-  const [fluxoFilter, setFluxoFilter] = useState('');
+  const [fluxoFilter, setFluxoFilter] = useState('SUPER'); // Apenas fluxo SUPER (Superintendência)
 
   // Options para filtros
   const [municipios, setMunicipios] = useState([]);

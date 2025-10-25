@@ -171,25 +171,41 @@ export default function ApprovalsPage() {
       title: 'Município',
       dataIndex: 'municipio',
       key: 'municipio',
-      render: (municipio) => municipio?.nome || '-',
+      render: (municipio) => {
+        // Backend retorna ID (número) ao invés de objeto
+        if (typeof municipio === 'number') return `Município #${municipio}`;
+        return municipio?.nome || '-';
+      },
     },
     {
       title: 'Projeto',
       dataIndex: 'projeto',
       key: 'projeto',
-      render: (projeto) => projeto?.nome || '-',
+      render: (projeto) => {
+        // Backend retorna ID (número) ao invés de objeto
+        if (typeof projeto === 'number') return `Projeto #${projeto}`;
+        return projeto?.nome || '-';
+      },
     },
     {
       title: 'Tipo',
       dataIndex: 'tipo_evento',
       key: 'tipo_evento',
-      render: (tipo) => tipo?.nome || '-',
+      render: (tipo) => {
+        // Backend retorna ID (número) ao invés de objeto
+        if (typeof tipo === 'number') return `Tipo #${tipo}`;
+        return tipo?.nome || '-';
+      },
     },
     {
       title: 'Autor',
       dataIndex: 'usuario',
       key: 'usuario',
-      render: (usuario) => (usuario ? `${usuario.first_name} ${usuario.last_name}` : '-'),
+      render: (usuario) => {
+        // Backend retorna ID (número) ao invés de objeto
+        if (typeof usuario === 'number') return `Usuário #${usuario}`;
+        return usuario ? `${usuario.first_name} ${usuario.last_name}` : '-';
+      },
     },
     {
       title: 'Status',

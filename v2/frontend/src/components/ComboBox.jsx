@@ -25,7 +25,12 @@ export default function ComboBox({
       try {
         setLoading(true);
         const results = await lookupFunction('');
-        setOptions(results.map(item => ({ value: item.id, label: item.label, data: item })));
+        console.log(`ComboBox: Carregadas ${results.length} opções iniciais`, results.slice(0, 3));
+        setOptions(results.map(item => ({
+          value: String(item.id),
+          label: item.label,
+          data: item
+        })));
       } catch (error) {
         console.error('Erro ao carregar opções iniciais:', error);
       } finally {
@@ -52,7 +57,11 @@ export default function ComboBox({
       try {
         setLoading(true);
         const results = await lookupFunction('');
-        setOptions(results.map(item => ({ value: item.id, label: item.label, data: item })));
+        setOptions(results.map(item => ({
+          value: String(item.id),
+          label: item.label,
+          data: item
+        })));
       } catch (error) {
         console.error('Erro ao buscar:', error);
       } finally {
@@ -64,7 +73,11 @@ export default function ComboBox({
     try {
       setLoading(true);
       const results = await lookupFunction(query);
-      setOptions(results.map(item => ({ value: item.id, label: item.label, data: item })));
+      setOptions(results.map(item => ({
+        value: String(item.id),
+        label: item.label,
+        data: item
+      })));
     } catch (error) {
       console.error('Erro ao buscar:', error);
     } finally {

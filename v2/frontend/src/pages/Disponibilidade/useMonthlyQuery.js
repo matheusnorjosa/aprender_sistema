@@ -23,12 +23,15 @@ export default function useMonthlyQuery(params) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Desestruturar params para evitar loop infinito
+  const { year, month, role, sector, q } = params;
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const result = await getMonthly(params);
+      const result = await getMonthly({ year, month, role, sector, q });
       setData(result);
     } catch (err) {
       setError(err.message || 'Erro ao carregar grade mensal');
@@ -36,7 +39,7 @@ export default function useMonthlyQuery(params) {
     } finally {
       setLoading(false);
     }
-  }, [params]);
+  }, [year, month, role, sector, q]);
 
   useEffect(() => {
     fetchData();

@@ -166,7 +166,7 @@ function App() {
           </Sider>
 
           {/* Layout com margem para compensar Sider fixo */}
-          <Layout style={{ marginLeft: 250 }}>
+          <Layout style={{ marginLeft: 250, minHeight: '100vh' }}>
             {/* Header com info do usuário */}
             <Header style={{
               background: '#fff',
@@ -175,15 +175,16 @@ function App() {
               alignItems: 'center',
               justifyContent: 'flex-end',
               borderBottom: '1px solid #f0f0f0',
+              width: '100%',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
                 <UserOutlined />
                 <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
               </div>
             </Header>
 
             {/* Conteúdo principal */}
-            <Content style={{ padding: '0' }}>
+            <Content style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: '#f0f2f5' }}>
               <Routes>
                 <Route path="/" element={<Navigate to="/disponibilidade" replace />} />
                 <Route path="/disponibilidade" element={<MonthlyPage />} />

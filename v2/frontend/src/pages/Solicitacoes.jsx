@@ -23,6 +23,9 @@ import {
   Card,
   Descriptions,
   Alert,
+  DatePicker,
+  Row,
+  Col,
 } from 'antd';
 import {
   CheckOutlined,
@@ -30,6 +33,8 @@ import {
   EyeOutlined,
   SearchOutlined,
   VideoCameraOutlined,
+  FilterOutlined,
+  ClearOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -39,6 +44,7 @@ import {
   rejectSolicitacao,
 } from '../api/solicitacoes';
 import { getMe } from '../api/availability';
+import { lookupMunicipios, lookupProjetos } from '../api/lookup';
 
 const { TextArea } = Input;
 
@@ -72,6 +78,15 @@ function Solicitacoes() {
   // Filtros
   const [statusFilter, setStatusFilter] = useState('pendente');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dataInicio, setDataInicio] = useState(null);
+  const [dataFim, setDataFim] = useState(null);
+  const [municipioFilter, setMunicipioFilter] = useState(null);
+  const [projetoFilter, setProjetoFilter] = useState(null);
+  const [fluxoFilter, setFluxoFilter] = useState('');
+
+  // Options para filtros
+  const [municipios, setMunicipios] = useState([]);
+  const [projetos, setProjetos] = useState([]);
 
   // Drawer de detalhes
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -110,6 +125,21 @@ function Solicitacoes() {
       }
     }
     fetchCurrentUser();
+
+    // Carregar opções de filtros
+    const loadFilterOptions = async () => {
+      try {
+        const [municData, projData] = await Promise.all([
+          lookupMunicipios(''),
+          lookupProjetos(''),
+        ]);
+        setMunicipios(municData);
+        setProjetos(projData);
+      } catch (error) {
+        console.error('Erro ao carregar opções de filtros:', error);
+      }
+    };
+    loadFilterOptions();
   }, []);
 
   /**
@@ -118,11 +148,30 @@ function Solicitacoes() {
   const fetchSolicitacoes = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const data = await listSolicitacoes({
+      const params = {
         status: statusFilter,
         page,
         search: searchTerm,
-      });
+      };
+
+      // Adicionar filtros opcionais
+      if (dataInicio) {
+        params.data_inicio = dayjs(dataInicio).format('YYYY-MM-DD');
+      }
+      if (dataFim) {
+        params.data_fim = dayjs(dataFim).format('YYYY-MM-DD');
+      }
+      if (municipioFilter) {
+        params.municipio_id = municipioFilter;
+      }
+      if (projetoFilter) {
+        params.projeto_id = projetoFilter;
+      }
+      if (fluxoFilter) {
+        params.fluxo = fluxoFilter;
+      }
+
+      const data = await listSolicitacoes(params);
 
       setSolicitacoes(data.results || []);
       setPagination({
@@ -135,7 +184,7 @@ function Solicitacoes() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, searchTerm]);
+  }, [statusFilter, searchTerm, dataInicio, dataFim, municipioFilter, projetoFilter, fluxoFilter]);
 
   /**
    * Recarrega quando filtros mudam
@@ -246,6 +295,12 @@ function Solicitacoes() {
       render: (text, record) => record.municipio?.nome || record.municipio || '-',
     },
     {
+      title: 'Projeto',
+      dataIndex: ['projeto', 'nome'],
+      key: 'projeto',
+      render: (text, record) => record.projeto?.nome || record.projeto || '-',
+    },
+    {
       title: 'Tipo Evento',
       dataIndex: ['tipo_evento', 'nome'],
       key: 'tipo_evento',
@@ -255,12 +310,6 @@ function Solicitacoes() {
       title: 'Início',
       dataIndex: 'inicio',
       key: 'inicio',
-      render: (text) => formatDateTime(text),
-    },
-    {
-      title: 'Fim',
-      dataIndex: 'fim',
-      key: 'fim',
       render: (text) => formatDateTime(text),
     },
     {
@@ -278,6 +327,17 @@ function Solicitacoes() {
         { text: 'Reprovado', value: 'reprovado' },
       ],
       filteredValue: [statusFilter],
+    },
+    {
+      title: 'Fluxo',
+      dataIndex: 'fluxo',
+      key: 'fluxo',
+      render: (fluxo) => {
+        if (!fluxo) return '-';
+        const color = fluxo === 'SUPER' ? 'blue' : 'green';
+        const label = fluxo === 'SUPER' ? 'SUPER' : 'NÃO SUPER';
+        return <Tag color={color}>{label}</Tag>;
+      },
     },
     {
       title: 'Ações',
@@ -341,27 +401,112 @@ function Solicitacoes() {
         )}
 
         {/* Filtros */}
-        <Space style={{ marginBottom: 16 }} wrap>
-          <Input
-            placeholder="Buscar por usuário, município, tipo..."
-            prefix={<SearchOutlined />}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: 300 }}
-            allowClear
-          />
-          <Select
-            value={statusFilter}
-            onChange={setStatusFilter}
-            style={{ width: 150 }}
-            options={[
-              { label: 'Pendente', value: 'pendente' },
-              { label: 'Aprovado', value: 'aprovado' },
-              { label: 'Reprovado', value: 'reprovado' },
-              { label: 'Todos', value: '' },
-            ]}
-          />
-        </Space>
+        <Card title={<Space><FilterOutlined /> Filtros</Space>} style={{ marginBottom: 16 }}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={8}>
+              <label style={{ display: 'block', marginBottom: 4 }}>Data Inicial</label>
+              <DatePicker
+                style={{ width: '100%' }}
+                placeholder="DD/MM/AAAA"
+                format="DD/MM/YYYY"
+                value={dataInicio}
+                onChange={setDataInicio}
+                allowClear
+              />
+            </Col>
+
+            <Col xs={24} sm={12} md={8}>
+              <label style={{ display: 'block', marginBottom: 4 }}>Data Final</label>
+              <DatePicker
+                style={{ width: '100%' }}
+                placeholder="DD/MM/AAAA"
+                format="DD/MM/YYYY"
+                value={dataFim}
+                onChange={setDataFim}
+                allowClear
+              />
+            </Col>
+
+            <Col xs={24} sm={12} md={8}>
+              <label style={{ display: 'block', marginBottom: 4 }}>Município</label>
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Selecione"
+                value={municipioFilter}
+                onChange={setMunicipioFilter}
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                options={municipios.map(m => ({ label: m.label, value: m.id }))}
+              />
+            </Col>
+
+            <Col xs={24} sm={12} md={8}>
+              <label style={{ display: 'block', marginBottom: 4 }}>Projeto</label>
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Selecione"
+                value={projetoFilter}
+                onChange={setProjetoFilter}
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                options={projetos.map(p => ({ label: p.label, value: p.id }))}
+              />
+            </Col>
+
+            <Col xs={24} sm={12} md={8}>
+              <label style={{ display: 'block', marginBottom: 4 }}>Status</label>
+              <Select
+                style={{ width: '100%' }}
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={[
+                  { label: 'Pendente', value: 'pendente' },
+                  { label: 'Aprovado', value: 'aprovado' },
+                  { label: 'Reprovado', value: 'reprovado' },
+                  { label: 'Todos', value: '' },
+                ]}
+              />
+            </Col>
+
+            <Col xs={24} sm={12} md={8}>
+              <label style={{ display: 'block', marginBottom: 4 }}>Fluxo</label>
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Selecione"
+                value={fluxoFilter}
+                onChange={setFluxoFilter}
+                allowClear
+                options={[
+                  { label: 'SUPER (Superintendência)', value: 'SUPER' },
+                  { label: 'NAO_SUPER (Outros)', value: 'NAO_SUPER' },
+                ]}
+              />
+            </Col>
+          </Row>
+
+          <Row style={{ marginTop: 16 }}>
+            <Col span={24}>
+              <Space>
+                <Button
+                  icon={<ClearOutlined />}
+                  onClick={() => {
+                    setStatusFilter('pendente');
+                    setSearchTerm('');
+                    setDataInicio(null);
+                    setDataFim(null);
+                    setMunicipioFilter(null);
+                    setProjetoFilter(null);
+                    setFluxoFilter('');
+                  }}
+                >
+                  Limpar Filtros
+                </Button>
+              </Space>
+            </Col>
+          </Row>
+        </Card>
 
         {/* Tabela */}
         <Table

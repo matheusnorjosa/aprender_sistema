@@ -136,7 +136,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 class AvailabilityBlockSerializer(serializers.ModelSerializer):
     """
     Serializer for AvailabilityBlock model.
-    PA-01: Status sempre começa pendente.
+
+    Status é auto-aprovado no ViewSet.perform_create().
     Usuario é preenchido automaticamente com request.user no ViewSet.
     """
 

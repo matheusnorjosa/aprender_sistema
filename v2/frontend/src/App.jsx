@@ -19,6 +19,7 @@ import {
   CloudUploadOutlined,
   UserOutlined,
   BarChartOutlined,
+  GlobalOutlined,
 } from '@ant-design/icons';
 import ptBR from 'antd/locale/pt_BR';
 import DisponibilidadeBlocks from './pages/Disponibilidade';
@@ -34,6 +35,7 @@ import LoginPage from './pages/Auth/LoginPage';
 import HomePage from './pages/Home/HomePage';
 import GCalPublishPage from './pages/GCalPublish/GCalPublishPage';
 import DashboardsPage from './pages/Dashboards/DashboardsPage';
+import MapaBrasilPage from './pages/MapaBrasil/MapaBrasilPage';
 import { getMe } from './api/availability';
 import './App.css';
 
@@ -135,6 +137,13 @@ function App() {
                 </Menu.Item>
               )}
 
+              {/* Mapa do Brasil (Admin/Gerência) */}
+              {isManager && (
+                <Menu.Item key="mapa-brasil" icon={<GlobalOutlined />}>
+                  <Link to="/mapa-brasil">Mapa do Brasil</Link>
+                </Menu.Item>
+              )}
+
               <Menu.Item key="bloqueios" icon={<CalendarOutlined />}>
                 <Link to="/bloqueios">Bloqueios</Link>
               </Menu.Item>
@@ -218,6 +227,12 @@ function App() {
                 <Route
                   path="/dashboards"
                   element={isManager ? <DashboardsPage /> : <Forbidden />}
+                />
+
+                {/* Mapa do Brasil (Admin/Gerência) */}
+                <Route
+                  path="/mapa-brasil"
+                  element={isManager ? <MapaBrasilPage /> : <Forbidden />}
                 />
 
                 <Route path="/disponibilidade" element={<MonthlyPage />} />

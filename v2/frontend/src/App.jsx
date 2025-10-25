@@ -18,6 +18,7 @@ import {
   SafetyOutlined,
   CloudUploadOutlined,
   UserOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import ptBR from 'antd/locale/pt_BR';
 import DisponibilidadeBlocks from './pages/Disponibilidade';
@@ -32,6 +33,7 @@ import PreAgendaPage from './pages/PreAgenda/PreAgendaPage';
 import LoginPage from './pages/Auth/LoginPage';
 import HomePage from './pages/Home/HomePage';
 import GCalPublishPage from './pages/GCalPublish/GCalPublishPage';
+import DashboardsPage from './pages/Dashboards/DashboardsPage';
 import { getMe } from './api/availability';
 import './App.css';
 
@@ -82,6 +84,8 @@ function App() {
   const canCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('DAT');
   const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
   const canControle = user?.is_superuser || user?.groups?.includes('Controle');
+  const isAdmin = user?.is_superuser || user?.groups?.includes('Superintendência');
+  const isManager = user?.groups?.includes('Gerência') || isAdmin;
 
   return (
     <ConfigProvider locale={ptBR}>
@@ -123,6 +127,14 @@ function App() {
               <Menu.Item key="grade-mensal" icon={<TableOutlined />}>
                 <Link to="/disponibilidade">Grade Mensal</Link>
               </Menu.Item>
+
+              {/* Dashboards (Admin/Gerência) */}
+              {isManager && (
+                <Menu.Item key="dashboards" icon={<BarChartOutlined />}>
+                  <Link to="/dashboards">Dashboards</Link>
+                </Menu.Item>
+              )}
+
               <Menu.Item key="bloqueios" icon={<CalendarOutlined />}>
                 <Link to="/bloqueios">Bloqueios</Link>
               </Menu.Item>
@@ -201,6 +213,13 @@ function App() {
             <Content style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: '#f0f2f5' }}>
               <Routes>
                 <Route path="/" element={<HomePage />} />
+
+                {/* Dashboards (Admin/Gerência) */}
+                <Route
+                  path="/dashboards"
+                  element={isManager ? <DashboardsPage /> : <Forbidden />}
+                />
+
                 <Route path="/disponibilidade" element={<MonthlyPage />} />
                 <Route path="/bloqueios" element={<DisponibilidadeBlocks />} />
 

@@ -56,12 +56,13 @@ def usuario_superintendencia():
 
 @pytest.fixture
 def solicitacao_pendente(usuario_comum):
-    """Solicitação pendente para testes."""
+    """Solicitação pendente para testes (projeto SUPER)."""
     municipio, _ = Municipio.objects.get_or_create(
         nome="Fortaleza", defaults={"uf": "CE", "ativo": True}
     )
     projeto, _ = Projeto.objects.get_or_create(
-        nome="Projeto Teste", defaults={"ativo": True}
+        nome="Projeto Teste SUPER",
+        defaults={"ativo": True, "fluxo": "SUPER"}
     )
     tipo_evento, _ = TipoEvento.objects.get_or_create(nome="Formação")
 
@@ -84,27 +85,30 @@ def solicitacao_pendente(usuario_comum):
 
 def test_never_auto_approves_on_clean_or_save(solicitacao_pendente):
     """
-    PA-01: Solicitacao NUNCA muda para "aprovado" automaticamente.
+    PA-01: Solicitacao de projeto SUPER NUNCA muda para "aprovado" automaticamente.
 
-    Verifica que .save() e .clean() não alteram status.
+    Verifica que .save() e .clean() não alteram status para projetos SUPER.
+
+    Nota: Projetos NAO_SUPER são auto-aprovados (testado em test_solicitacao_fluxo.py).
     """
     sol = solicitacao_pendente
+    assert sol.projeto.fluxo == "SUPER", "Teste deve usar projeto SUPER"
     assert sol.status == "pendente"
 
     # Save sem mudanças não deve alterar status
     sol.save()
     sol.refresh_from_db()
-    assert sol.status == "pendente", "Save() não deve auto-aprovar"
+    assert sol.status == "pendente", "Save() não deve auto-aprovar projeto SUPER"
 
     # Update de outro campo não deve alterar status
     sol.observacoes = "Atualização de teste"
     sol.save()
     sol.refresh_from_db()
-    assert sol.status == "pendente", "Update de campo não deve auto-aprovar"
+    assert sol.status == "pendente", "Update de campo não deve auto-aprovar projeto SUPER"
 
     # Clean não deve alterar status
     sol.full_clean()
-    assert sol.status == "pendente", "full_clean() não deve auto-aprovar"
+    assert sol.status == "pendente", "full_clean() não deve auto-aprovar projeto SUPER"
 
 
 # ===================================================================

@@ -26,6 +26,8 @@ import {
   DatePicker,
   Row,
   Col,
+  Timeline,
+  Typography,
 } from 'antd';
 import {
   CheckOutlined,
@@ -35,6 +37,8 @@ import {
   VideoCameraOutlined,
   FilterOutlined,
   ClearOutlined,
+  ClockCircleOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -47,6 +51,7 @@ import { getMe } from '../api/availability';
 import { lookupMunicipios, lookupProjetos } from '../api/lookup';
 
 const { TextArea } = Input;
+const { Title: AntTitle, Text } = Typography;
 
 /**
  * Mapeia status para cores de tags
@@ -553,51 +558,139 @@ function Solicitacoes() {
         {loadingDetails ? (
           <Spin />
         ) : selectedSolicitacao ? (
-          <Descriptions column={1} bordered>
-            <Descriptions.Item label="ID">{selectedSolicitacao.id}</Descriptions.Item>
-            <Descriptions.Item label="Usuário">
-              {selectedSolicitacao.usuario?.username || selectedSolicitacao.usuario || '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Município">
-              {selectedSolicitacao.municipio?.nome || selectedSolicitacao.municipio || '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Tipo de Evento">
-              {selectedSolicitacao.tipo_evento?.nome || selectedSolicitacao.tipo_evento || '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Início">
-              {formatDateTime(selectedSolicitacao.inicio)}
-            </Descriptions.Item>
-            <Descriptions.Item label="Fim">
-              {formatDateTime(selectedSolicitacao.fim)}
-            </Descriptions.Item>
-            <Descriptions.Item label="Status">
-              <Tag color={STATUS_COLORS[selectedSolicitacao.status]}>
-                {selectedSolicitacao.status?.toUpperCase()}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Observações">
-              {selectedSolicitacao.observacoes || '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Criado em">
-              {formatDateTime(selectedSolicitacao.created_at)}
-            </Descriptions.Item>
-            <Descriptions.Item label="Atualizado em">
-              {formatDateTime(selectedSolicitacao.updated_at)}
-            </Descriptions.Item>
-            {selectedSolicitacao.meet_link && (
-              <Descriptions.Item label="Reunião Online">
-                <Button
-                  type="primary"
-                  icon={<VideoCameraOutlined />}
-                  href={selectedSolicitacao.meet_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Entrar na reunião
-                </Button>
+          <>
+            <AntTitle level={5}>Linha do Tempo</AntTitle>
+            <Timeline
+              style={{ marginBottom: 24 }}
+              items={[
+                {
+                  color: 'blue',
+                  dot: <ClockCircleOutlined />,
+                  children: (
+                    <>
+                      <Text strong>Solicitação Criada</Text>
+                      <br />
+                      <Text type="secondary">
+                        {formatDateTime(selectedSolicitacao.created_at)}
+                      </Text>
+                    </>
+                  ),
+                },
+                selectedSolicitacao.status === 'aprovado' && {
+                  color: 'green',
+                  dot: <CheckOutlined />,
+                  children: (
+                    <>
+                      <Text strong>Solicitação Aprovada</Text>
+                      <br />
+                      <Text type="secondary">Aguardando aprovação</Text>
+                    </>
+                  ),
+                },
+                selectedSolicitacao.status === 'reprovado' && {
+                  color: 'red',
+                  dot: <CloseOutlined />,
+                  children: (
+                    <>
+                      <Text strong>Solicitação Reprovada</Text>
+                      <br />
+                      <Text type="secondary">Aguardando aprovação</Text>
+                    </>
+                  ),
+                },
+                selectedSolicitacao.status === 'pendente' && {
+                  color: 'gray',
+                  children: (
+                    <>
+                      <Text type="secondary">Aguardando aprovação</Text>
+                    </>
+                  ),
+                },
+                selectedSolicitacao.gcal_status === 'PUBLISHED' && {
+                  color: 'green',
+                  dot: <SyncOutlined />,
+                  children: (
+                    <>
+                      <Text strong>Sincronização Concluída</Text>
+                      <br />
+                      <Text type="secondary">
+                        Evento publicado no Google Calendar
+                        {selectedSolicitacao.gcal_last_sync_at &&
+                          ` em ${formatDateTime(selectedSolicitacao.gcal_last_sync_at)}`
+                        }
+                      </Text>
+                    </>
+                  ),
+                },
+              ].filter(Boolean)}
+            />
+
+            <AntTitle level={5}>Detalhes da Solicitação</AntTitle>
+            <Descriptions column={1} bordered size="small">
+              <Descriptions.Item label="ID">{selectedSolicitacao.id}</Descriptions.Item>
+              <Descriptions.Item label="Solicitante">
+                {selectedSolicitacao.usuario?.username || selectedSolicitacao.usuario || '-'}
               </Descriptions.Item>
+              <Descriptions.Item label="Município">
+                {selectedSolicitacao.municipio?.nome || selectedSolicitacao.municipio || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Projeto">
+                {selectedSolicitacao.projeto?.nome || selectedSolicitacao.projeto || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tipo de Evento">
+                {selectedSolicitacao.tipo_evento?.nome || selectedSolicitacao.tipo_evento || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Período">
+                {formatDateTime(selectedSolicitacao.inicio)} - {formatDateTime(selectedSolicitacao.fim)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Status">
+                <Tag color={STATUS_COLORS[selectedSolicitacao.status]}>
+                  {selectedSolicitacao.status?.toUpperCase()}
+                </Tag>
+              </Descriptions.Item>
+              {selectedSolicitacao.fluxo && (
+                <Descriptions.Item label="Fluxo">
+                  <Tag color={selectedSolicitacao.fluxo === 'SUPER' ? 'blue' : 'green'}>
+                    {selectedSolicitacao.fluxo === 'SUPER' ? 'SUPER' : 'NÃO SUPER'}
+                  </Tag>
+                </Descriptions.Item>
+              )}
+              {selectedSolicitacao.observacoes && (
+                <Descriptions.Item label="Observações">
+                  {selectedSolicitacao.observacoes}
+                </Descriptions.Item>
+              )}
+              {selectedSolicitacao.meet_link && (
+                <Descriptions.Item label="Reunião Online">
+                  <Button
+                    type="primary"
+                    icon={<VideoCameraOutlined />}
+                    href={selectedSolicitacao.meet_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    size="small"
+                  >
+                    Entrar na reunião
+                  </Button>
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+
+            {selectedSolicitacao.participations && selectedSolicitacao.participations.length > 0 && (
+              <>
+                <AntTitle level={5} style={{ marginTop: 16 }}>Participantes</AntTitle>
+                <Descriptions column={1} bordered size="small">
+                  {selectedSolicitacao.participations.map((p, idx) => (
+                    <Descriptions.Item key={idx} label={p.role}>
+                      {p.usuario?.first_name && p.usuario?.last_name
+                        ? `${p.usuario.first_name} ${p.usuario.last_name}`
+                        : p.email || p.guest_email || '-'}
+                    </Descriptions.Item>
+                  ))}
+                </Descriptions>
+              </>
             )}
-          </Descriptions>
+          </>
         ) : null}
       </Drawer>
 

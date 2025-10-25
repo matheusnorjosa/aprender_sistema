@@ -68,7 +68,7 @@ export default function PreAgendaPage() {
     try {
       setLoading(true);
 
-      const filters = { status: 'approved' };
+      const filters = { status: 'aprovado' };
       if (searchTerm) filters.q = searchTerm;
       if (sectorFilter) filters.sector = sectorFilter;
       if (dateRange[0]) filters.date_from = dateRange[0].format('YYYY-MM-DD');

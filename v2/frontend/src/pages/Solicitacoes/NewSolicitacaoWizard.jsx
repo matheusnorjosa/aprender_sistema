@@ -331,12 +331,18 @@ export default function NewSolicitacaoWizard() {
             </Checkbox>
           </Form.Item>
 
-          <Alert
-            message="Política de Aprovação (PA-01)"
-            description="Todas as solicitações requerem aprovação manual da Superintendência, independentemente do fluxo do projeto (SUPER ou NAO_SUPER)."
-            type="warning"
-            showIcon
-          />
+          {formData.projeto && (
+            <Alert
+              message={formData.projeto.fluxo === 'SUPER' ? 'Aprovação Manual Requerida' : 'Aprovação Automática'}
+              description={
+                formData.projeto.fluxo === 'SUPER'
+                  ? 'Esta solicitação será criada com status "Pendente" e aguardará aprovação manual da Superintendência.'
+                  : 'Esta solicitação será aprovada automaticamente ao ser criada e irá direto para a Pré-agenda.'
+              }
+              type={formData.projeto.fluxo === 'SUPER' ? 'warning' : 'success'}
+              showIcon
+            />
+          )}
         </>
       ),
     },
@@ -443,9 +449,17 @@ export default function NewSolicitacaoWizard() {
           </Descriptions>
 
           <Alert
-            message="Status Inicial: Pendente"
-            description="Sua solicitação será criada com status 'Pendente' e aguardará aprovação da Superintendência (PA-01)."
-            type="info"
+            message={
+              formData.projeto?.fluxo === 'SUPER'
+                ? 'Status Inicial: Pendente'
+                : 'Status Inicial: Aprovado'
+            }
+            description={
+              formData.projeto?.fluxo === 'SUPER'
+                ? 'Sua solicitação será criada com status "Pendente" e aguardará aprovação da Superintendência.'
+                : 'Sua solicitação será aprovada automaticamente ao ser criada e irá direto para a Pré-agenda.'
+            }
+            type={formData.projeto?.fluxo === 'SUPER' ? 'warning' : 'success'}
             showIcon
             style={{ marginTop: 16 }}
           />

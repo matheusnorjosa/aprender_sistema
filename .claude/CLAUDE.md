@@ -253,6 +253,26 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 
 ---
 
+### 6.1. Importação de Usuários e Grupos
+
+**Estrutura da Planilha (Acompanhamento de Agenda):**
+- Coluna **N**: Coordenador
+- Colunas **O-S**: Formador 1, Formador 2, ..., Formador 5
+
+**Regra de Atribuição de Grupos:**
+- Usuários com username `coordenacao*` → Grupo "Coordenador"
+- Demais usuários com participações → Grupo "Formador"
+
+**Comando de Backfill:**
+```bash
+python manage.py backfill_user_groups --apply
+```
+- Atribui grupos faltantes baseado no padrão do username
+- Usado após importação inicial de usuários (122 usuários importados)
+- Resultado: 65 Formadores + 10 Coordenadores atribuídos corretamente
+
+---
+
 ### 7. Benefícios Esperados
 - Fim da dependência de planilhas manuais  
 - Fluxo de solicitações, aprovações e conflitos totalmente digital  

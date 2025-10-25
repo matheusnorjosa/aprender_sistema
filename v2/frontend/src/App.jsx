@@ -20,6 +20,7 @@ import {
   UserOutlined,
   BarChartOutlined,
   GlobalOutlined,
+  HomeOutlined,
 } from '@ant-design/icons';
 import ptBR from 'antd/locale/pt_BR';
 import DisponibilidadeBlocks from './pages/Disponibilidade';
@@ -126,6 +127,10 @@ function App() {
               defaultSelectedKeys={['disponibilidade']}
               style={{ borderRight: 0 }}
             >
+              <Menu.Item key="home" icon={<HomeOutlined />}>
+                <Link to="/home">Página Inicial</Link>
+              </Menu.Item>
+
               <Menu.Item key="grade-mensal" icon={<TableOutlined />}>
                 <Link to="/disponibilidade">Grade Mensal</Link>
               </Menu.Item>
@@ -222,6 +227,7 @@ function App() {
             <Content style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: '#f0f2f5' }}>
               <Routes>
                 <Route path="/" element={<HomePage />} />
+                <Route path="/home" element={<HomePage />} />
 
                 {/* Dashboards (Admin/Gerência) */}
                 <Route

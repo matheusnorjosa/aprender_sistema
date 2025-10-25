@@ -292,6 +292,18 @@ class Command(BaseCommand):
             nome="Evento Genérico", defaults={"descricao": "Tipo padrão para eventos importados", "cor": "#808080"}
         )
 
+        # Get or create default Usuario for imports (coordenador missing/not found)
+        usuario_default, _ = Usuario.objects.get_or_create(
+            username="etl_import_default",
+            defaults={
+                "email": "etl.import@aprender.system",
+                "first_name": "ETL",
+                "last_name": "Import",
+                "cpf": "99999999999",
+                "is_active": False,  # Not a real user
+            },
+        )
+
         self.stdout.write(f"\n[Solicitações] Parsing {filepath.name}...")
         solicitacoes_data = parse_todas_abas_acompanhamento(filepath)
         self.stdout.write(f"  Found {len(solicitacoes_data)} solicitações")
@@ -354,9 +366,9 @@ class Command(BaseCommand):
                                 created_participations += 1
                     continue
 
-                # Create Solicitacao
+                # Create Solicitacao (use default user if coordenador not found)
                 solicitacao = Solicitacao.objects.create(
-                    usuario=coordenador,
+                    usuario=coordenador or usuario_default,
                     municipio=municipio,
                     projeto=projeto,
                     tipo_evento=tipo_evento_default,

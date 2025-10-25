@@ -61,11 +61,7 @@ function App() {
   }, []);
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Spin size="large" tip="Carregando..." />
-      </div>
-    );
+    return <Spin size="large" tip="Carregando..." fullscreen />;
   }
 
   // Calcular flags de permissão
@@ -153,10 +149,10 @@ function App() {
               {/* Ops Panels (Controle) */}
               {canControle && (
                 <SubMenu key="ops-submenu" icon={<ShoppingOutlined />} title="Ops">
-                  <Menu.Item key="controle">
+                  <Menu.Item key="controle-ops">
                     <Link to="/controle">Controle</Link>
                   </Menu.Item>
-                  <Menu.Item key="dat">
+                  <Menu.Item key="dat-ops">
                     <Link to="/dat">DAT</Link>
                   </Menu.Item>
                 </SubMenu>

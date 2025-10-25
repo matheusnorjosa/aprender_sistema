@@ -430,27 +430,20 @@ class Solicitacao(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Override save para garantir conformidade com PA-01.
+        Override save para implementar auto-aprovação de fluxo NAO_SUPER.
 
-        PA-01: Nenhuma solicitação é auto-aprovada, independentemente do fluxo do projeto.
-
-        IMPORTANTE: A lógica anterior de auto-aprovação para fluxo NAO_SUPER foi REMOVIDA
-        para cumprir a Política de Aprovação Manual (CP-02).
-
-        Todas as solicitações agora seguem o fluxo:
-        1. Criação com status='pendente' (sempre)
-        2. Aprovação manual pela Superintendência (endpoint /approve/)
-        3. Integrações externas só após aprovação (PA-03)
+        Fluxos do sistema:
+        - SUPER: Requer aprovação manual pela Superintendência (PA-01 a PA-07)
+        - NAO_SUPER: Auto-aprovado automaticamente na criação
 
         Histórico:
-        - PR 13/N: Auto-aprovação implementada (REMOVIDA em PR17)
-        - PR17: Conformidade com PA-01 (Política de Aprovação Manual obrigatória)
+        - PR 13/N: Auto-aprovação implementada para NAO_SUPER
+        - PR17: REMOVEU auto-aprovação (INCORRETO - revertido em PR18)
+        - PR18: RESTAURA auto-aprovação para NAO_SUPER conforme especificação correta
         """
-        # PA-01: Sem auto-aprovação. Status sempre começa 'pendente'.
-        # Se for criação e status não foi explicitamente definido, garantir 'pendente'
-        if self.pk is None and not hasattr(self, '_status_explicitly_set'):
-            # Mantém o default do campo (status='pendente')
-            pass
+        # Auto-aprovar apenas projetos NAO_SUPER na criação
+        if self.pk is None and self.projeto and self.projeto.fluxo == 'NAO_SUPER':
+            self.status = 'aprovado'
 
         super().save(*args, **kwargs)
 

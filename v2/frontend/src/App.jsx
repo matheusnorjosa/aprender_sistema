@@ -31,6 +31,7 @@ import ApprovalsPage from './pages/Aprovacoes/ApprovalsPage';
 import PreAgendaPage from './pages/PreAgenda/PreAgendaPage';
 import LoginPage from './pages/Auth/LoginPage';
 import HomePage from './pages/Home/HomePage';
+import GCalPublishPage from './pages/GCalPublish/GCalPublishPage';
 import { getMe } from './api/availability';
 import './App.css';
 
@@ -229,6 +230,12 @@ function App() {
                 <Route path="/solicitacoes" element={<Solicitacoes />} />
                 <Route path="/controle" element={<ControlePage />} />
                 <Route path="/dat" element={<DATPage />} />
+
+                {/* Rota de publicação GCal (Controle) */}
+                <Route
+                  path="/gcal/publicar"
+                  element={canControle ? <GCalPublishPage /> : <Forbidden />}
+                />
               </Routes>
             </Content>
           </Layout>

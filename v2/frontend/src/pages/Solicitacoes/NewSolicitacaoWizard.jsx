@@ -241,7 +241,7 @@ export default function NewSolicitacaoWizard() {
               description={
                 formData.projeto.fluxo === 'SUPER'
                   ? 'Esta solicitação requer aprovação manual da Superintendência.'
-                  : 'Esta solicitação requer aprovação manual da Superintendência.'
+                  : 'Esta solicitação não requer aprovação manual da Superintendência.'
               }
               type="info"
               showIcon

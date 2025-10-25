@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { ConfigProvider, Layout, Menu, Spin, Result, Typography } from 'antd';
+import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message } from 'antd';
 import {
   CalendarOutlined,
   CheckCircleOutlined,
@@ -21,6 +21,7 @@ import {
   BarChartOutlined,
   GlobalOutlined,
   HomeOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons';
 import ptBR from 'antd/locale/pt_BR';
 import DisponibilidadeBlocks from './pages/Disponibilidade';
@@ -82,6 +83,25 @@ function App() {
       </ConfigProvider>
     );
   }
+
+  // Função de logout
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout/', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      message.success('Logout realizado com sucesso');
+      // Recarregar a página para voltar para tela de login
+      window.location.reload();
+    } catch (error) {
+      message.error('Erro ao fazer logout');
+      console.error('Erro no logout:', error);
+    }
+  };
 
   // Calcular flags de permissão
   const canCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('DAT');
@@ -217,9 +237,19 @@ function App() {
               borderBottom: '1px solid #f0f0f0',
               width: '100%',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
-                <UserOutlined />
-                <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', whiteSpace: 'nowrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <UserOutlined />
+                  <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
+                </div>
+                <Button
+                  type="primary"
+                  danger
+                  icon={<LogoutOutlined />}
+                  onClick={handleLogout}
+                >
+                  Sair
+                </Button>
               </div>
             </Header>
 

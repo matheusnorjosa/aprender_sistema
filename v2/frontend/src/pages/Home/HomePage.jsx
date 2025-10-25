@@ -116,17 +116,17 @@ export default function HomePage() {
         </Text>
       </div>
 
-      {/* Administrator Access */}
+      {/* Acesso Administrativo */}
       {isAdmin && (
         <>
           <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
-            Administrator Access
+            Acesso Administrativo
           </Title>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={8}>
               <AccessCard
                 icon={<UserOutlined />}
-                title="User Management"
+                title="Gerenciamento de Usuários"
                 description="Gerenciar usuários, grupos e permissões."
                 link="/admin/usuarios"
                 disabled={true}
@@ -135,7 +135,7 @@ export default function HomePage() {
             <Col xs={24} sm={12} md={8}>
               <AccessCard
                 icon={<SettingOutlined />}
-                title="System Settings"
+                title="Configurações do Sistema"
                 description="Configurar parâmetros do sistema."
                 link="/admin/settings"
                 disabled={true}
@@ -144,7 +144,7 @@ export default function HomePage() {
             <Col xs={24} sm={12} md={8}>
               <AccessCard
                 icon={<BarChartOutlined />}
-                title="Analytics"
+                title="Análises"
                 description="Visualizar relatórios detalhados e métricas do sistema."
                 link="/dashboards"
                 disabled={true}
@@ -154,17 +154,17 @@ export default function HomePage() {
         </>
       )}
 
-      {/* Manager Access */}
+      {/* Acesso Gerencial */}
       {isManager && (
         <>
           <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
-            Manager Access
+            Acesso Gerencial
           </Title>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={8}>
               <AccessCard
                 icon={<CheckCircleOutlined />}
-                title="Approval Requests"
+                title="Solicitações de Aprovação"
                 description="Revisar e aprovar solicitações pendentes."
                 link="/aprovacoes"
                 badge={stats.pendingApprovals}
@@ -173,7 +173,7 @@ export default function HomePage() {
             <Col xs={24} sm={12} md={8}>
               <AccessCard
                 icon={<TeamOutlined />}
-                title="Team Performance"
+                title="Desempenho da Equipe"
                 description="Monitorar métricas e desempenho da equipe."
                 link="/dashboards"
                 disabled={true}
@@ -183,15 +183,15 @@ export default function HomePage() {
         </>
       )}
 
-      {/* General Access */}
+      {/* Acesso Geral */}
       <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
-        General Access
+        Acesso Geral
       </Title>
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} md={8}>
           <AccessCard
             icon={<DashboardOutlined />}
-            title="My Dashboard"
+            title="Meu Painel"
             description="Seu painel pessoal com informações-chave."
             link="/disponibilidade"
           />
@@ -201,7 +201,7 @@ export default function HomePage() {
             <Col xs={24} sm={12} md={8}>
               <AccessCard
                 icon={<FileTextOutlined />}
-                title="Submit Request"
+                title="Enviar Solicitação"
                 description="Criar uma nova solicitação de evento."
                 link="/solicitacoes/nova"
               />
@@ -209,7 +209,7 @@ export default function HomePage() {
             <Col xs={24} sm={12} md={8}>
               <AccessCard
                 icon={<ShoppingOutlined />}
-                title="My Items"
+                title="Minhas Solicitações"
                 description="Ver suas solicitações e itens submetidos."
                 link="/solicitacoes/minhas"
                 badge={stats.myRequests}

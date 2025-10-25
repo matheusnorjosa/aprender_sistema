@@ -222,14 +222,18 @@ export default function NewSolicitacaoWizard() {
       icon: <FileTextOutlined />,
       content: (
         <>
-          <ComboBox
+          <Form.Item
             label="Projeto"
             name="projeto"
-            required
-            fetchOptions={lookupProjetos}
-            onChange={(value) => setFormData({ ...formData, projeto: value })}
-            value={formData.projeto}
-          />
+            rules={[{ required: true, message: 'Por favor selecione um projeto' }]}
+          >
+            <ComboBox
+              lookupFunction={lookupProjetos}
+              onChange={(value) => setFormData({ ...formData, projeto: value })}
+              value={formData.projeto}
+              placeholder="Busque ou selecione um projeto"
+            />
+          </Form.Item>
 
           {formData.projeto && (
             <Alert
@@ -245,23 +249,31 @@ export default function NewSolicitacaoWizard() {
             />
           )}
 
-          <ComboBox
+          <Form.Item
             label="Tipo de Evento"
             name="tipoEvento"
-            required
-            fetchOptions={lookupTiposEvento}
-            onChange={(value) => setFormData({ ...formData, tipoEvento: value })}
-            value={formData.tipoEvento}
-          />
+            rules={[{ required: true, message: 'Por favor selecione um tipo de evento' }]}
+          >
+            <ComboBox
+              lookupFunction={lookupTiposEvento}
+              onChange={(value) => setFormData({ ...formData, tipoEvento: value })}
+              value={formData.tipoEvento}
+              placeholder="Busque ou selecione um tipo de evento"
+            />
+          </Form.Item>
 
-          <ComboBox
+          <Form.Item
             label="Município"
             name="municipio"
-            required
-            fetchOptions={lookupMunicipios}
-            onChange={(value) => setFormData({ ...formData, municipio: value })}
-            value={formData.municipio}
-          />
+            rules={[{ required: true, message: 'Por favor selecione um município' }]}
+          >
+            <ComboBox
+              lookupFunction={lookupMunicipios}
+              onChange={(value) => setFormData({ ...formData, municipio: value })}
+              value={formData.municipio}
+              placeholder="Busque ou selecione um município"
+            />
+          </Form.Item>
 
           <DateTimeRange
             labelStart="Data/Hora Início"
@@ -287,25 +299,28 @@ export default function NewSolicitacaoWizard() {
             style={{ marginBottom: 16 }}
           />
 
-          <PeoplePicker
+          <Form.Item
             label="Formadores"
             name="formadores"
-            required
-            multiple
-            value={formData.formadores}
-            onChange={(value) => setFormData({ ...formData, formadores: value })}
-            renderTag={(formador) => (
-              <Space>
-                {formador.name}
-                <AvailabilityBadge
-                  formador={formador}
-                  inicio={formData.inicio}
-                  fim={formData.fim}
-                  municipio={formData.municipio}
-                />
-              </Space>
-            )}
-          />
+            rules={[{ required: true, message: 'Por favor selecione pelo menos um formador' }]}
+          >
+            <PeoplePicker
+              multiple
+              value={formData.formadores}
+              onChange={(value) => setFormData({ ...formData, formadores: value })}
+              renderTag={(formador) => (
+                <Space>
+                  {formador.name}
+                  <AvailabilityBadge
+                    formador={formador}
+                    inicio={formData.inicio}
+                    fim={formData.fim}
+                    municipio={formData.municipio}
+                  />
+                </Space>
+              )}
+            />
+          </Form.Item>
 
           <Form.Item name="coordenadorAcompanha" valuePropName="checked">
             <Checkbox

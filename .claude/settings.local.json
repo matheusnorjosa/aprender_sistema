@@ -6,7 +6,9 @@
       "Read(//cygdrive/c/Users/datsu/Downloads/stitch_login_screen/**)",
       "Bash(for dir in */)",
       "Bash(do echo \"=== $dir ===\")",
-      "Bash(timeout 120 docker compose:*)"
+      "Bash(timeout 120 docker compose:*)",
+      "Read(//mnt/c/Users/datsu/OneDrive/Área de Trabalho/**)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

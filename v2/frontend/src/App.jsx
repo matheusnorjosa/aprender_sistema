@@ -30,6 +30,7 @@ import MySolicitacoesPage from './pages/Solicitacoes/MySolicitacoesPage';
 import ApprovalsPage from './pages/Aprovacoes/ApprovalsPage';
 import PreAgendaPage from './pages/PreAgenda/PreAgendaPage';
 import LoginPage from './pages/Auth/LoginPage';
+import HomePage from './pages/Home/HomePage';
 import { getMe } from './api/availability';
 import './App.css';
 
@@ -198,7 +199,7 @@ function App() {
             {/* Conteúdo principal */}
             <Content style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: '#f0f2f5' }}>
               <Routes>
-                <Route path="/" element={<Navigate to="/disponibilidade" replace />} />
+                <Route path="/" element={<HomePage />} />
                 <Route path="/disponibilidade" element={<MonthlyPage />} />
                 <Route path="/bloqueios" element={<DisponibilidadeBlocks />} />
 

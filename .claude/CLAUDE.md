@@ -538,6 +538,20 @@ test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 | **PA-06** | ✅ | Botões ocultos para não-Superintendência | `ApprovalsPage.jsx:66-68, 211` |
 | **PA-07** | ✅ | 5 testes obrigatórios implementados e passando | `test_approval_policy_PA.py` |
 
+### ⚠️ Nota Importante: Aprovação Manual NÃO Revalida Conflitos
+
+**Comportamento intencional**: O endpoint `approve()` (views_solicitacao.py:268-323) **NÃO** chama `check_conflicts()` antes de aprovar.
+
+**Razão**: Superintendência toma decisões com **contexto humano** que o sistema não captura:
+- Exceções autorizadas
+- Prioridades políticas/organizacionais
+- Contexto específico do município/projeto
+- Negociações não-formalizadas
+
+**Fluxo**: Superintendência acessa `/disponibilidade` (visualização da grade) e verifica **manualmente** antes de aprovar em `/aprovacoes`.
+
+**Sistema = ferramenta de suporte à decisão, NÃO automatização total.**
+
 ### Arquivos Modificados
 
 **Backend**:

@@ -2,15 +2,14 @@
  * FormadoresPicker - Seleção de Formadores para Nova Solicitação
  *
  * Componente específico para o wizard de nova solicitação.
- * Permite selecionar múltiplos formadores com badges de disponibilidade.
+ * Permite selecionar múltiplos formadores.
  */
 
 import { useState } from 'react';
 import { Space, Tag, AutoComplete, Spin } from 'antd';
-import { CloseCircleOutlined } from '@ant-design/icons';
 import { lookupUsuarios } from '../api/lookup';
 
-export default function FormadoresPicker({ value = [], onChange, renderBadge }) {
+export default function FormadoresPicker({ value = [], onChange }) {
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -81,10 +80,7 @@ export default function FormadoresPicker({ value = [], onChange, renderBadge }) 
               onClose={() => handleRemove(index)}
               color="blue"
             >
-              <Space size={4}>
-                {formador.label || formador.name}
-                {renderBadge && renderBadge(formador)}
-              </Space>
+              {formador.label || formador.name}
             </Tag>
           ))}
         </Space>

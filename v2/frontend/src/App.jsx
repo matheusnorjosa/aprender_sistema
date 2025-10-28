@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { ConfigProvider, Layout, Menu, Spin, Result, Typography } from 'antd';
+import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message } from 'antd';
 import {
   CalendarOutlined,
   CheckCircleOutlined,
@@ -21,6 +21,7 @@ import {
   BarChartOutlined,
   GlobalOutlined,
   HomeOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons';
 import ptBR from 'antd/locale/pt_BR';
 import DisponibilidadeBlocks from './pages/Disponibilidade';
@@ -34,7 +35,6 @@ import ApprovalsPage from './pages/Aprovacoes/ApprovalsPage';
 import PreAgendaPage from './pages/PreAgenda/PreAgendaPage';
 import LoginPage from './pages/Auth/LoginPage';
 import HomePage from './pages/Home/HomePage';
-import GCalPublishPage from './pages/GCalPublish/GCalPublishPage';
 import DashboardsPage from './pages/Dashboards/DashboardsPage';
 import MapaBrasilPage from './pages/MapaBrasil/MapaBrasilPage';
 import { getMe } from './api/availability';
@@ -82,6 +82,25 @@ function App() {
       </ConfigProvider>
     );
   }
+
+  // Função de logout
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout/', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      message.success('Logout realizado com sucesso');
+      // Recarregar a página para voltar para tela de login
+      window.location.reload();
+    } catch (error) {
+      message.error('Erro ao fazer logout');
+      console.error('Erro no logout:', error);
+    }
+  };
 
   // Calcular flags de permissão
   const canCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('DAT');
@@ -179,13 +198,6 @@ function App() {
                 </Menu.Item>
               )}
 
-              {/* Publicação GCal (Controle) */}
-              {canControle && (
-                <Menu.Item key="publicacao" icon={<CloudUploadOutlined />}>
-                  <Link to="/publicacao">Publicação GCal</Link>
-                </Menu.Item>
-              )}
-
               {/* Ops Panels (Controle) */}
               {canControle && (
                 <SubMenu key="ops-submenu" icon={<ShoppingOutlined />} title="Ops">
@@ -217,9 +229,19 @@ function App() {
               borderBottom: '1px solid #f0f0f0',
               width: '100%',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
-                <UserOutlined />
-                <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', whiteSpace: 'nowrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <UserOutlined />
+                  <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
+                </div>
+                <Button
+                  type="primary"
+                  danger
+                  icon={<LogoutOutlined />}
+                  onClick={handleLogout}
+                >
+                  Sair
+                </Button>
               </div>
             </Header>
 
@@ -270,12 +292,6 @@ function App() {
                 <Route path="/solicitacoes" element={<Solicitacoes />} />
                 <Route path="/controle" element={<ControlePage />} />
                 <Route path="/dat" element={<DATPage />} />
-
-                {/* Rota de publicação GCal (Controle) */}
-                <Route
-                  path="/gcal/publicar"
-                  element={canControle ? <GCalPublishPage /> : <Forbidden />}
-                />
               </Routes>
             </Content>
           </Layout>

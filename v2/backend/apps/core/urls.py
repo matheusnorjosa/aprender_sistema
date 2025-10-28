@@ -38,7 +38,6 @@ from .views_gcal_dashboard import (
     GCalStatusSummaryView,
     GCalListView,
     GCalDriftView,
-    GCalBulkReapplyView,
 )
 from .views_lookup import (
     MunicipioLookup,
@@ -146,7 +145,6 @@ urlpatterns = [
     path("gcal/status-summary/", GCalStatusSummaryView.as_view(), name="gcal-status-summary"),
     path("gcal/list/", GCalListView.as_view(), name="gcal-list"),
     path("gcal/drift/", GCalDriftView.as_view(), name="gcal-drift"),
-    path("gcal/reapply/", GCalBulkReapplyView.as_view(), name="gcal-bulk-reapply"),
     # Metrics and Reports
     path("metrics/map/", metrics_map, name="metrics-map"),
     path("reports/status-counts/", reports_status_counts, name="reports-status-counts"),

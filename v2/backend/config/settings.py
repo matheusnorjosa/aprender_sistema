@@ -292,16 +292,27 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 
+# Auto-apply GCal (Celery task preview_then_apply_gcal) - Fase 3
+# Default: False (desativado por padrão para consolidar governança via /pre-agenda)
+# Quando True: Celery beat executa preview_then_apply_gcal periodicamente
+# Quando False: Task retorna status="SKIPPED" sem executar sync
+# Fase 3 - Governança GCal: única via de criação é /pre-agenda (individual + massa)
+FEATURE_AUTO_APPLY_ENABLED = os.getenv("FEATURE_AUTO_APPLY_ENABLED", "0") == "1"
+
 # Celery Beat Schedule (tarefas periódicas)
-CELERY_BEAT_SCHEDULE = {
-    "gcal-sync-every-5-minutes": {
-        "task": "apps.core.tasks.preview_then_apply_gcal",
-        "schedule": 300.0,  # 5 minutos (em segundos)
-        "options": {
-            "expires": 60.0,  # Tarefa expira após 60s se não iniciar
+# Governança Fase 3: schedule só é registrado quando FEATURE_AUTO_APPLY_ENABLED=True
+if FEATURE_AUTO_APPLY_ENABLED:
+    CELERY_BEAT_SCHEDULE = {
+        "gcal-sync-every-5-minutes": {
+            "task": "apps.core.tasks.preview_then_apply_gcal",
+            "schedule": 300.0,  # 5 minutos (em segundos)
+            "options": {
+                "expires": 60.0,  # Tarefa expira após 60s se não iniciar
+            },
         },
-    },
-}
+    }
+else:
+    CELERY_BEAT_SCHEDULE = {}
 
 # ================================================================
 # LOGGING

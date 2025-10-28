@@ -1,5 +1,9 @@
 /* index.css - AS v2 */
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Clean reset - let Ant Design handle styling */
 * {
   margin: 0;

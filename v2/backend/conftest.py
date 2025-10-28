@@ -23,10 +23,10 @@ def _ensure_default_test_user(django_db_setup, django_db_blocker, faker):
     from apps.core.models import Usuario, Solicitacao
 
     with django_db_blocker.unblock():
-        # Create default test user with unique CPF per test
+        # Create default test user with unique username, email, CPF per test
         user = Usuario.objects.create(
-            username=f"test_{faker.user_name()}",
-            email=faker.email(),
+            username=faker.unique.user_name(),
+            email=faker.unique.email(),
             first_name=faker.first_name(),
             last_name=faker.last_name(),
             cpf=faker.unique.numerify('###########'),  # Unique 11-digit CPF

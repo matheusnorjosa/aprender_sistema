@@ -33,8 +33,8 @@ pytestmark = pytest.mark.django_db
 def usuario_comum(faker):
     """Usuário comum sem permissões especiais."""
     return Usuario.objects.create_user(
-        username=f"comum_{faker.user_name()}",
-        email=faker.email(),
+        username=faker.unique.user_name(),
+        email=faker.unique.email(),
         password="testpass",
         cpf=faker.unique.numerify('###########'),  # Unique 11-digit CPF
     )
@@ -44,8 +44,8 @@ def usuario_comum(faker):
 def usuario_superintendencia(faker):
     """Usuário do grupo Superintendência."""
     user = Usuario.objects.create_user(
-        username=f"super_{faker.user_name()}",
-        email=faker.email(),
+        username=faker.unique.user_name(),
+        email=faker.unique.email(),
         password="testpass",
         cpf=faker.unique.numerify('###########'),  # Unique 11-digit CPF
     )

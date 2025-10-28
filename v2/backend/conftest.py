@@ -9,6 +9,7 @@ Applied to:
 - ETL imports (missing coordenador/usuario in planilhas)
 """
 import pytest
+from uuid import uuid4
 from django.db.models.signals import pre_save
 from django.contrib.auth.models import Group
 
@@ -23,15 +24,16 @@ def _ensure_default_test_user(django_db_setup, django_db_blocker, faker):
     from apps.core.models import Usuario, Solicitacao
 
     with django_db_blocker.unblock():
-        # Create default test user with UUID-guaranteed uniqueness
-        # UUID ensures absolute uniqueness across all test runs (faker.unique has cache issues)
-        unique_id = faker.uuid4()[:12]  # Short UUID (12 chars, 281 trillion combinations)
+        # Create default test user with Python uuid4() (truly random, not seeded)
+        # CRITICAL: faker.uuid4() is seeded and generates duplicates across tests!
+        # Python's uuid4() uses os.urandom() and is cryptographically secure
+        uid = uuid4().hex  # 32 chars hex (no hyphens), 128-bit entropy
         user = Usuario.objects.create(
-            username=f"test_{unique_id}",
-            email=f"test_{unique_id}@example.com",
+            username=f"test_{uid}",
+            email=f"test_{uid}@example.com",
             first_name=faker.first_name(),
             last_name=faker.last_name(),
-            cpf=faker.unique.numerify('###########'),  # Unique 11-digit CPF
+            cpf=str(uuid4().int % 10**11).zfill(11),  # 11-digit CPF from UUID int
             is_active=True,
         )
 

@@ -10,6 +10,7 @@ Garante que:
 """
 
 import pytest
+from uuid import uuid4
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth.models import Group
@@ -32,26 +33,26 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def usuario_comum(faker):
     """Usuário comum sem permissões especiais."""
-    # UUID ensures absolute uniqueness (faker.unique has cache issues across function-scoped fixtures)
-    unique_id = faker.uuid4()[:12]
+    # Python uuid4() is truly random (faker.uuid4() is seeded and generates duplicates!)
+    uid = uuid4().hex  # 32 chars hex, 128-bit entropy
     return Usuario.objects.create_user(
-        username=f"comum_{unique_id}",
-        email=f"comum_{unique_id}@example.com",
+        username=f"comum_{uid}",
+        email=f"comum_{uid}@example.com",
         password="testpass",
-        cpf=faker.unique.numerify('###########'),  # Unique 11-digit CPF
+        cpf=str(uuid4().int % 10**11).zfill(11),  # 11-digit CPF from UUID int
     )
 
 
 @pytest.fixture
 def usuario_superintendencia(faker):
     """Usuário do grupo Superintendência."""
-    # UUID ensures absolute uniqueness (faker.unique has cache issues across function-scoped fixtures)
-    unique_id = faker.uuid4()[:12]
+    # Python uuid4() is truly random (faker.uuid4() is seeded and generates duplicates!)
+    uid = uuid4().hex  # 32 chars hex, 128-bit entropy
     user = Usuario.objects.create_user(
-        username=f"super_{unique_id}",
-        email=f"super_{unique_id}@example.com",
+        username=f"super_{uid}",
+        email=f"super_{uid}@example.com",
         password="testpass",
-        cpf=faker.unique.numerify('###########'),  # Unique 11-digit CPF
+        cpf=str(uuid4().int % 10**11).zfill(11),  # 11-digit CPF from UUID int
     )
     grupo, _ = Group.objects.get_or_create(name="Superintendência")
     user.groups.add(grupo)

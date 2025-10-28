@@ -131,7 +131,9 @@ def features(request):
 
     # Auto-apply GCal (Celery task preview_then_apply_gcal) - Fase 3
     # Default: False (desativado) - governança consolidada via /pre-agenda
-    auto_apply_enabled = os.getenv("FEATURE_AUTO_APPLY_ENABLED", "0") == "1"
+    # Usar settings efetivo (runtime) ao invés de os.getenv direto
+    from django.conf import settings as django_settings
+    auto_apply_enabled = getattr(django_settings, "FEATURE_AUTO_APPLY_ENABLED", False)
 
     # Check for Config overrides for auto_apply_enabled
     try:

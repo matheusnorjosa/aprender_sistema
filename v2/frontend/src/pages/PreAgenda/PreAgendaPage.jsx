@@ -38,6 +38,7 @@ import dayjs from 'dayjs';
 
 import { listSolicitacoes, previewSolicitacao, publishSolicitacao } from '../../api/solicitacoes';
 import { getStatusSummary } from '../../api/gcal';
+import { MeetLink } from '../../components/MeetLink';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -182,17 +183,7 @@ export default function PreAgendaPage() {
             title="Publicar"
             disabled={record.gcal_status === 'PUBLISHED'}
           />
-          {record.meet_link && (
-            <Button
-              size="small"
-              type="link"
-              icon={<VideoCameraOutlined />}
-              href={record.meet_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Entrar na reunião"
-            />
-          )}
+          <MeetLink href={record.meet_link} />
         </Space>
       ),
     },

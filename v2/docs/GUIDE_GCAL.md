@@ -161,12 +161,17 @@ curl -X POST http://localhost:8000/api/solicitacoes/123/publish/ \
 ### Fluxo de Criação
 
 1. Solicitação é aprovada
-2. API `POST /api/solicitacoes/{id}/publish/` é chamada
+2. API `POST /api/solicitacoes/{id}/publish/` é chamada com `dry_run=false` e `apply_blocked=false` (ou `GCAL_CLIENT=google`)
 3. Payload inclui `conferenceData` com `requestId` único
 4. Google Calendar cria evento + gera link Meet
 5. Backend extrai `hangoutLink` do response
-6. Campo `meet_link` é persistido no banco
+6. Campo `meet_link` é **persistido no banco APENAS em APPLY real**
 7. Serializer expõe `meet_link` na API
+
+**⚠️ IMPORTANTE - Quando meet_link NÃO é persistido:**
+- **PREVIEW** (`/preview-gcal/`): Retorna meet_link no payload mas NÃO persiste no DB
+- **apply_blocked (409)**: Quando `GCAL_CLIENT != "google"` e `apply_blocked=false`, retorna 409 e NÃO persiste
+- **dry_run=true**: Simula publicação mas NÃO persiste
 
 ### Endpoints Afetados
 
@@ -193,21 +198,28 @@ GET /api/solicitacoes/
 }
 ```
 
-### UI: Botões "Entrar na reunião"
+### UI: Componente MeetLink
 
-**3 locais exibem meet_link:**
+**Componente Reutilizável** (`frontend/src/components/MeetLink.jsx`):
+- Props: `href` (string | null | undefined)
+- Retorna `null` se href não existir
+- Renderiza dois botões:
+  1. **"Entrar na reunião"** (primário, abre em nova aba)
+  2. **"Copiar link"** (copia para clipboard com feedback)
+
+**3 locais integrados:**
 
 1. **Solicitacoes.jsx** (drawer de detalhes):
-   - Campo "Reunião Online" com botão primário
-   - Ícone: `<VideoCameraOutlined />`
+   - Campo "Reunião Online" com `<MeetLink href={selectedSolicitacao.meet_link} />`
+   - Exibido apenas se meet_link existir
 
 2. **PreAgendaPage.jsx** (coluna ações):
-   - Botão pequeno tipo link na coluna "Ações"
+   - `<MeetLink href={record.meet_link} />` na coluna "Ações"
    - Aparece ao lado de Preview/Publicar
 
 3. **MySolicitacoesPage.jsx** (coluna reunião):
    - Coluna dedicada "Reunião"
-   - Botão "Entrar" ou "-" se não houver link
+   - `<MeetLink href={meet_link} />` (retorna null se vazio)
 
 ## 5. Comandos Úteis
 
@@ -247,6 +259,7 @@ pytest apps/core/tests/test_gcal_publish_apply_blocked.py -v
 pytest apps/core/tests/test_gcal_retry_backoff.py -v
 pytest apps/core/tests/test_gcal_send_updates.py -v
 pytest apps/core/tests/test_gcal_conference_version.py -v
+pytest apps/core/tests/test_gcal_meet_link_persist.py -v  # RF06: meet_link persistence
 pytest apps/core/tests/test_solicitacao_serializer_meet_link.py -v
 ```
 
@@ -315,5 +328,6 @@ logger.info(f"GCal response: {result}")
 
 ## 8. Histórico
 
-- **PR19** (RF05/RF06): Implementação inicial
+- **PR19** (RF05/RF06): Implementação inicial (GCal + Meet integration)
 - **2025-10-23**: Guia criado
+- **2025-10-28**: Adicionado componente MeetLink reutilizável e testes de persistência

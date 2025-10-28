@@ -29,7 +29,6 @@ import {
   CloseOutlined,
   EyeOutlined,
   SearchOutlined,
-  VideoCameraOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -39,6 +38,7 @@ import {
   rejectSolicitacao,
 } from '../api/solicitacoes';
 import { getMe } from '../api/availability';
+import { MeetLink } from '../components/MeetLink';
 
 const { TextArea } = Input;
 
@@ -441,15 +441,7 @@ function Solicitacoes() {
             </Descriptions.Item>
             {selectedSolicitacao.meet_link && (
               <Descriptions.Item label="Reunião Online">
-                <Button
-                  type="primary"
-                  icon={<VideoCameraOutlined />}
-                  href={selectedSolicitacao.meet_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Entrar na reunião
-                </Button>
+                <MeetLink href={selectedSolicitacao.meet_link} />
               </Descriptions.Item>
             )}
           </Descriptions>

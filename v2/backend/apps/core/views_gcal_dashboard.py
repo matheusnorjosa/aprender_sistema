@@ -1,7 +1,7 @@
 """
 GCal Dashboard Views (PR14 - Ajustes pós-merge + Fase 2 batch publish)
 
-4 endpoints para painel de publicação com contrato padronizado:
+3 endpoints para painel de publicação com contrato padronizado:
 - GET /api/gcal/status-summary/ - resumo de contadores
 - GET /api/gcal/list/ - listagem com filtros
 - GET /api/gcal/drift/ - detecção de drift

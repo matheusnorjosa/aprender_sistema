@@ -10,6 +10,7 @@ Garante que:
 """
 
 import pytest
+from uuid import uuid4
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth.models import Group
@@ -30,24 +31,28 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def usuario_comum():
+def usuario_comum(faker):
     """Usuário comum sem permissões especiais."""
+    # Python uuid4() is truly random (faker.uuid4() is seeded and generates duplicates!)
+    uid = uuid4().hex  # 32 chars hex, 128-bit entropy
     return Usuario.objects.create_user(
-        username="comum",
-        email="comum@test.com",
+        username=f"comum_{uid}",
+        email=f"comum_{uid}@example.com",
         password="testpass",
-        cpf="11111111111",
+        cpf=str(uuid4().int % 10**11).zfill(11),  # 11-digit CPF from UUID int
     )
 
 
 @pytest.fixture
-def usuario_superintendencia():
+def usuario_superintendencia(faker):
     """Usuário do grupo Superintendência."""
+    # Python uuid4() is truly random (faker.uuid4() is seeded and generates duplicates!)
+    uid = uuid4().hex  # 32 chars hex, 128-bit entropy
     user = Usuario.objects.create_user(
-        username="super",
-        email="super@test.com",
+        username=f"super_{uid}",
+        email=f"super_{uid}@example.com",
         password="testpass",
-        cpf="22222222222",
+        cpf=str(uuid4().int % 10**11).zfill(11),  # 11-digit CPF from UUID int
     )
     grupo, _ = Group.objects.get_or_create(name="Superintendência")
     user.groups.add(grupo)
@@ -56,12 +61,13 @@ def usuario_superintendencia():
 
 @pytest.fixture
 def solicitacao_pendente(usuario_comum):
-    """Solicitação pendente para testes."""
+    """Solicitação pendente para testes (projeto SUPER)."""
     municipio, _ = Municipio.objects.get_or_create(
         nome="Fortaleza", defaults={"uf": "CE", "ativo": True}
     )
     projeto, _ = Projeto.objects.get_or_create(
-        nome="Projeto Teste", defaults={"ativo": True}
+        nome="Projeto Teste SUPER",
+        defaults={"ativo": True, "fluxo": "SUPER"}
     )
     tipo_evento, _ = TipoEvento.objects.get_or_create(nome="Formação")
 
@@ -84,27 +90,30 @@ def solicitacao_pendente(usuario_comum):
 
 def test_never_auto_approves_on_clean_or_save(solicitacao_pendente):
     """
-    PA-01: Solicitacao NUNCA muda para "aprovado" automaticamente.
+    PA-01: Solicitacao de projeto SUPER NUNCA muda para "aprovado" automaticamente.
 
-    Verifica que .save() e .clean() não alteram status.
+    Verifica que .save() e .clean() não alteram status para projetos SUPER.
+
+    Nota: Projetos NAO_SUPER são auto-aprovados (testado em test_solicitacao_fluxo.py).
     """
     sol = solicitacao_pendente
+    assert sol.projeto.fluxo == "SUPER", "Teste deve usar projeto SUPER"
     assert sol.status == "pendente"
 
     # Save sem mudanças não deve alterar status
     sol.save()
     sol.refresh_from_db()
-    assert sol.status == "pendente", "Save() não deve auto-aprovar"
+    assert sol.status == "pendente", "Save() não deve auto-aprovar projeto SUPER"
 
     # Update de outro campo não deve alterar status
     sol.observacoes = "Atualização de teste"
     sol.save()
     sol.refresh_from_db()
-    assert sol.status == "pendente", "Update de campo não deve auto-aprovar"
+    assert sol.status == "pendente", "Update de campo não deve auto-aprovar projeto SUPER"
 
     # Clean não deve alterar status
     sol.full_clean()
-    assert sol.status == "pendente", "full_clean() não deve auto-aprovar"
+    assert sol.status == "pendente", "full_clean() não deve auto-aprovar projeto SUPER"
 
 
 # ===================================================================

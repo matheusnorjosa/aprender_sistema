@@ -1,32 +1,46 @@
 /**
- * Componente de Legenda.
+ * Componente de Legenda com Design Visual.
  *
- * Consome legend do backend com fallback para CODE_LABEL.
- * Usa CODE_CLASS para estilização.
+ * Exibe círculos coloridos para cada código de disponibilidade.
+ * Baseado no design: paginadisponibilidade/screen.png
  */
 
-import { CODE_LABEL, CODE_CLASS } from './codes';
+import { CODE_LABEL } from './codes';
+
+// Mapeamento de códigos para cores (círculos)
+const CODE_COLOR = {
+  T: '#9333ea',     // Bloqueio total - roxo (purple-600)
+  P: '#06b6d4',     // Bloqueio parcial - ciano (cyan-500)
+  D: '#eab308',     // Deslocamento - amarelo (yellow-500)
+  X: '#ef4444',     // Conflito - vermelho (red-500)
+  E: '#22c55e',     // Evento - verde (green-500)
+  '2': '#16a34a',   // ≥2 eventos - verde escuro (green-600)
+  D1: '#3b82f6',    // Evento + deslocamento - azul (blue-500)
+};
 
 export default function Legend({ legend }) {
   // Usar legend do backend ou fallback local
   const map = legend ?? CODE_LABEL;
 
-  return (
-    <div className="flex flex-wrap gap-2 bg-white/80 rounded p-2 shadow-sm">
-      {Object.entries(map).map(([k, v]) => {
-        // Pular código vazio
-        if (!k) return null;
+  // Filtrar apenas códigos que têm cor definida
+  const entries = Object.entries(map).filter(([code]) => CODE_COLOR[code]);
 
-        return (
-          <span
-            key={k}
-            className={`inline-flex items-center gap-1 px-2 py-1 rounded ${CODE_CLASS[k] || CODE_CLASS['']}`}
-          >
-            <b>{k}</b>
-            <span className="text-sm">{v}</span>
-          </span>
-        );
-      })}
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-4">
+      <h3 className="font-bold mb-3 text-gray-900">Legenda</h3>
+      <div className="flex flex-wrap gap-4">
+        {entries.map(([code, label]) => (
+          <div key={code} className="flex items-center gap-2">
+            <div
+              className="w-4 h-4 rounded-full flex-shrink-0"
+              style={{ backgroundColor: CODE_COLOR[code] }}
+            ></div>
+            <span className="text-sm text-gray-700 whitespace-nowrap">
+              <span className="font-semibold">{code}</span> - {label}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

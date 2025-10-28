@@ -106,13 +106,14 @@ v2/frontend/
 - ✅ **Criar Bloqueio**: Formulário para criar bloqueios de disponibilidade (Total ou Parcial)
 - ✅ **Listar Bloqueios**: Tabela com todos os bloqueios do usuário atual
 - ✅ **Excluir Bloqueio**: Apenas bloqueios com `status=pendente` podem ser excluídos
-- ✅ **Checar Disponibilidade**: Pré-checagem consultiva de conflitos (X/T/P/D/M)
 
 **Validações**:
 
 - Data/hora início < Data/hora fim
 - Campos obrigatórios: `inicio`, `fim`, `tipo`
 - Tipo de bloqueio: `T` (Total) ou `P` (Parcial)
+
+**Nota sobre Conflitos**: Para projetos SUPER, a decisão de disponibilidade é feita manualmente pela Superintendência através da Grade Mensal (/disponibilidade), não há checagem automática em tempo real.
 
 ### Página de Solicitações (Superintendência)
 
@@ -153,7 +154,8 @@ v2/frontend/
 | GET | `/api/availability-blocks/?owner=me` | Lista bloqueios do usuário atual |
 | POST | `/api/availability-blocks/` | Cria novo bloqueio |
 | DELETE | `/api/availability-blocks/{id}/` | Remove bloqueio (apenas pendente) |
-| GET | `/api/availability/check/` | Checagem consultiva de conflitos |
+
+**Nota**: Endpoints de checagem de disponibilidade (`/api/availability/check/` e `/api/availability/check-many/`) são ferramentas consultivas restritas a perfis Controle/Superintendência (não usadas em tempo real na UX).
 
 ### Solicitações (Superintendência)
 
@@ -178,8 +180,7 @@ Formulário de criação de bloqueio com:
 - DatePicker para início/fim
 - Select para tipo (T/P)
 - TextArea para motivo (opcional)
-- Botão "Checar Disponibilidade" (consultivo)
-- Validação de datas
+- Validação de datas (início < fim)
 
 ### `<MyBlocksTable />`
 

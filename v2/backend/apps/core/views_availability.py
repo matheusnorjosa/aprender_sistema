@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from .models import AvailabilityBlock, Municipio, Usuario
+from .permissions import IsControleOrSuper
 from .serializers import AvailabilityBlockSerializer
 from .services.availability_service import check_conflicts
 
@@ -32,6 +33,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
 
     Formadores podem criar bloqueios para si mesmos.
     Usuario é preenchido automaticamente com request.user.
+    Status é auto-aprovado (bloqueios são informações factuais).
     """
 
     queryset = AvailabilityBlock.objects.all()
@@ -47,12 +49,24 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         return AvailabilityBlock.objects.filter(usuario=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(usuario=self.request.user)
+        """
+        Cria bloqueio e auto-aprova.
+
+        Bloqueios são informações factuais (formador sabe quando está indisponível)
+        e não requerem aprovação de terceiros. O status é definido como 'aprovado'
+        automaticamente para que o bloqueio seja considerado imediatamente nas
+        verificações de conflito (RD-02, RD-03).
+        """
+        serializer.save(usuario=self.request.user, status='aprovado')
 
 
 class AvailabilityCheckView(APIView):
     """
     Endpoint de checagem de disponibilidade (RD-01 a RD-08).
+
+    Ferramenta consultiva restrita a perfis Controle/Superintendência.
+    Não é usada em tempo real na UX; decisões de disponibilidade são
+    feitas manualmente pela Superintendência via Grade Mensal.
 
     GET /api/availability/check/
     Query params:
@@ -62,7 +76,7 @@ class AvailabilityCheckView(APIView):
         - municipio_id (opcional)
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsControleOrSuper]
     throttle_scope = "availability_check"
 
     def get(self, request):
@@ -154,13 +168,17 @@ class AvailabilityCheckView(APIView):
 
 class AvailabilityCheckManyView(APIView):
     """
-    Endpoint de checagem de disponibilidade em lote (PR 8/N).
+    Endpoint de checagem de disponibilidade em lote.
+
+    Ferramenta consultiva restrita a perfis Controle/Superintendência.
+    Não é usada em tempo real na UX; decisões de disponibilidade são
+    feitas manualmente pela Superintendência via Grade Mensal.
 
     POST /api/availability/check-many/
     Body: {"usuarios_ids": [1, 2], "inicio": "...", "fim": "...", "municipio_id": ...}
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsControleOrSuper]
     throttle_scope = "availability_check"
 
     def post(self, request):

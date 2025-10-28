@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { ConfigProvider, Layout, Menu, Spin, Result } from 'antd';
+import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message } from 'antd';
 import {
   CalendarOutlined,
   CheckCircleOutlined,
@@ -17,6 +17,11 @@ import {
   FileTextOutlined,
   SafetyOutlined,
   CloudUploadOutlined,
+  UserOutlined,
+  BarChartOutlined,
+  GlobalOutlined,
+  HomeOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons';
 import ptBR from 'antd/locale/pt_BR';
 import DisponibilidadeBlocks from './pages/Disponibilidade';
@@ -24,15 +29,20 @@ import MonthlyPage from './pages/Disponibilidade/MonthlyPage';
 import Solicitacoes from './pages/Solicitacoes';
 import ControlePage from './pages/Controle/ControlePage';
 import DATPage from './pages/DAT/DATPage';
-import NewSolicitacaoPage from './pages/Solicitacoes/NewSolicitacaoPage';
+import NewSolicitacaoWizard from './pages/Solicitacoes/NewSolicitacaoWizard';
 import MySolicitacoesPage from './pages/Solicitacoes/MySolicitacoesPage';
 import ApprovalsPage from './pages/Aprovacoes/ApprovalsPage';
 import PreAgendaPage from './pages/PreAgenda/PreAgendaPage';
+import LoginPage from './pages/Auth/LoginPage';
+import HomePage from './pages/Home/HomePage';
+import DashboardsPage from './pages/Dashboards/DashboardsPage';
+import MapaBrasilPage from './pages/MapaBrasil/MapaBrasilPage';
 import { getMe } from './api/availability';
 import './App.css';
 
-const { Header, Content } = Layout;
+const { Header, Content, Sider } = Layout;
 const { SubMenu } = Menu;
+const { Text } = Typography;
 
 // Componente 403 Forbidden
 function Forbidden() {
@@ -44,50 +54,120 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   // Carregar dados do usuário
+  const loadUser = async () => {
+    try {
+      const userData = await getMe();
+      setUser(userData);
+    } catch (error) {
+      console.error('Erro ao carregar usuário:', error);
+      setUser(null); // Explicitamente null se falhar
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await getMe();
-        setUser(userData);
-      } catch (error) {
-        console.error('Erro ao carregar usuário:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadUser();
   }, []);
 
   if (loading) {
+    return <Spin size="large" tip="Carregando..." fullscreen />;
+  }
+
+  // Se não autenticado, mostrar página de login
+  if (!user) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Spin size="large" tip="Carregando..." />
-      </div>
+      <ConfigProvider locale={ptBR}>
+        <LoginPage onLoginSuccess={loadUser} />
+      </ConfigProvider>
     );
   }
+
+  // Função de logout
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout/', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      message.success('Logout realizado com sucesso');
+      // Recarregar a página para voltar para tela de login
+      window.location.reload();
+    } catch (error) {
+      message.error('Erro ao fazer logout');
+      console.error('Erro no logout:', error);
+    }
+  };
 
   // Calcular flags de permissão
   const canCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('DAT');
   const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
   const canControle = user?.is_superuser || user?.groups?.includes('Controle');
+  const isAdmin = user?.is_superuser || user?.groups?.includes('Superintendência');
+  const isManager = user?.groups?.includes('Gerência') || isAdmin;
 
   return (
     <ConfigProvider locale={ptBR}>
       <Router>
         <Layout style={{ minHeight: '100vh' }}>
-          <Header style={{ display: 'flex', alignItems: 'center', padding: '0 24px' }}>
-            <div style={{ color: 'white', fontSize: '20px', fontWeight: 'bold', marginRight: '40px' }}>
+          {/* Sider lateral fixo */}
+          <Sider
+            width={250}
+            style={{
+              overflow: 'auto',
+              height: '100vh',
+              position: 'fixed',
+              left: 0,
+              top: 0,
+              bottom: 0,
+            }}
+          >
+            {/* Logo/Título */}
+            <div style={{
+              height: '64px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '22px',
+              fontWeight: 'bold',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            }}>
               AS v2
             </div>
+
+            {/* Menu vertical */}
             <Menu
               theme="dark"
-              mode="horizontal"
+              mode="inline"
               defaultSelectedKeys={['disponibilidade']}
-              style={{ flex: 1, minWidth: 0 }}
+              style={{ borderRight: 0 }}
             >
+              <Menu.Item key="home" icon={<HomeOutlined />}>
+                <Link to="/home">Página Inicial</Link>
+              </Menu.Item>
+
               <Menu.Item key="grade-mensal" icon={<TableOutlined />}>
                 <Link to="/disponibilidade">Grade Mensal</Link>
               </Menu.Item>
+
+              {/* Dashboards (Admin/Gerência) */}
+              {isManager && (
+                <Menu.Item key="dashboards" icon={<BarChartOutlined />}>
+                  <Link to="/dashboards">Dashboards</Link>
+                </Menu.Item>
+              )}
+
+              {/* Mapa do Brasil (Admin/Gerência) */}
+              {isManager && (
+                <Menu.Item key="mapa-brasil" icon={<GlobalOutlined />}>
+                  <Link to="/mapa-brasil">Mapa do Brasil</Link>
+                </Menu.Item>
+              )}
+
               <Menu.Item key="bloqueios" icon={<CalendarOutlined />}>
                 <Link to="/bloqueios">Bloqueios</Link>
               </Menu.Item>
@@ -118,20 +198,13 @@ function App() {
                 </Menu.Item>
               )}
 
-              {/* Publicação GCal (Controle) */}
-              {canControle && (
-                <Menu.Item key="publicacao" icon={<CloudUploadOutlined />}>
-                  <Link to="/publicacao">Publicação GCal</Link>
-                </Menu.Item>
-              )}
-
               {/* Ops Panels (Controle) */}
               {canControle && (
                 <SubMenu key="ops-submenu" icon={<ShoppingOutlined />} title="Ops">
-                  <Menu.Item key="controle">
+                  <Menu.Item key="controle-ops">
                     <Link to="/controle">Controle</Link>
                   </Menu.Item>
-                  <Menu.Item key="dat">
+                  <Menu.Item key="dat-ops">
                     <Link to="/dat">DAT</Link>
                   </Menu.Item>
                 </SubMenu>
@@ -141,48 +214,87 @@ function App() {
               <Menu.Item key="solicitacoes-old" icon={<CheckCircleOutlined />}>
                 <Link to="/solicitacoes">Solicitações (Old)</Link>
               </Menu.Item>
-              <Menu.Item key="controle" icon={<ShoppingOutlined />}>
-                <Link to="/controle">Controle</Link>
-              </Menu.Item>
-              <Menu.Item key="dat" icon={<DatabaseOutlined />}>
-                <Link to="/dat">DAT</Link>
-              </Menu.Item>
             </Menu>
-          </Header>
-          <Content style={{ padding: '0' }}>
-            <Routes>
-              <Route path="/" element={<Navigate to="/disponibilidade" replace />} />
-              <Route path="/disponibilidade" element={<MonthlyPage />} />
-              <Route path="/bloqueios" element={<DisponibilidadeBlocks />} />
+          </Sider>
 
-              {/* PR15: Novas rotas de solicitações */}
-              <Route
-                path="/solicitacoes/minhas"
-                element={canCoordenador ? <MySolicitacoesPage /> : <Forbidden />}
-              />
-              <Route
-                path="/solicitacoes/nova"
-                element={canCoordenador ? <NewSolicitacaoPage /> : <Forbidden />}
-              />
+          {/* Layout com margem para compensar Sider fixo */}
+          <Layout style={{ marginLeft: 250, minHeight: '100vh' }}>
+            {/* Header com info do usuário */}
+            <Header style={{
+              background: '#fff',
+              padding: '0 24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              borderBottom: '1px solid #f0f0f0',
+              width: '100%',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', whiteSpace: 'nowrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <UserOutlined />
+                  <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
+                </div>
+                <Button
+                  type="primary"
+                  danger
+                  icon={<LogoutOutlined />}
+                  onClick={handleLogout}
+                >
+                  Sair
+                </Button>
+              </div>
+            </Header>
 
-              {/* PR15: Rota de aprovações */}
-              <Route
-                path="/aprovacoes"
-                element={canSuper ? <ApprovalsPage /> : <Forbidden />}
-              />
+            {/* Conteúdo principal */}
+            <Content style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: '#f0f2f5' }}>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/home" element={<HomePage />} />
 
-              {/* PR15: Rota de pré-agenda */}
-              <Route
-                path="/pre-agenda"
-                element={canControle ? <PreAgendaPage /> : <Forbidden />}
-              />
+                {/* Dashboards (Admin/Gerência) */}
+                <Route
+                  path="/dashboards"
+                  element={isManager ? <DashboardsPage /> : <Forbidden />}
+                />
 
-              {/* Antigas rotas (manter compatibilidade) */}
-              <Route path="/solicitacoes" element={<Solicitacoes />} />
-              <Route path="/controle" element={<ControlePage />} />
-              <Route path="/dat" element={<DATPage />} />
-            </Routes>
-          </Content>
+                {/* Mapa do Brasil (Admin/Gerência) */}
+                <Route
+                  path="/mapa-brasil"
+                  element={isManager ? <MapaBrasilPage /> : <Forbidden />}
+                />
+
+                <Route path="/disponibilidade" element={<MonthlyPage />} />
+                <Route path="/bloqueios" element={<DisponibilidadeBlocks />} />
+
+                {/* PR15: Novas rotas de solicitações */}
+                <Route
+                  path="/solicitacoes/minhas"
+                  element={canCoordenador ? <MySolicitacoesPage /> : <Forbidden />}
+                />
+                <Route
+                  path="/solicitacoes/nova"
+                  element={canCoordenador ? <NewSolicitacaoWizard /> : <Forbidden />}
+                />
+
+                {/* PR15: Rota de aprovações */}
+                <Route
+                  path="/aprovacoes"
+                  element={canSuper ? <ApprovalsPage /> : <Forbidden />}
+                />
+
+                {/* PR15: Rota de pré-agenda */}
+                <Route
+                  path="/pre-agenda"
+                  element={canControle ? <PreAgendaPage /> : <Forbidden />}
+                />
+
+                {/* Antigas rotas (manter compatibilidade) */}
+                <Route path="/solicitacoes" element={<Solicitacoes />} />
+                <Route path="/controle" element={<ControlePage />} />
+                <Route path="/dat" element={<DATPage />} />
+              </Routes>
+            </Content>
+          </Layout>
         </Layout>
       </Router>
     </ConfigProvider>

@@ -58,7 +58,7 @@ export default function ApprovalsPage() {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
 
-  const [statusFilter, setStatusFilter] = useState('pending');
+  const [statusFilter, setStatusFilter] = useState('pendente');
   const [searchTerm, setSearchTerm] = useState('');
 
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -75,7 +75,7 @@ export default function ApprovalsPage() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const filters = { flow: 'SUPER', status: statusFilter || 'pending', q: searchTerm };
+      const filters = { flow: 'SUPER', status: statusFilter || 'pendente', q: searchTerm };
 
       const data = await listSolicitacoes(filters);
       setRows(data.results || data);
@@ -171,25 +171,41 @@ export default function ApprovalsPage() {
       title: 'Município',
       dataIndex: 'municipio',
       key: 'municipio',
-      render: (municipio) => municipio?.nome || '-',
+      render: (municipio) => {
+        // Backend retorna ID (número) ao invés de objeto
+        if (typeof municipio === 'number') return `Município #${municipio}`;
+        return municipio?.nome || '-';
+      },
     },
     {
       title: 'Projeto',
       dataIndex: 'projeto',
       key: 'projeto',
-      render: (projeto) => projeto?.nome || '-',
+      render: (projeto) => {
+        // Backend retorna ID (número) ao invés de objeto
+        if (typeof projeto === 'number') return `Projeto #${projeto}`;
+        return projeto?.nome || '-';
+      },
     },
     {
       title: 'Tipo',
       dataIndex: 'tipo_evento',
       key: 'tipo_evento',
-      render: (tipo) => tipo?.nome || '-',
+      render: (tipo) => {
+        // Backend retorna ID (número) ao invés de objeto
+        if (typeof tipo === 'number') return `Tipo #${tipo}`;
+        return tipo?.nome || '-';
+      },
     },
     {
       title: 'Autor',
       dataIndex: 'usuario',
       key: 'usuario',
-      render: (usuario) => (usuario ? `${usuario.first_name} ${usuario.last_name}` : '-'),
+      render: (usuario) => {
+        // Backend retorna ID (número) ao invés de objeto
+        if (typeof usuario === 'number') return `Usuário #${usuario}`;
+        return usuario ? `${usuario.first_name} ${usuario.last_name}` : '-';
+      },
     },
     {
       title: 'Status',
@@ -251,9 +267,9 @@ export default function ApprovalsPage() {
               style={{ width: 200 }}
               placeholder="Status"
             >
-              <Select.Option value="pending">Pendentes</Select.Option>
-              <Select.Option value="approved">Aprovadas</Select.Option>
-              <Select.Option value="rejected">Reprovadas</Select.Option>
+              <Select.Option value="pendente">Pendentes</Select.Option>
+              <Select.Option value="aprovado">Aprovadas</Select.Option>
+              <Select.Option value="reprovado">Reprovadas</Select.Option>
             </Select>
 
             <Input.Search
@@ -267,7 +283,7 @@ export default function ApprovalsPage() {
           </Space>
 
           {/* Contagem de pendentes */}
-          {statusFilter === 'pending' && total > 0 && (
+          {statusFilter === 'pendente' && total > 0 && (
             <Paragraph>
               <Tag color="orange">{total}</Tag> solicitações aguardando aprovação
             </Paragraph>

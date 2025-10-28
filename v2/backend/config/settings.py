@@ -40,11 +40,7 @@ SECRET_KEY = os.getenv(
 # ================================================================
 # ALLOWED HOSTS
 # ================================================================
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-
-# Add 'testserver' for Django tests
-if "test" in sys.argv or os.getenv("DJANGO_SETTINGS_MODULE", "").endswith("test"):
-    ALLOWED_HOSTS.append("testserver")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0,testserver").split(",")
 
 # ================================================================
 # PRODUCTION GUARD RAILS (P1.4)
@@ -239,6 +235,17 @@ CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read CSRF token
 
 # ================================================================
+# SESSION COOKIE (Development - allow cross-port)
+# ================================================================
+if ENVIRONMENT == "development":
+    SESSION_COOKIE_SAMESITE = "None"  # Allow cross-origin (localhost:5173 → localhost:8002)
+    SESSION_COOKIE_SECURE = False      # Required False for SameSite=None without HTTPS
+    CSRF_COOKIE_SAMESITE = "None"      # Also relax CSRF cookie
+else:
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SAMESITE = "Lax"
+
+# ================================================================
 # REST FRAMEWORK
 # ================================================================
 REST_FRAMEWORK = {
@@ -265,6 +272,14 @@ REST_FRAMEWORK = {
     },
 }
 
+# Relax throttling in development
+if ENVIRONMENT == "development":
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+        "anon": "10000/hour",
+        "user": "100000/hour",
+        "availability_check": "600/min",  # 10x mais permissivo em dev
+    }
+
 # ================================================================
 # CELERY
 # ================================================================
@@ -277,16 +292,27 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 
+# Auto-apply GCal (Celery task preview_then_apply_gcal) - Fase 3
+# Default: False (desativado por padrão para consolidar governança via /pre-agenda)
+# Quando True: Celery beat executa preview_then_apply_gcal periodicamente
+# Quando False: Task retorna status="SKIPPED" sem executar sync
+# Fase 3 - Governança GCal: única via de criação é /pre-agenda (individual + massa)
+FEATURE_AUTO_APPLY_ENABLED = os.getenv("FEATURE_AUTO_APPLY_ENABLED", "0") == "1"
+
 # Celery Beat Schedule (tarefas periódicas)
-CELERY_BEAT_SCHEDULE = {
-    "gcal-sync-every-5-minutes": {
-        "task": "apps.core.tasks.preview_then_apply_gcal",
-        "schedule": 300.0,  # 5 minutos (em segundos)
-        "options": {
-            "expires": 60.0,  # Tarefa expira após 60s se não iniciar
+# Governança Fase 3: schedule só é registrado quando FEATURE_AUTO_APPLY_ENABLED=True
+if FEATURE_AUTO_APPLY_ENABLED:
+    CELERY_BEAT_SCHEDULE = {
+        "gcal-sync-every-5-minutes": {
+            "task": "apps.core.tasks.preview_then_apply_gcal",
+            "schedule": 300.0,  # 5 minutos (em segundos)
+            "options": {
+                "expires": 60.0,  # Tarefa expira após 60s se não iniciar
+            },
         },
-    },
-}
+    }
+else:
+    CELERY_BEAT_SCHEDULE = {}
 
 # ================================================================
 # LOGGING
@@ -376,6 +402,25 @@ TRAVEL_BUFFER_MINUTES = int(os.getenv("TRAVEL_BUFFER_MINUTES", "120"))
 
 # ETL: Diretório padrão para importação de arquivos
 DATA_IMPORT_DIR = os.getenv("DATA_IMPORT_DIR", "/app/data/csv-import")
+
+# ================================================================
+# PR21: external_hash v2 + Data Quality Gates
+# ================================================================
+# Feature flag: usa hash v2 (17 campos) ao invés de v1 (8 campos)
+USE_EXTERNAL_HASH_V2 = os.getenv("USE_EXTERNAL_HASH_V2", "True") == "True"
+
+# Data Quality Gates: limites para abortar ETL apply
+ETL_MAX_DUPLICATES_PCT = float(os.getenv("ETL_MAX_DUPLICATES_PCT", "1.0"))  # 1.0% máximo de duplicatas
+
+ETL_MAX_UNKNOWN_USERS = int(os.getenv("ETL_MAX_UNKNOWN_USERS", "100"))  # Máximo de pessoas sem cadastro
+
+ETL_REQUIRE_ZERO_INVALID_INTERVALS = (
+    os.getenv("ETL_REQUIRE_ZERO_INVALID_INTERVALS", "True") == "True"
+)  # Se True, aborta se houver intervalos inválidos (fim <= início)
+
+ETL_REQUIRE_ZERO_INVALID_DATES = (
+    os.getenv("ETL_REQUIRE_ZERO_INVALID_DATES", "True") == "True"
+)  # Se True, aborta se houver datas/horas inválidas
 
 # ================================================================
 # SECURITY (Production)

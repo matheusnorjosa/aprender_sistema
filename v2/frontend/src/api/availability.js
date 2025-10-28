@@ -116,3 +116,12 @@ export async function getMonthly(params) {
   const url = buildUrl('/availability/monthly/', params);
   return await fetchAPI(url);
 }
+
+/**
+ * Busca feature flags do sistema.
+ *
+ * @returns {Promise<object>} Feature flags { apply_blocked, GCAL_CLIENT, PREVIEW_ONLY, ... }
+ */
+export async function getFeatures() {
+  return await fetchAPI('/features/');
+}

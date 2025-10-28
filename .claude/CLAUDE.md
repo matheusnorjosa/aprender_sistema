@@ -253,6 +253,26 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 
 ---
 
+### 6.1. Importação de Usuários e Grupos
+
+**Estrutura da Planilha (Acompanhamento de Agenda):**
+- Coluna **N**: Coordenador
+- Colunas **O-S**: Formador 1, Formador 2, ..., Formador 5
+
+**Regra de Atribuição de Grupos:**
+- Usuários com username `coordenacao*` → Grupo "Coordenador"
+- Demais usuários com participações → Grupo "Formador"
+
+**Comando de Backfill:**
+```bash
+python manage.py backfill_user_groups --apply
+```
+- Atribui grupos faltantes baseado no padrão do username
+- Usado após importação inicial de usuários (122 usuários importados)
+- Resultado: 65 Formadores + 10 Coordenadores atribuídos corretamente
+
+---
+
 ### 7. Benefícios Esperados
 - Fim da dependência de planilhas manuais  
 - Fluxo de solicitações, aprovações e conflitos totalmente digital  
@@ -518,6 +538,20 @@ test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 | **PA-06** | ✅ | Botões ocultos para não-Superintendência | `ApprovalsPage.jsx:66-68, 211` |
 | **PA-07** | ✅ | 5 testes obrigatórios implementados e passando | `test_approval_policy_PA.py` |
 
+### ⚠️ Nota Importante: Aprovação Manual NÃO Revalida Conflitos
+
+**Comportamento intencional**: O endpoint `approve()` (views_solicitacao.py:268-323) **NÃO** chama `check_conflicts()` antes de aprovar.
+
+**Razão**: Superintendência toma decisões com **contexto humano** que o sistema não captura:
+- Exceções autorizadas
+- Prioridades políticas/organizacionais
+- Contexto específico do município/projeto
+- Negociações não-formalizadas
+
+**Fluxo**: Superintendência acessa `/disponibilidade` (visualização da grade) e verifica **manualmente** antes de aprovar em `/aprovacoes`.
+
+**Sistema = ferramenta de suporte à decisão, NÃO automatização total.**
+
 ### Arquivos Modificados
 
 **Backend**:
@@ -538,6 +572,105 @@ test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 ✅ PA-01 a PA-07 completo
 ⏳ Push branch + criar PR17
 ⏳ Review e merge
+
+---
+
+## Correção PR18 - Restauração de Auto-Aprovação NAO_SUPER (2025-10-25)
+
+**Problema Identificado**: PR17 removeu a auto-aprovação para **TODOS** os fluxos, mas a especificação correta é:
+- **SUPER**: Manual approval required (Superintendência)
+- **NAO_SUPER**: Auto-approved on creation
+
+**Status**: ✅ Corrigido e testado
+
+### Fluxos Corretos do Sistema
+
+#### Fluxo SUPER (Manual)
+1. Coordenador acessa `/solicitacoes/nova` e preenche dados
+2. Solicitação criada com `status='pendente'`
+3. Superintendência aprova/reprova via `/aprovacoes`
+4. Se aprovado → vai para `/pre-agenda` (Controle cria evento no Google Calendar)
+5. Se reprovado → Coordenador é notificado para nova solicitação
+
+#### Fluxo NAO_SUPER (Auto-aprovado)
+1. Coordenador de projeto NAO_SUPER acessa `/solicitacoes/nova` e preenche dados
+2. **Solicitação criada com `status='aprovado'` automaticamente**
+3. Vai direto para `/pre-agenda` (Controle cria evento no Google Calendar)
+
+### Mapeamento de Fluxos na Planilha Original
+**Arquivo**: `v2/backend/data/csv-import/Cópia de Acompanhamento de Agenda _ 2025.xlsx`
+
+O **nome da aba** define o fluxo dos projetos (coluna "K" - "projeto"):
+- **Aba "Super"** → Projetos são **SUPER** (requerem aprovação manual)
+  - 8 projetos: Cataventos, CIRANDAR, LENDO E ESCREVENDO, NOVO LENDO, PROJETO AMMA, PROJETO MIUDEZAS E DESCOBERTAS, TEMA, UNI DUNI TÊ
+- **Abas "ACerta", "Outros", "Brincando", "Vidas"** → Projetos são **NAO_SUPER** (auto-aprovados)
+  - Total: ~16 projetos + variantes
+
+**Nota**: Correção aplicada em 25/10/2025 - 8 projetos da aba "Super" foram atualizados de NAO_SUPER → SUPER no banco.
+
+### Mudanças Implementadas
+
+**1. models.py - Restauração de Auto-Aprovação**
+- **Arquivo**: `v2/backend/apps/core/models.py` (linhas 431-448)
+- **Mudança**: Restaurada lógica de auto-aprovação para `projeto.fluxo == 'NAO_SUPER'`
+
+```python
+def save(self, *args, **kwargs):
+    """
+    Override save para implementar auto-aprovação de fluxo NAO_SUPER.
+
+    Fluxos do sistema:
+    - SUPER: Requer aprovação manual pela Superintendência (PA-01 a PA-07)
+    - NAO_SUPER: Auto-aprovado automaticamente na criação
+
+    Histórico:
+    - PR 13/N: Auto-aprovação implementada para NAO_SUPER
+    - PR17: REMOVEU auto-aprovação (INCORRETO - revertido em PR18)
+    - PR18: RESTAURA auto-aprovação para NAO_SUPER conforme especificação correta
+    """
+    # Auto-aprovar apenas projetos NAO_SUPER na criação
+    if self.pk is None and self.projeto and self.projeto.fluxo == 'NAO_SUPER':
+        self.status = 'aprovado'
+
+    super().save(*args, **kwargs)
+```
+
+**2. test_approval_policy_PA.py - Atualização de Testes**
+- **Arquivo**: `v2/backend/apps/core/tests/test_approval_policy_PA.py`
+- **Mudanças**:
+  - Fixture `solicitacao_pendente` agora usa projeto com `fluxo='SUPER'`
+  - Teste `test_never_auto_approves_on_clean_or_save` atualizado para validar apenas projetos SUPER
+  - Nota adicionada: "Projetos NAO_SUPER são auto-aprovados (testado em test_solicitacao_fluxo.py)"
+
+**3. test_solicitacao_fluxo.py - Correção de Fixtures**
+- **Arquivo**: `v2/backend/apps/core/tests/test_solicitacao_fluxo.py`
+- **Mudança**: Fixture `grupos` agora usa `get_or_create()` para evitar erros de unique constraint
+
+### Validação
+
+```bash
+# Teste manual no Django shell
+✅ Projeto SUPER: status = pendente (esperado: pendente)
+✅ Projeto NAO_SUPER: status = aprovado (esperado: aprovado)
+
+============================================================
+✅ SUCESSO! A correção está funcionando:
+  - SUPER: pendente (requer aprovação manual)
+  - NAO_SUPER: aprovado (auto-aprovado)
+============================================================
+```
+
+### Impacto
+
+- **PA-01 Atualizada**: "Solicitações de projeto SUPER nunca são auto-aprovadas"
+- **PA-02 a PA-07**: Sem mudanças, aplicam-se apenas ao fluxo SUPER
+- **Testes existentes**: `test_solicitacao_fluxo.py` já valida ambos os fluxos (9 testes)
+
+### Arquivos Modificados
+
+- `v2/backend/apps/core/models.py` (Solicitacao.save)
+- `v2/backend/apps/core/tests/test_approval_policy_PA.py` (fixture + docstrings)
+- `v2/backend/apps/core/tests/test_solicitacao_fluxo.py` (fixture grupos)
 
 ---
 

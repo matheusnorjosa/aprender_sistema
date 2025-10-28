@@ -1,17 +1,22 @@
 """
-GCal Dashboard Views (PR14 - Ajustes pós-merge)
+GCal Dashboard Views (PR14 - Ajustes pós-merge + Fase 2 batch publish)
 
-4 endpoints para painel de publicação com contrato padronizado:
+3 endpoints para painel de publicação com contrato padronizado:
 - GET /api/gcal/status-summary/ - resumo de contadores
 - GET /api/gcal/list/ - listagem com filtros
 - GET /api/gcal/drift/ - detecção de drift
-- POST /api/gcal/reapply/ - republicação em massa
+- POST /api/gcal/publish-batch/ - publicação em massa (Fase 2)
 
 Todos restritos a grupos Controle/Superintendência.
 Suportam filtros: date_from, date_to, sector, q, status (gcal_status).
+
+Nota: Publicação de eventos no Google Calendar ocorre via página /pre-agenda:
+- Individual: botão "Publicar" (POST /api/solicitacoes/{id}/publish/)
+- Em massa: botão "Publicar Selecionados" (POST /api/gcal/publish-batch/)
 """
 
 import logging
+import os
 from datetime import date
 
 from django.db.models import Count, Q
@@ -250,68 +255,120 @@ class GCalDriftView(APIView):
         })
 
 
-class GCalBulkReapplyView(APIView):
+class GCalPublishBatchView(APIView):
     """
-    POST /api/gcal/reapply/
+    POST /api/gcal/publish-batch/
 
-    Reenfileira publicação para lista de IDs.
+    Publicação em massa de solicitações aprovadas no Google Calendar.
+    Restrict: Controle/Superintendência
 
-    Request body:
+    Request Body:
     {
-        "ids": [1, 2, 3],
-        "dry_run": false
+        "solicitacao_ids": [123, 456, 789],  // Array de IDs
+        "dry_run": false,                     // Opcional (default: false)
+        "apply_blocked": false                // Opcional (default: false)
     }
 
-    Response:
+    Response 202 Accepted:
     {
-        "queued": 3,
-        "errors": [],  # Lista de {id, detail}
-        "dry_run": false
+        "queued": 2,                          // Quantidade enfileirada
+        "errors": [                           // Lista de erros
+            {
+                "id": 789,
+                "detail": "Status deve ser 'aprovado' (atual: pendente)"
+            }
+        ],
+        "dry_run": false,
+        "apply_blocked": false
     }
+
+    Regras:
+    - Apenas solicitações com status='aprovado' são processadas
+    - Se GCAL_CLIENT != "google" e dry_run=false e apply_blocked=false → erro
+    - Válidas: marca gcal_status=PENDING e enfileira task Celery
+    - Inválidas: retorna em 'errors' com motivo
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
     def post(self, request):
-        from apps.core.tasks import task_publish_solicitacao_to_gcal
-
-        ids = request.data.get('ids', [])
+        # Parse request body
+        solicitacao_ids = request.data.get('solicitacao_ids', [])
         dry_run = request.data.get('dry_run', False)
+        apply_blocked = request.data.get('apply_blocked', False)
 
-        if not ids:
+        # Validação: array de IDs obrigatório
+        if not isinstance(solicitacao_ids, list) or not solicitacao_ids:
             return Response(
-                {'detail': 'Campo ids é obrigatório'},
+                {'detail': 'solicitacao_ids deve ser um array não-vazio de IDs'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Validar que todas são aprovadas
-        qs = Solicitacao.objects.filter(id__in=ids, status='aprovado')
-        found_ids = set(qs.values_list('id', flat=True))
-        requested_ids = set(ids)
+        # Buscar solicitações
+        solicitacoes = Solicitacao.objects.filter(id__in=solicitacao_ids).select_related(
+            'projeto', 'municipio'
+        )
 
-        # Detectar IDs inválidos
-        invalid_ids = requested_ids - found_ids
+        # Verificar GCAL_CLIENT
+        gcal_client = os.getenv('GCAL_CLIENT', 'fake')
+
+        queued = []
         errors = []
-        for invalid_id in invalid_ids:
-            errors.append({
-                'id': invalid_id,
-                'detail': 'ID não encontrado ou não está aprovado'
-            })
 
-        # Marcar como PENDING e enfileirar
-        queued = 0
-        for s in qs:
+        for sol_id in solicitacao_ids:
+            # Verificar se existe
+            sol = next((s for s in solicitacoes if s.id == sol_id), None)
+            if not sol:
+                errors.append({
+                    'id': sol_id,
+                    'detail': 'Solicitação não encontrada'
+                })
+                continue
+
+            # Validar status='aprovado'
+            if sol.status != 'aprovado':
+                errors.append({
+                    'id': sol_id,
+                    'detail': f"Status deve ser 'aprovado' (atual: {sol.status})"
+                })
+                continue
+
+            # Validar apply_blocked com GCAL_CLIENT
+            if gcal_client != 'google' and not dry_run and not apply_blocked:
+                errors.append({
+                    'id': sol_id,
+                    'detail': f'GCAL_CLIENT={gcal_client} (não-google) requer dry_run=true ou apply_blocked=true'
+                })
+                continue
+
+            # Válida: marcar como PENDING e enfileirar
             if not dry_run:
-                s.mark_gcal(
-                    status=Solicitacao.GCalStatus.PENDING,
-                    payload_hash=None,
-                    error=''
-                )
+                sol.gcal_status = Solicitacao.GCalStatus.PENDING
+                sol.save(update_fields=['gcal_status', 'updated_at'])
 
-            task_publish_solicitacao_to_gcal.delay(s.id, dry_run=dry_run, apply_blocked=False)
-            queued += 1
+                # Importar e enfileirar task Celery
+                try:
+                    from .tasks import task_publish_solicitacao_to_gcal
+                    task_publish_solicitacao_to_gcal.delay(
+                        solicitacao_id=sol.id,
+                        dry_run=dry_run,
+                        apply_blocked=apply_blocked
+                    )
+                    queued.append(sol.id)
+                    logger.info(f"Batch publish queued: solicitacao_id={sol.id}, dry_run={dry_run}")
+                except Exception as e:
+                    logger.error(f"Failed to queue solicitacao_id={sol.id}: {e}")
+                    errors.append({
+                        'id': sol.id,
+                        'detail': f'Erro ao enfileirar task: {str(e)}'
+                    })
+            else:
+                # Dry-run: apenas simula
+                queued.append(sol.id)
+                logger.info(f"Batch publish dry-run: solicitacao_id={sol.id}")
 
         return Response({
-            'queued': queued,
+            'queued': len(queued),
             'errors': errors,
-            'dry_run': dry_run
-        }, status=status.HTTP_202_ACCEPTED if queued > 0 else status.HTTP_200_OK)
+            'dry_run': dry_run,
+            'apply_blocked': apply_blocked
+        }, status=status.HTTP_202_ACCEPTED)

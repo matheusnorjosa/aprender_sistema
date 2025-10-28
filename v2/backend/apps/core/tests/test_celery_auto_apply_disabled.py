@@ -58,7 +58,7 @@ class TestCeleryAutoApplyDisabled:
         GCAL_CALENDAR_ID="test-calendar-id",
         FEATURE_FLAGS={"GCAL_MODE": "google"}
     )
-    @patch("django.core.management.call_command")
+    @patch("apps.core.tasks.call_command")
     def test_auto_apply_enabled_allows_execution(
         self,
         mock_call_command
@@ -98,8 +98,9 @@ class TestCeleryAutoApplyDisabled:
         assert mock_call_command.call_count >= 1, f"Expected call_command to be called, but was called {mock_call_command.call_count} times"
 
         # Primeira chamada deve ser dry-run (preview)
-        first_call_kwargs = mock_call_command.call_args_list[0][1]
-        assert first_call_kwargs.get("dry_run") is True, "Expected first call to be dry-run (preview)"
+        first_call_args = mock_call_command.call_args_list[0][0]  # Positional args
+        assert "--dry-run" in first_call_args, f"Expected '--dry-run' in args, got {first_call_args}"
+        assert "--json" in first_call_args, f"Expected '--json' in args, got {first_call_args}"
 
         # Resultado deve ser NOOP (pois total=0, sem mudanças)
         assert result["status"] == "NOOP", f"Expected status NOOP, got {result.get('status')}"

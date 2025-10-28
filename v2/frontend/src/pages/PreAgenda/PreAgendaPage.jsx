@@ -5,8 +5,10 @@
  * - Lista solicitações aprovadas de ambos os fluxos (SUPER + NAO_SUPER)
  * - Filtros por data, setor, busca textual
  * - Exibe resumo de status GCal no topo
- * - Botões para preview e publish
- * - Link para painel /publicacao para operações em lote
+ * - Botões para preview e publish individual
+ *
+ * Nota: Publicação no Google Calendar ocorre exclusivamente via botão "Publicar"
+ * nesta página. Não há operações em lote de publicação.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -203,18 +205,9 @@ export default function PreAgendaPage() {
       <Space direction="vertical" style={{ width: '100%' }} size="large">
         {/* Header */}
         <Card>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={2} style={{ margin: 0 }}>
-              Pré-agenda (Controle)
-            </Title>
-            <Button
-              icon={<CalendarOutlined />}
-              onClick={() => navigate('/publicacao')}
-              type="default"
-            >
-              Painel de Publicação
-            </Button>
-          </div>
+          <Title level={2} style={{ margin: 0 }}>
+            Pré-agenda (Controle)
+          </Title>
         </Card>
 
         {/* Resumo GCal */}
@@ -291,20 +284,6 @@ export default function PreAgendaPage() {
             }}
           />
         </Card>
-
-        {/* Rodapé */}
-        <Alert
-          message="Publicação em Lote"
-          description={
-            <Text>
-              Para gerenciar status operacional, detectar drift e realizar re-aplicações em lote,
-              use o <a href="/publicacao">Painel de Publicação GCal</a>.
-            </Text>
-          }
-          type="info"
-          icon={<InfoCircleOutlined />}
-          showIcon
-        />
       </Space>
 
       {/* Modal Preview */}

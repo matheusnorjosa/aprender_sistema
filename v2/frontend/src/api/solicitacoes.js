@@ -48,6 +48,10 @@ export async function listSolicitacoes(filters = {}) {
  * @returns {Promise<object>} Solicitação criada
  */
 export async function createSolicitacao(body) {
+  console.log('=== createSolicitacao DEBUG ===');
+  console.log('Body enviado:', body);
+  console.log('JSON stringificado:', JSON.stringify(body));
+
   return await fetchAPI('/solicitacoes/', {
     method: 'POST',
     body: JSON.stringify(body),

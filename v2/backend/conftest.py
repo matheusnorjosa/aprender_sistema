@@ -9,43 +9,42 @@ Applied to:
 - ETL imports (missing coordenador/usuario in planilhas)
 """
 import pytest
+from uuid import uuid4
 from django.db.models.signals import pre_save
 from django.contrib.auth.models import Group
 
 
-@pytest.fixture(autouse=True, scope="session")
-def _ensure_default_test_user(django_db_setup, django_db_blocker):
+@pytest.fixture(autouse=True, scope="function")
+def _ensure_default_test_user(django_db_setup, django_db_blocker, faker):
     """
     Create default test user and auto-inject into Solicitacao instances missing usuario_id.
 
-    Runs once per test session, survives across all tests.
+    Runs once per test function with unique CPF to avoid IntegrityError.
     """
     from apps.core.models import Usuario, Solicitacao
 
     with django_db_blocker.unblock():
-        # Create or get default test user (avoid CPF conflict with ETL user)
-        user, created = Usuario.objects.get_or_create(
-            username="test_default_user",
-            defaults={
-                "email": "test.default@example.com",
-                "first_name": "Test",
-                "last_name": "User",
-                "cpf": "11111111111",  # Different from ETL user (99999999999)
-                "is_active": True,
-            },
+        # Create default test user with Python uuid4() (truly random, not seeded)
+        # CRITICAL: faker.uuid4() is seeded and generates duplicates across tests!
+        # Python's uuid4() uses os.urandom() and is cryptographically secure
+        uid = uuid4().hex  # 32 chars hex (no hyphens), 128-bit entropy
+        user = Usuario.objects.create(
+            username=f"test_{uid}",
+            email=f"test_{uid}@example.com",
+            first_name=faker.first_name(),
+            last_name=faker.last_name(),
+            cpf=str(uuid4().int % 10**11).zfill(11),  # 11-digit CPF from UUID int
+            is_active=True,
         )
 
-        if created:
-            # Get existing Coordenador group (created by seed_rbac)
-            try:
-                coordenador_group = Group.objects.get(name="Coordenador")
-                user.groups.add(coordenador_group)
-                user.save()
-            except Group.DoesNotExist:
-                # Fallback: create if doesn't exist (shouldn't happen)
-                coordenador_group = Group.objects.create(name="Coordenador")
-                user.groups.add(coordenador_group)
-                user.save()
+        # Get existing Coordenador group (created by seed_rbac)
+        try:
+            coordenador_group = Group.objects.get(name="Coordenador")
+            user.groups.add(coordenador_group)
+        except Group.DoesNotExist:
+            # Fallback: create if doesn't exist (shouldn't happen)
+            coordenador_group = Group.objects.create(name="Coordenador")
+            user.groups.add(coordenador_group)
 
         # Auto-inject user into Solicitacao instances missing usuario_id
         def _auto_inject_user(sender, instance, **kwargs):

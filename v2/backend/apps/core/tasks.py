@@ -134,6 +134,7 @@ def preview_then_apply_gcal():
     Preview-then-apply pattern para sync com Google Calendar.
 
     Workflow:
+    0. Verifica FEATURE_AUTO_APPLY_ENABLED (Fase 3 - Governança GCal)
     1. Verifica feature flags (GCAL_MODE, GCAL_CALENDAR_ID)
     2. Roda dry-run (preview) com --json
     3. Se preview retornar erro, aborta sem apply
@@ -149,6 +150,26 @@ def preview_then_apply_gcal():
     """
     from django.conf import settings
     from apps.core.models import AuditLog
+
+    # ================================================================
+    # GUARDA 0: Verificar FEATURE_AUTO_APPLY_ENABLED (Fase 3)
+    # ================================================================
+    # Governança GCal consolidada: publicações ocorrem SOMENTE via /pre-agenda
+    # Auto-apply do Celery desativado por padrão (FEATURE_AUTO_APPLY_ENABLED=0)
+    auto_apply_enabled = getattr(settings, "FEATURE_AUTO_APPLY_ENABLED", False)
+
+    if not auto_apply_enabled:
+        result = {
+            "status": "SKIPPED",
+            "reason": "FEATURE_AUTO_APPLY_ENABLED=False (auto-apply desativado, governança via /pre-agenda)",
+        }
+        AuditLog.objects.create(
+            usuario=None,
+            action="CELERY_GCAL_SYNC",
+            model_name=None,
+            details=result,
+        )
+        return result
 
     # ================================================================
     # GUARDA 1: Verificar GCAL_MODE

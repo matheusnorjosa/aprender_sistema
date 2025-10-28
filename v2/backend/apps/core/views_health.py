@@ -86,7 +86,8 @@ def features(request):
         "SHOW_PRE_AGENDA": true,
         "GCAL_CLIENT": "fake",
         "apply_blocked": true,
-        "ENVIRONMENT": "development"
+        "ENVIRONMENT": "development",
+        "realtime_check_enabled": false
     }
 
     Security:
@@ -107,6 +108,7 @@ def features(request):
     preview_only = os.getenv("PREVIEW_ONLY", "1") == "1"  # Default true (blocks writes)
     metrics_enabled = os.getenv("METRICS_ENABLED", "1") == "1"  # Default true
     show_pre_agenda = os.getenv("SHOW_PRE_AGENDA", "1") == "1"  # Default true
+    realtime_check_enabled = os.getenv("REALTIME_CHECK_ENABLED", "0") == "1"  # Default false (manual flow via Grade Mensal)
 
     # Check for Config overrides from database
     try:
@@ -119,12 +121,26 @@ def features(request):
             use_v2_only = config.value.get("USE_V2_ONLY", use_v2_only)
             metrics_enabled = config.value.get("METRICS_ENABLED", metrics_enabled)
             show_pre_agenda = config.value.get("SHOW_PRE_AGENDA", show_pre_agenda)
+            realtime_check_enabled = config.value.get("REALTIME_CHECK_ENABLED", realtime_check_enabled)
     except Exception:
         # If Config model doesn't exist or query fails, just use env vars
         pass
 
     # Security: block apply operations when not using real Google Calendar client
     apply_blocked = gcal_client != "google"
+
+    # Auto-apply GCal (Celery task preview_then_apply_gcal) - Fase 3
+    # Default: False (desativado) - governança consolidada via /pre-agenda
+    auto_apply_enabled = os.getenv("FEATURE_AUTO_APPLY_ENABLED", "0") == "1"
+
+    # Check for Config overrides for auto_apply_enabled
+    try:
+        from apps.core.models import Config
+        config = Config.objects.filter(key="features").first()
+        if config and isinstance(config.value, dict):
+            auto_apply_enabled = config.value.get("auto_apply_enabled", auto_apply_enabled)
+    except Exception:
+        pass
 
     return Response({
         "USE_V2_ONLY": use_v2_only,
@@ -134,5 +150,7 @@ def features(request):
         "SHOW_PRE_AGENDA": show_pre_agenda,
         "GCAL_CLIENT": gcal_client,
         "apply_blocked": apply_blocked,
+        "auto_apply_enabled": auto_apply_enabled,
         "ENVIRONMENT": environment,
+        "realtime_check_enabled": realtime_check_enabled,
     })

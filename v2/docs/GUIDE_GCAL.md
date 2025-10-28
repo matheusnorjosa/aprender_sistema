@@ -209,7 +209,80 @@ GET /api/solicitacoes/
    - Coluna dedicada "Reunião"
    - Botão "Entrar" ou "-" se não houver link
 
-## 5. Comandos Úteis
+## 5. Auto-apply (Celery) desativado por padrão
+
+### Fase 3: Governança Consolidada via /pre-agenda
+
+A partir da **Fase 3**, a publicação automática de eventos no Google Calendar via Celery (task `preview_then_apply_gcal`) está **desativada por padrão**. Isso consolida a governança para que **todas as publicações ocorram exclusivamente via interface /pre-agenda**.
+
+### Variável de Ambiente
+
+```bash
+# Auto-apply GCal (Celery task preview_then_apply_gcal)
+# Default: 0 (desativado) - governança consolidada via /pre-agenda
+# Quando 0: Task retorna status="SKIPPED" sem executar sync
+# Quando 1: Celery beat executa preview_then_apply_gcal periodicamente
+FEATURE_AUTO_APPLY_ENABLED=0
+```
+
+### Comportamento
+
+| FEATURE_AUTO_APPLY_ENABLED | Comportamento |
+|----------------------------|---------------|
+| `0` (default) | Task Celery retorna `status="SKIPPED"`, registra AuditLog, **não executa sync** |
+| `1` | Task Celery executa normalmente (preview → apply se houver mudanças) |
+
+### Endpoint /api/features/
+
+O endpoint `/api/features/` expõe o estado atual da flag:
+
+```bash
+curl http://localhost:8000/api/features/ \
+  -H "Authorization: Bearer $TOKEN"
+
+{
+  "USE_V2_ONLY": true,
+  "GCAL_MODE": "fake",
+  "PREVIEW_ONLY": true,
+  "METRICS_ENABLED": true,
+  "SHOW_PRE_AGENDA": true,
+  "GCAL_CLIENT": "fake",
+  "apply_blocked": true,
+  "auto_apply_enabled": false,  # ← Nova flag (Fase 3)
+  "ENVIRONMENT": "development",
+  "realtime_check_enabled": false
+}
+```
+
+### Motivação
+
+- **Controle explícito**: Evita publicações automáticas em background sem supervisão
+- **Governança única**: Toda criação/atualização de eventos passa por revisão manual em /pre-agenda
+- **Auditoria completa**: AuditLog registra tentativas de execução (mesmo quando skipped)
+- **Segurança**: Previne sincronizações acidentais em ambientes de desenvolvimento/staging
+
+### Como Ativar Auto-apply (Opcional)
+
+```bash
+# 1. Configure a variável de ambiente
+export FEATURE_AUTO_APPLY_ENABLED=1
+
+# 2. Rebuild containers (Docker)
+docker compose build web
+docker compose up -d web
+
+# 3. Verificar via API
+curl http://localhost:8000/api/features/ | jq '.auto_apply_enabled'
+# → true
+
+# 4. Monitorar logs do Celery Beat
+docker compose logs -f celery-beat
+# → Task executará a cada 5 minutos (ver CELERY_BEAT_SCHEDULE)
+```
+
+⚠️ **Atenção**: Ativar auto-apply requer configuração adequada de `GCAL_CLIENT=google` e credenciais válidas para evitar erros.
+
+## 7. Comandos Úteis
 
 ### Preview (GET /preview-gcal/)
 
@@ -250,7 +323,7 @@ pytest apps/core/tests/test_gcal_conference_version.py -v
 pytest apps/core/tests/test_solicitacao_serializer_meet_link.py -v
 ```
 
-## 6. Troubleshooting
+## 8. Troubleshooting
 
 ### Erro: "GCAL_CLIENT não configurado"
 
@@ -306,14 +379,15 @@ print(payload['conferenceData'])  # Deve existir
 logger.info(f"GCal response: {result}")
 ```
 
-## 7. Referências
+## 9. Referências
 
 - [Google Calendar API - Events.insert](https://developers.google.com/calendar/api/v3/reference/events/insert)
 - [Google Calendar API - Conference Data](https://developers.google.com/calendar/api/v3/reference/events#conferenceData)
 - [Service Account Authentication](https://developers.google.com/identity/protocols/oauth2/service-account)
 - [GCAL_SEND_UPDATES.md](../backend/GCAL_SEND_UPDATES.md)
 
-## 8. Histórico
+## 10. Histórico
 
 - **PR19** (RF05/RF06): Implementação inicial
 - **2025-10-23**: Guia criado
+- **Fase 3** (2025-10-28): Auto-apply Celery desativado por padrão (FEATURE_AUTO_APPLY_ENABLED=0), governança consolidada via /pre-agenda

@@ -377,6 +377,13 @@ GCAL_COLOR_MAP = {
     # "Reunião": 11,           # Red
 }
 
+# Auto-apply GCal (Celery task preview_then_apply_gcal)
+# Default: False (desativado por padrão para consolidar governança via /pre-agenda)
+# Quando True: Celery beat executa preview_then_apply_gcal periodicamente
+# Quando False: Task retorna status="SKIPPED" sem executar sync
+# Fase 3 - Governança GCal: única via de criação é /pre-agenda (individual + massa)
+FEATURE_AUTO_APPLY_ENABLED = os.getenv("FEATURE_AUTO_APPLY_ENABLED", "0") == "1"
+
 # ================================================================
 # AVAILABILITY & ETL SETTINGS (Cláusulas Pétreas RD-01..RD-08)
 # ================================================================

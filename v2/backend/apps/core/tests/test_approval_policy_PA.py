@@ -10,6 +10,7 @@ Garante que:
 """
 
 import pytest
+from uuid import uuid4
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth.models import Group
@@ -30,24 +31,28 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def usuario_comum():
+def usuario_comum(faker):
     """Usuário comum sem permissões especiais."""
+    # Python uuid4() is truly random (faker.uuid4() is seeded and generates duplicates!)
+    uid = uuid4().hex  # 32 chars hex, 128-bit entropy
     return Usuario.objects.create_user(
-        username="comum",
-        email="comum@test.com",
+        username=f"comum_{uid}",
+        email=f"comum_{uid}@example.com",
         password="testpass",
-        cpf="11111111111",
+        cpf=str(uuid4().int % 10**11).zfill(11),  # 11-digit CPF from UUID int
     )
 
 
 @pytest.fixture
-def usuario_superintendencia():
+def usuario_superintendencia(faker):
     """Usuário do grupo Superintendência."""
+    # Python uuid4() is truly random (faker.uuid4() is seeded and generates duplicates!)
+    uid = uuid4().hex  # 32 chars hex, 128-bit entropy
     user = Usuario.objects.create_user(
-        username="super",
-        email="super@test.com",
+        username=f"super_{uid}",
+        email=f"super_{uid}@example.com",
         password="testpass",
-        cpf="22222222222",
+        cpf=str(uuid4().int % 10**11).zfill(11),  # 11-digit CPF from UUID int
     )
     grupo, _ = Group.objects.get_or_create(name="Superintendência")
     user.groups.add(grupo)

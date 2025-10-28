@@ -253,6 +253,26 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 
 ---
 
+### 6.1. Importação de Usuários e Grupos
+
+**Estrutura da Planilha (Acompanhamento de Agenda):**
+- Coluna **N**: Coordenador
+- Colunas **O-S**: Formador 1, Formador 2, ..., Formador 5
+
+**Regra de Atribuição de Grupos:**
+- Usuários com username `coordenacao*` → Grupo "Coordenador"
+- Demais usuários com participações → Grupo "Formador"
+
+**Comando de Backfill:**
+```bash
+python manage.py backfill_user_groups --apply
+```
+- Atribui grupos faltantes baseado no padrão do username
+- Usado após importação inicial de usuários (122 usuários importados)
+- Resultado: 65 Formadores + 10 Coordenadores atribuídos corretamente
+
+---
+
 ### 7. Benefícios Esperados
 - Fim da dependência de planilhas manuais  
 - Fluxo de solicitações, aprovações e conflitos totalmente digital  
@@ -517,6 +537,20 @@ test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 | **PA-05** | ✅ | `AuditLog.objects.create()` em approve/reject | `views.py:165-220, 236-290` |
 | **PA-06** | ✅ | Botões ocultos para não-Superintendência | `ApprovalsPage.jsx:66-68, 211` |
 | **PA-07** | ✅ | 5 testes obrigatórios implementados e passando | `test_approval_policy_PA.py` |
+
+### ⚠️ Nota Importante: Aprovação Manual NÃO Revalida Conflitos
+
+**Comportamento intencional**: O endpoint `approve()` (views_solicitacao.py:268-323) **NÃO** chama `check_conflicts()` antes de aprovar.
+
+**Razão**: Superintendência toma decisões com **contexto humano** que o sistema não captura:
+- Exceções autorizadas
+- Prioridades políticas/organizacionais
+- Contexto específico do município/projeto
+- Negociações não-formalizadas
+
+**Fluxo**: Superintendência acessa `/disponibilidade` (visualização da grade) e verifica **manualmente** antes de aprovar em `/aprovacoes`.
+
+**Sistema = ferramenta de suporte à decisão, NÃO automatização total.**
 
 ### Arquivos Modificados
 

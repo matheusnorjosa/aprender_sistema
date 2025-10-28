@@ -98,6 +98,14 @@ export async function fetchAPI(url, options = {}) {
     headers['X-CSRFToken'] = csrfToken;
   }
 
+  console.log('=== fetchAPI DEBUG ===');
+  console.log('URL:', fullUrl);
+  console.log('Method:', method);
+  console.log('Headers:', headers);
+  if (options.body) {
+    console.log('Body:', options.body);
+  }
+
   const response = await fetch(fullUrl, {
     ...options,
     headers,
@@ -105,9 +113,19 @@ export async function fetchAPI(url, options = {}) {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({
-      detail: `HTTP ${response.status}: ${response.statusText}`
-    }));
+    console.error('=== fetchAPI ERROR ===');
+    console.error('Status:', response.status);
+    console.error('StatusText:', response.statusText);
+
+    const errorBody = await response.text();
+    console.error('Response body:', errorBody);
+
+    let error;
+    try {
+      error = JSON.parse(errorBody);
+    } catch {
+      error = { detail: `HTTP ${response.status}: ${response.statusText}` };
+    }
 
     throw new Error(error.detail || error.message || `Erro ${response.status}`);
   }

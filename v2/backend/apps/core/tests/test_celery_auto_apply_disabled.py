@@ -41,7 +41,7 @@ class TestCeleryAutoApplyDisabled:
         assert "FEATURE_AUTO_APPLY_ENABLED=False" in audit_log.details["reason"]
 
     @override_settings(FEATURE_AUTO_APPLY_ENABLED=False)
-    @patch("apps.core.tasks.management.call_command")
+    @patch("django.core.management.call_command")
     def test_auto_apply_disabled_does_not_call_command(self, mock_call_command):
         """
         Cenário: FEATURE_AUTO_APPLY_ENABLED=False
@@ -55,27 +55,18 @@ class TestCeleryAutoApplyDisabled:
 
     @override_settings(
         FEATURE_AUTO_APPLY_ENABLED=True,
-        GCAL_CALENDAR_ID="test-calendar-id"
+        GCAL_CALENDAR_ID="test-calendar-id",
+        FEATURE_FLAGS={"GCAL_MODE": "google"}
     )
-    @patch("apps.core.tasks.feature_flags.get")
-    @patch("apps.core.tasks.management.call_command")
+    @patch("django.core.management.call_command")
     def test_auto_apply_enabled_allows_execution(
         self,
-        mock_call_command,
-        mock_feature_flags_get
+        mock_call_command
     ):
         """
         Cenário: FEATURE_AUTO_APPLY_ENABLED=True + GCAL_MODE=google
         Espera: Task executa normalmente (chama call_command)
         """
-        # Mock feature_flags para retornar GCAL_MODE=google
-        def feature_flags_side_effect(key, default=None):
-            if key == "GCAL_MODE":
-                return "google"
-            return default
-
-        mock_feature_flags_get.side_effect = feature_flags_side_effect
-
         # Mock call_command para simular preview dry-run
         def call_command_side_effect(command_name, *args, **kwargs):
             if kwargs.get("dry_run"):
@@ -97,5 +88,5 @@ class TestCeleryAutoApplyDisabled:
         first_call_kwargs = mock_call_command.call_args_list[0][1]
         assert first_call_kwargs.get("dry_run") is True
 
-        # Resultado deve ser SUCCESS (noop, pois total=0)
-        assert result["status"] == "SUCCESS"
+        # Resultado deve ser NOOP (pois total=0, sem mudanças)
+        assert result["status"] == "NOOP"

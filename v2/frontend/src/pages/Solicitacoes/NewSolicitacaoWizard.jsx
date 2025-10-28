@@ -21,14 +21,8 @@ import {
   Alert,
   message,
   Typography,
-  Row,
-  Col,
   Descriptions,
   Tag,
-  Space,
-  Checkbox,
-  Spin,
-  List,
 } from 'antd';
 import {
   FileTextOutlined,
@@ -36,29 +30,21 @@ import {
   EditOutlined,
   CheckOutlined,
   ArrowLeftOutlined,
-  CheckCircleOutlined,
-  WarningOutlined,
-  CloseCircleOutlined,
-  StopOutlined,
-  MinusCircleOutlined,
-  CarOutlined,
-  ClockCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 
-import { createSolicitacao, checkAvailability } from '../../api/solicitacoes';
-import { getMe } from '../../api/availability';
+import { createSolicitacao } from '../../api/solicitacoes';
 import {
   lookupMunicipios,
   lookupProjetos,
   lookupTiposEvento,
-  validateSolic,
 } from '../../api/lookup';
 import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
-import PeoplePicker from '../../components/PeoplePicker';
+import FormadoresPicker from '../../components/FormadoresPicker';
+import CoordenadoresPicker from '../../components/CoordenadoresPicker';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -68,68 +54,6 @@ const { TextArea } = Input;
 const { Title, Text } = Typography;
 const { Step } = Steps;
 
-/**
- * Mapeia código de conflito para ícone
- */
-function getConflictIcon(code) {
-  const icons = {
-    X: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
-    T: <StopOutlined style={{ color: '#ff4d4f' }} />,
-    P: <MinusCircleOutlined style={{ color: '#fa8c16' }} />,
-    D: <CarOutlined style={{ color: '#fa8c16' }} />,
-    M: <ClockCircleOutlined style={{ color: '#faad14' }} />,
-  };
-  return icons[code] || <WarningOutlined style={{ color: '#d9d9d9' }} />;
-}
-
-/**
- * Badge de disponibilidade para formador
- */
-function AvailabilityBadge({ formador, inicio, fim, municipio }) {
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState(null);
-
-  useEffect(() => {
-    if (!formador || !inicio || !fim || !municipio) {
-      setStatus(null);
-      return;
-    }
-
-    const check = async () => {
-      setLoading(true);
-      try {
-        const result = await checkAvailability(formador.id, inicio, fim, municipio.id);
-        setStatus(result);
-      } catch (error) {
-        console.error('Erro ao checar disponibilidade:', error);
-        setStatus({ available: false, conflicts: [{ code: 'X', title: 'Erro' }] });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    check();
-  }, [formador?.id, inicio, fim, municipio?.id]);
-
-  if (loading) {
-    return <Spin size="small" />;
-  }
-
-  if (!status) {
-    return <Tag>Aguardando dados</Tag>;
-  }
-
-  if (status.available) {
-    return <Tag color="success" icon={<CheckCircleOutlined />}>Disponível</Tag>;
-  }
-
-  const firstConflict = status.conflicts[0];
-  return (
-    <Tag color="error" icon={getConflictIcon(firstConflict.code)}>
-      {firstConflict.title}
-    </Tag>
-  );
-}
 
 export default function NewSolicitacaoWizard() {
   const navigate = useNavigate();
@@ -137,7 +61,6 @@ export default function NewSolicitacaoWizard() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [me, setMe] = useState(null);
 
   // Estado do formulário
   const [formData, setFormData] = useState({
@@ -149,27 +72,13 @@ export default function NewSolicitacaoWizard() {
     fim: null,
     // Passo 2
     formadores: [],
-    coordenadorAcompanha: false,
+    coordenadores: [],
     // Passo 3
     tipo: '',
     encontro: '',
     segmento: '',
     observacoes: '',
   });
-
-  // Carregar dados do usuário
-  useEffect(() => {
-    const loadMe = async () => {
-      try {
-        const userData = await getMe();
-        setMe(userData);
-      } catch (error) {
-        console.error('Erro ao carregar usuário:', error);
-        message.error('Erro ao carregar dados do usuário');
-      }
-    };
-    loadMe();
-  }, []);
 
   // Navegação entre passos
   const next = () => {
@@ -189,20 +98,72 @@ export default function NewSolicitacaoWizard() {
   const handleSubmit = async () => {
     setLoading(true);
     try {
+      // Garantir que formadores é um array
+      const formadores = Array.isArray(formData.formadores) ? formData.formadores : [];
+
+      if (formadores.length === 0) {
+        message.error('Por favor, selecione pelo menos um formador');
+        setLoading(false);
+        return;
+      }
+
       // Validar dados completos
+      const coordenadores = Array.isArray(formData.coordenadores) ? formData.coordenadores : [];
+
+      // Validações específicas
+      if (!formData.inicio || !formData.fim) {
+        message.error('Por favor, selecione data/hora de início e fim');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.municipio) {
+        message.error('Por favor, selecione um município');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.projeto) {
+        message.error('Por favor, selecione um projeto');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.tipoEvento) {
+        message.error('Por favor, selecione um tipo de evento');
+        setLoading(false);
+        return;
+      }
+
       const payload = {
-        municipio_id: formData.municipio.id,
-        projeto_id: formData.projeto.id,
-        tipo_evento_id: formData.tipoEvento.id,
+        municipio: formData.municipio.id,
+        projeto: formData.projeto.id,
+        tipo_evento: formData.tipoEvento.id,
         inicio: dayjs(formData.inicio).utc().format(),
         fim: dayjs(formData.fim).utc().format(),
-        tipo: formData.tipo,
-        encontro: formData.encontro,
-        segmento: formData.segmento,
-        observacoes: formData.observacoes,
-        coordenador_acompanha: formData.coordenadorAcompanha,
-        formador_ids: formData.formadores.map(f => f.id),
+        tipo: formData.tipo || null,
+        encontro: formData.encontro || null,
+        segmento: formData.segmento || null,
+        observacoes: formData.observacoes || null,
+        coordenador_acompanha: coordenadores.length > 0,
+        // Backend espera participantes dentro de extra_participants
+        extra_participants: {
+          formador_ids: formadores.map(f => f.id),
+          coord_acompanha_ids: coordenadores.map(c => c.id),
+        },
       };
+
+      console.log('=== DEBUG: Payload sendo enviado ===');
+      console.log('FormData completo:', formData);
+      console.log('Payload preparado:', payload);
+      console.log('Tipos dos campos:');
+      console.log('- municipio:', typeof payload.municipio, payload.municipio);
+      console.log('- projeto:', typeof payload.projeto, payload.projeto);
+      console.log('- tipo_evento:', typeof payload.tipo_evento, payload.tipo_evento);
+      console.log('- inicio:', typeof payload.inicio, payload.inicio);
+      console.log('- fim:', typeof payload.fim, payload.fim);
+      console.log('- coordenador_acompanha:', typeof payload.coordenador_acompanha, payload.coordenador_acompanha);
+      console.log('- extra_participants:', payload.extra_participants);
 
       await createSolicitacao(payload);
       message.success('Solicitação criada com sucesso!');
@@ -292,8 +253,8 @@ export default function NewSolicitacaoWizard() {
       content: (
         <>
           <Alert
-            message="Selecione os Formadores"
-            description="Os badges de disponibilidade são atualizados em tempo real conforme você seleciona data/hora e município."
+            message="Selecione os Participantes"
+            description="Selecione os formadores que participarão do evento e, opcionalmente, os coordenadores acompanhantes."
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
@@ -304,39 +265,34 @@ export default function NewSolicitacaoWizard() {
             name="formadores"
             rules={[{ required: true, message: 'Por favor selecione pelo menos um formador' }]}
           >
-            <PeoplePicker
-              multiple
+            <FormadoresPicker
               value={formData.formadores}
               onChange={(value) => setFormData({ ...formData, formadores: value })}
-              renderTag={(formador) => (
-                <Space>
-                  {formador.name}
-                  <AvailabilityBadge
-                    formador={formador}
-                    inicio={formData.inicio}
-                    fim={formData.fim}
-                    municipio={formData.municipio}
-                  />
-                </Space>
-              )}
             />
           </Form.Item>
 
-          <Form.Item name="coordenadorAcompanha" valuePropName="checked">
-            <Checkbox
-              checked={formData.coordenadorAcompanha}
-              onChange={(e) => setFormData({ ...formData, coordenadorAcompanha: e.target.checked })}
-            >
-              Coordenador acompanhará o evento
-            </Checkbox>
+          <Form.Item
+            label="Coordenadores Acompanhantes"
+            name="coordenadores"
+          >
+            <CoordenadoresPicker
+              value={formData.coordenadores}
+              onChange={(value) => setFormData({ ...formData, coordenadores: value })}
+            />
           </Form.Item>
 
-          <Alert
-            message="Política de Aprovação (PA-01)"
-            description="Todas as solicitações requerem aprovação manual da Superintendência, independentemente do fluxo do projeto (SUPER ou NAO_SUPER)."
-            type="warning"
-            showIcon
-          />
+          {formData.projeto && (
+            <Alert
+              message={formData.projeto.fluxo === 'SUPER' ? 'Aprovação Manual Requerida' : 'Aprovação Automática'}
+              description={
+                formData.projeto.fluxo === 'SUPER'
+                  ? 'Esta solicitação será criada com status "Pendente" e aguardará aprovação manual da Superintendência.'
+                  : 'Esta solicitação será aprovada automaticamente ao ser criada e irá direto para a Pré-agenda.'
+              }
+              type={formData.projeto.fluxo === 'SUPER' ? 'warning' : 'success'}
+              showIcon
+            />
+          )}
         </>
       ),
     },
@@ -422,11 +378,13 @@ export default function NewSolicitacaoWizard() {
             </Descriptions.Item>
             <Descriptions.Item label="Formadores">
               {formData.formadores.length > 0
-                ? formData.formadores.map(f => f.name).join(', ')
+                ? formData.formadores.map(f => f.label || f.name).join(', ')
                 : 'Nenhum'}
             </Descriptions.Item>
-            <Descriptions.Item label="Coordenador Acompanha">
-              {formData.coordenadorAcompanha ? 'Sim' : 'Não'}
+            <Descriptions.Item label="Coordenadores Acompanhantes">
+              {formData.coordenadores.length > 0
+                ? formData.coordenadores.map(c => c.label || c.name).join(', ')
+                : 'Nenhum'}
             </Descriptions.Item>
             {formData.tipo && (
               <Descriptions.Item label="Tipo">{formData.tipo}</Descriptions.Item>
@@ -443,9 +401,17 @@ export default function NewSolicitacaoWizard() {
           </Descriptions>
 
           <Alert
-            message="Status Inicial: Pendente"
-            description="Sua solicitação será criada com status 'Pendente' e aguardará aprovação da Superintendência (PA-01)."
-            type="info"
+            message={
+              formData.projeto?.fluxo === 'SUPER'
+                ? 'Status Inicial: Pendente'
+                : 'Status Inicial: Aprovado'
+            }
+            description={
+              formData.projeto?.fluxo === 'SUPER'
+                ? 'Sua solicitação será criada com status "Pendente" e aguardará aprovação da Superintendência.'
+                : 'Sua solicitação será aprovada automaticamente ao ser criada e irá direto para a Pré-agenda.'
+            }
+            type={formData.projeto?.fluxo === 'SUPER' ? 'warning' : 'success'}
             showIcon
             style={{ marginTop: 16 }}
           />

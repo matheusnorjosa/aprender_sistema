@@ -1,76 +1,46 @@
 /**
- * Componente de Legenda Melhorada.
+ * Componente de Legenda com Design Visual.
  *
- * Design: paginadisponibilidade/screen.png
- * - Exibe códigos de disponibilidade com cores e ícones
- * - Layout responsivo e organizado
+ * Exibe círculos coloridos para cada código de disponibilidade.
+ * Baseado no design: paginadisponibilidade/screen.png
  */
 
-import { Card, Tag, Space, Typography } from 'antd';
-import {
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  ClockCircleOutlined,
-  StopOutlined,
-  MinusCircleOutlined,
-  CarOutlined,
-  WarningOutlined,
-} from '@ant-design/icons';
 import { CODE_LABEL } from './codes';
 
-const { Text } = Typography;
-
-// Mapeamento de códigos para cores e ícones
-const CODE_CONFIG = {
-  'T': { color: '#ff4d4f', label: 'Bloqueio Total', icon: <StopOutlined /> },
-  'P': { color: '#fa8c16', label: 'Bloqueio Parcial', icon: <MinusCircleOutlined /> },
-  'D': { color: '#1890ff', label: 'Deslocamento', icon: <CarOutlined /> },
-  'X': { color: '#f5222d', label: 'Conflito', icon: <CloseCircleOutlined /> },
-  'E': { color: '#52c41a', label: 'Evento', icon: <CheckCircleOutlined /> },
-  'M': { color: '#faad14', label: 'Mais de um evento', icon: <ClockCircleOutlined /> },
-  '': { color: '#d9d9d9', label: 'Vazio', icon: <WarningOutlined /> },
+// Mapeamento de códigos para cores (círculos)
+const CODE_COLOR = {
+  T: '#9333ea',     // Bloqueio total - roxo (purple-600)
+  P: '#06b6d4',     // Bloqueio parcial - ciano (cyan-500)
+  D: '#eab308',     // Deslocamento - amarelo (yellow-500)
+  X: '#ef4444',     // Conflito - vermelho (red-500)
+  E: '#22c55e',     // Evento - verde (green-500)
+  '2': '#16a34a',   // ≥2 eventos - verde escuro (green-600)
+  D1: '#3b82f6',    // Evento + deslocamento - azul (blue-500)
 };
 
 export default function Legend({ legend }) {
   // Usar legend do backend ou fallback local
   const map = legend ?? CODE_LABEL;
 
+  // Filtrar apenas códigos que têm cor definida
+  const entries = Object.entries(map).filter(([code]) => CODE_COLOR[code]);
+
   return (
-    <Card
-      title="Legenda"
-      size="small"
-      style={{ marginBottom: 16 }}
-      bodyStyle={{ padding: '12px' }}
-    >
-      <Space wrap size={[8, 8]}>
-        {Object.entries(map).map(([code, label]) => {
-          // Pular código vazio se não estiver na config
-          if (!code && !CODE_CONFIG['']) return null;
-
-          const config = CODE_CONFIG[code] || CODE_CONFIG[''];
-
-          return (
-            <Tag
-              key={code || 'empty'}
-              icon={config.icon}
-              style={{
-                borderColor: config.color,
-                color: config.color,
-                fontSize: '14px',
-                padding: '4px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              <Text strong style={{ color: config.color }}>{code || '∅'}</Text>
-              <Text style={{ color: config.color }}>
-                {label || config.label}
-              </Text>
-            </Tag>
-          );
-        })}
-      </Space>
-    </Card>
+    <div className="bg-white rounded-lg shadow-sm p-4">
+      <h3 className="font-bold mb-3 text-gray-900">Legenda</h3>
+      <div className="flex flex-wrap gap-4">
+        {entries.map(([code, label]) => (
+          <div key={code} className="flex items-center gap-2">
+            <div
+              className="w-4 h-4 rounded-full flex-shrink-0"
+              style={{ backgroundColor: CODE_COLOR[code] }}
+            ></div>
+            <span className="text-sm text-gray-700 whitespace-nowrap">
+              <span className="font-semibold">{code}</span> - {label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

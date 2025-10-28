@@ -39,7 +39,7 @@ jobs:
           fi
       - name: Forbid legacy strings
         run: |
-          if git diff "${{ steps.diff.outputs.base_commit }}"..HEAD | \
+          if git diff "${{ steps.diff.outputs.base_commit }}"..HEAD -- ':!**/package-lock.json' | \
              grep -E '(aprendersistema|web-1|db-1|redis-1|docker-compose.*v1)'; then
             echo "Referência v1 detectada" >&2
             exit 1

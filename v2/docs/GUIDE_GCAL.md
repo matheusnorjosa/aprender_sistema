@@ -221,6 +221,122 @@ GET /api/solicitacoes/
    - Coluna dedicada "Reunião"
    - `<MeetLink href={meet_link} />` (retorna null se vazio)
 
+## 4.5. Modalidade (Online x Presencial)
+
+### Visão Geral
+
+O campo `is_online` determina a modalidade do evento:
+- **`is_online=false` (padrão)**: Evento presencial, **sem conferenceData**, sem Meet link
+- **`is_online=true`**: Evento online, **com conferenceData**, gera Meet link automaticamente
+
+### Modelo e Migration
+
+**Campo**:
+```python
+# v2/backend/apps/core/models.py (linha 86)
+is_online = models.BooleanField(
+    default=False,
+    verbose_name='Evento Online?',
+    help_text='Se True, gera Google Meet link no APPLY (RF06). Se False, evento presencial sem conferenceData.'
+)
+```
+
+**Migration**: `0023_add_is_online.py`
+
+### Payload Google Calendar
+
+#### Evento Presencial (`is_online=false`)
+```json
+{
+  "summary": "Evento Teste",
+  "start": {"dateTime": "2025-10-28T10:00:00-03:00"},
+  "end": {"dateTime": "2025-10-28T12:00:00-03:00"},
+  "description": "...",
+  "attendees": [...]
+  // SEM conferenceData
+}
+```
+
+#### Evento Online (`is_online=true`)
+```json
+{
+  "summary": "Evento Teste",
+  "start": {"dateTime": "2025-10-28T10:00:00-03:00"},
+  "end": {"dateTime": "2025-10-28T12:00:00-03:00"},
+  "description": "...",
+  "attendees": [...],
+  "conferenceData": {
+    "createRequest": {
+      "requestId": "asv2-123-1730123456",
+      "conferenceSolutionKey": {"type": "hangoutsMeet"}
+    }
+  }
+}
+```
+
+**Nota**: `conferenceDataVersion=1` deve ser passado no parâmetro de query da API para criar Meet links.
+
+### UI: Checkbox no Wizard
+
+**Localização**: `v2/frontend/src/pages/Solicitacoes/NewSolicitacaoWizard.jsx` (linhas 358-365)
+
+```jsx
+<Form.Item name="is_online" valuePropName="checked">
+  <Checkbox
+    checked={formData.is_online}
+    onChange={(e) => setFormData({ ...formData, is_online: e.target.checked })}
+  >
+    Evento online (Google Meet)
+  </Checkbox>
+</Form.Item>
+
+<Alert
+  message="Modalidade do evento"
+  description={
+    formData.is_online
+      ? 'Link do Google Meet será gerado automaticamente após publicação do evento no calendário.'
+      : 'Evento presencial — nenhum link de reunião será gerado.'
+  }
+  type={formData.is_online ? 'info' : 'warning'}
+  showIcon
+/>
+```
+
+### Comportamento no Backend
+
+**Payload Building** (`gcal_sync_service.py`):
+```python
+def build_event_payload(solicitacao, enable_meet=True):
+    payload = {
+        "summary": "...",
+        "start": {...},
+        "end": {...},
+        # ...
+    }
+
+    # Adiciona conferenceData apenas se is_online=True
+    if enable_meet and solicitacao.is_online:
+        payload["conferenceData"] = {
+            "createRequest": {
+                "requestId": f"asv2-{solicitacao.id}-{int(datetime.now().timestamp())}",
+                "conferenceSolutionKey": {"type": "hangoutsMeet"}
+            }
+        }
+
+    return payload
+```
+
+**Persistência do Meet Link**:
+- Apenas eventos com `is_online=True` + APPLY real persistem `meet_link`
+- Eventos presenciais (`is_online=False`) nunca geram/persistem `meet_link`
+
+### Testes
+
+**Cobertura** (`v2/backend/apps/core/tests/test_gcal_conference_version.py`):
+- Testa que `conferenceDataVersion=1` é obrigatório
+- Valida que payload com `is_online=true` inclui `conferenceData`
+- Valida que payload com `is_online=false` **não** inclui `conferenceData`
+
 ## 5. Comandos Úteis
 
 ### Preview (GET /preview-gcal/)

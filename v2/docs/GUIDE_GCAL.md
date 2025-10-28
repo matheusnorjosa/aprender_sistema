@@ -209,7 +209,229 @@ GET /api/solicitacoes/
    - Coluna dedicada "Reunião"
    - Botão "Entrar" ou "-" se não houver link
 
-## 5. Comandos Úteis
+## 5. Publicação em Massa via Pré-agenda
+
+### Visão Geral
+
+A funcionalidade de publicação em massa permite que usuários com perfil **Controle** ou **Superintendência** publiquem múltiplas solicitações aprovadas no Google Calendar de uma só vez, através da página `/pre-agenda`.
+
+### Endpoint: POST /api/gcal/publish-batch/
+
+#### Request
+
+```bash
+POST /api/gcal/publish-batch/
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "solicitacao_ids": [123, 456, 789],  # Array de IDs (obrigatório)
+  "dry_run": false,                     # Simulação? (opcional, default: false)
+  "apply_blocked": false                # Forçar com fake client? (opcional, default: false)
+}
+```
+
+#### Response 202 Accepted
+
+```json
+{
+  "queued": 2,                          // Quantidade enfileirada com sucesso
+  "errors": [                           // Lista de erros (um por ID que falhou)
+    {
+      "id": 789,
+      "detail": "Status deve ser 'aprovado' (atual: pendente)"
+    }
+  ],
+  "dry_run": false,
+  "apply_blocked": false
+}
+```
+
+#### Regras de Validação
+
+1. **Array de IDs obrigatório**: `solicitacao_ids` deve ser um array não-vazio
+2. **Status aprovado**: Apenas solicitações com `status='aprovado'` são processadas
+3. **GCAL_CLIENT validation**:
+   - Se `GCAL_CLIENT != "google"` AND `dry_run=false` AND `apply_blocked=false` → erro
+   - Para testes com fake client: usar `apply_blocked=true`
+4. **RBAC**: Apenas usuários dos grupos **Controle** ou **Superintendência** podem chamar
+
+#### Comportamento
+
+Para cada ID na lista:
+
+1. **Busca a solicitação** no banco
+2. **Valida status='aprovado'**
+3. **Valida GCAL_CLIENT** (ou `apply_blocked=true`)
+4. Se válida:
+   - Marca `gcal_status=PENDING`
+   - Enfileira task Celery `task_publish_solicitacao_to_gcal`
+   - Adiciona ID ao array `queued`
+5. Se inválida:
+   - Adiciona objeto `{id, detail}` ao array `errors`
+
+### UI: Pré-agenda com Multi-select
+
+**Localização**: `/pre-agenda` (menu lateral → "Pré-agenda")
+
+**Features**:
+
+1. **Checkboxes na tabela**: Permite selecionar múltiplas linhas
+   - Eventos com `gcal_status='PUBLISHED'` ficam desabilitados (não podem ser republicados)
+
+2. **Botão "Publicar Selecionados (N)"**: Aparece no topo da tabela quando N > 0
+   - Abre modal de confirmação
+   - Mostra quantidade selecionada
+   - Se `GCAL_CLIENT != "google"`: exibe aviso sobre modo fake
+
+3. **Modal de Resultado**: Após publicação, exibe:
+   - ✅ Contador de eventos enfileirados (verde)
+   - ⚠️ Lista de erros (se houver), com ID e mensagem detalhada
+
+4. **Auto-reload**: Tabela recarrega após publicação para atualizar `gcal_status`
+
+### Exemplo de Uso
+
+#### Cenário 1: Publicação bem-sucedida (todos aprovados)
+
+```bash
+# Request
+POST /api/gcal/publish-batch/
+{
+  "solicitacao_ids": [101, 102, 103],
+  "dry_run": false,
+  "apply_blocked": false
+}
+
+# Response 202
+{
+  "queued": 3,
+  "errors": [],
+  "dry_run": false,
+  "apply_blocked": false
+}
+```
+
+**UI exibe**: "3 evento(s) enfileirado(s) para publicação!" (success message)
+
+#### Cenário 2: Misto de aprovados e pendentes
+
+```bash
+# Request
+POST /api/gcal/publish-batch/
+{
+  "solicitacao_ids": [101, 102, 999],  # 999 está pendente
+  "dry_run": false,
+  "apply_blocked": false
+}
+
+# Response 202
+{
+  "queued": 2,
+  "errors": [
+    {
+      "id": 999,
+      "detail": "Status deve ser 'aprovado' (atual: pendente)"
+    }
+  ],
+  "dry_run": false,
+  "apply_blocked": false
+}
+```
+
+**UI exibe**: "2 enfileirado(s), 1 erro(s)" (warning message) + modal com lista de erros
+
+#### Cenário 3: GCAL_CLIENT=fake sem apply_blocked
+
+```bash
+# Ambiente: GCAL_CLIENT=fake
+POST /api/gcal/publish-batch/
+{
+  "solicitacao_ids": [101],
+  "dry_run": false,
+  "apply_blocked": false  # ❌ Não permitido com fake client
+}
+
+# Response 202
+{
+  "queued": 0,
+  "errors": [
+    {
+      "id": 101,
+      "detail": "GCAL_CLIENT=fake (não-google) requer dry_run=true ou apply_blocked=true"
+    }
+  ],
+  "dry_run": false,
+  "apply_blocked": false
+}
+```
+
+**Solução**: Usar `apply_blocked=true` para testes com fake client:
+
+```bash
+POST /api/gcal/publish-batch/
+{
+  "solicitacao_ids": [101],
+  "dry_run": false,
+  "apply_blocked": true  # ✅ Permite publicação com fake client
+}
+
+# Response 202
+{
+  "queued": 1,
+  "errors": [],
+  "dry_run": false,
+  "apply_blocked": true
+}
+```
+
+### Testes Backend
+
+```bash
+# Rodar todos os testes de batch publish
+docker compose exec web pytest apps/core/tests/test_gcal_publish_batch.py -v
+
+# 8 cenários cobertos:
+# 1. test_batch_publish_aprovados_sucesso - Todos aprovados → queued=N
+# 2. test_batch_publish_mistura_aprovado_pendente - Misto → errors para pendentes
+# 3. test_batch_publish_requer_apply_blocked_quando_fake - GCAL_CLIENT validation
+# 4. test_batch_publish_com_apply_blocked_true - Forçar com fake client
+# 5. test_batch_publish_rbac_403_sem_permissao - RBAC enforcement
+# 6. test_batch_publish_array_vazio - Validação array vazio → 400
+# 7. test_batch_publish_dry_run_nao_persiste - Dry-run não persiste
+# 8. test_batch_publish_id_inexistente - IDs não encontrados → errors
+```
+
+### Monitoramento
+
+**Logs Celery** (worker):
+
+```bash
+docker compose logs -f worker --tail=50
+```
+
+Busque por:
+- `Batch publish queued: solicitacao_id=123, dry_run=false`
+- `Batch publish dry-run: solicitacao_id=123`
+
+**Banco de Dados**:
+
+```sql
+-- Ver solicitações em fila (PENDING)
+SELECT id, inicio, municipio_id, gcal_status, updated_at
+FROM core_solicitacao
+WHERE gcal_status = 'PENDING'
+ORDER BY updated_at DESC;
+
+-- Ver publicações recentes
+SELECT id, inicio, municipio_id, gcal_status, external_event_id, meet_link
+FROM core_solicitacao
+WHERE gcal_status = 'PUBLISHED'
+  AND updated_at > NOW() - INTERVAL '1 hour'
+ORDER BY updated_at DESC;
+```
+
+## 6. Comandos Úteis
 
 ### Preview (GET /preview-gcal/)
 
@@ -315,5 +537,9 @@ logger.info(f"GCal response: {result}")
 
 ## 8. Histórico
 
-- **PR19** (RF05/RF06): Implementação inicial
+- **PR19** (RF05/RF06): Implementação inicial de integração Google Calendar + Meet
 - **2025-10-23**: Guia criado
+- **feat/preagenda-bulk-publish** (Fase 2): Publicação em massa via `/pre-agenda`
+  - Endpoint POST `/api/gcal/publish-batch/`
+  - UI com multi-select e botão "Publicar Selecionados"
+  - 8 testes backend cobrindo validações e RBAC

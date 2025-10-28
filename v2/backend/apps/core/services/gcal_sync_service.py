@@ -366,20 +366,23 @@ def build_preview_for_solicitacao(s: Solicitacao) -> dict:
             "meet_link": str (fake link para preview, não persiste no DB)
         }
     """
-    # PR19/RF06: Enable Meet para preview
-    payload = _build_payload(s, enable_meet=True)
+    # PR19/RF06 + Modalidade: habilita Meet no preview apenas se for online
+    enable_meet = bool(getattr(s, "is_online", False))
+    payload = _build_payload(s, enable_meet=enable_meet)
     event_id = _event_id_for(s)
 
-    # Gerar meet_link fake para preview (não persiste)
-    # Extrai número do event_id (formato: asv2-{id})
-    event_num = event_id.split("-")[-1] if "-" in event_id else event_id
-    meet_link_preview = f"https://meet.google.com/fake-{event_num}"
+    # Gerar meet_link fake para preview (não persiste) apenas quando online
+    meet_link_preview = None
+    if enable_meet:
+        # Extrai número do event_id (formato: asv2-{id})
+        event_num = event_id.split("-")[-1] if "-" in event_id else event_id
+        meet_link_preview = f"https://meet.google.com/fake-{event_num}"
 
     return {
         "event_id": event_id,
         "payload": payload,
         "payload_hash": _payload_hash(payload),
-        "meet_link": meet_link_preview,  # PR19/RF06: Preview do Meet link
+        "meet_link": meet_link_preview,  # PR19/RF06: Preview do Meet link (somente online)
     }
 
 
@@ -429,8 +432,8 @@ def apply_one_solicitacao(
     payload = None
     payload_hash = None
     if s.status == "aprovado":
-        # PR19/RF06: Sempre enable_meet=True em APPLY (não em preview)
-        payload = build_event_payload(s, enable_meet=True)
+        # PR19/RF06 + Modalidade: enable_meet somente para eventos online
+        payload = build_event_payload(s, enable_meet=bool(getattr(s, "is_online", False)))
         payload_hash = _payload_hash(payload)
 
     # Obter cliente via factory (fake ou google baseado em settings)
@@ -567,7 +570,6 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
         "start": {"dateTime": start_iso, "timeZone": "UTC"},
         "end": {"dateTime": end_iso, "timeZone": "UTC"},
         "location": getattr(municipio, "nome", None) if municipio else None,
-        "conferenceData": conference_data,  # RF06: Google Meet link
         # Metadados para auditoria e reconciliação
         "extendedProperties": {
             "private": {
@@ -591,6 +593,10 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
         tipo_nome = getattr(tipo, "nome", None)
         if tipo_nome and tipo_nome in color_map:
             payload["colorId"] = str(color_map[tipo_nome])
+
+    # RF06: Adicionar conferenceData apenas se enable_meet=True (modalidade online)
+    if conference_data is not None:
+        payload["conferenceData"] = conference_data
 
     return payload
 
@@ -722,8 +728,8 @@ def upsert_one(
 
         # Usar payload fornecido ou recalcular (PR14, PR19/RF06)
         if payload is None:
-            # PR19/RF06: enable_meet sempre True em upsert (APPLY)
-            payload = _build_payload(s, enable_meet=True)
+            # PR19/RF06 + Modalidade: enable_meet somente para eventos online
+            payload = _build_payload(s, enable_meet=bool(getattr(s, "is_online", False)))
 
         # Verificar se evento já existe no Calendar
         existing = None
@@ -758,7 +764,7 @@ def upsert_one(
 
                     # RF06: Extrair hangoutLink se disponível
                     hangout_link = created.get("hangoutLink") if created else None
-                    if hangout_link:
+                    if hangout_link and bool(getattr(s, "is_online", False)):
                         s.meet_link = hangout_link
 
                     s.last_synced_at = timezone.now()
@@ -771,7 +777,7 @@ def upsert_one(
                         "last_sync_action",
                         "last_sync_error",
                     ]
-                    if hangout_link:
+                    if hangout_link and bool(getattr(s, "is_online", False)):
                         update_fields.append("meet_link")
 
                     s.save(update_fields=update_fields)
@@ -812,7 +818,7 @@ def upsert_one(
 
                     # RF06: Extrair hangoutLink se disponível
                     hangout_link = updated.get("hangoutLink") if updated else None
-                    if hangout_link:
+                    if hangout_link and bool(getattr(s, "is_online", False)):
                         s.meet_link = hangout_link
 
                     s.last_synced_at = timezone.now()
@@ -825,7 +831,7 @@ def upsert_one(
                         "last_sync_action",
                         "last_sync_error",
                     ]
-                    if hangout_link:
+                    if hangout_link and bool(getattr(s, "is_online", False)):
                         update_fields.append("meet_link")
 
                     s.save(update_fields=update_fields)

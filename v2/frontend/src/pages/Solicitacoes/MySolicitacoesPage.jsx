@@ -11,10 +11,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Table, Card, Select, Input, Button, Space, Tag, Typography, message } from 'antd';
-import { PlusOutlined, SearchOutlined, VideoCameraOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
 import { listSolicitacoes } from '../../api/solicitacoes';
+import { MeetLink } from '../../components/MeetLink';
 
 const { Title } = Typography;
 
@@ -98,22 +99,8 @@ export default function MySolicitacoesPage() {
       title: 'Reunião',
       dataIndex: 'meet_link',
       key: 'meet_link',
-      render: (meet_link) =>
-        meet_link ? (
-          <Button
-            size="small"
-            type="link"
-            icon={<VideoCameraOutlined />}
-            href={meet_link}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Entrar
-          </Button>
-        ) : (
-          '-'
-        ),
-      width: 100,
+      render: (meet_link) => <MeetLink href={meet_link} />,
+      width: 150,
     },
   ];
 

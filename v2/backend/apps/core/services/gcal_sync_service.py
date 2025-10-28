@@ -353,7 +353,7 @@ def build_attendees_for_solicitacao(s: Solicitacao) -> list[dict]:
 
 def build_preview_for_solicitacao(s: Solicitacao) -> dict:
     """
-    Constrói preview do payload GCal sem publicar (PR14).
+    Constrói preview do payload GCal sem publicar (PR14, PR19/RF06).
 
     Args:
         s: Solicitacao
@@ -362,14 +362,24 @@ def build_preview_for_solicitacao(s: Solicitacao) -> dict:
         dict: {
             "event_id": str,
             "payload": dict (Google Calendar API format),
-            "payload_hash": str (SHA1 hex)
+            "payload_hash": str (SHA1 hex),
+            "meet_link": str (fake link para preview, não persiste no DB)
         }
     """
-    payload = _build_payload(s)
+    # PR19/RF06: Enable Meet para preview
+    payload = _build_payload(s, enable_meet=True)
+    event_id = _event_id_for(s)
+
+    # Gerar meet_link fake para preview (não persiste)
+    # Extrai número do event_id (formato: asv2-{id})
+    event_num = event_id.split("-")[-1] if "-" in event_id else event_id
+    meet_link_preview = f"https://meet.google.com/fake-{event_num}"
+
     return {
-        "event_id": _event_id_for(s),
+        "event_id": event_id,
         "payload": payload,
         "payload_hash": _payload_hash(payload),
+        "meet_link": meet_link_preview,  # PR19/RF06: Preview do Meet link
     }
 
 
@@ -415,11 +425,12 @@ def apply_one_solicitacao(
             summary=f"Solicitação #{s.id} (GCAL_CLIENT não configurado)",
         )
 
-    # Construir payload antecipadamente para calcular hash (PR14)
+    # Construir payload antecipadamente para calcular hash (PR14, PR19/RF06)
     payload = None
     payload_hash = None
     if s.status == "aprovado":
-        payload = build_event_payload(s)
+        # PR19/RF06: Sempre enable_meet=True em APPLY (não em preview)
+        payload = build_event_payload(s, enable_meet=True)
         payload_hash = _payload_hash(payload)
 
     # Obter cliente via factory (fake ou google baseado em settings)
@@ -709,9 +720,10 @@ def upsert_one(
         # Caso 2: Aprovado → CREATE/UPDATE/ADOPT
         deterministic_eid = _event_id_for(s)
 
-        # Usar payload fornecido ou recalcular (PR14, PR19)
+        # Usar payload fornecido ou recalcular (PR14, PR19/RF06)
         if payload is None:
-            payload = _build_payload(s, enable_meet=enable_meet)
+            # PR19/RF06: enable_meet sempre True em upsert (APPLY)
+            payload = _build_payload(s, enable_meet=True)
 
         # Verificar se evento já existe no Calendar
         existing = None

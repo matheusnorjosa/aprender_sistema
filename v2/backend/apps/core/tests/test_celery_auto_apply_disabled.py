@@ -67,26 +67,41 @@ class TestCeleryAutoApplyDisabled:
         Cenário: FEATURE_AUTO_APPLY_ENABLED=True + GCAL_MODE=google
         Espera: Task executa normalmente (chama call_command)
         """
-        # Mock call_command para simular preview dry-run
+        import json
+
+        # Mock call_command para escrever no stdout (como faz o comando real)
         def call_command_side_effect(command_name, *args, **kwargs):
-            if kwargs.get("dry_run"):
-                # Retorna resultado de preview
-                return {
+            stdout = kwargs.get("stdout")
+            if stdout and kwargs.get("dry_run"):
+                # Simula preview dry-run com total=0 (sem mudanças)
+                preview_result = {
                     "status": "SUCCESS",
                     "meta": {"dry_run": True},
-                    "totals": {"total": 0}  # Sem mudanças
+                    "totals": {"total": 0, "CREATE": 0, "UPDATE": 0, "DELETE": 0, "ADOPT": 0}
                 }
-            return {"status": "SUCCESS"}
+                stdout.write(json.dumps(preview_result))
+            elif stdout and not kwargs.get("dry_run"):
+                # Simula apply (não será chamado pois preview retorna total=0)
+                apply_result = {
+                    "status": "SUCCESS",
+                    "meta": {"dry_run": False},
+                    "totals": {"total": 0}
+                }
+                stdout.write(json.dumps(apply_result))
+            return None
 
         mock_call_command.side_effect = call_command_side_effect
 
         result = preview_then_apply_gcal()
 
-        # Task deve executar (chamar call_command)
-        assert mock_call_command.call_count >= 1
+        # Task deve executar (chamar call_command para preview)
+        assert mock_call_command.call_count >= 1, f"Expected call_command to be called, but was called {mock_call_command.call_count} times"
+
         # Primeira chamada deve ser dry-run (preview)
         first_call_kwargs = mock_call_command.call_args_list[0][1]
-        assert first_call_kwargs.get("dry_run") is True
+        assert first_call_kwargs.get("dry_run") is True, "Expected first call to be dry-run (preview)"
 
         # Resultado deve ser NOOP (pois total=0, sem mudanças)
-        assert result["status"] == "NOOP"
+        assert result["status"] == "NOOP", f"Expected status NOOP, got {result.get('status')}"
+        assert result.get("applied") is False, "Expected applied=False when no changes"
+        assert "No changes detected" in result.get("reason", ""), "Expected reason to mention no changes"

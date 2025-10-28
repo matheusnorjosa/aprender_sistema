@@ -5,10 +5,8 @@
  * - Lista solicitações aprovadas de ambos os fluxos (SUPER + NAO_SUPER)
  * - Filtros por data, setor, busca textual
  * - Exibe resumo de status GCal no topo
- * - Botões para preview e publish individual
- *
- * Nota: Publicação no Google Calendar ocorre exclusivamente via botão "Publicar"
- * nesta página. Não há operações em lote de publicação.
+ * - Botões para preview e publish
+ * - Link para painel /publicacao para operações em lote
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -39,8 +37,8 @@ import {
 import dayjs from 'dayjs';
 
 import { listSolicitacoes, previewSolicitacao, publishSolicitacao } from '../../api/solicitacoes';
-import { getStatusSummary, publishBatch } from '../../api/gcal';
-import { getFeatures } from '../../api/availability';
+import { getStatusSummary } from '../../api/gcal';
+import { MeetLink } from '../../components/MeetLink';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -67,20 +65,11 @@ export default function PreAgendaPage() {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewData, setPreviewData] = useState(null);
 
-  // Multi-select state
-  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-  const [batchPublishing, setBatchPublishing] = useState(false);
-  const [batchResultVisible, setBatchResultVisible] = useState(false);
-  const [batchResult, setBatchResult] = useState({ queued: 0, errors: [] });
-
-  // Feature flags
-  const [features, setFeatures] = useState({ apply_blocked: false });
-
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
 
-      const filters = { status: 'aprovado' };
+      const filters = { status: 'approved' };
       if (searchTerm) filters.q = searchTerm;
       if (sectorFilter) filters.sector = sectorFilter;
       if (dateRange[0]) filters.date_from = dateRange[0].format('YYYY-MM-DD');
@@ -110,19 +99,6 @@ export default function PreAgendaPage() {
     loadData();
   }, [loadData]);
 
-  // Carregar feature flags
-  useEffect(() => {
-    const loadFeatures = async () => {
-      try {
-        const data = await getFeatures();
-        setFeatures(data);
-      } catch (error) {
-        console.error('Erro ao carregar features:', error);
-      }
-    };
-    loadFeatures();
-  }, []);
-
   const handlePreview = async (id) => {
     try {
       const data = await previewSolicitacao(id);
@@ -150,60 +126,6 @@ export default function PreAgendaPage() {
         }
       },
     });
-  };
-
-  const handleBatchPublish = () => {
-    if (selectedRowKeys.length === 0) {
-      message.warning('Selecione ao menos uma solicitação');
-      return;
-    }
-
-    const content = features.apply_blocked
-      ? `Publicar ${selectedRowKeys.length} evento(s) no Google Calendar?\n\nNota: GCAL_CLIENT está em modo "${features.GCAL_CLIENT}" - operações serão simuladas.`
-      : `Publicar ${selectedRowKeys.length} evento(s) no Google Calendar?`;
-
-    Modal.confirm({
-      title: 'Confirmar Publicação em Massa',
-      content,
-      okText: 'Publicar Selecionados',
-      okType: 'primary',
-      cancelText: 'Cancelar',
-      onOk: async () => {
-        try {
-          setBatchPublishing(true);
-          const result = await publishBatch({
-            solicitacao_ids: selectedRowKeys,
-            dry_run: false,
-            apply_blocked: features.apply_blocked,
-          });
-
-          setBatchResult(result);
-          setBatchResultVisible(true);
-
-          // Limpar seleção e recarregar
-          setSelectedRowKeys([]);
-          loadData();
-
-          if (result.errors.length === 0) {
-            message.success(`${result.queued} evento(s) enfileirado(s) para publicação!`);
-          } else {
-            message.warning(`${result.queued} enfileirado(s), ${result.errors.length} erro(s)`);
-          }
-        } catch (error) {
-          message.error('Erro ao publicar em massa: ' + error.message);
-        } finally {
-          setBatchPublishing(false);
-        }
-      },
-    });
-  };
-
-  const rowSelection = {
-    selectedRowKeys,
-    onChange: (keys) => setSelectedRowKeys(keys),
-    getCheckboxProps: (record) => ({
-      disabled: record.gcal_status === 'PUBLISHED',
-    }),
   };
 
   const columns = [
@@ -261,17 +183,7 @@ export default function PreAgendaPage() {
             title="Publicar"
             disabled={record.gcal_status === 'PUBLISHED'}
           />
-          {record.meet_link && (
-            <Button
-              size="small"
-              type="link"
-              icon={<VideoCameraOutlined />}
-              href={record.meet_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Entrar na reunião"
-            />
-          )}
+          <MeetLink href={record.meet_link} />
         </Space>
       ),
     },
@@ -282,9 +194,18 @@ export default function PreAgendaPage() {
       <Space direction="vertical" style={{ width: '100%' }} size="large">
         {/* Header */}
         <Card>
-          <Title level={2} style={{ margin: 0 }}>
-            Pré-agenda (Controle)
-          </Title>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={2} style={{ margin: 0 }}>
+              Pré-agenda (Controle)
+            </Title>
+            <Button
+              icon={<CalendarOutlined />}
+              onClick={() => navigate('/publicacao')}
+              type="default"
+            >
+              Painel de Publicação
+            </Button>
+          </div>
         </Card>
 
         {/* Resumo GCal */}
@@ -348,29 +269,12 @@ export default function PreAgendaPage() {
         </Card>
 
         {/* Tabela */}
-        <Card
-          title={
-            <Space>
-              <span>Eventos Aprovados</span>
-              {selectedRowKeys.length > 0 && (
-                <Button
-                  type="primary"
-                  icon={<CloudUploadOutlined />}
-                  onClick={handleBatchPublish}
-                  loading={batchPublishing}
-                >
-                  Publicar Selecionados ({selectedRowKeys.length})
-                </Button>
-              )}
-            </Space>
-          }
-        >
+        <Card>
           <Table
             columns={columns}
             dataSource={rows}
             loading={loading}
             rowKey="id"
-            rowSelection={rowSelection}
             pagination={{
               total,
               pageSize: 20,
@@ -378,6 +282,20 @@ export default function PreAgendaPage() {
             }}
           />
         </Card>
+
+        {/* Rodapé */}
+        <Alert
+          message="Publicação em Lote"
+          description={
+            <Text>
+              Para gerenciar status operacional, detectar drift e realizar re-aplicações em lote,
+              use o <a href="/publicacao">Painel de Publicação GCal</a>.
+            </Text>
+          }
+          type="info"
+          icon={<InfoCircleOutlined />}
+          showIcon
+        />
       </Space>
 
       {/* Modal Preview */}
@@ -395,49 +313,6 @@ export default function PreAgendaPage() {
         <pre style={{ maxHeight: 500, overflow: 'auto', backgroundColor: '#f5f5f5', padding: 12 }}>
           {JSON.stringify(previewData, null, 2)}
         </pre>
-      </Modal>
-
-      {/* Modal Resultado Batch */}
-      <Modal
-        title="Resultado da Publicação em Massa"
-        open={batchResultVisible}
-        onCancel={() => setBatchResultVisible(false)}
-        footer={[
-          <Button key="close" type="primary" onClick={() => setBatchResultVisible(false)}>
-            Fechar
-          </Button>,
-        ]}
-        width={700}
-      >
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <Statistic
-            title="Enfileirados para Publicação"
-            value={batchResult.queued}
-            valueStyle={{ color: '#52c41a' }}
-          />
-
-          {batchResult.errors && batchResult.errors.length > 0 && (
-            <>
-              <Alert
-                message={`${batchResult.errors.length} erro(s) encontrado(s)`}
-                type="warning"
-                showIcon
-              />
-              <div style={{ maxHeight: 300, overflow: 'auto' }}>
-                {batchResult.errors.map((err, idx) => (
-                  <Alert
-                    key={idx}
-                    message={`ID ${err.id}`}
-                    description={err.detail}
-                    type="error"
-                    showIcon
-                    style={{ marginBottom: 8 }}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </Space>
       </Modal>
     </div>
   );

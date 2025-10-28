@@ -220,7 +220,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ================================================================
 CORS_ALLOWED_ORIGINS = os.getenv(
     "CORS_ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:8000",
+    "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:8000,http://localhost:8002",
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
@@ -229,21 +229,19 @@ CORS_ALLOW_CREDENTIALS = True
 # ================================================================
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",
-    "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:8000",
+    "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:8000,http://localhost:8002",
 ).split(",")
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read CSRF token
 
 # ================================================================
-# SESSION COOKIE (Development - allow cross-port)
+# SESSION COOKIE
 # ================================================================
-if ENVIRONMENT == "development":
-    SESSION_COOKIE_SAMESITE = "None"  # Allow cross-origin (localhost:5173 → localhost:8002)
-    SESSION_COOKIE_SECURE = False      # Required False for SameSite=None without HTTPS
-    CSRF_COOKIE_SAMESITE = "None"      # Also relax CSRF cookie
-else:
-    SESSION_COOKIE_SAMESITE = "Lax"
-    CSRF_COOKIE_SAMESITE = "Lax"
+# Usar Lax para Django Admin funcionar (same-origin)
+# Cross-origin API requests usam SessionAuthentication via CORS_ALLOW_CREDENTIALS
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = False if ENVIRONMENT == "development" else True
+# CSRF_COOKIE_SAMESITE já definido acima como "Lax" (linha 234)
 
 # ================================================================
 # REST FRAMEWORK

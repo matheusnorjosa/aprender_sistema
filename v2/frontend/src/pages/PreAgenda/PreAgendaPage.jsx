@@ -39,7 +39,8 @@ import {
 import dayjs from 'dayjs';
 
 import { listSolicitacoes, previewSolicitacao, publishSolicitacao } from '../../api/solicitacoes';
-import { getStatusSummary } from '../../api/gcal';
+import { getStatusSummary, publishBatch } from '../../api/gcal';
+import { getFeatures } from '../../api/availability';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -65,6 +66,15 @@ export default function PreAgendaPage() {
 
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewData, setPreviewData] = useState(null);
+
+  // Multi-select state
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [batchPublishing, setBatchPublishing] = useState(false);
+  const [batchResultVisible, setBatchResultVisible] = useState(false);
+  const [batchResult, setBatchResult] = useState({ queued: 0, errors: [] });
+
+  // Feature flags
+  const [features, setFeatures] = useState({ apply_blocked: false });
 
   const loadData = useCallback(async () => {
     try {
@@ -100,6 +110,19 @@ export default function PreAgendaPage() {
     loadData();
   }, [loadData]);
 
+  // Carregar feature flags
+  useEffect(() => {
+    const loadFeatures = async () => {
+      try {
+        const data = await getFeatures();
+        setFeatures(data);
+      } catch (error) {
+        console.error('Erro ao carregar features:', error);
+      }
+    };
+    loadFeatures();
+  }, []);
+
   const handlePreview = async (id) => {
     try {
       const data = await previewSolicitacao(id);
@@ -127,6 +150,60 @@ export default function PreAgendaPage() {
         }
       },
     });
+  };
+
+  const handleBatchPublish = () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('Selecione ao menos uma solicitação');
+      return;
+    }
+
+    const content = features.apply_blocked
+      ? `Publicar ${selectedRowKeys.length} evento(s) no Google Calendar?\n\nNota: GCAL_CLIENT está em modo "${features.GCAL_CLIENT}" - operações serão simuladas.`
+      : `Publicar ${selectedRowKeys.length} evento(s) no Google Calendar?`;
+
+    Modal.confirm({
+      title: 'Confirmar Publicação em Massa',
+      content,
+      okText: 'Publicar Selecionados',
+      okType: 'primary',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          setBatchPublishing(true);
+          const result = await publishBatch({
+            solicitacao_ids: selectedRowKeys,
+            dry_run: false,
+            apply_blocked: features.apply_blocked,
+          });
+
+          setBatchResult(result);
+          setBatchResultVisible(true);
+
+          // Limpar seleção e recarregar
+          setSelectedRowKeys([]);
+          loadData();
+
+          if (result.errors.length === 0) {
+            message.success(`${result.queued} evento(s) enfileirado(s) para publicação!`);
+          } else {
+            message.warning(`${result.queued} enfileirado(s), ${result.errors.length} erro(s)`);
+          }
+        } catch (error) {
+          message.error('Erro ao publicar em massa: ' + error.message);
+        } finally {
+          setBatchPublishing(false);
+        }
+      },
+    });
+  };
+
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (keys) => setSelectedRowKeys(keys),
+    getCheckboxProps: (record) => ({
+      disabled: record.gcal_status === 'PUBLISHED',
+    }),
   };
 
   const columns = [
@@ -271,12 +348,29 @@ export default function PreAgendaPage() {
         </Card>
 
         {/* Tabela */}
-        <Card>
+        <Card
+          title={
+            <Space>
+              <span>Eventos Aprovados</span>
+              {selectedRowKeys.length > 0 && (
+                <Button
+                  type="primary"
+                  icon={<CloudUploadOutlined />}
+                  onClick={handleBatchPublish}
+                  loading={batchPublishing}
+                >
+                  Publicar Selecionados ({selectedRowKeys.length})
+                </Button>
+              )}
+            </Space>
+          }
+        >
           <Table
             columns={columns}
             dataSource={rows}
             loading={loading}
             rowKey="id"
+            rowSelection={rowSelection}
             pagination={{
               total,
               pageSize: 20,
@@ -301,6 +395,49 @@ export default function PreAgendaPage() {
         <pre style={{ maxHeight: 500, overflow: 'auto', backgroundColor: '#f5f5f5', padding: 12 }}>
           {JSON.stringify(previewData, null, 2)}
         </pre>
+      </Modal>
+
+      {/* Modal Resultado Batch */}
+      <Modal
+        title="Resultado da Publicação em Massa"
+        open={batchResultVisible}
+        onCancel={() => setBatchResultVisible(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setBatchResultVisible(false)}>
+            Fechar
+          </Button>,
+        ]}
+        width={700}
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Statistic
+            title="Enfileirados para Publicação"
+            value={batchResult.queued}
+            valueStyle={{ color: '#52c41a' }}
+          />
+
+          {batchResult.errors && batchResult.errors.length > 0 && (
+            <>
+              <Alert
+                message={`${batchResult.errors.length} erro(s) encontrado(s)`}
+                type="warning"
+                showIcon
+              />
+              <div style={{ maxHeight: 300, overflow: 'auto' }}>
+                {batchResult.errors.map((err, idx) => (
+                  <Alert
+                    key={idx}
+                    message={`ID ${err.id}`}
+                    description={err.detail}
+                    type="error"
+                    showIcon
+                    style={{ marginBottom: 8 }}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </Space>
       </Modal>
     </div>
   );

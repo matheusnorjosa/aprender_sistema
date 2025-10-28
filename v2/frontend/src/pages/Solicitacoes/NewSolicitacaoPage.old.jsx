@@ -1,11 +1,22 @@
 /**
+ * ⚠️ ARQUIVO OBSOLETO - NÃO UTILIZADO ⚠️
+ *
+ * Este arquivo foi substituído por NewSolicitacaoWizard.jsx (wizard multi-step).
+ * Mantido apenas como referência histórica.
+ *
+ * O fluxo atual (NewSolicitacaoWizard) não inclui checagem de disponibilidade em tempo real.
+ * Para projetos SUPER, a decisão de disponibilidade é feita manualmente pela Superintendência
+ * através da Grade Mensal (/disponibilidade).
+ *
+ * ---
+ *
  * PR16: NewSolicitacaoPage - Nova Solicitação com Autocomplete e Validação
  *
- * Fluxo:
+ * Fluxo (OBSOLETO):
  * 1. Preencher formulário com autocomplete (município, projeto, tipo)
  * 2. Selecionar participantes (formadores, coord_acompanha)
  * 3. Validar dados (POST /api/solicitacoes/validate/)
- * 4. Checar disponibilidade (opcional)
+ * 4. Checar disponibilidade (opcional) ← REMOVIDO DO FLUXO ATUAL
  * 5. Submeter com IDs canônicos
  */
 

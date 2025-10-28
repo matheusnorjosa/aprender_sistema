@@ -1,13 +1,10 @@
 /**
- * MeetLink - Componente reutilizável para exibir link do Google Meet
+ * MeetLink Component (PR19/RF06)
  *
- * Props:
- * - href: string | null | undefined - URL do Google Meet
- *
- * Features:
- * - Botão "Entrar na reunião" (abre em nova aba)
- * - Botão "Copiar link" (copia para clipboard)
- * - Retorna null se href não existir
+ * Exibe botão para entrar em reunião do Google Meet quando meet_link presente.
+ * Inclui botões:
+ * - "Entrar na reunião": abre link em nova tab
+ * - "Copiar link": copia URL para clipboard
  *
  * Uso:
  * <MeetLink href={solicitacao.meet_link} />
@@ -15,24 +12,25 @@
 
 import { Button, Space, message } from 'antd';
 import { VideoCameraOutlined, CopyOutlined } from '@ant-design/icons';
+import PropTypes from 'prop-types';
 
 export function MeetLink({ href }) {
   if (!href) return null;
 
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(href);
-      message.success('Link copiado para a área de transferência!');
-    } catch (error) {
-      message.error('Erro ao copiar link');
-    }
+  const handleCopy = () => {
+    navigator.clipboard.writeText(href)
+      .then(() => {
+        message.success('Link copiado para área de transferência!');
+      })
+      .catch(() => {
+        message.error('Erro ao copiar link');
+      });
   };
 
   return (
-    <Space size="small">
+    <Space>
       <Button
         type="primary"
-        size="small"
         icon={<VideoCameraOutlined />}
         href={href}
         target="_blank"
@@ -41,11 +39,21 @@ export function MeetLink({ href }) {
         Entrar na reunião
       </Button>
       <Button
-        size="small"
         icon={<CopyOutlined />}
-        onClick={handleCopyLink}
-        title="Copiar link"
-      />
+        onClick={handleCopy}
+      >
+        Copiar link
+      </Button>
     </Space>
   );
 }
+
+MeetLink.propTypes = {
+  href: PropTypes.string,
+};
+
+MeetLink.defaultProps = {
+  href: null,
+};
+
+export default MeetLink;

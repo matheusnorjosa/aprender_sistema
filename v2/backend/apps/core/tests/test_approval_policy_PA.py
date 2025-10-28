@@ -30,24 +30,24 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def usuario_comum():
+def usuario_comum(faker):
     """Usuário comum sem permissões especiais."""
     return Usuario.objects.create_user(
-        username="comum",
-        email="comum@test.com",
+        username=f"comum_{faker.user_name()}",
+        email=faker.email(),
         password="testpass",
-        cpf="11111111111",
+        cpf=faker.unique.numerify('###########'),  # Unique 11-digit CPF
     )
 
 
 @pytest.fixture
-def usuario_superintendencia():
+def usuario_superintendencia(faker):
     """Usuário do grupo Superintendência."""
     user = Usuario.objects.create_user(
-        username="super",
-        email="super@test.com",
+        username=f"super_{faker.user_name()}",
+        email=faker.email(),
         password="testpass",
-        cpf="22222222222",
+        cpf=faker.unique.numerify('###########'),  # Unique 11-digit CPF
     )
     grupo, _ = Group.objects.get_or_create(name="Superintendência")
     user.groups.add(grupo)

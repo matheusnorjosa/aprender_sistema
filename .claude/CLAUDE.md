@@ -726,10 +726,116 @@ Todo o sistema deve seguir os princípios ergonômicos para design de sistemas i
 ---
 
 ## Fluxos essenciais (Fase 1)
-- RF02 — Solicitar evento.  
-- RF03 — Verificar conflitos para formadores.  
-- RF04 — Aprovar/Reprovar solicitações.  
-- RF05/RF06 — Criar evento no Google Calendar + gerar link do Meet.  
+- RF02 — Solicitar evento.
+- RF03 — Verificar conflitos para formadores.
+- RF04 — Aprovar/Reprovar solicitações.
+- RF05/RF06 — Criar evento no Google Calendar + gerar link do Meet.
+
+---
+
+## RF05/RF06: Google Calendar + Meet (Implementado ✅)
+
+**Status**: Completo (PRs #32, #33, #41, #42; Issues #35–#40)
+
+### Funcionalidades
+
+#### 1. Publicação de Eventos (RF05)
+- **Endpoint**: `POST /api/solicitacoes/{id}/publish/`
+- **Parâmetros**:
+  - `dry_run` (bool): `true` = simulação (não persiste), `false` = publicação real
+  - `apply_blocked` (bool): `true` = força publicação mesmo com `GCAL_CLIENT=fake`
+- **Comportamento**:
+  - **Preview** (`/preview-gcal/`): Sempre retorna payload completo mas **não persiste** no DB
+  - **409 CONFLICT**: Quando `GCAL_CLIENT != "google"` e `apply_blocked=false`, retorna 409 e **não persiste**
+  - **APPLY real**: Apenas quando `GCAL_CLIENT=google` ou `apply_blocked=true` **persiste no DB**
+
+#### 2. Google Meet Link (RF06)
+- **Campo**: `meet_link` (TextField, read-only no serializer)
+- **Geração**: Automática via `conferenceData` com `requestId` único
+- **Persistência**:
+  - ✅ **APPLY real**: Persiste `meet_link` no banco
+  - ❌ **Preview**: Retorna no payload mas **não persiste**
+  - ❌ **409 blocked**: Não persiste
+  - ❌ **dry_run=true**: Não persiste
+- **Exposição**: Serializer `SolicitacaoSerializer` inclui `meet_link` em GET `/api/solicitacoes/`
+
+#### 3. Modalidade Online/Presencial (`is_online`)
+- **Campo**: `is_online` (BooleanField, default=False)
+- **Comportamento**:
+  - `is_online=false`: Evento presencial, **sem `conferenceData`**, sem Meet link
+  - `is_online=true`: Evento online, **com `conferenceData`**, gera Meet link automaticamente
+- **UI**: Checkbox no wizard de solicitação (passo 3 "Detalhes")
+- **Migration**: `0023_add_is_online.py`
+
+### Variáveis de Ambiente
+
+```bash
+# Google Calendar client type ('fake' ou 'google')
+GCAL_CLIENT=fake  # default: 'fake' (seguro para dev)
+
+# Calendar ID (primary ou ID específico)
+GCAL_CALENDAR_ID=your_calendar_id@group.calendar.google.com
+
+# Service Account credentials (escolher UMA das opções)
+GOOGLE_SERVICE_ACCOUNT_FILE=/secrets/aprender-sa-key.json
+# ou
+GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
+
+# Email notifications ('none', 'all', 'externalOnly')
+GCAL_SEND_UPDATES=none  # default: 'none'
+```
+
+### Arquivos Principais
+
+**Backend**:
+- `v2/backend/apps/core/models.py`: Campo `is_online` (linha 86), `meet_link` (linha 126)
+- `v2/backend/apps/core/serializers.py`: Serializer com `meet_link` e `is_online` (linhas 82-98)
+- `v2/backend/apps/core/services/gcal_sync_service.py`: Lógica de payload com `conferenceData`
+- `v2/backend/apps/core/services/gcal_google_client.py`: Cliente real Google Calendar API
+- `v2/backend/apps/core/migrations/0022_add_meet_link.py`: Migration `meet_link`
+- `v2/backend/apps/core/migrations/0023_add_is_online.py`: Migration `is_online`
+
+**Frontend**:
+- `v2/frontend/src/pages/Solicitacoes/NewSolicitacaoWizard.jsx`: Checkbox `is_online` (linhas 358-365)
+- `v2/frontend/src/components/MeetLink.jsx`: Componente reutilizável para exibir/copiar link Meet
+
+**Documentação**:
+- `v2/docs/GUIDE_GCAL.md`: Guia completo de configuração GCal + Meet
+- `.claude/CLAUDE.md`: Esta seção
+
+### Testes
+
+**Backend** (`v2/backend/apps/core/tests/`):
+- `test_gcal_publish_apply_blocked.py`: Testa 409 quando `GCAL_CLIENT=fake` + `apply_blocked=false`
+- `test_gcal_retry_backoff.py`: Retry com exponential backoff
+- `test_gcal_send_updates.py`: Validação de `sendUpdates` parameter
+- `test_gcal_conference_version.py`: `conferenceDataVersion=1` obrigatório
+- `test_gcal_meet_link_persist.py`: Persistência de `meet_link` apenas em APPLY real
+- `test_solicitacao_serializer_meet_link.py`: Serializer expõe `meet_link`
+
+**Status**: ✅ Todos os testes passando
+
+### Issues e PRs Relacionados
+
+**PRs Principais**:
+- **#32**: Implementação inicial GCal (fake client + migrations)
+- **#33**: Google Calendar Client real + retry/backoff
+- **#41**: Campo `meet_link` + persistência APPLY-only
+- **#42**: Campo `is_online` + modalidade online/presencial
+
+**Issues**:
+- **#35**: Integração Google Calendar API (fechada por #32)
+- **#36**: Geração de Meet links (fechada por #41)
+- **#37**: Retry policy para GCal API (fechada por #33)
+- **#38**: Testes de integração GCal (fechada por #33)
+- **#39**: Quarentena testes `dat_ingest` (em andamento)
+- **#40**: Remover quarentena após #39 (pendente)
+
+### Próximos Passos
+
+- ⏳ Fechar issue #39 (resolver testes `dat_ingest`)
+- ⏳ Remover quarentena `-k 'not dat_ingest'` dos workflows CI (#40)
+- ✅ Smoke test com `GCAL_CLIENT=google` em ambiente staging
 
 ---
 

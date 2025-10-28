@@ -44,9 +44,16 @@ class FakeCalendarClient(CalendarClientAdapter):
             payload: Dados do evento
 
         Returns:
-            dict com evento criado (inclui "id")
+            dict com evento criado (inclui "id" e "hangoutLink" se conferenceData presente)
         """
         event = {"id": event_id, **payload}
+
+        # RF06/PR19: Gerar hangoutLink fake se conferenceData presente
+        if payload.get("conferenceData"):
+            # Extrair event_id numérico do formato asv2-{id}
+            event_num = event_id.split("-")[-1] if "-" in event_id else event_id
+            event["hangoutLink"] = f"https://meet.google.com/fake-{event_num}"
+
         self._store[self._key(calendar_id, event_id)] = event
         return event
 
@@ -60,9 +67,16 @@ class FakeCalendarClient(CalendarClientAdapter):
             payload: Novos dados do evento
 
         Returns:
-            dict com evento atualizado
+            dict com evento atualizado (inclui "hangoutLink" se conferenceData presente)
         """
         event = {"id": event_id, **payload}
+
+        # RF06/PR19: Gerar hangoutLink fake se conferenceData presente
+        if payload.get("conferenceData"):
+            # Extrair event_id numérico do formato asv2-{id}
+            event_num = event_id.split("-")[-1] if "-" in event_id else event_id
+            event["hangoutLink"] = f"https://meet.google.com/fake-{event_num}"
+
         self._store[self._key(calendar_id, event_id)] = event
         return event
 

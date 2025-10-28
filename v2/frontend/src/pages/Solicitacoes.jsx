@@ -23,22 +23,12 @@ import {
   Card,
   Descriptions,
   Alert,
-  DatePicker,
-  Row,
-  Col,
-  Timeline,
-  Typography,
 } from 'antd';
 import {
   CheckOutlined,
   CloseOutlined,
   EyeOutlined,
   SearchOutlined,
-  VideoCameraOutlined,
-  FilterOutlined,
-  ClearOutlined,
-  ClockCircleOutlined,
-  SyncOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -48,10 +38,9 @@ import {
   rejectSolicitacao,
 } from '../api/solicitacoes';
 import { getMe } from '../api/availability';
-import { lookupMunicipios, lookupProjetos } from '../api/lookup';
+import { MeetLink } from '../components/MeetLink';
 
 const { TextArea } = Input;
-const { Title: AntTitle, Text } = Typography;
 
 /**
  * Mapeia status para cores de tags
@@ -83,15 +72,6 @@ function Solicitacoes() {
   // Filtros
   const [statusFilter, setStatusFilter] = useState('pendente');
   const [searchTerm, setSearchTerm] = useState('');
-  const [dataInicio, setDataInicio] = useState(null);
-  const [dataFim, setDataFim] = useState(null);
-  const [municipioFilter, setMunicipioFilter] = useState(null);
-  const [projetoFilter, setProjetoFilter] = useState(null);
-  const [fluxoFilter, setFluxoFilter] = useState('SUPER'); // Apenas fluxo SUPER (Superintendência)
-
-  // Options para filtros
-  const [municipios, setMunicipios] = useState([]);
-  const [projetos, setProjetos] = useState([]);
 
   // Drawer de detalhes
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -130,21 +110,6 @@ function Solicitacoes() {
       }
     }
     fetchCurrentUser();
-
-    // Carregar opções de filtros
-    const loadFilterOptions = async () => {
-      try {
-        const [municData, projData] = await Promise.all([
-          lookupMunicipios(''),
-          lookupProjetos(''),
-        ]);
-        setMunicipios(municData);
-        setProjetos(projData);
-      } catch (error) {
-        console.error('Erro ao carregar opções de filtros:', error);
-      }
-    };
-    loadFilterOptions();
   }, []);
 
   /**
@@ -153,30 +118,11 @@ function Solicitacoes() {
   const fetchSolicitacoes = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params = {
+      const data = await listSolicitacoes({
         status: statusFilter,
         page,
         search: searchTerm,
-      };
-
-      // Adicionar filtros opcionais
-      if (dataInicio) {
-        params.data_inicio = dayjs(dataInicio).format('YYYY-MM-DD');
-      }
-      if (dataFim) {
-        params.data_fim = dayjs(dataFim).format('YYYY-MM-DD');
-      }
-      if (municipioFilter) {
-        params.municipio_id = municipioFilter;
-      }
-      if (projetoFilter) {
-        params.projeto_id = projetoFilter;
-      }
-      if (fluxoFilter) {
-        params.fluxo = fluxoFilter;
-      }
-
-      const data = await listSolicitacoes(params);
+      });
 
       setSolicitacoes(data.results || []);
       setPagination({
@@ -189,7 +135,7 @@ function Solicitacoes() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, searchTerm, dataInicio, dataFim, municipioFilter, projetoFilter, fluxoFilter]);
+  }, [statusFilter, searchTerm]);
 
   /**
    * Recarrega quando filtros mudam
@@ -300,12 +246,6 @@ function Solicitacoes() {
       render: (text, record) => record.municipio?.nome || record.municipio || '-',
     },
     {
-      title: 'Projeto',
-      dataIndex: ['projeto', 'nome'],
-      key: 'projeto',
-      render: (text, record) => record.projeto?.nome || record.projeto || '-',
-    },
-    {
       title: 'Tipo Evento',
       dataIndex: ['tipo_evento', 'nome'],
       key: 'tipo_evento',
@@ -315,6 +255,12 @@ function Solicitacoes() {
       title: 'Início',
       dataIndex: 'inicio',
       key: 'inicio',
+      render: (text) => formatDateTime(text),
+    },
+    {
+      title: 'Fim',
+      dataIndex: 'fim',
+      key: 'fim',
       render: (text) => formatDateTime(text),
     },
     {
@@ -332,17 +278,6 @@ function Solicitacoes() {
         { text: 'Reprovado', value: 'reprovado' },
       ],
       filteredValue: [statusFilter],
-    },
-    {
-      title: 'Fluxo',
-      dataIndex: 'fluxo',
-      key: 'fluxo',
-      render: (fluxo) => {
-        if (!fluxo) return '-';
-        const color = fluxo === 'SUPER' ? 'blue' : 'green';
-        const label = fluxo === 'SUPER' ? 'SUPER' : 'NÃO SUPER';
-        return <Tag color={color}>{label}</Tag>;
-      },
     },
     {
       title: 'Ações',
@@ -406,112 +341,27 @@ function Solicitacoes() {
         )}
 
         {/* Filtros */}
-        <Card title={<Space><FilterOutlined /> Filtros</Space>} style={{ marginBottom: 16 }}>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12} md={8}>
-              <label style={{ display: 'block', marginBottom: 4 }}>Data Inicial</label>
-              <DatePicker
-                style={{ width: '100%' }}
-                placeholder="DD/MM/AAAA"
-                format="DD/MM/YYYY"
-                value={dataInicio}
-                onChange={setDataInicio}
-                allowClear
-              />
-            </Col>
-
-            <Col xs={24} sm={12} md={8}>
-              <label style={{ display: 'block', marginBottom: 4 }}>Data Final</label>
-              <DatePicker
-                style={{ width: '100%' }}
-                placeholder="DD/MM/AAAA"
-                format="DD/MM/YYYY"
-                value={dataFim}
-                onChange={setDataFim}
-                allowClear
-              />
-            </Col>
-
-            <Col xs={24} sm={12} md={8}>
-              <label style={{ display: 'block', marginBottom: 4 }}>Município</label>
-              <Select
-                style={{ width: '100%' }}
-                placeholder="Selecione"
-                value={municipioFilter}
-                onChange={setMunicipioFilter}
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                options={municipios.map(m => ({ label: m.label, value: m.id }))}
-              />
-            </Col>
-
-            <Col xs={24} sm={12} md={8}>
-              <label style={{ display: 'block', marginBottom: 4 }}>Projeto</label>
-              <Select
-                style={{ width: '100%' }}
-                placeholder="Selecione"
-                value={projetoFilter}
-                onChange={setProjetoFilter}
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                options={projetos.map(p => ({ label: p.label, value: p.id }))}
-              />
-            </Col>
-
-            <Col xs={24} sm={12} md={8}>
-              <label style={{ display: 'block', marginBottom: 4 }}>Status</label>
-              <Select
-                style={{ width: '100%' }}
-                value={statusFilter}
-                onChange={setStatusFilter}
-                options={[
-                  { label: 'Pendente', value: 'pendente' },
-                  { label: 'Aprovado', value: 'aprovado' },
-                  { label: 'Reprovado', value: 'reprovado' },
-                  { label: 'Todos', value: '' },
-                ]}
-              />
-            </Col>
-
-            <Col xs={24} sm={12} md={8}>
-              <label style={{ display: 'block', marginBottom: 4 }}>Fluxo</label>
-              <Select
-                style={{ width: '100%' }}
-                placeholder="Selecione"
-                value={fluxoFilter}
-                onChange={setFluxoFilter}
-                allowClear
-                options={[
-                  { label: 'SUPER (Superintendência)', value: 'SUPER' },
-                  { label: 'NAO_SUPER (Outros)', value: 'NAO_SUPER' },
-                ]}
-              />
-            </Col>
-          </Row>
-
-          <Row style={{ marginTop: 16 }}>
-            <Col span={24}>
-              <Space>
-                <Button
-                  icon={<ClearOutlined />}
-                  onClick={() => {
-                    setStatusFilter('pendente');
-                    setSearchTerm('');
-                    setDataInicio(null);
-                    setDataFim(null);
-                    setMunicipioFilter(null);
-                    setProjetoFilter(null);
-                    setFluxoFilter('');
-                  }}
-                >
-                  Limpar Filtros
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-        </Card>
+        <Space style={{ marginBottom: 16 }} wrap>
+          <Input
+            placeholder="Buscar por usuário, município, tipo..."
+            prefix={<SearchOutlined />}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ width: 300 }}
+            allowClear
+          />
+          <Select
+            value={statusFilter}
+            onChange={setStatusFilter}
+            style={{ width: 150 }}
+            options={[
+              { label: 'Pendente', value: 'pendente' },
+              { label: 'Aprovado', value: 'aprovado' },
+              { label: 'Reprovado', value: 'reprovado' },
+              { label: 'Todos', value: '' },
+            ]}
+          />
+        </Space>
 
         {/* Tabela */}
         <Table
@@ -558,139 +408,43 @@ function Solicitacoes() {
         {loadingDetails ? (
           <Spin />
         ) : selectedSolicitacao ? (
-          <>
-            <AntTitle level={5}>Linha do Tempo</AntTitle>
-            <Timeline
-              style={{ marginBottom: 24 }}
-              items={[
-                {
-                  color: 'blue',
-                  dot: <ClockCircleOutlined />,
-                  children: (
-                    <>
-                      <Text strong>Solicitação Criada</Text>
-                      <br />
-                      <Text type="secondary">
-                        {formatDateTime(selectedSolicitacao.created_at)}
-                      </Text>
-                    </>
-                  ),
-                },
-                selectedSolicitacao.status === 'aprovado' && {
-                  color: 'green',
-                  dot: <CheckOutlined />,
-                  children: (
-                    <>
-                      <Text strong>Solicitação Aprovada</Text>
-                      <br />
-                      <Text type="secondary">Aguardando aprovação</Text>
-                    </>
-                  ),
-                },
-                selectedSolicitacao.status === 'reprovado' && {
-                  color: 'red',
-                  dot: <CloseOutlined />,
-                  children: (
-                    <>
-                      <Text strong>Solicitação Reprovada</Text>
-                      <br />
-                      <Text type="secondary">Aguardando aprovação</Text>
-                    </>
-                  ),
-                },
-                selectedSolicitacao.status === 'pendente' && {
-                  color: 'gray',
-                  children: (
-                    <>
-                      <Text type="secondary">Aguardando aprovação</Text>
-                    </>
-                  ),
-                },
-                selectedSolicitacao.gcal_status === 'PUBLISHED' && {
-                  color: 'green',
-                  dot: <SyncOutlined />,
-                  children: (
-                    <>
-                      <Text strong>Sincronização Concluída</Text>
-                      <br />
-                      <Text type="secondary">
-                        Evento publicado no Google Calendar
-                        {selectedSolicitacao.gcal_last_sync_at &&
-                          ` em ${formatDateTime(selectedSolicitacao.gcal_last_sync_at)}`
-                        }
-                      </Text>
-                    </>
-                  ),
-                },
-              ].filter(Boolean)}
-            />
-
-            <AntTitle level={5}>Detalhes da Solicitação</AntTitle>
-            <Descriptions column={1} bordered size="small">
-              <Descriptions.Item label="ID">{selectedSolicitacao.id}</Descriptions.Item>
-              <Descriptions.Item label="Solicitante">
-                {selectedSolicitacao.usuario?.username || selectedSolicitacao.usuario || '-'}
+          <Descriptions column={1} bordered>
+            <Descriptions.Item label="ID">{selectedSolicitacao.id}</Descriptions.Item>
+            <Descriptions.Item label="Usuário">
+              {selectedSolicitacao.usuario?.username || selectedSolicitacao.usuario || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Município">
+              {selectedSolicitacao.municipio?.nome || selectedSolicitacao.municipio || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Tipo de Evento">
+              {selectedSolicitacao.tipo_evento?.nome || selectedSolicitacao.tipo_evento || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Início">
+              {formatDateTime(selectedSolicitacao.inicio)}
+            </Descriptions.Item>
+            <Descriptions.Item label="Fim">
+              {formatDateTime(selectedSolicitacao.fim)}
+            </Descriptions.Item>
+            <Descriptions.Item label="Status">
+              <Tag color={STATUS_COLORS[selectedSolicitacao.status]}>
+                {selectedSolicitacao.status?.toUpperCase()}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Observações">
+              {selectedSolicitacao.observacoes || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Criado em">
+              {formatDateTime(selectedSolicitacao.created_at)}
+            </Descriptions.Item>
+            <Descriptions.Item label="Atualizado em">
+              {formatDateTime(selectedSolicitacao.updated_at)}
+            </Descriptions.Item>
+            {selectedSolicitacao.meet_link && (
+              <Descriptions.Item label="Reunião Online">
+                <MeetLink href={selectedSolicitacao.meet_link} />
               </Descriptions.Item>
-              <Descriptions.Item label="Município">
-                {selectedSolicitacao.municipio?.nome || selectedSolicitacao.municipio || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Projeto">
-                {selectedSolicitacao.projeto?.nome || selectedSolicitacao.projeto || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Tipo de Evento">
-                {selectedSolicitacao.tipo_evento?.nome || selectedSolicitacao.tipo_evento || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Período">
-                {formatDateTime(selectedSolicitacao.inicio)} - {formatDateTime(selectedSolicitacao.fim)}
-              </Descriptions.Item>
-              <Descriptions.Item label="Status">
-                <Tag color={STATUS_COLORS[selectedSolicitacao.status]}>
-                  {selectedSolicitacao.status?.toUpperCase()}
-                </Tag>
-              </Descriptions.Item>
-              {selectedSolicitacao.fluxo && (
-                <Descriptions.Item label="Fluxo">
-                  <Tag color={selectedSolicitacao.fluxo === 'SUPER' ? 'blue' : 'green'}>
-                    {selectedSolicitacao.fluxo === 'SUPER' ? 'SUPER' : 'NÃO SUPER'}
-                  </Tag>
-                </Descriptions.Item>
-              )}
-              {selectedSolicitacao.observacoes && (
-                <Descriptions.Item label="Observações">
-                  {selectedSolicitacao.observacoes}
-                </Descriptions.Item>
-              )}
-              {selectedSolicitacao.meet_link && (
-                <Descriptions.Item label="Reunião Online">
-                  <Button
-                    type="primary"
-                    icon={<VideoCameraOutlined />}
-                    href={selectedSolicitacao.meet_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    size="small"
-                  >
-                    Entrar na reunião
-                  </Button>
-                </Descriptions.Item>
-              )}
-            </Descriptions>
-
-            {selectedSolicitacao.participations && selectedSolicitacao.participations.length > 0 && (
-              <>
-                <AntTitle level={5} style={{ marginTop: 16 }}>Participantes</AntTitle>
-                <Descriptions column={1} bordered size="small">
-                  {selectedSolicitacao.participations.map((p, idx) => (
-                    <Descriptions.Item key={idx} label={p.role}>
-                      {p.usuario?.first_name && p.usuario?.last_name
-                        ? `${p.usuario.first_name} ${p.usuario.last_name}`
-                        : p.email || p.guest_email || '-'}
-                    </Descriptions.Item>
-                  ))}
-                </Descriptions>
-              </>
             )}
-          </>
+          </Descriptions>
         ) : null}
       </Drawer>
 

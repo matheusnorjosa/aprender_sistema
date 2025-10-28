@@ -32,9 +32,11 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def usuario_comum(faker):
     """Usuário comum sem permissões especiais."""
+    # UUID ensures absolute uniqueness (faker.unique has cache issues across function-scoped fixtures)
+    unique_id = faker.uuid4()[:12]
     return Usuario.objects.create_user(
-        username=faker.unique.user_name(),
-        email=faker.unique.email(),
+        username=f"comum_{unique_id}",
+        email=f"comum_{unique_id}@example.com",
         password="testpass",
         cpf=faker.unique.numerify('###########'),  # Unique 11-digit CPF
     )
@@ -43,9 +45,11 @@ def usuario_comum(faker):
 @pytest.fixture
 def usuario_superintendencia(faker):
     """Usuário do grupo Superintendência."""
+    # UUID ensures absolute uniqueness (faker.unique has cache issues across function-scoped fixtures)
+    unique_id = faker.uuid4()[:12]
     user = Usuario.objects.create_user(
-        username=faker.unique.user_name(),
-        email=faker.unique.email(),
+        username=f"super_{unique_id}",
+        email=f"super_{unique_id}@example.com",
         password="testpass",
         cpf=faker.unique.numerify('###########'),  # Unique 11-digit CPF
     )

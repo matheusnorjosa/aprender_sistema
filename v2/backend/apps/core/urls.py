@@ -38,6 +38,7 @@ from .views_gcal_dashboard import (
     GCalStatusSummaryView,
     GCalListView,
     GCalDriftView,
+    GCalPublishBatchView,
 )
 from .views_lookup import (
     MunicipioLookup,
@@ -141,10 +142,11 @@ urlpatterns = [
     ),
     # Pré-agenda
     path("pre-agenda/", PreAgendaListView.as_view(), name="pre-agenda"),
-    # GCal Dashboard (PR14 - Ajustes pós-merge)
+    # GCal Dashboard (PR14 - Ajustes pós-merge + Fase 2 batch publish)
     path("gcal/status-summary/", GCalStatusSummaryView.as_view(), name="gcal-status-summary"),
     path("gcal/list/", GCalListView.as_view(), name="gcal-list"),
     path("gcal/drift/", GCalDriftView.as_view(), name="gcal-drift"),
+    path("gcal/publish-batch/", GCalPublishBatchView.as_view(), name="gcal-publish-batch"),
     # Metrics and Reports
     path("metrics/map/", metrics_map, name="metrics-map"),
     path("reports/status-counts/", reports_status_counts, name="reports-status-counts"),

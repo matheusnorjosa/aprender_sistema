@@ -23,6 +23,7 @@ import {
   Typography,
   Descriptions,
   Tag,
+  Checkbox,
 } from 'antd';
 import {
   FileTextOutlined,
@@ -78,6 +79,8 @@ export default function NewSolicitacaoWizard() {
     encontro: '',
     segmento: '',
     observacoes: '',
+    // PR19: Modalidade online/presencial
+    is_online: false,
   });
 
   // Navegação entre passos
@@ -145,6 +148,8 @@ export default function NewSolicitacaoWizard() {
         encontro: formData.encontro || null,
         segmento: formData.segmento || null,
         observacoes: formData.observacoes || null,
+        // PR19: incluir modalidade no payload
+        is_online: !!formData.is_online,
         coordenador_acompanha: coordenadores.length > 0,
         // Backend espera participantes dentro de extra_participants
         extra_participants: {
@@ -348,6 +353,27 @@ export default function NewSolicitacaoWizard() {
               onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
             />
           </Form.Item>
+
+          {/* PR19: Modalidade online/presencial */}
+          <Form.Item name="is_online" valuePropName="checked">
+            <Checkbox
+              checked={formData.is_online}
+              onChange={(e) => setFormData({ ...formData, is_online: e.target.checked })}
+            >
+              Evento online (Google Meet)
+            </Checkbox>
+          </Form.Item>
+
+          <Alert
+            message="Modalidade do evento"
+            description={
+              formData.is_online
+                ? 'Link do Google Meet será gerado automaticamente após publicação do evento no calendário.'
+                : 'Evento presencial — nenhum link de reunião será gerado.'
+            }
+            type={formData.is_online ? 'info' : 'warning'}
+            showIcon
+          />
         </>
       ),
     },
@@ -398,6 +424,11 @@ export default function NewSolicitacaoWizard() {
             {formData.observacoes && (
               <Descriptions.Item label="Observações">{formData.observacoes}</Descriptions.Item>
             )}
+            <Descriptions.Item label="Modalidade">
+              <Tag color={formData.is_online ? 'blue' : 'orange'}>
+                {formData.is_online ? 'Online (Google Meet)' : 'Presencial'}
+              </Tag>
+            </Descriptions.Item>
           </Descriptions>
 
           <Alert

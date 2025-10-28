@@ -79,6 +79,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "fim",
             "status",
             "observacoes",
+            # PR19: Modalidade online/presencial (gera Meet apenas quando online)
+            "is_online",
             "external_event_id",
             "created_at",
             "updated_at",
@@ -91,6 +93,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "gcal_payload_hash",
             # PR19/RF06: Google Meet link
             "meet_link",
+            # Modalidade online/presencial
+            "is_online",
         ]
         read_only_fields = [
             "id",

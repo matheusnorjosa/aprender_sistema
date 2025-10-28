@@ -339,6 +339,11 @@ class Solicitacao(models.Model):
         blank=True,
         help_text="SHA1 do payload aplicado no GCal (drift detection)",
     )
+    is_online = models.BooleanField(
+        default=False,
+        verbose_name="Evento online",
+        help_text="Evento online? Gera link do Google Meet no APPLY.",
+    )
     meet_link = models.URLField(
         max_length=500,
         null=True,

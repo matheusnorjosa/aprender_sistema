@@ -6,14 +6,14 @@
  * - Tipo (Total ou Parcial)
  * - Motivo (opcional)
  * - Validação de datas (início < fim)
- * - Checagem prévia de conflitos (opcional)
+ *
+ * Nota: Decisão de disponibilidade é feita manualmente pela Superintendência
+ * através da Grade Mensal (/disponibilidade), não há checagem em tempo real.
  */
 
 import { useState } from 'react';
-import { Form, DatePicker, Select, Input, Button, Alert, List, Tag } from 'antd';
-import { CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { Form, DatePicker, Select, Input, Button } from 'antd';
 import dayjs from 'dayjs';
-import { getMe, checkAvailability } from '../api/availability';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -21,35 +21,6 @@ const { Option } = Select;
 export default function BlockForm({ onSubmit }) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(false);
-  const [conflicts, setConflicts] = useState(null);
-
-  /**
-   * Handler para verificação prévia de conflitos.
-   */
-  const handleCheckAvailability = async () => {
-    try {
-      const values = await form.validateFields(['inicio', 'fim']);
-      setChecking(true);
-      setConflicts(null);
-
-      // Buscar ID do usuário atual
-      const user = await getMe();
-
-      // Chamar API de checagem
-      const result = await checkAvailability({
-        usuario_id: user.id,
-        inicio: values.inicio.toISOString(),
-        fim: values.fim.toISOString(),
-      });
-
-      setConflicts(result);
-    } catch (error) {
-      console.error('Erro ao checar disponibilidade:', error);
-    } finally {
-      setChecking(false);
-    }
-  };
 
   /**
    * Handler para submit do formulário.
@@ -90,58 +61,8 @@ export default function BlockForm({ onSubmit }) {
     return Promise.resolve();
   };
 
-  /**
-   * Renderiza lista de conflitos encontrados.
-   */
-  const renderConflicts = () => {
-    if (!conflicts) return null;
-
-    const conflictsList = conflicts.conflicts || [];
-
-    if (conflictsList.length === 0) {
-      return (
-        <Alert
-          message="Nenhum conflito encontrado"
-          description="O período selecionado está disponível."
-          type="success"
-          icon={<CheckCircleOutlined />}
-          showIcon
-          closable
-          style={{ marginBottom: 16 }}
-        />
-      );
-    }
-
-    return (
-      <Alert
-        message="Conflitos Encontrados"
-        description={
-          <List
-            size="small"
-            dataSource={conflictsList}
-            renderItem={(item) => (
-              <List.Item>
-                <Tag color={item.code === 'X' ? 'red' : 'orange'}>{item.code}</Tag>
-                <strong>{item.title}</strong>: {item.detail}
-              </List.Item>
-            )}
-          />
-        }
-        type="warning"
-        icon={<WarningOutlined />}
-        showIcon
-        closable
-        onClose={() => setConflicts(null)}
-        style={{ marginBottom: 16 }}
-      />
-    );
-  };
-
   return (
-    <>
-      {renderConflicts()}
-
-      <Form
+    <Form
         form={form}
         layout="vertical"
         onFinish={handleSubmit}
@@ -211,19 +132,10 @@ export default function BlockForm({ onSubmit }) {
 
         {/* Botões */}
         <Form.Item>
-          <Button
-            type="default"
-            onClick={handleCheckAvailability}
-            loading={checking}
-            style={{ marginRight: 8 }}
-          >
-            Checar Disponibilidade
-          </Button>
           <Button type="primary" htmlType="submit" loading={loading}>
             Criar Bloqueio
           </Button>
         </Form.Item>
       </Form>
-    </>
   );
 }

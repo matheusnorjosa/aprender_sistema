@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from .models import AvailabilityBlock, Municipio, Usuario
+from .permissions import IsControleOrSuper
 from .serializers import AvailabilityBlockSerializer
 from .services.availability_service import check_conflicts
 
@@ -63,6 +64,10 @@ class AvailabilityCheckView(APIView):
     """
     Endpoint de checagem de disponibilidade (RD-01 a RD-08).
 
+    Ferramenta consultiva restrita a perfis Controle/Superintendência.
+    Não é usada em tempo real na UX; decisões de disponibilidade são
+    feitas manualmente pela Superintendência via Grade Mensal.
+
     GET /api/availability/check/
     Query params:
         - usuario_id (obrigatório)
@@ -71,7 +76,7 @@ class AvailabilityCheckView(APIView):
         - municipio_id (opcional)
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsControleOrSuper]
     throttle_scope = "availability_check"
 
     def get(self, request):
@@ -163,13 +168,17 @@ class AvailabilityCheckView(APIView):
 
 class AvailabilityCheckManyView(APIView):
     """
-    Endpoint de checagem de disponibilidade em lote (PR 8/N).
+    Endpoint de checagem de disponibilidade em lote.
+
+    Ferramenta consultiva restrita a perfis Controle/Superintendência.
+    Não é usada em tempo real na UX; decisões de disponibilidade são
+    feitas manualmente pela Superintendência via Grade Mensal.
 
     POST /api/availability/check-many/
     Body: {"usuarios_ids": [1, 2], "inicio": "...", "fim": "...", "municipio_id": ...}
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsControleOrSuper]
     throttle_scope = "availability_check"
 
     def post(self, request):

@@ -1,14 +1,16 @@
 """
 GCal Dashboard Views (PR14 - Ajustes pós-merge)
 
-4 endpoints para painel de publicação com contrato padronizado:
+3 endpoints para painel de publicação com contrato padronizado:
 - GET /api/gcal/status-summary/ - resumo de contadores
 - GET /api/gcal/list/ - listagem com filtros
 - GET /api/gcal/drift/ - detecção de drift
-- POST /api/gcal/reapply/ - republicação em massa
 
 Todos restritos a grupos Controle/Superintendência.
 Suportam filtros: date_from, date_to, sector, q, status (gcal_status).
+
+Nota: Publicação de eventos no Google Calendar ocorre exclusivamente via
+página /pre-agenda através do botão "Publicar" (POST /api/solicitacoes/{id}/publish/).
 """
 
 import logging
@@ -248,70 +250,3 @@ class GCalDriftView(APIView):
             'count': len(drift_items),
             'items': drift_items
         })
-
-
-class GCalBulkReapplyView(APIView):
-    """
-    POST /api/gcal/reapply/
-
-    Reenfileira publicação para lista de IDs.
-
-    Request body:
-    {
-        "ids": [1, 2, 3],
-        "dry_run": false
-    }
-
-    Response:
-    {
-        "queued": 3,
-        "errors": [],  # Lista de {id, detail}
-        "dry_run": false
-    }
-    """
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
-
-    def post(self, request):
-        from apps.core.tasks import task_publish_solicitacao_to_gcal
-
-        ids = request.data.get('ids', [])
-        dry_run = request.data.get('dry_run', False)
-
-        if not ids:
-            return Response(
-                {'detail': 'Campo ids é obrigatório'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Validar que todas são aprovadas
-        qs = Solicitacao.objects.filter(id__in=ids, status='aprovado')
-        found_ids = set(qs.values_list('id', flat=True))
-        requested_ids = set(ids)
-
-        # Detectar IDs inválidos
-        invalid_ids = requested_ids - found_ids
-        errors = []
-        for invalid_id in invalid_ids:
-            errors.append({
-                'id': invalid_id,
-                'detail': 'ID não encontrado ou não está aprovado'
-            })
-
-        # Marcar como PENDING e enfileirar
-        queued = 0
-        for s in qs:
-            if not dry_run:
-                s.mark_gcal(
-                    status=Solicitacao.GCalStatus.PENDING,
-                    payload_hash=None,
-                    error=''
-                )
-
-            task_publish_solicitacao_to_gcal.delay(s.id, dry_run=dry_run, apply_blocked=False)
-            queued += 1
-
-        return Response({
-            'queued': queued,
-            'errors': errors,
-            'dry_run': dry_run
-        }, status=status.HTTP_202_ACCEPTED if queued > 0 else status.HTTP_200_OK)

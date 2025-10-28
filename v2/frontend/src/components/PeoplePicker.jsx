@@ -24,14 +24,15 @@ export default function PeoplePicker({
   const handleSearchFormadores = async (query) => {
     setFormadorSearch(query);
 
-    if (!query || query.length < 2) {
+    // Permitir busca vazia (mostra lista inicial) ou com 2+ caracteres
+    if (query && query.length > 0 && query.length < 2) {
       setFormadoresOptions([]);
       return;
     }
 
     try {
       setLoadingFormadores(true);
-      const results = await lookupUsuarios(query, 'Formador');
+      const results = await lookupUsuarios(query || '', 'Formador');
       setFormadoresOptions(
         results.map(item => ({
           value: item.id,
@@ -49,14 +50,15 @@ export default function PeoplePicker({
   const handleSearchCoord = async (query) => {
     setCoordSearch(query);
 
-    if (!query || query.length < 2) {
+    // Permitir busca vazia (mostra lista inicial) ou com 2+ caracteres
+    if (query && query.length > 0 && query.length < 2) {
       setCoordOptions([]);
       return;
     }
 
     try {
       setLoadingCoord(true);
-      const results = await lookupUsuarios(query, 'Coordenador');
+      const results = await lookupUsuarios(query || '', 'Coordenador');
       setCoordOptions(
         results.map(item => ({
           value: item.id,
@@ -93,9 +95,9 @@ export default function PeoplePicker({
       onChange(updated);
     }
 
-    // Limpar busca
+    // Limpar busca mas manter as opções para próxima seleção
     setFormadorSearch('');
-    setFormadoresOptions([]);
+    // Não limpar formadoresOptions para permitir múltiplas seleções
   };
 
   const handleAddCoord = (selectedValue, option) => {
@@ -120,9 +122,9 @@ export default function PeoplePicker({
       onChange(updated);
     }
 
-    // Limpar busca
+    // Limpar busca mas manter as opções para próxima seleção
     setCoordSearch('');
-    setCoordOptions([]);
+    // Não limpar coordOptions para permitir múltiplas seleções
   };
 
   const handleRemoveFormador = (index) => {
@@ -170,11 +172,17 @@ export default function PeoplePicker({
               value={formadorSearch}
               options={formadoresOptions}
               onSearch={handleSearchFormadores}
+              onFocus={() => {
+                // Carregar lista inicial ao focar no campo (se ainda não carregou)
+                if (formadoresOptions.length === 0 && !loadingFormadores) {
+                  handleSearchFormadores('');
+                }
+              }}
               onSelect={handleAddFormador}
               onChange={setFormadorSearch}
-              placeholder="Buscar formador por nome ou email..."
+              placeholder="Clique para ver lista ou digite para buscar..."
               style={{ width: '100%' }}
-              notFoundContent={loadingFormadores ? <Spin size="small" /> : 'Digite pelo menos 2 caracteres'}
+              notFoundContent={loadingFormadores ? <Spin size="small" /> : null}
             />
           </div>
         </div>
@@ -199,11 +207,17 @@ export default function PeoplePicker({
               value={coordSearch}
               options={coordOptions}
               onSearch={handleSearchCoord}
+              onFocus={() => {
+                // Carregar lista inicial ao focar no campo (se ainda não carregou)
+                if (coordOptions.length === 0 && !loadingCoord) {
+                  handleSearchCoord('');
+                }
+              }}
               onSelect={handleAddCoord}
               onChange={setCoordSearch}
-              placeholder="Buscar coordenador por nome ou email..."
+              placeholder="Clique para ver lista ou digite para buscar..."
               style={{ width: '100%' }}
-              notFoundContent={loadingCoord ? <Spin size="small" /> : 'Digite pelo menos 2 caracteres'}
+              notFoundContent={loadingCoord ? <Spin size="small" /> : null}
             />
           </div>
         </div>

@@ -1,4 +1,5 @@
 import csv
+import logging
 from pathlib import Path
 from django.contrib import admin
 from django.http import HttpResponse
@@ -89,7 +90,8 @@ class UsuarioAdmin(admin.ModelAdmin):
                     ])
         except Exception as e:
             # Se falhar ao salvar em out_etl, apenas retornar o CSV via HTTP
-            pass
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to save audit file to /app/out_etl: {e}")
 
         return response
 

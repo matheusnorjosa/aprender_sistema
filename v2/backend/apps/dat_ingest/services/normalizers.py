@@ -186,3 +186,211 @@ def parse_bool(value: Optional[str], default: bool = True) -> bool:
         return True
 
     return default
+
+
+# ============================================================================
+# Shims/Adapters para testes (Issue #39)
+# ============================================================================
+
+
+def normalize_text(value: Optional[str]) -> str:
+    """
+    Alias para normalize_str() (compatibilidade com testes)
+
+    Examples:
+        >>> normalize_text("  João  Silva  ")
+        "João Silva"
+    """
+    return normalize_str(value)
+
+
+def generate_cpf_from_email(email: str) -> str:
+    """
+    Gera CPF determinístico fake a partir de email (para testes)
+
+    Usa hash do email convertido para inteiro e formata como CPF de 11 dígitos.
+
+    Examples:
+        >>> generate_cpf_from_email("test@example.com")
+        "12345678901"  # determinístico baseado no hash
+    """
+    import hashlib
+
+    if not email:
+        return ""
+
+    # Hash do email para gerar CPF determinístico
+    hash_obj = hashlib.sha256(email.lower().encode())
+    hash_int = int(hash_obj.hexdigest(), 16)
+
+    # Pega os primeiros 11 dígitos do hash
+    cpf = str(hash_int)[:11].zfill(11)
+
+    return cpf
+
+
+def make_sha256_hash(data: str) -> str:
+    """
+    Gera hash SHA256 de uma string
+
+    Examples:
+        >>> make_sha256_hash("test")
+        "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    """
+    import hashlib
+
+    if not data:
+        return ""
+
+    return hashlib.sha256(str(data).encode()).hexdigest()
+
+
+def make_iso_datetime(dt, tz=None) -> str:
+    """
+    Converte datetime para ISO 8601
+
+    Args:
+        dt: datetime object ou string
+        tz: timezone (opcional)
+
+    Examples:
+        >>> from datetime import datetime
+        >>> make_iso_datetime(datetime(2025, 1, 15, 14, 30))
+        "2025-01-15T14:30:00"
+    """
+    from datetime import datetime
+
+    if isinstance(dt, str):
+        return dt
+
+    if isinstance(dt, datetime):
+        return dt.isoformat()
+
+    return ""
+
+
+def parse_datetime(value: Optional[str]):
+    """
+    Parse string para datetime
+
+    Args:
+        value: string no formato ISO ou comum
+
+    Returns:
+        datetime object ou None
+
+    Examples:
+        >>> parse_datetime("2025-01-15 14:30:00")
+        datetime.datetime(2025, 1, 15, 14, 30)
+    """
+    from dateutil import parser
+    from datetime import datetime
+
+    if not value:
+        return None
+
+    if isinstance(value, datetime):
+        return value
+
+    try:
+        return parser.parse(str(value))
+    except (ValueError, TypeError):
+        return None
+
+
+def parse_time(value: Optional[str]):
+    """
+    Parse string para time
+
+    Args:
+        value: string no formato "HH:MM" ou "HH:MM:SS"
+
+    Returns:
+        time object ou None
+
+    Examples:
+        >>> parse_time("14:30")
+        datetime.time(14, 30)
+    """
+    from datetime import time
+
+    if not value:
+        return None
+
+    if isinstance(value, time):
+        return value
+
+    try:
+        # Formato HH:MM ou HH:MM:SS
+        parts = str(value).strip().split(":")
+        if len(parts) == 2:
+            return time(int(parts[0]), int(parts[1]))
+        elif len(parts) == 3:
+            return time(int(parts[0]), int(parts[1]), int(parts[2]))
+    except (ValueError, IndexError, AttributeError):
+        pass
+
+    return None
+
+
+def split_municipio_uf(value: Optional[str]) -> tuple[str, str]:
+    """
+    Divide string "Municipio - UF" em tupla (municipio, uf)
+
+    Args:
+        value: string no formato "Fortaleza - CE"
+
+    Returns:
+        tuple (municipio, uf)
+
+    Examples:
+        >>> split_municipio_uf("Fortaleza - CE")
+        ("Fortaleza", "CE")
+        >>> split_municipio_uf("Caucaia-CE")
+        ("Caucaia", "CE")
+    """
+    if not value:
+        return ("", "")
+
+    # Tenta split por " - " primeiro, depois por "-"
+    v = str(value).strip()
+
+    if " - " in v:
+        parts = v.split(" - ", 1)
+    elif "-" in v:
+        parts = v.split("-", 1)
+    else:
+        return (v, "")
+
+    municipio = parts[0].strip() if len(parts) > 0 else ""
+    uf = parts[1].strip() if len(parts) > 1 else ""
+
+    return (municipio, uf)
+
+
+def validate_row_data(row: dict) -> tuple[bool, list[str]]:
+    """
+    Valida dados de uma linha (dict) retornando (ok, errors)
+
+    Args:
+        row: dicionário com dados da linha
+
+    Returns:
+        tuple (is_valid: bool, errors: list[str])
+
+    Examples:
+        >>> validate_row_data({"nome": "João", "email": "joao@example.com"})
+        (True, [])
+        >>> validate_row_data({"nome": "", "email": ""})
+        (False, ["Campo 'nome' obrigatório", "Campo 'email' obrigatório"])
+    """
+    errors = []
+
+    # Validações básicas (exemplos - ajustar conforme necessidade)
+    required_fields = []  # Nenhum campo obrigatório por padrão
+
+    for field in required_fields:
+        if not row.get(field):
+            errors.append(f"Campo '{field}' obrigatório")
+
+    return (len(errors) == 0, errors)

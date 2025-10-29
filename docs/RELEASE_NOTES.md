@@ -1,5 +1,100 @@
 # Release Notes - Aprender Sistema v2
 
+## PR #52 – Auditoria e Atribuição de CPF
+
+### Comandos de Gerenciamento
+
+**audit_agenda_users** (Read-Only)
+- Cross-check entre planilha de usuários e agenda (6007 eventos, 5 abas)
+- Identifica usuários não cadastrados, multi-setor e duplicados
+- Top 20 não cadastrados com ordenação determinística (-freq, +nome)
+- Contagem por linha (não por aba) para métricas precisas
+- Exclusão de emails de "Convidados" do ranking por nome
+- Saída: JSON/CSV em `/app/out_etl`
+
+**assign_cpf_from_excel** (DRY-RUN/APPLY)
+- Atribuição de CPFs com workflow DRY-RUN → revisão → APPLY
+- Matching por email (preferencial) ou nome normalizado
+- Validação de CPF com algoritmo mod 11 (dígitos verificadores)
+- Rejeita sequências iguais (111.111.111-11, 000.000.000-00)
+- Idempotente: re-run não altera registros já atualizados
+- Conflitos detectados: CPF duplicado, divergente, email ambíguo
+- Saída: relatório JSON em `/app/out_etl/assign_cpf_report.json`
+
+**Admin Django**
+- Filtro: CPF "Ausente" / "Preenchido" (trata `cpf=""` e `cpf__isnull=True`)
+- Ação: "Exportar usuários sem CPF (CSV)" com auditoria em `/app/out_etl`
+- Logging: `logger.warning()` em caso de falha ao salvar arquivo de auditoria
+
+### Validação de CPF (mod 11)
+
+**Algoritmo Implementado**
+- Validação de dígitos verificadores (primeiro e segundo)
+- Rejeita CPFs inválidos (ex: 123.456.789-10, 111.111.111-11)
+- Placeholders `000000000XX` bypass validação (apenas testes)
+- Função: `validate_cpf(cpf)` em `assign_cpf_from_excel.py`
+
+**Integração com `clean_cpf()`**
+- Normalização: remove máscara e valida 11 dígitos
+- Placeholder CPF → retorna válido (para testes)
+- CPF real → valida mod 11 obrigatório
+- CPF inválido → retorna `None` (skipped no relatório)
+
+### Documentação
+
+**USERS_CPF_GUIDE.md** (460 linhas)
+- Guia completo de auditoria e atribuição de CPF
+- Estrutura das planilhas e lógica de matching
+- Seção 8: CPF Placeholder (apenas para testes)
+- Workflows recomendados e resolução de conflitos
+- Cuidados com PII (dados pessoais)
+
+### Testes
+
+**test_assign_cpf_command.py** (6 testes)
+- DRY-RUN: simulação de atribuição
+- APPLY: persistência e idempotência
+- Validações: CPF inválido, email ambíguo, duplicados, divergências
+
+**test_audit_agenda_users.py** (5 testes)
+- Top 20 não cadastrados (ordenação determinística)
+- Multi-setor: usuários em múltiplas abas
+- Convidados: exclusão de emails do ranking por nome
+- Estrutura: chaves esperadas em JSON/CSV
+
+**Total**: 11/11 testes passando ✅
+
+### Smoke Tests (Planilhas Reais)
+
+**audit_agenda_users**
+- 6007 eventos processados (ACerta: 1001, Super: 1985, Brincando: 1000, Vidas: 999, Outros: 1022)
+- 115 usuários cadastrados
+- Top 5 não cadastrados: none (5992), - (943), alisson mendonca (179), janieri martins (62), solicitado (13)
+
+**assign_cpf_from_excel (DRY-RUN)**
+- 118 linhas lidas
+- Updated: 110 | Skipped: 2 | Conflicts: 6
+
+### Conformidade Técnica
+
+- ✅ **Sem migrations** (conforme requisito)
+- ✅ **Schema constraints**: `Usuario.cpf` mantém `NOT NULL + UNIQUE`
+- ✅ **Idempotência**: Re-run seguro
+- ✅ **Timezone-aware**: `America/Fortaleza`
+- ✅ **PII**: Logs contêm apenas contagens (não CPFs/nomes)
+
+### Commits (7 total)
+
+1. **182397c** - Placeholder CPF support + login label "CPF"
+2. **23c93c5** - Top 20 não cadastrados (contagem por linha, ordenação determinística)
+3. **2b2d44f** - Documentação: seção 8 sobre CPF placeholder
+4. **6d392ae** - Testes versionados (11 testes adicionados)
+5. **973ce7f** - Validação CPF mod 11
+6. **f747c72** - Admin logging (logger.warning em except)
+7. **47c369e** - Limpeza: remove arquivos indevidos + .gitignore
+
+---
+
 ## Autenticação
 
 ### Login por CPF (PR #51)

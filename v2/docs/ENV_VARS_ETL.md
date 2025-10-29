@@ -84,8 +84,24 @@ def test_command_output(tmp_path):
 
 ---
 
+## Constantes de Matching e Thresholds
+
+Os thresholds de matching de nomes e limites de relatórios estão centralizados no módulo **`apps/dat_ingest/constants.py`** (PR #54):
+
+```python
+NAME_MATCH_JACCARD_MIN = Decimal('0.60')      # Threshold mínimo Jaccard
+NAME_MATCH_SCORE_SUBSET = Decimal('0.90')     # Score subset tokens
+NAME_MATCH_SCORE_FIRST_LAST = Decimal('0.85') # Score first+last name
+TOP_UNKNOWN_USERS_LIMIT = 20                  # Top N usuários não cadastrados
+```
+
+**Veja**: `v2/backend/apps/dat_ingest/constants.py` para lista completa de constantes.
+
+---
+
 ## Histórico
 
+- **PR #54** (2025-10-29): Thresholds centralizados em `constants.py`
 - **PR #53** (2025-10-29): Adicionadas `ETL_OUTPUT_DIR` e `ETL_DATA_DIR` em `config/settings.py`
 - Comandos migrados: `audit_agenda_users`, `assign_cpf_from_excel`, admin export
 - Comandos pendentes: imports de acompanhamento/deslocamento/ações/cadastros
@@ -94,6 +110,8 @@ def test_command_output(tmp_path):
 
 ## Referências
 
+- Issue #54: Extrair magic numbers para constantes
 - Issue #53: Configurar ETL_OUTPUT_DIR e ETL_DATA_DIR via settings
+- `v2/backend/apps/dat_ingest/constants.py`: Constantes ETL
 - `v2/backend/config/settings.py`: Definições das variáveis (linhas 410-412)
 - `v2/docs/USERS_CPF_GUIDE.md`: Guia de uso dos comandos CPF

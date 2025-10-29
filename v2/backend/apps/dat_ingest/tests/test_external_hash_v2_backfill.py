@@ -54,6 +54,7 @@ class TestBackfillExternalHashV2DryRun(TestCase):
         # Create test solicitação
         tz = ZoneInfo("America/Fortaleza")
         self.sol = Solicitacao.objects.create(
+            usuario=self.coord,  # User who created the request
             coordenador=self.coord,
             municipio=self.municipio,
             tipo_evento=self.tipo,
@@ -81,12 +82,13 @@ class TestBackfillExternalHashV2DryRun(TestCase):
         # Hash must remain unchanged
         assert self.sol.external_hash == original_hash
 
-    def test_dry_run_shows_would_update_count(self, capsys):
+    def test_dry_run_shows_would_update_count(self):
         """--dry-run mostra contadores corretos."""
-        call_command("backfill_external_hash_v2")
+        from io import StringIO
+        out = StringIO()
 
-        captured = capsys.readouterr()
-        output = captured.out
+        call_command("backfill_external_hash_v2", stdout=out)
+        output = out.getvalue()
 
         # Should show stats
         assert "Would update: 1" in output or "would_update" in output.lower()
@@ -95,15 +97,16 @@ class TestBackfillExternalHashV2DryRun(TestCase):
     def test_dry_run_with_limit(self):
         """--dry-run com --limit funciona corretamente."""
         # Create 5 more solicitações
+        tz = ZoneInfo("America/Fortaleza")
         for i in range(5):
             Solicitacao.objects.create(
+                usuario=self.coord,  # User who created the request
                 coordenador=self.coord,
                 municipio=self.municipio,
                 tipo_evento=self.tipo,
                 projeto=self.projeto,
-                data=f"2025-01-{16+i}",
-                # hora via inicio
-                fim=datetime(2025, 1, 15, 12, 0, tzinfo=ZoneInfo("America/Fortaleza")),
+                inicio=datetime(2025, 1, 16+i, 8, 0, tzinfo=tz),
+                fim=datetime(2025, 1, 16+i, 12, 0, tzinfo=tz),
                 encontro=str(i+2),
                 segmento="EI",
                 status="pendente",
@@ -151,6 +154,7 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
     def test_apply_persists_new_hash(self):
         """--apply persiste o novo hash v2."""
         sol = Solicitacao.objects.create(
+            usuario=self.coord,  # User who created the request
             coordenador=self.coord,
             municipio=self.municipio,
             tipo_evento=self.tipo,
@@ -182,6 +186,7 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
         """--apply não cria duplicatas (respeita constraint)."""
         # Create two identical solicitações (should have same hash v2)
         sol1 = Solicitacao.objects.create(
+            usuario=self.coord,  # User who created the request
             coordenador=self.coord,
             municipio=self.municipio,
             tipo_evento=self.tipo,
@@ -198,6 +203,7 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
         sol1.formadores.add(self.formador)
 
         sol2 = Solicitacao.objects.create(
+            usuario=self.coord,  # User who created the request
             coordenador=self.coord,
             municipio=self.municipio,
             tipo_evento=self.tipo,
@@ -220,10 +226,16 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
         sol1.refresh_from_db()
         sol2.refresh_from_db()
 
-        # Both should have same hash v2 (collision)
-        assert sol1.external_hash == sol2.external_hash
+        # Due to unique constraint, only one gets the new hash
+        # (collision detected but constraint prevents duplicate)
+        new_hashes = [sol1.external_hash, sol2.external_hash]
+        old_hashes = ["old_hash_1", "old_hash_2"]
 
-        # But both records still exist
+        # One should be updated, one should keep old hash
+        assert len([h for h in new_hashes if h in old_hashes]) == 1  # One kept old
+        assert len([h for h in new_hashes if h not in old_hashes]) == 1  # One got new
+
+        # But both records still exist (constraint prevents, no deletion)
         assert Solicitacao.objects.count() == 2
 
     def test_apply_unchanged_when_hash_already_v2(self):
@@ -232,6 +244,7 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
 
         # Create solicitação
         sol = Solicitacao.objects.create(
+            usuario=self.coord,  # User who created the request
             coordenador=self.coord,
             municipio=self.municipio,
             tipo_evento=self.tipo,
@@ -320,6 +333,7 @@ class TestBackfillCollisionsReport(TestCase):
         """Collision file não é gerado quando não há colisões."""
         # Create single solicitação (no collision)
         sol = Solicitacao.objects.create(
+            usuario=self.coord,  # User who created the request
             coordenador=self.coord,
             municipio=self.municipio,
             tipo_evento=self.tipo,
@@ -344,6 +358,7 @@ class TestBackfillCollisionsReport(TestCase):
         """Collision file é gerado quando há colisões."""
         # Create two identical solicitações (collision)
         sol1 = Solicitacao.objects.create(
+            usuario=self.coord,  # User who created the request
             coordenador=self.coord,
             municipio=self.municipio,
             tipo_evento=self.tipo,
@@ -359,6 +374,7 @@ class TestBackfillCollisionsReport(TestCase):
         sol1.formadores.add(self.formador)
 
         sol2 = Solicitacao.objects.create(
+            usuario=self.coord,  # User who created the request
             coordenador=self.coord,
             municipio=self.municipio,
             tipo_evento=self.tipo,

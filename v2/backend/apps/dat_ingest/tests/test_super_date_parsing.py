@@ -20,7 +20,7 @@ O parser ETL (parse_acompanhamento.py) já usava o mapeamento correto (row[7] pa
 portanto este teste valida que o parsing continua funcionando corretamente.
 """
 
-from datetime import datetime
+from datetime import datetime, time
 from unittest.mock import MagicMock, patch
 
 import pytz
@@ -47,9 +47,9 @@ class TestSuperDateParsing(TestCase):
             "FORTALEZA - CE",  # E: Municípios
             "1º encontro",  # F: encontro
             "Presencial",  # G: tipo
-            datetime(2025, 3, 10),  # H: data ← COLUNA CORRETA
-            datetime(1900, 1, 1, 8, 0),  # I: hora início (datetime com data dummy)
-            datetime(1900, 1, 1, 12, 0),  # J: hora fim
+            datetime(2025, 3, 10).date(),  # H: data ← COLUNA CORRETA (date object)
+            time(8, 0),  # I: hora início (time object)
+            time(12, 0),  # J: hora fim (time object)
             "Gestão Escolar",  # K: projeto
             "EI",  # L: segmento
             False,  # M: Coord Acompanha
@@ -64,7 +64,15 @@ class TestSuperDateParsing(TestCase):
 
         # Criar mock worksheet
         mock_ws = MagicMock()
-        mock_ws.iter_rows.return_value = iter([self.mock_row])
+        # iter_rows() deve retornar iterador com a linha de dados
+        # quando chamado com min_row=2, values_only=True
+        def mock_iter_rows(min_row=1, values_only=False):
+            if min_row == 2 and values_only:
+                # Retorna apenas a linha de dados (linha 2)
+                return iter([self.mock_row])
+            return iter([])
+
+        mock_ws.iter_rows = mock_iter_rows
 
         # Criar mock workbook
         self.mock_wb = MagicMock()
@@ -88,15 +96,16 @@ class TestSuperDateParsing(TestCase):
             sol = result[0]
 
             # Validar que a data foi parseada corretamente (de row[7])
-            self.assertIsNotNone(sol["data_inicio"])
-            self.assertIsNotNone(sol["data_fim"])
+            # Parser retorna 'inicio' e 'fim', não 'data_inicio' e 'data_fim'
+            self.assertIsNotNone(sol["inicio"])
+            self.assertIsNotNone(sol["fim"])
 
             # Data deve ser 2025-03-10 (do mock)
             tz = pytz.timezone("America/Fortaleza")
             expected_date = datetime(2025, 3, 10, 8, 0)
             expected_inicio = tz.localize(expected_date)
 
-            self.assertEqual(sol["data_inicio"], expected_inicio)
+            self.assertEqual(sol["inicio"], expected_inicio)
 
     def test_super_tipo_column_is_not_data(self):
         """
@@ -114,10 +123,10 @@ class TestSuperDateParsing(TestCase):
             sol = result[0]
 
             # Tipo modalidade deve estar em campo separado, não como data
-            # O parser não expõe tipo_modal diretamente, mas validamos que
-            # a data parseada é datetime válido, não string "Presencial"
-            self.assertIsInstance(sol["data_inicio"], datetime)
-            self.assertIsInstance(sol["data_fim"], datetime)
+            # O parser expõe tipo_modal e inicio/fim como datetime válidos
+            # Validamos que a data parseada é datetime válido, não string "Presencial"
+            self.assertIsInstance(sol["inicio"], datetime)
+            self.assertIsInstance(sol["fim"], datetime)
 
     def test_combine_datetime_with_valid_date_and_time(self):
         """Valida função auxiliar combine_datetime"""

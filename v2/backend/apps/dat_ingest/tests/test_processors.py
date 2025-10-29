@@ -4,6 +4,7 @@ Valida processadores de planilhas (AgendaProcessor, DisponibilidadeProcessor, Co
 """
 
 import tempfile
+from datetime import date, time
 from pathlib import Path
 
 import pandas as pd
@@ -27,23 +28,72 @@ def temp_agenda_xlsx(tmp_path):
     ws = wb.active
     ws.title = "Super"
 
-    # Header
+    # Header (colunas A-T conforme parse_acompanhamento.py)
     ws.append([
-        "Data", "Horário Inicial", "Horário Final", "Projeto",
-        "Tipo de Evento", "Município", "Coordenador", "Formador(es)",
-        "Situação", "Observações"
+        "Criado na Agenda",  # A
+        "", "",  # B, C
+        "Cancelar",  # D
+        "Município",  # E
+        "Encontro",  # F
+        "Tipo",  # G
+        "Data",  # H
+        "Hora Início",  # I
+        "Hora Fim",  # J
+        "Projeto",  # K
+        "Segmento",  # L
+        "Coord Acompanha",  # M
+        "Coordenador",  # N
+        "Formador 1",  # O
+        "Formador 2",  # P
+        "Formador 3",  # Q
+        "Formador 4",  # R
+        "Formador 5",  # S
+        "Convidados"  # T
     ])
 
-    # Data rows
+    # Data rows (estrutura real da planilha)
+    # Nota: OpenPyXL com data_only=True retorna date/time objects, não strings
     ws.append([
-        "2025-01-15", "14:00", "17:00", "ACerta",
-        "Formação Presencial", "Fortaleza - CE", "Ellen Damares",
-        "João Silva, Maria Santos", "Realizado", "Primeira formação"
+        "Sim",  # A - Criado na Agenda
+        "", "",  # B, C
+        "",  # D - Cancelar (vazio = não cancelado)
+        "Fortaleza - CE",  # E - Município
+        "Formação Inicial",  # F - Encontro
+        "Presencial",  # G - Tipo
+        date(2025, 1, 15),  # H - Data (date object)
+        time(14, 0),  # I - Hora Início (time object)
+        time(17, 0),  # J - Hora Fim (time object)
+        "ACerta",  # K - Projeto
+        "EI",  # L - Segmento
+        True,  # M - Coord Acompanha
+        "Ellen Damares",  # N - Coordenador
+        "João Silva",  # O - Formador 1
+        "Maria Santos",  # P - Formador 2
+        "",  # Q - Formador 3
+        "",  # R - Formador 4
+        "",  # S - Formador 5
+        ""  # T - Convidados
     ])
     ws.append([
-        "2025-01-20", "09:00", "12:00", "Novo Lendo",
-        "Workshop", "Caucaia - CE", "Aurea Lucia",
-        "Pedro Oliveira", "Agendado", ""
+        "Sim",  # A
+        "", "",  # B, C
+        "",  # D
+        "Caucaia - CE",  # E
+        "Workshop",  # F
+        "Presencial",  # G
+        date(2025, 1, 20),  # H - Data (date object)
+        time(9, 0),  # I - Hora Início (time object)
+        time(12, 0),  # J - Hora Fim (time object)
+        "Novo Lendo",  # K - Projeto
+        "EF",  # L - Segmento
+        False,  # M
+        "Aurea Lucia",  # N
+        "Pedro Oliveira",  # O
+        "",  # P
+        "",  # Q
+        "",  # R
+        "",  # S
+        ""  # T
     ])
 
     wb.save(filepath)
@@ -98,14 +148,14 @@ def temp_disponibilidade_xlsx(tmp_path):
         "Data Fim", "Hora Fim", "Motivo", "Observações"
     ])
 
-    # Data rows
+    # Data rows (date/time objects como OpenPyXL retorna)
     ws.append([
-        "João Silva", "T", "2025-01-10", "08:00",
-        "2025-01-10", "18:00", "Férias", "Bloqueio total"
+        "João Silva", "T", date(2025, 1, 10), time(8, 0),
+        date(2025, 1, 10), time(18, 0), "Férias", "Bloqueio total"
     ])
     ws.append([
-        "Maria Santos", "P", "2025-01-15", "14:00",
-        "2025-01-15", "17:00", "Reunião", "Bloqueio parcial"
+        "Maria Santos", "P", date(2025, 1, 15), time(14, 0),
+        date(2025, 1, 15), time(17, 0), "Reunião", "Bloqueio parcial"
     ])
 
     wb.save(filepath)
@@ -114,28 +164,32 @@ def temp_disponibilidade_xlsx(tmp_path):
 
 @pytest.fixture
 def temp_controle_xlsx(tmp_path):
-    """Cria arquivo temporário de controle (planilha de compras)"""
+    """Cria arquivo temporário de controle (planilha de deslocamentos)"""
     filepath = tmp_path / "controle.xlsx"
     wb = Workbook()
 
-    # Aba COMPRAS
+    # Aba DESLOCAMENTO (parse_deslocamentos procura por esta aba)
     ws = wb.active
-    ws.title = "COMPRAS"
+    ws.title = "DESLOCAMENTO"
 
-    # Header
+    # Header (conforme parse_deslocamentos.py:19-29)
     ws.append([
-        "Código", "Produto", "Quantidade", "Município",
-        "Projeto", "Data", "Uso"
+        "Formador", "Origem", "Destino", "Data Saída", "Hora Saída",
+        "Data Chegada", "Hora Chegada", "Duração (min)", "Meio de Transporte", "Observações"
     ])
 
-    # Data rows
+    # Data rows (date/time objects como OpenPyXL retorna)
     ws.append([
-        "COMP001", "Livros didáticos", 100, "Fortaleza - CE",
-        "ACerta", "2025-01-15", "Formação inicial"
+        "João Silva", "Fortaleza - CE", "Caucaia - CE",
+        date(2025, 1, 15), time(8, 0),
+        date(2025, 1, 15), time(10, 0),
+        120, "Carro", "Deslocamento para formação"
     ])
     ws.append([
-        "COMP002", "Cadernos", 200, "Caucaia - CE",
-        "Novo Lendo", "2025-01-20", "Workshop"
+        "Maria Santos", "Caucaia - CE", "Maracanaú - CE",
+        date(2025, 1, 20), time(14, 0),
+        date(2025, 1, 20), time(15, 30),
+        90, "Ônibus", "Retorno de workshop"
     ])
 
     wb.save(filepath)
@@ -289,7 +343,7 @@ class TestControleProcessor:
     """Testes para ControleProcessor"""
 
     def test_processes_compras_sheet(self, temp_controle_xlsx):
-        """Test: ControleProcessor processa aba COMPRAS"""
+        """Test: ControleProcessor processa aba DESLOCAMENTO"""
         processor = ControleProcessor(temp_controle_xlsx)
         result = processor.process()
 
@@ -297,42 +351,46 @@ class TestControleProcessor:
         assert "compras" in result
 
         compras_df = result["compras"]
-        assert len(compras_df) == 2, "Deve ter 2 compras"
+        assert len(compras_df) == 2, "Deve ter 2 deslocamentos"
 
     def test_parses_compra_fields(self, temp_controle_xlsx):
-        """Test: Faz parse de todos os campos de compra"""
+        """Test: Faz parse de todos os campos de deslocamento"""
         processor = ControleProcessor(temp_controle_xlsx)
         result = processor.process()
 
         compras_df = result["compras"]
         first_compra = compras_df.iloc[0]
 
-        assert first_compra["codigo"] == "COMP001"
-        assert first_compra["produto"] == "Livros didáticos"
-        assert first_compra["quantidade"] == 100
-        assert first_compra["projeto_nome"] == "ACerta"
+        # Campos de deslocamento
+        assert first_compra["formador_nome"] == "João Silva"
+        assert first_compra["origem_nome_uf"] == "Fortaleza - CE"
+        assert first_compra["destino_nome_uf"] == "Caucaia - CE"
+        assert first_compra["duracao_minutos"] == 120
 
     def test_parses_municipio_with_uf_in_compras(self, temp_controle_xlsx):
-        """Test: Separa município e UF em compras"""
+        """Test: Mantém município com UF em deslocamentos"""
         processor = ControleProcessor(temp_controle_xlsx)
         result = processor.process()
 
         compras_df = result["compras"]
         first_compra = compras_df.iloc[0]
 
-        # Verifica separação (implementação pode variar)
-        assert first_compra["municipio_nome"] == "Fortaleza"
-        # Verificar se tem campo municipio_uf
+        # Verificar que origem/destino mantêm formato "Cidade - UF"
+        assert " - " in first_compra["origem_nome_uf"]
+        assert " - " in first_compra["destino_nome_uf"]
 
     def test_handles_empty_sheets_gracefully(self, tmp_path):
         """Test: Lida com planilhas vazias sem erro"""
         filepath = tmp_path / "empty_controle.xlsx"
         wb = Workbook()
         ws = wb.active
-        ws.title = "COMPRAS"
+        ws.title = "DESLOCAMENTO"
 
         # Apenas header, sem dados
-        ws.append(["Código", "Produto", "Quantidade", "Município", "Projeto", "Data", "Uso"])
+        ws.append([
+            "Formador", "Origem", "Destino", "Data Saída", "Hora Saída",
+            "Data Chegada", "Hora Chegada", "Duração (min)", "Meio de Transporte", "Observações"
+        ])
 
         wb.save(filepath)
 

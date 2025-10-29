@@ -519,7 +519,16 @@ class Command(BaseCommand):
                 display_name = p.get("display_name", "").strip()
 
                 # FILTRO PR20: Skip indicadores (não-pessoas)
-                if not should_create_participation(display_name):
+                # Skip se ambos (email E display_name) vazios OU se display_name é indicador
+                if not email and not display_name:
+                    self.stdout.write(f"      🚫 Participante vazio ({role}): sem email/nome")
+                    self.stats["skipped"]["indicators"] = (
+                        self.stats["skipped"].get("indicators", 0) + 1
+                    )
+                    continue
+
+                # Se display_name existe, verificar se é indicador
+                if display_name and not should_create_participation(display_name):
                     self.stdout.write(
                         f"      🚫 Indicador filtrado ({role}): {display_name}"
                     )

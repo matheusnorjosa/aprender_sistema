@@ -64,6 +64,8 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+pytest_full_output.txt
+pytest-report.log
 
 # Translations
 *.mo
@@ -239,6 +241,7 @@ acesso_planilhas.json
 # Temporary files
 *.tmp
 *.temp
+-
 
 # Cache directories
 .cache/

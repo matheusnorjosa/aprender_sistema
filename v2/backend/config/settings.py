@@ -407,7 +407,12 @@ AVAILABILITY_DAILY_LIMIT_HOURS = int(os.getenv("AVAILABILITY_DAILY_LIMIT_HOURS",
 # RD-04: Buffer de deslocamento entre municípios distintos (minutos)
 TRAVEL_BUFFER_MINUTES = int(os.getenv("TRAVEL_BUFFER_MINUTES", "120"))
 
-# ETL: Diretório padrão para importação de arquivos
+# ETL: Diretórios configuráveis para importação/exportação
+ETL_OUTPUT_DIR = os.getenv("ETL_OUTPUT_DIR", str(BASE_DIR / "out_etl"))
+ETL_DATA_DIR = os.getenv("ETL_DATA_DIR", str(BASE_DIR / "data" / "csv-import"))
+
+# ETL: Diretório padrão para importação de arquivos (legacy, deprecado)
+# TODO: Migrar para ETL_DATA_DIR após PR #53
 DATA_IMPORT_DIR = os.getenv("DATA_IMPORT_DIR", "/app/data/csv-import")
 
 # ================================================================

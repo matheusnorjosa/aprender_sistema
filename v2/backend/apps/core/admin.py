@@ -2,6 +2,7 @@ import csv
 import logging
 from pathlib import Path
 from django.contrib import admin
+from django.conf import settings
 from django.http import HttpResponse
 
 from .models import (
@@ -71,7 +72,7 @@ class UsuarioAdmin(admin.ModelAdmin):
 
         # Também salvar em out_etl para auditoria
         try:
-            out_dir = Path("/app/out_etl")
+            out_dir = Path(settings.ETL_OUTPUT_DIR)
             out_dir.mkdir(parents=True, exist_ok=True)
             csv_path = out_dir / "usuarios_sem_cpf.csv"
 
@@ -91,7 +92,7 @@ class UsuarioAdmin(admin.ModelAdmin):
         except Exception as e:
             # Se falhar ao salvar em out_etl, apenas retornar o CSV via HTTP
             logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to save audit file to /app/out_etl: {e}")
+            logger.warning(f"Failed to save audit file to {settings.ETL_OUTPUT_DIR}: {e}")
 
         return response
 

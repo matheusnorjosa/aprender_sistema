@@ -124,9 +124,8 @@ jobs:
           REQUIRE_DOCKER: "0"
         run: |
           cd v2/backend
-          # TEMP: Quarentena dat_ingest até concluir #39 (ImportErrors)
-          # Ver também #35, #36, #37, #38
-          pytest -q --tb=short -k "not dat_ingest"
+          # Quarentena removida - #39 resolvido via PR #44
+          pytest -q --tb=short
 
       - name: Upload coverage reports
         if: always()

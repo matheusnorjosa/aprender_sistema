@@ -26,6 +26,8 @@ from django.conf import settings
 from openpyxl import load_workbook
 from rapidfuzz import fuzz
 
+from apps.dat_ingest import constants
+
 
 def normalize_text(text):
     """Normaliza texto: NFKD, lowercase, strip."""
@@ -52,7 +54,7 @@ def jaccard_similarity(set1, set2):
     return len(intersection) / len(union) if union else 0.0
 
 
-def match_by_name(agenda_name, cadastrados_map, threshold=0.6):
+def match_by_name(agenda_name, cadastrados_map, threshold=None):
     """
     Tenta encontrar match de agenda_name nos cadastrados.
 
@@ -64,6 +66,8 @@ def match_by_name(agenda_name, cadastrados_map, threshold=0.6):
 
     Retorna: (best_match_key, confidence) ou (None, 0.0)
     """
+    if threshold is None:
+        threshold = float(constants.NAME_MATCH_JACCARD_MIN)
     agenda_norm = normalize_text(agenda_name)
     agenda_tokens = extract_tokens(agenda_name)
 
@@ -80,7 +84,7 @@ def match_by_name(agenda_name, cadastrados_map, threshold=0.6):
         # 2. Subset tokens (qualquer direção)
         if agenda_tokens and cad_tokens:
             if agenda_tokens.issubset(cad_tokens) or cad_tokens.issubset(agenda_tokens):
-                score = 0.9
+                score = float(constants.NAME_MATCH_SCORE_SUBSET)
                 if score > best_score:
                     best_match = cad_key
                     best_score = score
@@ -91,7 +95,7 @@ def match_by_name(agenda_name, cadastrados_map, threshold=0.6):
         cad_parts = cad_key.split()
         if len(agenda_parts) >= 2 and len(cad_parts) >= 2:
             if agenda_parts[0] == cad_parts[0] and agenda_parts[-1] == cad_parts[-1]:
-                score = 0.85
+                score = float(constants.NAME_MATCH_SCORE_FIRST_LAST)
                 if score > best_score:
                     best_match = cad_key
                     best_score = score
@@ -364,7 +368,7 @@ class Command(BaseCommand):
         top_nao_cadastrados = sorted(
             nao_cadastrados_freq_names_only.items(),
             key=lambda x: (-x[1], x[0])  # Ordenação: -freq, +nome (determinístico)
-        )[:20]
+        )[:constants.TOP_UNKNOWN_USERS_LIMIT]
 
         stats["nomes_na_agenda_nao_cadastrados"] = {
             "top_20": [{"nome": nome, "freq": freq} for nome, freq in top_nao_cadastrados],

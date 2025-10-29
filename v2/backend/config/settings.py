@@ -92,6 +92,15 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = "core.Usuario"
 
 # ================================================================
+# AUTHENTICATION BACKENDS
+# ================================================================
+# Custom backend: permite login por CPF ou username
+AUTHENTICATION_BACKENDS = [
+    "apps.core.auth_backends.CPFOrUsernameBackend",  # Custom: CPF or username
+    "django.contrib.auth.backends.ModelBackend",     # Fallback: default Django
+]
+
+# ================================================================
 # MIDDLEWARE
 # ================================================================
 MIDDLEWARE = [

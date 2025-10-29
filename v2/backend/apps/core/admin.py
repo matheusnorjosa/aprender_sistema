@@ -1,4 +1,7 @@
+import csv
+from pathlib import Path
 from django.contrib import admin
+from django.http import HttpResponse
 
 from .models import (
     AcaoControle,
@@ -15,11 +18,80 @@ from .models import (
 )
 
 
+class CPFFilter(admin.SimpleListFilter):
+    """Filtro para CPF ausente/preenchido."""
+    title = "CPF"
+    parameter_name = "cpf_status"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("missing", "Ausente"),
+            ("filled", "Preenchido"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "missing":
+            return queryset.filter(cpf__isnull=True) | queryset.filter(cpf="")
+        if self.value() == "filled":
+            return queryset.exclude(cpf__isnull=True).exclude(cpf="")
+        return queryset
+
+
 @admin.register(Usuario)
 class UsuarioAdmin(admin.ModelAdmin):
     list_display = ("username", "email", "cpf", "cargo", "is_active")
     search_fields = ("username", "email", "cpf", "first_name", "last_name")
-    list_filter = ("is_active", "is_staff", "cargo")
+    list_filter = ("is_active", "is_staff", "cargo", CPFFilter)
+    actions = ["export_usuarios_sem_cpf"]
+
+    @admin.action(description="Exportar usuários sem CPF (CSV)")
+    def export_usuarios_sem_cpf(self, request, queryset):
+        """Exporta usuários sem CPF para CSV."""
+        # Filtrar apenas usuários sem CPF no queryset selecionado
+        usuarios_sem_cpf = queryset.filter(cpf__isnull=True) | queryset.filter(cpf="")
+
+        # Gerar CSV em memória
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="usuarios_sem_cpf.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(["Username", "Email", "Nome Completo", "CPF", "Cargo", "Ativo"])
+
+        for user in usuarios_sem_cpf:
+            nome_completo = f"{user.first_name} {user.last_name}".strip()
+            writer.writerow([
+                user.username,
+                user.email,
+                nome_completo,
+                user.cpf or "",
+                user.cargo or "",
+                "Sim" if user.is_active else "Não",
+            ])
+
+        # Também salvar em out_etl para auditoria
+        try:
+            out_dir = Path("/app/out_etl")
+            out_dir.mkdir(parents=True, exist_ok=True)
+            csv_path = out_dir / "usuarios_sem_cpf.csv"
+
+            with open(csv_path, "w", newline="", encoding="utf-8") as f:
+                writer_file = csv.writer(f)
+                writer_file.writerow(["Username", "Email", "Nome Completo", "CPF", "Cargo", "Ativo"])
+                for user in usuarios_sem_cpf:
+                    nome_completo = f"{user.first_name} {user.last_name}".strip()
+                    writer_file.writerow([
+                        user.username,
+                        user.email,
+                        nome_completo,
+                        user.cpf or "",
+                        user.cargo or "",
+                        "Sim" if user.is_active else "Não",
+                    ])
+        except Exception as e:
+            # Se falhar ao salvar em out_etl, apenas retornar o CSV via HTTP
+            pass
+
+        return response
 
 
 @admin.register(Municipio)

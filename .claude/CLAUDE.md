@@ -8,6 +8,60 @@
 
 ---
 
+## 📊 Estrutura das Planilhas Source (v2/backend/data/csv-import/)
+
+### Acompanhamento de Agenda _ 2025.xlsx
+**Abas de Eventos**:
+- ACerta, Outros, Super, Brincando, Vidas
+
+**Abas de Suporte**:
+- DESLOCAMENTO
+- DISPONIBILIDADE
+- Bloqueios
+- Pré-Agenda
+- Google Agenda
+- Relatórios
+- Novo Google Agenda
+- Configurações
+
+### Disponibilidade _ 2025.xlsx
+**Abas Principais**:
+- MENSAL
+- ANUAL
+- DESLOCAMENTO
+- Bloqueios
+- Eventos
+- Configurações
+
+### Planilha de Controle - 2025.xlsx
+**Abas Operacionais**:
+- 🟥 AÇÕES
+- 🟥 COMPRAS (estrutura: CÓD, Produto, Quant., Município, UF, Data, Uso das coleções)
+- 🟥 COORD
+
+**Abas de Dados**:
+- ℹ️ FORMAÇÕES
+- ℹ️ DAT
+- ☑️ CADASTROS
+- ℹ️ FILTRO_PROD.
+
+**Abas Antigas/Legadas**:
+- ℹ️ FORMAÇÕES - ANTIGA
+- ℹ️ Antiga - DAT
+- 🖥️FORMAÇÕES
+- ☑️ CADASTROS (Antiga)
+
+**Configurações**:
+- ⚙️ CONFIG
+
+### Usuários.xlsx
+**Abas**:
+- Ativos
+- Inativos
+- Pendentes
+
+---
+
 ## ⚖️ CLÁUSULAS PÉTREAS — IMUTÁVEIS
 
 ### 🐳 CP-01: REQUIRE_DOCKER=1 (v2 ONLY)

@@ -66,9 +66,48 @@ def is_placeholder_cpf(cpf):
     return cpf.startswith('000000000')
 
 
+def validate_cpf(cpf):
+    """
+    Valida CPF usando algoritmo mod 11 (dígitos verificadores).
+
+    Rejeita:
+    - Sequências de dígitos iguais (ex: 111.111.111-11)
+    - CPFs com dígitos verificadores inválidos
+
+    Args:
+        cpf (str): CPF com 11 dígitos (sem máscara)
+
+    Retorna: bool (True se válido, False se inválido)
+    """
+    if not cpf or len(cpf) != 11 or not cpf.isdigit():
+        return False
+
+    # Rejeitar sequências de dígitos iguais (ex: 11111111111, 00000000000)
+    if cpf == cpf[0] * 11:
+        return False
+
+    # Calcular primeiro dígito verificador
+    soma = sum(int(cpf[i]) * (10 - i) for i in range(9))
+    resto = soma % 11
+    digito1 = 0 if resto < 2 else 11 - resto
+
+    if int(cpf[9]) != digito1:
+        return False
+
+    # Calcular segundo dígito verificador
+    soma = sum(int(cpf[i]) * (11 - i) for i in range(10))
+    resto = soma % 11
+    digito2 = 0 if resto < 2 else 11 - resto
+
+    if int(cpf[10]) != digito2:
+        return False
+
+    return True
+
+
 def clean_cpf(cpf_raw):
     """
-    Remove máscara de CPF e valida que tem 11 dígitos.
+    Remove máscara de CPF, valida que tem 11 dígitos e verifica dígitos verificadores.
 
     Retorna: str (11 dígitos) ou None (inválido)
     """
@@ -79,10 +118,18 @@ def clean_cpf(cpf_raw):
     cpf_clean = re.sub(r'\D', '', str(cpf_raw))
 
     # Valida 11 dígitos
-    if len(cpf_clean) == 11 and cpf_clean.isdigit():
+    if len(cpf_clean) != 11 or not cpf_clean.isdigit():
+        return None
+
+    # Se for placeholder, retornar como válido (para testes)
+    if is_placeholder_cpf(cpf_clean):
         return cpf_clean
 
-    return None
+    # Validar dígitos verificadores (mod 11)
+    if not validate_cpf(cpf_clean):
+        return None
+
+    return cpf_clean
 
 
 class Command(BaseCommand):

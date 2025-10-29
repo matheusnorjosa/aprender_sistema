@@ -93,6 +93,110 @@
 
 ---
 
+## Auditoria e Atribuição de CPF
+
+### Comandos de Management (DRY-RUN/APPLY)
+
+**1. audit_agenda_users** (Read-Only)
+- Cross-check entre planilha de usuários e planilhas de agenda
+- Identifica usuários não cadastrados que aparecem na agenda
+- Detecta multi-setor (usuários em múltiplas abas)
+- Gera relatórios JSON/CSV em `/app/out_etl`
+- Matching por nome (heurísticas) e email
+- Exclui "Convidados" no matching por nome
+- Inclui emails "Convidados" no matching por email
+
+**Uso**:
+```bash
+python manage.py audit_agenda_users \
+  --users "/app/data/csv-import/Cópia de Usuários.xlsx" \
+  --agenda "/app/data/csv-import/Cópia de Acompanhamento de Agenda _ 2025.xlsx"
+```
+
+**Saída**:
+- `audit_users_crosscheck_report.json`
+- `audit_users_crosscheck_enhanced.json`
+- `audit_users_encontrados_por_aba.csv`
+
+**2. assign_cpf_from_excel** (DRY-RUN → APPLY)
+- Atribui CPFs aos usuários do sistema baseado em planilha Excel
+- DRY-RUN (default): simula sem persistir
+- APPLY (`--apply`): persiste no banco via `transaction.atomic()`
+- Matching preferencial por email, fallback por nome
+- Validação de CPF (11 dígitos, remove máscara)
+- Detecta conflitos: duplicados, ambiguidades, divergências
+- Idempotente: re-run não altera registros já atualizados
+
+**Uso**:
+```bash
+# DRY-RUN (não persiste)
+python manage.py assign_cpf_from_excel \
+  --path "/app/data/csv-import/Cópia de Usuários.xlsx"
+
+# APPLY (persiste)
+python manage.py assign_cpf_from_excel \
+  --path "/app/data/csv-import/Cópia de Usuários.xlsx" \
+  --apply
+```
+
+**Saída**:
+- `assign_cpf_report.json` (mode, updated, skipped, conflicts, totals)
+
+### Admin Django — Filtro e Ação
+
+**Filtro "CPF"**:
+- **Ausente**: `cpf IS NULL` ou `cpf = ""`
+- **Preenchido**: `cpf != NULL` e `cpf != ""`
+
+**Ação "Exportar usuários sem CPF"**:
+- Gera CSV via HTTP download
+- Colunas: Username, Email, Nome Completo, CPF, Cargo, Ativo
+- Também salva em `/app/out_etl/usuarios_sem_cpf.csv` para auditoria
+
+### Segurança e PII
+
+- ✅ Logs contêm apenas contagens (não mostram CPFs/nomes)
+- ✅ Relatórios JSON/CSV mantidos em `/app/out_etl` (ignorados no Git)
+- ✅ DRY-RUN obrigatório antes de APPLY
+- ⚠️ Revisar `conflicts` antes de persistir
+- ⚠️ Não compartilhar relatórios publicamente
+
+### Testes
+
+**test_assign_cpf_command.py** (7 testes):
+- DRY-RUN: email match 1:1 → updated (não persiste)
+- APPLY: persiste e re-run é idempotente
+- CPF inválido/mascarado → skipped
+- Email ambíguo → conflicts
+- CPF duplicado na planilha → conflicts
+- CPF divergente (banco != planilha) → conflicts
+
+**test_audit_agenda_users.py** (5 testes):
+- Gera JSON/CSV com chaves esperadas
+- Exclui "Convidados" no matching por nome
+- Inclui emails "Convidados" no matching por email
+- Detecta multi-setor (usuários em múltiplas abas)
+- Relatório top 20 não cadastrados por frequência
+
+### Documentação
+
+- **Guia completo**: `v2/docs/USERS_CPF_GUIDE.md`
+  - Workflow recomendado (DRY-RUN → APPLY)
+  - Estrutura das planilhas
+  - Lógica de matching
+  - Resolução de conflitos
+  - Perguntas frequentes
+
+### Arquivos Principais
+
+- `v2/backend/apps/dat_ingest/management/commands/audit_agenda_users.py`
+- `v2/backend/apps/dat_ingest/management/commands/assign_cpf_from_excel.py`
+- `v2/backend/apps/core/admin.py` (classe `CPFFilter`, ação `export_usuarios_sem_cpf`)
+- `v2/backend/apps/core/tests/test_assign_cpf_command.py`
+- `v2/backend/apps/dat_ingest/tests/test_audit_agenda_users.py`
+
+---
+
 ## Commit History
 
 - **PR #47**: `5957b71` - fix(dat_ingest/tests): batch 2 — loaders/commands; 73→40 issues (-45%)

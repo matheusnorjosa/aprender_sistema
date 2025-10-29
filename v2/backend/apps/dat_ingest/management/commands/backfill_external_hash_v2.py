@@ -97,9 +97,17 @@ class Command(BaseCommand):
                     stats["would_update"] += 1
 
                     if apply:
-                        with transaction.atomic():
-                            sol.external_hash = new_hash
-                            sol.save(update_fields=["external_hash"])
+                        try:
+                            with transaction.atomic():
+                                sol.external_hash = new_hash
+                                sol.save(update_fields=["external_hash"])
+                        except Exception as save_err:
+                            # Unique constraint violation: skip silently (collision expected)
+                            # Mas registrar para relatório de colisões
+                            if "unique constraint" in str(save_err).lower() or "duplicate key" in str(save_err).lower():
+                                pass  # Hash já registrado no hash_map para relatório
+                            else:
+                                raise  # Re-raise se for outro tipo de erro
                 else:
                     stats["unchanged"] += 1
 
@@ -187,12 +195,12 @@ class Command(BaseCommand):
         fluxo = getattr(sol.projeto, "fluxo", "NAO_SUPER") or "NAO_SUPER"
         aprovacao = "SIM" if (fluxo == "SUPER" and sol.status == "aprovado") else ""
 
-        # Coordenador (usuario da solicitação)
-        coord_email = (sol.usuario.email or "").strip().lower() if sol.usuario_id else ""
+        # Coordenador (coordenador da solicitação)
+        coord_email = (sol.coordenador.email or "").strip().lower() if sol.coordenador_id else ""
         coord_name = ""
-        if sol.usuario_id:
-            fn = (sol.usuario.first_name or "").strip()
-            ln = (sol.usuario.last_name or "").strip()
+        if sol.coordenador_id:
+            fn = (sol.coordenador.first_name or "").strip()
+            ln = (sol.coordenador.last_name or "").strip()
             coord_name = f"{fn} {ln}".strip()
         coordenador = coord_email or coord_name
 
@@ -202,37 +210,57 @@ class Command(BaseCommand):
         # Tipo evento
         tipo = (sol.tipo_evento.nome or "").strip() if sol.tipo_evento_id else ""
 
-        # Participations
-        parts = Participation.objects.filter(solicitacao=sol).select_related("usuario")
-        coord_acomp = []
+        # Formadores: primeiro tenta M2M field, depois Participation
         formadores = []
-        convidados = []
+        if hasattr(sol, 'formadores'):
+            # Usar M2M field (modelo antigo)
+            formadores_qs = sol.formadores.all()
+            for f in formadores_qs:
+                ident = (f.email or "").strip().lower()
+                if not ident:
+                    fn = (f.first_name or "").strip()
+                    ln = (f.last_name or "").strip()
+                    ident = f"{fn} {ln}".strip()
+                if ident:
+                    formadores.append(ident)
 
-        for p in parts:
-            uemail = (getattr(p.usuario, "email", "") or "").strip().lower()
-            uname = ""
-            if p.usuario_id:
-                fn = (p.usuario.first_name or "").strip()
-                ln = (p.usuario.last_name or "").strip()
-                uname = f"{fn} {ln}".strip()
-            ident = uemail or uname
-            if not ident:
-                continue
+        # Se não encontrou formadores no M2M, tentar Participation
+        if not formadores:
+            parts = Participation.objects.filter(
+                solicitacao=sol, role="FORMADOR"
+            ).select_related("usuario")
+            for p in parts:
+                uemail = (getattr(p.usuario, "email", "") or "").strip().lower()
+                uname = ""
+                if p.usuario_id:
+                    fn = (p.usuario.first_name or "").strip()
+                    ln = (p.usuario.last_name or "").strip()
+                    uname = f"{fn} {ln}".strip()
+                ident = uemail or uname
+                if ident:
+                    formadores.append(ident)
 
-            if p.role == "COORD_ACOMPANHA":
-                coord_acomp.append(ident)
-            elif p.role == "FORMADOR":
-                formadores.append(ident)
-            elif p.role == "CONVIDADO":
-                convidados.append(ident)
-
-        # Ordenação determinística
-        coord_acomp = sorted(set(coord_acomp))
+        # Ordenação determinística e padding até 5
         formadores = sorted(set(formadores))[:5]
         while len(formadores) < 5:
             formadores.append("")
 
-        convidados_s = ";".join(sorted(set([c for c in convidados if c])))
+        # Coord acompanha: campo boolean ou Participation
+        coord_acomp_str = ""
+        if sol.coordenador_acompanha:
+            coord_acomp_str = "sim"
+        else:
+            # Verificar Participation
+            parts_coord = Participation.objects.filter(
+                solicitacao=sol, role="COORD_ACOMPANHA"
+            ).select_related("usuario")
+            coord_acomp_list = []
+            for p in parts_coord:
+                uemail = (getattr(p.usuario, "email", "") or "").strip().lower()
+                if uemail:
+                    coord_acomp_list.append(uemail)
+            if coord_acomp_list:
+                coord_acomp_str = ";".join(sorted(set(coord_acomp_list)))
 
         # Campos ausentes no modelo: usar vazio
         encontro = sol.encontro or ""
@@ -251,7 +279,7 @@ class Command(BaseCommand):
             "hora_fim": hora_fim,
             "projeto": projeto_normalizado,
             "segmento": segmento,
-            "coord_acompanha": ";".join(coord_acomp),
+            "coord_acompanha": coord_acomp_str,
             "coordenador": coordenador,
             "formador1": formadores[0],
             "formador2": formadores[1],
@@ -314,8 +342,8 @@ class Command(BaseCommand):
                         "id": sol.id,
                         "municipio": sol.municipio.nome if sol.municipio else None,
                         "tipo_evento": sol.tipo_evento.nome if sol.tipo_evento else None,
-                        "data": sol.data.strftime("%Y-%m-%d") if sol.data else None,
-                        "hora_inicio": sol.hora_inicio.strftime("%H:%M") if sol.hora_inicio else None,
+                        "inicio": sol.inicio.isoformat() if sol.inicio else None,
+                        "fim": sol.fim.isoformat() if sol.fim else None,
                         "projeto": sol.projeto.nome if sol.projeto else None,
                         "coordenador": sol.coordenador.email if sol.coordenador else None,
                     }

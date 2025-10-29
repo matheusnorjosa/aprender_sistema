@@ -119,6 +119,7 @@ def test_two_runs_no_duplicates(csv_files, setup_dependencies):
         events_csv=eventos_csv,
         participants_csv=participantes_csv,
         today="2025-01-01",
+        apply=True,  # Persist data to DB
     )
 
     assert Solicitacao.objects.count() == 1
@@ -130,6 +131,7 @@ def test_two_runs_no_duplicates(csv_files, setup_dependencies):
         events_csv=eventos_csv,
         participants_csv=participantes_csv,
         today="2025-01-01",
+        apply=True,  # Persist data to DB
     )
 
     # Não duplica

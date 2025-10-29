@@ -88,6 +88,7 @@ def test_super_multi_municipio(tmp_path, setup_dependencies):
         events_csv=str(eventos_csv),
         participants_csv=str(participantes_csv),
         today="2025-02-01",  # Evento no passado
+        apply=True,  # Persist data to DB
     )
 
     # Deve criar 2 Solicitações (1 por município)
@@ -155,6 +156,7 @@ def test_outros_sem_formador_duplica_coordenador(tmp_path, setup_dependencies):
         events_csv=str(eventos_csv),
         participants_csv=str(participantes_csv),
         today="2025-01-01",
+        apply=True,  # Persist data to DB
     )
 
     assert Solicitacao.objects.count() == 1

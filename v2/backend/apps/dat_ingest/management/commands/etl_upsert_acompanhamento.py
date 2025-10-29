@@ -126,9 +126,23 @@ class Command(BaseCommand):
         self.stdout.write("\n📊 Calculando métricas de qualidade...")
         metrics = self.calculate_metrics(eventos, participantes_map)
 
-        # PR21: Check gates se apply=True
-        if self.apply:
-            self.check_gates(metrics)
+        # PR21: Detect violations (dry-run: apenas reporta; apply: aborta)
+        violations = self.detect_violations(metrics)
+
+        if violations:
+            self.generate_violations_report(violations, metrics)
+            if self.apply:
+                # Apply: abortar se houver violações
+                error_msg = f"❌ Quality gates violated ({len(violations)} gate(s)). Apply aborted.\n"
+                error_msg += "\n".join(f"  - {v['gate']}: {v['message']}" for v in violations)
+                raise CommandError(error_msg)
+            else:
+                # Dry-run: apenas warning
+                self.stdout.write(self.style.WARNING(
+                    f"   ⚠️  {len(violations)} violation(s) detectadas (dry-run: sem abortar)"
+                ))
+        else:
+            self.stdout.write(self.style.SUCCESS("   ✅ All quality gates passed"))
 
         # Sempre gerar relatório de métricas (dry-run ou apply)
         self.generate_metrics_report(metrics)
@@ -559,11 +573,24 @@ class Command(BaseCommand):
         invalid_dates = 0
 
         for evento in eventos:
-            # Calcular hash (simples para contagem de duplicatas)
+            # Calcular hash (ALL campos relevantes para detectar duplicata EXATA)
             event_id = evento.get("event_hash", "")
             if not event_id:
-                # Generate simple hash for duplicate detection
-                simple_hash = f"{evento.get('data')}|{evento.get('hora_inicio')}|{evento.get('municipio')}|{evento.get('tipo')}"
+                # Duplicata = linha com TODOS os campos idênticos
+                # Incluir: source_sheet, municipio, encontro, tipo, data, horas, projeto, segmento, coord, formadores
+                simple_hash = (
+                    f"{evento.get('source_sheet')}|"
+                    f"{evento.get('municipio')}|"
+                    f"{evento.get('encontro')}|"
+                    f"{evento.get('tipo')}|"
+                    f"{evento.get('data')}|"
+                    f"{evento.get('hora_inicio')}|"
+                    f"{evento.get('hora_fim')}|"
+                    f"{evento.get('projeto')}|"
+                    f"{evento.get('segmento')}|"
+                    f"{evento.get('coord_acompanha')}|"
+                    f"{evento.get('coordenador')}"
+                )
                 event_id = simple_hash
 
             if event_id in hashes_seen:
@@ -571,7 +598,18 @@ class Command(BaseCommand):
             else:
                 hashes_seen[event_id] = True
 
-            # Unknown users
+            # Unknown users: check coordenador (from evento) + participantes (from participantes_map)
+            # 1. Check coordenador from evento
+            coord_email = evento.get("coordenador", "").strip()
+            if coord_email:
+                user = resolve_user_by_email(coord_email)
+                if not user:
+                    # Try by name if email failed
+                    user = resolve_user_by_name(coord_email)
+                if not user:
+                    unknown_users.add(coord_email)
+
+            # 2. Check participantes from participantes_map
             event_hash = evento.get("event_hash", "")
             if event_hash in participantes_map:
                 for p in participantes_map[event_hash]:
@@ -625,12 +663,12 @@ class Command(BaseCommand):
 
         return metrics
 
-    def check_gates(self, metrics: Dict):
+    def detect_violations(self, metrics: Dict) -> List[Dict]:
         """
-        Valida métricas contra quality gates e aborta se violar (PR21).
+        Detecta violações de quality gates (PR21).
 
-        Raises:
-            CommandError se algum gate for violado.
+        Returns:
+            Lista de violações [{gate, message}] ou [] se nenhuma.
         """
         violations = []
 
@@ -666,14 +704,7 @@ class Command(BaseCommand):
             )
             violations.append({"gate": "ETL_REQUIRE_ZERO_INVALID_DATES", "message": msg})
 
-        # If violations, generate report and abort
-        if violations:
-            self.generate_violations_report(violations, metrics)
-            error_msg = f"❌ Quality gates violated ({len(violations)} gate(s)). Apply aborted.\n"
-            error_msg += "\n".join(f"  - {v['gate']}: {v['message']}" for v in violations)
-            raise CommandError(error_msg)
-
-        self.stdout.write(self.style.SUCCESS("   ✅ All quality gates passed"))
+        return violations
 
     def generate_metrics_report(self, metrics: Dict):
         """

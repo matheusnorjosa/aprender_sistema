@@ -13,6 +13,7 @@ import pytest
 from pathlib import Path
 from openpyxl import Workbook
 from django.core.management import call_command
+from django.test import override_settings
 
 pytestmark = pytest.mark.django_db
 
@@ -302,3 +303,35 @@ def test_top_20_nao_cadastrados(tmp_path):
     assert fulano_entry is not None
     assert ciclano_entry is not None
     assert fulano_entry["freq"] > ciclano_entry["freq"]
+
+
+def test_etl_output_dir_from_settings(users_excel, agenda_excel, tmp_path):
+    """
+    Testa que comando respeita settings.ETL_OUTPUT_DIR quando --out não é fornecido.
+
+    Issue #53: Configuração de diretórios ETL via settings.
+    """
+    custom_out = tmp_path / "custom_audit_output"
+    custom_out.mkdir()
+
+    # Override settings para usar diretório customizado
+    with override_settings(ETL_OUTPUT_DIR=str(custom_out)):
+        # Chamar comando SEM --out (deve usar settings.ETL_OUTPUT_DIR)
+        call_command(
+            "audit_agenda_users",
+            users=str(users_excel),
+            agenda=str(agenda_excel),
+            sheet_users="Ativos",
+            # Nota: sem parâmetro --out, deve usar settings.ETL_OUTPUT_DIR
+        )
+
+    # Verificar que relatórios foram gerados no diretório customizado
+    report_json = custom_out / "audit_users_crosscheck_report.json"
+    assert report_json.exists(), f"Report should exist in {custom_out}"
+
+    # Verificar conteúdo do relatório
+    with open(report_json, "r", encoding="utf-8") as f:
+        report = json.load(f)
+
+    assert "nomes_na_agenda_cadastrados" in report
+    assert "nomes_na_agenda_nao_cadastrados" in report

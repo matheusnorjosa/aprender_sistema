@@ -15,6 +15,7 @@ from pathlib import Path
 from openpyxl import Workbook
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.test import override_settings
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
@@ -267,3 +268,34 @@ def test_cpf_divergente_banco_planilha(tmp_path, users_db):
     # Deve ser conflict (CPF divergente)
     assert report["totals"]["conflicts"] == 1
     assert "divergente" in report["conflicts"][0]["reason"].lower()
+
+
+def test_etl_output_dir_from_settings(excel_file, users_db, tmp_path):
+    """
+    Testa que comando respeita settings.ETL_OUTPUT_DIR quando --out não é fornecido.
+
+    Issue #53: Configuração de diretórios ETL via settings.
+    """
+    custom_out = tmp_path / "custom_output"
+    custom_out.mkdir()
+
+    # Override settings para usar diretório customizado
+    with override_settings(ETL_OUTPUT_DIR=str(custom_out)):
+        # Chamar comando SEM --out (deve usar settings.ETL_OUTPUT_DIR)
+        call_command(
+            "assign_cpf_from_excel",
+            path=str(excel_file),
+            sheet="Ativos",
+            # Nota: sem parâmetro --out, deve usar settings.ETL_OUTPUT_DIR
+        )
+
+    # Verificar que relatório foi gerado no diretório customizado
+    report_path = custom_out / "assign_cpf_report.json"
+    assert report_path.exists(), f"Report should exist in {custom_out}"
+
+    # Verificar conteúdo do relatório
+    with open(report_path, "r", encoding="utf-8") as f:
+        report = json.load(f)
+
+    assert report["mode"] == "DRY-RUN"
+    assert "updated" in report["totals"]

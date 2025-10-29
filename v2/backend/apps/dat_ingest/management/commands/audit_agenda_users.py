@@ -22,6 +22,7 @@ import csv
 import unicodedata
 from pathlib import Path
 from django.core.management.base import BaseCommand
+from django.conf import settings
 from openpyxl import load_workbook
 from rapidfuzz import fuzz
 
@@ -130,8 +131,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--out",
             type=str,
-            default="/app/out_etl",
-            help="Diretório de saída para relatórios (default: /app/out_etl)",
+            default=settings.ETL_OUTPUT_DIR,
+            help="Diretório de saída para relatórios (default: settings.ETL_OUTPUT_DIR)",
         )
 
     def handle(self, *args, **options):

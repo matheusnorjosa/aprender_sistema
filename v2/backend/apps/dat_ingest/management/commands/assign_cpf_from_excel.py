@@ -33,6 +33,7 @@ import re
 import unicodedata
 from pathlib import Path
 from django.core.management.base import BaseCommand
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from openpyxl import load_workbook
@@ -157,8 +158,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--out",
             type=str,
-            default="/app/out_etl",
-            help="Diretório de saída para relatório (default: /app/out_etl)",
+            default=settings.ETL_OUTPUT_DIR,
+            help="Diretório de saída para relatório (default: settings.ETL_OUTPUT_DIR)",
         )
 
     def handle(self, *args, **options):

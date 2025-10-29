@@ -304,3 +304,72 @@ def parse_tipos_evento(filepath: Path) -> list[dict[str, Any]]:
         )
 
     return tipos
+
+
+# ============================================================================
+# Shims/Adapters para testes (Issue #39)
+# ============================================================================
+
+
+def extract_tipos_evento_from_agenda(filepath: Path) -> list[dict[str, Any]]:
+    """
+    Extrai tipos de evento de uma planilha de agenda (shim para testes)
+
+    Varre as abas da agenda procurando por valores únicos na coluna "Tipo de Evento".
+
+    Args:
+        filepath: Caminho do arquivo Excel de agenda
+
+    Returns:
+        Lista de dicts com tipos de evento extraídos
+
+    Examples:
+        >>> extract_tipos_evento_from_agenda(Path("agenda.xlsx"))
+        [{"nome": "Formação Presencial", "src": "agenda.xlsx/Super", "rownum": 2}, ...]
+    """
+    wb = load_workbook(filepath, data_only=True)
+
+    tipos_vistos = set()
+    tipos = []
+
+    # Varre todas as abas procurando por coluna "Tipo de Evento"
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+
+        # Procura header "Tipo de Evento" ou "Tipo"
+        header_row = None
+        tipo_col_idx = None
+
+        for row in ws.iter_rows(min_row=1, max_row=5, values_only=True):
+            for idx, cell in enumerate(row):
+                if cell and "tipo" in str(cell).lower():
+                    header_row = row
+                    tipo_col_idx = idx
+                    break
+            if tipo_col_idx is not None:
+                break
+
+        if tipo_col_idx is None:
+            continue
+
+        # Extrai valores únicos da coluna
+        for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if not row or len(row) <= tipo_col_idx:
+                continue
+
+            tipo_nome = normalize_str(row[tipo_col_idx])
+            if not tipo_nome or tipo_nome in tipos_vistos:
+                continue
+
+            tipos_vistos.add(tipo_nome)
+            tipos.append(
+                {
+                    "nome": tipo_nome,
+                    "descricao": "",
+                    "cor": "",
+                    "src": f"{filepath.name}/{sheet_name}",
+                    "rownum": i,
+                }
+            )
+
+    return tipos

@@ -50,6 +50,22 @@ def normalize_text(text):
     return normalized.lower().strip()
 
 
+def is_placeholder_cpf(cpf):
+    """
+    Detecta se um CPF é um placeholder (ex: 00000000001, 00000000002).
+
+    Placeholders são CPFs que começam com 9 zeros seguidos de 1-3 dígitos.
+    Usados em testes quando o schema não permite CPF ausente (NOT NULL + UNIQUE).
+
+    Retorna: True se for placeholder, False caso contrário
+    """
+    if not cpf or len(cpf) != 11:
+        return False
+
+    # Padrão: 000000000XX (9 zeros + até 3 dígitos)
+    return cpf.startswith('000000000')
+
+
 def clean_cpf(cpf_raw):
     """
     Remove máscara de CPF e valida que tem 11 dígitos.
@@ -310,8 +326,8 @@ class Command(BaseCommand):
                     continue
 
                 # Match encontrado
-                # Verificar se CPF já está preenchido e é diferente
-                if matched_user.cpf and matched_user.cpf != cpf_clean:
+                # Verificar se CPF já está preenchido (não-placeholder) e é diferente
+                if matched_user.cpf and not is_placeholder_cpf(matched_user.cpf) and matched_user.cpf != cpf_clean:
                     conflicts.append({
                         "nome": row["nome"],
                         "email": row["email"],
@@ -323,7 +339,7 @@ class Command(BaseCommand):
                     continue
 
                 # Atualizar CPF
-                prev_cpf = matched_user.cpf or "(vazio)"
+                prev_cpf = "(vazio)" if not matched_user.cpf or is_placeholder_cpf(matched_user.cpf) else matched_user.cpf
                 matched_user.cpf = cpf_clean
 
                 if apply_mode:

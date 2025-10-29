@@ -297,12 +297,16 @@ class Command(BaseCommand):
 
         all_agenda_names = set()  # Para detectar duplicados e multi-setor
         name_to_abas = {}  # nome -> [abas onde aparece]
+        nao_cadastrados_freq = {}  # nome -> count (por linha, não por aba)
 
         for aba, eventos in agendas.items():
             encontrados = set()
             nao_encontrados = set()
 
             for evento in eventos:
+                # Deduplicar nomes na mesma linha (evitar contar 2x se aparecer em múltiplas colunas)
+                nomes_nao_encontrados_nesta_linha = set()
+
                 # Coordenador + Formadores (matching por nome)
                 for pessoa in [evento["coordenador"]] + evento["formadores"]:
                     if not pessoa:
@@ -323,6 +327,13 @@ class Command(BaseCommand):
                         encontrados.add(pessoa_norm)
                     else:
                         nao_encontrados.add(pessoa_norm)
+                        nomes_nao_encontrados_nesta_linha.add(pessoa_norm)
+
+                # Incrementar contador de frequência (por linha, deduplicado)
+                for nome in nomes_nao_encontrados_nesta_linha:
+                    if nome not in nao_cadastrados_freq:
+                        nao_cadastrados_freq[nome] = 0
+                    nao_cadastrados_freq[nome] += 1
 
                 # Convidados (matching por email)
                 for email in evento["convidados"]:
@@ -341,21 +352,22 @@ class Command(BaseCommand):
             if len(set(abas_list)) > 1:  # Múltiplas abas distintas
                 stats["multi_setor"][nome] = sorted(set(abas_list))
 
-        # Amostra de não cadastrados (top 20 por frequência)
-        nao_cadastrados_freq = {}
-        for aba, nomes in stats["usuarios_nao_encontrados"].items():
-            for nome in nomes:
-                if nome not in nao_cadastrados_freq:
-                    nao_cadastrados_freq[nome] = 0
-                nao_cadastrados_freq[nome] += 1
+        # Top 20 não cadastrados (ordenação determinística: -freq, +nome)
+        # Excluir emails de "Convidados" do ranking (mas manter para relatório geral)
+        nao_cadastrados_freq_names_only = {
+            nome: freq
+            for nome, freq in nao_cadastrados_freq.items()
+            if not nome.startswith("[email]")
+        }
 
         top_nao_cadastrados = sorted(
-            nao_cadastrados_freq.items(), key=lambda x: x[1], reverse=True
+            nao_cadastrados_freq_names_only.items(),
+            key=lambda x: (-x[1], x[0])  # Ordenação: -freq, +nome (determinístico)
         )[:20]
 
         stats["nomes_na_agenda_nao_cadastrados"] = {
             "top_20": [{"nome": nome, "freq": freq} for nome, freq in top_nao_cadastrados],
-            "total_unique": len(nao_cadastrados_freq),
+            "total_unique": len(nao_cadastrados_freq_names_only),
         }
 
         # Duplicados por aba (mesmo nome aparece >1 vez na mesma aba)

@@ -14,6 +14,22 @@ Este guia documenta as ferramentas para auditar e atribuir CPFs aos usuários do
 
 ---
 
+## Configuração de Diretórios
+
+**Diretórios ETL configuráveis via variáveis de ambiente** (PR #53):
+
+- **ETL_OUTPUT_DIR**: Diretório para relatórios gerados (JSON, CSV)
+  - Default: `{BASE_DIR}/out_etl` (ex: `/app/out_etl` no Docker)
+  - Customizar: `export ETL_OUTPUT_DIR=/custom/path`
+
+- **ETL_DATA_DIR**: Diretório base para importação de planilhas
+  - Default: `{BASE_DIR}/data/csv-import`
+  - Customizar: `export ETL_DATA_DIR=/custom/data`
+
+**Veja**: `v2/docs/ENV_VARS_ETL.md` para detalhes completos e exemplos de uso.
+
+---
+
 ## 1. audit_agenda_users (Read-Only)
 
 ### Propósito

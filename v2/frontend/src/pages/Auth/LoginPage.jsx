@@ -66,15 +66,15 @@ export default function LoginPage({ onLoginSuccess }) {
           size="large"
         >
           <Form.Item
-            label="CPF ou usuário"
+            label="CPF"
             name="username"
             rules={[
-              { required: true, message: 'Por favor, insira seu CPF ou usuário!' }
+              { required: true, message: 'Por favor, insira seu CPF!' }
             ]}
           >
             <Input
               prefix={<UserOutlined style={{ color: 'rgba(0,0,0,.25)' }} />}
-              placeholder="CPF (com ou sem máscara) ou usuário"
+              placeholder="CPF"
             />
           </Form.Item>
 

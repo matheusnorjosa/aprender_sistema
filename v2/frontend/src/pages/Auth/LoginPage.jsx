@@ -2,7 +2,8 @@
  * Página de Login - AS v2
  *
  * Design baseado em: paginadelogin/screen.png
- * - Login com username/senha
+ * - Login com CPF (com/sem máscara) ou username + senha
+ * - Backend aceita CPF ou username no mesmo campo
  * - Link "Esqueci a senha?"
  * - Link "Cadastre-se" (futuro)
  * - Layout centralizado e clean
@@ -65,15 +66,15 @@ export default function LoginPage({ onLoginSuccess }) {
           size="large"
         >
           <Form.Item
-            label="Nome de usuário"
+            label="CPF ou usuário"
             name="username"
             rules={[
-              { required: true, message: 'Por favor, insira seu nome de usuário!' }
+              { required: true, message: 'Por favor, insira seu CPF ou usuário!' }
             ]}
           >
             <Input
               prefix={<UserOutlined style={{ color: 'rgba(0,0,0,.25)' }} />}
-              placeholder="Seu nome de usuário"
+              placeholder="CPF (com ou sem máscara) ou usuário"
             />
           </Form.Item>
 

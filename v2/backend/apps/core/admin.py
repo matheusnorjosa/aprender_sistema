@@ -5,6 +5,9 @@ from django.contrib import admin
 from django.conf import settings
 from django.http import HttpResponse
 
+# Fase 1 - Plano DAT/GCal: Admin restrito a superusers
+from .admin_site import admin_site
+
 from .models import (
     AcaoControle,
     AcaoDAT,
@@ -39,7 +42,7 @@ class CPFFilter(admin.SimpleListFilter):
         return queryset
 
 
-@admin.register(Usuario)
+@admin_site.register(Usuario)
 class UsuarioAdmin(admin.ModelAdmin):
     list_display = ("username", "email", "cpf", "cargo", "is_active")
     search_fields = ("username", "email", "cpf", "first_name", "last_name")
@@ -97,28 +100,28 @@ class UsuarioAdmin(admin.ModelAdmin):
         return response
 
 
-@admin.register(Municipio)
+@admin_site.register(Municipio)
 class MunicipioAdmin(admin.ModelAdmin):
     list_display = ("nome", "uf", "ativo")
     search_fields = ("nome", "uf")
     list_filter = ("uf", "ativo")
 
 
-@admin.register(Projeto)
+@admin_site.register(Projeto)
 class ProjetoAdmin(admin.ModelAdmin):
     list_display = ("nome", "ativo")
     search_fields = ("nome", "descricao")
     list_filter = ("ativo",)
 
 
-@admin.register(TipoEvento)
+@admin_site.register(TipoEvento)
 class TipoEventoAdmin(admin.ModelAdmin):
     list_display = ("nome", "cor", "descricao")
     search_fields = ("nome", "descricao")
     list_filter = ()
 
 
-@admin.register(AvailabilityBlock)
+@admin_site.register(AvailabilityBlock)
 class AvailabilityBlockAdmin(admin.ModelAdmin):
     list_display = ("usuario", "tipo", "inicio", "fim", "status", "created_at")
     search_fields = ("usuario__username", "usuario__email", "motivo")
@@ -127,7 +130,7 @@ class AvailabilityBlockAdmin(admin.ModelAdmin):
     date_hierarchy = "inicio"
 
 
-@admin.register(Solicitacao)
+@admin_site.register(Solicitacao)
 class SolicitacaoAdmin(admin.ModelAdmin):
     list_display = (
         "usuario",
@@ -149,7 +152,7 @@ class SolicitacaoAdmin(admin.ModelAdmin):
     date_hierarchy = "inicio"
 
 
-@admin.register(Participation)
+@admin_site.register(Participation)
 class ParticipationAdmin(admin.ModelAdmin):
     list_display = ("solicitacao", "usuario", "role", "ch_horas", "created_at")
     list_filter = ("role",)
@@ -164,7 +167,7 @@ class ParticipationAdmin(admin.ModelAdmin):
     list_select_related = ("solicitacao", "usuario")
 
 
-@admin.register(Compra)
+@admin_site.register(Compra)
 class CompraAdmin(admin.ModelAdmin):
     list_display = ("codigo", "municipio", "projeto", "quantidade", "data", "uso")
     list_filter = ("projeto", "data")
@@ -174,7 +177,7 @@ class CompraAdmin(admin.ModelAdmin):
     date_hierarchy = "data"
 
 
-@admin.register(Deslocamento)
+@admin_site.register(Deslocamento)
 class DeslocamentoAdmin(admin.ModelAdmin):
     list_display = ("usuario", "origem", "destino", "start_date", "end_date")
     list_filter = ("usuario", "start_date")
@@ -184,7 +187,7 @@ class DeslocamentoAdmin(admin.ModelAdmin):
     date_hierarchy = "start_date"
 
 
-@admin.register(AcaoControle)
+@admin_site.register(AcaoControle)
 class AcaoControleAdmin(admin.ModelAdmin):
     list_display = (
         "municipio",
@@ -208,7 +211,7 @@ class AcaoControleAdmin(admin.ModelAdmin):
     date_hierarchy = "data_reuniao"
 
 
-@admin.register(AcaoDAT)
+@admin_site.register(AcaoDAT)
 class AcaoDATAdmin(admin.ModelAdmin):
     list_display = ("municipio", "projeto", "tipo_acao", "responsavel", "data_registro")
     list_filter = ("projeto", "tipo_acao")

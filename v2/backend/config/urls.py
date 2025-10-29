@@ -7,6 +7,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
+from apps.core.admin_site import admin_site  # Custom admin site (superusers only)
 
 
 def healthz(request):
@@ -22,8 +23,8 @@ def healthz(request):
 
 
 urlpatterns = [
-    # Admin
-    path("admin/", admin.site.urls),
+    # Admin (Custom - Superusers only, Fase 1 Plano DAT/GCal)
+    path("admin/", admin_site.urls),
     # Health check
     path("healthz/", healthz, name="healthz"),
     # API

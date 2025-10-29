@@ -37,6 +37,8 @@ import LoginPage from './pages/Auth/LoginPage';
 import HomePage from './pages/Home/HomePage';
 import DashboardsPage from './pages/Dashboards/DashboardsPage';
 import MapaBrasilPage from './pages/MapaBrasil/MapaBrasilPage';
+import AdminDATHomePage from './pages/AdminDAT/AdminDATHomePage';
+import UsuariosPage from './pages/AdminDAT/UsuariosPage';
 import { getMe } from './api/availability';
 import './App.css';
 
@@ -106,6 +108,7 @@ function App() {
   const canCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('DAT');
   const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
   const canControle = user?.is_superuser || user?.groups?.includes('Controle');
+  const canDAT = user?.is_superuser || user?.groups?.includes('DAT');
   const isAdmin = user?.is_superuser || user?.groups?.includes('Superintendência');
   const isManager = user?.groups?.includes('Gerência') || isAdmin;
 
@@ -210,6 +213,13 @@ function App() {
                 </SubMenu>
               )}
 
+              {/* Admin DAT (DAT + Superusers) */}
+              {canDAT && (
+                <Menu.Item key="admin-dat" icon={<DatabaseOutlined />}>
+                  <Link to="/admin-dat">Admin DAT</Link>
+                </Menu.Item>
+              )}
+
               {/* Fallback: Antigas páginas */}
               <Menu.Item key="solicitacoes-old" icon={<CheckCircleOutlined />}>
                 <Link to="/solicitacoes">Solicitações (Old)</Link>
@@ -286,6 +296,16 @@ function App() {
                 <Route
                   path="/pre-agenda"
                   element={canControle ? <PreAgendaPage /> : <Forbidden />}
+                />
+
+                {/* Admin DAT (Fase 1 - Plano DAT/GCal) */}
+                <Route
+                  path="/admin-dat"
+                  element={canDAT ? <AdminDATHomePage /> : <Forbidden />}
+                />
+                <Route
+                  path="/admin-dat/usuarios"
+                  element={canDAT ? <UsuariosPage /> : <Forbidden />}
                 />
 
                 {/* Antigas rotas (manter compatibilidade) */}

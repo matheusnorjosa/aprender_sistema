@@ -148,6 +148,10 @@ Atribui CPFs aos usuários do sistema baseado em planilha Excel.
 - CPF divergente (banco != planilha) → **conflicts**
 - CPF inválido/ausente → **skipped**
 - Usuário não encontrado → **skipped**
+- **CPF placeholder (000000000XX)** → tratado como "ausente" (ver seção 9)
+
+**Nota sobre CPF placeholder**:
+O comando reconhece CPFs que começam com 9 zeros seguidos de 1-3 dígitos (ex: `00000000001`, `00000000099`) como "CPF ausente". Esses placeholders são usados **apenas em testes** devido às constraints do schema (`cpf` campo com `NOT NULL + UNIQUE`). Ver seção 9 para detalhes.
 
 ### Uso
 
@@ -386,7 +390,68 @@ A: `docker compose cp aprender_v2-web-1:/app/out_etl ./local_out_etl`
 
 ---
 
-## 8. Referências
+## 8. CPF Placeholder (Apenas para Testes)
+
+### Contexto
+
+O campo `Usuario.cpf` possui as seguintes constraints no schema:
+- `NOT NULL` — Não aceita NULL
+- `UNIQUE` — Não aceita duplicatas
+
+Isso impede que múltiplos usuários tenham `cpf=""` (string vazia) em testes, pois violaria a constraint `UNIQUE`.
+
+### Solução: Padrão de Placeholder
+
+O comando `assign_cpf_from_excel` reconhece CPFs que começam com **9 zeros seguidos de 1-3 dígitos** como "CPF ausente":
+
+**Padrão**: `000000000XX` (onde XX = 01-99 ou 001-999)
+
+**Exemplos**:
+- `00000000001` → tratado como "ausente"
+- `00000000002` → tratado como "ausente"
+- `00000000099` → tratado como "ausente"
+
+**Função de detecção** (`assign_cpf_from_excel.py`):
+```python
+def is_placeholder_cpf(cpf):
+    """
+    Detecta se um CPF é um placeholder (ex: 00000000001, 00000000002).
+
+    Placeholders são CPFs que começam com 9 zeros seguidos de 1-3 dígitos.
+    Usados em testes quando o schema não permite CPF ausente (NOT NULL + UNIQUE).
+
+    Retorna: True se for placeholder, False caso contrário
+    """
+    if not cpf or len(cpf) != 11:
+        return False
+
+    # Padrão: 000000000XX (9 zeros + até 3 dígitos)
+    return cpf.startswith('000000000')
+```
+
+### Uso Restrito
+
+⚠️ **ATENÇÃO**: Placeholders devem ser usados **APENAS em testes**. Nunca em produção.
+
+**Casos de uso válidos**:
+- ✅ Testes unitários (`test_assign_cpf_command.py`)
+- ✅ Fixtures de testes (`users_db` fixture)
+
+**Casos de uso inválidos**:
+- ❌ Usuários reais no banco de produção
+- ❌ Planilhas de importação reais
+- ❌ Qualquer ambiente de staging/produção
+
+### Alternativas para Produção
+
+Se precisar de "CPF ausente" em produção, considere:
+1. **Migration** para alterar schema (`null=True, blank=True`)
+2. **Valor sentinela** único por usuário (ex: `"AUSENTE_{user_id}"`)
+3. **Campo separado** `cpf_verified` (BooleanField)
+
+---
+
+## 9. Referências
 
 - **Comando audit_agenda_users**: `v2/backend/apps/dat_ingest/management/commands/audit_agenda_users.py`
 - **Comando assign_cpf_from_excel**: `v2/backend/apps/dat_ingest/management/commands/assign_cpf_from_excel.py`

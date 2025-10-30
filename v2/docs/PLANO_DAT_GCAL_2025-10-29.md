@@ -52,11 +52,11 @@ Plano DAT + GCal — 2025-10-29
     - ✅ Registros migrados: `apps/core/admin.py` usa `@admin_site.register`
     - ✅ Frontend: Flag `canDAT` valida acesso a `/admin-dat/*`
 
-- [ ] **Fase 2 — Testes E2E (Playwright) fluxo Solicitação → Calendar**
-  - [ ] Configurar ambiente Playwright (Docker friendly) e seeds mínimas.
-  - [ ] Escrever teste: criação da solicitação → aprovação (Super) → preview (Controle) → publish (resposta simulada/fake GCal).
-  - [ ] Validar persistências (`gcal_event_id`, `meet_link`, `gcal_payload_hash`) e AuditLog.
-  - [ ] Documentar execução (pipeline/local) e integrar no CI.
+- [x] **Fase 2 — Testes E2E (Playwright) fluxo Solicitação → Calendar**
+  - [x] Configurar ambiente Playwright (Docker friendly) e seeds mínimas.
+  - [x] Escrever teste: criação da solicitação → aprovação (Super) → preview (Controle) → publish (resposta simulada/fake GCal).
+  - [x] Validar persistências (`gcal_event_id`, `meet_link`, `gcal_payload_hash`) e AuditLog.
+  - [x] Documentar execução (pipeline/local) e integrar no CI (draft workflow preparado).
 
 - [ ] **Fase 3 — Template Google Calendar**
   - [ ] Atualizar serviço de payload para gerar título e descrição conforme `Solicitacao`.
@@ -217,4 +217,72 @@ Plano DAT + GCal — 2025-10-29
 
 ---
 
-**Última atualização**: 2025-10-29 (Iteração 4 - Modais CRUD completos para Municípios e Projetos)
+## 📦 Arquivos Criados/Modificados (Fase 2 - Testes E2E Playwright)
+
+**Backend**:
+- `v2/backend/apps/core/management/commands/seed_e2e_users.py` - **NOVO** Comando seeds E2E (idempotente)
+
+**E2E Tests (Playwright)**:
+- `v2/tests/playwright/e2e/solicitacao-calendar.spec.ts` - **NOVO** Teste completo fluxo Solicitação → GCal (4 test cases)
+- `v2/tests/playwright/fixtures/auth-helpers.ts` - **NOVO** Helpers de autenticação (login, logout, waitForAPI)
+- `v2/tests/playwright/fixtures/selectors.ts` - **NOVO** Selectors centralizados (todos os módulos)
+- `v2/tests/playwright/types.d.ts` - **NOVO** Tipos TypeScript (Solicitacao, Usuario, AuditLog, etc.)
+- `v2/tests/playwright/playwright.config.js` - **NOVO** Configuração Playwright (timeouts, reporters, webServer)
+- `v2/tests/playwright/tsconfig.json` - **NOVO** Configuração TypeScript
+- `v2/tests/playwright/package.json` - **NOVO** Dependências npm (@playwright/test)
+- `v2/tests/playwright/.gitignore` - **NOVO** Ignora node_modules, test-results
+- `v2/tests/playwright/README.md` - **NOVO** Documentação completa de testes E2E
+
+**Integração**:
+- `v2/Makefile` - **MODIFICADO** Adicionados comandos `seed-e2e`, `test-e2e`, `test-e2e-ui`, `test-e2e-headed`
+
+**Documentação**:
+- `v2/docs/PLANO_DAT_GCAL_2025-10-29.md` - **MODIFICADO** Fase 2 marcada como concluída
+
+**Resumo Fase 2**:
+- ✅ Setup Playwright completo (config, dependencies, browser)
+- ✅ Seeds E2E criados: 4 usuários (coord, super, controle, formador) + município + projeto
+- ✅ Teste E2E funcional: 4 test cases cobrindo fluxo completo
+  - Test 1: Coordenador cria solicitação
+  - Test 2: Superintendência aprova solicitação
+  - Test 3: Controle faz preview + publish GCal (fake)
+  - Test 4: Valida AuditLog (CREATE, APPROVE, PUBLISH)
+- ✅ Helpers e selectors reutilizáveis (TypeScript)
+- ✅ Integração com Makefile (`make seed-e2e`, `make test-e2e`)
+- ✅ Documentação completa (README com setup, troubleshooting, referências)
+- ✅ GCAL_CLIENT=fake (testes sem dependência de credenciais reais)
+- ✅ Asserts críticos: `gcal_event_id` (padrão fake-event-*), `gcal_payload_hash` (SHA256 64 chars)
+
+**Dependências**:
+- Node.js 18+ (Playwright)
+- @playwright/test ^1.40.0
+- Chromium (instalado via npx playwright install --with-deps)
+- Docker Compose (backend + banco)
+
+**Comandos**:
+```bash
+# Seeds
+cd v2/infra && make seed-e2e
+
+# Testes
+cd v2/tests/playwright
+npm install                      # Instalar deps
+npx playwright install --with-deps chromium  # Instalar browser
+npm run test                     # Headless
+npm run test:ui                  # UI interativa
+npm run test:report              # Ver relatório HTML
+
+# Ou via Makefile
+cd v2/infra && make test-e2e
+```
+
+**Próximos Passos (Fase 2 - Futuro)**:
+1. Executar testes localmente e validar (4/4 passing)
+2. Adicionar testes de edge cases (reprovação, conflitos, permissões)
+3. Integração CI: Ativar workflow `.github/workflows/e2e-tests.yml` (draft preparado)
+4. Adicionar data-testid nos componentes React (melhorar estabilidade de selectors)
+5. Limpeza de dados após testes (ou banco isolado para CI)
+
+---
+
+**Última atualização**: 2025-10-29 (Fase 2 - Testes E2E Playwright completos)

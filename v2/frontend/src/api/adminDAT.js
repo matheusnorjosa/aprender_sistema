@@ -80,6 +80,22 @@ export async function deleteUser(id) {
   });
 }
 
+/**
+ * Assign groups to user
+ * @param {number} userId - User ID
+ * @param {Object} data - {group_ids: [1, 2, 3]}
+ * @returns {Promise<Object>} Updated user with groups
+ *
+ * GAP-003 (resolved): Endpoint for assigning groups to users.
+ * Phase 1 Iteration 3 - DAT/GCal Plan.
+ */
+export async function assignGroups(userId, data) {
+  return apiFetch(`${API_BASE}/usuarios-admin/${userId}/assign_groups/`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 // ========== GRUPOS ==========
 
 /**

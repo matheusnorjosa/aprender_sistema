@@ -4,14 +4,15 @@
  * Gestão de usuários: listagem, busca, criação/edição e atribuição de CPF.
  * Substitui uso cotidiano do Django Admin para usuários.
  *
- * Fase 1 - Plano DAT/GCal 2025-10-29
- * GAP-001: Endpoint /api/usuarios-admin/ precisa ser reativado
+ * Fase 1 Iteração 2 - Plano DAT/GCal 2025-10-29
+ * GAP-001 (resolvido): Endpoint /api/usuarios-admin/ reativado
  */
 
 import { useState, useEffect } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Alert, Card } from 'antd';
-import { UserAddOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Space, Tag, Typography, Card, message } from 'antd';
+import { UserAddOutlined, ReloadOutlined, EditOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
+import { listUsers } from '../../api/adminDAT';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -20,35 +21,52 @@ export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
 
-  // Placeholder: dados mock para desenvolvimento
-  const mockData = [
-    {
-      id: 1,
-      username: 'admin',
-      email: 'admin@example.com',
-      first_name: 'Admin',
-      last_name: 'Sistema',
-      cpf: '123.456.789-00',
-      is_active: true,
-      groups: ['Superintendência', 'DAT'],
-    },
-    {
-      id: 2,
-      username: 'coordenador1',
-      email: 'coord@example.com',
-      first_name: 'Coordenador',
-      last_name: 'Teste',
-      cpf: '987.654.321-00',
-      is_active: true,
-      groups: ['Coordenador'],
-    },
-  ];
+  /**
+   * Fetch users from API
+   */
+  const fetchUsuarios = async (params = {}) => {
+    setLoading(true);
+    try {
+      const data = await listUsers({
+        search: searchText,
+        page: params.current || pagination.current,
+        page_size: params.pageSize || pagination.pageSize,
+        ordering: params.ordering || 'username',
+      });
 
+      // DRF pagination response structure
+      setUsuarios(data.results || data);
+      setPagination({
+        ...pagination,
+        current: params.current || pagination.current,
+        total: data.count || (data.results || data).length,
+      });
+    } catch (error) {
+      message.error(`Erro ao carregar usuários: ${error.message}`);
+      console.error('Erro ao carregar usuários:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load users on mount and search change
   useEffect(() => {
-    // TODO: Implementar fetch de /api/usuarios-admin/ quando reativado
-    setUsuarios(mockData);
-  }, []);
+    fetchUsuarios();
+  }, [searchText]);
+
+  const handleTableChange = (newPagination, filters, sorter) => {
+    fetchUsuarios({
+      current: newPagination.current,
+      pageSize: newPagination.pageSize,
+      ordering: sorter.field ? `${sorter.order === 'descend' ? '-' : ''}${sorter.field}` : undefined,
+    });
+  };
 
   const columns = [
     {
@@ -56,17 +74,19 @@ export default function UsuariosPage() {
       dataIndex: 'id',
       key: 'id',
       width: 60,
+      sorter: true,
     },
     {
       title: 'Username',
       dataIndex: 'username',
       key: 'username',
       width: 150,
+      sorter: true,
     },
     {
       title: 'Nome',
       key: 'nome',
-      render: (_, record) => `${record.first_name} ${record.last_name}`,
+      render: (_, record) => `${record.first_name || ''} ${record.last_name || ''}`.trim() || '-',
       width: 200,
     },
     {
@@ -74,6 +94,7 @@ export default function UsuariosPage() {
       dataIndex: 'email',
       key: 'email',
       width: 250,
+      sorter: true,
     },
     {
       title: 'CPF',
@@ -87,7 +108,7 @@ export default function UsuariosPage() {
       dataIndex: 'groups',
       key: 'groups',
       render: (groups) =>
-        groups.map((g) => (
+        (groups || []).map((g) => (
           <Tag key={g} color="blue">
             {g}
           </Tag>
@@ -109,11 +130,14 @@ export default function UsuariosPage() {
       width: 150,
       render: (_, record) => (
         <Space size="small">
-          <Button type="link" size="small" disabled>
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            disabled
+            title="Em desenvolvimento"
+          >
             Editar
-          </Button>
-          <Button type="link" size="small" danger disabled>
-            Desativar
           </Button>
         </Space>
       ),
@@ -130,48 +154,39 @@ export default function UsuariosPage() {
       <Card>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <Title level={3} style={{ margin: 0 }}>
-            Usuários
+            Usuários ({pagination.total})
           </Title>
           <Space>
             <Search
               placeholder="Buscar por username, email, nome, CPF"
               allowClear
               style={{ width: 300 }}
-              onChange={(e) => setSearchText(e.target.value)}
+              onSearch={(value) => setSearchText(value)}
+              onChange={(e) => {
+                if (!e.target.value) setSearchText('');
+              }}
             />
-            <Button icon={<ReloadOutlined />} onClick={() => setUsuarios(mockData)}>
+            <Button icon={<ReloadOutlined />} onClick={() => fetchUsuarios()} loading={loading}>
               Atualizar
             </Button>
-            <Button type="primary" icon={<UserAddOutlined />} disabled>
+            <Button type="primary" icon={<UserAddOutlined />} disabled title="Em desenvolvimento">
               Novo Usuário
             </Button>
           </Space>
         </div>
 
-        {/* Alert de desenvolvimento */}
-        <Alert
-          message="Módulo em desenvolvimento"
-          description="GAP-001: Endpoint /api/usuarios-admin/ precisa ser reativado. Dados mock sendo exibidos."
-          type="warning"
-          showIcon
-          closable
-          style={{ marginBottom: '16px' }}
-        />
-
         {/* Tabela */}
         <Table
           columns={columns}
-          dataSource={usuarios.filter(
-            (u) =>
-              u.username.toLowerCase().includes(searchText.toLowerCase()) ||
-              u.email.toLowerCase().includes(searchText.toLowerCase()) ||
-              u.first_name.toLowerCase().includes(searchText.toLowerCase()) ||
-              u.last_name.toLowerCase().includes(searchText.toLowerCase()) ||
-              (u.cpf && u.cpf.includes(searchText))
-          )}
+          dataSource={usuarios}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `Total: ${total} usuários` }}
+          pagination={{
+            ...pagination,
+            showSizeChanger: true,
+            showTotal: (total) => `Total: ${total} usuários`,
+          }}
+          onChange={handleTableChange}
           scroll={{ x: 1200 }}
         />
       </Card>

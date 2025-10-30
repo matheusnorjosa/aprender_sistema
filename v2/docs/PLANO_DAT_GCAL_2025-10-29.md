@@ -58,10 +58,23 @@ Plano DAT + GCal — 2025-10-29
   - [x] Validar persistências (`gcal_event_id`, `meet_link`, `gcal_payload_hash`) e AuditLog.
   - [x] Documentar execução (pipeline/local) e integrar no CI (draft workflow preparado).
 
-- [ ] **Fase 3 — Template Google Calendar**
-  - [ ] Atualizar serviço de payload para gerar título e descrição conforme `Solicitacao`.
-  - [ ] Cobrir com testes unitários (preview/publish) garantindo formato.
+- [x] **Fase 3 — Template Google Calendar** ✅ **COMPLETO** (2025-10-30)
+  - [x] Atualizar serviço de payload para gerar título e descrição conforme `Solicitacao`.
+    - ✅ Refatorado `_build_payload()` em `gcal_sync_service.py`
+    - ✅ **Título**: "{municipio.nome} - {municipio.uf} {segmento} {modalidade} [{projeto.codigo}]"
+    - ✅ **Descrição**: Estrutura multi-linha com 7 seções (Header, Município, Projeto, Tipo, Data, Modalidade, Equipe, Observações)
+    - ✅ Timezone correto: `America/Fortaleza` para formatação de datas
+    - ✅ Truncation defensivo: summary ≤ 1000 chars, description ≤ 5000 chars
+  - [x] Cobrir com testes unitários (preview/publish) garantindo formato.
+    - ✅ **13 testes (13/13 passing)** em `test_gcal_template_fase3.py`:
+      - Formatação completa e parcial (com/sem campos opcionais)
+      - Timezone correto (America/Fortaleza)
+      - Truncation (fields respeita max_length constraints)
+      - Endpoints preview (`POST /api/solicitacoes/{id}/preview-gcal/`) e publish (`POST /api/solicitacoes/{id}/publish/`)
+      - Múltiplos formadores
+      - Modalidade Online/Presencial
   - [ ] Validar manualmente com smoke e anexar evidências.
+    - ⏳ Pendente: Smoke test manual em ambiente staging com `GCAL_CLIENT=google`
 
 - [ ] **Fase 4 — Alterar/Cancelar evento publicado**
   - [ ] Backend: expor endpoints “republicar” e “cancelar” com AuditLog e checagens de permissão.

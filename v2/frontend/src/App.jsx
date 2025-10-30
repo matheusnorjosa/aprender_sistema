@@ -39,6 +39,8 @@ import DashboardsPage from './pages/Dashboards/DashboardsPage';
 import MapaBrasilPage from './pages/MapaBrasil/MapaBrasilPage';
 import AdminDATHomePage from './pages/AdminDAT/AdminDATHomePage';
 import UsuariosPage from './pages/AdminDAT/UsuariosPage';
+import MunicipiosPage from './pages/AdminDAT/MunicipiosPage';
+import ProjetosPage from './pages/AdminDAT/ProjetosPage';
 import { getMe } from './api/availability';
 import './App.css';
 
@@ -306,6 +308,14 @@ function App() {
                 <Route
                   path="/admin-dat/usuarios"
                   element={canDAT ? <UsuariosPage /> : <Forbidden />}
+                />
+                <Route
+                  path="/admin-dat/municipios"
+                  element={canDAT ? <MunicipiosPage /> : <Forbidden />}
+                />
+                <Route
+                  path="/admin-dat/projetos"
+                  element={canDAT ? <ProjetosPage /> : <Forbidden />}
                 />
 
                 {/* Antigas rotas (manter compatibilidade) */}

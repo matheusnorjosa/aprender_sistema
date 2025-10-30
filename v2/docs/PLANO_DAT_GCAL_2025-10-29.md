@@ -35,9 +35,11 @@ Plano DAT + GCal — 2025-10-29
     - ✅ MunicipiosPage.jsx criado: listagem + busca + filtro UF + paginação (Iteração 2)
     - ✅ Rota `/admin-dat/municipios` configurada (Iteração 2)
     - ✅ Endpoint disponível: `GET/POST/PUT/PATCH/DELETE /api/municipios/`
-  - [ ] Implementar tela "Grupos/Setores" com CRUD e vínculo usuário↔setor.
-    - ⏳ Pendente: Criar `GruposPage.jsx` e rota `/admin-dat/grupos`
+  - [x] Implementar tela "Grupos/Setores" com CRUD e vínculo usuário↔setor.
+    - ✅ GruposPage.jsx criado: listagem + busca + modal CRUD + gestão de membros (Iteração 3)
+    - ✅ Rota `/admin-dat/grupos` configurada (Iteração 3)
     - ✅ GAP-002 resolvido: GroupViewSet criado (`/api/grupos/`) (Iteração 2)
+    - ✅ GAP-003 resolvido: Endpoint `assign_groups` criado (Iteração 3)
   - [x] Implementar tela "Projetos" com CRUD, fluxo (SUPER/NAO_SUPER) e vínculo com municípios.
     - ✅ ProjetosPage.jsx criado: listagem + busca + paginação + tags fluxo (Iteração 2)
     - ✅ Rota `/admin-dat/projetos` configurada (Iteração 2)
@@ -86,32 +88,37 @@ Plano DAT + GCal — 2025-10-29
 
 ---
 
-## 📋 Próximos Passos (Fase 1 - Iteração 3)
+## 📋 Próximos Passos (Fase 1 - Iteração 4)
 
 **Prioridade Alta** (próxima sessão):
-1. **Tela Grupos**: Criar `GruposPage.jsx`
-   - Listagem de grupos Django com fetch de `/api/grupos/`
-   - Tabela com ID, Nome, Permissions, User Count
-   - Modal para CRUD de grupos
-   - Reutilizar estrutura de MunicipiosPage/ProjetosPage
-2. **GAP-003**: Endpoint para atribuir grupos a usuários
-   - `POST /api/usuarios-admin/{id}/groups/` (payload: `{group_ids: [...]}`)
-   - Método `@action` no UsuarioAdminViewSet
-3. **Modais CRUD**: Adicionar criação/edição em todas as páginas
-   - UsuariosPage: modal criar/editar usuário + atribuir CPF
-   - MunicipiosPage: modal criar/editar município
-   - ProjetosPage: modal criar/editar projeto
-   - GruposPage: modal criar/editar grupo + atribuir usuários
+1. **Modais CRUD para Municípios e Projetos**:
+   - MunicipiosPage: modal criar/editar município (campos: nome, uf, ibge_code, ativo)
+   - ProjetosPage: modal criar/editar projeto (campos: nome, codigo, fluxo, ativo)
+   - Reutilizar padrão de UsuariosPage.jsx
+
+2. **Melhorias UX Admin DAT**:
+   - Confirmações de exclusão (Modal.confirm antes de deleteUser/deleteGroup/etc)
+   - Validações de formulário adicionais
+   - Loading states em operações assíncronas
+
+3. **Integração comando CPF**:
+   - Botão "Importar CPFs de Excel" em UsuariosPage
+   - Modal de upload + preview + confirmação
+   - Integrar com comando `assign_cpf_from_excel`
 
 **Prioridade Média**:
 4. **GAP-004**: Avaliar necessidade de modelo `Participation` ou vínculos ManyToMany
-5. Integração com comando `assign_cpf_from_excel` na UI de usuários
-6. Melhorias de UX: confirmações de exclusão, feedback visual, validações
+   - Análise de requisitos de vínculos usuário↔projeto
+   - Decisão: criar modelo ou usar campos existentes
+
+5. **Exportação de dados**:
+   - Botão "Exportar CSV" em cada listagem (Usuários, Municípios, Grupos, Projetos)
+   - Formatação adequada dos dados exportados
 
 **Backlog**:
-7. Testes E2E (Playwright) para fluxo completo de Admin DAT
-8. Exportação CSV de listagens
-9. Filtros avançados (datas, múltiplas UFs, etc.)
+6. Testes E2E (Playwright) para fluxo completo de Admin DAT
+7. Filtros avançados (datas, múltiplas UFs, permissões específicas)
+8. Auditoria de ações Admin DAT (log em AuditLog)
 
 ---
 
@@ -152,4 +159,29 @@ Plano DAT + GCal — 2025-10-29
 
 ---
 
-**Última atualização**: 2025-10-29 (Iteração 2 - Endpoints integrados, páginas Municípios/Projetos criadas)
+## 📦 Arquivos Criados/Modificados (Iteração 3)
+
+**Backend**:
+- `v2/backend/apps/core/views.py` - Adicionado método `assign_groups` (@action) no UsuarioAdminViewSet (GAP-003)
+- `v2/backend/apps/core/tests/test_assign_groups.py` - **NOVO** 7 testes para endpoint assign_groups (100% passing)
+
+**Frontend**:
+- `v2/frontend/src/api/adminDAT.js` - Adicionado método `assignGroups(userId, {group_ids: [...]})` (GAP-003)
+- `v2/frontend/src/pages/AdminDAT/GruposPage.jsx` - **NOVO** Página de grupos com CRUD e gestão de membros
+- `v2/frontend/src/pages/AdminDAT/UsuariosPage.jsx` - Adicionado modal CRUD (criar/editar usuário)
+- `v2/frontend/src/pages/AdminDAT/AdminDATHomePage.jsx` - Status de Grupos atualizado para "Disponível"
+- `v2/frontend/src/App.jsx` - Adicionada rota /admin-dat/grupos
+
+**Documentação**:
+- `v2/docs/PLANO_DAT_GCAL_2025-10-29.md` - Atualizado progresso Iteração 3 e próximos passos
+
+**Resumo Iteração 3**:
+- ✅ Endpoint `assign_groups` implementado e testado (7/7 testes passing)
+- ✅ GruposPage completa com gestão de membros via checkboxes
+- ✅ Modal CRUD funcional em UsuariosPage (criar/editar)
+- ✅ Todas as 4 páginas Admin DAT agora "Disponíveis" (Usuários, Municípios, Grupos, Projetos)
+- ⏳ Modais CRUD para Municípios e Projetos ficam para Iteração 4 (feature incremental)
+
+---
+
+**Última atualização**: 2025-10-29 (Iteração 3 - GruposPage, assign_groups e modais CRUD básicos)

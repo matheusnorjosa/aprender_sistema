@@ -3,6 +3,7 @@ DRF Serializers for Core models
 """
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from rest_framework import serializers
 
 from .models import (
@@ -412,3 +413,28 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             user.set_password(password)
             user.save()
         return user
+
+
+class GroupSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Django Group model (Admin CRUD).
+
+    Used by Admin DAT for managing user groups/sectors.
+    GAP-002 (resolved): Created in Phase 1 Iteration 2.
+    """
+
+    permissions = serializers.SerializerMethodField(read_only=True)
+    user_count = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Group
+        fields = ["id", "name", "permissions", "user_count"]
+        read_only_fields = ["id", "permissions", "user_count"]
+
+    def get_permissions(self, obj):
+        """Return list of permission codenames."""
+        return [f"{p.content_type.app_label}.{p.codename}" for p in obj.permissions.all()]
+
+    def get_user_count(self, obj):
+        """Return count of users in this group."""
+        return obj.user_set.count()

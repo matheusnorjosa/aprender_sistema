@@ -88,37 +88,44 @@ Plano DAT + GCal — 2025-10-29
 
 ---
 
-## 📋 Próximos Passos (Fase 1 - Iteração 4)
+## 📋 Próximos Passos (Fase 1 - Iteração 5)
 
-**Prioridade Alta** (próxima sessão):
-1. **Modais CRUD para Municípios e Projetos**:
-   - MunicipiosPage: modal criar/editar município (campos: nome, uf, ibge_code, ativo)
-   - ProjetosPage: modal criar/editar projeto (campos: nome, codigo, fluxo, ativo)
-   - Reutilizar padrão de UsuariosPage.jsx
+**Completado em Iteração 4** ✅:
+- ✅ Modais CRUD para Municípios e Projetos
+- ✅ Confirmações de exclusão (Modal.confirm)
+- ✅ Validações de formulário
+- ✅ Integração CPF (documentação comando existente)
 
-2. **Melhorias UX Admin DAT**:
-   - Confirmações de exclusão (Modal.confirm antes de deleteUser/deleteGroup/etc)
-   - Validações de formulário adicionais
-   - Loading states em operações assíncronas
+**Prioridade Alta** (Iteração 5):
+1. **Melhorias UX/Performance Admin DAT**:
+   - Loading states em operações assíncronas (create/update/delete)
+   - Feedback visual de sucesso/erro em todas as ações
+   - Validações adicionais de formulário (unicidade, formatos)
 
-3. **Integração comando CPF**:
-   - Botão "Importar CPFs de Excel" em UsuariosPage
-   - Modal de upload + preview + confirmação
-   - Integrar com comando `assign_cpf_from_excel`
+2. **Exportação de dados**:
+   - Botão "Exportar CSV" em cada listagem (Usuários, Municípios, Grupos, Projetos)
+   - Formatação adequada dos dados exportados
+   - Download direto via blob URL
+
+3. **Integração CPF - UI (opcional)**:
+   - Se demanda de uso aumentar: criar endpoint upload Excel
+   - Modal "Importar CPFs" com DRY-RUN/APPLY toggle
+   - Preview de mudanças antes de aplicar
 
 **Prioridade Média**:
 4. **GAP-004**: Avaliar necessidade de modelo `Participation` ou vínculos ManyToMany
    - Análise de requisitos de vínculos usuário↔projeto
    - Decisão: criar modelo ou usar campos existentes
 
-5. **Exportação de dados**:
-   - Botão "Exportar CSV" em cada listagem (Usuários, Municípios, Grupos, Projetos)
-   - Formatação adequada dos dados exportados
+5. **Filtros avançados**:
+   - Filtro por is_active em UsuariosPage
+   - Filtro por fluxo (SUPER/NAO_SUPER) em ProjetosPage
+   - Múltiplas UFs em MunicipiosPage
 
 **Backlog**:
 6. Testes E2E (Playwright) para fluxo completo de Admin DAT
-7. Filtros avançados (datas, múltiplas UFs, permissões específicas)
-8. Auditoria de ações Admin DAT (log em AuditLog)
+7. Auditoria de ações Admin DAT (log em AuditLog)
+8. Paginação server-side em MunicipiosPage e ProjetosPage (se necessário)
 
 ---
 
@@ -184,4 +191,30 @@ Plano DAT + GCal — 2025-10-29
 
 ---
 
-**Última atualização**: 2025-10-29 (Iteração 3 - GruposPage, assign_groups e modais CRUD básicos)
+## 📦 Arquivos Criados/Modificados (Iteração 4)
+
+**Frontend**:
+- `v2/frontend/src/pages/AdminDAT/MunicipiosPage.jsx` - **COMPLETO** Modal CRUD (criar/editar/excluir) com confirmações
+- `v2/frontend/src/pages/AdminDAT/ProjetosPage.jsx` - **COMPLETO** Modal CRUD com radio fluxo SUPER/NAO_SUPER
+
+**Documentação**:
+- `v2/docs/PLANO_DAT_GCAL_2025-10-29.md` - Atualizado progresso Iteração 4 e integração CPF
+
+**Resumo Iteração 4**:
+- ✅ MunicipiosPage: modal CRUD completo (campos: nome, uf, ibge_code, ativo)
+- ✅ ProjetosPage: modal CRUD completo (campos: nome, codigo, fluxo, ativo)
+- ✅ Modal.confirm implementado em todas as exclusões (UX/IHC compliance)
+- ✅ Validações de formulário (required fields, tipos corretos)
+- ✅ Integração CPF: Documentado comando existente `assign_cpf_from_excel`
+- 📝 Todas as 4 páginas Admin DAT agora com CRUD completo e funcional
+
+**Decisão de Implementação - Integração CPF (Iteração 4)**:
+- **Abordagem escolhida**: Documentação do comando existente (Opção 3)
+- **Razão**: Comando já implementado e testado; operação infrequente; mantém escopo da iteração focado
+- **Comando**: `python manage.py assign_cpf_from_excel --path /app/data/csv-import/Usuários.xlsx --sheet Ativos [--apply]`
+- **Funcionalidades**: DRY-RUN/APPLY, validação CPF mod 11, match email→nome, relatório JSON
+- **Upgrade futuro**: UI de upload pode ser adicionada em iteração posterior se necessário
+
+---
+
+**Última atualização**: 2025-10-29 (Iteração 4 - Modais CRUD completos para Municípios e Projetos)

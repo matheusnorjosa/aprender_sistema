@@ -27,14 +27,15 @@ export default function AdminDATHomePage() {
       description: 'Gerenciar usuários, CPF, grupos e perfis',
       icon: <UserOutlined style={{ fontSize: '48px', color: '#1890ff' }} />,
       path: '/admin-dat/usuarios',
-      status: 'Em desenvolvimento',
+      status: 'Disponível',
     },
     {
       key: 'municipios',
+      title: 'Municípios',
       description: 'CRUD de municípios com indicadores (UF, ativo)',
       icon: <EnvironmentOutlined style={{ fontSize: '48px', color: '#52c41a' }} />,
       path: '/admin-dat/municipios',
-      status: 'Pendente',
+      status: 'Disponível',
     },
     {
       key: 'grupos',
@@ -50,7 +51,7 @@ export default function AdminDATHomePage() {
       description: 'CRUD de projetos, fluxo (SUPER/NAO_SUPER) e municípios',
       icon: <ProjectOutlined style={{ fontSize: '48px', color: '#722ed1' }} />,
       path: '/admin-dat/projetos',
-      status: 'Pendente',
+      status: 'Disponível',
     },
   ];
 
@@ -73,11 +74,11 @@ export default function AdminDATHomePage() {
               style={{
                 textAlign: 'center',
                 height: '100%',
-                cursor: module.status === 'Em desenvolvimento' ? 'pointer' : 'not-allowed',
-                opacity: module.status === 'Em desenvolvimento' ? 1 : 0.6,
+                cursor: module.status === 'Disponível' ? 'pointer' : 'not-allowed',
+                opacity: module.status === 'Disponível' ? 1 : 0.6,
               }}
               onClick={() => {
-                if (module.status === 'Em desenvolvimento') {
+                if (module.status === 'Disponível') {
                   navigate(module.path);
                 }
               }}
@@ -90,7 +91,7 @@ export default function AdminDATHomePage() {
                 {module.description}
               </Text>
               <Text
-                type={module.status === 'Em desenvolvimento' ? 'success' : 'warning'}
+                type={module.status === 'Disponível' ? 'success' : 'warning'}
                 strong
                 style={{ fontSize: '11px' }}
               >

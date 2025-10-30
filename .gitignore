@@ -481,3 +481,4 @@ debug_*
 # OS files
 .DS_Store
 Thumbs.db
+v2/docs/issues/

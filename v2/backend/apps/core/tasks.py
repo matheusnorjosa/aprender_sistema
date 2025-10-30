@@ -128,6 +128,75 @@ def task_publish_solicitacao_to_gcal(
         }
 
 
+@shared_task(name="apps.core.tasks.task_cancel_solicitacao_from_gcal")
+def task_cancel_solicitacao_from_gcal(solicitation_id: int):
+    """
+    Cancela evento de uma Solicitacao no Google Calendar (via Celery) - Fase 4.
+
+    Deleta evento do Calendar e limpa campos relacionados (external_event_id,
+    meet_link, gcal_payload_hash). Trata 404 como sucesso (idempotência).
+
+    Args:
+        solicitation_id: ID da Solicitacao a cancelar
+
+    Returns:
+        dict: {
+            "action": "DELETE" | "ERROR",
+            "solicitation_id": int,
+            "external_event_id": str | None,
+            "summary": str,
+            "error": str | None
+        }
+    """
+    from apps.core.models import Solicitacao, AuditLog
+    from apps.core.services.gcal_sync_service import cancel_solicitacao
+
+    try:
+        # Buscar solicitação
+        s = Solicitacao.objects.get(id=solicitation_id)
+
+        # Cancelar evento no Calendar e limpar campos
+        outcome = cancel_solicitacao(s)
+
+        # Criar AuditLog
+        AuditLog.objects.create(
+            usuario=None,  # Task assíncrona, sem usuário direto
+            action="CANCEL_GCAL",
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": s.id,
+                "action": outcome.action,
+                "external_event_id": outcome.external_event_id,
+                "summary": outcome.summary,
+            },
+        )
+
+        return {
+            "action": outcome.action,
+            "solicitation_id": outcome.solicitation_id,
+            "external_event_id": outcome.external_event_id,
+            "summary": outcome.summary,
+            "error": None,
+        }
+
+    except Solicitacao.DoesNotExist:
+        return {
+            "action": "ERROR",
+            "solicitation_id": solicitation_id,
+            "external_event_id": None,
+            "summary": f"Solicitação #{solicitation_id} não encontrada",
+            "error": "DoesNotExist",
+        }
+    except Exception as e:
+        return {
+            "action": "ERROR",
+            "solicitation_id": solicitation_id,
+            "external_event_id": None,
+            "summary": f"Erro ao cancelar: {str(e)}",
+            "error": str(e)[:500],
+        }
+
+
 @shared_task(name="apps.core.tasks.preview_then_apply_gcal")
 def preview_then_apply_gcal():
     """

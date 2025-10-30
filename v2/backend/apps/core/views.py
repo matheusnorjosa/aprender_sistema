@@ -722,6 +722,56 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
     ordering_fields = ["username", "email", "date_joined", "id"]
     ordering = ["username"]
 
+    @action(detail=True, methods=["post"], permission_classes=[IsDAT])
+    def assign_groups(self, request, pk=None):
+        """
+        Atribui grupos a um usuário.
+
+        Endpoint: POST /api/usuarios-admin/{id}/assign_groups/
+        Payload: {"group_ids": [1, 2, 3]}
+
+        GAP-003 (resolvido): Endpoint para vincular usuários a grupos.
+        Iteração 3 - Fase 1 Plano DAT/GCal.
+        """
+        usuario = self.get_object()
+        group_ids = request.data.get("group_ids", [])
+
+        # Validar tipo de dados
+        if not isinstance(group_ids, list):
+            return Response(
+                {"error": "group_ids must be a list of integers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validar que são inteiros
+        try:
+            group_ids = [int(gid) for gid in group_ids]
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "group_ids must contain only integers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Remover duplicados
+        group_ids = list(set(group_ids))
+
+        # Verificar se todos os grupos existem
+        groups = Group.objects.filter(id__in=group_ids)
+        if groups.count() != len(group_ids):
+            found_ids = set(groups.values_list("id", flat=True))
+            missing_ids = set(group_ids) - found_ids
+            return Response(
+                {"error": f"Groups not found with IDs: {sorted(missing_ids)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Atribuir grupos (substitui grupos existentes)
+        usuario.groups.set(groups)
+
+        # Retornar usuário atualizado com grupos
+        serializer = self.get_serializer(usuario)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class GroupViewSet(viewsets.ModelViewSet):
     """

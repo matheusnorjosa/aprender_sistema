@@ -41,6 +41,7 @@ import AdminDATHomePage from './pages/AdminDAT/AdminDATHomePage';
 import UsuariosPage from './pages/AdminDAT/UsuariosPage';
 import MunicipiosPage from './pages/AdminDAT/MunicipiosPage';
 import ProjetosPage from './pages/AdminDAT/ProjetosPage';
+import GruposPage from './pages/AdminDAT/GruposPage';
 import { getMe } from './api/availability';
 import './App.css';
 
@@ -316,6 +317,10 @@ function App() {
                 <Route
                   path="/admin-dat/projetos"
                   element={canDAT ? <ProjetosPage /> : <Forbidden />}
+                />
+                <Route
+                  path="/admin-dat/grupos"
+                  element={canDAT ? <GruposPage /> : <Forbidden />}
                 />
 
                 {/* Antigas rotas (manter compatibilidade) */}

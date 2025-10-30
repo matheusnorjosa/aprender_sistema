@@ -473,4 +473,4 @@ Se precisar de "CPF ausente" em produção, considere:
 - **Comando assign_cpf_from_excel**: `v2/backend/apps/dat_ingest/management/commands/assign_cpf_from_excel.py`
 - **Admin CPF Filter**: `v2/backend/apps/core/admin.py` (classe `CPFFilter`)
 - **Testes**: `v2/backend/apps/core/tests/test_assign_cpf_command.py`, `v2/backend/apps/dat_ingest/tests/test_audit_agenda_users.py`
-- **Release Notes**: `docs/RELEASE_NOTES.md`
+- **Release Notes**: `v2/docs/RELEASE_NOTES.md`

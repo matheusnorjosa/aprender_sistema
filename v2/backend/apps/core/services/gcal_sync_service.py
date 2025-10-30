@@ -482,7 +482,11 @@ def apply_one_solicitacao(
 
 def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
     """
-    Constrói payload do evento para Google Calendar API.
+    Constrói payload do evento para Google Calendar API (Fase 3 - Template Padronizado).
+
+    Template Format:
+    - Title: "{municipio.nome} - {municipio.uf} {segmento} {modalidade} [{projeto.codigo}]"
+    - Description: Structured multi-line sections (Município, Projeto, Data, Modalidade, Equipe, Links/Observações)
 
     Args:
         s: Solicitacao aprovada
@@ -497,31 +501,45 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
 
     # Extrair atributos (podem ser None)
     municipio = getattr(s, "municipio", None)
+    projeto = getattr(s, "projeto", None)
     tipo = getattr(s, "tipo_evento", None)
     usuario = getattr(s, "usuario", None)
+    coordenador = getattr(s, "coordenador", None)
 
-    # Construir summary: "Município - UF — Tipo — Usuário"
-    parts = []
+    # ================================================================
+    # TITLE (SUMMARY) - Fase 3 Template
+    # ================================================================
+    # Format: "{municipio.nome} - {municipio.uf} {segmento} {modalidade} [{projeto.codigo ou nome}]"
+    # Example: "Salvador - BA Fundamental I Online [ACERTA]"
+    title_parts = []
 
+    # 1. Município - UF
     if municipio:
         nome_mun = getattr(municipio, "nome", "")
         uf_mun = getattr(municipio, "uf", "")
         if nome_mun:
-            parts.append(f"{nome_mun}{' - ' + uf_mun if uf_mun else ''}")
+            mun_part = f"{nome_mun} - {uf_mun}" if uf_mun else nome_mun
+            title_parts.append(mun_part)
 
-    if tipo:
-        nome_tipo = getattr(tipo, "nome", "")
-        if nome_tipo:
-            parts.append(nome_tipo)
+    # 2. Segmento (ex: "Fundamental I", "Fundamental II")
+    segmento = getattr(s, "segmento", "")
+    if segmento:
+        title_parts.append(segmento.strip())
 
-    if usuario:
-        nome_user = getattr(usuario, "get_full_name", lambda: "")() or getattr(
-            usuario, "username", ""
-        )
-        if nome_user:
-            parts.append(nome_user)
+    # 3. Modalidade (Online/Presencial)
+    is_online = getattr(s, "is_online", False)
+    modalidade = "Online" if is_online else "Presencial"
+    title_parts.append(modalidade)
 
-    summary = " — ".join(parts) if parts else f"Solicitação #{s.id}"
+    # 4. Projeto [codigo] ou [nome] como fallback
+    if projeto:
+        projeto_codigo = getattr(projeto, "codigo", "")
+        projeto_nome = getattr(projeto, "nome", "")
+        projeto_label = projeto_codigo if projeto_codigo else projeto_nome
+        if projeto_label:
+            title_parts.append(f"[{projeto_label}]")
+
+    summary = " ".join(title_parts) if title_parts else f"Solicitação #{s.id}"
 
     # ================================================================
     # DEFENSIVE TRUNCATION (Google Calendar limits)
@@ -535,14 +553,84 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
     else:
         summary_trimmed = summary
 
-    # Description base + excess do summary (se houver) + observações
-    description_parts = [f"AS v2 • Solicitação #{s.id}"]
-    if summary_excess:
-        description_parts.append(summary_excess.strip())
-    if s.observacoes:
-        description_parts.append(s.observacoes.strip())
+    # ================================================================
+    # DESCRIPTION - Fase 3 Template
+    # ================================================================
+    # Structured multi-line format with sections
+    description_lines = []
 
-    description = "\n\n".join(description_parts).strip()
+    # Header
+    description_lines.append(f"📋 Solicitação #{s.id} — AS v2")
+    description_lines.append("")
+
+    # Seção 1: Município
+    if municipio:
+        nome_mun = getattr(municipio, "nome", "")
+        uf_mun = getattr(municipio, "uf", "")
+        mun_display = f"{nome_mun} - {uf_mun}" if (nome_mun and uf_mun) else nome_mun
+        description_lines.append(f"📍 Município: {mun_display}")
+
+    # Seção 2: Projeto
+    if projeto:
+        projeto_nome = getattr(projeto, "nome", "")
+        projeto_codigo = getattr(projeto, "codigo", "")
+        if projeto_nome:
+            projeto_display = f"{projeto_nome} ({projeto_codigo})" if projeto_codigo else projeto_nome
+            description_lines.append(f"📂 Projeto: {projeto_display}")
+
+    # Seção 3: Tipo de Evento
+    if tipo:
+        tipo_nome = getattr(tipo, "nome", "")
+        if tipo_nome:
+            description_lines.append(f"🎯 Tipo: {tipo_nome}")
+
+    # Seção 4: Data/Horário (formatado em America/Fortaleza)
+    import pytz
+    fortaleza_tz = pytz.timezone("America/Fortaleza")
+    inicio_local = s.inicio.astimezone(fortaleza_tz)
+    fim_local = s.fim.astimezone(fortaleza_tz)
+    data_format = "%d/%m/%Y %H:%M"
+    description_lines.append(
+        f"📅 Data: {inicio_local.strftime(data_format)} a {fim_local.strftime(data_format)}"
+    )
+
+    # Seção 5: Modalidade
+    description_lines.append(f"🌐 Modalidade: {modalidade}")
+
+    # Seção 6: Equipe (Formadores + Coordenador)
+    equipe_parts = []
+
+    # Formadores (via ManyToMany)
+    formadores = s.formadores.all()
+    if formadores.exists():
+        formadores_names = [f.get_full_name() or f.username for f in formadores]
+        equipe_parts.append(f"Formador(es): {', '.join(formadores_names)}")
+
+    # Coordenador
+    if coordenador:
+        coord_name = coordenador.get_full_name() or coordenador.username
+        equipe_parts.append(f"Coordenador(a): {coord_name}")
+
+    if equipe_parts:
+        description_lines.append("")
+        description_lines.append("👥 Equipe:")
+        for equipe_line in equipe_parts:
+            description_lines.append(f"  • {equipe_line}")
+
+    # Seção 7: Links e Observações
+    observacoes = getattr(s, "observacoes", "")
+    if observacoes:
+        description_lines.append("")
+        description_lines.append("📝 Observações:")
+        description_lines.append(observacoes.strip())
+
+    # Adicionar excess do summary (se houver)
+    if summary_excess:
+        description_lines.append("")
+        description_lines.append(summary_excess.strip())
+
+    # Join lines
+    description = "\n".join(description_lines).strip()
 
     # Limitar description a 5000 chars
     if len(description) > 5000:

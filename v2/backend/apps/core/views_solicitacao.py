@@ -61,9 +61,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     ordering = ["-inicio"]
 
     def get_permissions(self):
-        # Actions approve, reject, preview_gcal, publish têm permission_classes específicas
+        # Actions approve, reject, preview_gcal, publish, resync_gcal, cancel_gcal têm permission_classes específicas
         # Não sobrescrever nesses casos
-        if self.action in ["approve", "reject", "preview_gcal", "publish"]:
+        if self.action in ["approve", "reject", "preview_gcal", "publish", "resync_gcal", "cancel_gcal"]:
             return super().get_permissions()
         if self.action == "create":
             return [IsCoordenadorOrDAT()]
@@ -526,6 +526,159 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 "detail": "Publicação solicitada com sucesso (processando em background).",
+                "task_id": task.id,
+                "solicitacao_id": solicitacao.id,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsControleOrSuper],
+        url_path="resync-gcal",
+    )
+    def resync_gcal(self, request, pk=None):
+        """
+        Republicar solicitação no Google Calendar (força UPDATE) - Fase 4.
+
+        Reseta gcal_payload_hash para forçar UPDATE mesmo se já publicado.
+        Enfileira task_publish_solicitacao_to_gcal para republicação.
+
+        Permissão: Controle ou Superintendência
+        Returns: 202 Accepted (processamento assíncrono)
+        """
+        from apps.core.tasks import task_publish_solicitacao_to_gcal
+        from apps.core.models import AuditLog
+
+        solicitacao = self.get_object()
+
+        # Validar status aprovado
+        if solicitacao.status != "aprovado":
+            return Response(
+                {"detail": "Apenas solicitações aprovadas podem ser resincronizadas."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Marcar como PENDING (será republicado)
+        solicitacao.mark_gcal(
+            status=Solicitacao.GCalStatus.PENDING,
+            payload_hash=None,  # Resetar hash para forçar UPDATE
+            error=""
+        )
+
+        # Enfileirar task de publicação (reutiliza lógica existente)
+        task = task_publish_solicitacao_to_gcal.delay(
+            solicitacao.id, dry_run=False, apply_blocked=False
+        )
+
+        # AuditLog
+        client_ip = _get_client_ip(request)
+        AuditLog.objects.create(
+            usuario=request.user,
+            action="RESYNC_GCAL_REQUESTED",
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": solicitacao.id,
+                "task_id": task.id,
+                "ip_address": client_ip,
+            },
+        )
+
+        logger.info(
+            "resync_gcal_requested",
+            extra={
+                "event": "resync_gcal_requested",
+                "user_id": request.user.id,
+                "username": request.user.username,
+                "solicitacao_id": solicitacao.id,
+                "task_id": task.id,
+                "ip_address": client_ip,
+                "timestamp": timezone.now().isoformat(),
+            },
+        )
+
+        return Response(
+            {
+                "detail": "Resincronização solicitada com sucesso (processando em background).",
+                "task_id": task.id,
+                "solicitacao_id": solicitacao.id,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsControleOrSuper],
+        url_path="cancel-gcal",
+    )
+    def cancel_gcal(self, request, pk=None):
+        """
+        Cancelar evento no Google Calendar e limpar campos - Fase 4.
+
+        Deleta evento do Calendar (trata 404 como sucesso - idempotência) e limpa
+        todos os campos relacionados: external_event_id, meet_link, gcal_payload_hash.
+
+        Permissão: Controle ou Superintendência
+        Returns: 202 Accepted (processamento assíncrono) ou 409 Conflict
+        """
+        from apps.core.tasks import task_cancel_solicitacao_from_gcal
+        from apps.core.models import AuditLog
+
+        solicitacao = self.get_object()
+
+        # Validar que evento foi publicado
+        if not solicitacao.external_event_id and solicitacao.gcal_status != Solicitacao.GCalStatus.PUBLISHED:
+            return Response(
+                {
+                    "detail": "Solicitação não possui evento publicado no Google Calendar.",
+                    "hint": "Apenas eventos publicados podem ser cancelados.",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        # Marcar como PENDING temporariamente (task mudará para NONE após deletar)
+        solicitacao.mark_gcal(
+            status=Solicitacao.GCalStatus.PENDING,
+            payload_hash=solicitacao.gcal_payload_hash,  # Manter hash durante cancelamento
+            error=""
+        )
+
+        # Enfileirar task de cancelamento
+        task = task_cancel_solicitacao_from_gcal.delay(solicitacao.id)
+
+        # AuditLog
+        client_ip = _get_client_ip(request)
+        AuditLog.objects.create(
+            usuario=request.user,
+            action="CANCEL_GCAL_REQUESTED",
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": solicitacao.id,
+                "task_id": task.id,
+                "external_event_id": solicitacao.external_event_id,
+                "ip_address": client_ip,
+            },
+        )
+
+        logger.info(
+            "cancel_gcal_requested",
+            extra={
+                "event": "cancel_gcal_requested",
+                "user_id": request.user.id,
+                "username": request.user.username,
+                "solicitacao_id": solicitacao.id,
+                "task_id": task.id,
+                "external_event_id": solicitacao.external_event_id,
+                "ip_address": client_ip,
+                "timestamp": timezone.now().isoformat(),
+            },
+        )
+
+        return Response(
+            {
+                "detail": "Cancelamento solicitado com sucesso (processando em background).",
                 "task_id": task.id,
                 "solicitacao_id": solicitacao.id,
             },

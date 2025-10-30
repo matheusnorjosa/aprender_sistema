@@ -6,10 +6,10 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message } from 'antd';
-import { ProjectOutlined, ReloadOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Radio, Checkbox } from 'antd';
+import { ProjectOutlined, ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
-import { listProjetos } from '../../api/adminDAT';
+import { listProjetos, createProjeto, updateProjeto, deleteProjeto } from '../../api/adminDAT';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -18,6 +18,10 @@ export default function ProjetosPage() {
   const [projetos, setProjetos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingProjeto, setEditingProjeto] = useState(null);
+
+  const [form] = Form.useForm();
 
   const fetchProjetos = async () => {
     setLoading(true);
@@ -37,6 +41,59 @@ export default function ProjetosPage() {
   useEffect(() => {
     fetchProjetos();
   }, [searchText]);
+
+  const handleCreate = () => {
+    setEditingProjeto(null);
+    form.resetFields();
+    setModalVisible(true);
+  };
+
+  const handleEdit = (projeto) => {
+    setEditingProjeto(projeto);
+    form.setFieldsValue({
+      nome: projeto.nome,
+      codigo: projeto.codigo,
+      fluxo: projeto.fluxo,
+      ativo: projeto.ativo,
+    });
+    setModalVisible(true);
+  };
+
+  const handleSave = async (values) => {
+    try {
+      if (editingProjeto) {
+        await updateProjeto(editingProjeto.id, values);
+        message.success('Projeto atualizado com sucesso');
+      } else {
+        await createProjeto(values);
+        message.success('Projeto criado com sucesso');
+      }
+      setModalVisible(false);
+      form.resetFields();
+      fetchProjetos();
+    } catch (error) {
+      message.error(`Erro: ${error.message}`);
+    }
+  };
+
+  const handleDelete = (projeto) => {
+    Modal.confirm({
+      title: 'Confirmar exclusão',
+      content: `Tem certeza que deseja excluir o projeto "${projeto.nome}"?`,
+      okText: 'Sim, excluir',
+      okType: 'danger',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          await deleteProjeto(projeto.id);
+          message.success('Projeto excluído com sucesso');
+          fetchProjetos();
+        } catch (error) {
+          message.error(`Erro ao excluir: ${error.message}`);
+        }
+      },
+    });
+  };
 
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
@@ -64,10 +121,26 @@ export default function ProjetosPage() {
       title: 'Ações',
       key: 'acoes',
       width: 150,
-      render: () => (
-        <Button type="link" size="small" icon={<EditOutlined />} disabled title="Em desenvolvimento">
-          Editar
-        </Button>
+      render: (_, record) => (
+        <Space size="small">
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+          >
+            Editar
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record)}
+          >
+            Excluir
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -94,7 +167,7 @@ export default function ProjetosPage() {
             <Button icon={<ReloadOutlined />} onClick={fetchProjetos} loading={loading}>
               Atualizar
             </Button>
-            <Button type="primary" icon={<PlusOutlined />} disabled title="Em desenvolvimento">
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
               Novo Projeto
             </Button>
           </Space>
@@ -109,6 +182,55 @@ export default function ProjetosPage() {
           scroll={{ x: 900 }}
         />
       </Card>
+
+      {/* Modal Criar/Editar Projeto */}
+      <Modal
+        title={editingProjeto ? 'Editar Projeto' : 'Novo Projeto'}
+        open={modalVisible}
+        onCancel={() => setModalVisible(false)}
+        onOk={() => form.submit()}
+        okText="Salvar"
+        cancelText="Cancelar"
+        width={600}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSave}
+        >
+          <Form.Item
+            name="nome"
+            label="Nome do Projeto"
+            rules={[{ required: true, message: 'Nome é obrigatório' }]}
+          >
+            <Input placeholder="Ex: PROJETO AMMA" />
+          </Form.Item>
+
+          <Form.Item
+            name="codigo"
+            label="Código"
+            rules={[{ required: true, message: 'Código é obrigatório' }]}
+          >
+            <Input placeholder="Ex: AMMA" />
+          </Form.Item>
+
+          <Form.Item
+            name="fluxo"
+            label="Fluxo de Aprovação"
+            rules={[{ required: true, message: 'Fluxo é obrigatório' }]}
+            initialValue="NAO_SUPER"
+          >
+            <Radio.Group>
+              <Radio value="SUPER">SUPER (Aprovação Manual pela Superintendência)</Radio>
+              <Radio value="NAO_SUPER">NAO_SUPER (Auto-aprovado)</Radio>
+            </Radio.Group>
+          </Form.Item>
+
+          <Form.Item name="ativo" valuePropName="checked" initialValue={true}>
+            <Checkbox>Projeto ativo</Checkbox>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

@@ -21,7 +21,18 @@ async function apiFetch(url, options = {}) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(error.detail || `HTTP ${response.status}`);
+
+    // Status-specific error handling
+    let message;
+    if (response.status === 403) {
+      message = 'Você não tem permissão para realizar esta ação.';
+    } else if (response.status === 404) {
+      message = 'Recurso não encontrado.';
+    } else {
+      message = error.detail || `Erro HTTP ${response.status}`;
+    }
+
+    throw new Error(message);
   }
 
   return response.json();

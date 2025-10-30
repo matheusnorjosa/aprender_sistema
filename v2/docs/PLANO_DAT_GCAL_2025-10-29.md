@@ -26,18 +26,21 @@ Plano DAT + GCal — 2025-10-29
       - Serializers: `v2/backend/apps/core/serializers.py`
       - Views: `v2/backend/apps/core/views.py`
   - [x] Implementar tela "Usuários" com listagem, busca, criação/edição e atribuição de CPF (reuso dos comandos).
-    - ✅ Skeleton criado: `AdminDATHomePage.jsx` + `UsuariosPage.jsx`
-    - ✅ Rotas configuradas: `/admin-dat` (landing), `/admin-dat/usuarios` (listagem mock)
-    - ✅ Permissão RBAC: `canDAT` (grupo DAT + superusers)
-    - ⏳ Pendente: Reativar `/api/usuarios-admin/` (GAP-001) e integrar fetch real
-  - [ ] Implementar tela "Municípios" com CRUD e indicadores (UF/ativo).
-    - ⏳ Pendente: Criar `MunicipiosPage.jsx` e rota `/admin-dat/municipios`
+    - ✅ Skeleton criado: `AdminDATHomePage.jsx` + `UsuariosPage.jsx` (Iteração 1)
+    - ✅ Rotas configuradas: `/admin-dat` (landing), `/admin-dat/usuarios` (Iteração 1)
+    - ✅ Permissão RBAC: `canDAT` (grupo DAT + superusers) (Iteração 1)
+    - ✅ GAP-001 resolvido: `/api/usuarios-admin/` reativado (Iteração 2)
+    - ✅ Fetch real: UsuariosPage integrado com API, paginação DRF, filtros (Iteração 2)
+  - [x] Implementar tela "Municípios" com CRUD e indicadores (UF/ativo).
+    - ✅ MunicipiosPage.jsx criado: listagem + busca + filtro UF + paginação (Iteração 2)
+    - ✅ Rota `/admin-dat/municipios` configurada (Iteração 2)
     - ✅ Endpoint disponível: `GET/POST/PUT/PATCH/DELETE /api/municipios/`
   - [ ] Implementar tela "Grupos/Setores" com CRUD e vínculo usuário↔setor.
     - ⏳ Pendente: Criar `GruposPage.jsx` e rota `/admin-dat/grupos`
-    - ❌ GAP-002: Criar GroupViewSet (`/api/grupos/`)
-  - [ ] Implementar tela "Projetos" com CRUD, fluxo (SUPER/NAO_SUPER) e vínculo com municípios.
-    - ⏳ Pendente: Criar `ProjetosPage.jsx` e rota `/admin-dat/projetos`
+    - ✅ GAP-002 resolvido: GroupViewSet criado (`/api/grupos/`) (Iteração 2)
+  - [x] Implementar tela "Projetos" com CRUD, fluxo (SUPER/NAO_SUPER) e vínculo com municípios.
+    - ✅ ProjetosPage.jsx criado: listagem + busca + paginação + tags fluxo (Iteração 2)
+    - ✅ Rota `/admin-dat/projetos` configurada (Iteração 2)
     - ✅ Endpoint disponível: `GET/POST/PUT/PATCH/DELETE /api/projetos/`
   - [ ] Implementar tela "Vínculos" (usuário↔projeto/setor) com filtros e ações rápidas.
     - ⏳ Pendente: Avaliar necessidade (GAP-004)
@@ -68,36 +71,47 @@ Plano DAT + GCal — 2025-10-29
   - [ ] Automatizar processos que ainda dependem de planilhas, detalhando substituições (ex: importadores → formulários/front).
   - [ ] Documentar estratégia de abandono das planilhas (como entradas alimentam o sistema).
 
+- [ ] **Fase 6 — Módulo Controle: Importação e consulta de Compras** *(executar após conclusão das fases anteriores)*
+  - [ ] Página “Importação” exclusiva para grupo Controle:
+    - [ ] Botão “Importar planilha” (Excel/CSV) usando layout de exemplo `planilha compras.xlsx`.
+    - [ ] Pré-visualização com confirmação antes de aplicar.
+    - [ ] Caixa de seleção obrigatória com opções: “Usará a coleção nesse ano”, “Usará a coleção no próximo ano”, “Usará a coleção em outro ano”.
+  - [ ] Integração com backend:
+    - [ ] Endpoint DRF para upload/import (dry-run/apply) aproveitando ETL de compras.
+    - [ ] Persistir informações (município, produto/código, descrição, quantidade) e guardar seleção de uso de coleção.
+  - [ ] Página “Compras” (consulta) para grupo Controle:
+    - [ ] Listagem tratada com colunas: Código do Produto, Produto, Quantidade, Município, UF, Data da compra, Data da importação, Uso das coleções.
+    - [ ] Filtros básicos (município, UF, data, uso da coleção) e export CSV opcional.
+  - [ ] Testes e documentação do fluxo (manual + automático onde possível).
+
 ---
 
-## 📋 Próximos Passos (Fase 1 - Iteração 2)
+## 📋 Próximos Passos (Fase 1 - Iteração 3)
 
 **Prioridade Alta** (próxima sessão):
-1. **GAP-001**: Reativar `UsuarioAdminViewSet` em `v2/backend/apps/core/views.py`
-   - Descomentar ViewSet (linhas 698-719)
-   - Descomentar registro em `urls.py` (linha 71)
-   - Integrar fetch real em `UsuariosPage.jsx`
-   - Adicionar modal de CRUD (criar/editar usuário)
-2. **GAP-002**: Criar `GroupViewSet` para gestão de grupos Django
-   - Serializer: `GroupSerializer` (id, name, permissions read-only)
-   - ViewSet com IsDAT permission
-   - Registrar em `urls.py` como `/api/grupos/`
-3. **Telas Municípios e Projetos**: Criar `MunicipiosPage.jsx` e `ProjetosPage.jsx`
-   - Reutilizar estrutura de `UsuariosPage.jsx` (tabela + filtros + modal CRUD)
-   - Endpoints já existem e estão funcionais
-
-**Prioridade Média**:
-4. **GAP-003**: Endpoint para atribuir grupos a usuários
+1. **Tela Grupos**: Criar `GruposPage.jsx`
+   - Listagem de grupos Django com fetch de `/api/grupos/`
+   - Tabela com ID, Nome, Permissions, User Count
+   - Modal para CRUD de grupos
+   - Reutilizar estrutura de MunicipiosPage/ProjetosPage
+2. **GAP-003**: Endpoint para atribuir grupos a usuários
    - `POST /api/usuarios-admin/{id}/groups/` (payload: `{group_ids: [...]}`)
    - Método `@action` no UsuarioAdminViewSet
-5. **Tela Grupos**: Criar `GruposPage.jsx`
-   - Listagem de grupos Django
-   - Modal para atribuir usuários a grupos (reuso GAP-003)
+3. **Modais CRUD**: Adicionar criação/edição em todas as páginas
+   - UsuariosPage: modal criar/editar usuário + atribuir CPF
+   - MunicipiosPage: modal criar/editar município
+   - ProjetosPage: modal criar/editar projeto
+   - GruposPage: modal criar/editar grupo + atribuir usuários
+
+**Prioridade Média**:
+4. **GAP-004**: Avaliar necessidade de modelo `Participation` ou vínculos ManyToMany
+5. Integração com comando `assign_cpf_from_excel` na UI de usuários
+6. Melhorias de UX: confirmações de exclusão, feedback visual, validações
 
 **Backlog**:
-6. **GAP-004**: Avaliar necessidade de modelo `Participation` ou vínculos ManyToMany
-7. Integração com comando `assign_cpf_from_excel` na UI de usuários
-8. Testes E2E (Playwright) para fluxo completo de Admin DAT
+7. Testes E2E (Playwright) para fluxo completo de Admin DAT
+8. Exportação CSV de listagens
+9. Filtros avançados (datas, múltiplas UFs, etc.)
 
 ---
 
@@ -118,4 +132,24 @@ Plano DAT + GCal — 2025-10-29
 
 ---
 
-**Última atualização**: 2025-10-29 (Iteração 1 - Skeleton concluído)
+## 📦 Arquivos Criados/Modificados (Iteração 2)
+
+**Backend**:
+- `v2/backend/apps/core/views.py` - Reativado UsuarioAdminViewSet (GAP-001), criado GroupViewSet (GAP-002)
+- `v2/backend/apps/core/serializers.py` - Criado GroupSerializer com permissions e user_count
+- `v2/backend/apps/core/urls.py` - Registrado rotas usuarios-admin e grupos
+
+**Frontend**:
+- `v2/frontend/src/api/adminDAT.js` - **NOVO** Cliente API centralizado com CRUD completo (usuarios, grupos, municipios, projetos)
+- `v2/frontend/src/pages/AdminDAT/UsuariosPage.jsx` - Integrado com API real (paginação DRF, busca, ordenação)
+- `v2/frontend/src/pages/AdminDAT/MunicipiosPage.jsx` - **NOVO** Página de municípios com filtro UF
+- `v2/frontend/src/pages/AdminDAT/ProjetosPage.jsx` - **NOVO** Página de projetos com tags de fluxo
+- `v2/frontend/src/pages/AdminDAT/AdminDATHomePage.jsx` - Atualizado status dos módulos (Disponível)
+- `v2/frontend/src/App.jsx` - Adicionadas rotas /admin-dat/municipios e /admin-dat/projetos
+
+**Documentação**:
+- `v2/docs/PLANO_DAT_GCAL_2025-10-29.md` - Atualizado progresso Iteração 2 e próximos passos
+
+---
+
+**Última atualização**: 2025-10-29 (Iteração 2 - Endpoints integrados, páginas Municípios/Projetos criadas)

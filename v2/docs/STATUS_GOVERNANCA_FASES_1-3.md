@@ -62,7 +62,7 @@
 - ✅ **Issue #38**: chore(tests): avaliar escopos de fixtures (12 falhas variadas)
 
 ### 6. ✅ **Release Notes**
-- ✅ Documento completo criado em `docs/RELEASE_GOVERNANCA_GCAL_FASES_1-3.md`
+- ✅ Documento completo criado em `v2/docs/RELEASE_GOVERNANCA_GCAL_FASES_1-3.md`
 - ✅ Smoke tests documentados (6 validações)
 - ✅ Estratégia de merge explicada
 - ✅ Links para todos os PRs e issues

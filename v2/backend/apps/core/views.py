@@ -8,6 +8,7 @@ PA-05: Registrar usuário, data/hora e justificativa em AuditLog.
 
 import logging
 
+from django.contrib.auth.models import Group
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -35,6 +36,7 @@ from .serializers import (
     AuditLogSerializer,
     AvailabilityBlockSerializer,
     CompraSerializer,
+    GroupSerializer,
     MunicipioOptionSerializer,
     MunicipioSerializer,
     ProjetoOptionSerializer,
@@ -695,28 +697,53 @@ class CompraViewSet(viewsets.ModelViewSet):
 
 
 # TODO(GAP-004): UsuarioAdminViewSet requer UsuarioAdminSerializer não implementado
-# class UsuarioAdminViewSet(viewsets.ModelViewSet):
-#     """
-#     ViewSet para CRUD de Usuários (apenas DAT).
-#
-#     Permite criar/atualizar usuários, atribuir grupos, setar senhas.
-#
-#     Filtros disponíveis:
-#     - is_active: booleano
-#     - is_staff: booleano
-#     - search: busca em username, email, first_name, last_name, cpf
-#     - ordering: username, email, date_joined, id
-#     """
-#
-#     queryset = Usuario.objects.prefetch_related("groups").all()
-#     serializer_class = UsuarioAdminSerializer
-#     permission_classes = [IsDAT]
-#
-#     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-#     filterset_fields = ["is_active", "is_staff", "is_superuser"]
-#     search_fields = ["username", "email", "first_name", "last_name", "cpf"]
-#     ordering_fields = ["username", "email", "date_joined", "id"]
-#     ordering = ["username"]
+class UsuarioAdminViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para CRUD de Usuários (apenas DAT).
+
+    Permite criar/atualizar usuários, atribuir grupos, setar senhas.
+
+    Filtros disponíveis:
+    - is_active: booleano
+    - is_staff: booleano
+    - search: busca em username, email, first_name, last_name, cpf
+    - ordering: username, email, date_joined, id
+
+    GAP-001 (resolvido): Endpoint reativado em Fase 1 Iteração 2.
+    """
+
+    queryset = Usuario.objects.prefetch_related("groups").all()
+    serializer_class = UsuarioAdminSerializer
+    permission_classes = [IsDAT]
+
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["is_active", "is_staff", "is_superuser"]
+    search_fields = ["username", "email", "first_name", "last_name", "cpf"]
+    ordering_fields = ["username", "email", "date_joined", "id"]
+    ordering = ["username"]
+
+
+class GroupViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para CRUD de Grupos Django (apenas DAT).
+
+    Gerencia grupos/setores do sistema (Superintendência, Coordenador, Formador, etc.).
+
+    Filtros disponíveis:
+    - search: busca textual em name
+    - ordering: name, id
+
+    GAP-002 (resolvido): Endpoint criado em Fase 1 Iteração 2.
+    """
+
+    queryset = Group.objects.prefetch_related("permissions").all()
+    serializer_class = GroupSerializer
+    permission_classes = [IsDAT]
+
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ["name"]
+    ordering_fields = ["name", "id"]
+    ordering = ["name"]
 
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):

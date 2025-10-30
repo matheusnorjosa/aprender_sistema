@@ -43,7 +43,7 @@ export default function AdminDATHomePage() {
       description: 'Gerenciar grupos e vínculos usuário↔setor',
       icon: <TeamOutlined style={{ fontSize: '48px', color: '#faad14' }} />,
       path: '/admin-dat/grupos',
-      status: 'Pendente',
+      status: 'Disponível',
     },
     {
       key: 'projetos',

@@ -9,10 +9,10 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message } from 'antd';
-import { UserAddOutlined, ReloadOutlined, EditOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form } from 'antd';
+import { UserAddOutlined, ReloadOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
-import { listUsers } from '../../api/adminDAT';
+import { listUsers, createUser, updateUser } from '../../api/adminDAT';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -26,6 +26,10 @@ export default function UsuariosPage() {
     pageSize: 10,
     total: 0,
   });
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+
+  const [form] = Form.useForm();
 
   /**
    * Fetch users from API
@@ -66,6 +70,41 @@ export default function UsuariosPage() {
       pageSize: newPagination.pageSize,
       ordering: sorter.field ? `${sorter.order === 'descend' ? '-' : ''}${sorter.field}` : undefined,
     });
+  };
+
+  const handleCreate = () => {
+    setEditingUser(null);
+    form.resetFields();
+    setModalVisible(true);
+  };
+
+  const handleEdit = (user) => {
+    setEditingUser(user);
+    form.setFieldsValue({
+      username: user.username,
+      email: user.email,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      cpf: user.cpf,
+    });
+    setModalVisible(true);
+  };
+
+  const handleSave = async (values) => {
+    try {
+      if (editingUser) {
+        await updateUser(editingUser.id, values);
+        message.success('Usuário atualizado com sucesso');
+      } else {
+        await createUser(values);
+        message.success('Usuário criado com sucesso');
+      }
+      setModalVisible(false);
+      form.resetFields();
+      fetchUsuarios();
+    } catch (error) {
+      message.error(`Erro: ${error.message}`);
+    }
   };
 
   const columns = [
@@ -134,8 +173,7 @@ export default function UsuariosPage() {
             type="link"
             size="small"
             icon={<EditOutlined />}
-            disabled
-            title="Em desenvolvimento"
+            onClick={() => handleEdit(record)}
           >
             Editar
           </Button>
@@ -169,7 +207,7 @@ export default function UsuariosPage() {
             <Button icon={<ReloadOutlined />} onClick={() => fetchUsuarios()} loading={loading}>
               Atualizar
             </Button>
-            <Button type="primary" icon={<UserAddOutlined />} disabled title="Em desenvolvimento">
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
               Novo Usuário
             </Button>
           </Space>
@@ -190,6 +228,64 @@ export default function UsuariosPage() {
           scroll={{ x: 1200 }}
         />
       </Card>
+
+      {/* Modal Criar/Editar Usuário */}
+      <Modal
+        title={editingUser ? 'Editar Usuário' : 'Novo Usuário'}
+        open={modalVisible}
+        onCancel={() => setModalVisible(false)}
+        onOk={() => form.submit()}
+        okText="Salvar"
+        cancelText="Cancelar"
+        width={600}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSave}
+        >
+          <Form.Item
+            name="username"
+            label="Username"
+            rules={[{ required: true, message: 'Username é obrigatório' }]}
+          >
+            <Input placeholder="Ex: joao.silva" disabled={!!editingUser} />
+          </Form.Item>
+
+          <Form.Item
+            name="email"
+            label="Email"
+            rules={[
+              { required: true, message: 'Email é obrigatório' },
+              { type: 'email', message: 'Email inválido' },
+            ]}
+          >
+            <Input placeholder="usuario@example.com" />
+          </Form.Item>
+
+          <Form.Item name="first_name" label="Nome">
+            <Input placeholder="João" />
+          </Form.Item>
+
+          <Form.Item name="last_name" label="Sobrenome">
+            <Input placeholder="Silva" />
+          </Form.Item>
+
+          <Form.Item name="cpf" label="CPF">
+            <Input placeholder="12345678901 (apenas números)" maxLength={11} />
+          </Form.Item>
+
+          {!editingUser && (
+            <Form.Item
+              name="password"
+              label="Senha"
+              rules={[{ required: true, message: 'Senha é obrigatória para novo usuário' }]}
+            >
+              <Input.Password placeholder="Senha inicial" />
+            </Form.Item>
+          )}
+        </Form>
+      </Modal>
     </div>
   );
 }

@@ -548,6 +548,10 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
     # Description: ≤5000 chars total.
     summary_excess = ""
     if len(summary) > 1000:
+        logger.warning(
+            f"GCal payload truncation: Solicitacao #{s.id} summary truncated "
+            f"(original: {len(summary)} chars, truncated to 1000 chars)"
+        )
         summary_excess = f"\n\n[Título completo]\n{summary}\n"
         summary_trimmed = summary[:997] + "..."
     else:
@@ -634,6 +638,10 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
 
     # Limitar description a 5000 chars
     if len(description) > 5000:
+        logger.warning(
+            f"GCal payload truncation: Solicitacao #{s.id} description truncated "
+            f"(original: {len(description)} chars, truncated to 5000 chars)"
+        )
         description_trimmed = description[:4997] + "..."
     else:
         description_trimmed = description

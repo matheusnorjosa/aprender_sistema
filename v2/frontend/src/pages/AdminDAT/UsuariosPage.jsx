@@ -271,7 +271,16 @@ export default function UsuariosPage() {
             <Input placeholder="Silva" />
           </Form.Item>
 
-          <Form.Item name="cpf" label="CPF">
+          <Form.Item
+            name="cpf"
+            label="CPF"
+            rules={[
+              {
+                pattern: /^[0-9]{11}$/,
+                message: 'CPF deve conter exatamente 11 dígitos numéricos',
+              },
+            ]}
+          >
             <Input placeholder="12345678901 (apenas números)" maxLength={11} />
           </Form.Item>
 

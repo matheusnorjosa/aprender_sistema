@@ -949,3 +949,91 @@ def upsert_one(
                 update_fields=["last_synced_at", "last_sync_action", "last_sync_error"]
             )
         raise
+
+
+def resync_solicitacao(s: Solicitacao, *, apply_blocked: bool = False) -> SyncOutcome:
+    """
+    Republicar solicitação no Google Calendar (força UPDATE) - Fase 4.
+
+    Reseta gcal_payload_hash para forçar UPDATE mesmo se já publicado.
+    Reutiliza apply_one_solicitacao para lógica de sincronização.
+
+    Args:
+        s: Solicitacao aprovada
+        apply_blocked: Se True, aplica mesmo sem GCAL_CLIENT configurado
+
+    Returns:
+        SyncOutcome com ação executada
+
+    Raises:
+        ValueError: Se status != 'aprovado'
+    """
+    if s.status != 'aprovado':
+        raise ValueError(
+            f"Apenas solicitações aprovadas podem ser resincronizadas (status atual: {s.status})"
+        )
+
+    # Resetar hash para forçar UPDATE (mesmo se já publicado)
+    s.gcal_payload_hash = None
+    s.save(update_fields=['gcal_payload_hash'])
+
+    # Reutilizar apply_one_solicitacao
+    return apply_one_solicitacao(s, dry_run=False, apply_blocked=apply_blocked)
+
+
+def cancel_solicitacao(s: Solicitacao) -> SyncOutcome:
+    """
+    Cancelar evento no Google Calendar e limpar campos - Fase 4.
+
+    Deleta evento do Calendar (trata 404 como sucesso - idempotência) e limpa
+    todos os campos relacionados: external_event_id, meet_link, gcal_payload_hash.
+
+    Args:
+        s: Solicitacao com evento publicado
+
+    Returns:
+        SyncOutcome com action="DELETE"
+
+    Raises:
+        ValueError: Se evento não foi publicado
+    """
+    if not s.external_event_id and s.gcal_status != Solicitacao.GCalStatus.PUBLISHED:
+        raise ValueError("Solicitação não possui evento publicado no Google Calendar")
+
+    from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
+
+    client, calendar_id = get_gcal_client_and_calendar_id()
+
+    # Usar external_event_id ou gerar determinístico
+    event_id = s.external_event_id or _event_id_for(s)
+
+    try:
+        # Tentar deletar com retry/backoff
+        _retry_with_backoff(
+            lambda: client.delete(calendar_id, event_id),
+            operation_name=f"GCal CANCEL #{s.id}",
+        )
+    except Exception as e:
+        # 404 = já foi deletado (idempotência OK)
+        if "404" not in str(e):
+            raise
+
+    # Limpar campos
+    s.external_event_id = None
+    s.meet_link = None
+    s.gcal_payload_hash = None
+    s.gcal_status = Solicitacao.GCalStatus.NONE
+    s.last_synced_at = timezone.now()
+    s.last_sync_action = "DELETE"
+    s.last_sync_error = None
+    s.save(update_fields=[
+        'external_event_id', 'meet_link', 'gcal_payload_hash',
+        'gcal_status', 'last_synced_at', 'last_sync_action', 'last_sync_error'
+    ])
+
+    return SyncOutcome(
+        action="DELETE",
+        solicitation_id=s.id,
+        external_event_id=None,
+        summary=f"Solicitação #{s.id} (cancelada)"
+    )

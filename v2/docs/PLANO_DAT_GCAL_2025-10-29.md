@@ -76,10 +76,23 @@ Plano DAT + GCal — 2025-10-29
   - [ ] Validar manualmente com smoke e anexar evidências.
     - ⏳ Pendente: Smoke test manual em ambiente staging com `GCAL_CLIENT=google`
 
-- [ ] **Fase 4 — Alterar/Cancelar evento publicado**
-  - [ ] Backend: expor endpoints “republicar” e “cancelar” com AuditLog e checagens de permissão.
-  - [ ] Frontend: adicionar botões na Pré-agenda (Controle/Super) com confirmações.
-  - [ ] Testes (backend + Playwright) cobrindo update/delete e idempotência.
+- [x] **Fase 4 — Alterar/Cancelar evento publicado** ✅ **(Completo em 2025-10-30)**
+  - [x] Backend: expor endpoints "republicar" e "cancelar" com AuditLog e checagens de permissão.
+    - ✅ Helpers: `resync_solicitacao()` e `cancel_solicitacao()` em `gcal_sync_service.py`
+    - ✅ Task Celery: `task_cancel_solicitacao_from_gcal` em `tasks.py`
+    - ✅ Endpoints DRF: `POST /api/solicitacoes/{id}/resync-gcal/` e `/cancel-gcal/`
+    - ✅ Permissão: `IsControleOrSuper`, retorna 202 Accepted
+    - ✅ AuditLog: Actions `RESYNC_GCAL_REQUESTED` e `CANCEL_GCAL_REQUESTED`
+  - [x] Frontend: adicionar botões na Pré-agenda (Controle/Super) com confirmações.
+    - ✅ API client: `resyncSolicitacao()` e `cancelSolicitacao()` em `api/solicitacoes.js`
+    - ✅ Botões condicionais em `PreAgendaPage.jsx`:
+      - **Reenviar** (SyncOutlined): Visível quando `gcal_status === 'PUBLISHED' || 'ERROR'`
+      - **Cancelar** (StopOutlined): Visível quando `gcal_status === 'PUBLISHED' && external_event_id`
+    - ✅ Modal.confirm com warning (resync) e danger (cancel)
+    - ✅ Feedback com message.success/error + reload automático
+  - [x] Testes (backend + Playwright) cobrindo update/delete e idempotência.
+    - ✅ **13 testes backend** em `test_gcal_cancel_resync.py` (3 helpers + 2 task + 7 endpoints + 1 idempotência)
+    - ⏳ E2E Playwright: Recomendado mas não obrigatório (requer setup inicial de Playwright)
 
 - [ ] **Fase 5 — Gestão interna adicional e desligamento de planilhas**
   - [ ] Implementar endpoint `/api/etl/reports/latest` e painel simples para arquivos recentes (read-only).

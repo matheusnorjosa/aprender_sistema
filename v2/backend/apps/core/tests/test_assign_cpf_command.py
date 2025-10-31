@@ -27,6 +27,7 @@ def users_db():
     Cria usuários no banco com CPFs válidos temporários.
 
     CPFs no banco são diferentes dos CPFs na planilha para testar update.
+    CPFs usam valores válidos segundo algoritmo de dígitos verificadores.
     """
     u1 = User.objects.create_user(
         username="user1",
@@ -34,7 +35,7 @@ def users_db():
         password="test123",
         first_name="João",
         last_name="Silva",
-        cpf="11111111191",  # CPF válido temporário (será atualizado para 12345678901)
+        cpf="11122233396",  # CPF válido temporário (será atualizado para 12345678909)
     )
     u2 = User.objects.create_user(
         username="user2",
@@ -42,7 +43,7 @@ def users_db():
         password="test123",
         first_name="Maria",
         last_name="Santos",
-        cpf="22222222280",  # CPF válido temporário (será atualizado para 98765432109)
+        cpf="99988877735",  # CPF válido temporário (será atualizado para 98765432100)
     )
     u3 = User.objects.create_user(
         username="user3",
@@ -50,7 +51,7 @@ def users_db():
         password="test123",
         first_name="Pedro",
         last_name="Costa",
-        cpf="33333333372",  # CPF válido temporário (email ambíguo → conflict)
+        cpf="00000000191",  # CPF válido temporário (email ambíguo → conflict)
     )
     # Duplicar email para criar ambiguidade
     u4 = User.objects.create_user(
@@ -59,7 +60,7 @@ def users_db():
         password="test123",
         first_name="Pedro",
         last_name="Costa Júnior",
-        cpf="44444444453",  # CPF válido temporário (email ambíguo → conflict)
+        cpf="11111111142",  # CPF válido temporário (email ambíguo → conflict)
     )
     return {"u1": u1, "u2": u2, "u3": u3, "u4": u4}
 
@@ -74,11 +75,11 @@ def excel_file(tmp_path, users_db):
     # Header
     ws.append(["Nome", "Nome Completo", "Email", "CPF"])
 
-    # Dados
-    ws.append(["João", "João Silva", "user1@example.com", "123.456.789-01"])  # CPF com máscara
-    ws.append(["Maria", "Maria Santos", "user2@example.com", "98765432109"])  # CPF sem máscara
-    ws.append(["Pedro", "Pedro Costa", "ambiguo@example.com", "11111111111"])  # Email ambíguo
-    ws.append(["Novo", "Novo Usuário", "novo@example.com", "22222222222"])  # Não existe no banco
+    # Dados (usando CPFs válidos segundo algoritmo de dígitos verificadores)
+    ws.append(["João", "João Silva", "user1@example.com", "123.456.789-09"])  # CPF com máscara (válido)
+    ws.append(["Maria", "Maria Santos", "user2@example.com", "98765432100"])  # CPF sem máscara (válido)
+    ws.append(["Pedro", "Pedro Costa", "ambiguo@example.com", "22233344450"])  # Email ambíguo (válido)
+    ws.append(["Novo", "Novo Usuário", "novo@example.com", "33344455563"])  # Não existe no banco (válido)
     ws.append(["Inválido", "CPF Inválido", "invalido@example.com", "abc123"])  # CPF inválido
 
     path = tmp_path / "usuarios.xlsx"
@@ -112,7 +113,7 @@ def test_dry_run_email_match(excel_file, users_db, tmp_path):
 
     # Verificar que não persistiu no banco (mantém CPF original)
     users_db["u1"].refresh_from_db()
-    assert users_db["u1"].cpf == "11111111191"  # Não foi alterado (DRY-RUN)
+    assert users_db["u1"].cpf == "11122233396"  # Não foi alterado (DRY-RUN)
 
 
 def test_apply_persists_and_idempotent(excel_file, users_db, tmp_path):
@@ -131,10 +132,10 @@ def test_apply_persists_and_idempotent(excel_file, users_db, tmp_path):
 
     # Verificar persistência
     users_db["u1"].refresh_from_db()
-    assert users_db["u1"].cpf == "12345678901"  # Máscara removida
+    assert users_db["u1"].cpf == "12345678909"  # Máscara removida (CPF válido)
 
     users_db["u2"].refresh_from_db()
-    assert users_db["u2"].cpf == "98765432109"
+    assert users_db["u2"].cpf == "98765432100"  # CPF válido
 
     # Verificar relatório
     with open(out_dir / "assign_cpf_report.json", "r", encoding="utf-8") as f:
@@ -160,7 +161,7 @@ def test_apply_persists_and_idempotent(excel_file, users_db, tmp_path):
 
     # Verificar que não houve mudança
     users_db["u1"].refresh_from_db()
-    assert users_db["u1"].cpf == "12345678901"
+    assert users_db["u1"].cpf == "12345678909"
 
 
 def test_cpf_invalido_skipped(excel_file, users_db, tmp_path):

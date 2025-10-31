@@ -33,10 +33,18 @@ import {
   CalendarOutlined,
   VideoCameraOutlined,
   InfoCircleOutlined,
+  SyncOutlined,
+  StopOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
-import { listSolicitacoes, previewSolicitacao, publishSolicitacao } from '../../api/solicitacoes';
+import {
+  listSolicitacoes,
+  previewSolicitacao,
+  publishSolicitacao,
+  resyncSolicitacao,
+  cancelSolicitacao,
+} from '../../api/solicitacoes';
 import { getStatusSummary } from '../../api/gcal';
 import { MeetLink } from '../../components/MeetLink';
 
@@ -128,6 +136,60 @@ export default function PreAgendaPage() {
     });
   };
 
+  const handleResync = (id) => {
+    Modal.confirm({
+      title: 'Confirmar Reenvio',
+      icon: <SyncOutlined style={{ color: '#faad14' }} />,
+      content: (
+        <div>
+          <p>Deseja reenviar (forçar UPDATE) este evento no Google Calendar?</p>
+          <p style={{ color: '#888', fontSize: '12px' }}>
+            Esta ação irá sobrescrever o evento existente com os dados atualizados.
+          </p>
+        </div>
+      ),
+      okText: 'Reenviar',
+      okType: 'warning',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          await resyncSolicitacao(id);
+          message.success('Reenvio solicitado! O evento será atualizado em instantes.');
+          loadData();
+        } catch (error) {
+          message.error('Erro ao reenviar: ' + error.message);
+        }
+      },
+    });
+  };
+
+  const handleCancel = (id) => {
+    Modal.confirm({
+      title: 'Confirmar Cancelamento',
+      icon: <StopOutlined style={{ color: '#ff4d4f' }} />,
+      content: (
+        <div>
+          <p>Deseja cancelar este evento no Google Calendar?</p>
+          <p style={{ color: '#ff4d4f', fontWeight: 'bold', fontSize: '12px' }}>
+            ⚠️ ATENÇÃO: Esta ação irá deletar permanentemente o evento do Calendar e limpar todos os campos relacionados (event_id, meet_link, etc.).
+          </p>
+        </div>
+      ),
+      okText: 'Sim, Cancelar Evento',
+      okType: 'danger',
+      cancelText: 'Não',
+      onOk: async () => {
+        try {
+          await cancelSolicitacao(id);
+          message.success('Cancelamento solicitado! O evento será removido em instantes.');
+          loadData();
+        } catch (error) {
+          message.error('Erro ao cancelar: ' + error.message);
+        }
+      },
+    });
+  };
+
   const columns = [
     {
       title: 'Data/Hora',
@@ -166,26 +228,57 @@ export default function PreAgendaPage() {
     {
       title: 'Ações',
       key: 'actions',
-      width: 150,
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => handlePreview(record.id)}
-            title="Preview"
-          />
-          <Button
-            size="small"
-            type="primary"
-            icon={<CloudUploadOutlined />}
-            onClick={() => handlePublish(record.id)}
-            title="Publicar"
-            disabled={record.gcal_status === 'PUBLISHED'}
-          />
-          <MeetLink href={record.meet_link} />
-        </Space>
-      ),
+      width: 200,
+      render: (_, record) => {
+        const isPublished = record.gcal_status === 'PUBLISHED';
+        const hasError = record.gcal_status === 'ERROR';
+        const hasEventId = !!record.external_event_id;
+
+        // Resync: mostrar quando PUBLISHED ou ERROR
+        const showResync = isPublished || hasError;
+
+        // Cancel: mostrar apenas quando PUBLISHED e tem event_id
+        const showCancel = isPublished && hasEventId;
+
+        return (
+          <Space size="small">
+            <Button
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => handlePreview(record.id)}
+              title="Preview"
+            />
+            <Button
+              size="small"
+              type="primary"
+              icon={<CloudUploadOutlined />}
+              onClick={() => handlePublish(record.id)}
+              title="Publicar"
+              disabled={isPublished}
+            />
+            {showResync && (
+              <Button
+                size="small"
+                type="default"
+                icon={<SyncOutlined />}
+                onClick={() => handleResync(record.id)}
+                title="Reenviar (forçar UPDATE)"
+                style={{ color: '#faad14', borderColor: '#faad14' }}
+              />
+            )}
+            {showCancel && (
+              <Button
+                size="small"
+                danger
+                icon={<StopOutlined />}
+                onClick={() => handleCancel(record.id)}
+                title="Cancelar evento no Calendar"
+              />
+            )}
+            <MeetLink href={record.meet_link} />
+          </Space>
+        );
+      },
     },
   ];
 

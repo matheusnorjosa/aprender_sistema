@@ -7,7 +7,8 @@ WEB = $(DC) exec -T web
         import-compras-dry import-acoes-dry import-cadastros-dry \
         solic-pend-super solic-approve solic-reject \
         readyz healthz preview-json apply-json flags-fake flags-google preview-on preview-off \
-        ban-v1 up-worker up-beat logs-worker logs-beat logs-worker-last logs-beat-last help
+        ban-v1 up-worker up-beat logs-worker logs-beat logs-worker-last logs-beat-last \
+        seed-e2e test-e2e test-e2e-ui test-e2e-headed help
 
 up:
 	$(DC) up -d --build
@@ -231,6 +232,27 @@ logs-beat-last:
 	$(DC) logs --tail=200 beat
 
 # ════════════════════════════════════════════════════════════════════════════
+# E2E Tests (Playwright) — Fase 2
+# ════════════════════════════════════════════════════════════════════════════
+
+seed-e2e:
+	@echo "🌱 Criando seeds para testes E2E (Playwright)..."
+	$(WEB) python manage.py seed_e2e_users
+	@echo "✅ Seeds E2E criados com sucesso"
+
+test-e2e:
+	@echo "🎭 Executando testes E2E (Playwright headless)..."
+	@cd ../tests/playwright && npm run test
+
+test-e2e-ui:
+	@echo "🎭 Executando testes E2E com UI interativa (Playwright)..."
+	@cd ../tests/playwright && npm run test:ui
+
+test-e2e-headed:
+	@echo "🎭 Executando testes E2E (headed mode - ver browser)..."
+	@cd ../tests/playwright && npm run test:headed
+
+# ════════════════════════════════════════════════════════════════════════════
 # Help
 # ════════════════════════════════════════════════════════════════════════════
 
@@ -281,6 +303,13 @@ help:
 	@echo "  make logs-beat             Follow beat logs (Ctrl+C to exit)"
 	@echo "  make logs-worker-last      Show last 200 lines of worker logs"
 	@echo "  make logs-beat-last        Show last 200 lines of beat logs"
+	@echo ""
+	@echo "E2E Tests (Playwright) — Fase 2:"
+	@echo "  make seed-e2e              Create seeds for E2E tests (coord, super, controle, formador)"
+	@echo "  make test-e2e              Run E2E tests (headless)"
+	@echo "  make test-e2e-ui           Run E2E tests with interactive UI"
+	@echo "  make test-e2e-headed       Run E2E tests (headed mode - visible browser)"
+	@echo "  Nota: Requer npm install em ../tests/playwright/"
 	@echo ""
 	@echo "Health Checks:"
 	@echo "  make readyz                Check /api/readyz/ (db + redis)"

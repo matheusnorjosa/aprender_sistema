@@ -69,7 +69,7 @@ if ENVIRONMENT == "production":
 # ================================================================
 INSTALLED_APPS = [
     # Django core
-    "django.contrib.admin",
+    "django.contrib.admin.apps.SimpleAdminConfig",  # Disables autodiscover (custom admin site)
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",

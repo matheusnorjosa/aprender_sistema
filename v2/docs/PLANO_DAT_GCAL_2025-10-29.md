@@ -95,12 +95,13 @@ Plano DAT + GCal — 2025-10-29
     - ⏳ E2E Playwright: Recomendado mas não obrigatório (requer setup inicial de Playwright)
 
 - [ ] **Fase 5 — Gestão interna adicional e desligamento de planilhas** *(em andamento)*
-  - [x] **Backend: Endpoint `/api/etl/reports/latest`** ✅ **(Completo em 2025-10-30)**
+  - [x] **Backend: Endpoint `/api/etl/reports/latest`** ✅ **(Completo em 2025-10-31)**
     - ✅ Service layer: `list_latest_reports()` em `apps/dat_ingest/services/etl_observability.py`
     - ✅ View: `EtlReportsLatestView` (GET, IsControleOrSuper)
     - ✅ Rota: `/api/etl/reports/latest/?limit=20`
-    - ✅ Testes: `test_etl_reports_latest.py` (service + endpoint + permissões + edge cases)
+    - ✅ Testes: `test_etl_reports_latest.py` (24/24 passing - service + endpoint + permissões + edge cases)
     - ✅ Segurança: Valida limit (1-100), trata diretório ausente, previne path traversal
+    - ✅ Container build issue resolved (custom admin site circular import fixed)
   - [ ] **Frontend: Painel de relatórios ETL** *(próximo passo)*
     - [ ] Página `/etl-reports` para grupos Controle/Superintendência
     - [ ] Listagem com colunas: Nome, Tipo, Tamanho, Data

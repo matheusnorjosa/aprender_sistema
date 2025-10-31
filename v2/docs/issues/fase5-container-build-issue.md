@@ -1,10 +1,43 @@
 # Fase 5 - Container Build Issue (admin_site.py not copied)
 
-**Data**: 2025-10-30
+**Data**: 2025-10-30 → 2025-10-31 (Resolved)
 **Branch**: `feat/fase5-etl-observability`
-**Status**: ⚠️ **BLOCKER** - Tests not executed
+**Status**: ✅ **RESOLVED** - All tests passing (24/24)
 
 ---
+
+## ✅ Resolução (2025-10-31)
+
+**Root Cause**: Circular import causado por `django.contrib.admin` com custom admin site.
+
+**Problema real**: Não era que `admin_site.py` não estava sendo copiado (estava!), mas sim que:
+1. `django.contrib.admin` em `INSTALLED_APPS` ativa autodiscover
+2. Autodiscover tenta importar `admin.py` de todos os apps
+3. `apps/core/admin.py` importa `admin_site` de `admin_site.py`
+4. Import circular → `admin_site` retorna `None`
+5. `@admin_site.register()` → `TypeError: 'NoneType' object is not callable`
+
+**Solução aplicada** (commit `7142822`):
+1. **settings.py**: Trocar `"django.contrib.admin"` por `"django.contrib.admin.apps.SimpleAdminConfig"`
+   - `SimpleAdminConfig` desabilita autodiscover (custom admin site gerencia registros manualmente)
+2. **urls.py**: Remover import não utilizado `from django.contrib import admin`
+3. **test_etl_reports_latest.py**: Corrigir expectativa de 401 → 403 (IsControleOrSuper retorna 403 para não autenticados)
+
+**Testes**: 24/24 passing ✅
+
+**Arquivos modificados**:
+- `v2/backend/config/settings.py`
+- `v2/backend/config/urls.py`
+- `v2/backend/apps/dat_ingest/tests/test_etl_reports_latest.py`
+
+**Lições aprendidas**:
+- Django admin com custom site requer `SimpleAdminConfig` em INSTALLED_APPS
+- Erro "file not found" no Docker for Windows (`C:/Program Files/Git/...`) era red herring (path resolution do `docker compose run`)
+- Arquivo **estava** sendo copiado corretamente; problema era import circular durante startup
+
+---
+
+## Problema Original (2025-10-30)
 
 ## Problema
 

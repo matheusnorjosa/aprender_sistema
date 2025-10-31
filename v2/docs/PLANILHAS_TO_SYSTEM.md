@@ -58,11 +58,20 @@ Antes da Fase 5, os relatórios ETL eram gerados em `out_etl/` mas não havia fo
 }
 ```
 
-**Frontend** *(próximo passo)*:
-- Página `/etl-reports` com tabela listando arquivos
-- Colunas: Nome, Tipo, Tamanho, Data
-- Filtros: tipo de arquivo, limite
-- Botão de download por arquivo
+**Frontend** ✅ **(Completo - 2025-10-31)**:
+- Página `/controle/etl-reports` com tabela listando arquivos
+- Colunas: Nome (com ícone), Tipo (tag colorida), Tamanho (formatado), Data/Hora, Ações (download)
+- Filtros: tipo de arquivo (todos/json/csv/txt/outro), limite (1-100), botão atualizar
+- Download individual: link direto para `/out_etl/{filename}` em nova aba
+- Permissões: Controle ou Superintendência
+- Menu: item "Relatórios ETL" no sidebar principal
+
+**Como usar**:
+1. Acesse `/controle/etl-reports` no sistema (menu lateral → Relatórios ETL)
+2. Use filtros para visualizar apenas relatórios específicos (ex: apenas JSON)
+3. Ajuste o limite para ver mais/menos arquivos
+4. Clique em "Download" para baixar um relatório individual
+5. Relatórios são gerados automaticamente pelos comandos ETL (ver seção 4.1)
 
 ---
 

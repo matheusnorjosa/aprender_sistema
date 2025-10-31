@@ -8,6 +8,7 @@ import pytest
 from django.utils import timezone
 from django.conf import settings
 from datetime import timedelta
+from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 from rest_framework import status as http_status
 
@@ -346,6 +347,10 @@ class TestAvailabilityCheckEndpoint:
         """
         Test: Endpoint retorna conflitos corretamente.
         """
+        # Adicionar grupo Controle para passar pela permission check
+        controle_group, _ = Group.objects.get_or_create(name="Controle")
+        usuario_test.groups.add(controle_group)
+
         client = APIClient()
         client.force_authenticate(user=usuario_test)
 
@@ -410,6 +415,10 @@ class TestAvailabilityCheckEndpoint:
         """
         Test: Endpoint requer usuario_id obrigatório.
         """
+        # Adicionar grupo Controle para passar pela permission check
+        controle_group, _ = Group.objects.get_or_create(name="Controle")
+        usuario_test.groups.add(controle_group)
+
         client = APIClient()
         client.force_authenticate(user=usuario_test)
 
@@ -430,6 +439,10 @@ class TestAvailabilityCheckEndpoint:
         """
         Test: Endpoint valida datas (fim > inicio).
         """
+        # Adicionar grupo Controle para passar pela permission check
+        controle_group, _ = Group.objects.get_or_create(name="Controle")
+        usuario_test.groups.add(controle_group)
+
         client = APIClient()
         client.force_authenticate(user=usuario_test)
 
@@ -533,7 +546,9 @@ class TestAvailabilityCheckEndpoint:
         )
 
         assert response.status_code == http_status.HTTP_403_FORBIDDEN
-        assert "permissão" in str(response.data).lower()
+        # Verificar que mensagem menciona controle ou superintendência
+        response_lower = str(response.data).lower()
+        assert "controle" in response_lower or "superintendência" in response_lower
 
 
 @pytest.mark.django_db

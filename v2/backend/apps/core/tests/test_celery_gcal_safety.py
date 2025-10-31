@@ -33,6 +33,7 @@ class CeleryGCalSafetyTests(TestCase):
         - call_command só chamado com --dry-run (nunca sem)
         """
         with override_settings(
+            FEATURE_AUTO_APPLY_ENABLED=True,
             FEATURE_FLAGS={"PREVIEW_ONLY": True, "GCAL_MODE": "google"},
             GCAL_CALENDAR_ID="test-calendar-id@example.com",
         ):
@@ -82,6 +83,7 @@ class CeleryGCalSafetyTests(TestCase):
         - call_command NUNCA é chamado (curto-circuito)
         """
         with override_settings(
+            FEATURE_AUTO_APPLY_ENABLED=True,
             FEATURE_FLAGS={"PREVIEW_ONLY": False, "GCAL_MODE": "google"},
             GCAL_CALENDAR_ID="",  # Vazio
         ):
@@ -91,7 +93,7 @@ class CeleryGCalSafetyTests(TestCase):
 
                 # Validações
                 self.assertEqual(result["status"], "SKIPPED")
-                self.assertIn("GCAL_CALENDAR_ID", result["reason"])
+                self.assertIn("GCAL_CALENDAR_ID não configurado", result["reason"])
 
                 # Verificar que call_command NUNCA foi chamado
                 mock_call.assert_not_called()
@@ -100,7 +102,7 @@ class CeleryGCalSafetyTests(TestCase):
                 log = AuditLog.objects.filter(action="CELERY_GCAL_SYNC").first()
                 self.assertIsNotNone(log)
                 self.assertEqual(log.details["status"], "SKIPPED")
-                self.assertIn("GCAL_CALENDAR_ID", log.details["reason"])
+                self.assertIn("GCAL_CALENDAR_ID não configurado", log.details["reason"])
 
     def test_task_noop_when_gcal_mode_not_google(self):
         """
@@ -116,6 +118,7 @@ class CeleryGCalSafetyTests(TestCase):
         - call_command NUNCA é chamado (curto-circuito)
         """
         with override_settings(
+            FEATURE_AUTO_APPLY_ENABLED=True,
             FEATURE_FLAGS={"PREVIEW_ONLY": False, "GCAL_MODE": "fake"},
             GCAL_CALENDAR_ID="test-calendar@example.com",
         ):
@@ -125,8 +128,8 @@ class CeleryGCalSafetyTests(TestCase):
 
                 # Validações
                 self.assertEqual(result["status"], "SKIPPED")
-                self.assertIn("GCAL_MODE", result["reason"])
-                self.assertIn("fake", result["reason"])
+                self.assertIn("GCAL_MODE=fake", result["reason"])
+                self.assertIn("esperado: 'google'", result["reason"])
 
                 # Verificar que call_command NUNCA foi chamado
                 mock_call.assert_not_called()
@@ -135,7 +138,8 @@ class CeleryGCalSafetyTests(TestCase):
                 log = AuditLog.objects.filter(action="CELERY_GCAL_SYNC").first()
                 self.assertIsNotNone(log)
                 self.assertEqual(log.details["status"], "SKIPPED")
-                self.assertIn("GCAL_MODE", log.details["reason"])
+                self.assertIn("GCAL_MODE=fake", log.details["reason"])
+                self.assertIn("esperado: 'google'", log.details["reason"])
 
     def test_task_preview_only_does_not_apply(self):
         """
@@ -153,6 +157,7 @@ class CeleryGCalSafetyTests(TestCase):
         - AuditLog registra "10 mudanças detectadas, mas PREVIEW_ONLY bloqueou"
         """
         with override_settings(
+            FEATURE_AUTO_APPLY_ENABLED=True,
             FEATURE_FLAGS={"PREVIEW_ONLY": True, "GCAL_MODE": "google"},
             GCAL_CALENDAR_ID="test-calendar@example.com",
         ):
@@ -199,6 +204,7 @@ class CeleryGCalSafetyTests(TestCase):
         - call_command chamado APENAS 1x (preview, apply NÃO executa)
         """
         with override_settings(
+            FEATURE_AUTO_APPLY_ENABLED=True,
             FEATURE_FLAGS={"PREVIEW_ONLY": False, "GCAL_MODE": "google"},
             GCAL_CALENDAR_ID="test-calendar@example.com",
         ):
@@ -247,6 +253,7 @@ class CeleryGCalSafetyTests(TestCase):
         - applied=False (não foi aplicado com sucesso)
         """
         with override_settings(
+            FEATURE_AUTO_APPLY_ENABLED=True,
             FEATURE_FLAGS={"PREVIEW_ONLY": False, "GCAL_MODE": "google"},
             GCAL_CALENDAR_ID="test-calendar@example.com",
         ):

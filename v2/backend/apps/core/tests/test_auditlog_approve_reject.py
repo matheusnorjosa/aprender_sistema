@@ -46,9 +46,14 @@ def solicitacao_pendente(super_user):
         defaults={"uf": "TS", "ativo": True},
     )
     projeto, _ = Projeto.objects.get_or_create(
-        nome="Test Project",
-        defaults={"ativo": True},
+        nome="Test Project SUPER",
+        defaults={"ativo": True, "fluxo": "SUPER"},
     )
+    # Garantir que o projeto é SUPER (caso já exista no banco)
+    if projeto.fluxo != "SUPER":
+        projeto.fluxo = "SUPER"
+        projeto.save()
+
     tipo_evento, _ = TipoEvento.objects.get_or_create(
         nome="Test Event Type",
     )

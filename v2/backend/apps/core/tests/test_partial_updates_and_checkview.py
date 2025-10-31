@@ -11,6 +11,7 @@ Cobertura:
 import pytest
 from django.urls import reverse
 from django.utils import timezone
+from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 from apps.core.models import (
@@ -43,12 +44,23 @@ def projeto():
     return Projeto.objects.create(nome="Projeto Teste", descricao="Desc")
 
 
-def auth_client(user=None):
-    """Helper para criar cliente autenticado."""
+def auth_client(user=None, privileged=False):
+    """
+    Helper para criar cliente autenticado.
+
+    Args:
+        user: Usuário opcional (cria um novo se None)
+        privileged: Se True, adiciona usuário ao grupo Controle
+    """
     client = APIClient()
     user = user or Usuario.objects.create_user(
         username="u1", email="u1@x.com", password="x"
     )
+
+    if privileged:
+        controle_group, _ = Group.objects.get_or_create(name="Controle")
+        user.groups.add(controle_group)
+
     client.force_authenticate(user=user)
     return client, user
 
@@ -109,7 +121,7 @@ def test_availability_check_invalid_user_id_returns_400():
     Antes do patch: ValueError não tratado causava 500
     Depois do patch: 400 com mensagem clara
     """
-    c, u = auth_client()
+    c, u = auth_client(privileged=True)
     now = timezone.now()
     url = reverse("core:availability-check")
     res = c.get(
@@ -131,7 +143,7 @@ def test_availability_check_invalid_municipio_id_returns_400():
     Antes do patch: ValueError não tratado causava 500
     Depois do patch: 400 com mensagem clara
     """
-    c, u = auth_client()
+    c, u = auth_client(privileged=True)
     now = timezone.now()
     url = reverse("core:availability-check")
     res = c.get(
@@ -151,7 +163,7 @@ def test_availability_check_missing_dates_returns_400():
     """
     AvailabilityCheckView sem inicio/fim deve retornar 400 claro.
     """
-    c, u = auth_client()
+    c, u = auth_client(privileged=True)
     url = reverse("core:availability-check")
 
     # Falta inicio
@@ -171,7 +183,7 @@ def test_availability_check_fim_before_inicio_returns_400():
 
     Nova validação adicionada no PATCH 2.
     """
-    c, u = auth_client()
+    c, u = auth_client(privileged=True)
     now = timezone.now()
     url = reverse("core:availability-check")
     res = c.get(

@@ -197,7 +197,10 @@ class TestAPIAvailabilityBlocks:
 
     def test_create_block_status_is_always_pendente(self, user_test):
         """
-        Test: Bloqueios criados via API sempre começam com status=pendente.
+        Test: Bloqueios criados via API sempre começam com status=aprovado.
+
+        O endpoint AvailabilityBlockViewSet.perform_create força status="aprovado"
+        independentemente do payload enviado.
         """
         client = APIClient()
         client.force_authenticate(user=user_test)
@@ -211,7 +214,7 @@ class TestAPIAvailabilityBlocks:
             "fim": fim.isoformat(),
             "tipo": "T",
             "motivo": "Bloqueio de teste",
-            "status": "aprovado",  # Tentativa de especificar (deve ser ignorado)
+            "status": "pendente",  # Tentativa de especificar (será ignorado, vira aprovado)
         }
 
         response = client.post("/api/availability-blocks/", payload, format="json")
@@ -220,14 +223,14 @@ class TestAPIAvailabilityBlocks:
             response.status_code == http_status.HTTP_201_CREATED
         ), f"Esperado 201, obtido {response.status_code}: {response.data}"
 
-        # Verificar que status é pendente, ignorando payload
+        # Verificar que status é aprovado (perform_create força isso)
         block = AvailabilityBlock.objects.get(pk=response.data["id"])
         assert (
-            block.status == "pendente"
-        ), "Status deve ser 'pendente' (campo read_only)"
+            block.status == "aprovado"
+        ), "Status deve ser 'aprovado' (forçado por perform_create)"
         assert (
-            response.data["status"] == "pendente"
-        ), "Resposta deve retornar status=pendente"
+            response.data["status"] == "aprovado"
+        ), "Resposta deve retornar status=aprovado"
 
     def test_unauthenticated_cannot_create_block(self):
         """

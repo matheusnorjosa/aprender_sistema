@@ -24,10 +24,9 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def users_db():
     """
-    Cria usuários no banco com CPF placeholder.
+    Cria usuários no banco com CPFs válidos temporários.
 
-    Nota: Não podemos usar cpf="" devido ao constraint UNIQUE no campo CPF.
-    Placeholders (000000000XX) são tratados como "ausente" pelo comando.
+    CPFs no banco são diferentes dos CPFs na planilha para testar update.
     """
     u1 = User.objects.create_user(
         username="user1",
@@ -35,7 +34,7 @@ def users_db():
         password="test123",
         first_name="João",
         last_name="Silva",
-        cpf="00000000001",  # CPF placeholder (tratado como ausente)
+        cpf="11111111191",  # CPF válido temporário (será atualizado para 12345678901)
     )
     u2 = User.objects.create_user(
         username="user2",
@@ -43,7 +42,7 @@ def users_db():
         password="test123",
         first_name="Maria",
         last_name="Santos",
-        cpf="00000000002",  # CPF placeholder (tratado como ausente)
+        cpf="22222222280",  # CPF válido temporário (será atualizado para 98765432109)
     )
     u3 = User.objects.create_user(
         username="user3",
@@ -51,7 +50,7 @@ def users_db():
         password="test123",
         first_name="Pedro",
         last_name="Costa",
-        cpf="00000000003",  # CPF placeholder (tratado como ausente)
+        cpf="33333333372",  # CPF válido temporário (email ambíguo → conflict)
     )
     # Duplicar email para criar ambiguidade
     u4 = User.objects.create_user(
@@ -60,7 +59,7 @@ def users_db():
         password="test123",
         first_name="Pedro",
         last_name="Costa Júnior",
-        cpf="00000000004",  # CPF placeholder (tratado como ausente)
+        cpf="44444444453",  # CPF válido temporário (email ambíguo → conflict)
     )
     return {"u1": u1, "u2": u2, "u3": u3, "u4": u4}
 
@@ -111,9 +110,9 @@ def test_dry_run_email_match(excel_file, users_db, tmp_path):
     assert report["totals"]["skipped"] >= 1  # Novo usuário, CPF inválido
     assert report["totals"]["conflicts"] >= 1  # Email ambíguo
 
-    # Verificar que não persistiu no banco (mantém CPF placeholder)
+    # Verificar que não persistiu no banco (mantém CPF original)
     users_db["u1"].refresh_from_db()
-    assert users_db["u1"].cpf == "00000000001"  # Não foi alterado (DRY-RUN)
+    assert users_db["u1"].cpf == "11111111191"  # Não foi alterado (DRY-RUN)
 
 
 def test_apply_persists_and_idempotent(excel_file, users_db, tmp_path):

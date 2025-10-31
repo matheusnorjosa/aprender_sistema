@@ -717,9 +717,9 @@ class Command(BaseCommand):
 
     def generate_metrics_report(self, metrics: Dict):
         """
-        Gera relatório JSON de métricas em v2/.agents/outbox/etl_metrics.json (PR21).
+        Gera relatório JSON de métricas em .agents/outbox/etl_metrics.json (PR21).
         """
-        outbox = Path("/app/.agents/outbox")
+        outbox = Path(settings.BASE_DIR) / ".agents" / "outbox"
         outbox.mkdir(parents=True, exist_ok=True)
 
         report_path = outbox / "etl_metrics.json"
@@ -731,9 +731,9 @@ class Command(BaseCommand):
 
     def generate_violations_report(self, violations: List[Dict], metrics: Dict):
         """
-        Gera relatório CSV de violações em v2/.agents/outbox/etl_violations.csv (PR21).
+        Gera relatório CSV de violações em .agents/outbox/etl_violations.csv (PR21).
         """
-        outbox = Path("/app/.agents/outbox")
+        outbox = Path(settings.BASE_DIR) / ".agents" / "outbox"
         outbox.mkdir(parents=True, exist_ok=True)
 
         report_path = outbox / "etl_violations.csv"

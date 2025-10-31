@@ -29,6 +29,7 @@ def etl_tmpdir(settings, tmp_path):
     tmp_base.mkdir()
     agents_outbox = tmp_base / ".agents" / "outbox"
     agents_outbox.mkdir(parents=True)
+    # BASE_DIR deve ser Path, não str, para compatibilidade com Path() / ".agents"
     settings.BASE_DIR = tmp_base
 
     yield

@@ -38,13 +38,8 @@ def _ensure_default_test_user(django_db_setup, django_db_blocker, faker):
         )
 
         # Get existing Coordenador group (created by seed_rbac)
-        try:
-            coordenador_group = Group.objects.get(name="Coordenador")
-            user.groups.add(coordenador_group)
-        except Group.DoesNotExist:
-            # Fallback: create if doesn't exist (shouldn't happen)
-            coordenador_group = Group.objects.create(name="Coordenador")
-            user.groups.add(coordenador_group)
+        coordenador_group, _ = Group.objects.get_or_create(name="Coordenador")
+        user.groups.add(coordenador_group)
 
         # Auto-inject user into Solicitacao instances missing usuario_id
         def _auto_inject_user(sender, instance, **kwargs):

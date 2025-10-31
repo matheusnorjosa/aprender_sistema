@@ -27,16 +27,20 @@ class Command(BaseCommand):
     help = "Gera CSV com top-50 usuários para cadastro em lote (PR20)"
 
     def add_arguments(self, parser):
+        from django.conf import settings
+        default_input = str(Path(settings.BASE_DIR) / ".agents" / "outbox" / "relatorio_pessoas_pendentes_match.csv")
+        default_output = str(Path(settings.BASE_DIR) / ".agents" / "outbox" / "top50_usuarios_sugeridos.csv")
+
         parser.add_argument(
             "--input",
             type=str,
-            default="/app/.agents/outbox/relatorio_pessoas_pendentes_match.csv",
+            default=default_input,
             help="Caminho do relatório de pendências",
         )
         parser.add_argument(
             "--out",
             type=str,
-            default="/app/.agents/outbox/top50_usuarios_sugeridos.csv",
+            default=default_output,
             help="Caminho do CSV de saída",
         )
         parser.add_argument(

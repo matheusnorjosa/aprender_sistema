@@ -141,7 +141,7 @@ class Command(BaseCommand):
                 )
             )
             self.stdout.write(
-                "   Veja: v2/.agents/outbox/external_hash_v2_collisions.json"
+                "   Veja: .agents/outbox/external_hash_v2_collisions.json"
             )
         else:
             self.stdout.write(
@@ -317,12 +317,13 @@ class Command(BaseCommand):
 
     def generate_collisions_report(self, collisions: Dict[str, List[int]]):
         """
-        Gera relatório JSON de colisões em v2/.agents/outbox/.
+        Gera relatório JSON de colisões em .agents/outbox/.
 
         Args:
             collisions: Mapa de hash → list[Solicitacao IDs]
         """
-        outbox = Path("/app/.agents/outbox")
+        from django.conf import settings
+        outbox = Path(settings.BASE_DIR) / ".agents" / "outbox"
         outbox.mkdir(parents=True, exist_ok=True)
 
         output_file = outbox / "external_hash_v2_collisions.json"

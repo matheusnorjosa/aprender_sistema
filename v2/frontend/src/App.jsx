@@ -28,6 +28,7 @@ import DisponibilidadeBlocks from './pages/Disponibilidade';
 import MonthlyPage from './pages/Disponibilidade/MonthlyPage';
 import Solicitacoes from './pages/Solicitacoes';
 import ControlePage from './pages/Controle/ControlePage';
+import EtlReportsPage from './pages/Controle/EtlReportsPage';
 import DATPage from './pages/DAT/DATPage';
 import NewSolicitacaoWizard from './pages/Solicitacoes/NewSolicitacaoWizard';
 import MySolicitacoesPage from './pages/Solicitacoes/MySolicitacoesPage';
@@ -216,6 +217,13 @@ function App() {
                 </SubMenu>
               )}
 
+              {/* Relatórios ETL (Controle + Superintendência) */}
+              {(canControle || canSuper) && (
+                <Menu.Item key="etl-reports" icon={<FileTextOutlined />}>
+                  <Link to="/controle/etl-reports">Relatórios ETL</Link>
+                </Menu.Item>
+              )}
+
               {/* Admin DAT (DAT + Superusers) */}
               {canDAT && (
                 <Menu.Item key="admin-dat" icon={<DatabaseOutlined />}>
@@ -326,6 +334,10 @@ function App() {
                 {/* Antigas rotas (manter compatibilidade) */}
                 <Route path="/solicitacoes" element={<Solicitacoes />} />
                 <Route path="/controle" element={<ControlePage />} />
+                <Route
+                  path="/controle/etl-reports"
+                  element={canControle || canSuper ? <EtlReportsPage /> : <Forbidden />}
+                />
                 <Route path="/dat" element={<DATPage />} />
               </Routes>
             </Content>

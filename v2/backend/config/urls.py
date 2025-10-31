@@ -29,6 +29,7 @@ urlpatterns = [
     path("healthz/", healthz, name="healthz"),
     # API
     path("api/", include("apps.core.urls")),
+    path("api/", include("apps.dat_ingest.urls")),  # Fase 5: ETL Observability
 ]
 
 # Static/Media files (development only)

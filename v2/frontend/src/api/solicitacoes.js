@@ -123,6 +123,38 @@ export async function publishSolicitacao(id, body = {}) {
   });
 }
 
+/**
+ * Republicar solicitação no Google Calendar (força UPDATE) - Fase 4.
+ *
+ * Reseta gcal_payload_hash para forçar UPDATE mesmo se já publicado.
+ * Enfileira task_publish_solicitacao_to_gcal para republicação.
+ *
+ * @param {number} id - ID da solicitação aprovada
+ * @returns {Promise<object>} { detail, task_id, solicitacao_id }
+ */
+export async function resyncSolicitacao(id) {
+  return await fetchAPI(`/solicitacoes/${id}/resync-gcal/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+/**
+ * Cancelar evento no Google Calendar e limpar campos - Fase 4.
+ *
+ * Deleta evento do Calendar (trata 404 como sucesso - idempotência) e limpa
+ * todos os campos relacionados: external_event_id, meet_link, gcal_payload_hash.
+ *
+ * @param {number} id - ID da solicitação com evento publicado
+ * @returns {Promise<object>} { detail, task_id, solicitacao_id }
+ */
+export async function cancelSolicitacao(id) {
+  return await fetchAPI(`/solicitacoes/${id}/cancel-gcal/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
 // ========================================
 // Endpoints de opções (dropdowns/selects)
 // ========================================

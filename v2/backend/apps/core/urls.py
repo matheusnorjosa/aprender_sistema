@@ -51,7 +51,8 @@ from .views import (
     MunicipioViewSet,
     ProjetoViewSet,
     CompraViewSet,
-    # UsuarioAdminViewSet,  # Comentado no views.py (PR #20)
+    UsuarioAdminViewSet,  # Reativado (Fase 1 Iteração 2, GAP-001)
+    GroupViewSet,  # Criado (Fase 1 Iteração 2, GAP-002)
     AuditLogViewSet,
 )
 
@@ -68,7 +69,8 @@ router.register(
 router.register(r"municipios", MunicipioViewSet, basename="municipio")
 router.register(r"projetos", ProjetoViewSet, basename="projeto")
 router.register(r"compras", CompraViewSet, basename="compra")
-# router.register(r"usuarios-admin", UsuarioAdminViewSet, basename="usuario-admin")  # Comentado (PR #20)
+router.register(r"usuarios-admin", UsuarioAdminViewSet, basename="usuario-admin")  # Reativado (Fase 1 Iteração 2, GAP-001)
+router.register(r"grupos", GroupViewSet, basename="grupo")  # Criado (Fase 1 Iteração 2, GAP-002)
 router.register(r"audit-logs", AuditLogViewSet, basename="audit-log")
 
 urlpatterns = [

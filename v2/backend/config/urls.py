@@ -2,7 +2,6 @@
 URL configuration for AS v2 project.
 """
 
-from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
@@ -29,6 +28,7 @@ urlpatterns = [
     path("healthz/", healthz, name="healthz"),
     # API
     path("api/", include("apps.core.urls")),
+    path("api/", include("apps.dat_ingest.urls")),  # Fase 5: ETL Observability
 ]
 
 # Static/Media files (development only)

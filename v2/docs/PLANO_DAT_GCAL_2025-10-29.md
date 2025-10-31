@@ -94,8 +94,19 @@ Plano DAT + GCal — 2025-10-29
     - ✅ **13 testes backend** em `test_gcal_cancel_resync.py` (3 helpers + 2 task + 7 endpoints + 1 idempotência)
     - ⏳ E2E Playwright: Recomendado mas não obrigatório (requer setup inicial de Playwright)
 
-- [ ] **Fase 5 — Gestão interna adicional e desligamento de planilhas**
-  - [ ] Implementar endpoint `/api/etl/reports/latest` e painel simples para arquivos recentes (read-only).
+- [ ] **Fase 5 — Gestão interna adicional e desligamento de planilhas** *(em andamento)*
+  - [x] **Backend: Endpoint `/api/etl/reports/latest`** ✅ **(Completo em 2025-10-31)**
+    - ✅ Service layer: `list_latest_reports()` em `apps/dat_ingest/services/etl_observability.py`
+    - ✅ View: `EtlReportsLatestView` (GET, IsControleOrSuper)
+    - ✅ Rota: `/api/etl/reports/latest/?limit=20`
+    - ✅ Testes: `test_etl_reports_latest.py` (24/24 passing - service + endpoint + permissões + edge cases)
+    - ✅ Segurança: Valida limit (1-100), trata diretório ausente, previne path traversal
+    - ✅ Container build issue resolved (custom admin site circular import fixed)
+  - [ ] **Frontend: Painel de relatórios ETL** *(próximo passo)*
+    - [ ] Página `/etl-reports` para grupos Controle/Superintendência
+    - [ ] Listagem com colunas: Nome, Tipo, Tamanho, Data
+    - [ ] Filtros: tipo de arquivo, limite de resultados
+    - [ ] Download de arquivos individuais
   - [ ] Automatizar processos que ainda dependem de planilhas, detalhando substituições (ex: importadores → formulários/front).
   - [ ] Documentar estratégia de abandono das planilhas (como entradas alimentam o sistema).
 

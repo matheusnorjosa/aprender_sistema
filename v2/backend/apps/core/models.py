@@ -9,6 +9,7 @@ Cláusulas Pétreas:
 
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 
@@ -19,7 +20,18 @@ class Usuario(AbstractUser):
     SSOT: Substitui IMPORTRANGE de Usuários.xlsx
     """
 
-    cpf = models.CharField(max_length=11, unique=True, db_index=True)
+    cpf = models.CharField(
+        max_length=11,
+        unique=True,
+        db_index=True,
+        validators=[
+            RegexValidator(
+                regex=r'^\d{11}$',
+                message='CPF deve conter exatamente 11 dígitos numéricos.',
+                code='invalid_cpf'
+            )
+        ]
+    )
     telefone = models.CharField(max_length=20, blank=True)
     cargo = models.CharField(max_length=100, blank=True)
 

@@ -102,11 +102,16 @@ Plano DAT + GCal — 2025-10-29
     - ✅ Testes: `test_etl_reports_latest.py` (24/24 passing - service + endpoint + permissões + edge cases)
     - ✅ Segurança: Valida limit (1-100), trata diretório ausente, previne path traversal
     - ✅ Container build issue resolved (custom admin site circular import fixed)
-  - [ ] **Frontend: Painel de relatórios ETL** *(próximo passo)*
-    - [ ] Página `/etl-reports` para grupos Controle/Superintendência
-    - [ ] Listagem com colunas: Nome, Tipo, Tamanho, Data
-    - [ ] Filtros: tipo de arquivo, limite de resultados
-    - [ ] Download de arquivos individuais
+  - [x] **Frontend: Painel de relatórios ETL** ✅ **(Completo em 2025-10-31)**
+    - ✅ Página `/controle/etl-reports` para grupos Controle/Superintendência
+    - ✅ Cliente API: `listLatestReports(limit)` em `api/etl.js`
+    - ✅ Componente: `EtlReportsPage.jsx` com Table do Ant Design
+    - ✅ Colunas: Nome (com ícone por tipo), Tipo (tag colorida), Tamanho (formatado KB/MB), Data/Hora (DD/MM/YYYY HH:mm), Ações (download)
+    - ✅ Filtros: tipo de arquivo (todos/json/csv/txt/outro), limite de resultados (1-100), botão atualizar
+    - ✅ Download: link direto para `/out_etl/{filename}` em nova aba
+    - ✅ Tratamento de erros: 403 (permissão), outros erros (mensagem genérica)
+    - ✅ Helpers: formatBytes (bytes → KB/MB), dayjs format (ISO → local)
+    - ✅ Menu: item "Relatórios ETL" com ícone FileText para Controle/Super
   - [ ] Automatizar processos que ainda dependem de planilhas, detalhando substituições (ex: importadores → formulários/front).
   - [ ] Documentar estratégia de abandono das planilhas (como entradas alimentam o sistema).
 

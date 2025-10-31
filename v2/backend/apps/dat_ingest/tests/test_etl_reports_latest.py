@@ -270,7 +270,7 @@ class TestEtlReportsLatestEndpoint:
         """Deve exigir autenticação"""
         with override_settings(ETL_OUTPUT_DIR=str(tmp_path)):
             response = api_client.get('/api/etl/reports/latest/')
-            assert response.status_code == http_status.HTTP_401_UNAUTHORIZED
+            assert response.status_code == http_status.HTTP_403_FORBIDDEN
 
     def test_requires_controle_or_super_permission(self, api_client, usuario_formador, tmp_path):
         """Deve exigir grupo Controle ou Superintendência"""

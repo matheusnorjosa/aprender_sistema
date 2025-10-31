@@ -55,6 +55,7 @@ const { TextArea } = Input;
 const { Title, Text } = Typography;
 const { Step } = Steps;
 
+const RANGE_TIMEZONE = 'America/Fortaleza';
 
 export default function NewSolicitacaoWizard() {
   const navigate = useNavigate();
@@ -82,6 +83,43 @@ export default function NewSolicitacaoWizard() {
     // PR19: Modalidade online/presencial
     is_online: false,
   });
+
+  // Handler para DateTimeRange: converte {date, start, end} para ISO UTC
+  const handleRangeChange = (range) => {
+    if (!range || !range.date || !range.start || !range.end) {
+      // Se faltar dados, limpar os campos
+      setFormData(prev => ({ ...prev, inicio: null, fim: null }));
+      return;
+    }
+
+    try {
+      // Combinar date + hora usando timezone America/Fortaleza
+      const dateStr = range.date; // formato YYYY-MM-DD
+      const startTime = range.start; // formato HH:mm
+      const endTime = range.end; // formato HH:mm
+
+      // Criar dayjs objects em America/Fortaleza e converter para ISO UTC
+      const inicioLocal = dayjs.tz(`${dateStr} ${startTime}`, RANGE_TIMEZONE);
+      const fimLocal = dayjs.tz(`${dateStr} ${endTime}`, RANGE_TIMEZONE);
+
+      const isoInicio = inicioLocal.utc().format();
+      const isoFim = fimLocal.utc().format();
+
+      setFormData(prev => ({ ...prev, inicio: isoInicio, fim: isoFim }));
+    } catch (error) {
+      console.error('Erro ao converter data/hora:', error);
+      setFormData(prev => ({ ...prev, inicio: null, fim: null }));
+    }
+  };
+
+  // Derivar rangeValue de formData.inicio/fim para o componente DateTimeRange
+  const rangeValue = formData.inicio && formData.fim
+    ? {
+        date: dayjs(formData.inicio).tz(RANGE_TIMEZONE).format('YYYY-MM-DD'),
+        start: dayjs(formData.inicio).tz(RANGE_TIMEZONE).format('HH:mm'),
+        end: dayjs(formData.fim).tz(RANGE_TIMEZONE).format('HH:mm'),
+      }
+    : { date: '', start: '', end: '' };
 
   // Navegação entre passos
   const next = () => {
@@ -244,10 +282,9 @@ export default function NewSolicitacaoWizard() {
           <DateTimeRange
             labelStart="Data/Hora Início"
             labelEnd="Data/Hora Fim"
-            nameStart="inicio"
-            nameEnd="fim"
             required
-            onChange={(inicio, fim) => setFormData({ ...formData, inicio, fim })}
+            value={rangeValue}
+            onChange={handleRangeChange}
           />
         </>
       ),
@@ -399,7 +436,7 @@ export default function NewSolicitacaoWizard() {
             </Descriptions.Item>
             <Descriptions.Item label="Período">
               {formData.inicio && formData.fim
-                ? `${dayjs(formData.inicio).format('DD/MM/YYYY HH:mm')} - ${dayjs(formData.fim).format('DD/MM/YYYY HH:mm')}`
+                ? `${dayjs(formData.inicio).tz(RANGE_TIMEZONE).format('DD/MM/YYYY HH:mm')} - ${dayjs(formData.fim).tz(RANGE_TIMEZONE).format('DD/MM/YYYY HH:mm')}`
                 : 'Não informado'}
             </Descriptions.Item>
             <Descriptions.Item label="Formadores">

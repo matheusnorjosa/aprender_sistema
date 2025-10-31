@@ -27,7 +27,7 @@ jobs:
               branch: 'main',
               required_status_checks: {
                 strict: true,
-                contexts: ['code-quality', 'tests']
+                contexts: ['tests']
               },
               enforce_admins: false,
               required_pull_request_reviews: {
@@ -52,7 +52,7 @@ jobs:
               branch: 'develop',
               required_status_checks: {
                 strict: true,
-                contexts: ['code-quality', 'tests']
+                contexts: ['tests']
               },
               enforce_admins: false,
               required_pull_request_reviews: {

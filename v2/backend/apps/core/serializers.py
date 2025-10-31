@@ -3,6 +3,9 @@ DRF Serializers for Core models
 """
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
 from .models import (
@@ -412,3 +415,48 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             user.set_password(password)
             user.save()
         return user
+
+    def validate_password(self, value):
+        """
+        Validate password using Django's password validators.
+        Enforces minimum length of 8 characters and Django's AUTH_PASSWORD_VALIDATORS.
+        """
+        if value:
+            # Minimum length check
+            if len(value) < 8:
+                raise serializers.ValidationError(
+                    "A senha deve ter no mínimo 8 caracteres."
+                )
+
+            # Use Django's validate_password for consistent policy
+            try:
+                validate_password(value)
+            except ValidationError as e:
+                raise serializers.ValidationError(list(e.messages))
+
+        return value
+
+
+class GroupSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Django Group model (Admin CRUD).
+
+    Used by Admin DAT for managing user groups/sectors.
+    GAP-002 (resolved): Created in Phase 1 Iteration 2.
+    """
+
+    permissions = serializers.SerializerMethodField(read_only=True)
+    user_count = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Group
+        fields = ["id", "name", "permissions", "user_count"]
+        read_only_fields = ["id", "permissions", "user_count"]
+
+    def get_permissions(self, obj):
+        """Return list of permission codenames."""
+        return [f"{p.content_type.app_label}.{p.codename}" for p in obj.permissions.all()]
+
+    def get_user_count(self, obj):
+        """Return count of users in this group."""
+        return obj.user_set.count()

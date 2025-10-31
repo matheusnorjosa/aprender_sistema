@@ -8,6 +8,7 @@ PA-05: Registrar usuário, data/hora e justificativa em AuditLog.
 
 import logging
 
+from django.contrib.auth.models import Group
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -35,6 +36,7 @@ from .serializers import (
     AuditLogSerializer,
     AvailabilityBlockSerializer,
     CompraSerializer,
+    GroupSerializer,
     MunicipioOptionSerializer,
     MunicipioSerializer,
     ProjetoOptionSerializer,
@@ -695,28 +697,103 @@ class CompraViewSet(viewsets.ModelViewSet):
 
 
 # TODO(GAP-004): UsuarioAdminViewSet requer UsuarioAdminSerializer não implementado
-# class UsuarioAdminViewSet(viewsets.ModelViewSet):
-#     """
-#     ViewSet para CRUD de Usuários (apenas DAT).
-#
-#     Permite criar/atualizar usuários, atribuir grupos, setar senhas.
-#
-#     Filtros disponíveis:
-#     - is_active: booleano
-#     - is_staff: booleano
-#     - search: busca em username, email, first_name, last_name, cpf
-#     - ordering: username, email, date_joined, id
-#     """
-#
-#     queryset = Usuario.objects.prefetch_related("groups").all()
-#     serializer_class = UsuarioAdminSerializer
-#     permission_classes = [IsDAT]
-#
-#     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-#     filterset_fields = ["is_active", "is_staff", "is_superuser"]
-#     search_fields = ["username", "email", "first_name", "last_name", "cpf"]
-#     ordering_fields = ["username", "email", "date_joined", "id"]
-#     ordering = ["username"]
+class UsuarioAdminViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para CRUD de Usuários (apenas DAT).
+
+    Permite criar/atualizar usuários, atribuir grupos, setar senhas.
+
+    Filtros disponíveis:
+    - is_active: booleano
+    - is_staff: booleano
+    - search: busca em username, email, first_name, last_name, cpf
+    - ordering: username, email, date_joined, id
+
+    GAP-001 (resolvido): Endpoint reativado em Fase 1 Iteração 2.
+    """
+
+    queryset = Usuario.objects.prefetch_related("groups").all()
+    serializer_class = UsuarioAdminSerializer
+    permission_classes = [IsDAT]
+
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["is_active", "is_staff", "is_superuser"]
+    search_fields = ["username", "email", "first_name", "last_name", "cpf"]
+    ordering_fields = ["username", "email", "date_joined", "id"]
+    ordering = ["username"]
+
+    @action(detail=True, methods=["post"], permission_classes=[IsDAT])
+    def assign_groups(self, request, pk=None):
+        """
+        Atribui grupos a um usuário.
+
+        Endpoint: POST /api/usuarios-admin/{id}/assign_groups/
+        Payload: {"group_ids": [1, 2, 3]}
+
+        GAP-003 (resolvido): Endpoint para vincular usuários a grupos.
+        Iteração 3 - Fase 1 Plano DAT/GCal.
+        """
+        usuario = self.get_object()
+        group_ids = request.data.get("group_ids", [])
+
+        # Validar tipo de dados
+        if not isinstance(group_ids, list):
+            return Response(
+                {"error": "group_ids must be a list of integers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validar que são inteiros
+        try:
+            group_ids = [int(gid) for gid in group_ids]
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "group_ids must contain only integers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Remover duplicados
+        group_ids = list(set(group_ids))
+
+        # Verificar se todos os grupos existem
+        groups = Group.objects.filter(id__in=group_ids)
+        if groups.count() != len(group_ids):
+            found_ids = set(groups.values_list("id", flat=True))
+            missing_ids = set(group_ids) - found_ids
+            return Response(
+                {"error": f"Groups not found with IDs: {sorted(missing_ids)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Atribuir grupos (substitui grupos existentes)
+        usuario.groups.set(groups)
+
+        # Retornar usuário atualizado com grupos
+        serializer = self.get_serializer(usuario)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class GroupViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para CRUD de Grupos Django (apenas DAT).
+
+    Gerencia grupos/setores do sistema (Superintendência, Coordenador, Formador, etc.).
+
+    Filtros disponíveis:
+    - search: busca textual em name
+    - ordering: name, id
+
+    GAP-002 (resolvido): Endpoint criado em Fase 1 Iteração 2.
+    """
+
+    queryset = Group.objects.prefetch_related("permissions").all()
+    serializer_class = GroupSerializer
+    permission_classes = [IsDAT]
+
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ["name"]
+    ordering_fields = ["name", "id"]
+    ordering = ["name"]
 
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):

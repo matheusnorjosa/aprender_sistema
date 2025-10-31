@@ -337,6 +337,211 @@ def build_event_payload(solicitacao, enable_meet=True):
 - Valida que payload com `is_online=true` inclui `conferenceData`
 - Valida que payload com `is_online=false` **não** inclui `conferenceData`
 
+## 4.6. Resync/Cancel (Fase 4)
+
+### Visão Geral
+
+A **Fase 4** implementa funcionalidades para **reenviar (resync)** e **cancelar** eventos já publicados no Google Calendar, permitindo correções e manutenção do calendário diretamente pelo sistema.
+
+**Casos de uso:**
+- **Resync**: Corrigir dados de um evento já publicado (ex: horário alterado, descrição atualizada)
+- **Cancel**: Remover permanentemente um evento do Calendar quando cancelado/reprovado
+
+### Endpoints
+
+#### POST /api/solicitacoes/{id}/resync-gcal/
+
+**Descrição**: Republicar solicitação no Google Calendar (força UPDATE)
+
+**Permissão**: `IsControleOrSuper`
+
+**Fluxo**:
+1. Valida `status == 'aprovado'`
+2. Reseta `gcal_payload_hash = None` (força UPDATE mesmo se já publicado)
+3. Marca `gcal_status = PENDING`
+4. Enfileira `task_publish_solicitacao_to_gcal.delay(id)`
+5. Retorna **202 Accepted** com `task_id`
+
+**AuditLog**: Action `RESYNC_GCAL_REQUESTED`
+
+**Exemplo**:
+```bash
+curl -X POST http://localhost:8002/api/solicitacoes/123/resync-gcal/ \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json"
+```
+
+**Response**:
+```json
+{
+  "detail": "Resincronização solicitada com sucesso (processando em background).",
+  "task_id": "abc-123-def",
+  "solicitacao_id": 123
+}
+```
+
+#### POST /api/solicitacoes/{id}/cancel-gcal/
+
+**Descrição**: Cancelar evento no Google Calendar e limpar campos
+
+**Permissão**: `IsControleOrSuper`
+
+**Fluxo**:
+1. Valida que evento foi publicado (`external_event_id` existe ou `gcal_status == PUBLISHED`)
+2. Marca `gcal_status = PENDING` temporariamente
+3. Enfileira `task_cancel_solicitacao_from_gcal.delay(id)`
+4. Task deleta evento do Calendar (trata 404 como sucesso - idempotência)
+5. Limpa campos: `external_event_id`, `meet_link`, `gcal_payload_hash`
+6. Marca `gcal_status = NONE`, `last_sync_action = DELETE`
+
+**AuditLog**: Actions `CANCEL_GCAL_REQUESTED` (endpoint) e `CANCEL_GCAL` (task)
+
+**Retornos**:
+- **202 Accepted**: Cancelamento enfileirado com sucesso
+- **409 Conflict**: Evento não foi publicado (não pode cancelar)
+
+**Exemplo**:
+```bash
+curl -X POST http://localhost:8002/api/solicitacoes/123/cancel-gcal/ \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json"
+```
+
+**Response**:
+```json
+{
+  "detail": "Cancelamento solicitado com sucesso (processando em background).",
+  "task_id": "xyz-789-ghi",
+  "solicitacao_id": 123
+}
+```
+
+### Helpers (Service Layer)
+
+**Arquivo**: `v2/backend/apps/core/services/gcal_sync_service.py`
+
+#### resync_solicitacao(s, *, apply_blocked=False)
+
+```python
+from apps.core.services.gcal_sync_service import resync_solicitacao
+
+# Republicar solicitação aprovada
+outcome = resync_solicitacao(solicitacao, apply_blocked=False)
+# outcome.action == "UPDATE"
+# outcome.external_event_id == "asv2-123"
+```
+
+**Comportamento**:
+- Reseta `gcal_payload_hash = None` para forçar UPDATE
+- Reutiliza `apply_one_solicitacao()` para lógica de sincronização
+- Raises `ValueError` se `status != 'aprovado'`
+
+#### cancel_solicitacao(s)
+
+```python
+from apps.core.services.gcal_sync_service import cancel_solicitacao
+
+# Cancelar evento publicado
+outcome = cancel_solicitacao(solicitacao)
+# outcome.action == "DELETE"
+# outcome.external_event_id == None (limpo)
+```
+
+**Comportamento**:
+- Deleta evento do Calendar via `client.delete(calendar_id, event_id)`
+- Trata **404 como sucesso** (idempotência)
+- Limpa **todos** os campos GCal: `external_event_id`, `meet_link`, `gcal_payload_hash`
+- Marca `gcal_status = NONE`, `last_sync_action = DELETE`
+- Raises `ValueError` se evento não foi publicado
+
+### UI: Botões em PreAgendaPage
+
+**Arquivo**: `v2/frontend/src/pages/PreAgenda/PreAgendaPage.jsx`
+
+**Botões condicionais** na coluna "Ações":
+
+1. **Botão "Reenviar"** (ícone: `SyncOutlined`, cor: laranja)
+   - **Visível quando**: `gcal_status === 'PUBLISHED' || gcal_status === 'ERROR'`
+   - **Modal.confirm**: Warning (okType: 'warning')
+   - **Ação**: Chama `resyncSolicitacao(id)` → message.success → reload
+
+2. **Botão "Cancelar"** (ícone: `StopOutlined`, cor: vermelho)
+   - **Visível quando**: `gcal_status === 'PUBLISHED' && external_event_id`
+   - **Modal.confirm**: Danger (okType: 'danger')
+   - **Ação**: Chama `cancelSolicitacao(id)` → message.success → reload
+
+**Exemplo de uso**:
+```jsx
+{showResync && (
+  <Button
+    size="small"
+    type="default"
+    icon={<SyncOutlined />}
+    onClick={() => handleResync(record.id)}
+    title="Reenviar (forçar UPDATE)"
+    style={{ color: '#faad14', borderColor: '#faad14' }}
+  />
+)}
+
+{showCancel && (
+  <Button
+    size="small"
+    danger
+    icon={<StopOutlined />}
+    onClick={() => handleCancel(record.id)}
+    title="Cancelar evento no Calendar"
+  />
+)}
+```
+
+### Testes
+
+**Cobertura** (`v2/backend/apps/core/tests/test_gcal_cancel_resync.py`):
+
+**13 testes totais**:
+- **3 testes helpers**:
+  - `test_resync_requires_approved_status`: ValueError se `status != 'aprovado'`
+  - `test_resync_resets_hash_and_calls_apply`: Valida reset de hash e chamada de `apply_one`
+  - `test_cancel_validates_published`: ValueError se não publicado
+  - `test_cancel_deletes_and_clears_fields`: Valida delete + limpeza de campos
+
+- **2 testes task**:
+  - `test_task_cancel_success`: Sucesso com AuditLog
+  - `test_task_cancel_not_found`: DoesNotExist tratado
+
+- **7 testes endpoints**:
+  - `test_resync_endpoint_requires_approved`: 400 se não aprovado
+  - `test_resync_endpoint_success`: 202 + task_id + AuditLog
+  - `test_resync_endpoint_requires_permission`: 403 para não-autorizados
+  - `test_cancel_endpoint_requires_published`: 409 se não publicado
+  - `test_cancel_endpoint_success`: 202 + task_id + AuditLog
+  - `test_cancel_endpoint_requires_permission`: 403 para não-autorizados
+  - `test_cancel_endpoint_idempotent_404`: 404 tratado como sucesso
+
+**Rodar testes**:
+```bash
+cd v2/infra
+docker compose exec -T web pytest apps/core/tests/test_gcal_cancel_resync.py -v
+# ========================= 13 passed in 10.00s =========================
+```
+
+### Idempotência
+
+**Cancel é idempotente**: Se o evento já foi deletado do Calendar (404), a operação é tratada como sucesso. Isso permite múltiplas tentativas sem erro.
+
+**Implementação** (`cancel_solicitacao` linha ~1015):
+```python
+try:
+    _retry_with_backoff(
+        lambda: client.delete(calendar_id, event_id),
+        operation_name=f"GCal CANCEL #{s.id}",
+    )
+except Exception as e:
+    # 404 = já foi deletado (idempotência OK)
+    if "404" not in str(e):
+        raise
+```
+
 ## 5. Comandos Úteis
 
 ### Preview (GET /preview-gcal/)
@@ -447,3 +652,4 @@ logger.info(f"GCal response: {result}")
 - **PR19** (RF05/RF06): Implementação inicial (GCal + Meet integration)
 - **2025-10-23**: Guia criado
 - **2025-10-28**: Adicionado componente MeetLink reutilizável e testes de persistência
+- **2025-10-30**: Fase 4 completa (Resync/Cancel) - 13 testes backend, endpoints DRF, UI PreAgenda

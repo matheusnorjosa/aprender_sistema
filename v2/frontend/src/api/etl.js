@@ -39,5 +39,5 @@ export async function listLatestReports(limit = 20) {
 export function getReportDownloadUrl(filename) {
   // Backend deve servir arquivos estáticos em /out_etl/
   // ou implementar endpoint /api/etl/reports/download/{filename}
-  return `/out_etl/${filename}`;
+  return `/out_etl/${encodeURIComponent(filename)}`;
 }

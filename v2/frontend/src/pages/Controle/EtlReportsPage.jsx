@@ -76,6 +76,11 @@ export default function EtlReportsPage() {
   const [filterKind, setFilterKind] = useState('all'); // all, json, csv, txt, other
 
   /**
+   * Calcular limite efetivo (garantir entre 1-100, fallback 20)
+   */
+  const effectiveLimit = Math.max(1, Math.min(limit ?? 20, 100));
+
+  /**
    * Buscar relatórios do backend
    */
   const fetchReports = useCallback(async () => {
@@ -83,7 +88,7 @@ export default function EtlReportsPage() {
     setError(null);
 
     try {
-      const data = await listLatestReports(limit);
+      const data = await listLatestReports(effectiveLimit);
       setCount(data.count);
       setReports(data.reports || []);
     } catch (err) {
@@ -100,7 +105,7 @@ export default function EtlReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [limit]);
+  }, [effectiveLimit]);
 
   /**
    * Carregar ao montar e quando limit mudar
@@ -218,7 +223,7 @@ export default function EtlReportsPage() {
               min={1}
               max={100}
               value={limit}
-              onChange={setLimit}
+              onChange={(value) => setLimit(value ?? 20)}
               className="w-full"
               placeholder="1-100"
             />
@@ -271,8 +276,8 @@ export default function EtlReportsPage() {
             columns={columns}
             rowKey="filename"
             pagination={{
-              pageSize: 20,
-              showSizeChanger: true,
+              pageSize: Math.min(effectiveLimit, filteredReports.length || effectiveLimit),
+              showSizeChanger: false,
               showTotal: (total) => `Total: ${total} arquivos`,
             }}
             locale={{

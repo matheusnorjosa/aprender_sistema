@@ -10,12 +10,12 @@ Fase 5 - Desligamento gradual de planilhas
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from django.conf import settings
 
 
-def list_latest_reports(limit: int = 20) -> List[Dict[str, any]]:
+def list_latest_reports(limit: int = 20) -> List[Dict[str, Any]]:
     """
     Lista os relatórios ETL mais recentes do diretório de saída.
 

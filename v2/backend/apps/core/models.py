@@ -81,11 +81,11 @@ class Projeto(models.Model):
     nome = models.CharField(max_length=200, unique=True, db_index=True)
     codigo = models.CharField(
         max_length=50,
-        unique=True,
-        null=True,
+        null=False,
         blank=True,
+        default='',
         db_index=True,
-        help_text="Código único do projeto (ex: ACERTA, NLENDO)"
+        help_text="Código único do projeto (ex: ACERTA, NLENDO). Unique apenas quando preenchido."
     )
     fluxo = models.CharField(
         max_length=12,
@@ -102,6 +102,13 @@ class Projeto(models.Model):
         verbose_name = "Projeto"
         verbose_name_plural = "Projetos"
         ordering = ["nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['codigo'],
+                condition=~models.Q(codigo=''),
+                name='unique_projeto_codigo_nonempty',
+            ),
+        ]
 
     def __str__(self):
         return self.nome

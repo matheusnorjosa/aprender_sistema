@@ -912,3 +912,107 @@ class Participation(models.Model):
 
     def __str__(self):
         return f"{self.solicitacao_id} — {self.usuario or self.guest_email} ({self.get_role_display()})"
+
+
+class GoogleOAuthCredential(models.Model):
+    """
+    Credenciais OAuth 2.0 do Google para usuários do grupo Controle.
+
+    Permite que usuários autorizem individualmente o acesso ao Google Calendar
+    para publicação de eventos, substituindo o modelo de service account.
+
+    **Segurança**:
+    - Tokens criptografados com Fernet (GCAL_ENCRYPTION_KEY dedicada)
+    - Relação OneToOne com Usuario (1 credencial por usuário)
+    - Validação de domínio (@aprendereditora.com.br)
+    - Auditoria completa (AuditLog + google_email tracking)
+
+    **Refresh automático**:
+    - `refresh_access_token_safe()` usa select_for_update() (concorrência)
+    - Refresh executado automaticamente antes de publicar eventos
+
+    **Rotação de chave**:
+    - Management command: `python manage.py rotate_gcal_encryption_key`
+    - Zero downtime: lê com chave antiga, salva com chave nova
+
+    Refs:
+    - Sprint 1 (Issue #1): Modelo + Migration + Serviço OAuth
+    - GAP-1: Concorrência com select_for_update
+    - GAP-2: Encryption key dedicada com rotação
+    - GAP-5: Multi-calendar preparado (allowed_calendars)
+    """
+
+    user = models.OneToOneField(
+        Usuario,
+        on_delete=models.CASCADE,
+        related_name="google_oauth",
+        verbose_name="Usuário",
+        help_text="Usuário Controle que conectou sua conta Google"
+    )
+    google_email = models.EmailField(
+        max_length=255,
+        db_index=True,
+        verbose_name="E-mail Google",
+        help_text="E-mail da conta Google conectada (ex: operacional1@aprendereditora.com.br)"
+    )
+    access_token_encrypted = models.BinaryField(
+        verbose_name="Access Token (criptografado)",
+        help_text="Access token criptografado com Fernet (GCAL_ENCRYPTION_KEY)"
+    )
+    refresh_token_encrypted = models.BinaryField(
+        verbose_name="Refresh Token (criptografado)",
+        help_text="Refresh token criptografado com Fernet (GCAL_ENCRYPTION_KEY)"
+    )
+    token_expiry = models.DateTimeField(
+        verbose_name="Expiração do Token",
+        help_text="Timestamp UTC de expiração do access token (geralmente 1h)"
+    )
+    scope = models.CharField(
+        max_length=500,
+        default="https://www.googleapis.com/auth/calendar",
+        verbose_name="Scopes OAuth",
+        help_text="Permissões concedidas pelo usuário (separadas por espaço)"
+    )
+    default_calendar_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name="Calendário Padrão",
+        help_text="ID do calendário padrão (ex: 'primary' ou ID específico)"
+    )
+    allowed_calendars = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Calendários Permitidos",
+        help_text="Lista de IDs de calendários que o usuário pode publicar (GAP-5: multi-calendar futuro)"
+    )
+
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Conectado em")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+
+    class Meta:
+        db_table = "core_google_oauth_credential"
+        verbose_name = "Credencial OAuth Google"
+        verbose_name_plural = "Credenciais OAuth Google"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "token_expiry"]),
+            models.Index(fields=["google_email"]),
+            models.Index(fields=["token_expiry"]),  # Para job diário de alertas
+        ]
+
+    def __str__(self):
+        expiry_fmt = self.token_expiry.strftime('%d/%m/%Y %H:%M') if self.token_expiry else "N/A"
+        return f"{self.user.username} ({self.google_email}) - expira: {expiry_fmt}"
+
+    def is_expired(self):
+        """Verifica se o access token está expirado (com margem de 5 minutos)."""
+        from datetime import timedelta
+        return timezone.now() >= self.token_expiry - timedelta(minutes=5)
+
+    def days_until_expiry(self):
+        """Retorna número de dias até expiração (usado pelo job de alertas)."""
+        if self.is_expired():
+            return 0
+        delta = self.token_expiry - timezone.now()
+        return delta.days

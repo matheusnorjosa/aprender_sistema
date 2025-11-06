@@ -8,6 +8,60 @@
 
 ---
 
+## 🔧 Ferramentas Disponíveis (.claude/)
+
+### Slash Commands Customizados
+
+Use `/command-name` para executar comandos especializados:
+
+**Desenvolvimento e Qualidade:**
+- `/new-feat` - Criar nova feature seguindo padrões do projeto
+- `/migrate` - Executar migrações Django e validar modelo
+- `/test-coverage` - Análise completa de cobertura de testes
+- `/review` - Review automático de código (style, security, best practices)
+
+**Fluxos de Negócio (Testes):**
+- `/approve-flow` - Testar fluxo completo de aprovação (PA-01 a PA-07)
+- `/check-conflicts` - Testar verificação de conflitos (RF03, RD-01 a RD-08)
+
+**ETL e Importação:**
+- `/etl-dry` - Rodar ETL em modo dry-run (simula sem persistir)
+- `/etl-apply` - Rodar ETL com apply (persiste no banco + relatórios)
+
+**Deploy e Infraestrutura:**
+- `/deploy-staging` - Deploy completo para ambiente staging
+
+**Project Agents (Tasks Autônomas):**
+- `/project_git-pr` - Preparar commit limpo e descrição de PR
+- `/project_import-formadores` - Importar formadores do Excel
+- `/project_migrate-models` - Criar e aplicar migrations para models
+- `/project_tdd <app> <feature>` - Iniciar ciclo TDD para feature
+- `/project_e2e-smoke` - Criar/atualizar smoke test Playwright (RF01→RF07)
+- `/project_fix-django-url` - Investigar e corrigir problemas de URL reverse
+- `/project_plan` - Planejar implementação detalhada de tarefa
+
+### Skills Especializadas
+
+Use `Skill` tool com nome da skill para contexto especializado:
+
+- **aprender-domain** - Conhecimento completo do domínio (planilhas originais, fluxos SUPER/NAO_SUPER, RFs, códigos de disponibilidade E/M/D/P/T/X)
+- **django-patterns** - Padrões Django/DRF (models, serializers, views, services, permissions, testes)
+- **etl-guidelines** - Guidelines para management commands ETL (dry-run, idempotência, relatórios JSON)
+
+### Quando Usar
+
+**Sempre use slash commands quando:**
+- Tarefa complexa com múltiplas etapas (approve-flow, etl-apply)
+- Necessita validação de conformidade (check-conflicts, test-coverage)
+- Deploy ou operação crítica (deploy-staging)
+
+**Use skills quando:**
+- Precisar contexto detalhado do domínio antes de implementar
+- Dúvida sobre padrão correto (Django patterns, ETL guidelines)
+- Planejamento de features que envolvem regras de negócio
+
+---
+
 ## 📊 Estrutura das Planilhas Source (v2/backend/data/csv-import/)
 
 ### Acompanhamento de Agenda _ 2025.xlsx

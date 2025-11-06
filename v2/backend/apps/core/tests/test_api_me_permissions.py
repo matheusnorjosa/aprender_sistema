@@ -24,8 +24,8 @@ def test_me_includes_groups_and_flag():
     user = Usuario.objects.create_user(
         username="u1", email="u1@x.com", password="x", cpf="11111111111"
     )
-    group1 = Group.objects.create(name="Coordenador")
-    group2 = Group.objects.create(name="Formador")
+    group1, _ = Group.objects.get_or_create(name="Coordenador")
+    group2, _ = Group.objects.get_or_create(name="Formador")
     user.groups.add(group1, group2)
 
     client = APIClient()
@@ -52,7 +52,7 @@ def test_is_superintendencia_true_only_for_group():
     user = Usuario.objects.create_user(
         username="u2", email="u2@x.com", password="x", cpf="22222222222"
     )
-    super_group = Group.objects.create(name="Superintendência")
+    super_group, _ = Group.objects.get_or_create(name="Superintendência")
     user.groups.add(super_group)
 
     client = APIClient()
@@ -75,7 +75,7 @@ def test_is_superintendencia_false_for_similar_name():
     user = Usuario.objects.create_user(
         username="u3", email="u3@x.com", password="x", cpf="33333333333"
     )
-    fake_group = Group.objects.create(name="superintendencia")  # minúsculo
+    fake_group, _ = Group.objects.get_or_create(name="superintendencia")  # minúsculo
     user.groups.add(fake_group)
 
     client = APIClient()

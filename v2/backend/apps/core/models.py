@@ -855,7 +855,7 @@ class Participation(models.Model):
         related_name="participations",
         verbose_name="Solicitação",
     )
-    # Usuário é obrigatório para todos os papéis, exceto CONVIDADO
+    # Usuário ou guest_email é obrigatório (pelo menos um deve estar preenchido)
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -889,14 +889,6 @@ class Participation(models.Model):
             models.CheckConstraint(
                 name="core_participation_user_or_email",
                 check=(models.Q(usuario__isnull=False) | models.Q(guest_email__isnull=False)),
-            ),
-            # Se não for convidado, usuário é obrigatório
-            models.CheckConstraint(
-                name="core_participation_user_required_when_not_guest",
-                check=(
-                    models.Q(role="CONVIDADO")
-                    | (models.Q(role__in=["COORDENADOR", "FORMADOR", "COORD_ACOMPANHA"]) & models.Q(usuario__isnull=False))
-                ),
             ),
             # Unicidade por usuário (quando usuário existe)
             models.UniqueConstraint(

@@ -70,7 +70,13 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
         out = StringIO()
         try:
             call_command('seed_projetos_fluxo_from_sheets', '--help', stdout=out)
-            self.assertIn('seed_projetos_fluxo_from_sheets', out.getvalue())
+            # Se chegar aqui, comando executou sem SystemExit (não esperado para --help)
+            # Mas podemos verificar se há conteúdo
+            if out.getvalue():
+                self.assertIn('seed', out.getvalue().lower())
+        except SystemExit as e:
+            # --help causa SystemExit(0), o que significa que o comando existe
+            self.assertEqual(e.code, 0, f"Comando deve ter código de saída 0 com --help, recebeu: {e.code}")
         except Exception as e:
             self.fail(f"Comando não encontrado ou erro ao invocar: {e}")
 
@@ -207,7 +213,7 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
             self.assertEqual(acerta_after.fluxo, "SUPER")
 
             # Verificar que CSV foi gerado
-            csv_path = Path("v2/backend/apps/core/data/projetos_fluxo_resolved.csv")
+            csv_path = Path("apps/core/data/projetos_fluxo_resolved.csv")
             if csv_path.exists():
                 content = csv_path.read_text(encoding='utf-8')
                 self.assertIn("ACerta", content)
@@ -293,7 +299,7 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
         - Fonte cita aba/arquivo
         - Detalhe cita coluna/linha/valor
         """
-        csv_path = Path("v2/backend/apps/core/data/projetos_fluxo_resolved.csv")
+        csv_path = Path("apps/core/data/projetos_fluxo_resolved.csv")
 
         # Gerar CSV mockado para teste
         csv_content = (
@@ -350,7 +356,8 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
             mock_wb_agenda.__getitem__.return_value = mock_ws_agenda
 
             def load_side_effect(path, *args, **kwargs):
-                if "controle" in path.lower():
+                path_str = str(path).lower()
+                if "controle" in path_str:
                     return mock_wb_controle
                 else:
                     return mock_wb_agenda
@@ -394,12 +401,12 @@ class TestProjetosFluxoIntegration:
 
     def test_projeto_default_fluxo_is_outros(self):
         """Testa que projetos novos têm fluxo padrão NAO_SUPER."""
-        projeto = Projeto.objects.create(nome="Teste Default Fluxo")
+        projeto = Projeto.objects.create(nome="Teste Default Fluxo", codigo='')
         assert projeto.fluxo == "NAO_SUPER"
 
     def test_projeto_can_be_set_to_super(self):
         """Testa que projetos podem ser setados para SUPER."""
-        projeto = Projeto.objects.create(nome="Teste SUPER", fluxo="SUPER")
+        projeto = Projeto.objects.create(nome="Teste SUPER", codigo='', fluxo="SUPER")
         assert projeto.fluxo == "SUPER"
 
         # Verificar que pode ser salvo novamente

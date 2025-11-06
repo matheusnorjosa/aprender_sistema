@@ -26,7 +26,7 @@ def usuario_dat(db):
         password="testpass123",
         cpf="11111111111",
     )
-    grupo_dat = Group.objects.create(name="DAT")
+    grupo_dat, _ = Group.objects.get_or_create(name="DAT")
     user.groups.add(grupo_dat)
     return user
 
@@ -60,8 +60,8 @@ class TestAssignGroups:
     def test_assign_groups_success(self, api_client, usuario_dat, usuario_formador):
         """Deve atribuir grupos com sucesso (200)."""
         # Criar grupos
-        grupo1 = Group.objects.create(name="Grupo 1")
-        grupo2 = Group.objects.create(name="Grupo 2")
+        grupo1, _ = Group.objects.get_or_create(name="Grupo 1")
+        grupo2, _ = Group.objects.get_or_create(name="Grupo 2")
 
         # Login como DAT
         api_client.force_authenticate(usuario_dat)
@@ -88,7 +88,7 @@ class TestAssignGroups:
         self, api_client, usuario_dat, usuario_formador
     ):
         """Deve retornar 400 quando grupo não existe."""
-        grupo1 = Group.objects.create(name="Grupo 1")
+        grupo1, _ = Group.objects.get_or_create(name="Grupo 1")
 
         api_client.force_authenticate(usuario_dat)
 
@@ -107,7 +107,7 @@ class TestAssignGroups:
     def test_assign_groups_empty_list(self, api_client, usuario_dat, usuario_formador):
         """Deve remover todos os grupos quando lista vazia (200)."""
         # Adicionar grupo inicial
-        grupo1 = Group.objects.create(name="Grupo 1")
+        grupo1, _ = Group.objects.get_or_create(name="Grupo 1")
         usuario_formador.groups.add(grupo1)
         assert usuario_formador.groups.count() == 1
 
@@ -128,7 +128,7 @@ class TestAssignGroups:
 
     def test_assign_groups_duplicates(self, api_client, usuario_dat, usuario_formador):
         """Deve ignorar IDs duplicados e atribuir apenas uma vez."""
-        grupo1 = Group.objects.create(name="Grupo 1")
+        grupo1, _ = Group.objects.get_or_create(name="Grupo 1")
 
         api_client.force_authenticate(usuario_dat)
 
@@ -150,7 +150,7 @@ class TestAssignGroups:
         self, api_client, usuario_comum, usuario_formador
     ):
         """Deve retornar 403 quando usuário não tem permissão DAT."""
-        grupo1 = Group.objects.create(name="Grupo 1")
+        grupo1, _ = Group.objects.get_or_create(name="Grupo 1")
 
         # Login como usuário comum (sem DAT)
         api_client.force_authenticate(usuario_comum)
@@ -194,9 +194,9 @@ class TestAssignGroups:
     ):
         """Deve substituir grupos existentes (não adicionar)."""
         # Configurar grupos iniciais
-        grupo1 = Group.objects.create(name="Grupo 1")
-        grupo2 = Group.objects.create(name="Grupo 2")
-        grupo3 = Group.objects.create(name="Grupo 3")
+        grupo1, _ = Group.objects.get_or_create(name="Grupo 1")
+        grupo2, _ = Group.objects.get_or_create(name="Grupo 2")
+        grupo3, _ = Group.objects.get_or_create(name="Grupo 3")
 
         usuario_formador.groups.set([grupo1, grupo2])
         assert usuario_formador.groups.count() == 2

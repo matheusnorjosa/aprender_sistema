@@ -27,7 +27,7 @@ def api_client():
 @pytest.fixture
 def grupo_controle(db):
     """Cria grupo Controle."""
-    return Group.objects.create(name='Controle')
+    return Group.objects.get_or_create(name='Controle')[0]
 
 
 @pytest.fixture

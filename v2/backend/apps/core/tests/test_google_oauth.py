@@ -439,7 +439,10 @@ class TestGoogleOAuthEndpoints:
         - Credencial criada com tokens criptografados
         - AuditLog com action=GOOGLE_CONNECT
         - Redirect para return_to?google=connected
+        - State token validado contra cache
         """
+        from django.core.cache import cache
+
         client = APIClient()
         client.force_authenticate(user=usuario_controle)
 
@@ -453,12 +456,23 @@ class TestGoogleOAuthEndpoints:
             json=lambda: {"email": "controle@aprendereditora.com.br"}
         )
 
+        # Criar state no cache (simular build_authorization_url)
+        csrf_token = "test_csrf_token_valid_123"
+        cache_key = f"oauth_state:{csrf_token}"
+        cache.set(cache_key, {
+            "user_id": usuario_controle.id,
+            "return_to": "/pre-agenda",
+            "created_at": timezone.now().isoformat(),
+        }, timeout=600)
+
+        state = f"{csrf_token}|/pre-agenda|{usuario_controle.id}"
+
         # Callback
         response = client.get(
             "/api/oauth/google/callback/",
             {
                 "code": "fake_code_123",
-                "state": f"csrf_token|/pre-agenda|{usuario_controle.id}",
+                "state": state,
             }
         )
 
@@ -548,6 +562,187 @@ class TestGoogleOAuthEndpoints:
 
 
 # ============================================================================
+# TESTES DE SEGURANÇA (SECURITY)
+# ============================================================================
+
+class TestOAuthSecurity:
+    """
+    Testes de segurança para prevenir vulnerabilidades:
+    - State/CSRF validation
+    - Open redirect
+    - Replay attacks
+    """
+
+    def test_oauth_state_validated_in_callback(self, usuario_controle):
+        """
+        Security: State token deve ser validado contra cache (CSRF protection).
+
+        Previne: Atacante criar link malicioso /callback?code=...&state=fake|/|<victim_id>
+        """
+        from apps.core.services.google_oauth import build_authorization_url
+        from django.core.cache import cache
+
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        # Gerar state válido
+        with patch.dict('os.environ', {
+            'GCAL_OAUTH_CLIENT_ID': 'test_client_id',
+            'GCAL_OAUTH_CLIENT_SECRET': 'test_secret',
+            'GCAL_OAUTH_REDIRECT_URI': 'http://localhost:8002/api/oauth/google/callback/',
+        }):
+            auth_url = build_authorization_url(usuario_controle, return_to="/pre-agenda")
+
+        # Extrair state da URL
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(auth_url)
+        query_params = parse_qs(parsed.query)
+        valid_state = query_params['state'][0]
+
+        # Tentar callback com state inválido (não no cache)
+        fake_state = "invalid_csrf_token|/pre-agenda|" + str(usuario_controle.id)
+
+        response = client.get("/api/oauth/google/callback/", {
+            "code": "fake_code_123",
+            "state": fake_state,
+        })
+
+        # Deve rejeitar (redirect com erro)
+        assert response.status_code == http_status.HTTP_302_FOUND
+        assert "error" in response.url
+        assert "invalid_state" in response.url
+
+    def test_oauth_state_is_one_time_use(self, usuario_controle):
+        """
+        Security: State token deve ser removido do cache após uso (previne replay).
+        """
+        from apps.core.services.google_oauth import build_authorization_url, validate_oauth_state
+
+        with patch.dict('os.environ', {
+            'GCAL_OAUTH_CLIENT_ID': 'test_client_id',
+            'GCAL_OAUTH_CLIENT_SECRET': 'test_secret',
+            'GCAL_OAUTH_REDIRECT_URI': 'http://localhost:8002/api/oauth/google/callback/',
+        }):
+            auth_url = build_authorization_url(usuario_controle, return_to="/pre-agenda")
+
+        # Extrair state
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(auth_url)
+        query_params = parse_qs(parsed.query)
+        state = query_params['state'][0]
+
+        # Primeira validação: sucesso
+        result1 = validate_oauth_state(state, usuario_controle.id)
+        assert result1["valid"] is True
+
+        # Segunda validação: falha (state já removido do cache)
+        result2 = validate_oauth_state(state, usuario_controle.id)
+        assert result2["valid"] is False
+        assert "expired" in result2["error"]
+
+    def test_open_redirect_blocked_in_return_to(self, usuario_controle):
+        """
+        Security: return_to deve rejeitar URLs absolutas (previne open redirect).
+
+        Previne: Atacante enviar /oauth/google/start?return_to=https://malicioso.com
+        """
+        from apps.core.services.google_oauth import build_authorization_url
+
+        with patch.dict('os.environ', {
+            'GCAL_OAUTH_CLIENT_ID': 'test_client_id',
+            'GCAL_OAUTH_CLIENT_SECRET': 'test_secret',
+            'GCAL_OAUTH_REDIRECT_URI': 'http://localhost:8002/api/oauth/google/callback/',
+        }):
+            # Tentar URLs maliciosas
+            malicious_urls = [
+                "https://malicioso.com",
+                "http://evil.com/steal",
+                "//malicioso.com/phishing",
+                "javascript:alert(1)",
+                "data:text/html,<script>alert(1)</script>",
+            ]
+
+            for malicious_url in malicious_urls:
+                auth_url = build_authorization_url(usuario_controle, return_to=malicious_url)
+
+                # Extrair state da URL gerada
+                from urllib.parse import urlparse, parse_qs
+                parsed = urlparse(auth_url)
+                query_params = parse_qs(parsed.query)
+                state = query_params['state'][0]
+
+                # State deve ter /pre-agenda (fallback), não a URL maliciosa
+                csrf_token, return_to, user_id = state.split('|')
+                assert return_to == "/pre-agenda", f"URL maliciosa não foi bloqueada: {malicious_url}"
+
+    def test_safe_internal_paths_allowed_in_return_to(self, usuario_controle):
+        """
+        Security: Caminhos internos válidos devem ser permitidos.
+        """
+        from apps.core.services.google_oauth import build_authorization_url
+
+        with patch.dict('os.environ', {
+            'GCAL_OAUTH_CLIENT_ID': 'test_client_id',
+            'GCAL_OAUTH_CLIENT_SECRET': 'test_secret',
+            'GCAL_OAUTH_REDIRECT_URI': 'http://localhost:8002/api/oauth/google/callback/',
+        }):
+            safe_paths = [
+                "/pre-agenda",
+                "/dashboard",
+                "/integrations",
+                "/solicitacoes/nova",
+            ]
+
+            for safe_path in safe_paths:
+                auth_url = build_authorization_url(usuario_controle, return_to=safe_path)
+
+                # Extrair state
+                from urllib.parse import urlparse, parse_qs
+                parsed = urlparse(auth_url)
+                query_params = parse_qs(parsed.query)
+                state = query_params['state'][0]
+
+                # State deve conter o caminho seguro
+                csrf_token, return_to, user_id = state.split('|')
+                assert return_to == safe_path, f"Caminho seguro foi rejeitado: {safe_path}"
+
+    def test_oauth_callback_rejects_expired_state(self, usuario_controle):
+        """
+        Security: Callback deve rejeitar state expirado (TTL 10min).
+        """
+        from django.core.cache import cache
+        import time
+
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        # Criar state manualmente no cache com TTL curto
+        csrf_token = "test_csrf_token_123"
+        cache_key = f"oauth_state:{csrf_token}"
+        cache.set(cache_key, {
+            "user_id": usuario_controle.id,
+            "return_to": "/pre-agenda",
+            "created_at": timezone.now().isoformat(),
+        }, timeout=1)  # 1 segundo apenas
+
+        state = f"{csrf_token}|/pre-agenda|{usuario_controle.id}"
+
+        # Aguardar expiração
+        time.sleep(2)
+
+        # Tentar callback com state expirado
+        response = client.get("/api/oauth/google/callback/", {
+            "code": "fake_code_123",
+            "state": state,
+        })
+
+        # Deve rejeitar
+        assert response.status_code == http_status.HTTP_302_FOUND
+        assert "error" in response.url
+        assert "invalid_state" in response.url
+
+
+# ============================================================================
 # RESUMO DOS TESTES
 # ============================================================================
 
@@ -557,7 +752,7 @@ class TestGoogleOAuthEndpoints:
 # ✅ test_refresh_access_token_with_concurrency → GAP-1 (select_for_update)
 # ✅ test_rotate_encryption_key → GAP-2 (Rotação chave)
 
-# Testes API (6):
+# Testes API (7):
 # ✅ test_google_oauth_start_requires_authentication → PA-06 (Auth)
 # ✅ test_google_oauth_start_requires_controle_group → PA-06 (RBAC)
 # ✅ test_google_oauth_start_throttling → GAP-3 (Rate limiting 10/h)
@@ -566,5 +761,12 @@ class TestGoogleOAuthEndpoints:
 # ✅ test_status_endpoint_returns_connected → Status endpoint
 # ✅ test_disconnect_removes_credential → PA-05 (Disconnect + AuditLog)
 
-# Total: 10 testes (4 unit + 6 API)
+# Testes de Segurança (5):
+# ✅ test_oauth_state_validated_in_callback → CSRF protection
+# ✅ test_oauth_state_is_one_time_use → Replay attack prevention
+# ✅ test_open_redirect_blocked_in_return_to → Open redirect prevention
+# ✅ test_safe_internal_paths_allowed_in_return_to → Valid paths allowed
+# ✅ test_oauth_callback_rejects_expired_state → TTL validation
+
+# Total: 16 testes (4 unit + 7 API + 5 security)
 # Cobertura: GAP-1, GAP-2, GAP-3, PA-05, PA-06

@@ -106,6 +106,101 @@ def _decrypt_token(encrypted: bytes) -> str:
 
 
 # ============================================================================
+# SECURITY HELPERS
+# ============================================================================
+
+def _is_safe_url(url: str) -> bool:
+    """
+    Valida se URL é segura para redirect (previne open redirect).
+
+    Args:
+        url: URL a ser validada
+
+    Returns:
+        bool: True se segura, False caso contrário
+
+    Security:
+        - Apenas caminhos internos (começam com "/")
+        - Rejeita URLs absolutas (http://, https://, //)
+        - Rejeita javascript:, data:, etc.
+    """
+    if not url:
+        return False
+
+    # Permitir apenas caminhos internos
+    if url.startswith("/") and not url.startswith("//"):
+        return True
+
+    # Rejeitar qualquer URL absoluta ou protocolo
+    return False
+
+
+def validate_oauth_state(state: str, user_id: int) -> dict:
+    """
+    Valida state token do OAuth callback (previne CSRF).
+
+    Args:
+        state: State string recebido no callback (formato: csrf_token|return_to|user_id)
+        user_id: ID do usuário autenticado
+
+    Returns:
+        dict: {
+            "valid": bool,
+            "return_to": str,
+            "error": str | None
+        }
+
+    Security:
+        - Valida CSRF token contra cache (one-time use)
+        - Verifica user_id match
+        - Valida return_to (previne open redirect)
+        - Remove state do cache após validação
+    """
+    from django.core.cache import cache
+
+    try:
+        # Parse state
+        parts = state.split('|')
+        if len(parts) != 3:
+            return {"valid": False, "return_to": "/pre-agenda", "error": "State format invalid"}
+
+        csrf_token, return_to, state_user_id_str = parts
+        state_user_id = int(state_user_id_str)
+
+        # Verificar user_id match
+        if state_user_id != user_id:
+            logger.error(
+                f"❌ OAuth state validation: user_id mismatch "
+                f"(state={state_user_id}, authenticated={user_id})"
+            )
+            return {"valid": False, "return_to": "/pre-agenda", "error": "User ID mismatch"}
+
+        # Buscar state no cache
+        cache_key = f"oauth_state:{csrf_token}"
+        cached_state = cache.get(cache_key)
+
+        if not cached_state:
+            logger.error(f"❌ OAuth state validation: token not found or expired ({csrf_token[:8]}...)")
+            return {"valid": False, "return_to": "/pre-agenda", "error": "State token invalid or expired"}
+
+        # Validar return_to
+        cached_return_to = cached_state.get("return_to", "/pre-agenda")
+        if not _is_safe_url(cached_return_to):
+            logger.warning(f"⚠️ OAuth state validation: unsafe return_to in cache ({cached_return_to})")
+            cached_return_to = "/pre-agenda"
+
+        # Remover state do cache (one-time use)
+        cache.delete(cache_key)
+        logger.info(f"✅ OAuth state validado: {csrf_token[:8]}... (user={user_id})")
+
+        return {"valid": True, "return_to": cached_return_to, "error": None}
+
+    except (ValueError, IndexError) as e:
+        logger.error(f"❌ OAuth state validation: parse error ({e})")
+        return {"valid": False, "return_to": "/pre-agenda", "error": "State parse error"}
+
+
+# ============================================================================
 # OAUTH 2.0 FLOW
 # ============================================================================
 
@@ -120,10 +215,16 @@ def build_authorization_url(user, return_to: str = "/pre-agenda") -> str:
     Returns:
         str: URL completa de redirecionamento para Google OAuth
 
+    Security:
+        - State token armazenado em cache (Redis) com TTL 10min
+        - return_to validado (apenas caminhos internos)
+
     Example:
         >>> url = build_authorization_url(request.user, return_to="/pre-agenda")
         >>> return redirect(url)
     """
+    from django.core.cache import cache
+
     client_id = os.getenv("GCAL_OAUTH_CLIENT_ID")
     redirect_uri = os.getenv("GCAL_OAUTH_REDIRECT_URI")
 
@@ -133,13 +234,25 @@ def build_authorization_url(user, return_to: str = "/pre-agenda") -> str:
             "Configure no Google Cloud Console e defina no .env"
         )
 
-    # State: CSRF token + return_to (formato: "csrf_token|return_to")
+    # Validar return_to para prevenir open redirect
+    if not _is_safe_url(return_to):
+        logger.warning(f"⚠️ return_to rejeitado (open redirect attempt): {return_to}")
+        return_to = "/pre-agenda"
+
+    # State: CSRF token + return_to + user_id (formato: "csrf_token|return_to|user_id")
     import secrets
     csrf_token = secrets.token_urlsafe(32)
     state = f"{csrf_token}|{return_to}|{user.id}"
 
-    # Armazenar CSRF token em cache/sessão (simplificado: usar state na URL)
-    # Produção: usar cache Redis com TTL 10min
+    # Armazenar CSRF token em cache (Redis) com TTL 10min
+    cache_key = f"oauth_state:{csrf_token}"
+    cache.set(cache_key, {
+        "user_id": user.id,
+        "return_to": return_to,
+        "created_at": timezone.now().isoformat(),
+    }, timeout=600)  # 10 minutos
+
+    logger.info(f"🔐 OAuth state criado: {csrf_token[:8]}... (user={user.id})")
 
     params = {
         "client_id": client_id,

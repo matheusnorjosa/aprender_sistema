@@ -15,6 +15,7 @@ Refs:
 
 import logging
 from datetime import timedelta
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 from django.conf import settings
 from django.shortcuts import redirect
@@ -34,6 +35,49 @@ from apps.core.services.google_oauth import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def _merge_query_params(url: str, **params) -> str:
+    """
+    Merge query parameters into URL, preserving existing parameters.
+
+    Args:
+        url: Base URL (may contain existing query params)
+        **params: Query parameters to add/update
+
+    Returns:
+        URL with merged query parameters
+
+    Example:
+        _merge_query_params("/pre-agenda?tab=integrations", google="connected")
+        → "/pre-agenda?tab=integrations&google=connected"
+
+        _merge_query_params("/pre-agenda", google="error", reason="validation")
+        → "/pre-agenda?google=error&reason=validation"
+    """
+    parsed = urlparse(url)
+    query_dict = parse_qs(parsed.query)
+
+    # Add new parameters
+    for key, value in params.items():
+        query_dict[key] = [value]
+
+    # Rebuild query string
+    new_query = urlencode(query_dict, doseq=True)
+
+    # Rebuild URL
+    return urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        parsed.path,
+        parsed.params,
+        new_query,
+        parsed.fragment
+    ))
 
 
 # ============================================================================
@@ -202,18 +246,21 @@ def google_oauth_callback(request):
             }
         )
 
-        # Redirecionar para return_to
-        return redirect(f"{return_to}?google=connected")
+        # Redirecionar para return_to (merge query params)
+        redirect_url = _merge_query_params(return_to, google="connected")
+        return redirect(redirect_url)
 
     except ValueError as e:
         # Erro de validação (ex: domínio inválido)
         logger.error(f"❌ OAuth callback falhou (validação): {e}")
-        return redirect(f"{return_to}?google=error&reason=validation")
+        redirect_url = _merge_query_params(return_to, google="error", reason="validation")
+        return redirect(redirect_url)
 
     except Exception as e:
         # Erro genérico
         logger.error(f"❌ OAuth callback falhou: {e}")
-        return redirect(f"{return_to}?google=error&reason=server_error")
+        redirect_url = _merge_query_params(return_to, google="error", reason="server_error")
+        return redirect(redirect_url)
 
 
 @api_view(['GET'])

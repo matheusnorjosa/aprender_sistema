@@ -277,6 +277,45 @@ class TestGoogleOAuthServiceUnit:
         assert audit is not None, "Deve criar AuditLog"
         assert audit.details["credentials_updated"] == 1
 
+    def test_merge_query_params_adds_to_path_without_params(self):
+        """
+        Helper: _merge_query_params deve adicionar query params a paths sem params.
+
+        Correto: /pre-agenda → /pre-agenda?google=connected
+        """
+        from apps.core.views_oauth import _merge_query_params
+
+        result = _merge_query_params("/pre-agenda", google="connected")
+        assert result == "/pre-agenda?google=connected"
+
+    def test_merge_query_params_merges_with_existing_params(self):
+        """
+        Helper: _merge_query_params deve mesclar params com paths existentes.
+
+        Previne: /pre-agenda?tab=integrations?google=connected (ERRADO)
+        Correto: /pre-agenda?tab=integrations&google=connected
+        """
+        from apps.core.views_oauth import _merge_query_params
+
+        result = _merge_query_params("/pre-agenda?tab=integrations", google="connected")
+
+        assert result.count("?") == 1
+        assert "tab=integrations" in result
+        assert "google=connected" in result
+        assert "&" in result
+
+    def test_merge_query_params_multiple_new_params(self):
+        """
+        Helper: _merge_query_params deve adicionar múltiplos params novos.
+        """
+        from apps.core.views_oauth import _merge_query_params
+
+        result = _merge_query_params("/pre-agenda", google="error", reason="validation")
+
+        assert result.count("?") == 1
+        assert "google=error" in result
+        assert "reason=validation" in result
+
 
 # ============================================================================
 # TESTES API (6 testes)
@@ -746,11 +785,14 @@ class TestOAuthSecurity:
 # RESUMO DOS TESTES
 # ============================================================================
 
-# Testes Unitários (4):
+# Testes Unitários + Helpers (7):
 # ✅ test_encrypt_decrypt_token → GAP-2 (Criptografia Fernet)
 # ✅ test_exchange_code_validates_domain → GAP-2 (Validação domínio)
 # ✅ test_refresh_access_token_with_concurrency → GAP-1 (select_for_update)
 # ✅ test_rotate_encryption_key → GAP-2 (Rotação chave)
+# ✅ test_merge_query_params_adds_to_path_without_params → Query param add
+# ✅ test_merge_query_params_merges_with_existing_params → Query param merge
+# ✅ test_merge_query_params_multiple_new_params → Multiple params
 
 # Testes API (7):
 # ✅ test_google_oauth_start_requires_authentication → PA-06 (Auth)
@@ -768,5 +810,5 @@ class TestOAuthSecurity:
 # ✅ test_safe_internal_paths_allowed_in_return_to → Valid paths allowed
 # ✅ test_oauth_callback_rejects_expired_state → TTL validation
 
-# Total: 16 testes (4 unit + 7 API + 5 security)
+# Total: 19 testes (7 unit/helpers + 7 API + 5 security)
 # Cobertura: GAP-1, GAP-2, GAP-3, PA-05, PA-06

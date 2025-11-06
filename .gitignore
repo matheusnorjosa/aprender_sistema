@@ -66,6 +66,15 @@ coverage.xml
 .pytest_cache/
 pytest_full_output.txt
 pytest-report.log
+coverage/
+
+# Temporary analysis/planning documents
+ANALISE_*.md
+CHECKLIST_*.md
+EPIC_*.md
+VALIDACAO_*.md
+auditoria_sistema_plano.md
+runlog.zip
 
 # Translations
 *.mo

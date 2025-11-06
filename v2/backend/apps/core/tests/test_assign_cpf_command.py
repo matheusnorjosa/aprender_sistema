@@ -75,11 +75,11 @@ def excel_file(tmp_path, users_db):
     # Header
     ws.append(["Nome", "Nome Completo", "Email", "CPF"])
 
-    # Dados
-    ws.append(["João", "João Silva", "user1@example.com", "123.456.789-01"])  # CPF com máscara
-    ws.append(["Maria", "Maria Santos", "user2@example.com", "98765432109"])  # CPF sem máscara
-    ws.append(["Pedro", "Pedro Costa", "ambiguo@example.com", "11111111111"])  # Email ambíguo
-    ws.append(["Novo", "Novo Usuário", "novo@example.com", "22222222222"])  # Não existe no banco
+    # Dados (CPFs válidos conforme mod 11)
+    ws.append(["João", "João Silva", "user1@example.com", "123.456.789-09"])  # CPF com máscara (12345678909)
+    ws.append(["Maria", "Maria Santos", "user2@example.com", "98765432100"])  # CPF sem máscara (98765432100)
+    ws.append(["Pedro", "Pedro Costa", "ambiguo@example.com", "45678901249"])  # Email ambíguo (45678901249)
+    ws.append(["Novo", "Novo Usuário", "novo@example.com", "23456789092"])  # Não existe no banco (23456789092)
     ws.append(["Inválido", "CPF Inválido", "invalido@example.com", "abc123"])  # CPF inválido
 
     path = tmp_path / "usuarios.xlsx"
@@ -132,10 +132,10 @@ def test_apply_persists_and_idempotent(excel_file, users_db, tmp_path):
 
     # Verificar persistência
     users_db["u1"].refresh_from_db()
-    assert users_db["u1"].cpf == "12345678901"  # Máscara removida
+    assert users_db["u1"].cpf == "12345678909"  # Máscara removida (mod 11 válido)
 
     users_db["u2"].refresh_from_db()
-    assert users_db["u2"].cpf == "98765432109"
+    assert users_db["u2"].cpf == "98765432100"  # CPF válido (mod 11)
 
     # Verificar relatório
     with open(out_dir / "assign_cpf_report.json", "r", encoding="utf-8") as f:
@@ -161,7 +161,7 @@ def test_apply_persists_and_idempotent(excel_file, users_db, tmp_path):
 
     # Verificar que não houve mudança
     users_db["u1"].refresh_from_db()
-    assert users_db["u1"].cpf == "12345678901"
+    assert users_db["u1"].cpf == "12345678909"  # CPF válido (mod 11)
 
 
 def test_cpf_invalido_skipped(excel_file, users_db, tmp_path):
@@ -212,8 +212,8 @@ def test_cpf_duplicado_na_planilha(tmp_path, users_db):
     ws = wb.active
     ws.title = "Ativos"
     ws.append(["Nome", "Nome Completo", "Email", "CPF"])
-    ws.append(["João", "João Silva", "user1@example.com", "12345678901"])
-    ws.append(["Maria", "Maria Santos", "user2@example.com", "12345678901"])  # CPF duplicado
+    ws.append(["João", "João Silva", "user1@example.com", "12345678909"])  # CPF válido (mod 11)
+    ws.append(["Maria", "Maria Santos", "user2@example.com", "12345678909"])  # CPF duplicado (válido mod 11)
 
     path = tmp_path / "usuarios_dup.xlsx"
     wb.save(path)
@@ -238,8 +238,8 @@ def test_cpf_duplicado_na_planilha(tmp_path, users_db):
 
 def test_cpf_divergente_banco_planilha(tmp_path, users_db):
     """CPF divergente (banco != planilha) → conflicts."""
-    # Atribuir CPF diferente no banco
-    users_db["u1"].cpf = "99999999999"
+    # Atribuir CPF diferente no banco (válido mod 11)
+    users_db["u1"].cpf = "52998224725"  # CPF válido diferente
     users_db["u1"].save()
 
     # Criar planilha com CPF diferente
@@ -247,7 +247,7 @@ def test_cpf_divergente_banco_planilha(tmp_path, users_db):
     ws = wb.active
     ws.title = "Ativos"
     ws.append(["Nome", "Nome Completo", "Email", "CPF"])
-    ws.append(["João", "João Silva", "user1@example.com", "12345678901"])  # Diferente do banco
+    ws.append(["João", "João Silva", "user1@example.com", "12345678909"])  # Diferente do banco (válido mod 11)
 
     path = tmp_path / "usuarios_div.xlsx"
     wb.save(path)

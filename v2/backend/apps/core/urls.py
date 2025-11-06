@@ -47,6 +47,12 @@ from .views_lookup import (
     UsuarioLookup,
 )
 from .views_validate import SolicitationValidateView
+from .views_oauth import (
+    google_oauth_start,
+    google_oauth_callback,
+    google_oauth_status,
+    google_oauth_disconnect,
+)
 from .views import (
     MunicipioViewSet,
     ProjetoViewSet,
@@ -81,6 +87,11 @@ urlpatterns = [
     # Authentication
     path("auth/login/", login, name="auth-login"),
     path("auth/logout/", logout, name="auth-logout"),
+    # Google OAuth 2.0 (Sprint 1 - Issue #1)
+    path("oauth/google/start/", google_oauth_start, name="google-oauth-start"),
+    path("oauth/google/callback/", google_oauth_callback, name="google-oauth-callback"),
+    path("integrations/google/status/", google_oauth_status, name="google-oauth-status"),
+    path("integrations/google/disconnect/", google_oauth_disconnect, name="google-oauth-disconnect"),
     path(
         "availability/check/",
         AvailabilityCheckView.as_view(),

@@ -30,7 +30,7 @@ class GCalEndpointsTests(TestCase):
     def setUp(self):
         """Setup: criar usuário Controle, solicitação, e grupos"""
         # Criar grupo Controle
-        self.group_controle = Group.objects.create(name="Controle")
+        self.group_controle, _ = Group.objects.get_or_create(name="Controle")
 
         # Criar usuário Controle
         self.user_controle = Usuario.objects.create_user(

@@ -151,29 +151,21 @@ def google_oauth_callback(request):
         logger.error("❌ OAuth callback: code ou state ausente")
         return redirect("/pre-agenda?google=error&reason=missing_params")
 
-    # Parse state: "csrf_token|return_to|user_id"
-    try:
-        parts = state.split('|')
-        if len(parts) != 3:
-            raise ValueError("State inválido")
+    # Verificar autenticação
+    if not request.user.is_authenticated:
+        logger.error("❌ OAuth callback: usuário não autenticado")
+        return redirect("/pre-agenda?google=error&reason=unauthenticated")
 
-        csrf_token, return_to, user_id_str = parts
-        user_id = int(user_id_str)
+    # Validar state token (CSRF + user_id + return_to)
+    from apps.core.services.google_oauth import validate_oauth_state
+    validation = validate_oauth_state(state, request.user.id)
 
-        # TODO: Validar CSRF token (produção: usar Redis cache)
-        # Por ora, confiamos no user_id do state
-
-    except (ValueError, IndexError):
-        logger.error(f"❌ OAuth callback: state inválido ({state})")
+    if not validation["valid"]:
+        logger.error(f"❌ OAuth callback: state validation failed ({validation['error']})")
         return redirect("/pre-agenda?google=error&reason=invalid_state")
 
-    # Verificar se usuário do state é o mesmo logado
-    if not request.user.is_authenticated or request.user.id != user_id:
-        logger.error(
-            f"❌ OAuth callback: user_id mismatch "
-            f"(state={user_id}, logged={request.user.id if request.user.is_authenticated else 'anon'})"
-        )
-        return redirect("/pre-agenda?google=error&reason=user_mismatch")
+    # State válido - usar return_to validado
+    return_to = validation["return_to"]
 
     try:
         # Trocar code por tokens

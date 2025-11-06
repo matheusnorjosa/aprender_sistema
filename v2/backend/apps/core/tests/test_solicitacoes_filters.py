@@ -88,7 +88,7 @@ def setup_data():
     )
 
     # Criar grupo Superintendência
-    super_group = Group.objects.create(name="Superintendência")
+    super_group, _ = Group.objects.get_or_create(name="Superintendência")
     user_admin = Usuario.objects.create_user(
         username="admin", email="admin@x.com", password="x", cpf="11111111111"
     )

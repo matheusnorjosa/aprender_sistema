@@ -371,10 +371,34 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
     """
     Full serializer for Usuario (Admin CRUD).
     Includes groups and permissions for DAT admin operations.
+
+    P1.1 Security Hardening:
+    - is_staff and is_superuser are read-only
+    - Groups whitelist: DAT, Controle, Superintendência, Coordenador, Formador, Gerência
+    - Users cannot modify their own groups
+
+    API Design:
+    - groups (read-only): Retorna nomes dos grupos (ex: ["DAT", "Coordenador"])
+    - group_ids (write-only): Aceita IDs dos grupos para escrita
     """
 
+    # Read-only: retorna nomes dos grupos para a API/frontend
     groups = serializers.StringRelatedField(many=True, read_only=True)
+
+    # Write-only: aceita IDs dos grupos para criar/atualizar (P1.1)
+    group_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Group.objects.all(),
+        required=False,
+        allow_empty=True,
+        write_only=True,
+        source='groups'  # Maps to the same field in the model
+    )
+
     password = serializers.CharField(write_only=True, required=False)
+
+    # Whitelist of allowed groups (P1.1) - incluindo Gerência
+    ALLOWED_GROUPS = {"DAT", "Controle", "Superintendência", "Coordenador", "Formador", "Gerência"}
 
     class Meta:
         model = get_user_model()
@@ -389,31 +413,76 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             "is_active",
             "is_staff",
             "is_superuser",
-            "groups",
+            "groups",       # Read-only (nomes)
+            "group_ids",    # Write-only (IDs)
             "date_joined",
             "last_login",
         ]
-        read_only_fields = ["id", "date_joined", "last_login", "groups"]
+        # P1.1: is_staff and is_superuser are read-only
+        read_only_fields = ["id", "date_joined", "last_login", "is_staff", "is_superuser"]
         extra_kwargs = {
             "password": {"write_only": True}
         }
 
+    def validate_group_ids(self, value):
+        """
+        P1.1: Validate group_ids against whitelist and self-modification.
+
+        Rules:
+        - Only groups in ALLOWED_GROUPS can be assigned
+        - Users cannot modify their own groups
+        """
+        request = self.context.get("request")
+        instance = self.instance  # None for create, User object for update
+
+        # Check if user is trying to modify their own groups (P1.1)
+        if instance and request and instance.id == request.user.id:
+            raise serializers.ValidationError(
+                "Você não pode modificar seus próprios grupos."
+            )
+
+        # Validate groups against whitelist (P1.1)
+        for group in value:
+            if group.name not in self.ALLOWED_GROUPS:
+                allowed_list = ", ".join(sorted(self.ALLOWED_GROUPS))
+                raise serializers.ValidationError(
+                    f"Grupo '{group.name}' não permitido. Grupos válidos: {allowed_list}"
+                )
+
+        return value
+
     def create(self, validated_data):
-        """Create user with hashed password."""
+        """Create user with hashed password and groups."""
+        groups = validated_data.pop("groups", [])
         password = validated_data.pop("password", None)
+
         user = super().create(validated_data)
+
         if password:
             user.set_password(password)
             user.save()
+
+        # Assign groups after user creation
+        if groups:
+            user.groups.set(groups)
+
         return user
 
     def update(self, instance, validated_data):
         """Update user and hash password if provided."""
+        groups = validated_data.pop("groups", None)
         password = validated_data.pop("password", None)
+
         user = super().update(instance, validated_data)
+
         if password:
             user.set_password(password)
             user.save()
+
+        # Update groups if provided (P1.1 validation already applied)
+        if groups is not None:
+            user.groups.set(groups)
+
         return user
 
     def validate_password(self, value):

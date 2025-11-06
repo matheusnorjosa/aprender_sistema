@@ -35,7 +35,7 @@ pytestmark = pytest.mark.django_db
 def test_controle_user_can_list():
     """Usuário do grupo Controle pode listar ações."""
     # Criar grupo e usuário
-    controle_group = Group.objects.create(name="Controle")
+    controle_group, _ = Group.objects.get_or_create(name="Controle")
     user = User.objects.create_user(
         username="controle1",
         email="controle@example.com",
@@ -111,7 +111,7 @@ def test_unauthenticated_cannot_list_controle_acoes():
 
 def test_filter_by_date_range():
     """Filtro por data_inicio e data_fim funciona."""
-    controle_group = Group.objects.create(name="Controle")
+    controle_group, _ = Group.objects.get_or_create(name="Controle")
     user = User.objects.create_user(
         username="controle1",
         email="controle@example.com",
@@ -153,7 +153,7 @@ def test_filter_by_date_range():
 
 def test_controle_serializer_uses_string_related_field():
     """Serializer retorna nomes legíveis (não IDs) para FKs."""
-    controle_group = Group.objects.create(name="Controle")
+    controle_group, _ = Group.objects.get_or_create(name="Controle")
     user = User.objects.create_user(
         username="controle1",
         email="controle@example.com",
@@ -190,7 +190,7 @@ def test_controle_serializer_uses_string_related_field():
 
 def test_dat_user_can_list():
     """Usuário do grupo DAT pode listar ações."""
-    dat_group = Group.objects.create(name="DAT")
+    dat_group, _ = Group.objects.get_or_create(name="DAT")
     user = User.objects.create_user(
         username="dat1",
         email="dat@example.com",
@@ -244,7 +244,7 @@ def test_regular_user_cannot_list_dat_acoes():
 
 def test_filter_by_projeto():
     """Filtro por projeto funciona."""
-    dat_group = Group.objects.create(name="DAT")
+    dat_group, _ = Group.objects.get_or_create(name="DAT")
     user = User.objects.create_user(
         username="dat1",
         email="dat@example.com",
@@ -280,7 +280,7 @@ def test_filter_by_projeto():
 
 def test_filter_by_tipo_acao():
     """Filtro parcial por tipo_acao (icontains) funciona."""
-    dat_group = Group.objects.create(name="DAT")
+    dat_group, _ = Group.objects.get_or_create(name="DAT")
     user = User.objects.create_user(
         username="dat1",
         email="dat@example.com",
@@ -320,7 +320,7 @@ def test_filter_by_tipo_acao():
 
 def test_dat_user_can_create():
     """Usuário do grupo DAT pode criar ações."""
-    dat_group = Group.objects.create(name="DAT")
+    dat_group, _ = Group.objects.get_or_create(name="DAT")
     user = User.objects.create_user(
         username="dat1",
         email="dat@example.com",
@@ -386,7 +386,7 @@ def test_regular_user_cannot_create():
 
 def test_create_returns_read_serializer():
     """POST retorna serializer de leitura (StringRelatedField)."""
-    dat_group = Group.objects.create(name="DAT")
+    dat_group, _ = Group.objects.get_or_create(name="DAT")
     user = User.objects.create_user(
         username="dat1",
         email="dat@example.com",
@@ -417,7 +417,7 @@ def test_create_returns_read_serializer():
 
 def test_create_without_optional_fields():
     """Criação funciona sem campos opcionais (responsavel, observacao, data_registro)."""
-    dat_group = Group.objects.create(name="DAT")
+    dat_group, _ = Group.objects.get_or_create(name="DAT")
     user = User.objects.create_user(
         username="dat1",
         email="dat@example.com",
@@ -446,7 +446,7 @@ def test_create_without_optional_fields():
 
 def test_create_missing_required_fields():
     """POST sem campos obrigatórios retorna 400."""
-    dat_group = Group.objects.create(name="DAT")
+    dat_group, _ = Group.objects.get_or_create(name="DAT")
     user = User.objects.create_user(
         username="dat1",
         email="dat@example.com",

@@ -91,7 +91,9 @@ jobs:
           TZ: America/Fortaleza
           REQUIRE_DOCKER: "0"
           GCAL_CLIENT: fake
+          GCAL_SEND_UPDATES: none
           FEATURE_AUTO_APPLY_ENABLED: "false"
+          CELERY_TASK_ALWAYS_EAGER: "1"
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend
@@ -113,7 +115,9 @@ jobs:
           TZ: America/Fortaleza
           REQUIRE_DOCKER: "0"
           GCAL_CLIENT: fake
+          GCAL_SEND_UPDATES: none
           FEATURE_AUTO_APPLY_ENABLED: "false"
+          CELERY_TASK_ALWAYS_EAGER: "1"
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend
@@ -135,7 +139,9 @@ jobs:
           TZ: America/Fortaleza
           REQUIRE_DOCKER: "0"
           GCAL_CLIENT: fake
+          GCAL_SEND_UPDATES: none
           FEATURE_AUTO_APPLY_ENABLED: "false"
+          CELERY_TASK_ALWAYS_EAGER: "1"
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend

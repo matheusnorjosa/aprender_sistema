@@ -66,7 +66,9 @@ jobs:
         echo "TZ=America/Fortaleza" >> $GITHUB_ENV
         echo "REQUIRE_DOCKER=0" >> $GITHUB_ENV
         echo "GCAL_CLIENT=fake" >> $GITHUB_ENV
+        echo "GCAL_SEND_UPDATES=none" >> $GITHUB_ENV
         echo "FEATURE_AUTO_APPLY_ENABLED=false" >> $GITHUB_ENV
+        echo "CELERY_TASK_ALWAYS_EAGER=1" >> $GITHUB_ENV
         echo "PYTHONDONTWRITEBYTECODE=1" >> $GITHUB_ENV
 
     - name: Run migrations

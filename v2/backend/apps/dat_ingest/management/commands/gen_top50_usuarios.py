@@ -18,6 +18,7 @@ import csv
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from apps.dat_ingest.services.indicator_filter import should_create_participation
@@ -27,16 +28,17 @@ class Command(BaseCommand):
     help = "Gera CSV com top-50 usuários para cadastro em lote (PR20)"
 
     def add_arguments(self, parser):
+        outbox = Path(settings.BASE_DIR) / ".agents" / "outbox"
         parser.add_argument(
             "--input",
             type=str,
-            default="/app/.agents/outbox/relatorio_pessoas_pendentes_match.csv",
+            default=str(outbox / "relatorio_pessoas_pendentes_match.csv"),
             help="Caminho do relatório de pendências",
         )
         parser.add_argument(
             "--out",
             type=str,
-            default="/app/.agents/outbox/top50_usuarios_sugeridos.csv",
+            default=str(outbox / "top50_usuarios_sugeridos.csv"),
             help="Caminho do CSV de saída",
         )
         parser.add_argument(

@@ -72,6 +72,15 @@ jobs:
         echo "ETL_DATA_DIR=${{ github.workspace }}/v2/backend/data/csv-import" >> $GITHUB_ENV
         echo "PYTHONDONTWRITEBYTECODE=1" >> $GITHUB_ENV
 
+    - name: Validate test paths (no /app hardcoded)
+      run: |
+        cd v2/backend
+        if grep -R --line-number "/app" apps/core/tests apps/dat_ingest/tests 2>/dev/null | grep -v "Binary file"; then
+          echo "❌ Found '/app' hardcoded in tests. Use Path(settings.BASE_DIR) instead." >&2
+          exit 1
+        fi
+        echo "✅ No hardcoded '/app' paths found in tests"
+
     - name: Run migrations
       run: |
         cd v2/backend

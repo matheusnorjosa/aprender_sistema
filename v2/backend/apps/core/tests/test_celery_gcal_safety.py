@@ -2,29 +2,45 @@
 P0.3 - Testes de Segurança para Celery GCal Task
 
 Valida que a task preview_then_apply_gcal respeita flags de segurança:
+- FEATURE_AUTO_APPLY_ENABLED: guarda inicial (GUARDA 0)
+- GCAL_MODE: só executa se 'google' (GUARDA 1)
+- GCAL_CALENDAR_ID: só executa se configurado (GUARDA 2)
 - PREVIEW_ONLY: nunca aplica mudanças
-- GCAL_MODE: só executa se 'google'
-- GCAL_CALENDAR_ID: só executa se configurado
 """
 
 from unittest.mock import patch, MagicMock
+import pytest
 from django.test import TestCase, override_settings
 
 from apps.core.tasks import preview_then_apply_gcal
 from apps.core.models import AuditLog
 
 
+@pytest.fixture
+def enable_auto_apply(settings):
+    """
+    Fixture para habilitar FEATURE_AUTO_APPLY_ENABLED.
+
+    Necessária para testes que precisam passar da GUARDA 0 e chegar
+    nas validações subsequentes (GCAL_MODE, GCAL_CALENDAR_ID, PREVIEW_ONLY).
+    """
+    settings.FEATURE_AUTO_APPLY_ENABLED = True
+    yield
+
+
 class CeleryGCalSafetyTests(TestCase):
     """Testes de segurança para task Celery de sincronização GCal"""
 
+    @pytest.mark.usefixtures("enable_auto_apply")
     def test_task_noop_when_preview_only(self):
         """
         P0.3 - Task NÃO deve aplicar mudanças quando PREVIEW_ONLY=True
 
         Cenário:
-        - PREVIEW_ONLY=True
-        - GCAL_MODE='google'
-        - GCAL_CALENDAR_ID configurado
+        - FEATURE_AUTO_APPLY_ENABLED=True (passa GUARDA 0)
+        - GCAL_MODE='google' (passa GUARDA 1)
+        - GCAL_CALENDAR_ID configurado (passa GUARDA 2)
+        - PREVIEW_ONLY=True (bloqueia apply)
         - Preview detecta mudanças
 
         Expectativa:
@@ -68,21 +84,23 @@ class CeleryGCalSafetyTests(TestCase):
                     self.assertFalse(log.details["applied"])
                     self.assertIn("PREVIEW_ONLY", log.details["reason"])
 
+    @pytest.mark.usefixtures("enable_auto_apply")
     def test_task_noop_when_calendar_unconfigured(self):
         """
         P0.3 - Task NÃO deve executar quando GCAL_CALENDAR_ID ausente
 
         Cenário:
-        - GCAL_MODE='google'
-        - GCAL_CALENDAR_ID='' (vazio)
+        - FEATURE_AUTO_APPLY_ENABLED=True (passa GUARDA 0)
+        - GCAL_MODE='google' (passa GUARDA 1)
+        - GCAL_CALENDAR_ID='' (vazio) → SKIPPED na GUARDA 2
 
         Expectativa:
         - Task retorna status='SKIPPED'
-        - AuditLog registra "calendário não configurado"
+        - AuditLog registra "GCAL_CALENDAR_ID não configurado"
         - call_command NUNCA é chamado (curto-circuito)
         """
         with override_settings(
-            FEATURE_FLAGS={"PREVIEW_ONLY": False, "GCAL_MODE": "google"},
+            FEATURE_FLAGS={"GCAL_MODE": "google"},
             GCAL_CALENDAR_ID="",  # Vazio
         ):
             with patch("apps.core.tasks.call_command") as mock_call:
@@ -102,21 +120,23 @@ class CeleryGCalSafetyTests(TestCase):
                 self.assertEqual(log.details["status"], "SKIPPED")
                 self.assertIn("GCAL_CALENDAR_ID", log.details["reason"])
 
+    @pytest.mark.usefixtures("enable_auto_apply")
     def test_task_noop_when_gcal_mode_not_google(self):
         """
         P0.3 - Task NÃO deve executar quando GCAL_MODE != 'google'
 
         Cenário:
-        - GCAL_MODE='fake'
-        - GCAL_CALENDAR_ID configurado
+        - FEATURE_AUTO_APPLY_ENABLED=True (passa GUARDA 0)
+        - GCAL_MODE='fake' → SKIPPED na GUARDA 1
+        - GCAL_CALENDAR_ID configurado (não chega nesta validação)
 
         Expectativa:
         - Task retorna status='SKIPPED'
-        - AuditLog registra "GCAL_MODE inválido"
+        - AuditLog registra "GCAL_MODE=fake (esperado: 'google')"
         - call_command NUNCA é chamado (curto-circuito)
         """
         with override_settings(
-            FEATURE_FLAGS={"PREVIEW_ONLY": False, "GCAL_MODE": "fake"},
+            FEATURE_FLAGS={"GCAL_MODE": "fake"},
             GCAL_CALENDAR_ID="test-calendar@example.com",
         ):
             with patch("apps.core.tasks.call_command") as mock_call:
@@ -137,14 +157,17 @@ class CeleryGCalSafetyTests(TestCase):
                 self.assertEqual(log.details["status"], "SKIPPED")
                 self.assertIn("GCAL_MODE", log.details["reason"])
 
+    @pytest.mark.usefixtures("enable_auto_apply")
     def test_task_preview_only_does_not_apply(self):
         """
         P0.3 - Mesmo com mudanças detectadas, PREVIEW_ONLY=True bloqueia apply
 
         Cenário completo:
-        - Todas as flags OK (GCAL_MODE='google', CALENDAR_ID configurado)
+        - FEATURE_AUTO_APPLY_ENABLED=True (passa GUARDA 0)
+        - GCAL_MODE='google' (passa GUARDA 1)
+        - GCAL_CALENDAR_ID configurado (passa GUARDA 2)
+        - PREVIEW_ONLY=True (bloqueia apply)
         - Preview detecta 10 mudanças (CREATE + UPDATE)
-        - PREVIEW_ONLY=True
 
         Expectativa:
         - Task executa preview
@@ -184,13 +207,15 @@ class CeleryGCalSafetyTests(TestCase):
                     self.assertEqual(log.details["total_changes"], 10)
                     self.assertIn("PREVIEW_ONLY bloqueou apply", log.details["reason"])
 
+    @pytest.mark.usefixtures("enable_auto_apply")
     def test_task_logs_error_when_preview_fails(self):
         """
         P0.3 - Task DEVE logar erro quando preview retorna {"error": true}
 
         Cenário:
-        - GCAL_MODE='google'
-        - GCAL_CALENDAR_ID configurado
+        - FEATURE_AUTO_APPLY_ENABLED=True (passa GUARDA 0)
+        - GCAL_MODE='google' (passa GUARDA 1)
+        - GCAL_CALENDAR_ID configurado (passa GUARDA 2)
         - Preview retorna {"error": true, "message": "Permission denied"}
 
         Expectativa:
@@ -199,7 +224,7 @@ class CeleryGCalSafetyTests(TestCase):
         - call_command chamado APENAS 1x (preview, apply NÃO executa)
         """
         with override_settings(
-            FEATURE_FLAGS={"PREVIEW_ONLY": False, "GCAL_MODE": "google"},
+            FEATURE_FLAGS={"GCAL_MODE": "google"},
             GCAL_CALENDAR_ID="test-calendar@example.com",
         ):
             with patch("apps.core.tasks.call_command") as mock_call:
@@ -231,13 +256,16 @@ class CeleryGCalSafetyTests(TestCase):
                     self.assertEqual(log.details["phase"], "preview")
                     self.assertTrue(log.details["error"])
 
+    @pytest.mark.usefixtures("enable_auto_apply")
     def test_task_logs_error_when_apply_fails(self):
         """
         P0.3 - Task DEVE logar erro quando apply retorna {"error": true}
 
         Cenário:
-        - GCAL_MODE='google', GCAL_CALENDAR_ID configurado
-        - PREVIEW_ONLY=False
+        - FEATURE_AUTO_APPLY_ENABLED=True (passa GUARDA 0)
+        - GCAL_MODE='google' (passa GUARDA 1)
+        - GCAL_CALENDAR_ID configurado (passa GUARDA 2)
+        - PREVIEW_ONLY=False (permite apply)
         - Preview bem-sucedido (detecta mudanças)
         - Apply retorna {"error": true, "message": "Calendar API error"}
 
@@ -247,7 +275,7 @@ class CeleryGCalSafetyTests(TestCase):
         - applied=False (não foi aplicado com sucesso)
         """
         with override_settings(
-            FEATURE_FLAGS={"PREVIEW_ONLY": False, "GCAL_MODE": "google"},
+            FEATURE_FLAGS={"GCAL_MODE": "google"},
             GCAL_CALENDAR_ID="test-calendar@example.com",
         ):
             with patch("apps.core.tasks.call_command") as mock_call:

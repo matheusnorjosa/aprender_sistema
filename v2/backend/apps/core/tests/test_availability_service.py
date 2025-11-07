@@ -345,7 +345,16 @@ class TestAvailabilityCheckEndpoint:
     ):
         """
         Test: Endpoint retorna conflitos corretamente.
+
+        Para chamar endpoint com sucesso (200), usuário deve ter permissão.
+        Adiciona usuário ao grupo Controle para passar RBAC (403→200).
         """
+        from django.contrib.auth.models import Group
+
+        # Dar permissão ao usuário (evitar 403)
+        grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+        usuario_test.groups.add(grupo_controle)
+
         client = APIClient()
         client.force_authenticate(user=usuario_test)
 
@@ -409,7 +418,16 @@ class TestAvailabilityCheckEndpoint:
     def test_check_endpoint_requires_usuario_id(self, usuario_test):
         """
         Test: Endpoint requer usuario_id obrigatório.
+
+        Para validar parâmetros (400), usuário deve ter permissão.
+        Adiciona usuário ao grupo Controle para passar RBAC (403→400).
         """
+        from django.contrib.auth.models import Group
+
+        # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
+        grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+        usuario_test.groups.add(grupo_controle)
+
         client = APIClient()
         client.force_authenticate(user=usuario_test)
 
@@ -429,7 +447,16 @@ class TestAvailabilityCheckEndpoint:
     def test_check_endpoint_validates_dates(self, usuario_test):
         """
         Test: Endpoint valida datas (fim > inicio).
+
+        Para validar parâmetros (400), usuário deve ter permissão.
+        Adiciona usuário ao grupo Controle para passar RBAC (403→400).
         """
+        from django.contrib.auth.models import Group
+
+        # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
+        grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+        usuario_test.groups.add(grupo_controle)
+
         client = APIClient()
         client.force_authenticate(user=usuario_test)
 
@@ -508,6 +535,8 @@ class TestAvailabilityCheckEndpoint:
     def test_permission_only_self_or_privileged(self, usuario_test):
         """
         Test: Usuário não-privilegiado só pode checar própria disponibilidade.
+
+        Valida 403 RBAC quando usuário sem permissão tenta checar outro usuário.
         """
         # Criar segundo usuário (não privilegiado)
         outro_usuario = Usuario.objects.create_user(
@@ -533,7 +562,8 @@ class TestAvailabilityCheckEndpoint:
         )
 
         assert response.status_code == http_status.HTTP_403_FORBIDDEN
-        assert "permissão" in str(response.data).lower()
+        # Buscar por substring robusta (mensagem: "Apenas Controle ou Superintendência...")
+        assert "controle" in str(response.data).lower() or "superintend" in str(response.data).lower()
 
 
 @pytest.mark.django_db

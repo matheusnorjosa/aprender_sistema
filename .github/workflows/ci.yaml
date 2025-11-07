@@ -50,6 +50,14 @@ jobs:
         pip install -r v2/backend/requirements.txt
         pip install pytest pytest-django
 
+    - name: Generate Fernet key for GCAL
+      run: |
+        echo "GCAL_ENCRYPTION_KEY=$(python - <<'PY'
+        from cryptography.fernet import Fernet
+        print(Fernet.generate_key().decode())
+        PY
+        )" >> $GITHUB_ENV
+
     - name: Set up environment variables
       run: |
         echo "DJANGO_SETTINGS_MODULE=config.settings" >> $GITHUB_ENV
@@ -76,6 +84,18 @@ jobs:
       run: |
         cd v2/backend
         python manage.py migrate --noinput
+
+    - name: Prepare runtime dirs and symlinks
+      run: |
+        sudo mkdir -p /app
+        # garantir diretórios no workspace
+        mkdir -p "$GITHUB_WORKSPACE/v2/backend/.agents/outbox"
+        # apontar /app/.agents -> workspace/.agents
+        sudo rm -rf /app/.agents || true
+        sudo ln -s "$GITHUB_WORKSPACE/v2/backend/.agents" /app/.agents
+        # opcional: ETL dirs também
+        mkdir -p "$GITHUB_WORKSPACE/v2/backend/out_etl"
+        mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
 
     - name: Run tests
       run: |

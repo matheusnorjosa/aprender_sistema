@@ -38,7 +38,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Python 3.11
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         cache: 'pip'
@@ -54,7 +54,7 @@ jobs:
       run: |
         echo "DJANGO_SETTINGS_MODULE=config.settings" >> $GITHUB_ENV
         echo "ENVIRONMENT=testing" >> $GITHUB_ENV
-        echo "DEBUG=False" >> $GITHUB_ENV
+        echo "DEBUG=0" >> $GITHUB_ENV
         echo "SECRET_KEY=test-secret-key-for-ci-only" >> $GITHUB_ENV
         echo "DB_HOST=localhost" >> $GITHUB_ENV
         echo "DB_PORT=5432" >> $GITHUB_ENV
@@ -63,8 +63,11 @@ jobs:
         echo "DB_PASSWORD=postgres" >> $GITHUB_ENV
         echo "REDIS_HOST=localhost" >> $GITHUB_ENV
         echo "REDIS_PORT=6379" >> $GITHUB_ENV
-        echo "REQUIRE_DOCKER=0" >> $GITHUB_ENV
         echo "TZ=America/Fortaleza" >> $GITHUB_ENV
+        echo "REQUIRE_DOCKER=0" >> $GITHUB_ENV
+        echo "GCAL_CLIENT=fake" >> $GITHUB_ENV
+        echo "FEATURE_AUTO_APPLY_ENABLED=false" >> $GITHUB_ENV
+        echo "PYTHONDONTWRITEBYTECODE=1" >> $GITHUB_ENV
 
     - name: Run migrations
       run: |

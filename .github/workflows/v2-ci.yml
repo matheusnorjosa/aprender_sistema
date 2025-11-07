@@ -20,11 +20,11 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15-alpine
+        image: postgres:15
         env:
-          POSTGRES_DB: aprender_db_test
-          POSTGRES_USER: aprender_user
-          POSTGRES_PASSWORD: aprender_password
+          POSTGRES_DB: test_aprender
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -34,7 +34,7 @@ jobs:
           - 5432:5432
 
       redis:
-        image: redis:7-alpine
+        image: redis:7
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -47,10 +47,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.13
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.11'
           cache: 'pip'
           cache-dependency-path: 'v2/backend/requirements.txt'
 
@@ -78,16 +78,21 @@ jobs:
       - name: Django Check
         env:
           DJANGO_SETTINGS_MODULE: config.settings
-          SECRET_KEY: test-secret-key-for-ci
+          ENVIRONMENT: testing
+          SECRET_KEY: test-secret-key-for-ci-only
           DEBUG: "0"
-          DB_NAME: aprender_db_test
-          DB_USER: aprender_user
-          DB_PASSWORD: aprender_password
+          DB_NAME: test_aprender
+          DB_USER: postgres
+          DB_PASSWORD: postgres
           DB_HOST: localhost
           DB_PORT: 5432
           REDIS_HOST: localhost
           REDIS_PORT: 6379
+          TZ: America/Fortaleza
           REQUIRE_DOCKER: "0"
+          GCAL_CLIENT: fake
+          FEATURE_AUTO_APPLY_ENABLED: "false"
+          PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend
           python manage.py check --deploy
@@ -95,16 +100,21 @@ jobs:
       - name: Run Migrations
         env:
           DJANGO_SETTINGS_MODULE: config.settings
-          SECRET_KEY: test-secret-key-for-ci
-          DEBUG: "1"
-          DB_NAME: aprender_db_test
-          DB_USER: aprender_user
-          DB_PASSWORD: aprender_password
+          ENVIRONMENT: testing
+          SECRET_KEY: test-secret-key-for-ci-only
+          DEBUG: "0"
+          DB_NAME: test_aprender
+          DB_USER: postgres
+          DB_PASSWORD: postgres
           DB_HOST: localhost
           DB_PORT: 5432
           REDIS_HOST: localhost
           REDIS_PORT: 6379
+          TZ: America/Fortaleza
           REQUIRE_DOCKER: "0"
+          GCAL_CLIENT: fake
+          FEATURE_AUTO_APPLY_ENABLED: "false"
+          PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend
           python manage.py migrate --noinput
@@ -112,16 +122,21 @@ jobs:
       - name: Run Tests
         env:
           DJANGO_SETTINGS_MODULE: config.settings
-          SECRET_KEY: test-secret-key-for-ci
-          DEBUG: "1"
-          DB_NAME: aprender_db_test
-          DB_USER: aprender_user
-          DB_PASSWORD: aprender_password
+          ENVIRONMENT: testing
+          SECRET_KEY: test-secret-key-for-ci-only
+          DEBUG: "0"
+          DB_NAME: test_aprender
+          DB_USER: postgres
+          DB_PASSWORD: postgres
           DB_HOST: localhost
           DB_PORT: 5432
           REDIS_HOST: localhost
           REDIS_PORT: 6379
+          TZ: America/Fortaleza
           REQUIRE_DOCKER: "0"
+          GCAL_CLIENT: fake
+          FEATURE_AUTO_APPLY_ENABLED: "false"
+          PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend
           # Quarentena removida - #39 resolvido via PR #44

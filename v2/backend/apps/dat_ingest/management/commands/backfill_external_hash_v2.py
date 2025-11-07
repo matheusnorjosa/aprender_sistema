@@ -17,6 +17,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
@@ -322,7 +323,7 @@ class Command(BaseCommand):
         Args:
             collisions: Mapa de hash → list[Solicitacao IDs]
         """
-        outbox = Path("/app/.agents/outbox")
+        outbox = Path(settings.BASE_DIR) / ".agents" / "outbox"
         outbox.mkdir(parents=True, exist_ok=True)
 
         output_file = outbox / "external_hash_v2_collisions.json"

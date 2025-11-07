@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from django.conf import settings
 from django.core.management import CommandError, call_command
 from django.test import TestCase, override_settings
 
@@ -422,8 +423,8 @@ class TestETLGatesMetricsReporting(TestCase):
 
     def tearDown(self):
         """Clean up generated files."""
-        metrics_file = Path("/app/.agents/outbox/etl_metrics.json")
-        violations_file = Path("/app/.agents/outbox/etl_violations.csv")
+        metrics_file = Path(settings.BASE_DIR) / ".agents/outbox/etl_metrics.json"
+        violations_file = Path(settings.BASE_DIR) / ".agents/outbox/etl_violations.csv"
 
         if metrics_file.exists():
             metrics_file.unlink()
@@ -458,7 +459,7 @@ class TestETLGatesMetricsReporting(TestCase):
         call_command("etl_upsert_acompanhamento")
 
         # Metrics file should exist
-        metrics_file = Path("/app/.agents/outbox/etl_metrics.json")
+        metrics_file = Path(settings.BASE_DIR) / ".agents/outbox/etl_metrics.json"
         assert metrics_file.exists()
 
         # Validate JSON structure
@@ -507,7 +508,7 @@ class TestETLGatesMetricsReporting(TestCase):
         call_command("etl_upsert_acompanhamento")
 
         # Violations file should exist
-        violations_file = Path("/app/.agents/outbox/etl_violations.csv")
+        violations_file = Path(settings.BASE_DIR) / ".agents/outbox/etl_violations.csv"
         assert violations_file.exists()
 
         # Validate CSV has headers

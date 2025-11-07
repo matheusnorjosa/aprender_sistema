@@ -13,6 +13,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
+from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase, TransactionTestCase
 
@@ -325,7 +326,7 @@ class TestBackfillCollisionsReport(TestCase):
 
     def tearDown(self):
         """Clean up collision file."""
-        collision_file = Path("/app/.agents/outbox/external_hash_v2_collisions.json")
+        collision_file = Path(settings.BASE_DIR) / ".agents/outbox/external_hash_v2_collisions.json"
         if collision_file.exists():
             collision_file.unlink()
 
@@ -351,7 +352,7 @@ class TestBackfillCollisionsReport(TestCase):
         call_command("backfill_external_hash_v2")
 
         # Collision file should NOT exist
-        collision_file = Path("/app/.agents/outbox/external_hash_v2_collisions.json")
+        collision_file = Path(settings.BASE_DIR) / ".agents/outbox/external_hash_v2_collisions.json"
         assert not collision_file.exists()
 
     def test_collision_file_generated_when_collisions_exist(self):
@@ -393,7 +394,7 @@ class TestBackfillCollisionsReport(TestCase):
         call_command("backfill_external_hash_v2")
 
         # Collision file SHOULD exist
-        collision_file = Path("/app/.agents/outbox/external_hash_v2_collisions.json")
+        collision_file = Path(settings.BASE_DIR) / ".agents/outbox/external_hash_v2_collisions.json"
         assert collision_file.exists()
 
         # Validate JSON structure

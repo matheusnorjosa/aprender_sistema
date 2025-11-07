@@ -93,7 +93,8 @@ jobs:
           GCAL_CLIENT: fake
           GCAL_SEND_UPDATES: none
           FEATURE_AUTO_APPLY_ENABLED: "false"
-          CELERY_TASK_ALWAYS_EAGER: "1"
+          ETL_OUTPUT_DIR: ${{ github.workspace }}/v2/backend/out_etl
+          ETL_DATA_DIR: ${{ github.workspace }}/v2/backend/data/csv-import
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend
@@ -117,7 +118,8 @@ jobs:
           GCAL_CLIENT: fake
           GCAL_SEND_UPDATES: none
           FEATURE_AUTO_APPLY_ENABLED: "false"
-          CELERY_TASK_ALWAYS_EAGER: "1"
+          ETL_OUTPUT_DIR: ${{ github.workspace }}/v2/backend/out_etl
+          ETL_DATA_DIR: ${{ github.workspace }}/v2/backend/data/csv-import
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend
@@ -141,7 +143,8 @@ jobs:
           GCAL_CLIENT: fake
           GCAL_SEND_UPDATES: none
           FEATURE_AUTO_APPLY_ENABLED: "false"
-          CELERY_TASK_ALWAYS_EAGER: "1"
+          ETL_OUTPUT_DIR: ${{ github.workspace }}/v2/backend/out_etl
+          ETL_DATA_DIR: ${{ github.workspace }}/v2/backend/data/csv-import
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend

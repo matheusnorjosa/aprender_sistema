@@ -68,7 +68,8 @@ jobs:
         echo "GCAL_CLIENT=fake" >> $GITHUB_ENV
         echo "GCAL_SEND_UPDATES=none" >> $GITHUB_ENV
         echo "FEATURE_AUTO_APPLY_ENABLED=false" >> $GITHUB_ENV
-        echo "CELERY_TASK_ALWAYS_EAGER=1" >> $GITHUB_ENV
+        echo "ETL_OUTPUT_DIR=${{ github.workspace }}/v2/backend/out_etl" >> $GITHUB_ENV
+        echo "ETL_DATA_DIR=${{ github.workspace }}/v2/backend/data/csv-import" >> $GITHUB_ENV
         echo "PYTHONDONTWRITEBYTECODE=1" >> $GITHUB_ENV
 
     - name: Run migrations

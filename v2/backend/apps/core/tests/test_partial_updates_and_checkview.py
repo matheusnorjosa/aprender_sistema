@@ -108,8 +108,18 @@ def test_availability_check_invalid_user_id_returns_400():
 
     Antes do patch: ValueError não tratado causava 500
     Depois do patch: 400 com mensagem clara
+
+    Para validar parâmetros (400), usuário deve ter permissão.
+    Adiciona usuário ao grupo Controle para passar RBAC (403→400).
     """
+    from django.contrib.auth.models import Group
+
     c, u = auth_client()
+
+    # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
+    grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+    u.groups.add(grupo_controle)
+
     now = timezone.now()
     url = reverse("core:availability-check")
     res = c.get(
@@ -130,8 +140,18 @@ def test_availability_check_invalid_municipio_id_returns_400():
 
     Antes do patch: ValueError não tratado causava 500
     Depois do patch: 400 com mensagem clara
+
+    Para validar parâmetros (400), usuário deve ter permissão.
+    Adiciona usuário ao grupo Controle para passar RBAC (403→400).
     """
+    from django.contrib.auth.models import Group
+
     c, u = auth_client()
+
+    # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
+    grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+    u.groups.add(grupo_controle)
+
     now = timezone.now()
     url = reverse("core:availability-check")
     res = c.get(
@@ -150,8 +170,18 @@ def test_availability_check_invalid_municipio_id_returns_400():
 def test_availability_check_missing_dates_returns_400():
     """
     AvailabilityCheckView sem inicio/fim deve retornar 400 claro.
+
+    Para validar parâmetros (400), usuário deve ter permissão.
+    Adiciona usuário ao grupo Controle para passar RBAC (403→400).
     """
+    from django.contrib.auth.models import Group
+
     c, u = auth_client()
+
+    # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
+    grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+    u.groups.add(grupo_controle)
+
     url = reverse("core:availability-check")
 
     # Falta inicio
@@ -170,8 +200,18 @@ def test_availability_check_fim_before_inicio_returns_400():
     AvailabilityCheckView com fim <= inicio deve retornar 400.
 
     Nova validação adicionada no PATCH 2.
+
+    Para validar parâmetros (400), usuário deve ter permissão.
+    Adiciona usuário ao grupo Controle para passar RBAC (403→400).
     """
+    from django.contrib.auth.models import Group
+
     c, u = auth_client()
+
+    # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
+    grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+    u.groups.add(grupo_controle)
+
     now = timezone.now()
     url = reverse("core:availability-check")
     res = c.get(

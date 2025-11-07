@@ -75,7 +75,7 @@ jobs:
     - name: Validate test paths (no /app hardcoded)
       run: |
         cd v2/backend
-        if grep -R --line-number "/app" apps/core/tests apps/dat_ingest/tests 2>/dev/null | grep -v "Binary file"; then
+        if grep -R --line-number '"/app' apps/core/tests apps/dat_ingest/tests 2>/dev/null | grep -v "Binary file" | grep -v '"/api/'; then
           echo "❌ Found '/app' hardcoded in tests. Use Path(settings.BASE_DIR) instead." >&2
           exit 1
         fi

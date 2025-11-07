@@ -314,9 +314,12 @@ def test_import_compras_requires_controle_group():
     client.force_authenticate(user=user)
 
     # Tentar importar
+    from pathlib import Path
+    from django.conf import settings
+    csv_path = str(Path(settings.BASE_DIR) / "data/csv-import/compras.csv")
     response = client.post(
         "/api/controle/import-compras/?dry_run=true",
-        data={"path": "/app/data/csv-import/compras.csv"}
+        data={"path": csv_path}
     )
 
     # Deve retornar 403 Forbidden
@@ -344,9 +347,12 @@ def test_import_compras_allowed_for_controle():
     client.force_authenticate(user=user)
 
     # Tentar importar (arquivo não existe, mas não deve dar 403)
+    from pathlib import Path
+    from django.conf import settings
+    csv_path = str(Path(settings.BASE_DIR) / "data/csv-import/compras_nao_existe.csv")
     response = client.post(
         "/api/controle/import-compras/?dry_run=true",
-        data={"path": "/app/data/csv-import/compras_nao_existe.csv"}
+        data={"path": csv_path}
     )
 
     # Deve retornar 400 (arquivo não encontrado) ou 200, mas NÃO 403
@@ -373,9 +379,12 @@ def test_import_compras_allowed_for_superintendencia():
     client.force_authenticate(user=user)
 
     # Tentar importar (arquivo não existe, mas não deve dar 403)
+    from pathlib import Path
+    from django.conf import settings
+    csv_path = str(Path(settings.BASE_DIR) / "data/csv-import/compras_nao_existe.csv")
     response = client.post(
         "/api/controle/import-compras/?dry_run=true",
-        data={"path": "/app/data/csv-import/compras_nao_existe.csv"}
+        data={"path": csv_path}
     )
 
     # Deve retornar 400 (arquivo não encontrado) ou 200, mas NÃO 403

@@ -39,6 +39,12 @@ Tópicos cobertos:
 - ✅ **Portas HOST vs CONTAINER** (5432/5434, 6379/6380, 8000/8002)
 - ✅ **Cheat sheet** de comandos rápidos
 
+### 🧪 Testing Policy
+
+Para políticas e práticas de testes (RBAC, Celery flags, OAuth fixtures, paths), consulte: **[v2/docs/TESTING_POLICY.md](v2/docs/TESTING_POLICY.md)**
+
+Baseline CI: **809 passed, 27 skipped, 6 warnings**
+
 ## Legado (v1)
 
 O material arquivado tem README próprio em `archive/v1_legado/README.md`.

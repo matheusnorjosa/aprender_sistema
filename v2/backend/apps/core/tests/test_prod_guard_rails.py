@@ -12,7 +12,9 @@ Valida que settings.py bloqueia configurações inseguras em produção:
 import os
 import sys
 import subprocess
+from pathlib import Path
 from unittest import TestCase
+from django.conf import settings
 
 
 class ProductionGuardRailsTests(TestCase):
@@ -51,7 +53,7 @@ class ProductionGuardRailsTests(TestCase):
         # P1.4 FIX: Correct path - manage.py is at /app/manage.py (container root)
         result = subprocess.run(
             [sys.executable, "manage.py", "check", "--deploy"],
-            cwd="/app",  # Container root where manage.py is located
+            cwd=str(Path(settings.BASE_DIR)),  # Project root where manage.py is located
             env=env,
             capture_output=True,
             text=True,
@@ -92,7 +94,7 @@ class ProductionGuardRailsTests(TestCase):
         # P1.4 FIX: Correct path - manage.py is at /app/manage.py (container root)
         result = subprocess.run(
             [sys.executable, "manage.py", "check", "--deploy"],
-            cwd="/app",  # Container root where manage.py is located
+            cwd=str(Path(settings.BASE_DIR)),  # Project root where manage.py is located
             env=env,
             capture_output=True,
             text=True,
@@ -134,7 +136,7 @@ class ProductionGuardRailsTests(TestCase):
         # P1.4 FIX: Correct path - manage.py is at /app/manage.py (container root)
         result = subprocess.run(
             [sys.executable, "manage.py", "check", "--deploy"],
-            cwd="/app",  # Container root where manage.py is located
+            cwd=str(Path(settings.BASE_DIR)),  # Project root where manage.py is located
             env=env,
             capture_output=True,
             text=True,
@@ -180,7 +182,7 @@ class ProductionGuardRailsTests(TestCase):
         # P1.4 FIX: Correct path - manage.py is at /app/manage.py (container root)
         result = subprocess.run(
             [sys.executable, "manage.py", "check", "--deploy"],
-            cwd="/app",  # Container root where manage.py is located
+            cwd=str(Path(settings.BASE_DIR)),  # Project root where manage.py is located
             env=env,
             capture_output=True,
             text=True,

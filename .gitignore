@@ -469,7 +469,11 @@ tmp_*
 *_tmp
 
 # Development files
-test_*
+# Ignore test temp files (but allow pytest test_*.py in tests/ dirs)
+test_*.txt
+test_*.json
+test_*.csv
+test_*.log
 debug_*
 *_debug
 *_test

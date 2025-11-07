@@ -60,14 +60,6 @@ jobs:
           pip install -r v2/backend/requirements.txt
           pip install black isort flake8 pytest pytest-django pytest-cov
 
-      - name: Generate Fernet key for GCAL
-        run: |
-          echo "GCAL_ENCRYPTION_KEY=$(python - <<'PY'
-          from cryptography.fernet import Fernet
-          print(Fernet.generate_key().decode())
-          PY
-          )" >> $GITHUB_ENV
-
       - name: Lint with Black
         run: |
           cd v2/backend

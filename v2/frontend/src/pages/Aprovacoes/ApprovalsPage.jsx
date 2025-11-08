@@ -95,7 +95,6 @@ export default function ApprovalsPage() {
     const loadUser = async () => {
       try {
         const userData = await getMe();
-        setUser(userData);
 
         // Verificar se usuário tem permissão para aprovar/reprovar
         const isSuperintendencia =

@@ -69,7 +69,6 @@ export default function ApprovalsPage() {
   const [rejectForm] = Form.useForm();
 
   // PA-06: Estado para verificar permissão do usuário
-  const [user, setUser] = useState(null);
   const [canApprove, setCanApprove] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -96,7 +95,6 @@ export default function ApprovalsPage() {
     const loadUser = async () => {
       try {
         const userData = await getMe();
-        setUser(userData);
 
         // Verificar se usuário tem permissão para aprovar/reprovar
         const isSuperintendencia =

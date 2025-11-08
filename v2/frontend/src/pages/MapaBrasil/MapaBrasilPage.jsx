@@ -8,7 +8,7 @@
  * - Toggle Map/List view
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Card,
   Row,

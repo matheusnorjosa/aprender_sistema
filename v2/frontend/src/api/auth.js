@@ -37,7 +37,7 @@ export async function checkAuth() {
   try {
     const response = await fetchAPI('/me/');
     return { authenticated: true, user: response };
-  } catch (error) {
+  } catch {
     return { authenticated: false, user: null };
   }
 }

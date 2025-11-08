@@ -1,5 +1,8 @@
 # Aprender Sistema
 
+[![CI](https://github.com/matheusnorjosa/aprender_sistema/actions/workflows/ci.yaml/badge.svg)](https://github.com/matheusnorjosa/aprender_sistema/actions/workflows/ci.yaml)
+[![codecov](https://codecov.io/gh/matheusnorjosa/aprender_sistema/branch/main/graph/badge.svg)](https://codecov.io/gh/matheusnorjosa/aprender_sistema)
+
 Este repositório armazena apenas a estrutura **v2** do Sistema Aprender.
 Todo o código/documentação da versão anterior (v1) foi movido para
 `archive/v1_legado/` e permanece somente para consulta histórica.

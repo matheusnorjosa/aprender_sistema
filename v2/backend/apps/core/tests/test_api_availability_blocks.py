@@ -195,9 +195,14 @@ class TestAPIAvailabilityBlocks:
         ), "Criar com fim == inicio deve retornar 400"
         assert "fim" in response.data, "Deve retornar erro no campo 'fim'"
 
-    def test_create_block_status_is_always_pendente(self, user_test):
+    def test_create_block_status_is_always_approved(self, user_test):
         """
-        Test: Bloqueios criados via API sempre começam com status=pendente.
+        Test: Bloqueios criados via API são auto-aprovados (status='aprovado').
+
+        Regra de Negócio:
+        - Bloqueios são informações factuais (formador sabe quando estará indisponível)
+        - NÃO requerem aprovação de terceiros
+        - Entram automaticamente no cálculo de disponibilidade (RD-02, RD-03)
         """
         client = APIClient()
         client.force_authenticate(user=user_test)
@@ -211,7 +216,7 @@ class TestAPIAvailabilityBlocks:
             "fim": fim.isoformat(),
             "tipo": "T",
             "motivo": "Bloqueio de teste",
-            "status": "aprovado",  # Tentativa de especificar (deve ser ignorado)
+            "status": "pendente",  # Tentativa de especificar (deve ser ignorado e virar 'aprovado')
         }
 
         response = client.post("/api/availability-blocks/", payload, format="json")
@@ -220,14 +225,14 @@ class TestAPIAvailabilityBlocks:
             response.status_code == http_status.HTTP_201_CREATED
         ), f"Esperado 201, obtido {response.status_code}: {response.data}"
 
-        # Verificar que status é pendente, ignorando payload
+        # Verificar que status é aprovado (auto-aprovação)
         block = AvailabilityBlock.objects.get(pk=response.data["id"])
         assert (
-            block.status == "pendente"
-        ), "Status deve ser 'pendente' (campo read_only)"
+            block.status == "aprovado"
+        ), "Status deve ser 'aprovado' (auto-aprovação de bloqueios)"
         assert (
-            response.data["status"] == "pendente"
-        ), "Resposta deve retornar status=pendente"
+            response.data["status"] == "aprovado"
+        ), "Resposta deve retornar status='aprovado'"
 
     def test_unauthenticated_cannot_create_block(self):
         """

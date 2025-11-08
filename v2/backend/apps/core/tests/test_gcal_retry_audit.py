@@ -316,14 +316,15 @@ class TestAuditLog:
 
         # Verificar AuditLog
         audit_log = AuditLog.objects.filter(
-            action="PUBLISH_GCAL",
+            action="PUBLISH_GCAL_ERROR",
             model_name="Solicitacao",
         ).latest("created_at")
 
         assert audit_log is not None
         assert audit_log.details["solicitacao_id"] == solicitacao_aprovada.id
-        assert audit_log.details["action"] == "ERROR"
         assert "error" in audit_log.details
+        assert audit_log.details["dry_run"] is False
+        assert audit_log.details["apply_blocked"] is True
 
 
 @pytest.mark.django_db

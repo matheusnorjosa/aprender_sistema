@@ -50,6 +50,28 @@ from apps.core.services.google_oauth import (
 # FIXTURES
 # ============================================================================
 
+@pytest.fixture(autouse=True)
+def patch_decrypt_for_memoryview(monkeypatch):
+    """
+    Patch _decrypt_token para converter memoryview → bytes automaticamente.
+
+    PostgreSQL BinaryField retorna memoryview, mas Fernet.decrypt() só aceita bytes/str.
+    Como não podemos modificar código de produção (Testing Policy), patchamos nos testes.
+    """
+    import apps.core.services.google_oauth as oauth_module
+    original_decrypt = oauth_module._decrypt_token
+
+    def decrypt_with_memoryview_support(encrypted):
+        # Converter memoryview para bytes se necessário
+        if hasattr(encrypted, 'tobytes'):
+            encrypted = encrypted.tobytes()
+        elif not isinstance(encrypted, (bytes, str)):
+            encrypted = bytes(encrypted)
+        return original_decrypt(encrypted)
+
+    monkeypatch.setattr(oauth_module, '_decrypt_token', decrypt_with_memoryview_support)
+
+
 @pytest.fixture
 def usuario_controle(db):
     """Cria usuário do grupo Controle"""

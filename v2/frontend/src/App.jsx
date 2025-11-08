@@ -22,6 +22,7 @@ import {
   GlobalOutlined,
   HomeOutlined,
   LogoutOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import ptBR from 'antd/locale/pt_BR';
 import DisponibilidadeBlocks from './pages/Disponibilidade';
@@ -37,6 +38,7 @@ import PreAgendaPage from './pages/PreAgenda/PreAgendaPage';
 import LoginPage from './pages/Auth/LoginPage';
 import HomePage from './pages/Home/HomePage';
 import DashboardsPage from './pages/Dashboards/DashboardsPage';
+import GCalDashboardPage from './pages/Dashboards/GCalDashboardPage';
 import MapaBrasilPage from './pages/MapaBrasil/MapaBrasilPage';
 import AdminDATHomePage from './pages/AdminDAT/AdminDATHomePage';
 import UsuariosPage from './pages/AdminDAT/UsuariosPage';
@@ -168,6 +170,13 @@ function App() {
                 </Menu.Item>
               )}
 
+              {/* GCal Dashboard (Controle/Super) */}
+              {(canControle || canSuper) && (
+                <Menu.Item key="gcal-dashboard" icon={<SyncOutlined />}>
+                  <Link to="/dashboard/gcal">Dashboard GCal</Link>
+                </Menu.Item>
+              )}
+
               {/* Mapa do Brasil (Admin/Gerência) */}
               {isManager && (
                 <Menu.Item key="mapa-brasil" icon={<GlobalOutlined />}>
@@ -276,6 +285,12 @@ function App() {
                 <Route
                   path="/dashboards"
                   element={isManager ? <DashboardsPage /> : <Forbidden />}
+                />
+
+                {/* GCal Dashboard (Controle/Super) */}
+                <Route
+                  path="/dashboard/gcal"
+                  element={(canControle || canSuper) ? <GCalDashboardPage /> : <Forbidden />}
                 />
 
                 {/* Mapa do Brasil (Admin/Gerência) */}

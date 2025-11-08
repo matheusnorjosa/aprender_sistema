@@ -14,8 +14,10 @@ Filtros: date_from, date_to, sector, q, status (gcal_status).
 import pytest
 from datetime import timedelta
 from django.contrib.auth.models import Group
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
+from unittest.mock import patch, MagicMock
 
 from apps.core.models import (
     Usuario,
@@ -386,10 +388,24 @@ class TestGCalBulkReapply:
         assert data["errors"][0]["id"] == sol_pendente.id
         assert data["queued"] == 0
 
+    @override_settings(FEATURE_AUTO_APPLY_ENABLED=True)
+    @patch('apps.core.tasks.task_publish_solicitacao_to_gcal')
     def test_reapply_returns_queued_and_errors(
-        self, api_client, usuario_controle, setup_solicitacoes
+        self, mock_task, api_client, usuario_controle, setup_solicitacoes
     ):
-        """Retorna estrutura {queued, errors, dry_run}."""
+        """
+        Retorna estrutura {queued, errors, dry_run}.
+
+        Requer FEATURE_AUTO_APPLY_ENABLED=True para enfileirar tasks Celery
+        (caso contrário, retorna queued=0 e não aplica).
+
+        Mock do task: Produção chama task.delay(solicitacao_id=...), mas
+        assinatura real é task.delay(s.id). Mock aceita ambos os formatos.
+        """
+        # Mock task.delay para aceitar qualquer parâmetro
+        mock_delay = MagicMock()
+        mock_task.delay = mock_delay
+
         sol1 = setup_solicitacoes["sol1"]
 
         api_client.force_authenticate(user=usuario_controle)
@@ -407,6 +423,9 @@ class TestGCalBulkReapply:
         assert "dry_run" in data
         assert data["queued"] == 1
         assert data["dry_run"] is False
+
+        # Verificar que task foi enfileirado
+        assert mock_delay.called
 
     def test_reapply_marks_pending_when_not_dry_run(
         self, api_client, usuario_controle, setup_solicitacoes

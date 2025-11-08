@@ -39,6 +39,8 @@ from .views_gcal_dashboard import (
     GCalListView,
     GCalDriftView,
     GCalPublishBatchView,
+    DashboardMetricsView,
+    DashboardEventsView,
 )
 from .views_gcal import gcal_calendars, gcal_health
 from .views_lookup import (
@@ -161,6 +163,9 @@ urlpatterns = [
     path("gcal/list/", GCalListView.as_view(), name="gcal-list"),
     path("gcal/drift/", GCalDriftView.as_view(), name="gcal-drift"),
     path("gcal/publish-batch/", GCalPublishBatchView.as_view(), name="gcal-publish-batch"),
+    # Sprint 5 - Dashboard/Monitoring
+    path("gcal/dashboard/metrics/", DashboardMetricsView.as_view(), name="gcal-dashboard-metrics"),
+    path("gcal/dashboard/events/", DashboardEventsView.as_view(), name="gcal-dashboard-events"),
     # GCal Endpoints (Sprint 2 - Issue #65)
     path("gcal/calendars/", gcal_calendars, name="gcal-calendars"),
     path("gcal/health/", gcal_health, name="gcal-health"),

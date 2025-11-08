@@ -314,7 +314,12 @@ class TestFluxoPorProjeto(TestCase):
         Testa que o comando seed_projetos_fluxo_from_csv funciona.
         """
         from django.core.management import call_command
+        from django.conf import settings
+        from pathlib import Path
         from io import StringIO
+
+        # Path absoluto do CSV (não depende do CWD)
+        csv_path = Path(settings.BASE_DIR) / "apps/core/data/projetos_fluxo.csv"
 
         # Criar projeto para atualizar
         projeto_teste = Projeto.objects.create(
@@ -327,6 +332,7 @@ class TestFluxoPorProjeto(TestCase):
         out = StringIO()
         call_command(
             "seed_projetos_fluxo_from_csv",
+            f"--csv={csv_path}",
             "--dry-run",
             "--verbose",
             stdout=out,
@@ -341,7 +347,7 @@ class TestFluxoPorProjeto(TestCase):
         self.assertEqual(projeto_teste.fluxo, "NAO_SUPER")
 
         # Executar sem dry-run
-        call_command("seed_projetos_fluxo_from_csv")
+        call_command("seed_projetos_fluxo_from_csv", f"--csv={csv_path}")
 
         # Verificar que foi atualizado
         projeto_teste.refresh_from_db()

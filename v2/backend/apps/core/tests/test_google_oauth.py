@@ -745,6 +745,12 @@ class TestOAuthSecurity:
                 csrf_token, return_to, user_id = state.split('|')
                 assert return_to == safe_path, f"Caminho seguro foi rejeitado: {safe_path}"
 
+    @patch.dict('os.environ', {
+        'GCAL_OAUTH_CLIENT_ID': 'test_client_id_123',
+        'GCAL_OAUTH_CLIENT_SECRET': 'test_client_secret_456',
+        'GCAL_OAUTH_REDIRECT_URI': 'http://localhost:8002/api/oauth/google/callback/',
+        'GCAL_ALLOWED_DOMAIN': 'aprendereditora.com.br',
+    })
     def test_oauth_callback_rejects_expired_state(self, usuario_controle):
         """
         Security: Callback deve rejeitar state expirado (TTL 10min).

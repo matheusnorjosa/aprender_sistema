@@ -66,24 +66,20 @@ const mockTopCoordenadores = [
 
 export default function DashboardsPage() {
   const [stats, setStats] = useState(mockStats);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadStats();
   }, []);
 
   const loadStats = async () => {
-    setLoading(true);
     try {
       // TODO: Chamar API real de estatísticas
       // const data = await fetchDashboardStats();
       setTimeout(() => {
         setStats(mockStats);
-        setLoading(false);
       }, 300);
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
-      setLoading(false);
     }
   };
 

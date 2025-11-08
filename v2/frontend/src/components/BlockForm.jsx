@@ -39,7 +39,6 @@ export default function BlockForm({ onSubmit }) {
 
       // Limpar form após sucesso
       form.resetFields();
-      setConflicts(null);
     } catch {
       // Erro já tratado no parent (Disponibilidade.jsx)
     } finally {

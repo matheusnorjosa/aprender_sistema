@@ -85,6 +85,9 @@ def google_oauth_credential(usuario_controle):
 
     IMPORTANTE: Tokens criptografados devem ser bytes (BinaryField).
     Usa _encrypt_token() que retorna bytes via Fernet.
+
+    PostgreSQL BinaryField pode retornar memoryview após .save(), então
+    convertemos explicitamente para bytes após refresh.
     """
     access_token = "fake_access_token_1234567890"
     refresh_token = "fake_refresh_token_0987654321"
@@ -99,7 +102,7 @@ def google_oauth_credential(usuario_controle):
     if not isinstance(refresh_encrypted, bytes):
         refresh_encrypted = refresh_encrypted.encode() if isinstance(refresh_encrypted, str) else bytes(refresh_encrypted)
 
-    return GoogleOAuthCredential.objects.create(
+    cred = GoogleOAuthCredential.objects.create(
         user=usuario_controle,
         google_email="controle@aprendereditora.com.br",
         access_token_encrypted=access_encrypted,
@@ -108,6 +111,15 @@ def google_oauth_credential(usuario_controle):
         scope="https://www.googleapis.com/auth/calendar",
         default_calendar_id="primary",
     )
+
+    # CRITICAL: PostgreSQL BinaryField retorna memoryview, converter para bytes
+    cred.refresh_from_db()
+    if hasattr(cred.access_token_encrypted, 'tobytes'):
+        cred.access_token_encrypted = bytes(cred.access_token_encrypted)
+    if hasattr(cred.refresh_token_encrypted, 'tobytes'):
+        cred.refresh_token_encrypted = bytes(cred.refresh_token_encrypted)
+
+    return cred
 
 
 @pytest.fixture

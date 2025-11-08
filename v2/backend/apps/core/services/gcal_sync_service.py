@@ -249,6 +249,25 @@ class CalendarClientAdapter:
         """
         raise NotImplementedError
 
+    def list_calendars(self) -> list:
+        """
+        Lista calendários disponíveis.
+
+        Returns:
+            Lista de dicts com informações dos calendários:
+            [{"id": str, "summary": str, "primary": bool}, ...]
+        """
+        raise NotImplementedError
+
+    def health_check(self) -> dict:
+        """
+        Verifica saúde da integração com Calendar API.
+
+        Returns:
+            dict com status: {"status": "healthy"|"unhealthy", "details": str}
+        """
+        raise NotImplementedError
+
 
 def _validate_event_id(event_id: str) -> bool:
     """

@@ -45,10 +45,15 @@ def solicitacao_pendente(super_user):
         nome="Test City",
         defaults={"uf": "TS", "ativo": True},
     )
-    projeto, _ = Projeto.objects.get_or_create(
-        nome="Test Project",
-        defaults={"ativo": True},
+
+    # Criar projeto com fluxo SUPER (não auto-aprova)
+    projeto = Projeto.objects.create(
+        nome="Test Project SUPER",
+        codigo="",
+        ativo=True,
+        fluxo="SUPER",
     )
+
     tipo_evento, _ = TipoEvento.objects.get_or_create(
         nome="Test Event Type",
     )
@@ -63,6 +68,11 @@ def solicitacao_pendente(super_user):
         fim=now + timedelta(hours=2),
         status="pendente",
     )
+
+    # Garantir que status é 'pendente' (bypass auto-aprovação se houver)
+    Solicitacao.objects.filter(pk=sol.pk).update(status="pendente")
+    sol.refresh_from_db()
+
     return sol
 
 

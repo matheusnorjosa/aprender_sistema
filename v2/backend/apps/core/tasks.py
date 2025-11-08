@@ -119,6 +119,35 @@ def task_publish_solicitacao_to_gcal(
             "error": "DoesNotExist",
         }
     except Exception as e:
+        # Tentar registrar erro e estado se a solicitação existir
+        try:
+            s = Solicitacao.objects.get(id=solicitation_id)
+            # Marcar status de erro
+            try:
+                s.mark_gcal(
+                    status=Solicitacao.GCalStatus.ERROR,
+                    payload_hash=None,
+                    error=str(e)[:500],
+                )
+            except Exception:
+                pass  # Falha ao marcar não deve bloquear o retorno
+
+            # Registrar AuditLog somente quando não for dry-run
+            if not dry_run:
+                AuditLog.objects.create(
+                    usuario=None,  # Task assíncrona
+                    action="PUBLISH_GCAL_ERROR",
+                    model_name="Solicitacao",
+                    details={
+                        "solicitacao_id": s.id,
+                        "error": str(e)[:500],
+                        "dry_run": dry_run,
+                        "apply_blocked": apply_blocked,
+                    },
+                )
+        except Solicitacao.DoesNotExist:
+            pass  # Solicitação não existe, não há o que marcar
+
         return {
             "action": "ERROR",
             "solicitation_id": solicitation_id,

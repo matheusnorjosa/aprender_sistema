@@ -388,7 +388,15 @@ class TestExtraParticipants:
         self, api_client, usuario_coordenador,
         municipio, projeto_super, tipo_evento
     ):
-        """Cria Participation com guest_email para email desconhecido."""
+        """
+        Cria Participation com guest_email mantendo papel formal para email desconhecido.
+
+        Regra de Negócio (Issue #69 Categoria 8):
+        - Email desconhecido enviado em formador_emails → role='FORMADOR' (não CONVIDADO)
+        - guest_email armazena o email externo
+        - usuario=null é permitido quando guest_email está preenchido
+        - Caso de uso: formador externo não cadastrado no sistema
+        """
         api_client.force_authenticate(user=usuario_coordenador)
 
         response = api_client.post('/api/solicitacoes/', {
@@ -409,13 +417,16 @@ class TestExtraParticipants:
         assert response.status_code == 201
         sol_id = response.json()['id']
 
-        # Verificar guest_email cria role=CONVIDADO (constraint: guest_email → CONVIDADO)
+        # Verificar guest_email mantém role formal (FORMADOR, não CONVIDADO)
         guest_part = Participation.objects.filter(
             solicitacao_id=sol_id,
             guest_email='externo@example.com',
-            role='CONVIDADO'
+            role='FORMADOR'
         )
-        assert guest_part.exists()
+        assert guest_part.exists(), (
+            "Participation com guest_email deve ter role='FORMADOR' "
+            "(papel formal mantido para email em formador_emails)"
+        )
 
 
 @pytest.mark.django_db

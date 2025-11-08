@@ -109,3 +109,41 @@ class FakeCalendarClient(CalendarClientAdapter):
     def clear(self):
         """Limpa todos os eventos (helper para testes)"""
         self._store.clear()
+
+    def list_calendars(self) -> list:
+        """
+        Lista calendários disponíveis (mock).
+
+        Returns:
+            Lista fake de calendários para testes
+        """
+        return [
+            {
+                "id": "primary",
+                "summary": "Calendário Principal (Fake)",
+                "primary": True,
+            },
+            {
+                "id": "test-calendar-1",
+                "summary": "Calendário de Testes 1",
+                "primary": False,
+            },
+            {
+                "id": "test-calendar-2",
+                "summary": "Calendário de Testes 2",
+                "primary": False,
+            },
+        ]
+
+    def health_check(self) -> dict:
+        """
+        Health check (fake sempre retorna healthy).
+
+        Returns:
+            dict com status healthy
+        """
+        return {
+            "status": "healthy",
+            "client_type": "fake",
+            "details": "Fake client is always healthy",
+        }

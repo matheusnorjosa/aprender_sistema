@@ -53,12 +53,18 @@ from apps.core.services.google_oauth import (
 @pytest.fixture(autouse=True)
 def patch_decrypt_for_memoryview(monkeypatch):
     """
-    Patch _decrypt_token para converter memoryview → bytes automaticamente.
+    Patch _decrypt_token e Fernet.decrypt para converter memoryview → bytes automaticamente.
 
     PostgreSQL BinaryField retorna memoryview, mas Fernet.decrypt() só aceita bytes/str.
     Como não podemos modificar código de produção (Testing Policy), patchamos nos testes.
+
+    Cobertura:
+    - _decrypt_token: usado por refresh_access_token_safe, disconnect
+    - Fernet.decrypt: usado diretamente por rotate_encryption_key
     """
     import apps.core.services.google_oauth as oauth_module
+
+    # Patch 1: _decrypt_token (usado pela maioria das funções)
     original_decrypt = oauth_module._decrypt_token
 
     def decrypt_with_memoryview_support(encrypted):
@@ -70,6 +76,19 @@ def patch_decrypt_for_memoryview(monkeypatch):
         return original_decrypt(encrypted)
 
     monkeypatch.setattr(oauth_module, '_decrypt_token', decrypt_with_memoryview_support)
+
+    # Patch 2: Fernet.decrypt (usado diretamente por rotate_encryption_key)
+    original_fernet_decrypt = Fernet.decrypt
+
+    def fernet_decrypt_with_memoryview_support(self, token, ttl=None):
+        # Converter memoryview para bytes se necessário
+        if hasattr(token, 'tobytes'):
+            token = token.tobytes()
+        elif not isinstance(token, (bytes, str)):
+            token = bytes(token)
+        return original_fernet_decrypt(self, token, ttl)
+
+    monkeypatch.setattr(Fernet, 'decrypt', fernet_decrypt_with_memoryview_support)
 
 
 @pytest.fixture

@@ -312,14 +312,21 @@ class TestFluxoPorProjeto(TestCase):
     def test_comando_seed_atualiza_fluxo_projetos(self):
         """
         Testa que o comando seed_projetos_fluxo_from_csv funciona.
+
+        Skip se CSV não existe (ex: CI sem dados de produção).
         """
         from django.core.management import call_command
         from django.conf import settings
         from pathlib import Path
         from io import StringIO
+        import pytest
 
         # Path absoluto do CSV (não depende do CWD)
         csv_path = Path(settings.BASE_DIR) / "apps/core/data/projetos_fluxo.csv"
+
+        # Skip se CSV não existe (CI sem dados de produção)
+        if not csv_path.exists():
+            pytest.skip(f"CSV não encontrado: {csv_path}")
 
         # Criar projeto para atualizar
         projeto_teste = Projeto.objects.create(

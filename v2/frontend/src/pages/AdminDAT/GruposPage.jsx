@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Checkbox } from 'antd';
 import { TeamOutlined, ReloadOutlined, EditOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
-import { listGroups, createGroup, updateGroup, deleteGroup, listUsers, assignGroups } from '../../api/adminDAT';
+import { listGroups, createGroup, updateGroup, listUsers, assignGroups } from '../../api/adminDAT';
 
 const { Title } = Typography;
 const { Search } = Input;

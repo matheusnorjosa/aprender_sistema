@@ -1,11 +1,15 @@
 """
-GCal Dashboard Views (PR14 - Ajustes pós-merge + Fase 2 batch publish)
+GCal Dashboard Views (PR14 - Ajustes pós-merge + Fase 2 batch publish + Sprint 5)
 
-3 endpoints para painel de publicação com contrato padronizado:
+Endpoints para painel de publicação com contrato padronizado:
 - GET /api/gcal/status-summary/ - resumo de contadores
 - GET /api/gcal/list/ - listagem com filtros
 - GET /api/gcal/drift/ - detecção de drift
 - POST /api/gcal/publish-batch/ - publicação em massa (Fase 2)
+
+Sprint 5 - Dashboard/Monitoring:
+- GET /api/gcal/dashboard/metrics/ - métricas + recent_errors (com start/end)
+- GET /api/gcal/dashboard/events/ - lista paginada (DRF PageNumberPagination)
 
 Todos restritos a grupos Controle/Superintendência.
 Suportam filtros: date_from, date_to, sector, q, status (gcal_status).
@@ -17,11 +21,12 @@ Nota: Publicação de eventos no Google Calendar ocorre via página /pre-agenda:
 
 import logging
 import os
-from datetime import date
+from datetime import date, datetime
 
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -372,3 +377,194 @@ class GCalPublishBatchView(APIView):
             'dry_run': dry_run,
             'apply_blocked': apply_blocked
         }, status=status.HTTP_202_ACCEPTED)
+
+
+# ================================================================
+# Sprint 5 - Dashboard/Monitoring
+# ================================================================
+
+class DashboardMetricsView(APIView):
+    """
+    GET /api/gcal/dashboard/metrics/
+
+    Retorna métricas de publicação GCal com erros recentes.
+
+    Query params:
+    - start (ISO date): Filtro início >= start (formato: YYYY-MM-DD)
+    - end (ISO date): Filtro início <= end (formato: YYYY-MM-DD)
+
+    Response:
+    {
+        "counts": {
+            "NONE": 10,
+            "PENDING": 2,
+            "PUBLISHED": 150,
+            "ERROR": 1
+        },
+        "recent_errors": [
+            {
+                "id": 789,
+                "summary": "Fortaleza - CE Fundamental I Online [ACERTA]",
+                "gcal_last_error": "500 Internal Server Error",
+                "updated_at": "2025-11-08T10:30:00Z"
+            },
+            ...
+        ],
+        "window": {
+            "start": "2025-10-01",
+            "end": "2025-11-30"
+        }
+    }
+
+    Permissions: IsControleOrSuper
+    """
+    permission_classes = [IsAuthenticated, IsControleOrSuper]
+
+    def get(self, request):
+        # Base queryset: apenas solicitações aprovadas
+        qs = Solicitacao.objects.filter(status='aprovado')
+
+        # Parse filtros de janela (start/end)
+        start_param = request.query_params.get('start')
+        end_param = request.query_params.get('end')
+
+        start_date = None
+        end_date = None
+
+        if start_param:
+            try:
+                start_date = date.fromisoformat(start_param)
+                qs = qs.filter(inicio__date__gte=start_date)
+            except (ValueError, TypeError):
+                pass
+
+        if end_param:
+            try:
+                end_date = date.fromisoformat(end_param)
+                qs = qs.filter(inicio__date__lte=end_date)
+            except (ValueError, TypeError):
+                pass
+
+        # Contadores por gcal_status
+        summary = qs.values('gcal_status').annotate(count=Count('id'))
+        counts = {item['gcal_status']: item['count'] for item in summary}
+
+        # Garantir todas as chaves existem
+        for status_key in ['NONE', 'PENDING', 'PUBLISHED', 'ERROR']:
+            if status_key not in counts:
+                counts[status_key] = 0
+
+        # Recent errors (top 5, ordenados por updated_at desc)
+        error_qs = qs.filter(gcal_status=Solicitacao.GCalStatus.ERROR).select_related(
+            'municipio', 'projeto'
+        ).order_by('-updated_at')[:5]
+
+        recent_errors = []
+        for s in error_qs:
+            # Gerar summary simples para exibição
+            municipio_nome = s.municipio.nome if s.municipio else ''
+            municipio_uf = s.municipio.uf if s.municipio else ''
+            projeto_nome = s.projeto.nome if s.projeto else ''
+            summary_text = f"{municipio_nome} - {municipio_uf} {projeto_nome}" if municipio_nome else f"Solicitação #{s.id}"
+
+            recent_errors.append({
+                'id': s.id,
+                'summary': summary_text.strip(),
+                'gcal_last_error': s.gcal_last_error or '',
+                'updated_at': s.updated_at.isoformat() if s.updated_at else None
+            })
+
+        return Response({
+            'counts': counts,
+            'recent_errors': recent_errors,
+            'window': {
+                'start': start_date.isoformat() if start_date else None,
+                'end': end_date.isoformat() if end_date else None
+            }
+        })
+
+
+class DashboardEventsPagination(PageNumberPagination):
+    """Paginação customizada para dashboard events"""
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+class DashboardEventsView(APIView):
+    """
+    GET /api/gcal/dashboard/events/
+
+    Lista paginada de eventos com campos GCal essenciais.
+
+    Query params:
+    - status: Filtro por gcal_status (NONE/PENDING/PUBLISHED/ERROR)
+    - start (ISO date): Filtro início >= start (formato: YYYY-MM-DD)
+    - end (ISO date): Filtro início <= end (formato: YYYY-MM-DD)
+    - page: Número da página (default: 1)
+    - page_size: Itens por página (default: 20, max: 100)
+
+    Response:
+    {
+        "count": 150,
+        "next": "http://localhost:8000/api/gcal/dashboard/events/?page=2",
+        "previous": null,
+        "results": [
+            {
+                "id": 123,
+                "summary": "...",
+                "gcal_status": "PUBLISHED",
+                "gcal_last_error": "",
+                "gcal_last_sync_at": "2025-11-08T10:00:00Z",
+                ...
+            },
+            ...
+        ]
+    }
+
+    Permissions: IsControleOrSuper
+    """
+    permission_classes = [IsAuthenticated, IsControleOrSuper]
+
+    def get(self, request):
+        # Base queryset: apenas aprovadas
+        qs = Solicitacao.objects.filter(status='aprovado').select_related(
+            'usuario', 'municipio', 'tipo_evento', 'projeto'
+        )
+
+        # Filtro por status
+        status_param = request.query_params.get('status')
+        if status_param:
+            qs = qs.filter(gcal_status=status_param)
+
+        # Filtro por janela (start/end)
+        start_param = request.query_params.get('start')
+        if start_param:
+            try:
+                start_date = date.fromisoformat(start_param)
+                qs = qs.filter(inicio__date__gte=start_date)
+            except (ValueError, TypeError):
+                pass
+
+        end_param = request.query_params.get('end')
+        if end_param:
+            try:
+                end_date = date.fromisoformat(end_param)
+                qs = qs.filter(inicio__date__lte=end_date)
+            except (ValueError, TypeError):
+                pass
+
+        # Ordenação: updated_at desc (mais recentes primeiro)
+        qs = qs.order_by('-updated_at', '-id')
+
+        # Paginação DRF
+        paginator = DashboardEventsPagination()
+        page = paginator.paginate_queryset(qs, request)
+
+        if page is not None:
+            serializer = SolicitacaoSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+
+        # Fallback sem paginação (não deveria acontecer)
+        serializer = SolicitacaoSerializer(qs, many=True)
+        return Response(serializer.data)

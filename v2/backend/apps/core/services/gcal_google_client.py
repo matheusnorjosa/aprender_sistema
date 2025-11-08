@@ -255,3 +255,53 @@ class GoogleCalendarClient(CalendarClientAdapter):
                 logger.debug(f"Event {event_id} already deleted (404)")
                 return
             raise
+
+    def list_calendars(self) -> list:
+        """
+        Lista calendários disponíveis via Calendar API.
+
+        Returns:
+            Lista de dicts com informações dos calendários:
+            [{"id": str, "summary": str, "primary": bool}, ...]
+        """
+        def _list_calendars():
+            # Usando calendarList API para listar calendários do usuário
+            calendar_list = self.service.calendarList().list().execute()
+            items = calendar_list.get("items", [])
+
+            # Formatar para estrutura consistente
+            return [
+                {
+                    "id": cal.get("id"),
+                    "summary": cal.get("summary", ""),
+                    "primary": cal.get("primary", False),
+                }
+                for cal in items
+            ]
+
+        return self._retry_with_backoff(_list_calendars)
+
+    def health_check(self) -> dict:
+        """
+        Verifica saúde da integração com Google Calendar API.
+
+        Tenta listar calendários para validar autenticação e conectividade.
+
+        Returns:
+            dict com status: {"status": "healthy"|"unhealthy", "details": str}
+        """
+        try:
+            # Tentar listar calendários como health check
+            calendars = self.list_calendars()
+            return {
+                "status": "healthy",
+                "client_type": "google",
+                "details": f"Successfully connected to Google Calendar API. {len(calendars)} calendars found.",
+            }
+        except Exception as e:
+            logger.error(f"Google Calendar health check failed: {e}")
+            return {
+                "status": "unhealthy",
+                "client_type": "google",
+                "details": f"Error: {str(e)}",
+            }

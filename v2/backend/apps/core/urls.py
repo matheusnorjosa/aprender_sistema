@@ -40,6 +40,7 @@ from .views_gcal_dashboard import (
     GCalDriftView,
     GCalPublishBatchView,
 )
+from .views_gcal import gcal_calendars, gcal_health
 from .views_lookup import (
     MunicipioLookup,
     ProjetoLookup,
@@ -160,6 +161,9 @@ urlpatterns = [
     path("gcal/list/", GCalListView.as_view(), name="gcal-list"),
     path("gcal/drift/", GCalDriftView.as_view(), name="gcal-drift"),
     path("gcal/publish-batch/", GCalPublishBatchView.as_view(), name="gcal-publish-batch"),
+    # GCal Endpoints (Sprint 2 - Issue #65)
+    path("gcal/calendars/", gcal_calendars, name="gcal-calendars"),
+    path("gcal/health/", gcal_health, name="gcal-health"),
     # Metrics and Reports
     path("metrics/map/", metrics_map, name="metrics-map"),
     path("reports/status-counts/", reports_status_counts, name="reports-status-counts"),

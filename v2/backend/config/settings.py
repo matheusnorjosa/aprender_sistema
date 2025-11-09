@@ -367,6 +367,12 @@ GCAL_CALENDAR_ID = os.getenv("GCAL_CALENDAR_ID", "")
 # Default: 'fake' para evitar publicações acidentais até implementar GoogleCalendarClient
 GCAL_CLIENT = os.getenv("GCAL_CLIENT", "fake")
 
+# Google Calendar authentication mode: 'service_account' (default) or 'oauth'
+# - service_account: Uses GOOGLE_SERVICE_ACCOUNT_JSON for server-to-server auth
+# - oauth: Uses user OAuth credentials from GoogleOAuthCredential model
+# Note: GCAL_CLIENT must be 'google' for either mode to work
+GCAL_AUTH_MODE = os.getenv("GCAL_CLIENT_MODE", "service_account")
+
 # Google Calendar sendUpdates parameter (RF05/RF06 - PR19)
 # Controls whether email notifications are sent to attendees:
 # - 'none': No emails (default, recommended for testing)

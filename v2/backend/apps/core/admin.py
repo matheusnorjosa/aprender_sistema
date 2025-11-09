@@ -218,10 +218,10 @@ class AuditLogAdmin(admin.ModelAdmin):
     Registro de auditoria para rastreamento de ações críticas (RF07).
     Não permite edição/exclusão via admin.
     """
-    list_display = ("id", "usuario", "action", "model_name", "object_id", "created_at")
+    list_display = ("id", "usuario", "action", "model_name", "created_at")
     list_filter = ("action", "model_name", "created_at")
-    search_fields = ("usuario__username", "usuario__email", "action", "model_name", "object_id")
-    readonly_fields = ("usuario", "action", "model_name", "object_id", "details", "created_at")
+    search_fields = ("usuario__username", "usuario__email", "action", "model_name")
+    readonly_fields = ("usuario", "action", "model_name", "details", "created_at")
     date_hierarchy = "created_at"
     list_select_related = ("usuario",)
 

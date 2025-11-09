@@ -448,7 +448,24 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """Publica solicitação no Google Calendar via Celery (Controle ou Superintendência)."""
         from django.conf import settings
         from apps.core.tasks import task_publish_solicitacao_to_gcal
-        from apps.core.models import AuditLog
+        from apps.core.models import AuditLog, GoogleOAuthCredential
+
+        # OAuth Phase 4: Verificar credencial Google em modo OAuth
+        auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
+        operator_user_id = None
+
+        if auth_mode == "oauth":
+            try:
+                GoogleOAuthCredential.objects.get(user=request.user)
+                operator_user_id = request.user.id
+            except GoogleOAuthCredential.DoesNotExist:
+                return Response(
+                    {
+                        "detail": "Conecte sua conta Google",
+                        "code": "google_not_connected"
+                    },
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
         solicitacao = self.get_object()
 
@@ -489,8 +506,12 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             )
 
         # Disparar task Celery (assíncrona)
+        # OAuth Phase 4: Passar operator_user_id em modo OAuth
         task = task_publish_solicitacao_to_gcal.delay(
-            solicitacao.id, dry_run=dry_run, apply_blocked=apply_blocked
+            solicitacao.id,
+            dry_run=dry_run,
+            apply_blocked=apply_blocked,
+            operator_user_id=operator_user_id
         )
 
         # AuditLog
@@ -548,8 +569,26 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         Permissão: Controle ou Superintendência
         Returns: 202 Accepted (processamento assíncrono)
         """
+        from django.conf import settings
         from apps.core.tasks import task_publish_solicitacao_to_gcal
-        from apps.core.models import AuditLog
+        from apps.core.models import AuditLog, GoogleOAuthCredential
+
+        # OAuth Phase 4: Verificar credencial Google em modo OAuth
+        auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
+        operator_user_id = None
+
+        if auth_mode == "oauth":
+            try:
+                GoogleOAuthCredential.objects.get(user=request.user)
+                operator_user_id = request.user.id
+            except GoogleOAuthCredential.DoesNotExist:
+                return Response(
+                    {
+                        "detail": "Conecte sua conta Google",
+                        "code": "google_not_connected"
+                    },
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
         solicitacao = self.get_object()
 
@@ -568,8 +607,12 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         )
 
         # Enfileirar task de publicação (reutiliza lógica existente)
+        # OAuth Phase 4: Passar operator_user_id em modo OAuth
         task = task_publish_solicitacao_to_gcal.delay(
-            solicitacao.id, dry_run=False, apply_blocked=False
+            solicitacao.id,
+            dry_run=False,
+            apply_blocked=False,
+            operator_user_id=operator_user_id
         )
 
         # AuditLog

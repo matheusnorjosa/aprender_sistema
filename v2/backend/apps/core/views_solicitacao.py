@@ -506,13 +506,21 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             )
 
         # Disparar task Celery (assíncrona)
-        # OAuth Phase 4: Passar operator_user_id em modo OAuth
-        task = task_publish_solicitacao_to_gcal.delay(
-            solicitacao.id,
-            dry_run=dry_run,
-            apply_blocked=apply_blocked,
-            operator_user_id=operator_user_id
-        )
+        # OAuth Phase 3: Passar operator_user_id APENAS em modo OAuth
+        if auth_mode == "oauth":
+            task = task_publish_solicitacao_to_gcal.delay(
+                solicitacao.id,
+                dry_run=dry_run,
+                apply_blocked=apply_blocked,
+                operator_user_id=operator_user_id
+            )
+        else:
+            # Service account mode: não passar operator_user_id (mantém assinatura antiga)
+            task = task_publish_solicitacao_to_gcal.delay(
+                solicitacao.id,
+                dry_run=dry_run,
+                apply_blocked=apply_blocked
+            )
 
         # AuditLog
         client_ip = _get_client_ip(request)
@@ -607,13 +615,21 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         )
 
         # Enfileirar task de publicação (reutiliza lógica existente)
-        # OAuth Phase 4: Passar operator_user_id em modo OAuth
-        task = task_publish_solicitacao_to_gcal.delay(
-            solicitacao.id,
-            dry_run=False,
-            apply_blocked=False,
-            operator_user_id=operator_user_id
-        )
+        # OAuth Phase 3: Passar operator_user_id APENAS em modo OAuth
+        if auth_mode == "oauth":
+            task = task_publish_solicitacao_to_gcal.delay(
+                solicitacao.id,
+                dry_run=False,
+                apply_blocked=False,
+                operator_user_id=operator_user_id
+            )
+        else:
+            # Service account mode: não passar operator_user_id (mantém assinatura antiga)
+            task = task_publish_solicitacao_to_gcal.delay(
+                solicitacao.id,
+                dry_run=False,
+                apply_blocked=False
+            )
 
         # AuditLog
         client_ip = _get_client_ip(request)

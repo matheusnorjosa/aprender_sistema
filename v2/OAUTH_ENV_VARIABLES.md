@@ -1,219 +1,192 @@
-# OAuth 2.0 Environment Variables
+# OAuth Environment Variables — Aprender Sistema v2
 
-**Arquivo**: `.env` (adicione ao `.env.example` existente)
+Documentação de variáveis de ambiente para modo OAuth do Google Calendar.
 
-## Variáveis Obrigatórias (Sprint 1 - Issue #1)
+---
+
+## 📋 Overview
+
+O sistema suporta dois modos de autenticação com Google Calendar:
+
+1. **Service Account Mode** (padrão): Usa credenciais de conta de serviço para autenticação servidor-a-servidor
+2. **OAuth Mode**: Usa credenciais OAuth 2.0 individuais por usuário (Controle/Superintendência)
+
+---
+
+## 🔧 Variáveis de Ambiente
+
+### Modo de Autenticação
 
 ```bash
-# ============================================================================
-# GOOGLE OAUTH 2.0 (Sprint 1 - Issue #1)
-# ============================================================================
-
-# Client ID do Google Cloud OAuth 2.0 Client
-# Obter em: https://console.cloud.google.com/apis/credentials
-# Formato: 123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com
-GCAL_OAUTH_CLIENT_ID=
-
-# Client Secret do Google Cloud OAuth 2.0 Client
-# Obter em: https://console.cloud.google.com/apis/credentials
-# Formato: GOCSPX-abcdefghijklmnopqrstuvwxyz
-GCAL_OAUTH_CLIENT_SECRET=
-
-# Redirect URI autorizada (deve estar configurada no Google Cloud Console)
-# Desenvolvimento: http://localhost:8002/api/oauth/google/callback/
-# Staging: https://staging.aprender.com/api/oauth/google/callback/
-# Produção: https://sistema.aprender.com/api/oauth/google/callback/
-GCAL_OAUTH_REDIRECT_URI=http://localhost:8002/api/oauth/google/callback/
-
-# Domínio permitido para contas Google (validação de segurança)
-# Apenas contas com email @GCAL_ALLOWED_DOMAIN serão aceitas
-GCAL_ALLOWED_DOMAIN=aprendereditora.com.br
-
-# Chave de criptografia dedicada para tokens OAuth (GAP-2)
-# OBRIGATÓRIA EM PRODUÇÃO. Gere com:
-#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Formato: 32 bytes base64-encoded (ex: "abcdefghijklmnopqrstuvwxyz012345678901234=")
-# IMPORTANTE: Guarde esta chave em local seguro (ex: Vault, AWS Secrets Manager)
-GCAL_ENCRYPTION_KEY=
-
-# Modo do cliente Google Calendar
-# Valores: "oauth" (usar credenciais OAuth individuais) ou "service_account" (fallback)
-# Staging/Produção: "oauth"
-# Desenvolvimento: "fake" (para testes sem Google API)
+# Modo OAuth (requer conexão individual por usuário)
 GCAL_CLIENT_MODE=oauth
 
-# ID do calendário padrão (usado se usuário não especificar)
-# Obter em: Google Calendar Settings > Integrate calendar
-# Formato: "primary" ou "abc123@group.calendar.google.com"
+# Modo Service Account (padrão, sem conexão individual)
+GCAL_CLIENT_MODE=service_account  # ou omitir (default)
+```
+
+### Cliente Google Calendar
+
+```bash
+# Cliente real do Google Calendar (produção)
+GCAL_CLIENT=google
+
+# Cliente fake (desenvolvimento/testes)
+GCAL_CLIENT=fake  # ou omitir (default)
+```
+
+### Credenciais OAuth 2.0
+
+```bash
+# OAuth 2.0 Client ID (Google Cloud Console)
+GCAL_OAUTH_CLIENT_ID=123456789-abc.apps.googleusercontent.com
+
+# OAuth 2.0 Client Secret (Google Cloud Console)
+GCAL_OAUTH_CLIENT_SECRET=GOCSPX-xyz123abc456
+
+# Redirect URI (deve estar registrada no Google Cloud Console)
+GCAL_OAUTH_REDIRECT_URI=https://seu-dominio.com/api/oauth/google/callback/
+```
+
+### Chave de Criptografia
+
+```bash
+# Chave Fernet para criptografar tokens OAuth (base64-encoded, 32 bytes)
+# Gerar: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+GCAL_ENCRYPTION_KEY=your-base64-encoded-fernet-key-here
+```
+
+### Calendar ID
+
+```bash
+# ID do calendário Google (produção)
+GCAL_CALENDAR_ID=your-calendar-id@group.calendar.google.com
+
+# Usar calendário primário do usuário (OAuth mode)
 GCAL_CALENDAR_ID=primary
 ```
 
 ---
 
-## Configuração no Google Cloud Console
+## 🚀 Configuração por Ambiente
 
-### 1. Criar OAuth 2.0 Client ID
+### Desenvolvimento (Local)
 
-1. Acesse: https://console.cloud.google.com/apis/credentials
-2. Clique em **"+ CREATE CREDENTIALS"** → **"OAuth 2.0 Client ID"**
-3. **Application type**: Web application
-4. **Name**: Aprender Sistema v2 - OAuth (ou nome descritivo)
-5. **Authorized redirect URIs**:
-   - Desenvolvimento: `http://localhost:8002/api/oauth/google/callback/`
-   - Staging: `https://staging.aprender.com/api/oauth/google/callback/`
-   - Produção: `https://sistema.aprender.com/api/oauth/google/callback/`
-6. Clique em **"CREATE"**
-7. Copie **Client ID** e **Client Secret**
+```bash
+# .env (desenvolvimento)
+GCAL_CLIENT=fake
+GCAL_CLIENT_MODE=service_account
+# Sem necessidade de credenciais OAuth
+```
 
-### 2. Configurar OAuth Consent Screen
+### Staging (OAuth Habilitado)
 
-1. Acesse: https://console.cloud.google.com/apis/credentials/consent
-2. **User Type**: Internal (apenas @aprendereditora.com.br)
-3. **App name**: Aprender Sistema v2
-4. **User support email**: operacional1@aprendereditora.com.br
-5. **Developer contact**: operacional1@aprendereditora.com.br
-6. **Scopes**:
-   - `https://www.googleapis.com/auth/calendar` (gerenciar eventos de calendário)
-7. **Test users** (se necessário em dev):
-   - `operacional1@aprendereditora.com.br`
-   - `operacional3@aprendereditora.com.br`
-8. Clique em **"SAVE AND CONTINUE"**
+```bash
+# .env (staging)
+GCAL_CLIENT=google
+GCAL_CLIENT_MODE=oauth
+GCAL_OAUTH_CLIENT_ID=123456789-abc.apps.googleusercontent.com
+GCAL_OAUTH_CLIENT_SECRET=GOCSPX-xyz123abc456
+GCAL_OAUTH_REDIRECT_URI=https://staging.seu-dominio.com/api/oauth/google/callback/
+GCAL_ENCRYPTION_KEY=your-staging-fernet-key
+GCAL_CALENDAR_ID=primary
+```
 
-### 3. Habilitar Google Calendar API
+### Produção (OAuth Habilitado)
 
-1. Acesse: https://console.cloud.google.com/apis/library/calendar-json.googleapis.com
-2. Clique em **"ENABLE"**
+```bash
+# .env (produção)
+GCAL_CLIENT=google
+GCAL_CLIENT_MODE=oauth
+GCAL_OAUTH_CLIENT_ID=987654321-xyz.apps.googleusercontent.com
+GCAL_OAUTH_CLIENT_SECRET=GOCSPX-prod789def012
+GCAL_OAUTH_REDIRECT_URI=https://seu-dominio.com/api/oauth/google/callback/
+GCAL_ENCRYPTION_KEY=your-production-fernet-key
+GCAL_CALENDAR_ID=calendario-aprender@group.calendar.google.com
+```
 
 ---
 
-## Gerar Chave de Criptografia (GAP-2)
+## ⚙️ Modo OAuth - Comportamento
+
+### Pré-requisitos
+
+- **GCAL_CLIENT_MODE=oauth**: Modo OAuth ativado
+- **Usuários**: Controle ou Superintendência
+- **Conexão**: Cada usuário deve conectar sua conta Google via `/api/oauth/google/start/`
+
+### Fluxo de Publicação
+
+1. Usuário acessa Pré-agenda (`/pre-agenda`)
+2. Se não conectado, vê card vermelho "Conectar conta Google"
+3. Ao tentar Publish/Resync, sistema verifica conexão:
+   - **Sem conexão**: Bloqueia ação, mostra modal "Conectar agora"
+   - **Com conexão**: Enfileira task Celery com `operator_user_id`
+4. Task usa cliente OAuth do usuário para publicar evento
+
+### Governança
+
+- **apply_blocked**: Ainda depende de `GCAL_CLIENT='google'`
+- **403 Forbidden**: Retornado se usuário não conectado (OAuth mode)
+- **202 Accepted**: Retornado se task enfileirada com sucesso
+
+---
+
+## 🔄 Rotação de Chave de Criptografia
+
+### Comando
 
 ```bash
-# Gerar nova chave Fernet (32 bytes)
+# Gerar nova chave
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
-# Exemplo de saída:
-# 1234567890abcdefghijklmnopqrstuvwxyzABCDEF==
+# Rotacionar (OLD_KEY = valor atual de GCAL_ENCRYPTION_KEY)
+python manage.py rotate_gcal_encryption_key \
+    --old-key="<VALOR_ANTIGO>" \
+    --new-key="<NOVO_VALOR_GERADO>"
 
-# Adicionar ao .env:
-GCAL_ENCRYPTION_KEY=1234567890abcdefghijklmnopqrstuvwxyzABCDEF==
+# Atualizar .env com nova chave
+GCAL_ENCRYPTION_KEY="<NOVO_VALOR_GERADO>"
+
+# Restart aplicação
+docker compose restart web worker beat
 ```
 
-**⚠️ IMPORTANTE:**
-- **NÃO** commitar chave no Git
-- Usar gerenciador de secrets (Vault, AWS Secrets Manager, etc.) em produção
-- Rotacionar chave periodicamente (ver `python manage.py rotate_gcal_encryption_key`)
+### Processo
+
+1. Descriptografa todos os tokens com chave antiga
+2. Re-criptografa com chave nova
+3. Salva no banco
+4. Cria registro de auditoria (AuditLog)
+5. Retorna contagem de credenciais atualizadas
 
 ---
 
-## Teste de Configuração
+## 🔒 Segurança
 
-### 1. Verificar variáveis:
+### Chave de Criptografia
 
-```bash
-cd v2/backend
-python manage.py shell
+- **NUNCA** commitar `GCAL_ENCRYPTION_KEY` no repositório
+- Usar secrets management (HashiCorp Vault, AWS Secrets Manager, etc.)
+- Rotacionar periodicamente (recomendado: 90 dias)
 
-# No shell Python:
-import os
-print("CLIENT_ID:", os.getenv("GCAL_OAUTH_CLIENT_ID")[:20], "...")
-print("CLIENT_SECRET:", "✅ configurado" if os.getenv("GCAL_OAUTH_CLIENT_SECRET") else "❌ ausente")
-print("REDIRECT_URI:", os.getenv("GCAL_OAUTH_REDIRECT_URI"))
-print("ENCRYPTION_KEY:", "✅ configurado" if os.getenv("GCAL_ENCRYPTION_KEY") else "❌ ausente")
-```
+### OAuth Client Secret
 
-### 2. Testar fluxo OAuth:
+- **NUNCA** commitar `GCAL_OAUTH_CLIENT_SECRET` no repositório
+- Usar secrets management
+- Restringir acesso apenas a aplicações autorizadas no Google Cloud Console
 
-```bash
-# Aplicar migration
-docker compose exec web python manage.py migrate
+### Redirect URI
 
-# Criar usuário de teste Controle (se não existir)
-docker compose exec web python manage.py shell
->>> from django.contrib.auth.models import Group
->>> from apps.core.models import Usuario
->>> controle_group = Group.objects.get(name="Controle")
->>> user = Usuario.objects.create_user(
-...     username="teste_oauth",
-...     email="teste@aprendereditora.com.br",
-...     password="senha123",
-...     cpf="12345678901"
-... )
->>> user.groups.add(controle_group)
->>> exit()
-
-# Acessar frontend
-# 1. Login com usuario teste_oauth
-# 2. Acessar /pre-agenda
-# 3. Clicar "Conectar conta Google"
-# 4. Autorizar permissões
-# 5. Verificar card verde "Conectado"
-```
+- **HTTPS obrigatório** em produção
+- Registrar **exatamente** a URI usada no código (incluindo trailing slash)
+- Validar domínio no Google Cloud Console
 
 ---
 
-## Troubleshooting
+## 📚 Referências
 
-### Erro: "redirect_uri_mismatch"
-
-**Causa**: Redirect URI no .env não está configurado no Google Cloud Console
-
-**Solução**:
-1. Verificar GCAL_OAUTH_REDIRECT_URI no .env
-2. Adicionar exatamente a mesma URI em: https://console.cloud.google.com/apis/credentials → OAuth 2.0 Client → "Authorized redirect URIs"
-
-### Erro: "invalid_grant"
-
-**Causa**: Usuário revogou permissões ou refresh_token expirou
-
-**Solução**:
-- Usuário deve reconectar conta via `/pre-agenda` → "Conectar conta Google"
-
-### Erro: "Domínio não permitido"
-
-**Causa**: Email da conta Google não é @aprendereditora.com.br
-
-**Solução**:
-- Usar apenas contas corporativas @aprendereditora.com.br
-- Ou atualizar GCAL_ALLOWED_DOMAIN no .env
-
-### Erro: "GCAL_ENCRYPTION_KEY obrigatória"
-
-**Causa**: GCAL_ENCRYPTION_KEY não definida no .env
-
-**Solução**:
-```bash
-# Gerar chave
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-
-# Adicionar ao .env
-echo 'GCAL_ENCRYPTION_KEY=<chave-gerada>' >> .env
-```
-
----
-
-## Segurança (Produção)
-
-### Checklist:
-
-- [ ] `GCAL_ENCRYPTION_KEY` gerada e armazenada em Vault/Secrets Manager
-- [ ] `GCAL_OAUTH_CLIENT_SECRET` armazenado em Secrets Manager (não em plaintext)
-- [ ] `GCAL_ALLOWED_DOMAIN` configurado corretamente
-- [ ] OAuth Consent Screen configurado como "Internal"
-- [ ] HTTPS obrigatório (`request.is_secure()` validado no callback)
-- [ ] Rate limiting ativo (10 req/h por usuário)
-- [ ] AuditLog monitorado (Sentry alertas para `invalid_grant`)
-- [ ] Rotation de chave documentada e testada
-
----
-
-## Refs:
-
-- Sprint 1 (Issue #1): Core OAuth - Backend + Frontend
-- GAP-2: Encryption key dedicada
-- GAP-3: Rate limiting
-- PA-05: Auditoria obrigatória
-- Checklist Validação: Sprint 1 (39 itens)
-
-**Data**: 05/11/2025
-**Versão**: 1.0
+- [Google Calendar API - OAuth 2.0](https://developers.google.com/calendar/api/guides/auth)
+- [Fernet (Cryptography)](https://cryptography.io/en/latest/fernet/)
+- [fechar_plano_gcal.md](../docs/fechar_plano_gcal.md) - Plano completo OAuth
+- [GUIDE_GCAL.md](../docs/GUIDE_GCAL.md) - Guia de configuração GCal

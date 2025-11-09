@@ -65,6 +65,43 @@ Dashboard de monitoramento da sincronização com Google Calendar:
 
 **Testes**: 12/12 passando em `v2/backend/apps/core/tests/test_gcal_dashboard_metrics.py` (veja [Testing Policy](v2/docs/TESTING_POLICY.md))
 
+### 🔐 Google Calendar OAuth
+
+O sistema suporta dois modos de autenticação com Google Calendar:
+
+#### Service Account Mode (padrão)
+- Usa credenciais de conta de serviço para autenticação servidor-a-servidor
+- Não requer conexão individual por usuário
+- Configuração: `GCAL_CLIENT_MODE=service_account` (ou omitir)
+
+#### OAuth Mode (produção recomendada)
+- Usa credenciais OAuth 2.0 individuais por usuário (Controle/Superintendência)
+- Cada usuário deve conectar sua conta Google via `/api/oauth/google/start/`
+- Configuração: `GCAL_CLIENT_MODE=oauth`
+
+**Pré-requisitos para publicar eventos (OAuth mode)**:
+- Usuário deve estar em grupo "Controle" ou "Superintendência"
+- Usuário deve ter conectado sua conta Google (vê card verde/amarelo na Pré-agenda)
+- Sem conexão: Publish/Resync bloqueados com modal "Conectar agora" (403 Forbidden)
+
+**Documentação completa**: [v2/OAUTH_ENV_VARIABLES.md](v2/OAUTH_ENV_VARIABLES.md)
+
+**Rotação de chave de criptografia**:
+```bash
+# Gerar nova chave
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+# Rotacionar
+python manage.py rotate_gcal_encryption_key \
+    --old-key="<OLD_KEY>" \
+    --new-key="<NEW_KEY>"
+```
+
+**Governança**:
+- `apply_blocked` ainda depende de `GCAL_CLIENT='google'`
+- OAuth mode adiciona verificação de conexão individual por usuário
+- AuditLog registra `operator_user_id` e `google_email` em operações OAuth
+
 ## Legado (v1)
 
 O material arquivado tem README próprio em `archive/v1_legado/README.md`.

@@ -406,7 +406,11 @@ def build_preview_for_solicitacao(s: Solicitacao) -> dict:
 
 
 def apply_one_solicitacao(
-    s: Solicitacao, *, dry_run: bool = False, apply_blocked: bool = False
+    s: Solicitacao,
+    *,
+    dry_run: bool = False,
+    apply_blocked: bool = False,
+    client: "CalendarClientAdapter | None" = None,
 ) -> SyncOutcome:
     """
     Aplica uma Solicitacao ao Google Calendar (wrapper sobre upsert_one) - PR14.
@@ -418,11 +422,13 @@ def apply_one_solicitacao(
       - Se apply_blocked=False, marca ERROR e retorna SKIP
 
     PR14: Atualiza gcal_status/payload_hash conforme resultado.
+    OAuth Phase 3: Aceita cliente externo (OAuth ou service account).
 
     Args:
         s: Solicitacao a aplicar
         dry_run: Se True, não persiste mudanças no DB/Calendar
         apply_blocked: Se True, aplica mesmo sem GCAL_CLIENT configurado
+        client: Cliente opcional (OAuth ou service account). Se None, usa factory.
 
     Returns:
         SyncOutcome com ação executada
@@ -455,10 +461,21 @@ def apply_one_solicitacao(
         payload = build_event_payload(s, enable_meet=bool(getattr(s, "is_online", False)))
         payload_hash = _payload_hash(payload)
 
-    # Obter cliente via factory (fake ou google baseado em settings)
-    from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
+    # OAuth Phase 3: Usar cliente fornecido ou obter via factory
+    if client is None:
+        # Obter cliente via factory (fake ou google baseado em settings)
+        from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
 
-    client, calendar_id = get_gcal_client_and_calendar_id()
+        client, calendar_id = get_gcal_client_and_calendar_id()
+    else:
+        # Cliente fornecido externamente (OAuth mode), resolver calendar_id
+        import os
+
+        calendar_id = (
+            getattr(settings, "GCAL_CALENDAR_ID", None)
+            or os.getenv("GCAL_CALENDAR_ID")
+            or "primary"
+        )
 
     try:
         # Chamar upsert_one com payload pré-calculado (PR14)

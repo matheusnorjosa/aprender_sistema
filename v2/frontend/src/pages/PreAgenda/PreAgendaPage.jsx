@@ -47,6 +47,9 @@ import {
 } from '../../api/solicitacoes';
 import { getStatusSummary } from '../../api/gcal';
 import { MeetLink } from '../../components/MeetLink';
+import { getMe } from '../../api/availability';
+import useGoogleIntegration from '../../hooks/useGoogleIntegration';
+import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -72,6 +75,23 @@ export default function PreAgendaPage() {
 
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewData, setPreviewData] = useState(null);
+
+  // OAuth Phase 5: Estado do usuário e integração Google
+  const [user, setUser] = useState(null);
+  const { status: googleStatus, loading: _googleLoading, fetchStatus: _fetchStatus } = useGoogleIntegration();
+
+  // Carregar dados do usuário
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userData = await getMe();
+        setUser(userData);
+      } catch (error) {
+        console.error('Erro ao carregar usuário:', error);
+      }
+    };
+    loadUser();
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -118,6 +138,26 @@ export default function PreAgendaPage() {
   };
 
   const handlePublish = (id) => {
+    // OAuth Phase 5: Guarda - verificar conexão Google
+    if (googleStatus && !googleStatus.connected) {
+      Modal.confirm({
+        title: 'Conectar conta Google',
+        content: (
+          <div>
+            <p>Para publicar eventos no Google Calendar, você precisa conectar sua conta corporativa do Google.</p>
+          </div>
+        ),
+        okText: 'Conectar agora',
+        okType: 'primary',
+        cancelText: 'Cancelar',
+        onOk: () => {
+          const returnUrl = encodeURIComponent(window.location.href);
+          window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+        },
+      });
+      return;
+    }
+
     Modal.confirm({
       title: 'Confirmar Publicação',
       content: 'Deseja publicar este evento no Google Calendar?',
@@ -130,13 +170,52 @@ export default function PreAgendaPage() {
           message.success('Evento publicado com sucesso!');
           loadData();
         } catch (error) {
-          message.error('Erro ao publicar: ' + error.message);
+          // OAuth Phase 5: Tratar erro 403 com code='google_not_connected'
+          if (error.response?.data?.code === 'google_not_connected') {
+            Modal.confirm({
+              title: 'Conectar conta Google',
+              content: (
+                <div>
+                  <p>{error.response?.data?.detail || 'Conecte sua conta Google para publicar eventos.'}</p>
+                </div>
+              ),
+              okText: 'Conectar agora',
+              okType: 'primary',
+              cancelText: 'Cancelar',
+              onOk: () => {
+                const returnUrl = encodeURIComponent(window.location.href);
+                window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+              },
+            });
+          } else {
+            message.error('Erro ao publicar: ' + error.message);
+          }
         }
       },
     });
   };
 
   const handleResync = (id) => {
+    // OAuth Phase 5: Guarda - verificar conexão Google
+    if (googleStatus && !googleStatus.connected) {
+      Modal.confirm({
+        title: 'Conectar conta Google',
+        content: (
+          <div>
+            <p>Para reenviar eventos no Google Calendar, você precisa conectar sua conta corporativa do Google.</p>
+          </div>
+        ),
+        okText: 'Conectar agora',
+        okType: 'primary',
+        cancelText: 'Cancelar',
+        onOk: () => {
+          const returnUrl = encodeURIComponent(window.location.href);
+          window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+        },
+      });
+      return;
+    }
+
     Modal.confirm({
       title: 'Confirmar Reenvio',
       icon: <SyncOutlined style={{ color: '#faad14' }} />,
@@ -157,7 +236,26 @@ export default function PreAgendaPage() {
           message.success('Reenvio solicitado! O evento será atualizado em instantes.');
           loadData();
         } catch (error) {
-          message.error('Erro ao reenviar: ' + error.message);
+          // OAuth Phase 5: Tratar erro 403 com code='google_not_connected'
+          if (error.response?.data?.code === 'google_not_connected') {
+            Modal.confirm({
+              title: 'Conectar conta Google',
+              content: (
+                <div>
+                  <p>{error.response?.data?.detail || 'Conecte sua conta Google para reenviar eventos.'}</p>
+                </div>
+              ),
+              okText: 'Conectar agora',
+              okType: 'primary',
+              cancelText: 'Cancelar',
+              onOk: () => {
+                const returnUrl = encodeURIComponent(window.location.href);
+                window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+              },
+            });
+          } else {
+            message.error('Erro ao reenviar: ' + error.message);
+          }
         }
       },
     });
@@ -282,6 +380,22 @@ export default function PreAgendaPage() {
     },
   ];
 
+  // OAuth Phase 5: RBAC - verificar se é Controle ou Super
+  const canControle = user?.is_superuser || user?.groups?.includes('Controle');
+  const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
+  const showGoogleCard = canControle || canSuper;
+
+  // Handlers para o card Google
+  const handleGoogleConnect = () => {
+    const returnUrl = encodeURIComponent(window.location.href);
+    window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+  };
+
+  const handleGoogleDisconnect = async () => {
+    // Implementação futura (Fase 6+)
+    message.info('Desconexão será implementada em breve');
+  };
+
   return (
     <div style={{ padding: '24px' }}>
       <Space direction="vertical" style={{ width: '100%' }} size="large">
@@ -300,6 +414,15 @@ export default function PreAgendaPage() {
             </Button>
           </div>
         </Card>
+
+        {/* OAuth Phase 5: Google Integration Card (Controle/Super apenas) */}
+        {showGoogleCard && (
+          <GoogleIntegrationCard
+            status={googleStatus}
+            onConnect={handleGoogleConnect}
+            onDisconnect={handleGoogleDisconnect}
+          />
+        )}
 
         {/* Resumo GCal */}
         <Card title="Resumo de Status GCal" size="small">

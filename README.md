@@ -46,7 +46,7 @@ Tópicos cobertos:
 
 Para políticas e práticas de testes (RBAC, Celery flags, OAuth fixtures, paths), consulte: **[v2/docs/TESTING_POLICY.md](v2/docs/TESTING_POLICY.md)**
 
-Baseline CI: **809 passed, 27 skipped, 6 warnings**
+Baseline CI: **855 passed, 14 skipped** (inclui testes do [GCal Dashboard](#-gcal-dashboard))
 
 ### 📊 GCal Dashboard
 
@@ -63,7 +63,7 @@ Dashboard de monitoramento da sincronização com Google Calendar:
 - `GET /api/gcal/dashboard/metrics/?start=&end=` - Métricas + erros recentes
 - `GET /api/gcal/dashboard/events/?status=&start=&end=&page=&page_size=` - Lista paginada
 
-**Testes**: 12/12 passando em `v2/backend/apps/core/tests/test_gcal_dashboard_metrics.py`
+**Testes**: 12/12 passando em `v2/backend/apps/core/tests/test_gcal_dashboard_metrics.py` (veja [Testing Policy](v2/docs/TESTING_POLICY.md))
 
 ## Legado (v1)
 

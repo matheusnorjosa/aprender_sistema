@@ -48,6 +48,23 @@ Para políticas e práticas de testes (RBAC, Celery flags, OAuth fixtures, paths
 
 Baseline CI: **809 passed, 27 skipped, 6 warnings**
 
+### 📊 GCal Dashboard
+
+**Rota**: `/dashboard/gcal`
+**Permissões**: Grupos "Controle" ou "Superintendência" (ou superuser)
+
+Dashboard de monitoramento da sincronização com Google Calendar:
+- **4 Cards de Contagem**: Status de publicação (NONE/PENDING/PUBLISHED/ERROR)
+- **Filtros**: Período (date range) e status
+- **Tabela Paginada**: Lista de eventos com ordenação e filtros
+- **Alertas de Erros**: Top 5 erros recentes
+
+**Endpoints Backend**:
+- `GET /api/gcal/dashboard/metrics/?start=&end=` - Métricas + erros recentes
+- `GET /api/gcal/dashboard/events/?status=&start=&end=&page=&page_size=` - Lista paginada
+
+**Testes**: 12/12 passando em `v2/backend/apps/core/tests/test_gcal_dashboard_metrics.py`
+
 ## Legado (v1)
 
 O material arquivado tem README próprio em `archive/v1_legado/README.md`.

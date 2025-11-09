@@ -11,6 +11,7 @@ from .admin_site import admin_site
 from .models import (
     AcaoControle,
     AcaoDAT,
+    AuditLog,
     AvailabilityBlock,
     Compra,
     Deslocamento,
@@ -42,7 +43,6 @@ class CPFFilter(admin.SimpleListFilter):
         return queryset
 
 
-@admin_site.register(Usuario)
 class UsuarioAdmin(admin.ModelAdmin):
     list_display = ("username", "email", "cpf", "cargo", "is_active")
     search_fields = ("username", "email", "cpf", "first_name", "last_name")
@@ -100,28 +100,24 @@ class UsuarioAdmin(admin.ModelAdmin):
         return response
 
 
-@admin_site.register(Municipio)
 class MunicipioAdmin(admin.ModelAdmin):
     list_display = ("nome", "uf", "ativo")
     search_fields = ("nome", "uf")
     list_filter = ("uf", "ativo")
 
 
-@admin_site.register(Projeto)
 class ProjetoAdmin(admin.ModelAdmin):
     list_display = ("nome", "ativo")
     search_fields = ("nome", "descricao")
     list_filter = ("ativo",)
 
 
-@admin_site.register(TipoEvento)
 class TipoEventoAdmin(admin.ModelAdmin):
     list_display = ("nome", "cor", "descricao")
     search_fields = ("nome", "descricao")
     list_filter = ()
 
 
-@admin_site.register(AvailabilityBlock)
 class AvailabilityBlockAdmin(admin.ModelAdmin):
     list_display = ("usuario", "tipo", "inicio", "fim", "status", "created_at")
     search_fields = ("usuario__username", "usuario__email", "motivo")
@@ -130,7 +126,6 @@ class AvailabilityBlockAdmin(admin.ModelAdmin):
     date_hierarchy = "inicio"
 
 
-@admin_site.register(Solicitacao)
 class SolicitacaoAdmin(admin.ModelAdmin):
     list_display = (
         "usuario",
@@ -152,7 +147,6 @@ class SolicitacaoAdmin(admin.ModelAdmin):
     date_hierarchy = "inicio"
 
 
-@admin_site.register(Participation)
 class ParticipationAdmin(admin.ModelAdmin):
     list_display = ("solicitacao", "usuario", "role", "ch_horas", "created_at")
     list_filter = ("role",)
@@ -167,7 +161,6 @@ class ParticipationAdmin(admin.ModelAdmin):
     list_select_related = ("solicitacao", "usuario")
 
 
-@admin_site.register(Compra)
 class CompraAdmin(admin.ModelAdmin):
     list_display = ("codigo", "municipio", "projeto", "quantidade", "data", "uso")
     list_filter = ("projeto", "data")
@@ -177,7 +170,6 @@ class CompraAdmin(admin.ModelAdmin):
     date_hierarchy = "data"
 
 
-@admin_site.register(Deslocamento)
 class DeslocamentoAdmin(admin.ModelAdmin):
     list_display = ("usuario", "origem", "destino", "start_date", "end_date")
     list_filter = ("usuario", "start_date")
@@ -187,7 +179,6 @@ class DeslocamentoAdmin(admin.ModelAdmin):
     date_hierarchy = "start_date"
 
 
-@admin_site.register(AcaoControle)
 class AcaoControleAdmin(admin.ModelAdmin):
     list_display = (
         "municipio",
@@ -211,7 +202,6 @@ class AcaoControleAdmin(admin.ModelAdmin):
     date_hierarchy = "data_reuniao"
 
 
-@admin_site.register(AcaoDAT)
 class AcaoDATAdmin(admin.ModelAdmin):
     list_display = ("municipio", "projeto", "tipo_acao", "responsavel", "data_registro")
     list_filter = ("projeto", "tipo_acao")
@@ -219,3 +209,45 @@ class AcaoDATAdmin(admin.ModelAdmin):
     autocomplete_fields = ("municipio", "projeto", "responsavel")
     list_select_related = ("municipio", "projeto", "responsavel")
     date_hierarchy = "data_registro"
+
+
+class AuditLogAdmin(admin.ModelAdmin):
+    """
+    AuditLog Admin - Somente Leitura
+
+    Registro de auditoria para rastreamento de ações críticas (RF07).
+    Não permite edição/exclusão via admin.
+    """
+    list_display = ("id", "usuario", "action", "model_name", "created_at")
+    list_filter = ("action", "model_name", "created_at")
+    search_fields = ("usuario__username", "usuario__email", "action", "model_name")
+    readonly_fields = ("usuario", "action", "model_name", "details", "created_at")
+    date_hierarchy = "created_at"
+    list_select_related = ("usuario",)
+
+    def has_add_permission(self, request):
+        """Desabilita adição manual de logs de auditoria."""
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        """Desabilita edição de logs de auditoria."""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Desabilita exclusão de logs de auditoria."""
+        return False
+
+
+# Registro funcional (evita problemas de importação circular com decoradores)
+admin_site.register(Usuario, UsuarioAdmin)
+admin_site.register(Municipio, MunicipioAdmin)
+admin_site.register(Projeto, ProjetoAdmin)
+admin_site.register(TipoEvento, TipoEventoAdmin)
+admin_site.register(AvailabilityBlock, AvailabilityBlockAdmin)
+admin_site.register(Solicitacao, SolicitacaoAdmin)
+admin_site.register(Participation, ParticipationAdmin)
+admin_site.register(Compra, CompraAdmin)
+admin_site.register(Deslocamento, DeslocamentoAdmin)
+admin_site.register(AcaoControle, AcaoControleAdmin)
+admin_site.register(AcaoDAT, AcaoDATAdmin)
+admin_site.register(AuditLog, AuditLogAdmin)

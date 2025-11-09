@@ -8,9 +8,13 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         """
-        Importa signals para registrar auto-invalidação de cache.
+        Importa signals e admin para registrar auto-invalidação de cache e modelos.
 
         Signals registrados:
         - post_save(Config): Invalida cache quando Config é salvo
+
+        Admin registrado:
+        - Registro explícito de modelos essenciais (Usuario, Projeto, Municipio, etc.)
         """
         import apps.core.signals  # noqa: F401
+        import apps.core.admin  # noqa: F401

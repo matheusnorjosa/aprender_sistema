@@ -57,49 +57,110 @@ def gcal_sync_task():
 
 @shared_task(name="apps.core.tasks.task_publish_solicitacao_to_gcal")
 def task_publish_solicitacao_to_gcal(
-    solicitation_id: int, dry_run: bool = False, apply_blocked: bool = False
+    solicitation_id: int,
+    dry_run: bool = False,
+    apply_blocked: bool = False,
+    operator_user_id: int | None = None,
 ):
     """
     Publica uma Solicitacao no Google Calendar (via Celery).
+
+    OAuth Phase 3: Aceita operator_user_id para autenticação OAuth.
 
     Args:
         solicitation_id: ID da Solicitacao a publicar
         dry_run: Se True, não persiste mudanças no DB/Calendar
         apply_blocked: Se True, aplica mesmo sem GCAL_CLIENT configurado
+        operator_user_id: ID do usuário operador (OAuth mode)
 
     Returns:
         dict: {
-            "action": str (CREATE/UPDATE/DELETE/ADOPT/SKIP),
+            "action": str (CREATE/UPDATE/DELETE/ADOPT/SKIP/ERROR),
             "solicitation_id": int,
             "external_event_id": str | None,
             "summary": str,
             "error": str | None
         }
     """
-    from apps.core.models import Solicitacao, AuditLog
+    from django.conf import settings
+    from apps.core.models import Solicitacao, AuditLog, Usuario
     from apps.core.services.gcal_sync_service import apply_one_solicitacao
+
+    # OAuth Phase 3: Verificar modo OAuth e criar cliente se necessário
+    auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
+    client = None
+    operator = None
+    google_email = None
+
+    if auth_mode == "oauth" and not dry_run:
+        # OAuth mode requer operator_user_id
+        if operator_user_id is None:
+            return {
+                "action": "ERROR",
+                "solicitation_id": solicitation_id,
+                "external_event_id": None,
+                "summary": "OAuth mode requer operator_user_id",
+                "error": "missing_operator_user_id",
+            }
+
+        try:
+            # Carregar usuário operador
+            operator = Usuario.objects.get(id=operator_user_id)
+
+            # Criar cliente OAuth
+            from apps.core.services.gcal_client_factory import get_oauth_client_for_user
+
+            client, _ = get_oauth_client_for_user(operator)
+            google_email = client.credential.google_email
+
+        except Usuario.DoesNotExist:
+            return {
+                "action": "ERROR",
+                "solicitation_id": solicitation_id,
+                "external_event_id": None,
+                "summary": f"Usuário operador #{operator_user_id} não encontrado",
+                "error": "operator_not_found",
+            }
+        except ValueError as e:
+            # get_oauth_client_for_user pode lançar ValueError se não há credencial
+            return {
+                "action": "ERROR",
+                "solicitation_id": solicitation_id,
+                "external_event_id": None,
+                "summary": str(e),
+                "error": "oauth_credential_missing",
+            }
 
     try:
         # Buscar solicitação
         s = Solicitacao.objects.get(id=solicitation_id)
 
-        # Aplicar publicação
-        outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked)
+        # Aplicar publicação (com cliente OAuth se disponível)
+        outcome = apply_one_solicitacao(
+            s, dry_run=dry_run, apply_blocked=apply_blocked, client=client
+        )
 
         # Criar AuditLog (apenas se não for dry_run)
         if not dry_run:
+            audit_details = {
+                "solicitacao_id": s.id,
+                "action": outcome.action,
+                "external_event_id": outcome.external_event_id,
+                "summary": outcome.summary,
+                "dry_run": dry_run,
+                "apply_blocked": apply_blocked,
+            }
+
+            # OAuth Phase 3: Incluir google_email no AuditLog se disponível
+            if google_email:
+                audit_details["google_email"] = google_email
+                audit_details["operator_user_id"] = operator_user_id
+
             AuditLog.objects.create(
-                usuario=None,  # Task assíncrona, sem usuário direto
+                usuario=operator,  # OAuth: registrar operador; service_account: None
                 action="PUBLISH_GCAL",
                 model_name="Solicitacao",
-                details={
-                    "solicitacao_id": s.id,
-                    "action": outcome.action,
-                    "external_event_id": outcome.external_event_id,
-                    "summary": outcome.summary,
-                    "dry_run": dry_run,
-                    "apply_blocked": apply_blocked,
-                },
+                details=audit_details,
             )
 
         return {

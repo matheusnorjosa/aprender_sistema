@@ -371,7 +371,7 @@ GCAL_CLIENT = os.getenv("GCAL_CLIENT", "fake")
 # - service_account: Uses GOOGLE_SERVICE_ACCOUNT_JSON for server-to-server auth
 # - oauth: Uses user OAuth credentials from GoogleOAuthCredential model
 # Note: GCAL_CLIENT must be 'google' for either mode to work
-GCAL_AUTH_MODE = os.getenv("GCAL_CLIENT_MODE", "service_account")
+GCAL_AUTH_MODE = os.getenv("GCAL_AUTH_MODE", "service_account")
 
 # Google Calendar sendUpdates parameter (RF05/RF06 - PR19)
 # Controls whether email notifications are sent to attendees:

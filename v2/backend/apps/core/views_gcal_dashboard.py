@@ -23,6 +23,7 @@ import logging
 import os
 from datetime import date, datetime
 
+from django.conf import settings
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import status
@@ -314,7 +315,7 @@ class GCalPublishBatchView(APIView):
         )
 
         # Verificar GCAL_CLIENT
-        gcal_client = os.getenv('GCAL_CLIENT', 'fake')
+        gcal_client = getattr(settings, 'GCAL_CLIENT', 'fake')
 
         queued = []
         errors = []

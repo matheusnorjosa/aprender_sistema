@@ -76,6 +76,10 @@ export default function PreAgendaPage() {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewData, setPreviewData] = useState(null);
 
+  // Issue #95: Batch operations - Row selection
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [batchLoading, setBatchLoading] = useState(false);
+
   // OAuth Phase 5: Estado do usuário e integração Google
   const [user, setUser] = useState(null);
   const { status: googleStatus, loading: _googleLoading, fetchStatus: _fetchStatus } = useGoogleIntegration();
@@ -288,6 +292,200 @@ export default function PreAgendaPage() {
     });
   };
 
+  // Issue #95: Batch Reapply
+  const handleBatchReapply = () => {
+    // OAuth Phase 5: Guarda - verificar conexão Google
+    if (googleStatus && !googleStatus.connected) {
+      Modal.confirm({
+        title: 'Conectar conta Google',
+        content: (
+          <div>
+            <p>Para realizar ações em massa no Google Calendar, você precisa conectar sua conta corporativa do Google.</p>
+          </div>
+        ),
+        okText: 'Conectar agora',
+        okType: 'primary',
+        cancelText: 'Cancelar',
+        onOk: () => {
+          const returnUrl = encodeURIComponent(window.location.href);
+          window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+        },
+      });
+      return;
+    }
+
+    if (selectedRowKeys.length === 0) {
+      message.warning('Selecione ao menos um evento para reaplica');
+      return;
+    }
+
+    Modal.confirm({
+      title: `Confirmar Reapply em Massa (${selectedRowKeys.length} eventos)`,
+      icon: <SyncOutlined style={{ color: '#faad14' }} />,
+      content: (
+        <div>
+          <p>Deseja reenviar (forçar UPDATE) estes {selectedRowKeys.length} eventos no Google Calendar?</p>
+          <p style={{ color: '#888', fontSize: '12px' }}>
+            Esta ação irá sobrescrever os eventos existentes com os dados atualizados.
+          </p>
+        </div>
+      ),
+      okText: 'Reenviar',
+      okType: 'warning',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          setBatchLoading(true);
+          const response = await fetch('/api/gcal/dashboard/batch/reapply/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              ids: selectedRowKeys,
+              dry_run: false,
+              apply_blocked: true,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.status === 403 && data.code === 'google_not_connected') {
+            Modal.confirm({
+              title: 'Conectar conta Google',
+              content: (
+                <div>
+                  <p>{data.detail || 'Conecte sua conta Google para realizar ações em massa.'}</p>
+                </div>
+              ),
+              okText: 'Conectar agora',
+              okType: 'primary',
+              cancelText: 'Cancelar',
+              onOk: () => {
+                const returnUrl = encodeURIComponent(window.location.href);
+                window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+              },
+            });
+            return;
+          }
+
+          if (!response.ok) {
+            throw new Error(data.detail || 'Erro ao reenviar eventos');
+          }
+
+          message.success(`${data.queued} eventos enfileirados para reapply!`);
+          if (data.errors && data.errors.length > 0) {
+            message.warning(`${data.errors.length} erros: ${data.errors.map(e => e.detail).join(', ')}`);
+          }
+          setSelectedRowKeys([]);
+          loadData();
+        } catch (error) {
+          message.error('Erro ao reenviar em massa: ' + error.message);
+        } finally {
+          setBatchLoading(false);
+        }
+      },
+    });
+  };
+
+  // Issue #95: Batch Resync
+  const handleBatchResync = () => {
+    // OAuth Phase 5: Guarda - verificar conexão Google
+    if (googleStatus && !googleStatus.connected) {
+      Modal.confirm({
+        title: 'Conectar conta Google',
+        content: (
+          <div>
+            <p>Para realizar ações em massa no Google Calendar, você precisa conectar sua conta corporativa do Google.</p>
+          </div>
+        ),
+        okText: 'Conectar agora',
+        okType: 'primary',
+        cancelText: 'Cancelar',
+        onOk: () => {
+          const returnUrl = encodeURIComponent(window.location.href);
+          window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+        },
+      });
+      return;
+    }
+
+    if (selectedRowKeys.length === 0) {
+      message.warning('Selecione ao menos um evento para resync');
+      return;
+    }
+
+    Modal.confirm({
+      title: `Confirmar Resync em Massa (${selectedRowKeys.length} eventos)`,
+      icon: <SyncOutlined style={{ color: '#ff4d4f' }} />,
+      content: (
+        <div>
+          <p>Deseja forçar resync (resetar hash + PENDING) destes {selectedRowKeys.length} eventos?</p>
+          <p style={{ color: '#888', fontSize: '12px' }}>
+            Útil para corrigir drift ou reprocessar eventos com erros.
+          </p>
+        </div>
+      ),
+      okText: 'Resync',
+      okType: 'danger',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          setBatchLoading(true);
+          const response = await fetch('/api/gcal/dashboard/batch/resync/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              ids: selectedRowKeys,
+              dry_run: false,
+              apply_blocked: true,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.status === 403 && data.code === 'google_not_connected') {
+            Modal.confirm({
+              title: 'Conectar conta Google',
+              content: (
+                <div>
+                  <p>{data.detail || 'Conecte sua conta Google para realizar ações em massa.'}</p>
+                </div>
+              ),
+              okText: 'Conectar agora',
+              okType: 'primary',
+              cancelText: 'Cancelar',
+              onOk: () => {
+                const returnUrl = encodeURIComponent(window.location.href);
+                window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+              },
+            });
+            return;
+          }
+
+          if (!response.ok) {
+            throw new Error(data.detail || 'Erro ao fazer resync de eventos');
+          }
+
+          message.success(`${data.queued} eventos enfileirados para resync!`);
+          if (data.errors && data.errors.length > 0) {
+            message.warning(`${data.errors.length} erros: ${data.errors.map(e => e.detail).join(', ')}`);
+          }
+          setSelectedRowKeys([]);
+          loadData();
+        } catch (error) {
+          message.error('Erro ao resync em massa: ' + error.message);
+        } finally {
+          setBatchLoading(false);
+        }
+      },
+    });
+  };
+
   const columns = [
     {
       title: 'Data/Hora',
@@ -486,11 +684,51 @@ export default function PreAgendaPage() {
 
         {/* Tabela */}
         <Card>
+          {/* Issue #95: Toolbar de Ações em Massa */}
+          {selectedRowKeys.length > 0 && (
+            <div style={{ marginBottom: 16, padding: '12px', background: '#e6f7ff', borderRadius: '4px' }}>
+              <Space>
+                <Text strong>{selectedRowKeys.length} evento(s) selecionado(s)</Text>
+                <Button
+                  type="default"
+                  icon={<SyncOutlined />}
+                  onClick={handleBatchReapply}
+                  loading={batchLoading}
+                  style={{ color: '#faad14', borderColor: '#faad14' }}
+                >
+                  Reapply Selecionados
+                </Button>
+                <Button
+                  danger
+                  icon={<SyncOutlined />}
+                  onClick={handleBatchResync}
+                  loading={batchLoading}
+                >
+                  Resync Selecionados
+                </Button>
+                <Button
+                  type="link"
+                  onClick={() => setSelectedRowKeys([])}
+                >
+                  Limpar Seleção
+                </Button>
+              </Space>
+            </div>
+          )}
           <Table
             columns={columns}
             dataSource={rows}
             loading={loading}
             rowKey="id"
+            rowSelection={{
+              selectedRowKeys,
+              onChange: (keys) => setSelectedRowKeys(keys),
+              selections: [
+                Table.SELECTION_ALL,
+                Table.SELECTION_INVERT,
+                Table.SELECTION_NONE,
+              ],
+            }}
             pagination={{
               total,
               pageSize: 20,

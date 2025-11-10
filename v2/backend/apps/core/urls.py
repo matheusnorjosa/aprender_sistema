@@ -41,6 +41,8 @@ from .views_gcal_dashboard import (
     GCalPublishBatchView,
     DashboardMetricsView,
     DashboardEventsView,
+    GCalBatchReapplyView,
+    GCalBatchResyncView,
 )
 from .views_gcal import gcal_calendars, gcal_health
 from .views_lookup import (
@@ -166,6 +168,9 @@ urlpatterns = [
     # Sprint 5 - Dashboard/Monitoring
     path("gcal/dashboard/metrics/", DashboardMetricsView.as_view(), name="gcal-dashboard-metrics"),
     path("gcal/dashboard/events/", DashboardEventsView.as_view(), name="gcal-dashboard-events"),
+    # Issue #95 - Batch Reapply/Resync
+    path("gcal/dashboard/batch/reapply/", GCalBatchReapplyView.as_view(), name="gcal-batch-reapply"),
+    path("gcal/dashboard/batch/resync/", GCalBatchResyncView.as_view(), name="gcal-batch-resync"),
     # GCal Endpoints (Sprint 2 - Issue #65)
     path("gcal/calendars/", gcal_calendars, name="gcal-calendars"),
     path("gcal/health/", gcal_health, name="gcal-health"),

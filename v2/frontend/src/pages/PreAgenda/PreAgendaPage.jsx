@@ -155,8 +155,7 @@ export default function PreAgendaPage() {
         okType: 'primary',
         cancelText: 'Cancelar',
         onOk: () => {
-          const returnUrl = encodeURIComponent(window.location.href);
-          window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+          window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
         },
       });
       return;
@@ -187,8 +186,7 @@ export default function PreAgendaPage() {
               okType: 'primary',
               cancelText: 'Cancelar',
               onOk: () => {
-                const returnUrl = encodeURIComponent(window.location.href);
-                window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+                window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
               },
             });
           } else {
@@ -213,8 +211,7 @@ export default function PreAgendaPage() {
         okType: 'primary',
         cancelText: 'Cancelar',
         onOk: () => {
-          const returnUrl = encodeURIComponent(window.location.href);
-          window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+          window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
         },
       });
       return;
@@ -253,8 +250,7 @@ export default function PreAgendaPage() {
               okType: 'primary',
               cancelText: 'Cancelar',
               onOk: () => {
-                const returnUrl = encodeURIComponent(window.location.href);
-                window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+                window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
               },
             });
           } else {
@@ -307,8 +303,7 @@ export default function PreAgendaPage() {
         okType: 'primary',
         cancelText: 'Cancelar',
         onOk: () => {
-          const returnUrl = encodeURIComponent(window.location.href);
-          window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+          window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
         },
       });
       return;
@@ -363,8 +358,7 @@ export default function PreAgendaPage() {
               okType: 'primary',
               cancelText: 'Cancelar',
               onOk: () => {
-                const returnUrl = encodeURIComponent(window.location.href);
-                window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+                window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
               },
             });
             return;
@@ -404,8 +398,7 @@ export default function PreAgendaPage() {
         okType: 'primary',
         cancelText: 'Cancelar',
         onOk: () => {
-          const returnUrl = encodeURIComponent(window.location.href);
-          window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+          window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
         },
       });
       return;
@@ -460,8 +453,7 @@ export default function PreAgendaPage() {
               okType: 'primary',
               cancelText: 'Cancelar',
               onOk: () => {
-                const returnUrl = encodeURIComponent(window.location.href);
-                window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+                window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
               },
             });
             return;
@@ -585,8 +577,7 @@ export default function PreAgendaPage() {
 
   // Handlers para o card Google
   const handleGoogleConnect = () => {
-    const returnUrl = encodeURIComponent(window.location.href);
-    window.location.href = `/api/oauth/google/start/?return_to=${returnUrl}`;
+    window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
   };
 
   const handleGoogleDisconnect = async () => {

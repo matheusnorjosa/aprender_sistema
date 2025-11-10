@@ -13,6 +13,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 from django.contrib.auth.models import Group
+from django.test import override_settings
 from rest_framework.test import APIClient
 
 from apps.core.models import Usuario, Solicitacao, Projeto, Municipio, TipoEvento
@@ -117,7 +118,7 @@ class TestGCalPublishBatchEndpoint:
     """Testes do endpoint POST /api/gcal/publish-batch/."""
 
     @patch('apps.core.tasks.task_publish_solicitacao_to_gcal')
-    @patch.dict(os.environ, {'GCAL_CLIENT': 'google'})
+    @override_settings(GCAL_CLIENT='google')
     def test_batch_publish_aprovados_sucesso(
         self,
         mock_task,
@@ -176,7 +177,7 @@ class TestGCalPublishBatchEndpoint:
         assert sol2.gcal_status == 'PENDING'
 
     @patch('apps.core.tasks.task_publish_solicitacao_to_gcal')
-    @patch.dict(os.environ, {'GCAL_CLIENT': 'google'})
+    @override_settings(GCAL_CLIENT='google')
     def test_batch_publish_mistura_aprovado_pendente(
         self,
         mock_task,
@@ -229,7 +230,7 @@ class TestGCalPublishBatchEndpoint:
         solicitacao_pendente.refresh_from_db()
         assert solicitacao_pendente.gcal_status == 'NONE'
 
-    @patch.dict(os.environ, {'GCAL_CLIENT': 'fake'})
+    @override_settings(GCAL_CLIENT='fake')
     def test_batch_publish_requer_apply_blocked_quando_fake(
         self,
         api_client,
@@ -266,7 +267,7 @@ class TestGCalPublishBatchEndpoint:
         assert 'apply_blocked=true' in error['detail']
 
     @patch('apps.core.tasks.task_publish_solicitacao_to_gcal')
-    @patch.dict(os.environ, {'GCAL_CLIENT': 'fake'})
+    @override_settings(GCAL_CLIENT='fake')
     def test_batch_publish_com_apply_blocked_true(
         self,
         mock_task,
@@ -359,7 +360,7 @@ class TestGCalPublishBatchEndpoint:
         assert 'não-vazio' in response.json()['detail']
 
     @patch('apps.core.tasks.task_publish_solicitacao_to_gcal')
-    @patch.dict(os.environ, {'GCAL_CLIENT': 'google'})
+    @override_settings(GCAL_CLIENT='google')
     def test_batch_publish_dry_run_nao_persiste(
         self,
         mock_task,

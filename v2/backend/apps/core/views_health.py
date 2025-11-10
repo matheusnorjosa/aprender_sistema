@@ -98,8 +98,10 @@ def features(request):
     Config overrides:
     - Values in Config(key="features") override environment variables
     """
+    from django.conf import settings as django_settings
+
     # Environment configuration (defaults)
-    gcal_client = os.getenv("GCAL_CLIENT", "fake")
+    gcal_client = getattr(django_settings, "GCAL_CLIENT", "fake")
     gcal_mode = os.getenv("GCAL_MODE", gcal_client)  # GCAL_MODE defaults to GCAL_CLIENT
     environment = os.getenv("ENVIRONMENT", "development")
 

@@ -21,7 +21,7 @@ import base64
 import logging
 import requests
 from datetime import timedelta
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from django.conf import settings
 from django.db import transaction
@@ -120,19 +120,61 @@ def _is_safe_url(url: str) -> bool:
         bool: True se segura, False caso contrário
 
     Security:
-        - Apenas caminhos internos (começam com "/")
-        - Rejeita URLs absolutas (http://, https://, //)
+        - Caminhos relativos (começam com "/" mas não "//") são permitidos
+        - URLs absolutas permitidas se origin estiver em CORS_ALLOWED_ORIGINS ou OAUTH_ALLOWED_RETURN_ORIGINS
         - Rejeita javascript:, data:, etc.
+
+    Example:
+        >>> _is_safe_url("/pre-agenda")  # True (caminho relativo)
+        >>> _is_safe_url("http://localhost:5173/pre-agenda")  # True (se em CORS_ALLOWED_ORIGINS)
+        >>> _is_safe_url("http://malicious.com/steal")  # False
     """
     if not url:
         return False
 
-    # Permitir apenas caminhos internos
+    # 1. Permitir caminhos relativos (começam com "/" mas não "//")
     if url.startswith("/") and not url.startswith("//"):
         return True
 
-    # Rejeitar qualquer URL absoluta ou protocolo
-    return False
+    # 2. Permitir URLs absolutas de origens confiáveis
+    try:
+        parsed = urlparse(url)
+
+        # Rejeitar protocolos perigosos
+        if parsed.scheme in ['javascript', 'data', 'vbscript', 'file']:
+            return False
+
+        # Rejeitar URLs sem scheme ou netloc (ex: "//malicious.com")
+        if not parsed.scheme or not parsed.netloc:
+            return False
+
+        # Rejeitar se não for http/https
+        if parsed.scheme not in ['http', 'https']:
+            return False
+
+        # Reconstruir origin (scheme://host:port)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+
+        # Obter origens confiáveis de settings.CORS_ALLOWED_ORIGINS
+        allowed_origins = getattr(settings, 'CORS_ALLOWED_ORIGINS', [])
+
+        # Adicionar origens de OAUTH_ALLOWED_RETURN_ORIGINS (env var opcional)
+        extra_origins_str = os.getenv("OAUTH_ALLOWED_RETURN_ORIGINS", "")
+        if extra_origins_str:
+            extra_origins = [o.strip() for o in extra_origins_str.split(",") if o.strip()]
+            allowed_origins = list(allowed_origins) + extra_origins
+
+        # Verificar se origin está na lista de origens confiáveis
+        if origin in allowed_origins:
+            logger.debug(f"✅ URL absoluta aceita (origin confiável): {origin}")
+            return True
+        else:
+            logger.warning(f"⚠️ URL absoluta rejeitada (origin não confiável): {origin}")
+            return False
+
+    except Exception as e:
+        logger.warning(f"⚠️ Erro ao validar URL: {url} ({e})")
+        return False
 
 
 def validate_oauth_state(state: str, user_id: int) -> dict:
@@ -258,7 +300,7 @@ def build_authorization_url(user, return_to: str = "/pre-agenda") -> str:
         "client_id": client_id,
         "redirect_uri": redirect_uri,
         "response_type": "code",
-        "scope": "https://www.googleapis.com/auth/calendar",
+        "scope": "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.email",
         "access_type": "offline",  # Obter refresh_token
         "prompt": "consent",  # Forçar tela de consentimento (garantir refresh_token)
         "state": state,

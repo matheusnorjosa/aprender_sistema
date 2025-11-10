@@ -57,6 +57,8 @@ from .views_oauth import (
     google_oauth_callback,
     google_oauth_status,
     google_oauth_disconnect,
+    google_oauth_list_calendars,
+    google_oauth_select_calendar,
 )
 from .views import (
     MunicipioViewSet,
@@ -97,6 +99,8 @@ urlpatterns = [
     path("oauth/google/callback/", google_oauth_callback, name="google-oauth-callback"),
     path("integrations/google/status/", google_oauth_status, name="google-oauth-status"),
     path("integrations/google/disconnect/", google_oauth_disconnect, name="google-oauth-disconnect"),
+    path("integrations/google/calendars/", google_oauth_list_calendars, name="google-oauth-list-calendars"),
+    path("integrations/google/select-calendar/", google_oauth_select_calendar, name="google-oauth-select-calendar"),
     path(
         "availability/check/",
         AvailabilityCheckView.as_view(),

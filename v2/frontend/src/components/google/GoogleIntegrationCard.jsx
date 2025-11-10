@@ -17,23 +17,76 @@
  * - PA-06: Controle explícito (ISO 9241-110)
  */
 
-import React from 'react';
-import { Card, Button, Space, Tag, Typography, Popconfirm } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Card, Button, Space, Tag, Typography, Popconfirm, Select, message } from 'antd';
 import {
   GoogleOutlined,
   CheckCircleOutlined,
   WarningOutlined,
   DisconnectOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
+import api from '../../api';
 
 const { Text, Title } = Typography;
 
 const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
+  const [calendars, setCalendars] = useState([]);
+  const [loadingCalendars, setLoadingCalendars] = useState(false);
+  const [selectedCalendar, setSelectedCalendar] = useState(null);
+  const [savingCalendar, setSavingCalendar] = useState(false);
+
   if (!status) {
     return null;
   }
 
-  const { connected, googleEmail, tokenExpiry, expiresInDays, isExpired } = status;
+  const { connected, googleEmail, tokenExpiry, expiresInDays, isExpired, defaultCalendarId } = status;
+
+  // Carregar calendários quando conectado
+  useEffect(() => {
+    if (connected && !isExpired) {
+      loadCalendars();
+    }
+  }, [connected, isExpired]);
+
+  // Atualizar calendário selecionado quando defaultCalendarId mudar
+  useEffect(() => {
+    if (defaultCalendarId) {
+      setSelectedCalendar(defaultCalendarId);
+    } else if (googleEmail) {
+      // Se não houver defaultCalendarId, usar email como fallback
+      setSelectedCalendar(googleEmail);
+    }
+  }, [defaultCalendarId, googleEmail]);
+
+  const loadCalendars = async () => {
+    try {
+      setLoadingCalendars(true);
+      const response = await api.get('/integrations/google/calendars/');
+      setCalendars(response.data.calendars || []);
+    } catch (error) {
+      console.error('Erro ao carregar calendários:', error);
+      message.error('Não foi possível carregar seus calendários');
+    } finally {
+      setLoadingCalendars(false);
+    }
+  };
+
+  const handleCalendarChange = async (calendarId) => {
+    try {
+      setSavingCalendar(true);
+      await api.post('/integrations/google/select-calendar/', {
+        calendar_id: calendarId,
+      });
+      setSelectedCalendar(calendarId);
+      message.success('Calendário selecionado com sucesso');
+    } catch (error) {
+      console.error('Erro ao salvar calendário:', error);
+      message.error('Não foi possível salvar o calendário selecionado');
+    } finally {
+      setSavingCalendar(false);
+    }
+  };
 
   // Estado: DESCONECTADO
   if (!connected) {
@@ -115,7 +168,7 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
           </Tag>
         </Space>
 
-        <Space direction="vertical" size="small">
+        <Space direction="vertical" size="small" style={{ width: '100%' }}>
           <Text>
             <strong>Conta conectada:</strong> {googleEmail}
           </Text>
@@ -131,6 +184,36 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
               })}
             </Text>
           )}
+
+          {/* Seletor de calendário */}
+          <div style={{ marginTop: '8px' }}>
+            <Text strong style={{ display: 'block', marginBottom: '8px' }}>
+              <CalendarOutlined /> Calendário para eventos:
+            </Text>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="Selecione um calendário"
+              value={selectedCalendar}
+              onChange={handleCalendarChange}
+              loading={loadingCalendars || savingCalendar}
+              disabled={isExpired}
+              options={calendars.map((cal) => ({
+                value: cal.id,
+                label: (
+                  <span>
+                    {cal.summary}
+                    {cal.primary && <Tag color="blue" style={{ marginLeft: '8px' }}>Principal</Tag>}
+                  </span>
+                ),
+              }))}
+              notFoundContent={loadingCalendars ? 'Carregando...' : 'Nenhum calendário encontrado'}
+            />
+            {!defaultCalendarId && (
+              <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginTop: '4px' }}>
+                Usando calendário principal por padrão
+              </Text>
+            )}
+          </div>
         </Space>
 
         <Space>

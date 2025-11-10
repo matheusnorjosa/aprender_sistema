@@ -115,6 +115,54 @@ class OAuthCalendarClient(CalendarClientAdapter):
             f"(user_id={credential.user_id})"
         )
 
+    def get_default_calendar_id(self) -> str:
+        """
+        Retorna calendar_id preferido do usuário OAuth.
+
+        Ordem de preferência:
+        1. default_calendar_id configurado pelo usuário
+        2. google_email (calendário principal)
+
+        Returns:
+            ID do calendário a ser usado
+        """
+        # Preferir calendário selecionado pelo usuário
+        if self.credential.default_calendar_id:
+            calendar_id = self.credential.default_calendar_id
+            logger.debug(
+                f"📅 Using user-selected calendar: {calendar_id}"
+            )
+            return calendar_id
+
+        # Fallback: usar calendário principal (email)
+        calendar_id = self.credential.google_email
+        logger.debug(
+            f"📧 Using primary calendar (no selection): {calendar_id}"
+        )
+        return calendar_id
+
+    def _resolve_calendar_id(self, calendar_id: str) -> str:
+        """
+        Resolve calendar_id para OAuth.
+
+        Com OAuth, se o calendar_id for o email principal do usuário OAuth,
+        devemos usar "primary" em vez do email.
+
+        Args:
+            calendar_id: ID do calendário ("primary" ou email)
+
+        Returns:
+            "primary" para calendário principal, ou calendar_id original para outros
+        """
+        # Se for o email principal do usuário OAuth, usar "primary"
+        if calendar_id == self.credential.google_email:
+            logger.debug(
+                f"📧 Resolved {calendar_id} → 'primary' for OAuth user"
+            )
+            return "primary"
+        # Caso contrário, usar o calendar_id original
+        return calendar_id
+
     def _retry_with_backoff(self, func, max_retries=3):
         """
         Executa função com retry exponencial para 429/5xx.
@@ -166,6 +214,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
         Returns:
             dict com evento ou None se não encontrado
         """
+        calendar_id = self._resolve_calendar_id(calendar_id)
 
         def _get():
             return (
@@ -194,23 +243,38 @@ class OAuthCalendarClient(CalendarClientAdapter):
         Returns:
             dict com evento criado
         """
+        calendar_id = self._resolve_calendar_id(calendar_id)
+
         # Garantir que o payload tenha o event_id
         body = {**payload, "id": event_id}
+
+        # DEBUG: Log body antes de enviar
+        logger.debug(
+            f"🔍 OAuthClient.insert() - calendar_id={calendar_id}, "
+            f"event_id={event_id}, body_has_id={'id' in body}, body_id={body.get('id')}"
+        )
 
         # RF05/RF06: Ler sendUpdates do settings (configurável via env)
         send_updates = getattr(settings, "GCAL_SEND_UPDATES", "none")
 
         def _insert():
-            return (
-                self.service.events()
-                .insert(
-                    calendarId=calendar_id,
-                    body=body,
-                    sendUpdates=send_updates,
-                    conferenceDataVersion=1,  # RF06: Necessário para criar Google Meet
+            try:
+                return (
+                    self.service.events()
+                    .insert(
+                        calendarId=calendar_id,
+                        body=body,
+                        sendUpdates=send_updates,
+                        conferenceDataVersion=1,  # RF06: Necessário para criar Google Meet
+                    )
+                    .execute()
                 )
-                .execute()
-            )
+            except Exception as e:
+                logger.error(
+                    f"❌ Google Calendar API error - calendar_id={calendar_id}, "
+                    f"event_id={body.get('id')}, error={str(e)}"
+                )
+                raise
 
         return self._retry_with_backoff(_insert)
 
@@ -226,6 +290,8 @@ class OAuthCalendarClient(CalendarClientAdapter):
         Returns:
             dict com evento atualizado
         """
+        calendar_id = self._resolve_calendar_id(calendar_id)
+
         # Garantir que o payload tenha o event_id
         body = {**payload, "id": event_id}
 
@@ -255,6 +321,8 @@ class OAuthCalendarClient(CalendarClientAdapter):
             calendar_id: ID do calendário
             event_id: ID do evento
         """
+        calendar_id = self._resolve_calendar_id(calendar_id)
+
         # RF05/RF06: Ler sendUpdates do settings (configurável via env)
         send_updates = getattr(settings, "GCAL_SEND_UPDATES", "none")
 
@@ -285,7 +353,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
 
         Returns:
             Lista de dicts com informações dos calendários:
-            [{"id": str, "summary": str, "primary": bool}, ...]
+            [{"id": str, "summary": str, "primary": bool, "accessRole": str}, ...]
         """
 
         def _list_calendars():
@@ -299,6 +367,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
                     "id": cal.get("id"),
                     "summary": cal.get("summary", ""),
                     "primary": cal.get("primary", False),
+                    "accessRole": cal.get("accessRole", ""),  # owner, writer, reader, freeBusyReader
                 }
                 for cal in items
             ]

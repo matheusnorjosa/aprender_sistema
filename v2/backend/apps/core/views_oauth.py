@@ -80,6 +80,60 @@ def _merge_query_params(url: str, **params) -> str:
     ))
 
 
+def _build_frontend_redirect_url(path: str) -> str:
+    """
+    Constrói URL absoluta do frontend para redirecionamento OAuth.
+
+    Args:
+        path: Caminho relativo (ex: "/pre-agenda?google=connected") ou URL absoluta
+
+    Returns:
+        URL absoluta para redirect
+
+    Example:
+        _build_frontend_redirect_url("/pre-agenda?google=connected")
+        → "http://localhost:5173/pre-agenda?google=connected" (dev)
+        → "https://sistema.aprendereditora.com.br/pre-agenda?google=connected" (prod)
+
+    Security:
+        - Caminhos relativos são convertidos para URL do frontend (CORS_ALLOWED_ORIGINS[0])
+        - URLs absolutas são preservadas (já validadas por _is_safe_url)
+    """
+    import os
+
+    # Se já for URL absoluta, retornar como está
+    parsed = urlparse(path)
+    if parsed.scheme and parsed.netloc:
+        return path
+
+    # Caminho relativo: construir URL do frontend
+    # Usar primeira origem do CORS_ALLOWED_ORIGINS (geralmente o frontend)
+    frontend_origin = os.getenv("FRONTEND_URL")
+
+    if not frontend_origin and settings.CORS_ALLOWED_ORIGINS:
+        # Priorizar localhost:5173 (Vite dev server padrão)
+        for origin in settings.CORS_ALLOWED_ORIGINS:
+            if ':5173' in origin:
+                frontend_origin = origin
+                break
+
+        # Se não encontrou :5173, pegar primeira origem que não seja :8002 (backend)
+        if not frontend_origin:
+            for origin in settings.CORS_ALLOWED_ORIGINS:
+                if ':8002' not in origin:
+                    frontend_origin = origin
+                    break
+
+    # Fallback para localhost:5173 (dev)
+    if not frontend_origin:
+        frontend_origin = "http://localhost:5173"
+
+    # Construir URL absoluta
+    full_url = f"{frontend_origin}{path}"
+    logger.info(f"🔗 Redirect construído: {full_url} (frontend_origin={frontend_origin})")
+    return full_url
+
+
 # ============================================================================
 # RATE LIMITING (GAP-3)
 # ============================================================================
@@ -185,7 +239,8 @@ def google_oauth_callback(request):
     error = request.GET.get('error')
     if error:
         logger.warning(f"⚠️ OAuth callback erro: {error}")
-        return redirect(f"/pre-agenda?google=error&reason={error}")
+        redirect_url = _build_frontend_redirect_url(f"/pre-agenda?google=error&reason={error}")
+        return redirect(redirect_url)
 
     # Obter parâmetros
     code = request.GET.get('code')
@@ -193,12 +248,14 @@ def google_oauth_callback(request):
 
     if not code or not state:
         logger.error("❌ OAuth callback: code ou state ausente")
-        return redirect("/pre-agenda?google=error&reason=missing_params")
+        redirect_url = _build_frontend_redirect_url("/pre-agenda?google=error&reason=missing_params")
+        return redirect(redirect_url)
 
     # Verificar autenticação
     if not request.user.is_authenticated:
         logger.error("❌ OAuth callback: usuário não autenticado")
-        return redirect("/pre-agenda?google=error&reason=unauthenticated")
+        redirect_url = _build_frontend_redirect_url("/pre-agenda?google=error&reason=unauthenticated")
+        return redirect(redirect_url)
 
     # Validar state token (CSRF + user_id + return_to)
     from apps.core.services.google_oauth import validate_oauth_state
@@ -206,7 +263,8 @@ def google_oauth_callback(request):
 
     if not validation["valid"]:
         logger.error(f"❌ OAuth callback: state validation failed ({validation['error']})")
-        return redirect("/pre-agenda?google=error&reason=invalid_state")
+        redirect_url = _build_frontend_redirect_url("/pre-agenda?google=error&reason=invalid_state")
+        return redirect(redirect_url)
 
     # State válido - usar return_to validado
     return_to = validation["return_to"]
@@ -247,19 +305,22 @@ def google_oauth_callback(request):
         )
 
         # Redirecionar para return_to (merge query params)
-        redirect_url = _merge_query_params(return_to, google="connected")
+        redirect_path = _merge_query_params(return_to, google="connected")
+        redirect_url = _build_frontend_redirect_url(redirect_path)
         return redirect(redirect_url)
 
     except ValueError as e:
         # Erro de validação (ex: domínio inválido)
         logger.error(f"❌ OAuth callback falhou (validação): {e}")
-        redirect_url = _merge_query_params(return_to, google="error", reason="validation")
+        redirect_path = _merge_query_params(return_to, google="error", reason="validation")
+        redirect_url = _build_frontend_redirect_url(redirect_path)
         return redirect(redirect_url)
 
     except Exception as e:
         # Erro genérico
         logger.error(f"❌ OAuth callback falhou: {e}")
-        redirect_url = _merge_query_params(return_to, google="error", reason="server_error")
+        redirect_path = _merge_query_params(return_to, google="error", reason="server_error")
+        redirect_url = _build_frontend_redirect_url(redirect_path)
         return redirect(redirect_url)
 
 
@@ -310,6 +371,7 @@ def google_oauth_status(request):
             "token_expiry": credential.token_expiry.isoformat(),
             "expires_in_days": credential.days_until_expiry(),
             "is_expired": credential.is_expired(),
+            "default_calendar_id": credential.default_calendar_id or None,
         })
 
     except GoogleOAuthCredential.DoesNotExist:
@@ -319,6 +381,7 @@ def google_oauth_status(request):
             "token_expiry": None,
             "expires_in_days": None,
             "is_expired": False,
+            "default_calendar_id": None,
         })
 
 
@@ -368,6 +431,144 @@ def google_oauth_disconnect(request):
                 "message": "Credencial removida localmente, mas falha ao revogar no Google",
                 "google_email": google_email
             }, status=status.HTTP_200_OK)
+
+    except GoogleOAuthCredential.DoesNotExist:
+        return Response(
+            {"error": "Nenhuma conexão Google encontrada"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsControleOrSuper])
+def google_oauth_list_calendars(request):
+    """
+    Lista calendários disponíveis do usuário OAuth.
+
+    **Permissão**: IsControleOrSuper
+
+    Returns:
+        200 OK: Lista de calendários
+        404 Not Found: Nenhuma conexão encontrada
+        500 Error: Erro ao listar calendários
+
+    Example:
+        GET /api/integrations/google/calendars/
+
+        Response:
+        {
+            "calendars": [
+                {
+                    "id": "operacional1@aprendereditora.com.br",
+                    "summary": "operacional1@aprendereditora.com.br",
+                    "primary": true
+                },
+                {
+                    "id": "agenda-formacoes@aprendereditora.com.br",
+                    "summary": "Agenda Formações",
+                    "primary": false
+                }
+            ]
+        }
+    """
+    try:
+        credential = GoogleOAuthCredential.objects.get(user=request.user)
+
+        # Criar cliente OAuth e listar calendários
+        from apps.core.services.gcal_oauth_client import OAuthCalendarClient
+
+        client = OAuthCalendarClient(credential)
+        calendars = client.list_calendars()
+
+        logger.info(
+            f"📅 Listed {len(calendars)} calendars for {request.user.username}"
+        )
+        # DEBUG: Log calendar details
+        for cal in calendars:
+            logger.info(
+                f"  📅 {cal['summary']}: id={cal['id']}, "
+                f"primary={cal.get('primary', False)}, accessRole={cal.get('accessRole', 'N/A')}"
+            )
+
+        return Response({"calendars": calendars})
+
+    except GoogleOAuthCredential.DoesNotExist:
+        return Response(
+            {"error": "Nenhuma conexão Google encontrada"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"❌ Erro ao listar calendários: {e}")
+        return Response(
+            {"error": "Erro ao listar calendários", "detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsControleOrSuper])
+def google_oauth_select_calendar(request):
+    """
+    Salva calendário selecionado pelo usuário.
+
+    **Permissão**: IsControleOrSuper
+
+    Request Body:
+        {
+            "calendar_id": "agenda-formacoes@aprendereditora.com.br"
+        }
+
+    Returns:
+        200 OK: Calendário salvo com sucesso
+        400 Bad Request: calendar_id não fornecido
+        404 Not Found: Nenhuma conexão encontrada
+
+    Example:
+        POST /api/integrations/google/select-calendar/
+        {
+            "calendar_id": "agenda-formacoes@aprendereditora.com.br"
+        }
+
+        Response:
+        {
+            "message": "Calendário selecionado com sucesso",
+            "calendar_id": "agenda-formacoes@aprendereditora.com.br"
+        }
+    """
+    try:
+        credential = GoogleOAuthCredential.objects.get(user=request.user)
+
+        calendar_id = request.data.get("calendar_id")
+        if not calendar_id:
+            return Response(
+                {"error": "calendar_id é obrigatório"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Atualizar calendário padrão
+        credential.default_calendar_id = calendar_id
+        credential.save(update_fields=["default_calendar_id", "updated_at"])
+
+        logger.info(
+            f"📅 Calendar selected: {request.user.username} → {calendar_id}"
+        )
+
+        # Auditoria (PA-05)
+        AuditLog.objects.create(
+            usuario=request.user,
+            action="GOOGLE_SELECT_CALENDAR",
+            model_name="GoogleOAuthCredential",
+            details={
+                "calendar_id": calendar_id,
+                "ip_address": request.META.get('REMOTE_ADDR', ''),
+                "user_agent": request.META.get('HTTP_USER_AGENT', '')[:200],
+            }
+        )
+
+        return Response({
+            "message": "Calendário selecionado com sucesso",
+            "calendar_id": calendar_id
+        })
 
     except GoogleOAuthCredential.DoesNotExist:
         return Response(

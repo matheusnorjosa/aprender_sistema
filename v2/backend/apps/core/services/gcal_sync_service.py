@@ -312,7 +312,14 @@ def _event_id_for(s: Solicitacao) -> str:
     """
     Gera eventId determinístico para uma Solicitacao.
 
-    Format: asv2-{id} (lowercase, a-z0-9-, mínimo 6 chars)
+    Format: asv2{id} (lowercase a-v, digits 0-9, NO separators, mínimo 5 chars)
+
+    Note: Google Calendar API uses base32hex encoding and ONLY accepts:
+    - Lowercase letters: a-v (NOT a-z, only up to 'v')
+    - Digits: 0-9
+    - NO special characters (no hyphens, underscores, or any separators)
+
+    Length: 5-1024 characters
 
     Args:
         s: Solicitacao
@@ -323,7 +330,7 @@ def _event_id_for(s: Solicitacao) -> str:
     Raises:
         ValueError: Se ID gerado for inválido
     """
-    event_id = f"asv2-{s.id}"
+    event_id = f"asv2{s.id}"
 
     # Validar antes de retornar
     _validate_event_id(event_id)
@@ -468,14 +475,18 @@ def apply_one_solicitacao(
 
         client, calendar_id = get_gcal_client_and_calendar_id()
     else:
-        # Cliente fornecido externamente (OAuth mode), resolver calendar_id
-        import os
-
-        calendar_id = (
-            getattr(settings, "GCAL_CALENDAR_ID", None)
-            or os.getenv("GCAL_CALENDAR_ID")
-            or "primary"
-        )
+        # Cliente fornecido externamente (OAuth mode), usar calendário preferido
+        # Verificar se cliente tem método get_default_calendar_id (OAuthCalendarClient)
+        if hasattr(client, 'get_default_calendar_id'):
+            calendar_id = client.get_default_calendar_id()
+        else:
+            # Fallback para clientes antigos
+            import os
+            calendar_id = (
+                getattr(settings, "GCAL_CALENDAR_ID", None)
+                or os.getenv("GCAL_CALENDAR_ID")
+                or "primary"
+            )
 
     try:
         # Chamar upsert_one com payload pré-calculado (PR14)
@@ -887,6 +898,11 @@ def upsert_one(
 
             if not dry_run:
                 try:
+                    # DEBUG: Log payload antes de enviar
+                    logger.debug(
+                        f"🔍 GCal INSERT #{s.id} - calendar_id={calendar_id}, "
+                        f"event_id={deterministic_eid}, payload={payload}"
+                    )
                     # RF05: Retry com backoff exponencial (PR19)
                     created = _retry_with_backoff(
                         lambda: client.insert(calendar_id, deterministic_eid, payload),

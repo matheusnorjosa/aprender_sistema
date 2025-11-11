@@ -38,6 +38,12 @@ Retorna:
 }
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 from datetime import datetime, time
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -61,7 +67,7 @@ class SolicitationValidateView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
         errors = []
         canonical = {}

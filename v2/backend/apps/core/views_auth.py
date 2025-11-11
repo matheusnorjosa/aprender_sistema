@@ -6,6 +6,12 @@ Endpoints:
 - POST /api/auth/logout/ - Logout
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 from django.contrib.auth import authenticate, login as django_login, logout as django_logout
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -17,7 +23,7 @@ from .models import AuditLog
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def login(request):
+def login(request: Request) -> Response:
     """
     Endpoint de login com username/password.
 
@@ -87,7 +93,7 @@ def login(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def logout(request):
+def logout(request: Request) -> Response:
     """
     Endpoint de logout.
 

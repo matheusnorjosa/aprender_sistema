@@ -454,6 +454,7 @@ class Command(BaseCommand):
                 external_hash=external_hash,
                 defaults={
                     "usuario": autor,
+                    "coordenador": autor,  # Set coordenador to same user as autor (from spreadsheet column N)
                     "municipio": municipio,
                     "projeto": projeto,
                     "tipo_evento": tipo_evento,

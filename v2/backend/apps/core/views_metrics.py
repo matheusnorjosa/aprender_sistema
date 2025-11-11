@@ -4,6 +4,12 @@ Metrics API Views
 Provides aggregated metrics for dashboard and monitoring.
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 from django.db.models import Count
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
@@ -15,7 +21,7 @@ from .permissions import IsControleOrDAT
 
 @api_view(["GET"])
 @permission_classes([IsControleOrDAT])
-def metrics_map(request):
+def metrics_map(request: Request) -> Response:
     """
     GET /api/metrics/map/
 

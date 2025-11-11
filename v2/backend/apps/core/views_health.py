@@ -2,6 +2,12 @@
 Health Check and Features Views
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 import os
 
 from django.core.cache import cache
@@ -12,7 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 
-def readyz(request):
+def readyz(request: Request) -> Response:
     """
     Health check: DB + Redis.
 
@@ -69,7 +75,7 @@ def readyz(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def features(request):
+def features(request: Request) -> Response:
     """
     Returns feature flags and environment configuration.
 

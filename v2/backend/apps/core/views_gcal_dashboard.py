@@ -19,6 +19,12 @@ Nota: Publicação de eventos no Google Calendar ocorre via página /pre-agenda:
 - Em massa: botão "Publicar Selecionados" (POST /api/gcal/publish-batch/)
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 import logging
 import os
 from datetime import date, datetime
@@ -114,7 +120,7 @@ class GCalStatusSummaryView(APIView):
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
-    def get(self, request):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas solicitações aprovadas
         qs = Solicitacao.objects.filter(status='aprovado')
 
@@ -153,7 +159,7 @@ class GCalListView(APIView):
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
-    def get(self, request):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas aprovadas
         qs = Solicitacao.objects.filter(status='aprovado').select_related(
             'usuario', 'municipio', 'tipo_evento', 'projeto'
@@ -204,7 +210,7 @@ class GCalDriftView(APIView):
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
-    def get(self, request):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas PUBLISHED
         qs = Solicitacao.objects.filter(
             status='aprovado',
@@ -296,7 +302,7 @@ class GCalPublishBatchView(APIView):
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
-    def post(self, request):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Parse request body
         solicitacao_ids = request.data.get('solicitacao_ids', [])
         dry_run = request.data.get('dry_run', False)
@@ -421,7 +427,7 @@ class DashboardMetricsView(APIView):
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
-    def get(self, request):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas solicitações aprovadas
         qs = Solicitacao.objects.filter(status='aprovado')
 
@@ -527,7 +533,7 @@ class DashboardEventsView(APIView):
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
-    def get(self, request):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas aprovadas
         qs = Solicitacao.objects.filter(status='aprovado').select_related(
             'usuario', 'municipio', 'tipo_evento', 'projeto'
@@ -608,7 +614,7 @@ class GCalBatchReapplyView(APIView):
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
-    def post(self, request):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         from django.conf import settings
         from .models import GoogleOAuthCredential
         from .tasks import task_publish_solicitacao_to_gcal
@@ -755,7 +761,7 @@ class GCalBatchResyncView(APIView):
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
-    def post(self, request):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         from django.conf import settings
         from .models import GoogleOAuthCredential
         from .tasks import task_publish_solicitacao_to_gcal

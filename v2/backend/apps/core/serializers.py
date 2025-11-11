@@ -2,6 +2,10 @@
 DRF Serializers for Core models
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
@@ -9,15 +13,15 @@ from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
 from .models import (
-    AvailabilityBlock,
-    Participation,
-    Solicitacao,
-    Compra,
-    AuditLog,
     AcaoControle,
     AcaoDAT,
+    AuditLog,
+    AvailabilityBlock,
+    Compra,
     Municipio,
+    Participation,
     Projeto,
+    Solicitacao,
     TipoEvento,
 )
 
@@ -46,7 +50,7 @@ class ParticipationNestedSerializer(serializers.ModelSerializer):
         model = Participation
         fields = ("usuario", "guest_email", "email", "role", "ch_horas", "observacao")
 
-    def get_email(self, obj):
+    def get_email(self, obj: Participation) -> str | None:
         user_email = getattr(getattr(obj, "usuario", None), "email", None)
         return user_email or getattr(obj, "guest_email", None)
 
@@ -127,19 +131,19 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "meet_link",
         ]
 
-    def get_fluxo(self, obj):
+    def get_fluxo(self, obj: Solicitacao) -> str:
         """Retorna fluxo do projeto (SUPER ou NAO_SUPER), fallback para NAO_SUPER."""
         if obj.projeto:
             return obj.projeto.fluxo
         return 'NAO_SUPER'  # PR15: Fallback para solicitações sem projeto
 
-    def get_usuario_username(self, obj):
+    def get_usuario_username(self, obj: Solicitacao) -> str | None:
         """Retorna username do usuário que criou a solicitação."""
         if obj.usuario:
             return obj.usuario.username
         return None
 
-    def get_coordenador_username(self, obj):
+    def get_coordenador_username(self, obj: Solicitacao) -> str | None:
         """
         Retorna username do coordenador.
         Prioriza: coordenador field -> usuario (fallback para ETL imports).
@@ -152,7 +156,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             return obj.usuario.username
         return None
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """
         Permite PATCH parcial: se apenas um dos campos vier no payload,
         usa o valor atual da instância para validar o intervalo.
@@ -194,7 +198,7 @@ class AvailabilityBlockSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "usuario", "status", "created_at", "updated_at"]
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """
         Aceita updates parciais sem estourar KeyError.
         """
@@ -232,7 +236,7 @@ class CompraSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
-    def validate_quantidade(self, value):
+    def validate_quantidade(self, value: int) -> int:
         """Quantidade não pode ser negativa."""
         if value < 0:
             raise serializers.ValidationError("Quantidade não pode ser negativa.")
@@ -455,7 +459,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             "password": {"write_only": True}
         }
 
-    def validate_group_ids(self, value):
+    def validate_group_ids(self, value: list[int]) -> list[int]:
         """
         P1.1: Validate group_ids against whitelist and self-modification.
 
@@ -482,7 +486,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
         return value
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> Any:
         """Create user with hashed password and groups."""
         groups = validated_data.pop("groups", [])
         password = validated_data.pop("password", None)
@@ -499,7 +503,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
         return user
 
-    def update(self, instance, validated_data):
+    def update(self, instance: Any, validated_data: dict[str, Any]) -> Any:
         """Update user and hash password if provided."""
         groups = validated_data.pop("groups", None)
         password = validated_data.pop("password", None)
@@ -516,7 +520,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
         return user
 
-    def validate_password(self, value):
+    def validate_password(self, value: str) -> str:
         """
         Validate password using Django's password validators.
         Enforces minimum length of 8 characters and Django's AUTH_PASSWORD_VALIDATORS.
@@ -553,10 +557,10 @@ class GroupSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "permissions", "user_count"]
         read_only_fields = ["id", "permissions", "user_count"]
 
-    def get_permissions(self, obj):
+    def get_permissions(self, obj: Group) -> list[str]:
         """Return list of permission codenames."""
         return [f"{p.content_type.app_label}.{p.codename}" for p in obj.permissions.all()]
 
-    def get_user_count(self, obj):
+    def get_user_count(self, obj: Group) -> int:
         """Return count of users in this group."""
         return obj.user_set.count()

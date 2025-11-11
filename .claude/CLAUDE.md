@@ -2,9 +2,10 @@
 
 ## Contexto do Projeto
 - Objetivo: Substituir planilhas pelo **AS** para solicitação → aprovação → criação de eventos (Google Calendar), com verificação de conflitos e logs de auditoria.
-- Stack: **Python 3.11 + Django 5.1.x + DRF + Celery + PostgreSQL 15 + Redis 7**, containers via **Docker + Docker Compose** (`v2/infra/docker-compose.yml`).
+- Stack: **Python 3.12.12 + Django 5.1.x + DRF + Celery + PostgreSQL 15 + Redis 7**, containers via **Docker + Docker Compose** (`v2/infra/docker-compose.yml`).
 - Frontend: **React (Vite) + Tailwind + Ant Design**, dev server com proxy `/api → http://localhost:8002` e chamadas com `credentials: 'include'`.
 - Fuso horário padrão: `America/Fortaleza`.
+- Type Checking: **Pyright (strict mode)** com suporte a **PEP 695** (Python 3.12)
 
 ---
 
@@ -59,6 +60,60 @@ Use `Skill` tool com nome da skill para contexto especializado:
 - Precisar contexto detalhado do domínio antes de implementar
 - Dúvida sobre padrão correto (Django patterns, ETL guidelines)
 - Planejamento de features que envolvem regras de negócio
+
+---
+
+## 🐍 Type Hints (Python 3.12 + PEP 695)
+
+**Status**: Em implementação (PR #1 a PR #8)
+**Type Checker**: Pyright 1.1.382 (strict mode)
+**Meta**: 100% cobertura em código crítico (35% do projeto = 65 arquivos)
+
+### Documentação
+
+- **Guia do Desenvolvedor**: `v2/docs/TYPE_HINTS_GUIDE.md` - Como usar type hints
+- **Setup & Troubleshooting**: `v2/docs/PYRIGHT_SETUP.md` - Instalação e resolução de problemas
+- **Referência Completa**: `TYPE_HINTS_REFERENCE_FULL.md` - 1500 linhas com todos os padrões
+
+### Roadmap
+
+| PR | Escopo | Arquivos | Tempo | Status |
+|----|--------|----------|-------|--------|
+| #1 | Setup Pyright + CI | 3 | 4h | 🔄 In Progress |
+| #2 | Services | 24 (~7,192 linhas) | 36h | ⏳ Pending |
+| #3 | Models | 5 (1,017+ linhas) | 10h | ⏳ Pending |
+| #4 | Serializers | 1+ (562+ linhas) | 30h | ⏳ Pending |
+| #5 | Views | 21 (981+ linhas) | 14h | ⏳ Pending |
+| #6 | Tasks (Celery) | 1+ (489 linhas) | 26h | ⏳ Pending |
+| #7 | Tests (fixtures) | 4 | 6h | ⏳ Pending |
+| #8 | Polish + Commands | 27+ | 18h | ⏳ Pending |
+
+**Timeline**: 3.6 semanas (144h)
+**Conclusão Estimada**: 2025-12-08
+
+### Quick Reference
+
+```python
+# PEP 695: Type aliases modernos (Python 3.12+)
+type UserId = int
+type Status = Literal["pendente", "aprovado", "reprovado"]
+
+# Django QuerySet tipado
+def pendentes(cls) -> models.QuerySet[Self]:
+    return cls.objects.filter(status="pendente")
+
+# DRF Serializer tipado
+class SolicitacaoSerializer(serializers.ModelSerializer[Solicitacao]):
+    def create(self, validated_data: dict[str, Any]) -> Solicitacao:
+        return Solicitacao.objects.create(**validated_data)
+```
+
+### Rodar Localmente
+
+```bash
+cd v2/backend
+pyright apps/core apps/dat_ingest config
+```
 
 ---
 

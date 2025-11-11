@@ -1,7 +1,7 @@
 """
 Type Aliases Centralizados — Aprender Sistema v2
 
-Arquivo centralizado com todos os type aliases do projeto usando PEP 695 (Python 3.12+).
+Arquivo centralizado com todos os type aliases do projeto usando TypeAlias (Python 3.10+).
 
 Organização:
 1. IDs e Identificadores
@@ -15,68 +15,68 @@ Uso:
     from apps.core.types import UserId, Status, ConflictCode
 """
 
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, TypeAlias
 
 # ==============================================================================
 # 1. IDs e Identificadores
 # ==============================================================================
 
-type UserId = int
+UserId: TypeAlias = int
 """ID de usuário (Usuario.id)."""
 
-type SolicitacaoId = int
+SolicitacaoId: TypeAlias = int
 """ID de solicitação (Solicitacao.id)."""
 
-type ProjetoId = int
+ProjetoId: TypeAlias = int
 """ID de projeto (Projeto.id)."""
 
-type MunicipioId = int
+MunicipioId: TypeAlias = int
 """ID de município (Municipio.id)."""
 
-type TipoEventoId = int
+TipoEventoId: TypeAlias = int
 """ID de tipo de evento (TipoEvento.id)."""
 
-type AvailabilityBlockId = int
+AvailabilityBlockId: TypeAlias = int
 """ID de bloqueio (AvailabilityBlock.id)."""
 
-type DeslocamentoId = int
+DeslocamentoId: TypeAlias = int
 """ID de deslocamento (Deslocamento.id)."""
 
-type ParticipationId = int
+ParticipationId: TypeAlias = int
 """ID de participação (Participation.id)."""
 
 # ==============================================================================
 # 2. Status e Estados
 # ==============================================================================
 
-type Status = Literal["pendente", "aprovado", "reprovado"]
+Status: TypeAlias = Literal["pendente", "aprovado", "reprovado"]
 """Status de solicitação (Solicitacao.status)."""
 
-type Fluxo = Literal["SUPER", "NAO_SUPER"]
+Fluxo: TypeAlias = Literal["SUPER", "NAO_SUPER"]
 """Fluxo de aprovação (Projeto.fluxo).
 
 - SUPER: Requer aprovação manual da Superintendência (PA-01 a PA-07)
 - NAO_SUPER: Auto-aprovado na criação (PR18)
 """
 
-type GCalStatus = Literal["NONE", "PENDING", "PUBLISHED", "ERROR"]
+GCalStatus: TypeAlias = Literal["NONE", "PENDING", "PUBLISHED", "ERROR"]
 """Status de sincronização Google Calendar (Solicitacao.gcal_status)."""
 
-type BlockType = Literal["P", "T"]
+BlockType: TypeAlias = Literal["P", "T"]
 """Tipo de bloqueio de disponibilidade (AvailabilityBlock.tipo).
 
 - P: Parcial (RD-03)
 - T: Total (RD-02)
 """
 
-type ApprovalStatus = Literal["pendente", "aprovado", "reprovado"]
+ApprovalStatus: TypeAlias = Literal["pendente", "aprovado", "reprovado"]
 """Status de aprovação (Aprovacao.status)."""
 
 # ==============================================================================
 # 3. Códigos de Conflito (RD-01 a RD-08)
 # ==============================================================================
 
-type ConflictCode = Literal["X", "T", "P", "D", "M", "E"]
+ConflictCode: TypeAlias = Literal["X", "T", "P", "D", "M", "E"]
 """Código de conflito de disponibilidade (RD-08).
 
 Códigos:
@@ -92,23 +92,23 @@ Códigos:
 # 4. Google Calendar
 # ==============================================================================
 
-type EventId = str
+EventId: TypeAlias = str
 """ID de evento no Google Calendar (ex: 'asv2-123')."""
 
-type CalendarId = str
+CalendarId: TypeAlias = str
 """ID de calendário Google (ex: 'primary' ou 'user@group.calendar.google.com')."""
 
-type MeetLink = str
+MeetLink: TypeAlias = str
 """URL do Google Meet (ex: 'https://meet.google.com/abc-defg-hij')."""
 
-type GCalClientType = Literal["fake", "google"]
+GCalClientType: TypeAlias = Literal["fake", "google"]
 """Tipo de cliente Google Calendar (settings.GCAL_CLIENT).
 
 - fake: Cliente in-memory para testes (sem side effects)
 - google: Cliente real via Google Calendar API
 """
 
-type SendUpdates = Literal["none", "all", "externalOnly"]
+SendUpdates: TypeAlias = Literal["none", "all", "externalOnly"]
 """Política de envio de notificações Google Calendar (settings.GCAL_SEND_UPDATES).
 
 - none: Não envia emails
@@ -120,36 +120,41 @@ type SendUpdates = Literal["none", "all", "externalOnly"]
 # 5. JSON e Estruturas
 # ==============================================================================
 
-type JsonDict = dict[str, Any]
+JsonDict: TypeAlias = dict[str, Any]
 """Dicionário JSON genérico."""
 
-type JsonList = list[JsonDict]
+JsonList: TypeAlias = list[JsonDict]
 """Lista de dicionários JSON."""
 
-type PayloadHash = str
+PayloadHash: TypeAlias = str
 """Hash SHA256 de payload (ex: gcal_payload_hash para idempotência)."""
 
-type ExternalHash = str
+ExternalHash: TypeAlias = str
 """Hash SHA1/SHA256 para idempotência de ETL (external_hash)."""
 
 # ==============================================================================
 # 6. Handlers e Callbacks
 # ==============================================================================
 
-type ErrorHandler = Callable[[Exception], None]
+ErrorHandler: TypeAlias = Callable[[Exception], None]
 """Callback para tratamento de erros."""
 
-type SuccessCallback[T] = Callable[[T], None]
-"""Callback genérico para sucesso (PEP 695 generic)."""
+# Generic callbacks (Python 3.11+ compatible)
+from typing import TypeVar
 
-type ValidationFunction[T] = Callable[[T], bool]
+T = TypeVar('T')
+
+SuccessCallback: TypeAlias = Callable[[Any], None]
+"""Callback genérico para sucesso."""
+
+ValidationFunction: TypeAlias = Callable[[Any], bool]
 """Função de validação genérica (retorna True se válido)."""
 
 # ==============================================================================
 # 7. Timezone
 # ==============================================================================
 
-type TimezoneName = Literal["America/Fortaleza"]
+TimezoneName: TypeAlias = Literal["America/Fortaleza"]
 """Timezone do projeto (RD-06).
 
 IMPORTANTE: Sempre usar timezone-aware datetimes.
@@ -161,7 +166,7 @@ IMPORTANTE: Sempre usar timezone-aware datetimes.
 # 8. RBAC (Grupos e Permissões)
 # ==============================================================================
 
-type GroupName = Literal[
+GroupName: TypeAlias = Literal[
     "Superintendência",
     "Controle",
     "Coordenador",
@@ -171,7 +176,7 @@ type GroupName = Literal[
 ]
 """Grupos de permissão Django (Usuario.groups)."""
 
-type ActionType = Literal[
+ActionType: TypeAlias = Literal[
     "APPROVE",
     "REJECT",
     "PREVIEW_GCAL",
@@ -187,14 +192,14 @@ type ActionType = Literal[
 # 9. ETL e Import
 # ==============================================================================
 
-type ETLMode = Literal["dry-run", "apply"]
+ETLMode: TypeAlias = Literal["dry-run", "apply"]
 """Modo de execução de ETL.
 
 - dry-run: Simulação, não persiste no banco
 - apply: Execução real, persiste no banco
 """
 
-type ImportSource = Literal["xlsx", "csv", "api"]
+ImportSource: TypeAlias = Literal["xlsx", "csv", "api"]
 """Fonte de importação de dados."""
 
 # ==============================================================================

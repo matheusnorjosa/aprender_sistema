@@ -312,25 +312,18 @@ def _event_id_for(s: Solicitacao) -> str:
     """
     Gera eventId determinístico para uma Solicitacao.
 
-    Format: asv2{id} (lowercase a-v, digits 0-9, NO separators, mínimo 5 chars)
-
-    Note: Google Calendar API uses base32hex encoding and ONLY accepts:
-    - Lowercase letters: a-v (NOT a-z, only up to 'v')
-    - Digits: 0-9
-    - NO special characters (no hyphens, underscores, or any separators)
-
-    Length: 5-1024 characters
+    Format: asv2-{id}
 
     Args:
         s: Solicitacao
 
     Returns:
-        str: Event ID determinístico (validado)
+        str: Event ID determinístico (ex: asv2-123)
 
     Raises:
         ValueError: Se ID gerado for inválido
     """
-    event_id = f"asv2{s.id}"
+    event_id = f"asv2-{s.id}"
 
     # Validar antes de retornar
     _validate_event_id(event_id)

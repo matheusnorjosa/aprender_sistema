@@ -67,6 +67,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 
     # Campos legíveis para exibição (além dos IDs)
     usuario_username = serializers.SerializerMethodField()
+    coordenador_username = serializers.SerializerMethodField()
     municipio_nome = serializers.CharField(source='municipio.nome', read_only=True)
     projeto_nome = serializers.CharField(source='projeto.nome', read_only=True)
     tipo_evento_nome = serializers.CharField(source='tipo_evento.nome', read_only=True)
@@ -88,6 +89,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "segmento",
             "coordenador_acompanha",
             "coordenador",
+            "coordenador_username",
             "inicio",
             "fim",
             "status",
@@ -133,6 +135,19 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 
     def get_usuario_username(self, obj):
         """Retorna username do usuário que criou a solicitação."""
+        if obj.usuario:
+            return obj.usuario.username
+        return None
+
+    def get_coordenador_username(self, obj):
+        """
+        Retorna username do coordenador.
+        Prioriza: coordenador field -> usuario (fallback para ETL imports).
+        """
+        if obj.coordenador:
+            return obj.coordenador.username
+        # Fallback: Se coordenador não foi preenchido, usa usuario
+        # (para eventos importados via ETL onde usuario = coordenador resolvido)
         if obj.usuario:
             return obj.usuario.username
         return None

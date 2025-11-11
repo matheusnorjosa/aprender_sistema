@@ -7,6 +7,12 @@ Endpoints:
 - POST /api/dat/acoes/ - Cria AcaoDAT
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 from django.db.models import Q
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -47,7 +53,7 @@ class ControleAcoesListView(generics.ListAPIView):
         "municipio", "projeto", "coordenador"
     ).order_by("-data_reuniao", "-data_entrega")
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         """
         Filtra por data usando Q() para considerar qualquer uma das datas.
         """
@@ -133,7 +139,7 @@ class DATAcoesListCreateView(generics.ListCreateAPIView):
             return AcaoDATCreateSerializer
         return AcaoDATSerializer
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         """
         Filtra por query params opcionais.
         """

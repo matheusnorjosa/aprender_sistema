@@ -16,28 +16,32 @@ Refs:
 - PA-05: Auditoria obrigatória
 """
 
-import os
+from __future__ import annotations
+
 import base64
 import logging
-import requests
+import os
 from datetime import timedelta
+from typing import Any
 from urllib.parse import urlencode, urlparse
 
+import requests
+from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from cryptography.fernet import Fernet, InvalidToken
 
-from apps.core.models import GoogleOAuthCredential, AuditLog
+from apps.core.models import AuditLog, GoogleOAuthCredential, Usuario
+from apps.core.types import UserId
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 # ============================================================================
 # ENCRYPTION (GAP-2: Chave dedicada)
 # ============================================================================
 
-def _get_fernet_key():
+def _get_fernet_key() -> bytes:
     """
     Retorna chave Fernet dedicada para criptografia de tokens OAuth.
 
@@ -48,7 +52,7 @@ def _get_fernet_key():
     Raises:
         ValueError: Se nenhuma chave válida for encontrada
     """
-    key = os.getenv("GCAL_ENCRYPTION_KEY")
+    key: str | None = os.getenv("GCAL_ENCRYPTION_KEY")
 
     if key:
         return key.encode('utf-8')
@@ -84,7 +88,7 @@ def _encrypt_token(token: str) -> bytes:
     Raises:
         ValueError: Se chave de criptografia não estiver configurada
     """
-    fernet = Fernet(_get_fernet_key())
+    fernet: Fernet = Fernet(_get_fernet_key())
     return fernet.encrypt(token.encode('utf-8'))
 
 
@@ -101,7 +105,7 @@ def _decrypt_token(encrypted: bytes) -> str:
     Raises:
         InvalidToken: Se token estiver corrompido ou chave incorreta
     """
-    fernet = Fernet(_get_fernet_key())
+    fernet: Fernet = Fernet(_get_fernet_key())
     return fernet.decrypt(encrypted).decode('utf-8')
 
 
@@ -138,7 +142,7 @@ def _is_safe_url(url: str) -> bool:
 
     # 2. Permitir URLs absolutas de origens confiáveis
     try:
-        parsed = urlparse(url)
+        parsed: Any = urlparse(url)
 
         # Rejeitar protocolos perigosos
         if parsed.scheme in ['javascript', 'data', 'vbscript', 'file']:
@@ -153,13 +157,13 @@ def _is_safe_url(url: str) -> bool:
             return False
 
         # Reconstruir origin (scheme://host:port)
-        origin = f"{parsed.scheme}://{parsed.netloc}"
+        origin: str = f"{parsed.scheme}://{parsed.netloc}"
 
         # Obter origens confiáveis de settings.CORS_ALLOWED_ORIGINS
-        allowed_origins = getattr(settings, 'CORS_ALLOWED_ORIGINS', [])
+        allowed_origins: list[str] = getattr(settings, 'CORS_ALLOWED_ORIGINS', [])
 
         # Adicionar origens de OAUTH_ALLOWED_RETURN_ORIGINS (env var opcional)
-        extra_origins_str = os.getenv("OAUTH_ALLOWED_RETURN_ORIGINS", "")
+        extra_origins_str: str = os.getenv("OAUTH_ALLOWED_RETURN_ORIGINS", "")
         if extra_origins_str:
             extra_origins = [o.strip() for o in extra_origins_str.split(",") if o.strip()]
             allowed_origins = list(allowed_origins) + extra_origins
@@ -202,12 +206,12 @@ def validate_oauth_state(state: str, user_id: int) -> dict:
 
     try:
         # Parse state
-        parts = state.split('|')
+        parts: list[str] = state.split('|')
         if len(parts) != 3:
             return {"valid": False, "return_to": "/pre-agenda", "error": "State format invalid"}
 
         csrf_token, return_to, state_user_id_str = parts
-        state_user_id = int(state_user_id_str)
+        state_user_id: int = int(state_user_id_str)
 
         # Verificar user_id match
         if state_user_id != user_id:
@@ -218,15 +222,15 @@ def validate_oauth_state(state: str, user_id: int) -> dict:
             return {"valid": False, "return_to": "/pre-agenda", "error": "User ID mismatch"}
 
         # Buscar state no cache
-        cache_key = f"oauth_state:{csrf_token}"
-        cached_state = cache.get(cache_key)
+        cache_key: str = f"oauth_state:{csrf_token}"
+        cached_state: Any = cache.get(cache_key)
 
         if not cached_state:
             logger.error(f"❌ OAuth state validation: token not found or expired ({csrf_token[:8]}...)")
             return {"valid": False, "return_to": "/pre-agenda", "error": "State token invalid or expired"}
 
         # Validar return_to
-        cached_return_to = cached_state.get("return_to", "/pre-agenda")
+        cached_return_to: str = cached_state.get("return_to", "/pre-agenda")
         if not _is_safe_url(cached_return_to):
             logger.warning(f"⚠️ OAuth state validation: unsafe return_to in cache ({cached_return_to})")
             cached_return_to = "/pre-agenda"
@@ -267,8 +271,8 @@ def build_authorization_url(user, return_to: str = "/pre-agenda") -> str:
     """
     from django.core.cache import cache
 
-    client_id = os.getenv("GCAL_OAUTH_CLIENT_ID")
-    redirect_uri = os.getenv("GCAL_OAUTH_REDIRECT_URI")
+    client_id: str | None = os.getenv("GCAL_OAUTH_CLIENT_ID")
+    redirect_uri: str | None = os.getenv("GCAL_OAUTH_REDIRECT_URI")
 
     if not client_id or not redirect_uri:
         raise ValueError(
@@ -283,11 +287,11 @@ def build_authorization_url(user, return_to: str = "/pre-agenda") -> str:
 
     # State: CSRF token + return_to + user_id (formato: "csrf_token|return_to|user_id")
     import secrets
-    csrf_token = secrets.token_urlsafe(32)
-    state = f"{csrf_token}|{return_to}|{user.id}"
+    csrf_token: str = secrets.token_urlsafe(32)
+    state: str = f"{csrf_token}|{return_to}|{user.id}"
 
     # Armazenar CSRF token em cache (Redis) com TTL 10min
-    cache_key = f"oauth_state:{csrf_token}"
+    cache_key: str = f"oauth_state:{csrf_token}"
     cache.set(cache_key, {
         "user_id": user.id,
         "return_to": return_to,
@@ -296,7 +300,7 @@ def build_authorization_url(user, return_to: str = "/pre-agenda") -> str:
 
     logger.info(f"🔐 OAuth state criado: {csrf_token[:8]}... (user={user.id})")
 
-    params = {
+    params: dict[str, str] = {
         "client_id": client_id,
         "redirect_uri": redirect_uri,
         "response_type": "code",
@@ -306,7 +310,7 @@ def build_authorization_url(user, return_to: str = "/pre-agenda") -> str:
         "state": state,
     }
 
-    base_url = "https://accounts.google.com/o/oauth2/v2/auth"
+    base_url: str = "https://accounts.google.com/o/oauth2/v2/auth"
     return f"{base_url}?{urlencode(params)}"
 
 
@@ -343,15 +347,15 @@ def exchange_code_for_tokens(code: str) -> dict:
     """
     import requests
 
-    client_id = os.getenv("GCAL_OAUTH_CLIENT_ID")
-    client_secret = os.getenv("GCAL_OAUTH_CLIENT_SECRET")
-    redirect_uri = os.getenv("GCAL_OAUTH_REDIRECT_URI")
+    client_id: str | None = os.getenv("GCAL_OAUTH_CLIENT_ID")
+    client_secret: str | None = os.getenv("GCAL_OAUTH_CLIENT_SECRET")
+    redirect_uri: str | None = os.getenv("GCAL_OAUTH_REDIRECT_URI")
 
     if not all([client_id, client_secret, redirect_uri]):
         raise ValueError("❌ Variáveis OAuth não configuradas (client_id, client_secret, redirect_uri)")
 
-    token_url = "https://oauth2.googleapis.com/token"
-    payload = {
+    token_url: str = "https://oauth2.googleapis.com/token"
+    payload: dict[str, str] = {
         "code": code,
         "client_id": client_id,
         "client_secret": client_secret,
@@ -362,9 +366,9 @@ def exchange_code_for_tokens(code: str) -> dict:
     logger.info(f"🔐 Trocando authorization code por tokens (grant_type=authorization_code)")
 
     try:
-        response = requests.post(token_url, data=payload, timeout=10)
+        response: requests.Response = requests.post(token_url, data=payload, timeout=10)
         response.raise_for_status()
-        data = response.json()
+        data: dict[str, Any] = response.json()
 
         # Validar presence de refresh_token (crítico)
         if "refresh_token" not in data:
@@ -375,19 +379,19 @@ def exchange_code_for_tokens(code: str) -> dict:
             )
 
         # Obter email da conta Google via UserInfo endpoint
-        access_token = data["access_token"]
-        userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
-        headers = {"Authorization": f"Bearer {access_token}"}
-        userinfo_response = requests.get(userinfo_url, headers=headers, timeout=10)
+        access_token: str = data["access_token"]
+        userinfo_url: str = "https://www.googleapis.com/oauth2/v2/userinfo"
+        headers: dict[str, str] = {"Authorization": f"Bearer {access_token}"}
+        userinfo_response: requests.Response = requests.get(userinfo_url, headers=headers, timeout=10)
         userinfo_response.raise_for_status()
-        userinfo = userinfo_response.json()
+        userinfo: dict[str, Any] = userinfo_response.json()
 
-        email = userinfo.get("email")
+        email: str | None = userinfo.get("email")
         if not email:
             raise ValueError("❌ Email não retornado pela API Google UserInfo")
 
         # Validar domínio permitido
-        allowed_domain = os.getenv("GCAL_ALLOWED_DOMAIN", "aprendereditora.com.br")
+        allowed_domain: str = os.getenv("GCAL_ALLOWED_DOMAIN", "aprendereditora.com.br")
         if not email.endswith(f"@{allowed_domain}"):
             raise ValueError(
                 f"❌ Domínio não permitido: {email}. "
@@ -437,7 +441,7 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
 
     with transaction.atomic():
         # Row-level lock (GAP-1: Concorrência)
-        cred = GoogleOAuthCredential.objects.select_for_update().get(id=credential.id)
+        cred: GoogleOAuthCredential = GoogleOAuthCredential.objects.select_for_update().get(id=credential.id)
 
         # Double-check: outro thread já refrescou?
         if cred.token_expiry > timezone.now() + timedelta(minutes=5):
@@ -448,16 +452,16 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
             return cred
 
         # Refresh via Google API
-        client_id = os.getenv("GCAL_OAUTH_CLIENT_ID")
-        client_secret = os.getenv("GCAL_OAUTH_CLIENT_SECRET")
+        client_id: str | None = os.getenv("GCAL_OAUTH_CLIENT_ID")
+        client_secret: str | None = os.getenv("GCAL_OAUTH_CLIENT_SECRET")
 
         if not client_id or not client_secret:
             raise ValueError("❌ GCAL_OAUTH_CLIENT_ID e GCAL_OAUTH_CLIENT_SECRET não configuradas")
 
-        refresh_token = _decrypt_token(cred.refresh_token_encrypted)
+        refresh_token: str = _decrypt_token(cred.refresh_token_encrypted)
 
-        token_url = "https://oauth2.googleapis.com/token"
-        payload = {
+        token_url: str = "https://oauth2.googleapis.com/token"
+        payload: dict[str, str] = {
             "client_id": client_id,
             "client_secret": client_secret,
             "refresh_token": refresh_token,
@@ -467,9 +471,9 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
         logger.info(f"🔄 Refreshing access token para {cred.google_email}")
 
         try:
-            response = requests.post(token_url, data=payload, timeout=10)
+            response: requests.Response = requests.post(token_url, data=payload, timeout=10)
             response.raise_for_status()
-            data = response.json()
+            data: dict[str, Any] = response.json()
 
             # Atualizar credencial
             cred.access_token_encrypted = _encrypt_token(data["access_token"])
@@ -497,7 +501,7 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
         except requests.exceptions.HTTPError as e:
             # invalid_grant: refresh_token revogado pelo usuário
             if e.response.status_code == 400:
-                error_data = e.response.json()
+                error_data: dict[str, Any] = e.response.json()
                 if error_data.get("error") == "invalid_grant":
                     logger.error(
                         f"❌ Refresh token inválido (revogado pelo usuário): {cred.google_email}"
@@ -546,15 +550,15 @@ def revoke_token(credential: GoogleOAuthCredential) -> bool:
 
     try:
         # Descriptografar refresh_token
-        refresh_token = _decrypt_token(credential.refresh_token_encrypted)
+        refresh_token: str = _decrypt_token(credential.refresh_token_encrypted)
 
         # Revogar no Google
-        revoke_url = "https://oauth2.googleapis.com/revoke"
-        payload = {"token": refresh_token}
+        revoke_url: str = "https://oauth2.googleapis.com/revoke"
+        payload: dict[str, str] = {"token": refresh_token}
 
         logger.info(f"🔓 Revogando refresh token para {credential.google_email}")
 
-        response = requests.post(revoke_url, data=payload, timeout=10)
+        response: requests.Response = requests.post(revoke_url, data=payload, timeout=10)
 
         # 200 OK: revogado com sucesso
         # 400 Bad Request: token já inválido (ok, continuar)
@@ -562,8 +566,8 @@ def revoke_token(credential: GoogleOAuthCredential) -> bool:
             logger.warning(f"⚠️ Revoke retornou status {response.status_code}")
 
         # Remover credencial local
-        user = credential.user
-        google_email = credential.google_email
+        user: Usuario = credential.user
+        google_email: str = credential.google_email
         credential.delete()
 
         # Auditoria (PA-05)
@@ -621,11 +625,11 @@ def rotate_encryption_key(old_key: str, new_key: str) -> int:
         >>> print(f"✅ {count} credenciais atualizadas")
         >>> # Atualizar .env e restart
     """
-    old_fernet = Fernet(old_key.encode('utf-8'))
-    new_fernet = Fernet(new_key.encode('utf-8'))
+    old_fernet: Fernet = Fernet(old_key.encode('utf-8'))
+    new_fernet: Fernet = Fernet(new_key.encode('utf-8'))
 
-    credentials = GoogleOAuthCredential.objects.all()
-    count = 0
+    credentials: Any = GoogleOAuthCredential.objects.all()
+    count: int = 0
 
     logger.info(f"🔄 Iniciando rotação de chave ({credentials.count()} credenciais)")
 

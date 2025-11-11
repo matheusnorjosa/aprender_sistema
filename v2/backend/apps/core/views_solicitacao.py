@@ -2,6 +2,12 @@
 Solicitacao ViewSet (views ativas)
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 import logging
 
 from rest_framework import status, viewsets
@@ -20,7 +26,7 @@ from .serializers import SolicitacaoSerializer
 logger = logging.getLogger(__name__)
 
 
-def _get_client_ip(request):
+def _get_client_ip(request: Request) -> Response:
     """
     Extrai o IP real do cliente, considerando proxies reversos.
     """
@@ -69,7 +75,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             return [IsCoordenadorOrDAT()]
         return [IsAuthenticated()]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         # PR15: Filtro mine força filtro por usuário (mesmo para superusers)
         mine = self.request.query_params.get("mine")
 

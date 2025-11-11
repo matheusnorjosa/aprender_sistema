@@ -6,6 +6,12 @@ PA-02: Apenas Superintendência pode aprovar/reprovar.
 PA-05: Registrar usuário, data/hora e justificativa em AuditLog.
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 import logging
 
 from django.contrib.auth.models import Group
@@ -53,7 +59,7 @@ from .services.availability_service import check_conflicts
 logger = logging.getLogger(__name__)
 
 
-def _get_client_ip(request):
+def _get_client_ip(request: Request) -> str:
     """
     Extrai o IP real do cliente, considerando proxies reversos.
 
@@ -78,7 +84,7 @@ def _get_client_ip(request):
     return request.META.get("REMOTE_ADDR", "unknown")
 
 
-def api_root(request):
+def api_root(request: Request) -> Response:
     """API root endpoint"""
     return JsonResponse(
         {
@@ -134,7 +140,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             return [IsCoordenadorOrDAT()]
         return [IsAuthenticated()]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         """
         Filtrar solicitações por usuário (exceto Superintendência/superuser que vê todas).
         """
@@ -311,7 +317,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
     serializer_class = AvailabilityBlockSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         """
         Filtrar bloqueios por usuário (exceto Superintendência/superuser que vê todos).
         """
@@ -348,7 +354,7 @@ class CurrentUserView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         user = request.user
         groups = list(user.groups.values_list("name", flat=True))
         # Superusers sempre têm acesso completo
@@ -396,7 +402,7 @@ class AvailabilityCheckView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = "availability_check"
 
-    def get(self, request):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Extrair e validar usuario_id
         usuario_id_raw = request.query_params.get("usuario_id")
         if not usuario_id_raw:
@@ -510,7 +516,7 @@ class AvailabilityCheckManyView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = "availability_check"
 
-    def post(self, request):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Validar payload
         usuarios_ids = request.data.get("usuarios_ids", [])
         if not usuarios_ids or not isinstance(usuarios_ids, list):
@@ -857,7 +863,7 @@ class ImportComprasView(APIView):
 
     permission_classes = [IsControleOrDAT]
 
-    def post(self, request):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # TODO(GAP-004): Implementar import_compras_from_file antes de habilitar
         return Response(
             {"detail": "Import de compras temporariamente desabilitado (GAP-004)"},
@@ -926,7 +932,7 @@ class CoordenadorOptionViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [SearchFilter]
     search_fields = ["username", "first_name", "last_name", "email"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         """Retorna apenas usuários coordenadores ativos"""
         return (
             Usuario.objects.filter(is_active=True, groups__name="Coordenador")
@@ -953,7 +959,7 @@ class FormadorOptionViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [SearchFilter]
     search_fields = ["username", "first_name", "last_name", "email"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         """Retorna apenas usuários formadores ativos"""
         return (
             Usuario.objects.filter(is_active=True, groups__name="Formador")

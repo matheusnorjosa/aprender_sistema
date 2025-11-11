@@ -8,7 +8,8 @@ import json
 import logging
 import os
 import time
-from typing import Optional
+from collections.abc import Callable
+from typing import TypeVar
 
 from django.conf import settings
 from google.oauth2 import service_account
@@ -16,8 +17,12 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from apps.core.services.gcal_sync_service import CalendarClientAdapter
+from apps.core.types import CalendarId, EventId, JsonDict
 
 logger = logging.getLogger(__name__)
+
+# Type variable para retry genérico
+T = TypeVar('T')
 
 
 class GoogleCalendarClient(CalendarClientAdapter):
@@ -37,7 +42,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
 
     SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
-    def __init__(self, credentials_json: str = None):
+    def __init__(self, credentials_json: str | None = None) -> None:
         """
         Inicializa cliente Google Calendar.
 
@@ -77,7 +82,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
 
         logger.info("GoogleCalendarClient initialized with Service Account")
 
-    def _load_credentials(self, credentials_json: str) -> dict:
+    def _load_credentials(self, credentials_json: str) -> JsonDict:
         """
         Carrega credenciais de arquivo ou string JSON.
 
@@ -98,7 +103,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
         except json.JSONDecodeError:
             raise ValueError(f"Invalid credentials: not a file or valid JSON")
 
-    def _retry_with_backoff(self, func, max_retries=3):
+    def _retry_with_backoff(self, func: Callable[[], T], max_retries: int = 3) -> T:
         """
         Executa função com retry exponencial para 429/5xx.
 
@@ -137,7 +142,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
                 # Outros erros ou max retries atingido
                 raise
 
-    def get(self, calendar_id: str, event_id: str) -> Optional[dict]:
+    def get(self, calendar_id: CalendarId, event_id: EventId) -> JsonDict | None:
         """
         Busca evento por ID.
 
@@ -164,7 +169,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
                 return None
             raise
 
-    def insert(self, calendar_id: str, event_id: str, payload: dict) -> dict:
+    def insert(self, calendar_id: CalendarId, event_id: EventId, payload: JsonDict) -> JsonDict:
         """
         Cria novo evento.
 
@@ -196,7 +201,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
 
         return self._retry_with_backoff(_insert)
 
-    def update(self, calendar_id: str, event_id: str, payload: dict) -> dict:
+    def update(self, calendar_id: CalendarId, event_id: EventId, payload: JsonDict) -> JsonDict:
         """
         Atualiza evento existente (usa PATCH para atualização parcial).
 
@@ -229,7 +234,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
 
         return self._retry_with_backoff(_update)
 
-    def delete(self, calendar_id: str, event_id: str) -> None:
+    def delete(self, calendar_id: CalendarId, event_id: EventId) -> None:
         """
         Deleta evento.
 
@@ -256,7 +261,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
                 return
             raise
 
-    def list_calendars(self) -> list:
+    def list_calendars(self) -> list[JsonDict]:
         """
         Lista calendários disponíveis via Calendar API.
 
@@ -281,7 +286,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
 
         return self._retry_with_backoff(_list_calendars)
 
-    def health_check(self) -> dict:
+    def health_check(self) -> JsonDict:
         """
         Verifica saúde da integração com Google Calendar API.
 

@@ -2,7 +2,13 @@
 Pre-agenda API Views - Lista solicitações aprovadas com filtros por fluxo.
 """
 
+from __future__ import annotations
+
+from typing import Any
+
+from django.db.models import QuerySet
 from rest_framework import generics
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .models import Solicitacao
@@ -27,14 +33,14 @@ class PreAgendaListView(generics.ListAPIView):
     permission_classes = [IsControleOrDAT]
     serializer_class = SolicitacaoSerializer
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Solicitacao]:
         """Retorna apenas solicitações aprovadas, com filtros opcionais."""
-        queryset = Solicitacao.objects.filter(status='aprovado').select_related(
+        queryset: QuerySet[Solicitacao] = Solicitacao.objects.filter(status='aprovado').select_related(
             'usuario', 'municipio', 'projeto', 'tipo_evento', 'coordenador'
         ).prefetch_related('participations__usuario')
 
         # Filtro por fluxo do projeto
-        super_param = self.request.query_params.get('super')
+        super_param: str | None = self.request.query_params.get('super')
         if super_param == '1':
             # Apenas projetos SUPER
             queryset = queryset.filter(projeto__fluxo='SUPER')
@@ -44,10 +50,10 @@ class PreAgendaListView(generics.ListAPIView):
 
         return queryset.order_by('-created_at')
 
-    def list(self, request, *args, **kwargs):
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Override para retornar formato paginado com count."""
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
+        queryset: QuerySet[Solicitacao] = self.get_queryset()
+        serializer: SolicitacaoSerializer = self.get_serializer(queryset, many=True)
 
         return Response({
             'count': queryset.count(),

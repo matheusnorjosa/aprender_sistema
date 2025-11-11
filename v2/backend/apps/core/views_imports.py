@@ -14,6 +14,12 @@ POST /api/dat/import-cadastros/
 - Returns: Relatório com stats, pendências
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 import tempfile
 import os
 from django.utils.datastructures import MultiValueDictKeyError
@@ -53,7 +59,7 @@ class ControleImportAcoesView(APIView):
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
-    def post(self, request):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Parse dry_run query param
         dry_run_param = str(request.query_params.get("dry_run", "true")).lower()
         dry_run = dry_run_param in {"1", "true", "t", "yes", "y"}
@@ -123,7 +129,7 @@ class DATImportCadastrosView(APIView):
     """
     permission_classes = [IsAuthenticated, IsDATOrSuper]
 
-    def post(self, request):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Parse dry_run query param
         dry_run_param = str(request.query_params.get("dry_run", "true")).lower()
         dry_run = dry_run_param in {"1", "true", "t", "yes", "y"}

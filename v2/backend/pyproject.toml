@@ -67,7 +67,7 @@ reportImplicitStringConcatenation = "warning"
 # Django-specific relaxations
 reportGeneralTypeIssues = "warning"  # Django QuerySet magic
 
-[tool.pyright.executionEnvironments]
+# Execution environments (array of tables)
 [[tool.pyright.executionEnvironments]]
 root = "."
 pythonVersion = "3.12"

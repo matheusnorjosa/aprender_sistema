@@ -82,7 +82,7 @@ export default function PreAgendaPage() {
 
   // OAuth Phase 5: Estado do usuário e integração Google
   const [user, setUser] = useState(null);
-  const { status: googleStatus, loading: _googleLoading, fetchStatus: _fetchStatus } = useGoogleIntegration();
+  const { status: googleStatus, loading: _googleLoading, fetchStatus: _fetchStatus, disconnect: googleDisconnect } = useGoogleIntegration();
 
   // Carregar dados do usuário
   useEffect(() => {
@@ -581,8 +581,17 @@ export default function PreAgendaPage() {
   };
 
   const handleGoogleDisconnect = async () => {
-    // Implementação futura (Fase 6+)
-    message.info('Desconexão será implementada em breve');
+    try {
+      const result = await googleDisconnect();
+
+      if (result.success) {
+        message.success('Conta Google desconectada com sucesso');
+      } else {
+        message.error(result.error || 'Erro ao desconectar conta Google');
+      }
+    } catch (error) {
+      message.error('Erro ao desconectar: ' + error.message);
+    }
   };
 
   return (

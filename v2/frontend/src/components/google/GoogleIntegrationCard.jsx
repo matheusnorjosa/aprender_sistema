@@ -36,11 +36,8 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
   const [selectedCalendar, setSelectedCalendar] = useState(null);
   const [savingCalendar, setSavingCalendar] = useState(false);
 
-  if (!status) {
-    return null;
-  }
-
-  const { connected, googleEmail, tokenExpiry, expiresInDays, isExpired, defaultCalendarId } = status;
+  // Extrair valores de status (ou usar defaults se status for null)
+  const { connected, googleEmail, tokenExpiry, expiresInDays, isExpired, defaultCalendarId } = status || {};
 
   // Carregar calendários quando conectado
   useEffect(() => {
@@ -58,6 +55,11 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
       setSelectedCalendar(googleEmail);
     }
   }, [defaultCalendarId, googleEmail]);
+
+  // Early return após todos os hooks
+  if (!status) {
+    return null;
+  }
 
   const loadCalendars = async () => {
     try {

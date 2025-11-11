@@ -19,7 +19,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone as dt_timezone
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, TypeAlias, TypeVar
 from uuid import uuid4
 
 from django.conf import settings
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar('T')
 
 # Type alias for sync actions (different from ActionType in types.py which is for audit logs)
-type Action = Literal["CREATE", "UPDATE", "DELETE", "ADOPT", "SKIP"]
+Action: TypeAlias = Literal["CREATE", "UPDATE", "DELETE", "ADOPT", "SKIP"]
 
 
 def _retry_with_backoff(

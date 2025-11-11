@@ -66,7 +66,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     fluxo = serializers.SerializerMethodField()
 
     # Campos legíveis para exibição (além dos IDs)
-    usuario_username = serializers.CharField(source='usuario.username', read_only=True)
+    usuario_username = serializers.SerializerMethodField()
     municipio_nome = serializers.CharField(source='municipio.nome', read_only=True)
     projeto_nome = serializers.CharField(source='projeto.nome', read_only=True)
     tipo_evento_nome = serializers.CharField(source='tipo_evento.nome', read_only=True)
@@ -130,6 +130,12 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         if obj.projeto:
             return obj.projeto.fluxo
         return 'NAO_SUPER'  # PR15: Fallback para solicitações sem projeto
+
+    def get_usuario_username(self, obj):
+        """Retorna username do usuário que criou a solicitação."""
+        if obj.usuario:
+            return obj.usuario.username
+        return None
 
     def validate(self, attrs):
         """

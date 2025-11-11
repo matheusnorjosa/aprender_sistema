@@ -167,43 +167,27 @@ export default function ApprovalsPage() {
     },
     {
       title: 'Município',
-      dataIndex: 'municipio',
-      key: 'municipio',
-      render: (municipio) => {
-        // Backend retorna ID (número) ao invés de objeto
-        if (typeof municipio === 'number') return `Município #${municipio}`;
-        return municipio?.nome || '-';
-      },
+      dataIndex: 'municipio_nome',
+      key: 'municipio_nome',
+      render: (nome) => nome || '-',
     },
     {
       title: 'Projeto',
-      dataIndex: 'projeto',
-      key: 'projeto',
-      render: (projeto) => {
-        // Backend retorna ID (número) ao invés de objeto
-        if (typeof projeto === 'number') return `Projeto #${projeto}`;
-        return projeto?.nome || '-';
-      },
+      dataIndex: 'projeto_nome',
+      key: 'projeto_nome',
+      render: (nome) => nome || '-',
     },
     {
       title: 'Tipo',
-      dataIndex: 'tipo_evento',
-      key: 'tipo_evento',
-      render: (tipo) => {
-        // Backend retorna ID (número) ao invés de objeto
-        if (typeof tipo === 'number') return `Tipo #${tipo}`;
-        return tipo?.nome || '-';
-      },
+      dataIndex: 'tipo_evento_nome',
+      key: 'tipo_evento_nome',
+      render: (nome) => nome || '-',
     },
     {
       title: 'Autor',
-      dataIndex: 'usuario',
-      key: 'usuario',
-      render: (usuario) => {
-        // Backend retorna ID (número) ao invés de objeto
-        if (typeof usuario === 'number') return `Usuário #${usuario}`;
-        return usuario ? `${usuario.first_name} ${usuario.last_name}` : '-';
-      },
+      dataIndex: 'usuario_username',
+      key: 'usuario_username',
+      render: (username) => username || '-',
     },
     {
       title: 'Status',

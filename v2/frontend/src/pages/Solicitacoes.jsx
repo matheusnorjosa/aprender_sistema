@@ -235,21 +235,21 @@ function Solicitacoes() {
     },
     {
       title: 'Usuário',
-      dataIndex: ['usuario', 'username'],
-      key: 'usuario',
-      render: (text, record) => record.usuario?.username || record.usuario || '-',
+      dataIndex: 'usuario_username',
+      key: 'usuario_username',
+      render: (username) => username || '-',
     },
     {
       title: 'Município',
-      dataIndex: ['municipio', 'nome'],
-      key: 'municipio',
-      render: (text, record) => record.municipio?.nome || record.municipio || '-',
+      dataIndex: 'municipio_nome',
+      key: 'municipio_nome',
+      render: (nome) => nome || '-',
     },
     {
       title: 'Tipo Evento',
-      dataIndex: ['tipo_evento', 'nome'],
-      key: 'tipo_evento',
-      render: (text, record) => record.tipo_evento?.nome || record.tipo_evento || '-',
+      dataIndex: 'tipo_evento_nome',
+      key: 'tipo_evento_nome',
+      render: (nome) => nome || '-',
     },
     {
       title: 'Início',
@@ -411,13 +411,13 @@ function Solicitacoes() {
           <Descriptions column={1} bordered>
             <Descriptions.Item label="ID">{selectedSolicitacao.id}</Descriptions.Item>
             <Descriptions.Item label="Usuário">
-              {selectedSolicitacao.usuario?.username || selectedSolicitacao.usuario || '-'}
+              {selectedSolicitacao.usuario_username || '-'}
             </Descriptions.Item>
             <Descriptions.Item label="Município">
-              {selectedSolicitacao.municipio?.nome || selectedSolicitacao.municipio || '-'}
+              {selectedSolicitacao.municipio_nome || '-'}
             </Descriptions.Item>
             <Descriptions.Item label="Tipo de Evento">
-              {selectedSolicitacao.tipo_evento?.nome || selectedSolicitacao.tipo_evento || '-'}
+              {selectedSolicitacao.tipo_evento_nome || '-'}
             </Descriptions.Item>
             <Descriptions.Item label="Início">
               {formatDateTime(selectedSolicitacao.inicio)}

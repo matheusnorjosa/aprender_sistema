@@ -65,14 +65,22 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     )
     fluxo = serializers.SerializerMethodField()
 
+    # Campos legíveis para exibição (além dos IDs)
+    municipio_nome = serializers.CharField(source='municipio.nome', read_only=True)
+    projeto_nome = serializers.CharField(source='projeto.nome', read_only=True)
+    tipo_evento_nome = serializers.CharField(source='tipo_evento.nome', read_only=True)
+
     class Meta:
         model = Solicitacao
         fields = [
             "id",
             "usuario",
             "municipio",
+            "municipio_nome",
             "projeto",
+            "projeto_nome",
             "tipo_evento",
+            "tipo_evento_nome",
             "tipo",
             "encontro",
             "segmento",

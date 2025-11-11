@@ -1,4 +1,9 @@
 """
+
+from typing import Any
+
+from rest_framework.request import Request
+from __future__ import annotations
 Endpoints DRF para importação de Compras.
 
 POST /api/controle/import-compras/
@@ -6,6 +11,10 @@ POST /api/controle/import-compras/
 - Body (multipart/form-data): {file: upload}
 - Returns: Relatório com stats, pendências e IDs criados
 """
+
+from typing import Any
+
+from rest_framework.request import Request
 
 import tempfile
 import os
@@ -46,7 +55,7 @@ class ImportComprasView(APIView):
     """
     permission_classes = [IsControleOrSuper]
 
-    def post(self, request):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Parse dry_run query param
         dry_run_param = str(request.query_params.get("dry_run", "true")).lower()
         dry_run = dry_run_param in {"1", "true", "t", "yes", "y"}

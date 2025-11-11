@@ -16,12 +16,22 @@ Calcula CH mês/ano, ranking por CH mês (denso).
 Details_index para dias com E/2/X/D1 (lista de eventos).
 """
 
-from datetime import date, datetime, timedelta
-from typing import Optional
-from django.utils import timezone
-from django.db.models import Q, Prefetch
+from __future__ import annotations
 
-from apps.core.models import Usuario, Solicitacao, AvailabilityBlock, Participation, Deslocamento
+from datetime import date, datetime, timedelta
+from typing import Any
+
+from django.db.models import Prefetch, Q
+from django.utils import timezone
+
+from apps.core.models import (
+    AvailabilityBlock,
+    Deslocamento,
+    Participation,
+    Solicitacao,
+    Usuario,
+)
+from apps.core.types import UserId
 
 
 def build_monthly_grid(
@@ -29,10 +39,10 @@ def build_monthly_grid(
     year: int,
     month: int,
     role: str,
-    sector: Optional[str] = None,
-    q: Optional[str] = None,
-    allowed_user_ids: Optional[list] = None,
-) -> dict:
+    sector: str | None = None,
+    q: str | None = None,
+    allowed_user_ids: list[UserId] | None = None,
+) -> dict[str, Any]:
     """
     Compõe grade mensal de disponibilidade por pessoa (role).
 
@@ -347,7 +357,7 @@ def build_monthly_grid(
     }
 
 
-def _init_user_data(year: int, month: int, days_in_month: int) -> dict:
+def _init_user_data(year: int, month: int, days_in_month: int) -> dict[str, Any]:
     """Inicializa estrutura de dados por usuário."""
     return {
         "ch_month": 0.0,
@@ -385,7 +395,7 @@ def _calc_hours_in_range(
     return hours
 
 
-def _event_to_detail(event: Solicitacao, tz) -> dict:
+def _event_to_detail(event: Solicitacao, tz) -> dict[str, Any]:
     """
     Converte evento para formato de detalhe.
 
@@ -416,7 +426,7 @@ def _event_to_detail(event: Solicitacao, tz) -> dict:
     }
 
 
-def _build_legend() -> dict:
+def _build_legend() -> dict[str, Any]:
     """Constrói legenda de códigos."""
     return {
         "E": "1 evento",

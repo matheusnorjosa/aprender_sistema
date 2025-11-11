@@ -8,25 +8,25 @@ Importa Compras da aba "🟥 COMPRAS" da Planilha de Controle.
 """
 
 from __future__ import annotations
+
 import csv
 import hashlib
 import json
-import os
-from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from apps.core.models import Compra
-from apps.dat_ingest.services.resolvers import resolve_municipio, resolve_projeto
+from apps.core.models import Compra, Municipio, Projeto
+from apps.core.types import ExternalHash
 from apps.dat_ingest.services.acompanhamento_normalize import norm_text
+from apps.dat_ingest.services.resolvers import resolve_municipio, resolve_projeto
 
-
-OUT_DIR = Path(settings.BASE_DIR) / "out_etl"
+OUT_DIR: Path = Path(settings.BASE_DIR) / "out_etl"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -86,12 +86,12 @@ class ImportStats:
 @dataclass
 class ImportPendencias:
     """Pendências encontradas durante importação."""
-    municipios: List[Dict[str, Any]] = field(default_factory=list)
-    projetos: List[Dict[str, Any]] = field(default_factory=list)
-    linhas_invalidas: List[Dict[str, Any]] = field(default_factory=list)
+    municipios: list[dict[str, Any]] = field(default_factory=list)
+    projetos: list[dict[str, Any]] = field(default_factory=list)
+    linhas_invalidas: list[dict[str, Any]] = field(default_factory=list)
 
 
-def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, Any]:
+def import_compras_from_file(*, path: str, dry_run: bool = True) -> dict[str, Any]:
     """
     Importa Compras de CSV/XLSX.
 
@@ -105,51 +105,53 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
     Raises:
         FileNotFoundError: Se arquivo não existe
     """
-    p = Path(path)
+    p: Path = Path(path)
     if not p.exists():
         raise FileNotFoundError(f"Arquivo não encontrado: {path}")
 
     # Ler CSV ou XLSX
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     if p.suffix.lower() == ".csv":
         with p.open("r", encoding="utf-8-sig", newline="") as f:
             rows = list(csv.DictReader(f))
     else:
         from openpyxl import load_workbook
+
         wb = load_workbook(p, data_only=True, read_only=True)
         ws = wb.active
-        headers = [
+        headers: list[str] = [
             str(c.value).strip() if c.value is not None else ""
             for c in next(ws.iter_rows(min_row=1, max_row=1))
         ]
         for row in ws.iter_rows(min_row=2):
-            rec = {}
+            rec: dict[str, Any] = {}
             for j, cell in enumerate(row):
-                key = headers[j] if j < len(headers) else f"col{j}"
+                key: str = headers[j] if j < len(headers) else f"col{j}"
                 rec[key] = cell.value
             rows.append(rec)
         wb.close()
 
-    stats = ImportStats()
-    pendencias = ImportPendencias()
+    stats: ImportStats = ImportStats()
+    pendencias: ImportPendencias = ImportPendencias()
 
-    def normalize_row(r: Dict[str, Any]) -> Dict[str, Any]:
+    def normalize_row(r: dict[str, Any]) -> dict[str, Any]:
         """Normaliza uma linha do arquivo."""
-        codigo = str(r.get("CÓD") or r.get("COD") or r.get("Cód") or "").strip()
-        produto = str(r.get("Produto") or "").strip()
-        produto_norm = norm_text(produto)
-        quant_raw = r.get("Quant.") or r.get("Quant") or r.get("Quantidade")
-        municipio = str(r.get("Município") or r.get("Municipio") or "").strip()
-        uf = str(r.get("UF") or "").strip().upper()
-        data_raw = r.get("Data")
-        uso = str(r.get("Uso das coleções") or r.get("Uso") or "").strip()
+        codigo: str = str(r.get("CÓD") or r.get("COD") or r.get("Cód") or "").strip()
+        produto: str = str(r.get("Produto") or "").strip()
+        produto_norm: str = norm_text(produto)
+        quant_raw: Any = r.get("Quant.") or r.get("Quant") or r.get("Quantidade")
+        municipio: str = str(r.get("Município") or r.get("Municipio") or "").strip()
+        uf: str = str(r.get("UF") or "").strip().upper()
+        data_raw: Any = r.get("Data")
+        uso: str = str(r.get("Uso das coleções") or r.get("Uso") or "").strip()
 
+        quantidade: int | None
         try:
             quantidade = int(float(quant_raw or 0))
         except Exception:
             quantidade = None
 
-        data = parse_date_flexible(str(data_raw) if data_raw is not None else "")
+        data: date | None = parse_date_flexible(str(data_raw) if data_raw is not None else "")
 
         return {
             "codigo": codigo,
@@ -162,10 +164,10 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
             "uso_norm": norm_text(uso),
         }
 
-    normalized = [normalize_row(r) for r in rows]
+    normalized: list[dict[str, Any]] = [normalize_row(r) for r in rows]
 
     # Resolver municípios e projetos
-    def _build_ext_key(r: Dict[str, Any]) -> str:
+    def _build_ext_key(r: dict[str, Any]) -> str:
         """Constrói chave para external_hash (mesma lógica em dry-run e apply)."""
         return "|".join([
             str(r["municipio_obj"].id),
@@ -177,7 +179,7 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
             r["uso_norm"],
         ])
 
-    resolved: List[Dict[str, Any]] = []
+    resolved: list[dict[str, Any]] = []
     for i, r in enumerate(normalized, start=2):
         # Validar campos obrigatórios
         if not r["municipio"] or r["quantidade"] is None or not r["codigo"]:
@@ -194,7 +196,7 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
             continue
 
         # Resolver município
-        mun_obj = resolve_municipio(r["municipio"])
+        mun_obj: Municipio | None = resolve_municipio(r["municipio"])
         if not mun_obj:
             stats.skipped += 1
             pendencias.municipios.append({
@@ -205,7 +207,7 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
             continue
 
         # Resolver projeto (obrigatório)
-        proj_obj = _infer_projeto_from_produto(r["produto_norm"])
+        proj_obj: Projeto | None = _infer_projeto_from_produto(r["produto_norm"])
         if not proj_obj:
             stats.skipped += 1
             pendencias.projetos.append({
@@ -218,15 +220,15 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
         resolved.append({**r, "municipio_obj": mun_obj, "projeto_obj": proj_obj})
 
     # Persistir ou simular
-    created_ids: List[int] = []
+    created_ids: list[int] = []
     if not dry_run:
         with transaction.atomic():
             for r in resolved:
                 # Gerar external_hash determinístico (mesma lógica do dry-run)
-                ext_key = _build_ext_key(r)
-                ext_hash = sha1_str(ext_key)
+                ext_key: str = _build_ext_key(r)
+                ext_hash: ExternalHash = sha1_str(ext_key)
 
-                defaults = dict(
+                defaults: dict[str, Any] = dict(
                     municipio=r["municipio_obj"],
                     projeto=r["projeto_obj"],
                     codigo=r["codigo"],
@@ -235,6 +237,8 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
                     uso=r["uso_norm"],
                 )
 
+                obj: Compra
+                created: bool
                 obj, created = Compra.objects.update_or_create(
                     external_hash=ext_hash,
                     defaults=defaults
@@ -245,7 +249,7 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
                     created_ids.append(obj.id)
                 else:
                     # Verificar se houve mudança
-                    changed = any(getattr(obj, k) != v for k, v in defaults.items())
+                    changed: bool = any(getattr(obj, k) != v for k, v in defaults.items())
                     if changed:
                         stats.updated += 1
                     else:
@@ -253,16 +257,16 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
     else:
         # Simulação: verificar se já existe sem persistir (mesma lógica do apply)
         for r in resolved:
-            ext_key = _build_ext_key(r)
-            ext_hash = sha1_str(ext_key)
-            exists = Compra.objects.filter(external_hash=ext_hash).exists()
+            ext_key: str = _build_ext_key(r)
+            ext_hash: ExternalHash = sha1_str(ext_key)
+            exists: bool = Compra.objects.filter(external_hash=ext_hash).exists()
             if exists:
                 stats.updated += 1
             else:
                 stats.created += 1
 
     # Gerar relatório
-    report = {
+    report: dict[str, Any] = {
         "path": str(p),
         "dry_run": dry_run,
         "stats": vars(stats),
@@ -276,7 +280,7 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
     }
 
     # Salvar relatório em arquivo
-    report_path = OUT_DIR / "import_compras_report.json"
+    report_path: Path = OUT_DIR / "import_compras_report.json"
     report_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2),
         encoding="utf-8"
@@ -285,7 +289,7 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> Dict[str, An
     return report
 
 
-def _infer_projeto_from_produto(produto_norm: str):
+def _infer_projeto_from_produto(produto_norm: str) -> Projeto | None:
     """
     Infere projeto a partir do nome do produto normalizado.
 
@@ -296,7 +300,7 @@ def _infer_projeto_from_produto(produto_norm: str):
     if not produto_norm:
         return None
 
-    key = produto_norm.upper()
+    key: str = produto_norm.upper()
 
     try:
         if "NOVO LENDO" in key:

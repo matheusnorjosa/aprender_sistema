@@ -13,28 +13,31 @@ Regras de negócio:
 - Relatório em out_etl/import_acoes_controle_report.json
 """
 
+from __future__ import annotations
+
 import csv
 import hashlib
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from django.conf import settings
 from django.db import transaction
 
-from apps.core.models import AcaoControle, Municipio, Projeto
+from apps.core.models import AcaoControle, Municipio, Projeto, Usuario
+from apps.core.types import ExternalHash
 from apps.dat_ingest.services.acompanhamento_normalize import norm_text
 from apps.dat_ingest.services.resolvers import (
     resolve_user_by_email,
     resolve_user_by_name,
 )
 
-OUT_DIR = Path(settings.BASE_DIR) / "out_etl"
+OUT_DIR: Path = Path(settings.BASE_DIR) / "out_etl"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def import_acoes_controle(file_path: str, dry_run: bool = False) -> Dict[str, Any]:
+def import_acoes_controle(file_path: str, dry_run: bool = False) -> dict[str, Any]:
     """
     Importa ações de controle de CSV/XLSX.
 
@@ -45,13 +48,13 @@ def import_acoes_controle(file_path: str, dry_run: bool = False) -> Dict[str, An
     Returns:
         Dict com stats e pendências
     """
-    stats = {
+    stats: dict[str, Any] = {
         "created": 0,
         "updated": 0,
         "unchanged": 0,
         "skipped": {"municipio": 0, "projeto": 0, "coordenador": 0, "dates": 0, "other": 0},
     }
-    pendencias = {
+    pendencias: dict[str, list[dict[str, Any]]] = {
         "municipios": [],
         "projetos": [],
         "coordenadores": [],
@@ -60,13 +63,13 @@ def import_acoes_controle(file_path: str, dry_run: bool = False) -> Dict[str, An
     }
 
     # Carregar arquivo
-    rows = _load_file(file_path)
+    rows: list[dict[str, Any]] = _load_file(file_path)
 
     # Processar linhas
     with transaction.atomic():
         for idx, row in enumerate(rows, start=1):
             try:
-                result = _process_row(row, idx, stats, pendencias)
+                result: str | None = _process_row(row, idx, stats, pendencias)
                 if result == "skip":
                     continue
             except Exception as e:
@@ -81,19 +84,19 @@ def import_acoes_controle(file_path: str, dry_run: bool = False) -> Dict[str, An
             transaction.set_rollback(True)
 
     # Gerar relatório
-    report = {
+    report: dict[str, Any] = {
         "stats": stats,
         "pendencias": pendencias,
         "dry_run": dry_run,
         "file": file_path,
     }
-    report_path = OUT_DIR / "import_acoes_controle_report.json"
+    report_path: Path = OUT_DIR / "import_acoes_controle_report.json"
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str))
 
     return report
 
 
-def _load_file(file_path: str) -> List[Dict[str, Any]]:
+def _load_file(file_path: str) -> list[dict[str, Any]]:
     """
     Carrega CSV ou XLSX em memória.
 
@@ -124,7 +127,7 @@ def _load_file(file_path: str) -> List[Dict[str, Any]]:
         raise ValueError(f"Formato não suportado: {ext}")
 
 
-def _normalize_headers(row: Dict[str, Any]) -> Dict[str, Optional[str]]:
+def _normalize_headers(row: dict[str, Any]) -> dict[str, str | None]:
     """
     Normaliza headers do CSV/XLSX para padrão interno.
 
@@ -192,44 +195,44 @@ def _normalize_headers(row: Dict[str, Any]) -> Dict[str, Optional[str]]:
     return normalized
 
 
-def _process_row(row: Dict[str, Any], idx: int, stats: dict, pendencias: dict) -> Optional[str]:
+def _process_row(row: dict[str, Any], idx: int, stats: dict[str, Any], pendencias: dict[str, list[dict[str, Any]]]) -> str | None:
     """
     Processa uma linha do CSV/XLSX.
 
     Returns:
         "skip" se linha deve ser pulada, None caso contrário
     """
-    norm = _normalize_headers(row)
+    norm: dict[str, str | None] = _normalize_headers(row)
 
     # Resolver município
-    municipio_nome = norm["municipio"]
+    municipio_nome: str | None = norm["municipio"]
     if not municipio_nome:
         stats["skipped"]["municipio"] += 1
         pendencias["municipios"].append({"linha": idx, "nome": None})
         return "skip"
 
-    municipio = Municipio.objects.filter(nome__iexact=norm_text(municipio_nome)).first()
+    municipio: Municipio | None = Municipio.objects.filter(nome__iexact=norm_text(municipio_nome)).first()
     if not municipio:
         stats["skipped"]["municipio"] += 1
         pendencias["municipios"].append({"linha": idx, "nome": municipio_nome})
         return "skip"
 
     # Resolver projeto
-    projeto_nome = norm["projeto"]
+    projeto_nome: str | None = norm["projeto"]
     if not projeto_nome:
         stats["skipped"]["projeto"] += 1
         pendencias["projetos"].append({"linha": idx, "nome": None})
         return "skip"
 
-    projeto = Projeto.objects.filter(nome__iexact=norm_text(projeto_nome)).first()
+    projeto: Projeto | None = Projeto.objects.filter(nome__iexact=norm_text(projeto_nome)).first()
     if not projeto:
         stats["skipped"]["projeto"] += 1
         pendencias["projetos"].append({"linha": idx, "nome": projeto_nome})
         return "skip"
 
     # Resolver coordenador (opcional)
-    coordenador = None
-    coordenador_val = norm["coordenador"]
+    coordenador: Usuario | None = None
+    coordenador_val: str | None = norm["coordenador"]
     if coordenador_val:
         if "@" in coordenador_val:
             coordenador = resolve_user_by_email(coordenador_val)
@@ -242,23 +245,23 @@ def _process_row(row: Dict[str, Any], idx: int, stats: dict, pendencias: dict) -
             # Não retorna skip, coordenador é opcional
 
     # Parsear datas
-    data_entrega = _parse_date(norm["data_entrega"])
-    data_carta = _parse_date(norm["data_carta"])
-    contato_inicial = _parse_date(norm["contato_inicial"])
-    data_reuniao = _parse_date(norm["data_reuniao"])
+    data_entrega: date | None = _parse_date(norm["data_entrega"])
+    data_carta: date | None = _parse_date(norm["data_carta"])
+    contato_inicial: date | None = _parse_date(norm["contato_inicial"])
+    data_reuniao: date | None = _parse_date(norm["data_reuniao"])
 
     # Criar external_hash (baseado em identidade estável)
     # external_hash baseado em identidade (município, projeto, coordenador).
     # Dados variáveis (datas/obs) atualizam o mesmo registro.
-    coord_id = getattr(coordenador, "id", "NA")
-    hash_key = f"{municipio.id}|{projeto.id}|{coord_id}"
-    external_hash = hashlib.sha1(hash_key.encode()).hexdigest()
+    coord_id: int | str = getattr(coordenador, "id", "NA")
+    hash_key: str = f"{municipio.id}|{projeto.id}|{coord_id}"
+    external_hash: ExternalHash = hashlib.sha1(hash_key.encode()).hexdigest()
 
     # Verificar se já existe registro com este external_hash
-    existing = AcaoControle.objects.filter(external_hash=external_hash).first()
+    existing: AcaoControle | None = AcaoControle.objects.filter(external_hash=external_hash).first()
 
     # Preparar campos para criação/atualização
-    defaults = {
+    defaults: dict[str, Any] = {
         "municipio": municipio,
         "projeto": projeto,
         "coordenador": coordenador,
@@ -271,7 +274,7 @@ def _process_row(row: Dict[str, Any], idx: int, stats: dict, pendencias: dict) -
 
     if existing:
         # Detectar mudanças comparando campos
-        changed = any(getattr(existing, k) != v for k, v in defaults.items())
+        changed: bool = any(getattr(existing, k) != v for k, v in defaults.items())
 
         if changed:
             # Atualizar campos modificados
@@ -289,7 +292,7 @@ def _process_row(row: Dict[str, Any], idx: int, stats: dict, pendencias: dict) -
     return None
 
 
-def _parse_date(val: Any) -> Optional[date]:
+def _parse_date(val: Any) -> date | None:
     """
     Tenta parsear data de múltiplos formatos (robusto).
 

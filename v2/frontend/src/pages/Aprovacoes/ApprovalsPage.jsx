@@ -159,35 +159,82 @@ export default function ApprovalsPage() {
 
   const columns = [
     {
-      title: 'Data/Hora',
+      title: 'Data',
       dataIndex: 'inicio',
-      key: 'inicio',
-      render: (inicio) => dayjs(inicio).format('DD/MM/YYYY HH:mm'),
-      width: 150,
+      key: 'data',
+      render: (inicio) => dayjs(inicio).format('DD/MM/YYYY'),
+      width: 100,
+    },
+    {
+      title: 'Início',
+      dataIndex: 'inicio',
+      key: 'hora_inicio',
+      render: (inicio) => dayjs(inicio).format('HH:mm'),
+      width: 70,
+    },
+    {
+      title: 'Fim',
+      dataIndex: 'fim',
+      key: 'hora_fim',
+      render: (fim) => dayjs(fim).format('HH:mm'),
+      width: 70,
     },
     {
       title: 'Município',
       dataIndex: 'municipio_nome',
       key: 'municipio_nome',
       render: (nome) => nome || '-',
+      width: 150,
     },
     {
       title: 'Projeto',
       dataIndex: 'projeto_nome',
       key: 'projeto_nome',
       render: (nome) => nome || '-',
+      width: 150,
     },
     {
       title: 'Tipo',
       dataIndex: 'tipo',
       key: 'tipo',
       render: (tipo) => tipo || '-',
+      width: 100,
     },
     {
-      title: 'Autor',
+      title: 'Coordenador',
       dataIndex: 'coordenador_username',
       key: 'coordenador_username',
       render: (username) => username || '-',
+      width: 120,
+    },
+    {
+      title: 'Encontro',
+      dataIndex: 'encontro',
+      key: 'encontro',
+      render: (encontro) => encontro || '-',
+      width: 100,
+    },
+    {
+      title: 'Segmento',
+      dataIndex: 'segmento',
+      key: 'segmento',
+      render: (segmento) => segmento || '-',
+      width: 100,
+    },
+    {
+      title: 'Formadores',
+      dataIndex: 'participations',
+      key: 'formadores',
+      render: (participations) => {
+        if (!participations || participations.length === 0) return '-';
+        const formadores = participations
+          .filter(p => p.role === 'FORMADOR')
+          .map(p => p.usuario?.first_name || p.usuario?.last_name || p.email || 'N/A')
+          .filter(name => name !== 'N/A')
+          .join(', ');
+        return formadores || '-';
+      },
+      width: 200,
     },
     {
       title: 'Status',
@@ -277,6 +324,7 @@ export default function ApprovalsPage() {
             dataSource={rows}
             loading={loading}
             rowKey="id"
+            scroll={{ x: 1800 }}
             pagination={{
               total,
               pageSize: 20,

@@ -1,0 +1,81 @@
+# Aprender Sistema v2 - Type Checking Configuration
+# Baseado em: https://github.com/luizomf/typehints_python
+# Python: 3.12.12 (PEP 695 support)
+# Type Checker: Pyright (strict mode)
+
+[tool.pyright]
+# Mode: strict (máximo rigor)
+typeCheckingMode = "strict"
+
+# Python version
+pythonVersion = "3.12"
+
+# Virtual environment
+venvPath = "."
+venv = ".venv"
+
+# Use library code for types
+useLibraryCodeForTypes = true
+
+# Diretórios para verificar (código crítico: 35% do projeto)
+include = [
+    "apps/core",
+    "apps/dat_ingest",
+    "config"
+]
+
+# Ignorar temporariamente (baseline)
+exclude = [
+    "**/__pycache__",
+    "**/migrations",
+    "**/tests",           # Fixtures serão incluídas depois (PR #7)
+    "**/.venv",
+    "**/venv",
+    "**/node_modules"
+]
+
+# Django settings module
+stubPath = "typings"
+
+# Strict rules (Pyright strict mode)
+reportMissingImports = "error"
+reportMissingTypeStubs = "warning"  # Warning (muitas libs não têm stubs)
+reportUnusedImport = "warning"
+reportUnusedClass = "warning"
+reportUnusedFunction = "warning"
+reportUnusedVariable = "warning"
+reportDuplicateImport = "error"
+reportOptionalMemberAccess = "error"
+reportOptionalSubscript = "error"
+reportOptionalCall = "error"
+reportOptionalIterable = "error"
+reportUntypedFunctionDecorator = "warning"  # Django decorators
+reportUntypedClassDecorator = "warning"     # Django Meta
+reportUntypedBaseClass = "warning"
+reportPrivateUsage = "warning"
+reportTypeCommentUsage = "warning"
+reportConstantRedefinition = "error"
+reportIncompatibleMethodOverride = "error"
+reportIncompatibleVariableOverride = "error"
+reportOverlappingOverload = "error"
+reportUnnecessaryIsInstance = "warning"
+reportUnnecessaryCast = "warning"
+reportUnnecessaryComparison = "warning"
+reportUnnecessaryContains = "warning"
+reportImplicitStringConcatenation = "warning"
+
+# Django-specific relaxations
+reportGeneralTypeIssues = "warning"  # Django QuerySet magic
+
+[tool.pyright.executionEnvironments]
+[[tool.pyright.executionEnvironments]]
+root = "."
+pythonVersion = "3.12"
+extraPaths = [
+    "apps",
+    "config"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

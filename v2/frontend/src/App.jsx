@@ -27,7 +27,6 @@ import {
 import ptBR from 'antd/locale/pt_BR';
 import DisponibilidadeBlocks from './pages/Disponibilidade';
 import MonthlyPage from './pages/Disponibilidade/MonthlyPage';
-import Solicitacoes from './pages/Solicitacoes';
 import ControlePage from './pages/Controle/ControlePage';
 import EtlReportsPage from './pages/Controle/EtlReportsPage';
 import DATPage from './pages/DAT/DATPage';
@@ -239,11 +238,6 @@ function App() {
                   <Link to="/admin-dat">Admin DAT</Link>
                 </Menu.Item>
               )}
-
-              {/* Fallback: Antigas páginas */}
-              <Menu.Item key="solicitacoes-old" icon={<CheckCircleOutlined />}>
-                <Link to="/solicitacoes">Solicitações (Old)</Link>
-              </Menu.Item>
             </Menu>
           </Sider>
 
@@ -347,7 +341,6 @@ function App() {
                 />
 
                 {/* Antigas rotas (manter compatibilidade) */}
-                <Route path="/solicitacoes" element={<Solicitacoes />} />
                 <Route path="/controle" element={<ControlePage />} />
                 <Route
                   path="/controle/etl-reports"

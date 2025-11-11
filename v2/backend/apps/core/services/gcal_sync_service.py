@@ -16,22 +16,25 @@ import hashlib
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timezone as dt_timezone
-from typing import Callable, Literal, Optional, TypeVar
+from datetime import datetime, timezone as dt_timezone
+from typing import Any, Literal, TypeAlias, TypeVar
 from uuid import uuid4
 
 from django.conf import settings
 from django.utils import timezone
 
 from apps.core.models import Solicitacao, Participation
+from apps.core.types import CalendarId, EventId, JsonDict, MeetLink, PayloadHash
 
 logger = logging.getLogger(__name__)
 
 # Type variable para retry genérico
 T = TypeVar('T')
 
-Action = Literal["CREATE", "UPDATE", "DELETE", "ADOPT", "SKIP"]
+# Type alias for sync actions (different from ActionType in types.py which is for audit logs)
+Action: TypeAlias = Literal["CREATE", "UPDATE", "DELETE", "ADOPT", "SKIP"]
 
 
 def _retry_with_backoff(
@@ -162,7 +165,7 @@ def _retry_with_backoff(
     raise last_exception or Exception(f"{operation_name}: Unexpected retry loop exit")
 
 
-def _payload_hash(payload: dict) -> str:
+def _payload_hash(payload: JsonDict) -> PayloadHash:
     """
     Calcula SHA1 hash determinístico do payload (PR14).
 
@@ -172,7 +175,7 @@ def _payload_hash(payload: dict) -> str:
     Returns:
         str: Hash SHA1 hex (40 chars)
     """
-    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    serialized: str = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha1(serialized.encode("utf-8")).hexdigest()
 
 
@@ -189,7 +192,7 @@ class SyncOutcome:
 
     action: Action
     solicitation_id: int
-    external_event_id: Optional[str]
+    external_event_id: EventId | None
     summary: str
 
 
@@ -202,7 +205,7 @@ class CalendarClientAdapter:
     - GoogleCalendarClient: real Google API (futuro)
     """
 
-    def get(self, calendar_id: str, event_id: str) -> Optional[dict]:
+    def get(self, calendar_id: CalendarId, event_id: EventId) -> JsonDict | None:
         """
         Busca evento por ID.
 
@@ -211,7 +214,7 @@ class CalendarClientAdapter:
         """
         raise NotImplementedError
 
-    def insert(self, calendar_id: str, event_id: str, payload: dict) -> dict:
+    def insert(self, calendar_id: CalendarId, event_id: EventId, payload: JsonDict) -> JsonDict:
         """
         Cria novo evento.
 
@@ -225,7 +228,7 @@ class CalendarClientAdapter:
         """
         raise NotImplementedError
 
-    def update(self, calendar_id: str, event_id: str, payload: dict) -> dict:
+    def update(self, calendar_id: CalendarId, event_id: EventId, payload: JsonDict) -> JsonDict:
         """
         Atualiza evento existente.
 
@@ -239,7 +242,7 @@ class CalendarClientAdapter:
         """
         raise NotImplementedError
 
-    def delete(self, calendar_id: str, event_id: str) -> None:
+    def delete(self, calendar_id: CalendarId, event_id: EventId) -> None:
         """
         Deleta evento.
 
@@ -249,7 +252,7 @@ class CalendarClientAdapter:
         """
         raise NotImplementedError
 
-    def list_calendars(self) -> list:
+    def list_calendars(self) -> list[JsonDict]:
         """
         Lista calendários disponíveis.
 
@@ -259,7 +262,7 @@ class CalendarClientAdapter:
         """
         raise NotImplementedError
 
-    def health_check(self) -> dict:
+    def health_check(self) -> JsonDict:
         """
         Verifica saúde da integração com Calendar API.
 
@@ -269,7 +272,7 @@ class CalendarClientAdapter:
         raise NotImplementedError
 
 
-def _validate_event_id(event_id: str) -> bool:
+def _validate_event_id(event_id: EventId) -> bool:
     """
     Valida eventId conforme especificação Google Calendar API.
 
@@ -308,7 +311,7 @@ def _validate_event_id(event_id: str) -> bool:
     return True
 
 
-def _event_id_for(s: Solicitacao) -> str:
+def _event_id_for(s: Solicitacao) -> EventId:
     """
     Gera eventId determinístico para uma Solicitacao.
 
@@ -331,7 +334,7 @@ def _event_id_for(s: Solicitacao) -> str:
     return event_id
 
 
-def build_attendees_for_solicitacao(s: Solicitacao) -> list[dict]:
+def build_attendees_for_solicitacao(s: Solicitacao) -> list[JsonDict]:
     """
     Extrai attendees (participantes) de uma Solicitacao.
 
@@ -370,7 +373,7 @@ def build_attendees_for_solicitacao(s: Solicitacao) -> list[dict]:
     return [{"email": email} for email in sorted(emails)]
 
 
-def build_preview_for_solicitacao(s: Solicitacao) -> dict:
+def build_preview_for_solicitacao(s: Solicitacao) -> JsonDict:
     """
     Constrói preview do payload GCal sem publicar (PR14, PR19/RF06).
 
@@ -410,7 +413,7 @@ def apply_one_solicitacao(
     *,
     dry_run: bool = False,
     apply_blocked: bool = False,
-    client: "CalendarClientAdapter | None" = None,
+    client: CalendarClientAdapter | None = None,
 ) -> SyncOutcome:
     """
     Aplica uma Solicitacao ao Google Calendar (wrapper sobre upsert_one) - PR14.
@@ -520,7 +523,7 @@ def apply_one_solicitacao(
         raise
 
 
-def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
+def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
     """
     Constrói payload do evento para Google Calendar API (Fase 3 - Template Padronizado).
 
@@ -737,7 +740,7 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
     return payload
 
 
-def build_event_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
+def build_event_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
     """
     Wrapper público para _build_payload (PR14, PR19).
 
@@ -751,7 +754,7 @@ def build_event_payload(s: Solicitacao, *, enable_meet: bool = False) -> dict:
     return _build_payload(s, enable_meet=enable_meet)
 
 
-def compute_payload_hash(s: Solicitacao) -> str:
+def compute_payload_hash(s: Solicitacao) -> PayloadHash:
     """
     Calcula hash do payload de uma solicitação (PR14).
 
@@ -768,11 +771,11 @@ def compute_payload_hash(s: Solicitacao) -> str:
 def upsert_one(
     *,
     client: CalendarClientAdapter,
-    calendar_id: str,
+    calendar_id: CalendarId,
     s: Solicitacao,
     dry_run: bool = False,
     no_delete: bool = False,
-    payload: Optional[dict] = None,
+    payload: JsonDict | None = None,
     enable_meet: bool = False,
 ) -> SyncOutcome:
     """
@@ -798,9 +801,9 @@ def upsert_one(
     Returns:
         SyncOutcome com ação executada
     """
-    action: Optional[Action] = None
-    error_msg: Optional[str] = None
-    external_event_id: Optional[str] = None
+    action: Action | None = None
+    error_msg: str | None = None
+    external_event_id: EventId | None = None
 
     try:
         # ================================================================

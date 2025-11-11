@@ -5,20 +5,21 @@ Retorna instância do cliente apropriado baseado em settings.GCAL_CLIENT.
 """
 
 import os
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 
-from apps.core.models import GoogleOAuthCredential
+from apps.core.models import GoogleOAuthCredential, Usuario
 from apps.core.services.gcal_fake_client import FakeCalendarClient
 from apps.core.services.gcal_google_client import GoogleCalendarClient
 from apps.core.services.gcal_oauth_client import OAuthCalendarClient
+from apps.core.types import CalendarId
 
 if TYPE_CHECKING:
     from apps.core.services.gcal_sync_service import CalendarClientAdapter
 
 
-def get_gcal_client_and_calendar_id() -> Tuple["CalendarClientAdapter", str]:
+def get_gcal_client_and_calendar_id() -> tuple["CalendarClientAdapter", CalendarId]:
     """
     Retorna cliente e calendar_id baseado em settings.
 
@@ -36,10 +37,10 @@ def get_gcal_client_and_calendar_id() -> Tuple["CalendarClientAdapter", str]:
         >>> event = client.get(calendar_id, "event-id")
     """
     # Normalizar para lowercase e aceitar fallback via os.getenv
-    client_name = (
+    client_name: str = (
         getattr(settings, "GCAL_CLIENT", None) or os.getenv("GCAL_CLIENT") or "fake"
     ).lower()
-    calendar_id = (
+    calendar_id: CalendarId = (
         getattr(settings, "GCAL_CALENDAR_ID", None)
         or os.getenv("GCAL_CALENDAR_ID")
         or "primary"
@@ -55,7 +56,7 @@ def get_gcal_client_and_calendar_id() -> Tuple["CalendarClientAdapter", str]:
     return client, calendar_id
 
 
-def get_oauth_client_for_user(user) -> Tuple["CalendarClientAdapter", str]:
+def get_oauth_client_for_user(user: Usuario) -> tuple["CalendarClientAdapter", CalendarId]:
     """
     Retorna cliente OAuth e calendar_id para um usuário específico.
 
@@ -81,7 +82,7 @@ def get_oauth_client_for_user(user) -> Tuple["CalendarClientAdapter", str]:
         - Issue #1 Sprint 1: OAuth implementation
     """
     # Validar modo OAuth
-    auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
+    auth_mode: str = getattr(settings, "GCAL_AUTH_MODE", "service_account")
     if auth_mode != "oauth":
         raise ValueError(
             f"GCAL_AUTH_MODE must be 'oauth' (current: '{auth_mode}'). "
@@ -90,7 +91,7 @@ def get_oauth_client_for_user(user) -> Tuple["CalendarClientAdapter", str]:
 
     # Buscar credencial OAuth do usuário
     try:
-        credential = GoogleOAuthCredential.objects.get(user=user)
+        credential: GoogleOAuthCredential = GoogleOAuthCredential.objects.get(user=user)
     except GoogleOAuthCredential.DoesNotExist:
         raise ValueError(
             f"Google OAuth credential not found for user '{user.username}' (id={user.id}). "
@@ -98,13 +99,13 @@ def get_oauth_client_for_user(user) -> Tuple["CalendarClientAdapter", str]:
         )
 
     # Ler calendar_id (mesma lógica da função atual)
-    calendar_id = (
+    calendar_id: CalendarId = (
         getattr(settings, "GCAL_CALENDAR_ID", None)
         or os.getenv("GCAL_CALENDAR_ID")
         or "primary"
     )
 
     # Instanciar cliente OAuth com credencial do usuário
-    client = OAuthCalendarClient(credential)
+    client: OAuthCalendarClient = OAuthCalendarClient(credential)
 
     return client, calendar_id

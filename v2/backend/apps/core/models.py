@@ -7,8 +7,12 @@ Cláusulas Pétreas:
 - SSOT: Single Source of Truth (elimina IMPORTRANGE)
 """
 
-from django.contrib.auth.models import AbstractUser
+from __future__ import annotations
+
+from typing import Any
+
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
@@ -40,7 +44,7 @@ class Usuario(AbstractUser):
         verbose_name = "Usuário"
         verbose_name_plural = "Usuários"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.get_full_name() or self.username} ({self.cpf})"
 
 
@@ -66,7 +70,7 @@ class Municipio(models.Model):
         verbose_name_plural = "Municípios"
         ordering = ["nome"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.nome}-{self.uf}"
 
 
@@ -110,7 +114,7 @@ class Projeto(models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.nome
 
 
@@ -127,7 +131,7 @@ class TipoEvento(models.Model):
         verbose_name_plural = "Tipos de Evento"
         ordering = ["nome"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.nome
 
 
@@ -186,7 +190,7 @@ class AvailabilityBlock(models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.usuario.get_full_name()} - {self.get_tipo_display()} ({self.inicio.strftime('%d/%m/%Y %H:%M')} - {self.fim.strftime('%d/%m/%Y %H:%M')})"
 
 
@@ -398,7 +402,7 @@ class Solicitacao(models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.usuario.get_full_name()} - {self.tipo_evento.nome} ({self.inicio.strftime('%d/%m/%Y %H:%M')})"
 
     def mark_gcal(
@@ -407,9 +411,9 @@ class Solicitacao(models.Model):
         status: str,
         payload_hash: str | None = None,
         error: str | None = None,
-        sync_at=None,
+        sync_at: Any = None,
         meet_link: str | None = None,
-    ):
+    ) -> None:
         """
         Atualiza campos de rastreamento GCal (PR14, PR19).
 
@@ -452,7 +456,7 @@ class Solicitacao(models.Model):
 
         self.save(update_fields=update_fields)
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """
         Override save para implementar auto-aprovação de fluxo NAO_SUPER.
 
@@ -521,7 +525,7 @@ class Config(models.Model):
             models.Index(fields=["key", "updated_at"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.key} (updated: {self.updated_at.strftime('%Y-%m-%d %H:%M')})"
 
 
@@ -586,7 +590,7 @@ class Compra(models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.codigo} - {self.projeto.nome} ({self.data.strftime('%d/%m/%Y')})"
 
 
@@ -648,7 +652,7 @@ class Deslocamento(models.Model):
             models.Index(fields=["external_hash"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         start_fmt = self.start_date.strftime('%d/%m/%Y')
         end_fmt = self.end_date.strftime('%d/%m/%Y')
         return f"{self.usuario_id} {start_fmt}→{end_fmt} {self.origem}->{self.destino}"
@@ -715,7 +719,7 @@ class AcaoControle(models.Model):
             models.Index(fields=["external_hash"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         data_display = (
             self.data_entrega or self.data_reuniao or ""
         )
@@ -776,7 +780,7 @@ class AcaoDAT(models.Model):
             models.Index(fields=["external_hash"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.municipio_id} | {self.projeto_id} | {self.tipo_acao}"
 
 
@@ -825,7 +829,7 @@ class AuditLog(models.Model):
             models.Index(fields=["usuario", "created_at"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         usuario_str = self.usuario.get_full_name() if self.usuario else "Sistema"
         return f"{usuario_str} - {self.action} ({self.created_at.strftime('%d/%m/%Y %H:%M')})"
 
@@ -909,7 +913,7 @@ class Participation(models.Model):
             models.Index(fields=["guest_email"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.solicitacao_id} — {self.usuario or self.guest_email} ({self.get_role_display()})"
 
 
@@ -1000,16 +1004,16 @@ class GoogleOAuthCredential(models.Model):
             models.Index(fields=["token_expiry"]),  # Para job diário de alertas
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         expiry_fmt = self.token_expiry.strftime('%d/%m/%Y %H:%M') if self.token_expiry else "N/A"
         return f"{self.user.username} ({self.google_email}) - expira: {expiry_fmt}"
 
-    def is_expired(self):
+    def is_expired(self) -> bool:
         """Verifica se o access token está expirado (com margem de 5 minutos)."""
         from datetime import timedelta
         return timezone.now() >= self.token_expiry - timedelta(minutes=5)
 
-    def days_until_expiry(self):
+    def days_until_expiry(self) -> int:
         """Retorna número de dias até expiração (usado pelo job de alertas)."""
         if self.is_expired():
             return 0

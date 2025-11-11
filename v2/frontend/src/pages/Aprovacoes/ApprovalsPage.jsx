@@ -179,14 +179,14 @@ export default function ApprovalsPage() {
     },
     {
       title: 'Tipo',
-      dataIndex: 'tipo_evento_nome',
-      key: 'tipo_evento_nome',
-      render: (nome) => nome || '-',
+      dataIndex: 'tipo',
+      key: 'tipo',
+      render: (tipo) => tipo || '-',
     },
     {
       title: 'Autor',
-      dataIndex: 'usuario_username',
-      key: 'usuario_username',
+      dataIndex: 'coordenador_username',
+      key: 'coordenador_username',
       render: (username) => username || '-',
     },
     {

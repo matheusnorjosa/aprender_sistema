@@ -5,11 +5,13 @@ Cliente OAuth para Google Calendar API usando credenciais de usuário.
 Permite que usuários do grupo Controle publiquem eventos usando suas próprias contas Google.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import time
 from datetime import timedelta
-from typing import Optional
+from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.utils import timezone
@@ -18,8 +20,12 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from apps.core.services.gcal_sync_service import CalendarClientAdapter
+from apps.core.types import CalendarId, EventId, JsonDict
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from apps.core.models import GoogleOAuthCredential
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class OAuthCalendarClient(CalendarClientAdapter):
@@ -42,7 +48,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
 
     SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
-    def __init__(self, credential):
+    def __init__(self, credential: GoogleOAuthCredential) -> None:
         """
         Inicializa cliente Google Calendar com OAuth credentials.
 
@@ -203,7 +209,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
                 # Outros erros ou max retries atingido
                 raise
 
-    def get(self, calendar_id: str, event_id: str) -> Optional[dict]:
+    def get(self, calendar_id: CalendarId, event_id: EventId) -> JsonDict | None:
         """
         Busca evento por ID.
 
@@ -347,7 +353,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
                 return
             raise
 
-    def list_calendars(self) -> list:
+    def list_calendars(self) -> list[JsonDict]:
         """
         Lista calendários disponíveis via Calendar API.
 
@@ -374,7 +380,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
 
         return self._retry_with_backoff(_list_calendars)
 
-    def health_check(self) -> dict:
+    def health_check(self) -> JsonDict:
         """
         Verifica saúde da integração com Google Calendar API.
 

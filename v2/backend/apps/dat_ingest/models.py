@@ -2,6 +2,8 @@
 Data Ingestion models
 """
 
+from __future__ import annotations
+
 from django.db import models
 
 
@@ -30,5 +32,5 @@ class ImportLog(models.Model):
         db_table = "dat_ingest_import_log"
         ordering = ["-started_at"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.source} - {self.status} ({self.started_at})"

@@ -1,10 +1,17 @@
 """
+
+from typing import Any
+from __future__ import annotations
 Views para endpoints GCal (Sprint 2 - Issue #65)
 
 Endpoints:
 - GET /api/gcal/calendars/ - Lista calendários disponíveis
 - GET /api/gcal/health/ - Health check da integração GCal
 """
+
+from typing import Any
+
+from rest_framework.request import Request
 
 import logging
 from rest_framework import status
@@ -19,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def gcal_calendars(request):
+def gcal_calendars(request: Request) -> Response:
     """
     GET /api/gcal/calendars/
 
@@ -51,7 +58,7 @@ def gcal_calendars(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def gcal_health(request):
+def gcal_health(request: Request) -> Response:
     """
     GET /api/gcal/health/
 

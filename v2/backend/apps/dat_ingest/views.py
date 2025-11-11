@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 """
 Views for DAT Ingest app (ETL Observability)
 
 Fase 5 - Desligamento gradual de planilhas
 """
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
+from typing import Any
+
 from rest_framework import status
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.core.permissions import IsControleOrSuper
 from .services.etl_observability import list_latest_reports
@@ -34,13 +39,13 @@ class EtlReportsLatestView(APIView):
 
     permission_classes = [IsControleOrSuper]
 
-    def get(self, request):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """List latest ETL reports"""
         # Parse limit parameter
-        limit_str = request.query_params.get('limit', '20')
+        limit_str: str = request.query_params.get('limit', '20')
 
         try:
-            limit = int(limit_str)
+            limit: int = int(limit_str)
         except ValueError:
             return Response(
                 {

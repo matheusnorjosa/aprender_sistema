@@ -1,8 +1,17 @@
 """
+
+from typing import Any
+
+from rest_framework.request import Request
+from __future__ import annotations
 Options API Views
 
 Provides minimal dropdown/select options for frontend forms.
 """
+
+from typing import Any
+
+from rest_framework.request import Request
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -19,7 +28,7 @@ from .serializers import (
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def municipios_options(request):
+def municipios_options(request: Request) -> Response:
     """
     GET /api/options/municipios/
 
@@ -41,7 +50,7 @@ def municipios_options(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def projetos_options(request):
+def projetos_options(request: Request) -> Response:
     """
     GET /api/options/projetos/
 
@@ -63,7 +72,7 @@ def projetos_options(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def tipos_evento_options(request):
+def tipos_evento_options(request: Request) -> Response:
     """
     GET /api/options/tipos-evento/
 
@@ -85,7 +94,7 @@ def tipos_evento_options(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def usuarios_options(request):
+def usuarios_options(request: Request) -> Response:
     """
     GET /api/options/usuarios/
 

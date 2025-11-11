@@ -2,14 +2,19 @@
 Basic Views (api_root, CurrentUser)
 """
 
-from django.http import JsonResponse
+from __future__ import annotations
+
+from typing import Any
+
+from django.http import HttpRequest, JsonResponse
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 
-def api_root(request):
+def api_root(request: HttpRequest) -> JsonResponse:
     """API root endpoint"""
     return JsonResponse(
         {
@@ -33,13 +38,13 @@ class CurrentUserView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         user = request.user
-        groups = list(user.groups.values_list("name", flat=True))
-        is_superintendencia = user.is_superuser or ("Superintendência" in groups)
+        groups: list[str] = list(user.groups.values_list("name", flat=True))
+        is_superintendencia: bool = user.is_superuser or ("Superintendência" in groups)
 
         # Compute display name
-        name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+        name: str = f"{user.first_name or ''} {user.last_name or ''}".strip()
         if not name:
             name = user.email or f"#{user.id}"
 

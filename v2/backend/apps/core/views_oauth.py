@@ -13,6 +13,12 @@ Refs:
 - PA-05: Auditoria obrigatória (AuditLog)
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 import logging
 from datetime import timedelta
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
@@ -155,7 +161,7 @@ class OAuthThrottle(UserRateThrottle):
 @api_view(['GET'])
 @permission_classes([IsControleOrSuper])
 @throttle_classes([OAuthThrottle])
-def google_oauth_start(request):
+def google_oauth_start(request: Request) -> Response:
     """
     Inicia fluxo OAuth 2.0 com Google.
 
@@ -197,7 +203,7 @@ def google_oauth_start(request):
 
 
 @api_view(['GET'])
-def google_oauth_callback(request):
+def google_oauth_callback(request: Request) -> Response:
     """
     Callback OAuth 2.0 após autorização do usuário no Google.
 
@@ -326,7 +332,7 @@ def google_oauth_callback(request):
 
 @api_view(['GET'])
 @permission_classes([IsControleOrSuper])
-def google_oauth_status(request):
+def google_oauth_status(request: Request) -> Response:
     """
     Retorna status da conexão OAuth do usuário.
 
@@ -387,7 +393,7 @@ def google_oauth_status(request):
 
 @api_view(['POST'])
 @permission_classes([IsControleOrSuper])
-def google_oauth_disconnect(request):
+def google_oauth_disconnect(request: Request) -> Response:
     """
     Desconecta conta Google (revoga refresh_token).
 
@@ -441,7 +447,7 @@ def google_oauth_disconnect(request):
 
 @api_view(['GET'])
 @permission_classes([IsControleOrSuper])
-def google_oauth_list_calendars(request):
+def google_oauth_list_calendars(request: Request) -> Response:
     """
     Lista calendários disponíveis do usuário OAuth.
 
@@ -507,7 +513,7 @@ def google_oauth_list_calendars(request):
 
 @api_view(['POST'])
 @permission_classes([IsControleOrSuper])
-def google_oauth_select_calendar(request):
+def google_oauth_select_calendar(request: Request) -> Response:
     """
     Salva calendário selecionado pelo usuário.
 

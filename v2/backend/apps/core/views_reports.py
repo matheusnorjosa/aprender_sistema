@@ -4,6 +4,12 @@ Reports API Views
 Provides analytical reports for decision-making.
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 from datetime import datetime, timedelta
 
 from django.core.cache import cache
@@ -18,7 +24,7 @@ from .permissions import IsControleOrDAT
 
 @api_view(["GET"])
 @permission_classes([IsControleOrDAT])
-def reports_status_counts(request):
+def reports_status_counts(request: Request) -> Response:
     """
     GET /api/reports/status-counts/
 
@@ -107,7 +113,7 @@ def reports_status_counts(request):
 
 @api_view(["GET"])
 @permission_classes([IsControleOrDAT])
-def reports_top_projects(request):
+def reports_top_projects(request: Request) -> Response:
     """
     GET /api/reports/top-projects/
 
@@ -177,7 +183,7 @@ def reports_top_projects(request):
 
 @api_view(["GET"])
 @permission_classes([IsControleOrDAT])
-def reports_weekly_approved(request):
+def reports_weekly_approved(request: Request) -> Response:
     """
     GET /api/reports/weekly-approved/
 
@@ -264,7 +270,7 @@ def reports_weekly_approved(request):
 
 @api_view(["GET"])
 @permission_classes([IsControleOrDAT])
-def reports_by_uf(request):
+def reports_by_uf(request: Request) -> Response:
     """
     GET /api/reports/by-uf/
 

@@ -2,6 +2,12 @@
 Availability ViewSets (views ativas)
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -40,7 +46,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
     serializer_class = AvailabilityBlockSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         if (
             self.request.user.is_superuser
             or self.request.user.groups.filter(name="Superintendência").exists()
@@ -79,7 +85,7 @@ class AvailabilityCheckView(APIView):
     permission_classes = [IsControleOrSuper]
     throttle_scope = "availability_check"
 
-    def get(self, request):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Validar usuario_id
         usuario_id_raw = request.query_params.get("usuario_id")
         if not usuario_id_raw:
@@ -181,7 +187,7 @@ class AvailabilityCheckManyView(APIView):
     permission_classes = [IsControleOrSuper]
     throttle_scope = "availability_check"
 
-    def post(self, request):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         usuarios_ids = request.data.get("usuarios_ids", [])
         if not usuarios_ids or not isinstance(usuarios_ids, list):
             return Response(

@@ -12,6 +12,12 @@ Query params:
 Cache Redis 5 minutos por (year, month, role, sector, q).
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -50,7 +56,7 @@ class MonthlyAvailabilityView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Validação de parâmetros
         try:
             year = int(request.GET.get("year", 0))

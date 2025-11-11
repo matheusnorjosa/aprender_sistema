@@ -7,6 +7,12 @@ GET /api/controle/compras/
 - Returns: Lista de compras com campos relacionados
 """
 
+from __future__ import annotations
+from typing import Any
+from django.db.models import QuerySet
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import serializers
@@ -72,7 +78,7 @@ class ControleComprasListView(ListAPIView):
     permission_classes = [IsAuthenticated, IsControleOrSuper]
     serializer_class = CompraSerializer
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         # Queryset base com related fields otimizados
         qs = Compra.objects.select_related("municipio", "projeto").order_by(
             "-data", "-created_at"

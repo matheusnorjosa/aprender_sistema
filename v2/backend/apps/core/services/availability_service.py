@@ -15,8 +15,7 @@ RD-08: Mensagens com formador, intervalo, tipo, detalhe
 """
 
 from dataclasses import dataclass
-from datetime import timedelta
-from typing import List, Literal, Optional
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.db.models import Q
@@ -25,8 +24,7 @@ from django.utils import timezone
 import pytz
 from apps.core.models import AvailabilityBlock, Municipio, Solicitacao, Usuario
 from apps.core.services.config_service import get_cfg
-
-Code = Literal["X", "T", "P", "D", "M"]
+from apps.core.types import ConflictCode
 
 
 @dataclass
@@ -40,10 +38,10 @@ class Conflict:
     ref_id: ID do evento/bloqueio relacionado (opcional)
     """
 
-    code: Code
+    code: ConflictCode
     title: str
     detail: str
-    ref_id: Optional[int] = None
+    ref_id: int | None = None
 
 
 @dataclass
@@ -56,10 +54,10 @@ class CheckResult:
     """
 
     ok: bool
-    conflicts: List[Conflict]
+    conflicts: list[Conflict]
 
 
-def to_local(dt):
+def to_local(dt: datetime) -> datetime:
     """
     Converte datetime UTC para timezone local do projeto (RD-06).
 
@@ -69,8 +67,8 @@ def to_local(dt):
     Returns:
         datetime convertido para America/Fortaleza
     """
-    tz_name = getattr(settings, "TZ_PROJECT", "America/Fortaleza")
-    tz = pytz.timezone(tz_name)
+    tz_name: str = getattr(settings, "TZ_PROJECT", "America/Fortaleza")
+    tz: pytz.BaseTzInfo = pytz.timezone(tz_name)
 
     # Se naive, assume UTC
     if timezone.is_naive(dt):
@@ -79,7 +77,7 @@ def to_local(dt):
     return dt.astimezone(tz)
 
 
-def same_day_local(a, b):
+def same_day_local(a: datetime, b: datetime) -> bool:
     """
     Verifica se dois datetimes são no mesmo dia (timezone local).
 
@@ -89,11 +87,12 @@ def same_day_local(a, b):
     Returns:
         bool: True se mesma data local
     """
-    la, lb = to_local(a), to_local(b)
+    la: datetime = to_local(a)
+    lb: datetime = to_local(b)
     return la.date() == lb.date()
 
 
-def _fmt_interval_local(start, end):
+def _fmt_interval_local(start: datetime, end: datetime) -> str:
     """
     Formata intervalo para exibição (RD-08).
 
@@ -103,12 +102,13 @@ def _fmt_interval_local(start, end):
     Returns:
         str: Formato "HH:MM dd/mm–HH:MM dd/mm"
     """
-    s, e = to_local(start), to_local(end)
+    s: datetime = to_local(start)
+    e: datetime = to_local(end)
     return f"{s:%H:%M %d/%m}–{e:%H:%M %d/%m}"
 
 
 def check_conflicts(
-    *, usuario: Usuario, inicio, fim, municipio: Optional[Municipio] = None
+    *, usuario: Usuario, inicio: datetime, fim: datetime, municipio: Municipio | None = None
 ) -> CheckResult:
     """
     Verifica conflitos para um novo intervalo (inicio, fim) de um usuário.
@@ -138,17 +138,17 @@ def check_conflicts(
         )
 
     # Carregar configurações (RD-04, RD-05) com fallback para settings
-    cfg = get_cfg("availability", {})
-    buffer_min = int(
+    cfg: dict[str, str] = get_cfg("availability", {})
+    buffer_min: int = int(
         cfg.get("TRAVEL_BUFFER_MINUTES")
         or getattr(settings, "TRAVEL_BUFFER_MINUTES", 120)
     )
-    daily_limit_h = float(
+    daily_limit_h: float = float(
         cfg.get("AVAILABILITY_DAILY_LIMIT_HOURS")
         or getattr(settings, "AVAILABILITY_DAILY_LIMIT_HOURS", 8)
     )
 
-    conflicts: List[Conflict] = []
+    conflicts: list[Conflict] = []
 
     # ================================================================
     # RD-02, RD-03: BLOQUEIOS aprovados
@@ -160,7 +160,7 @@ def check_conflicts(
     )
 
     for b in blocks:
-        interval = _fmt_interval_local(b.inicio, b.fim)
+        interval: str = _fmt_interval_local(b.inicio, b.fim)
         if b.tipo == "T":
             # RD-02: Bloqueio Total
             conflicts.append(
@@ -190,7 +190,7 @@ def check_conflicts(
     )
 
     for ev in events:
-        interval = _fmt_interval_local(ev.inicio, ev.fim)
+        interval: str = _fmt_interval_local(ev.inicio, ev.fim)
         conflicts.append(
             Conflict(
                 "X",
@@ -205,14 +205,14 @@ def check_conflicts(
     # ================================================================
     # RD-04 sempre verifica buffer. Se municipio=None, trata como cidade diferente.
     # Evento imediatamente anterior
-    prev_ev = (
+    prev_ev: Solicitacao | None = (
         Solicitacao.objects.filter(usuario=usuario, status="aprovado", fim__lte=inicio)
         .order_by("-fim")
         .first()
     )
 
     # Evento imediatamente posterior
-    next_ev = (
+    next_ev: Solicitacao | None = (
         Solicitacao.objects.filter(usuario=usuario, status="aprovado", inicio__gte=fim)
         .order_by("inicio")
         .first()
@@ -222,14 +222,14 @@ def check_conflicts(
     if prev_ev:
         # RD-04: municipio=None é tratado como cidade diferente
         # Compara IDs de município. Se um é None e outro não, ou IDs diferentes → requer buffer.
-        municipio_id = municipio.id if municipio else None
-        prev_municipio_id = prev_ev.municipio_id
+        municipio_id: int | None = municipio.id if municipio else None
+        prev_municipio_id: int | None = prev_ev.municipio_id
 
-        prev_diff_city = municipio_id != prev_municipio_id
+        prev_diff_city: bool = municipio_id != prev_municipio_id
 
         if prev_diff_city:
-            delta = inicio - prev_ev.fim
-            mins = int(delta.total_seconds() // 60)
+            delta: timedelta = inicio - prev_ev.fim
+            mins: int = int(delta.total_seconds() // 60)
             # Buffer exato (==) deve passar, apenas < buffer conflita
             if mins < buffer_min:
                 conflicts.append(
@@ -244,14 +244,14 @@ def check_conflicts(
 
     # Verificar buffer posterior
     if next_ev:
-        municipio_id = municipio.id if municipio else None
-        next_municipio_id = next_ev.municipio_id
+        municipio_id: int | None = municipio.id if municipio else None
+        next_municipio_id: int | None = next_ev.municipio_id
 
-        next_diff_city = municipio_id != next_municipio_id
+        next_diff_city: bool = municipio_id != next_municipio_id
 
         if next_diff_city:
-            delta = next_ev.inicio - fim
-            mins = int(delta.total_seconds() // 60)
+            delta: timedelta = next_ev.inicio - fim
+            mins: int = int(delta.total_seconds() // 60)
             # Buffer exato (==) deve passar, apenas < buffer conflita
             if mins < buffer_min:
                 conflicts.append(
@@ -268,7 +268,7 @@ def check_conflicts(
     # RD-05: CAPACIDADE DIÁRIA
     # ================================================================
     # Buscar eventos aprovados no mesmo dia local do início
-    inicio_local = to_local(inicio)
+    inicio_local: datetime = to_local(inicio)
     inicio_date = inicio_local.date()
 
     # Seleção ampla: eventos que tocam o dia do início
@@ -277,18 +277,18 @@ def check_conflicts(
     ).filter(Q(inicio__date=inicio_date) | Q(fim__date=inicio_date))
 
     # Somar duração dos eventos existentes no dia
-    total_minutes = 0
+    total_minutes: int = 0
     for ev in same_day_events:
         if same_day_local(ev.inicio, inicio) or same_day_local(ev.fim, inicio):
-            dur = int((ev.fim - ev.inicio).total_seconds() // 60)
+            dur: int = int((ev.fim - ev.inicio).total_seconds() // 60)
             total_minutes += max(dur, 0)
 
     # Somar duração do novo intervalo
-    new_duration = int((fim - inicio).total_seconds() // 60)
+    new_duration: int = int((fim - inicio).total_seconds() // 60)
     total_minutes += new_duration
 
     # Verificar limite diário
-    daily_limit_minutes = int(daily_limit_h * 60)
+    daily_limit_minutes: int = int(daily_limit_h * 60)
     if total_minutes > daily_limit_minutes:
         conflicts.append(
             Conflict(

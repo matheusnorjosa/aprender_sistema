@@ -20,13 +20,15 @@ Invalidação automática:
     - Chama bust_cfg(key) automaticamente quando Config é salvo
 """
 
+from typing import Any
+
 from django.core.cache import cache
 
-_PREFIX = "cfg:v1:"
-_TTL = 300  # 5 minutos
+_PREFIX: str = "cfg:v1:"
+_TTL: int = 300  # 5 minutos
 
 
-def get_cfg(key: str, default=None):
+def get_cfg(key: str, default: Any = None) -> Any:
     """
     Busca config com cache (5min TTL).
 
@@ -46,8 +48,8 @@ def get_cfg(key: str, default=None):
         >>> batch_size = cfg.get("BATCH_SIZE", 200)
         200
     """
-    ck = f"{_PREFIX}{key}"
-    val = cache.get(ck)
+    ck: str = f"{_PREFIX}{key}"
+    val: Any = cache.get(ck)
 
     if val is not None:
         return val
@@ -68,7 +70,7 @@ def get_cfg(key: str, default=None):
     return val
 
 
-def bust_cfg(key: str):
+def bust_cfg(key: str) -> None:
     """
     Invalida cache para key específica.
 
@@ -83,5 +85,5 @@ def bust_cfg(key: str):
         - Chamado automaticamente pelo signal post_save em signals.py
         - Não precisa ser chamado manualmente na maioria dos casos
     """
-    ck = f"{_PREFIX}{key}"
+    ck: str = f"{_PREFIX}{key}"
     cache.delete(ck)

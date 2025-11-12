@@ -6,3 +6,5 @@ Serviços de lógica de negócio que substituem as 82K fórmulas Excel:
 - DisponibilidadeService: Mapa mensal (códigos D/P/T/E/M/X)
 - ApprovalWorkflow: Fluxo de aprovações
 """
+
+from __future__ import annotations

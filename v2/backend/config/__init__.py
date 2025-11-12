@@ -6,6 +6,7 @@ quando Django é iniciado.
 
 Isso permite que tasks sejam descobertos e registrados corretamente.
 """
+# pyright: reportUnknownVariableType=false
 
 from __future__ import annotations
 

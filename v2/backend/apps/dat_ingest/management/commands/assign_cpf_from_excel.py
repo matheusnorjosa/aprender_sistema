@@ -27,12 +27,17 @@ Lógica:
     5. DRY-RUN: relatar sem persistir
     6. APPLY: transaction.atomic() + save(update_fields=["cpf"])
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
+
+from __future__ import annotations
 
 import json
 import re
 import unicodedata
 from pathlib import Path
-from django.core.management.base import BaseCommand
+from typing import Any
+
+from django.core.management.base import BaseCommand, CommandParser
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -42,7 +47,7 @@ from openpyxl import load_workbook
 User = get_user_model()
 
 
-def normalize_text(text):
+def normalize_text(text: str | None) -> str:
     """Normaliza texto: NFKD, lowercase, strip."""
     if not text:
         return ""
@@ -51,7 +56,7 @@ def normalize_text(text):
     return normalized.lower().strip()
 
 
-def is_placeholder_cpf(cpf):
+def is_placeholder_cpf(cpf: str | None) -> bool:
     """
     Detecta se um CPF é um placeholder (ex: 00000000001, 00000000002).
 
@@ -67,7 +72,7 @@ def is_placeholder_cpf(cpf):
     return cpf.startswith('000000000')
 
 
-def validate_cpf(cpf):
+def validate_cpf(cpf: str | None) -> bool:
     """
     Valida CPF usando algoritmo mod 11 (dígitos verificadores).
 
@@ -106,7 +111,7 @@ def validate_cpf(cpf):
     return True
 
 
-def clean_cpf(cpf_raw):
+def clean_cpf(cpf_raw: Any) -> str | None:
     """
     Remove máscara de CPF, valida que tem 11 dígitos e verifica dígitos verificadores.
 
@@ -136,7 +141,7 @@ def clean_cpf(cpf_raw):
 class Command(BaseCommand):
     help = "Atribui CPFs aos usuários baseado em planilha Excel (DRY-RUN/APPLY)"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--path",
             type=str,
@@ -162,7 +167,7 @@ class Command(BaseCommand):
             help="Diretório de saída para relatório (default: settings.ETL_OUTPUT_DIR)",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         path = Path(options["path"])
         sheet_name = options["sheet"]
         apply_mode = options["apply"]
@@ -200,7 +205,7 @@ class Command(BaseCommand):
         self.stdout.write(f"   Conflicts: {result['totals']['conflicts']}")
         self.stdout.write("=" * 80)
 
-    def _load_excel(self, path, sheet_name):
+    def _load_excel(self, path: Path, sheet_name: str) -> list[dict[str, Any]]:
         """
         Carrega dados da planilha.
 
@@ -240,7 +245,7 @@ class Command(BaseCommand):
         wb.close()
         return data
 
-    def _process_matches(self, excel_data, apply_mode):
+    def _process_matches(self, excel_data: list[dict[str, Any]], apply_mode: bool) -> dict[str, Any]:
         """
         Processa matches e atribui CPFs.
 

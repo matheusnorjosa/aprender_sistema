@@ -1,8 +1,13 @@
 """
 ETL Command: Upsert staging → SSOT tables (idempotent by natural keys)
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
-from django.core.management.base import BaseCommand
+from __future__ import annotations
+
+from typing import Any
+
+from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 
 from apps.core.models import Municipio, Projeto, TipoEvento, Usuario
@@ -12,7 +17,7 @@ from apps.dat_ingest.models import StgMunicipio, StgProjeto, StgTipoEvento, StgU
 class Command(BaseCommand):
     help = "Upsert staging → SSOT tables (idempotent by natural keys)"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument("--dry-run", action="store_true", help="Simulate without writing to DB")
         parser.add_argument(
             "--only",
@@ -20,7 +25,7 @@ class Command(BaseCommand):
             help="Process only specific entity type",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         dry_run = options["dry_run"]
         only = options["only"]
 

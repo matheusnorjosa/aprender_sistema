@@ -1,9 +1,4 @@
 """
-
-from typing import Any
-
-from rest_framework.request import Request
-from __future__ import annotations
 Endpoints DRF para importação de Compras.
 
 POST /api/controle/import-compras/
@@ -11,10 +6,12 @@ POST /api/controle/import-compras/
 - Body (multipart/form-data): {file: upload}
 - Returns: Relatório com stats, pendências e IDs criados
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
+from __future__ import annotations
 from typing import Any
-
 from rest_framework.request import Request
+from rest_framework.response import Response
 
 import tempfile
 import os

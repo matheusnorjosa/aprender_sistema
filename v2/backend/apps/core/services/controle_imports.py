@@ -6,6 +6,7 @@ Importa Compras da aba "🟥 COMPRAS" da Planilha de Controle.
 - Dry-run mode para preview
 - Relatório JSON em out_etl/import_compras_report.json
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
 

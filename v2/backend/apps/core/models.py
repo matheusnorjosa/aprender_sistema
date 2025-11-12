@@ -39,7 +39,7 @@ class Usuario(AbstractUser):
     telefone = models.CharField(max_length=20, blank=True)
     cargo = models.CharField(max_length=100, blank=True)
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_usuario"
         verbose_name = "Usuário"
         verbose_name_plural = "Usuários"
@@ -64,7 +64,7 @@ class Municipio(models.Model):
     )
     ativo = models.BooleanField(default=True)
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_municipio"
         verbose_name = "Município"
         verbose_name_plural = "Municípios"
@@ -101,7 +101,7 @@ class Projeto(models.Model):
     descricao = models.TextField(blank=True)
     ativo = models.BooleanField(default=True)
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_projeto"
         verbose_name = "Projeto"
         verbose_name_plural = "Projetos"
@@ -125,7 +125,7 @@ class TipoEvento(models.Model):
     descricao = models.TextField(blank=True)
     cor = models.CharField(max_length=7, blank=True, help_text="Cor hex (#RRGGBB)")
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_tipo_evento"
         verbose_name = "Tipo de Evento"
         verbose_name_plural = "Tipos de Evento"
@@ -173,7 +173,7 @@ class AvailabilityBlock(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_availability_block"
         verbose_name = "Bloqueio de Disponibilidade"
         verbose_name_plural = "Bloqueios de Disponibilidade"
@@ -191,7 +191,7 @@ class AvailabilityBlock(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.usuario.get_full_name()} - {self.get_tipo_display()} ({self.inicio.strftime('%d/%m/%Y %H:%M')} - {self.fim.strftime('%d/%m/%Y %H:%M')})"
+        return f"{self.usuario.get_full_name()} - {self.get_tipo_display()} ({self.inicio.strftime('%d/%m/%Y %H:%M')} - {self.fim.strftime('%d/%m/%Y %H:%M')})"  # type: ignore[attr-defined]
 
 
 class Solicitacao(models.Model):
@@ -378,7 +378,7 @@ class Solicitacao(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_solicitacao"
         verbose_name = "Solicitação de Evento"
         verbose_name_plural = "Solicitações de Evento"
@@ -516,7 +516,7 @@ class Config(models.Model):
     )
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_config"
         verbose_name = "Configuração"
         verbose_name_plural = "Configurações"
@@ -573,7 +573,7 @@ class Compra(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_compra"
         verbose_name = "Compra"
         verbose_name_plural = "Compras"
@@ -642,7 +642,7 @@ class Deslocamento(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_deslocamento"
         verbose_name = "Deslocamento"
         verbose_name_plural = "Deslocamentos"
@@ -655,7 +655,7 @@ class Deslocamento(models.Model):
     def __str__(self) -> str:
         start_fmt = self.start_date.strftime('%d/%m/%Y')
         end_fmt = self.end_date.strftime('%d/%m/%Y')
-        return f"{self.usuario_id} {start_fmt}→{end_fmt} {self.origem}->{self.destino}"
+        return f"{self.usuario_id} {start_fmt}→{end_fmt} {self.origem}->{self.destino}"  # type: ignore[attr-defined]
 
 
 class AcaoControle(models.Model):
@@ -710,7 +710,7 @@ class AcaoControle(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_acao_controle"
         ordering = ["-data_reuniao", "-data_entrega", "municipio_id"]
         indexes = [
@@ -723,7 +723,7 @@ class AcaoControle(models.Model):
         data_display = (
             self.data_entrega or self.data_reuniao or ""
         )
-        return f"{self.municipio_id} | {self.projeto_id} | {data_display}"
+        return f"{self.municipio_id} | {self.projeto_id} | {data_display}"  # type: ignore[attr-defined]
 
 
 class AcaoDAT(models.Model):
@@ -771,7 +771,7 @@ class AcaoDAT(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_acao_dat"
         ordering = ["-data_registro", "municipio_id"]
         indexes = [
@@ -781,7 +781,7 @@ class AcaoDAT(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.municipio_id} | {self.projeto_id} | {self.tipo_acao}"
+        return f"{self.municipio_id} | {self.projeto_id} | {self.tipo_acao}"  # type: ignore[attr-defined]
 
 
 class AuditLog(models.Model):
@@ -819,7 +819,7 @@ class AuditLog(models.Model):
     )
     created_at = models.DateTimeField(default=timezone.now)
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_audit_log"
         verbose_name = "Log de Auditoria"
         verbose_name_plural = "Logs de Auditoria"
@@ -883,7 +883,7 @@ class Participation(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_participation"
         verbose_name = "Participação"
         verbose_name_plural = "Participações"
@@ -993,7 +993,7 @@ class GoogleOAuthCredential(models.Model):
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Conectado em")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "core_google_oauth_credential"
         verbose_name = "Credencial OAuth Google"
         verbose_name_plural = "Credenciais OAuth Google"

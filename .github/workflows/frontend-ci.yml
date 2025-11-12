@@ -8,9 +8,8 @@ on:
       - '.github/workflows/frontend-ci.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'v2/frontend/**'
-      - '.github/workflows/frontend-ci.yml'
+    # Removed path filters for pull_request to ensure required check always runs
+    # This is needed because the ruleset requires "frontend-ci" as a status check
 
 jobs:
   frontend:

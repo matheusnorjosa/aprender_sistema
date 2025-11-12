@@ -1,6 +1,7 @@
 """
 DRF Serializers for Core models
 """
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
 
@@ -10,7 +11,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from rest_framework import serializers
+from rest_framework import serializers  # type: ignore[attr-defined]
 
 from .models import (
     AcaoControle,

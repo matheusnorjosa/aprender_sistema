@@ -12,7 +12,7 @@ on:
     # This is needed because the ruleset requires "frontend-ci" as a status check
 
 jobs:
-  frontend:
+  frontend-ci:
     runs-on: ubuntu-latest
 
     defaults:

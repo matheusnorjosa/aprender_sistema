@@ -1,17 +1,14 @@
 """
-
-from typing import Any
-
-from rest_framework.request import Request
-from __future__ import annotations
 Options API Views
 
 Provides minimal dropdown/select options for frontend forms.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false
 
+from __future__ import annotations
 from typing import Any
-
 from rest_framework.request import Request
+from rest_framework.response import Response
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated

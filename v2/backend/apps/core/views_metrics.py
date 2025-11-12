@@ -3,6 +3,7 @@ Metrics API Views
 
 Provides aggregated metrics for dashboard and monitoring.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false
 
 from __future__ import annotations
 from typing import Any

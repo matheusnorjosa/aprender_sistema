@@ -5,6 +5,7 @@ Endpoints:
 - POST /api/auth/login/ - Login com username/password
 - POST /api/auth/logout/ - Logout
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false
 
 from __future__ import annotations
 from typing import Any

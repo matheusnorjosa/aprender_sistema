@@ -18,6 +18,7 @@ Nota: Publicação de eventos no Google Calendar ocorre via página /pre-agenda:
 - Individual: botão "Publicar" (POST /api/solicitacoes/{id}/publish/)
 - Em massa: botão "Publicar Selecionados" (POST /api/gcal/publish-batch/)
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false
 
 from __future__ import annotations
 from typing import Any

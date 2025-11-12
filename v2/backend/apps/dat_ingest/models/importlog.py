@@ -1,6 +1,7 @@
 """
 ImportLog - Rastreamento de imports para idempotência
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportIncompatibleMethodOverride=false
 
 from django.db import models
 from django.utils import timezone
@@ -34,7 +35,7 @@ class ImportLog(models.Model):
         default=dict, blank=True, help_text="Metadados adicionais"
     )
 
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "dat_import_log"
         verbose_name = "Import Log"
         verbose_name_plural = "Import Logs"

@@ -2,14 +2,19 @@
 URL configuration for AS v2 project.
 """
 
-from django.urls import path, include
+from __future__ import annotations
+
+from typing import Any
+
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import JsonResponse
+from django.http import HttpRequest, JsonResponse
+from django.urls import include, path
+
 from apps.core.admin_site import admin_site  # Custom admin site (superusers only)
 
 
-def healthz(request):
+def healthz(request: HttpRequest) -> JsonResponse:
     """Health check endpoint for Docker/K8s"""
     return JsonResponse(
         {

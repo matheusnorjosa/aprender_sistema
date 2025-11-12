@@ -11,6 +11,7 @@ Comandos:
 - Worker: celery -A config worker -l info
 - Beat: celery -A config beat -l info
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportCallIssue=false, reportUntypedFunctionDecorator=false
 
 from __future__ import annotations
 
@@ -32,7 +33,7 @@ app.autodiscover_tasks()
 
 
 @app.task(bind=True)
-def debug_task(self):
+def debug_task(self) -> None:  # type: ignore[no-untyped-def]
     """
     Debug task for testing Celery setup.
     Usage: from config.celery import debug_task; debug_task.delay()

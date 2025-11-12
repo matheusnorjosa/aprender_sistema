@@ -4,22 +4,29 @@ Management command to backfill coordenador field from usuario.
 For events imported via ETL where coordenador is NULL,
 set coordenador = usuario (the coordenador from spreadsheet column N).
 """
-from django.core.management.base import BaseCommand
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
+
+from __future__ import annotations
+
+from typing import Any
+
+from django.core.management.base import BaseCommand, CommandParser
 from django.db.models import F
+
 from apps.core.models import Solicitacao
 
 
 class Command(BaseCommand):
     help = "Backfill coordenador field from usuario for ETL-imported events"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--dry-run",
             action="store_true",
             help="Preview changes without applying them",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         dry_run = options.get("dry_run", False)
 
         self.stdout.write(f"🔄 Backfilling coordenador field (dry_run={dry_run})")

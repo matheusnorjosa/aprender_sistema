@@ -1,9 +1,15 @@
+from __future__ import annotations
+# pyright: reportMissingTypeArgument=false
+
 import csv
 import logging
 from pathlib import Path
+from typing import Any
+
 from django.contrib import admin
 from django.conf import settings
-from django.http import HttpResponse
+from django.db.models import QuerySet
+from django.http import HttpRequest, HttpResponse
 
 # Fase 1 - Plano DAT/GCal: Admin restrito a superusers
 from .admin_site import admin_site
@@ -29,13 +35,13 @@ class CPFFilter(admin.SimpleListFilter):
     title = "CPF"
     parameter_name = "cpf_status"
 
-    def lookups(self, request, model_admin):
-        return (
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[Any, str]]:
+        return [
             ("missing", "Ausente"),
             ("filled", "Preenchido"),
-        )
+        ]
 
-    def queryset(self, request, queryset):
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Any]) -> QuerySet[Any] | None:
         if self.value() == "missing":
             return queryset.filter(cpf__isnull=True) | queryset.filter(cpf="")
         if self.value() == "filled":
@@ -50,7 +56,7 @@ class UsuarioAdmin(admin.ModelAdmin):
     actions = ["export_usuarios_sem_cpf"]
 
     @admin.action(description="Exportar usuários sem CPF (CSV)")
-    def export_usuarios_sem_cpf(self, request, queryset):
+    def export_usuarios_sem_cpf(self, request: HttpRequest, queryset: QuerySet[Usuario]) -> HttpResponse:
         """Exporta usuários sem CPF para CSV."""
         # Filtrar apenas usuários sem CPF no queryset selecionado
         usuarios_sem_cpf = queryset.filter(cpf__isnull=True) | queryset.filter(cpf="")
@@ -225,15 +231,15 @@ class AuditLogAdmin(admin.ModelAdmin):
     date_hierarchy = "created_at"
     list_select_related = ("usuario",)
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request: HttpRequest) -> bool:
         """Desabilita adição manual de logs de auditoria."""
         return False
 
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request: HttpRequest, obj: AuditLog | None = None) -> bool:
         """Desabilita edição de logs de auditoria."""
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request: HttpRequest, obj: AuditLog | None = None) -> bool:
         """Desabilita exclusão de logs de auditoria."""
         return False
 

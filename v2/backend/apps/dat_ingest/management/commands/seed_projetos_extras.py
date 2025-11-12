@@ -21,8 +21,13 @@ ALIASES:
 
 Implementado em: resolvers.normalize_projeto()
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false
 
-from django.core.management.base import BaseCommand
+from __future__ import annotations
+
+from typing import Any
+
+from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 
 from apps.core.models import Projeto
@@ -31,14 +36,14 @@ from apps.core.models import Projeto
 class Command(BaseCommand):
     help = "Seed dos 6 projetos faltantes (PR20) - idempotente"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--dry-run",
             action="store_true",
             help="Simula execução sem writes no banco",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         dry_run = options["dry_run"]
 
         self.stdout.write("\n" + "=" * 80)

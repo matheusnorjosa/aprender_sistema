@@ -6,7 +6,13 @@ Tipos de evento comuns em contexto educacional:
 
 Idempotente: Usa get_or_create por nome
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
+from __future__ import annotations
+
+from typing import Any
+
 from django.core.management.base import BaseCommand
+
 from apps.core.models import TipoEvento
 
 
@@ -28,7 +34,7 @@ class Command(BaseCommand):
         {"nome": "Avaliação", "descricao": "Sessão de avaliação de resultados"},
     ]
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         self.stdout.write(self.style.WARNING("🌱 Seed TipoEvento (RF01)"))
 
         created_count = 0

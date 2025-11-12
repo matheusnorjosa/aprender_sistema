@@ -15,6 +15,8 @@ Uso:
     from apps.core.types import UserId, Status, ConflictCode
 """
 
+from __future__ import annotations
+
 from typing import Any, Callable, Literal, TypeAlias
 
 # ==============================================================================

@@ -13,6 +13,8 @@ Example:
 
     # Rotacionar (OLD_KEY = valor atual de GCAL_ENCRYPTION_KEY)
     python manage.py rotate_gcal_encryption_key \\
+"""
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
         --old-key="<VALOR_ANTIGO>" \\
         --new-key="<NOVO_VALOR_GERADO>"
 

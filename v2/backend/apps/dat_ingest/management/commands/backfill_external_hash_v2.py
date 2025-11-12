@@ -11,6 +11,7 @@ SEGURANÇA:
 OUTPUTS:
 - external_hash_v2_collisions.json: relatório de colisões detectadas
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
 

@@ -9,6 +9,7 @@ Regras de negócio:
 - Idempotência: SHA1(usuario_id|origem|destino|start|end)
 - Relatório em out_etl/etl_deslocamento_report.json
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
 

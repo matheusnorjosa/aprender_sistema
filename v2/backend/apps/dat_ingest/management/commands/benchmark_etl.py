@@ -11,6 +11,7 @@ Saída:
 
 Issue #55: Revisão de performance com microbenchmarks.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
 

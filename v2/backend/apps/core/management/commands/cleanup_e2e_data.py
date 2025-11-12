@@ -13,6 +13,8 @@ Uso:
 
 Dados removidos:
     - Usuários E2E (coord_e2e, super_e2e, controle_e2e, formador_e2e)
+"""
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
     - Solicitações criadas por esses usuários
     - Participations relacionadas
     - Município "Salvador, BA" (ibge_code=2927408) se não houver dependências

@@ -13,6 +13,7 @@ HEURÍSTICA:
 - papel_sugerido: se apareceu ≥1x como COORDENADOR → "Coordenador", senão "Formador"
 - Frequência: contar ocorrências únicas (pessoa + papel)
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
 

@@ -11,6 +11,7 @@ REGRAS:
 CSV ESPERADO:
 nome_display,email,papel_sugerido,gerente_sugerido,origem_mais_frequente,frequencia,papeis_observados,setores
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
 

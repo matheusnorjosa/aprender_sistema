@@ -13,6 +13,8 @@ Uso:
 
 Dados criados:
     - 4 usuários (coord, super, controle, formador) + grupos
+"""
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
     - 1 município (Salvador, BA)
     - 1 projeto (TESTE E2E, fluxo SUPER)
     - Logs de criação

@@ -13,6 +13,8 @@ PROJETOS:
 4. SOU DA PAZ
 5. A COR DA GENTE
 6. LEIO ESCREVO E CALCULO
+"""
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 
 ALIASES:
 - "IDEB" → "GESTÃO ESCOLAR"

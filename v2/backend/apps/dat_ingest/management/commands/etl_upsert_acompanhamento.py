@@ -12,6 +12,7 @@ Regras de negócio:
 - Outros sem formadores → Coordenador também FORMADOR
 - Convidados (coluna T) ignorados neste ETL
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
 

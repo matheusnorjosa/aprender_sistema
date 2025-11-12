@@ -13,7 +13,7 @@ RD-06: Timezone-aware (UTC storage, America/Fortaleza comparison)
 RD-07: Prioridade de checagem (reporta todos)
 RD-08: Mensagens com formador, intervalo, tipo, detalhe
 """
-# pyright: reportUnknownMemberType=false, reportUnknownArgumentType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
 

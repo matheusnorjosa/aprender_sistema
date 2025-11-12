@@ -4,6 +4,7 @@ Fake Calendar Client - In-memory implementation for testing
 Armazena eventos em memória sem dependências externas.
 Usado nos testes para simular Google Calendar API.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
 

@@ -86,7 +86,7 @@ def parse_deslocamentos(filepath: Path) -> list[dict[str, Any]]:
             continue
 
         # Calcular duração se não fornecida
-        if not duracao_min or duracao_min <= 0:
+        if not duracao_min or duracao_min <= 0:  # type: ignore[operator]
             duracao_min = int((chegada - saida).total_seconds() / 60)
 
         # Converter para int

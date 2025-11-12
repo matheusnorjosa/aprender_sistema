@@ -117,7 +117,7 @@ class Command(BaseCommand):
             help="Output JSON estruturado (para automação/Celery)",
         )
 
-    def handle(self, *args: Any, **options: Any) -> int:
+    def handle(self, *args: Any, **options: Any) -> int:  # type: ignore[override]
         # Timestamp início
         start_time = time.time()
         started_at = timezone.now()

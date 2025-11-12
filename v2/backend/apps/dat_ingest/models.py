@@ -1,7 +1,7 @@
 """
 Data Ingestion models
 """
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIncompatibleMethodOverride=false
 
 from __future__ import annotations
 
@@ -29,6 +29,7 @@ class ImportLog(models.Model):
     records_failed = models.IntegerField(default=0)
     error_message = models.TextField(blank=True)
 
+    # type: ignore[misc]
     class Meta:
         db_table = "dat_ingest_import_log"
         ordering = ["-started_at"]

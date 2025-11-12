@@ -276,7 +276,7 @@ class Command(BaseCommand):
         if not data_evento:
             return "pendente"
 
-        if data_evento < self.today:
+        if data_evento < self.today:  # type: ignore[operator]
             return "aprovado"
 
         source_sheet = evento.get("source_sheet", "").strip()

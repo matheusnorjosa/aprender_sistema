@@ -356,7 +356,7 @@ def exchange_code_for_tokens(code: str) -> dict:
         raise ValueError("❌ Variáveis OAuth não configuradas (client_id, client_secret, redirect_uri)")
 
     token_url: str = "https://oauth2.googleapis.com/token"
-    payload: dict[str, str] = {
+    payload: dict[str, str] = {  # type: ignore[assignment]
         "code": code,
         "client_id": client_id,
         "client_secret": client_secret,

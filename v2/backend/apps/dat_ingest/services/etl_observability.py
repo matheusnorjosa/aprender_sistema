@@ -89,7 +89,7 @@ def list_latest_reports(limit: int = 20) -> List[Dict[str, Any]]:
         return []
 
     # Ordenar por mtime (mais recente primeiro)
-    files.sort(key=lambda x: x['mtime_iso'], reverse=True)
+    files.sort(key=lambda x: x['mtime_iso'], reverse=True)  # type: ignore[misc]
 
     # Aplicar limite
     return files[:limit]

@@ -131,7 +131,7 @@ class AgendaProcessor:
             },
         }
 
-    def _infer_user(self, raw_value: str, missing_set: set) -> str:
+    def _infer_user(self, raw_value: str, missing_set: set[str]) -> str:
         """
         Infere usuário por email (exact match) ou nome (fuzzy match)
 

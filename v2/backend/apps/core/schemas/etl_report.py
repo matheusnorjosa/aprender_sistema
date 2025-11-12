@@ -29,7 +29,7 @@ Exemplo de uso:
 """
 # pyright: reportUnknownParameterType=false, reportMissingTypeArgument=false, reportUnknownMemberType=false, reportReturnType=false, reportArgumentType=false
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from datetime import datetime
 from typing import List, Dict, Optional, Literal
 import json
@@ -101,7 +101,7 @@ class ETLReport:
     metrics: ETLMetrics
     filters: Dict[str, str]
     errors: List[ETLError]
-    warnings: List[str] = None
+    warnings: List[str] = field(default_factory=list)
 
     def duration_seconds(self) -> float:
         """Calcula duração da execução em segundos"""

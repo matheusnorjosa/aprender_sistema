@@ -1,4 +1,5 @@
 from __future__ import annotations
+# pyright: reportMissingTypeArgument=false
 
 import csv
 import logging

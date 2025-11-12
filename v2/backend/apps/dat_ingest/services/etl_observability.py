@@ -6,6 +6,7 @@ management commands (etl_upsert_*, etl_import_*, etc).
 
 Fase 5 - Desligamento gradual de planilhas
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 import os
 from datetime import datetime

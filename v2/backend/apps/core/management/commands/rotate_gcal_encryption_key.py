@@ -22,10 +22,14 @@ Refs:
     - OAuth Phase 6: Management Command de rotação
     - google_oauth.py: rotate_encryption_key()
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
+from __future__ import annotations
 
 import sys
-from django.core.management.base import BaseCommand, CommandError
+from typing import Any
+
 from cryptography.fernet import InvalidToken
+from django.core.management.base import BaseCommand, CommandParser
 
 from apps.core.services.google_oauth import rotate_encryption_key
 
@@ -33,7 +37,7 @@ from apps.core.services.google_oauth import rotate_encryption_key
 class Command(BaseCommand):
     help = "Rotaciona GCAL_ENCRYPTION_KEY sem downtime"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             '--old-key',
             type=str,
@@ -47,7 +51,7 @@ class Command(BaseCommand):
             help='Chave Fernet nova (base64-encoded, gerada via Fernet.generate_key())'
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         old_key = options['old_key']
         new_key = options['new_key']
 

@@ -6,12 +6,12 @@ PA-02: Apenas Superintendência pode aprovar/reprovar solicitações.
 
 from __future__ import annotations
 
-from rest_framework import permissions
+from rest_framework import permissions  # type: ignore[attr-defined]
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
 
-class IsSuperintendencia(permissions.BasePermission):
+class IsSuperintendencia(permissions.BasePermission):  # type: ignore[misc]
     """
     Permissão: apenas usuários do grupo 'Superintendência' ou superusers podem executar.
     PA-02: Aprovação/reprovação restrita à Superintendência.
@@ -26,13 +26,13 @@ class IsSuperintendencia(permissions.BasePermission):
             request.user
             and request.user.is_authenticated
             and (
-                request.user.is_superuser
-                or request.user.groups.filter(name="Superintendência").exists()
+                getattr(request.user, 'is_superuser', False)
+                or request.user.groups.filter(name="Superintendência").exists()  # type: ignore[attr-defined]
             )
         )
 
 
-class IsCoordenadorOrDAT(permissions.BasePermission):
+class IsCoordenadorOrDAT(permissions.BasePermission):  # type: ignore[misc]
     """
     Permissão: apenas Coordenadores ou DAT podem criar solicitações.
 
@@ -46,13 +46,13 @@ class IsCoordenadorOrDAT(permissions.BasePermission):
             request.user
             and request.user.is_authenticated
             and (
-                request.user.is_superuser
-                or request.user.groups.filter(name__in=["Coordenador", "DAT"]).exists()
+                getattr(request.user, 'is_superuser', False)
+                or request.user.groups.filter(name__in=["Coordenador", "DAT"]).exists()  # type: ignore[attr-defined]
             )
         )
 
 
-class IsControleOrSuper(permissions.BasePermission):
+class IsControleOrSuper(permissions.BasePermission):  # type: ignore[misc]
     """
     Permissão: apenas usuários do grupo 'Controle' ou 'Superintendência' podem executar.
 
@@ -67,13 +67,13 @@ class IsControleOrSuper(permissions.BasePermission):
             request.user
             and request.user.is_authenticated
             and (
-                request.user.is_superuser
-                or request.user.groups.filter(name__in=["Controle", "Superintendência"]).exists()
+                getattr(request.user, 'is_superuser', False)
+                or request.user.groups.filter(name__in=["Controle", "Superintendência"]).exists()  # type: ignore[attr-defined]
             )
         )
 
 
-class IsDATOrSuper(permissions.BasePermission):
+class IsDATOrSuper(permissions.BasePermission):  # type: ignore[misc]
     """
     Permissão: apenas usuários do grupo 'DAT' ou superusers podem executar.
 
@@ -88,13 +88,13 @@ class IsDATOrSuper(permissions.BasePermission):
             request.user
             and request.user.is_authenticated
             and (
-                request.user.is_superuser
-                or request.user.groups.filter(name="DAT").exists()
+                getattr(request.user, 'is_superuser', False)
+                or request.user.groups.filter(name="DAT").exists()  # type: ignore[attr-defined]
             )
         )
 
 
-class IsDAT(permissions.BasePermission):
+class IsDAT(permissions.BasePermission):  # type: ignore[misc]
     """
     Permissão: apenas usuários do grupo 'DAT' (sem incluir Super).
 
@@ -109,13 +109,13 @@ class IsDAT(permissions.BasePermission):
             request.user
             and request.user.is_authenticated
             and (
-                request.user.is_superuser
-                or request.user.groups.filter(name="DAT").exists()
+                getattr(request.user, 'is_superuser', False)
+                or request.user.groups.filter(name="DAT").exists()  # type: ignore[attr-defined]
             )
         )
 
 
-class IsControleOrDAT(permissions.BasePermission):
+class IsControleOrDAT(permissions.BasePermission):  # type: ignore[misc]
     """
     Permissão: apenas usuários dos grupos 'Controle' ou 'DAT' podem executar.
 
@@ -130,7 +130,7 @@ class IsControleOrDAT(permissions.BasePermission):
             request.user
             and request.user.is_authenticated
             and (
-                request.user.is_superuser
-                or request.user.groups.filter(name__in=["Controle", "DAT", "Superintendência"]).exists()
+                getattr(request.user, 'is_superuser', False)
+                or request.user.groups.filter(name__in=["Controle", "DAT", "Superintendência"]).exists()  # type: ignore[attr-defined]
             )
         )

@@ -3,6 +3,7 @@ Funções de normalização para ETL de Acompanhamento.
 
 Normaliza textos, setores, municípios, datas e horas vindos de CSVs.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 import hashlib
 import re

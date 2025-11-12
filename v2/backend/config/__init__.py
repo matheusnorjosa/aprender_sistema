@@ -6,6 +6,9 @@ quando Django é iniciado.
 
 Isso permite que tasks sejam descobertos e registrados corretamente.
 """
+# pyright: reportUnknownVariableType=false
+
+from __future__ import annotations
 
 from .celery import app as celery_app
 

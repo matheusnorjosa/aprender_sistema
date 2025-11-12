@@ -18,8 +18,6 @@ Uso:
 
 Saída:
     - out_etl/assign_cpf_report.json (DRY-RUN ou APPLY)
-"""
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 
 Lógica:
     1. Match preferencial por email (1:1)
@@ -29,6 +27,7 @@ Lógica:
     5. DRY-RUN: relatar sem persistir
     6. APPLY: transaction.atomic() + save(update_fields=["cpf"])
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
 

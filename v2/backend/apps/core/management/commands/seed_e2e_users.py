@@ -13,14 +13,13 @@ Uso:
 
 Dados criados:
     - 4 usuários (coord, super, controle, formador) + grupos
-"""
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
     - 1 município (Salvador, BA)
     - 1 projeto (TESTE E2E, fluxo SUPER)
     - Logs de criação
 
 Fase 2 - Testes E2E (Playwright) - Plano DAT/GCal 2025-10-29
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 from __future__ import annotations
 
 from typing import Any

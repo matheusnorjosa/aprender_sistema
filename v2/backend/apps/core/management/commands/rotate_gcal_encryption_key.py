@@ -13,8 +13,6 @@ Example:
 
     # Rotacionar (OLD_KEY = valor atual de GCAL_ENCRYPTION_KEY)
     python manage.py rotate_gcal_encryption_key \\
-"""
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
         --old-key="<VALOR_ANTIGO>" \\
         --new-key="<NOVO_VALOR_GERADO>"
 
@@ -24,6 +22,7 @@ Refs:
     - OAuth Phase 6: Management Command de rotação
     - google_oauth.py: rotate_encryption_key()
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 from __future__ import annotations
 
 import sys

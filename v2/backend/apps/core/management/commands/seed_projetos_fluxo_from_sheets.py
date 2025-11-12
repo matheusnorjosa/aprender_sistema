@@ -12,8 +12,7 @@ Estrutura esperada:
 - Acompanhamento de Agenda:
   - Aba "Super" → SUPER
   - Outras abas → NAO_SUPER
-"""
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
+
 Matching:
 - Prioridade 1: código (case-insensitive)
 - Prioridade 2: nome normalizado (NFKD, casefold)
@@ -21,6 +20,7 @@ Matching:
 Idempotente: Só atualiza se fluxo mudou.
 Gera CSV com fonte/detalhe rastreável.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 from __future__ import annotations
 
 import csv

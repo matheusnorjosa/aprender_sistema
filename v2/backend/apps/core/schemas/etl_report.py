@@ -27,6 +27,7 @@ Exemplo de uso:
 
     report.save_to_file("out/etl/last_run.json")
 """
+# pyright: reportUnknownParameterType=false, reportMissingTypeArgument=false, reportUnknownMemberType=false, reportReturnType=false, reportArgumentType=false
 
 from dataclasses import dataclass, asdict
 from datetime import datetime

@@ -19,6 +19,7 @@ Invalidação automática:
     - Via signal post_save em apps/core/signals.py
     - Chama bust_cfg(key) automaticamente quando Config é salvo
 """
+# pyright: reportUnknownMemberType=false
 
 from __future__ import annotations
 

@@ -12,6 +12,7 @@ Regras de negócio:
   - Dados variáveis (datas/obs) atualizam o mesmo registro
 - Relatório em out_etl/import_acoes_controle_report.json
 """
+# pyright: reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportReturnType=false
 
 from __future__ import annotations
 

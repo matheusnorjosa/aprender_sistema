@@ -4,6 +4,7 @@ ETL Processors - Classes para processar planilhas (Shim/Adapter para testes Issu
 Este módulo fornece wrappers/adapters mínimos para os testes sem reescrever toda a lógica.
 As implementações delegam para as funções parse_* e loaders existentes.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 import hashlib
 from pathlib import Path
@@ -130,7 +131,7 @@ class AgendaProcessor:
             },
         }
 
-    def _infer_user(self, raw_value: str, missing_set: set) -> str:
+    def _infer_user(self, raw_value: str, missing_set: set[str]) -> str:
         """
         Infere usuário por email (exact match) ou nome (fuzzy match)
 

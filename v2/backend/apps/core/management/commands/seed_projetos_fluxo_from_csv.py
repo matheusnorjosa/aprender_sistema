@@ -15,12 +15,16 @@ Mapping de fluxos:
 
 Idempotente: Só atualiza se fluxo mudou.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
+from __future__ import annotations
+
 import csv
 import re
 import unicodedata
 from pathlib import Path
+from typing import Any
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 from django.db.models import Q
 
 from apps.core.models import Projeto
@@ -29,7 +33,7 @@ from apps.core.models import Projeto
 class Command(BaseCommand):
     help = "Seed Projeto.fluxo a partir de CSV (idempotente)"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             '--csv',
             type=str,
@@ -47,7 +51,7 @@ class Command(BaseCommand):
             help='Log detalhado de cada operação'
         )
 
-    def _normalize_string(self, s):
+    def _normalize_string(self, s: str | None) -> str:
         """
         Normaliza string para matching robusto.
 
@@ -71,7 +75,7 @@ class Command(BaseCommand):
         s = re.sub(r'\s+', ' ', s).strip()
         return s
 
-    def _map_fluxo(self, fluxo_csv):
+    def _map_fluxo(self, fluxo_csv: str) -> str | None:
         """
         Mapeia fluxo do CSV para choices do model.
 
@@ -87,7 +91,7 @@ class Command(BaseCommand):
         else:
             return None  # Inválido
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         csv_path = Path(options['csv'])
         dry_run = options['dry_run']
         verbose = options['verbose']

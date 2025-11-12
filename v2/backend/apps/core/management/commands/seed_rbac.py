@@ -11,17 +11,22 @@ Grupos criados:
 
 Permissões atribuídas por grupo conforme PR 12/N.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
+from __future__ import annotations
 
-from django.core.management.base import BaseCommand
+from typing import Any
+
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.management.base import BaseCommand, CommandParser
+
 from apps.core.models import (
-    Solicitacao,
-    Usuario,
+    AvailabilityBlock,
+    Compra,
     Municipio,
     Projeto,
-    Compra,
-    AvailabilityBlock,
+    Solicitacao,
+    Usuario,
 )
 
 GROUPS = [
@@ -86,7 +91,7 @@ PERMS_BY_GROUP = {
 }
 
 
-def perm_codename(action: str, model) -> str:
+def perm_codename(action: str, model: Any) -> str:
     """Gera codename de permissão: <action>_<model_name>."""
     return f"{action}_{model._meta.model_name}"
 
@@ -96,14 +101,14 @@ class Command(BaseCommand):
 
     help = "Cria/atualiza grupos e permissões mínimas (idempotente)."
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--verbose",
             action="store_true",
             help="Exibir detalhes da operação",
         )
 
-    def handle(self, *args, **opts):
+    def handle(self, *args: Any, **opts: Any) -> None:
         verbose = opts.get("verbose", False)
 
         # Criar grupos

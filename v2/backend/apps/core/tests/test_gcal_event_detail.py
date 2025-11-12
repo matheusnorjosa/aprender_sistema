@@ -99,17 +99,18 @@ class TestEventDetail:
         com todos os campos esperados.
         """
         # Criar alguns logs de auditoria para timeline
-        AuditLog.objects.create(
-            usuario=usuario_controle,
-            action="PUBLISH_GCAL",
-            model_name="Solicitacao",
-            details={"solicitacao_id": solicitacao_aprovada.id, "dry_run": False, "status": "success"},
-        )
+        # Ordem: primeiro PUBLISH_GCAL_REQUESTED (mais antigo), depois PUBLISH_GCAL (mais recente)
         AuditLog.objects.create(
             usuario=None,  # Sistema
             action="PUBLISH_GCAL_REQUESTED",
             model_name="Solicitacao",
             details={"solicitacao_id": solicitacao_aprovada.id},
+        )
+        AuditLog.objects.create(
+            usuario=usuario_controle,
+            action="PUBLISH_GCAL",
+            model_name="Solicitacao",
+            details={"solicitacao_id": solicitacao_aprovada.id, "dry_run": False, "status": "success"},
         )
 
         client = APIClient()

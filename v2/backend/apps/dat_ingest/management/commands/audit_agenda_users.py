@@ -17,19 +17,23 @@ Saída:
     - out_etl/audit_users_encontrados_por_aba.csv
 """
 
-import json
+from __future__ import annotations
+
 import csv
+import json
 import unicodedata
 from pathlib import Path
-from django.core.management.base import BaseCommand
+from typing import Any
+
 from django.conf import settings
+from django.core.management.base import BaseCommand, CommandParser
 from openpyxl import load_workbook
 from rapidfuzz import fuzz
 
 from apps.dat_ingest import constants
 
 
-def normalize_text(text):
+def normalize_text(text: str | None) -> str:
     """Normaliza texto: NFKD, lowercase, strip."""
     if not text:
         return ""
@@ -40,12 +44,12 @@ def normalize_text(text):
     return normalized.lower().strip()
 
 
-def extract_tokens(name):
+def extract_tokens(name: str) -> set[str]:
     """Extrai tokens de um nome (split por espaços)."""
     return set(normalize_text(name).split())
 
 
-def jaccard_similarity(set1, set2):
+def jaccard_similarity(set1: set[str], set2: set[str]) -> float:
     """Calcula similaridade Jaccard entre dois conjuntos."""
     if not set1 or not set2:
         return 0.0
@@ -54,7 +58,7 @@ def jaccard_similarity(set1, set2):
     return len(intersection) / len(union) if union else 0.0
 
 
-def match_by_name(agenda_name, cadastrados_map, threshold=None):
+def match_by_name(agenda_name: str, cadastrados_map: dict[str, dict[str, Any]], threshold: float | None = None) -> tuple[str | None, float]:
     """
     Tenta encontrar match de agenda_name nos cadastrados.
 

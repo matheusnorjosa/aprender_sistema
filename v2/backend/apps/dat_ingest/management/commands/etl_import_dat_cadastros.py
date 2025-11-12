@@ -6,9 +6,12 @@ Usage:
     python manage.py etl_import_dat_cadastros /path/to/file.xlsx
 """
 
-from pathlib import Path
+from __future__ import annotations
 
-from django.core.management.base import BaseCommand, CommandError
+from pathlib import Path
+from typing import Any
+
+from django.core.management.base import BaseCommand, CommandError, CommandParser
 
 from apps.core.services.dat_cadastros_import import import_dat_cadastros
 
@@ -16,7 +19,7 @@ from apps.core.services.dat_cadastros_import import import_dat_cadastros
 class Command(BaseCommand):
     help = "Import AcaoDAT from CSV/XLSX (idempotent via external_hash)"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "file_path",
             type=str,
@@ -28,7 +31,7 @@ class Command(BaseCommand):
             help="Simulate without writing to DB",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         file_path = Path(options["file_path"])
         dry_run = options["dry_run"]
 

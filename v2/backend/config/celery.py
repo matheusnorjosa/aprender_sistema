@@ -32,7 +32,7 @@ app.autodiscover_tasks()
 
 
 @app.task(bind=True)
-def debug_task(self):
+def debug_task(self) -> None:  # type: ignore[no-untyped-def]
     """
     Debug task for testing Celery setup.
     Usage: from config.celery import debug_task; debug_task.delay()

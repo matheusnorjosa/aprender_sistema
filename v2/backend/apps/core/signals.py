@@ -13,6 +13,10 @@ Registro:
     - Registrado em apps/core/apps.py no método ready()
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -21,7 +25,7 @@ from apps.core.services.config_service import bust_cfg
 
 
 @receiver(post_save, sender=Config)
-def _cfg_invalidate(sender, instance, **kwargs):
+def _cfg_invalidate(sender: type[Config], instance: Config, **kwargs: Any) -> None:
     """
     Invalida cache quando Config é salvo.
 

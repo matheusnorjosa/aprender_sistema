@@ -94,7 +94,7 @@ def resolve_user_by_name(name: str) -> Optional[User]:
     return None
 
 
-def _nfkd(value):
+def _nfkd(value: str | None) -> str:
     """
     Normaliza string para comparação: NFKD + casefold + ASCII.
 
@@ -108,7 +108,7 @@ def _nfkd(value):
     return v.casefold()
 
 
-def _split_city_uf(raw: str) -> Tuple[str, Optional[str]]:
+def _split_city_uf(raw: str | None) -> Tuple[str, Optional[str]]:
     """
     Separa município e UF de formatos variados:
     - "Cidade - UF"

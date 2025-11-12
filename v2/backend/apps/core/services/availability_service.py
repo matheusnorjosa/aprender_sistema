@@ -14,6 +14,8 @@ RD-07: Prioridade de checagem (reporta todos)
 RD-08: Mensagens com formador, intervalo, tipo, detalhe
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 

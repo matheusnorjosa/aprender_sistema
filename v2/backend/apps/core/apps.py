@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from django.apps import AppConfig
 
 
@@ -6,7 +8,7 @@ class CoreConfig(AppConfig):
     name = "apps.core"
     verbose_name = "Core"
 
-    def ready(self):
+    def ready(self) -> None:
         """
         Importa signals e admin para registrar auto-invalidação de cache e modelos.
 

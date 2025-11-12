@@ -20,11 +20,15 @@ Dados removidos:
 
 Fase 2 - Testes E2E (Playwright) - Plano DAT/GCal 2025-10-29
 """
+from __future__ import annotations
 
-from django.core.management.base import BaseCommand
+from typing import Any
+
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
-from apps.core.models import Municipio, Projeto, Solicitacao, Participation
+
+from apps.core.models import Municipio, Participation, Projeto, Solicitacao
 
 User = get_user_model()
 
@@ -32,14 +36,14 @@ User = get_user_model()
 class Command(BaseCommand):
     help = "Remove dados de testes E2E (Playwright) criados por seed_e2e_users"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             '--dry-run',
             action='store_true',
             help='Apenas exibe o que seria deletado, sem aplicar mudanças',
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         dry_run = options.get('dry_run', False)
 
         self.stdout.write("=" * 80)
@@ -85,7 +89,7 @@ class Command(BaseCommand):
             if dry_run:
                 transaction.set_rollback(True)
 
-    def _delete_users(self, dry_run):
+    def _delete_users(self, dry_run: bool) -> dict[str, int]:
         """Remove usuários E2E e seus dados relacionados."""
         e2e_usernames = [
             "coord_e2e@test.com",
@@ -125,7 +129,7 @@ class Command(BaseCommand):
             'participations': participations_count,
         }
 
-    def _delete_municipio(self, dry_run):
+    def _delete_municipio(self, dry_run: bool) -> bool:
         """Remove município de teste se não houver dependências."""
         try:
             municipio = Municipio.objects.get(ibge_code="2927408")  # Salvador
@@ -151,7 +155,7 @@ class Command(BaseCommand):
             self.stdout.write("   ⏭️  Município não encontrado")
             return False
 
-    def _delete_projeto(self, dry_run):
+    def _delete_projeto(self, dry_run: bool) -> bool:
         """Remove projeto de teste se não houver dependências."""
         try:
             projeto = Projeto.objects.get(codigo="E2E")

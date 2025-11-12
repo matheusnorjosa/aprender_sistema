@@ -4,6 +4,8 @@ Google Calendar Client - Real implementation
 Cliente real para Google Calendar API usando Service Account.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os

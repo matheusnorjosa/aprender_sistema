@@ -10,15 +10,17 @@ Regras de negócio:
 - Relatório em out_etl/etl_deslocamento_report.json
 """
 
+from __future__ import annotations
+
 import csv
 import hashlib
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 
 from apps.core.models import Deslocamento
@@ -31,7 +33,7 @@ from apps.dat_ingest.services.resolvers import (
 class Command(BaseCommand):
     help = "ETL de Deslocamentos: upsert idempotente de Deslocamento"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--file",
             type=str,
@@ -44,7 +46,7 @@ class Command(BaseCommand):
             help="Simula execução sem writes no banco",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         self.dry_run = options["dry_run"]
         self.file_path = options["file"]
 
@@ -93,7 +95,7 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("\n✅ ETL concluído!"))
 
-    def load_file(self) -> List[Dict[str, Any]]:
+    def load_file(self) -> list[dict[str, Any]]:
         """
         Carrega CSV ou XLSX em memória.
 
@@ -114,7 +116,7 @@ class Command(BaseCommand):
         else:
             raise ValueError(f"Formato não suportado: {file_path.suffix}")
 
-    def _load_csv(self, file_path: Path) -> List[Dict[str, Any]]:
+    def _load_csv(self, file_path: Path) -> list[dict[str, Any]]:
         """Carrega CSV com headers flexíveis."""
         rows = []
         with open(file_path, "r", encoding="utf-8") as f:

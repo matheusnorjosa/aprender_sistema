@@ -2,11 +2,14 @@
 ETL Command: Load .xlsx files to staging tables
 """
 
+from __future__ import annotations
+
 import os
 from pathlib import Path
+from typing import Any
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 
 from apps.dat_ingest.models import ImportLog, StgMunicipio, StgProjeto, StgTipoEvento, StgUsuario
@@ -23,7 +26,7 @@ from apps.dat_ingest.services.loaders import (
 class Command(BaseCommand):
     help = "Load .xlsx files from DATA_IMPORT_DIR to staging tables (idempotent via SHA256)"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--dir",
             type=str,
@@ -37,7 +40,7 @@ class Command(BaseCommand):
             help="Process only specific entity type",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         directory = Path(options["dir"])
         dry_run = options["dry_run"]
         only = options["only"]
@@ -57,7 +60,7 @@ class Command(BaseCommand):
             self._process_file(filepath, dry_run=dry_run, only=only)
 
     @transaction.atomic
-    def _process_file(self, filepath: Path, dry_run: bool = False, only: str = None):
+    def _process_file(self, filepath: Path, dry_run: bool = False, only: str | None = None) -> None:
         """Process single Excel file"""
         digest = compute_file_hash(filepath)
 

@@ -5,6 +5,8 @@ Armazena eventos em memória sem dependências externas.
 Usado nos testes para simular Google Calendar API.
 """
 
+from __future__ import annotations
+
 from apps.core.services.gcal_sync_service import CalendarClientAdapter
 from apps.core.types import CalendarId, EventId, JsonDict
 

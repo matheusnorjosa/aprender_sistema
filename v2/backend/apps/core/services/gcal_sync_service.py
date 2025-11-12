@@ -12,6 +12,8 @@ Regras:
 - PA-01: Não auto-aprova nada
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
@@ -23,9 +25,10 @@ from typing import Any, Literal, TypeAlias, TypeVar
 from uuid import uuid4
 
 from django.conf import settings
+from django.db.models import QuerySet
 from django.utils import timezone
 
-from apps.core.models import Solicitacao, Participation
+from apps.core.models import Participation, Solicitacao
 from apps.core.types import CalendarId, EventId, JsonDict, MeetLink, PayloadHash
 
 logger = logging.getLogger(__name__)

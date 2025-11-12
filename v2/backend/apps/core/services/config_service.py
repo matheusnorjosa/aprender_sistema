@@ -20,6 +20,8 @@ Invalidação automática:
     - Chama bust_cfg(key) automaticamente quando Config é salvo
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 from django.core.cache import cache

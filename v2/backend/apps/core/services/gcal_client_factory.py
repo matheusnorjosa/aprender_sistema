@@ -4,6 +4,8 @@ Factory para selecionar cliente do Google Calendar (fake vs real).
 Retorna instância do cliente apropriado baseado em settings.GCAL_CLIENT.
 """
 
+from __future__ import annotations
+
 import os
 from typing import TYPE_CHECKING
 

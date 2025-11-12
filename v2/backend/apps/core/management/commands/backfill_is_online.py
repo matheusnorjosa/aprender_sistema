@@ -1,15 +1,20 @@
 """
 Management command to backfill tipo (CharField) from original spreadsheet
 """
+from __future__ import annotations
+
+from typing import Any
+
 import pandas as pd
 from django.core.management.base import BaseCommand
+
 from apps.core.models import Solicitacao, TipoEvento
 
 
 class Command(BaseCommand):
     help = "Backfill tipo (CharField) from original spreadsheet column G"
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         file_path = '/app/data/csv-import/Cópia de Acompanhamento de Agenda _ 2025.xlsx'
         abas = ['ACerta', 'Outros', 'Super', 'Brincando', 'Vidas']
 

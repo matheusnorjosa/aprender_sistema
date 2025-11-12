@@ -19,11 +19,15 @@ Dados criados:
 
 Fase 2 - Testes E2E (Playwright) - Plano DAT/GCal 2025-10-29
 """
+from __future__ import annotations
 
-from django.core.management.base import BaseCommand
+from typing import Any
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.management.base import BaseCommand
 from django.db import transaction
+
 from apps.core.models import Municipio, Projeto
 
 User = get_user_model()
@@ -32,7 +36,7 @@ User = get_user_model()
 class Command(BaseCommand):
     help = "Cria usuários e dados mínimos para testes E2E (Playwright)"
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         self.stdout.write("=" * 80)
         self.stdout.write("SEED E2E USERS — Testes Playwright")
         self.stdout.write("=" * 80)
@@ -76,7 +80,7 @@ class Command(BaseCommand):
                 self.stdout.write(f"   - {usuario.username} (grupos: {grupos_str}){flags_str}")
             self.stdout.write("=" * 80)
 
-    def _create_users(self, grupos):
+    def _create_users(self, grupos: dict[str, Group]) -> list[Any]:
         """Cria 4 usuários para testes E2E."""
         users_data = [
             {
@@ -150,7 +154,7 @@ class Command(BaseCommand):
 
         return usuarios_criados
 
-    def _create_municipio(self):
+    def _create_municipio(self) -> Municipio:
         """Cria município para testes E2E."""
         municipio, created = Municipio.objects.get_or_create(
             ibge_code="2927408",  # Salvador
@@ -165,7 +169,7 @@ class Command(BaseCommand):
         self.stdout.write(f"   {status}: {municipio.nome} ({municipio.uf})")
         return municipio
 
-    def _create_projeto(self, municipio):
+    def _create_projeto(self, municipio: Municipio) -> Projeto:
         """Cria projeto para testes E2E."""
         projeto, created = Projeto.objects.get_or_create(
             codigo="E2E",

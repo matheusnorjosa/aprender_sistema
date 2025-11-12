@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from django.contrib import admin
 
 from .models import ImportLog
 
 
 @admin.register(ImportLog)
-class ImportLogAdmin(admin.ModelAdmin):
+class ImportLogAdmin(admin.ModelAdmin[ImportLog]):
     list_display = (
         "file",
         "ok",

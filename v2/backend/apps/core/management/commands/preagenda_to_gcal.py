@@ -33,16 +33,18 @@ Exemplos:
     # IDs específicos
     python manage.py preagenda_to_gcal --ids 1,2,3 --dry-run
 """
+from __future__ import annotations
 
 import json
 import sys
 import time
 import uuid
 from datetime import datetime, timedelta
+from typing import Any
 
 from django.conf import settings
 from django.core.cache import cache
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 from django.utils import timezone
 
@@ -54,7 +56,7 @@ from apps.core.services.gcal_sync_service import upsert_one
 class Command(BaseCommand):
     help = "Sincroniza solicitações aprovadas com o Google Calendar (pré-agenda)"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--calendar-id",
             type=str,
@@ -113,7 +115,7 @@ class Command(BaseCommand):
             help="Output JSON estruturado (para automação/Celery)",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> int:
         # Timestamp início
         start_time = time.time()
         started_at = timezone.now()

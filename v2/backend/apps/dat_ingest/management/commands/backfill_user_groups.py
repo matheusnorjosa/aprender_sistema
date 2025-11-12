@@ -16,8 +16,12 @@ USO:
     python manage.py backfill_user_groups --apply     # Aplica
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 from django.contrib.auth.models import Group
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 from django.db.models import Count, Q
 
@@ -27,7 +31,7 @@ from apps.core.models import Usuario
 class Command(BaseCommand):
     help = "Atribui grupos aos usuários baseado em participações históricas"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--dry-run",
             action="store_true",
@@ -39,7 +43,7 @@ class Command(BaseCommand):
             help="Aplica mudanças no banco",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         dry_run = options.get("dry_run", False)
         apply = options.get("apply", False)
 

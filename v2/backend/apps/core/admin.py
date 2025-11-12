@@ -1,9 +1,12 @@
 import csv
 import logging
 from pathlib import Path
+from typing import Any
+
 from django.contrib import admin
 from django.conf import settings
-from django.http import HttpResponse
+from django.db.models import QuerySet
+from django.http import HttpRequest, HttpResponse
 
 # Fase 1 - Plano DAT/GCal: Admin restrito a superusers
 from .admin_site import admin_site
@@ -29,13 +32,13 @@ class CPFFilter(admin.SimpleListFilter):
     title = "CPF"
     parameter_name = "cpf_status"
 
-    def lookups(self, request, model_admin):
-        return (
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[Any, str]]:
+        return [
             ("missing", "Ausente"),
             ("filled", "Preenchido"),
-        )
+        ]
 
-    def queryset(self, request, queryset):
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Any]) -> QuerySet[Any] | None:
         if self.value() == "missing":
             return queryset.filter(cpf__isnull=True) | queryset.filter(cpf="")
         if self.value() == "filled":
@@ -43,14 +46,14 @@ class CPFFilter(admin.SimpleListFilter):
         return queryset
 
 
-class UsuarioAdmin(admin.ModelAdmin):
+class UsuarioAdmin(admin.ModelAdmin[Usuario]):
     list_display = ("username", "email", "cpf", "cargo", "is_active")
     search_fields = ("username", "email", "cpf", "first_name", "last_name")
     list_filter = ("is_active", "is_staff", "cargo", CPFFilter)
     actions = ["export_usuarios_sem_cpf"]
 
     @admin.action(description="Exportar usuários sem CPF (CSV)")
-    def export_usuarios_sem_cpf(self, request, queryset):
+    def export_usuarios_sem_cpf(self, request: HttpRequest, queryset: QuerySet[Usuario]) -> HttpResponse:
         """Exporta usuários sem CPF para CSV."""
         # Filtrar apenas usuários sem CPF no queryset selecionado
         usuarios_sem_cpf = queryset.filter(cpf__isnull=True) | queryset.filter(cpf="")
@@ -100,25 +103,25 @@ class UsuarioAdmin(admin.ModelAdmin):
         return response
 
 
-class MunicipioAdmin(admin.ModelAdmin):
+class MunicipioAdmin(admin.ModelAdmin[Municipio]):
     list_display = ("nome", "uf", "ativo")
     search_fields = ("nome", "uf")
     list_filter = ("uf", "ativo")
 
 
-class ProjetoAdmin(admin.ModelAdmin):
+class ProjetoAdmin(admin.ModelAdmin[Projeto]):
     list_display = ("nome", "ativo")
     search_fields = ("nome", "descricao")
     list_filter = ("ativo",)
 
 
-class TipoEventoAdmin(admin.ModelAdmin):
+class TipoEventoAdmin(admin.ModelAdmin[TipoEvento]):
     list_display = ("nome", "cor", "descricao")
     search_fields = ("nome", "descricao")
     list_filter = ()
 
 
-class AvailabilityBlockAdmin(admin.ModelAdmin):
+class AvailabilityBlockAdmin(admin.ModelAdmin[AvailabilityBlock]):
     list_display = ("usuario", "tipo", "inicio", "fim", "status", "created_at")
     search_fields = ("usuario__username", "usuario__email", "motivo")
     list_filter = ("tipo", "status", "created_at")
@@ -126,7 +129,7 @@ class AvailabilityBlockAdmin(admin.ModelAdmin):
     date_hierarchy = "inicio"
 
 
-class SolicitacaoAdmin(admin.ModelAdmin):
+class SolicitacaoAdmin(admin.ModelAdmin[Solicitacao]):
     list_display = (
         "usuario",
         "tipo_evento",
@@ -147,7 +150,7 @@ class SolicitacaoAdmin(admin.ModelAdmin):
     date_hierarchy = "inicio"
 
 
-class ParticipationAdmin(admin.ModelAdmin):
+class ParticipationAdmin(admin.ModelAdmin[Participation]):
     list_display = ("solicitacao", "usuario", "role", "ch_horas", "created_at")
     list_filter = ("role",)
     search_fields = (
@@ -161,7 +164,7 @@ class ParticipationAdmin(admin.ModelAdmin):
     list_select_related = ("solicitacao", "usuario")
 
 
-class CompraAdmin(admin.ModelAdmin):
+class CompraAdmin(admin.ModelAdmin[Compra]):
     list_display = ("codigo", "municipio", "projeto", "quantidade", "data", "uso")
     list_filter = ("projeto", "data")
     search_fields = ("codigo", "municipio__nome", "projeto__nome", "uso")
@@ -170,7 +173,7 @@ class CompraAdmin(admin.ModelAdmin):
     date_hierarchy = "data"
 
 
-class DeslocamentoAdmin(admin.ModelAdmin):
+class DeslocamentoAdmin(admin.ModelAdmin[Deslocamento]):
     list_display = ("usuario", "origem", "destino", "start_date", "end_date")
     list_filter = ("usuario", "start_date")
     search_fields = ("origem", "destino", "usuario__username")
@@ -179,7 +182,7 @@ class DeslocamentoAdmin(admin.ModelAdmin):
     date_hierarchy = "start_date"
 
 
-class AcaoControleAdmin(admin.ModelAdmin):
+class AcaoControleAdmin(admin.ModelAdmin[AcaoControle]):
     list_display = (
         "municipio",
         "projeto",
@@ -202,7 +205,7 @@ class AcaoControleAdmin(admin.ModelAdmin):
     date_hierarchy = "data_reuniao"
 
 
-class AcaoDATAdmin(admin.ModelAdmin):
+class AcaoDATAdmin(admin.ModelAdmin[AcaoDAT]):
     list_display = ("municipio", "projeto", "tipo_acao", "responsavel", "data_registro")
     list_filter = ("projeto", "tipo_acao")
     search_fields = ("municipio__nome", "projeto__nome", "tipo_acao", "responsavel__email")
@@ -211,7 +214,7 @@ class AcaoDATAdmin(admin.ModelAdmin):
     date_hierarchy = "data_registro"
 
 
-class AuditLogAdmin(admin.ModelAdmin):
+class AuditLogAdmin(admin.ModelAdmin[AuditLog]):
     """
     AuditLog Admin - Somente Leitura
 
@@ -225,15 +228,15 @@ class AuditLogAdmin(admin.ModelAdmin):
     date_hierarchy = "created_at"
     list_select_related = ("usuario",)
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request: HttpRequest) -> bool:
         """Desabilita adição manual de logs de auditoria."""
         return False
 
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request: HttpRequest, obj: AuditLog | None = None) -> bool:
         """Desabilita edição de logs de auditoria."""
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request: HttpRequest, obj: AuditLog | None = None) -> bool:
         """Desabilita exclusão de logs de auditoria."""
         return False
 

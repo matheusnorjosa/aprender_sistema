@@ -5,8 +5,13 @@ Implements CPF-based authentication alongside username authentication.
 """
 
 import re
+from typing import Any
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
+from django.http import HttpRequest
+
+from .models import Usuario
 
 
 User = get_user_model()
@@ -29,7 +34,13 @@ class CPFOrUsernameBackend(ModelBackend):
         - "joao@example.com" → username lookup (not email)
     """
 
-    def authenticate(self, request, username=None, password=None, **kwargs):
+    def authenticate(
+        self,
+        request: HttpRequest | None,
+        username: str | None = None,
+        password: str | None = None,
+        **kwargs: Any
+    ) -> Usuario | None:
         """
         Authenticate user by CPF or username.
 

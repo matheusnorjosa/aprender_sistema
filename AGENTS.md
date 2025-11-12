@@ -3,7 +3,7 @@ Aprender Sistema v2 — Contexto Consolidado para o Agente
 Este arquivo fornece ao agente (Codex/MCP) o contexto permanente do projeto v2, para ser carregado automaticamente a cada sessão. Use-o como referência para decisões, nomes, convenções e restrições. Não repita trechos extensos em mensagens; apenas siga estas diretrizes.
 
 Visão Geral
-- Projeto v2‑only (v1 arquivado em `archive/v1_legado/`). Docker‑first obrigatório.
+- Projeto v2. Docker‑first obrigatório.
 - Backend: Django 5.1.x + DRF; Celery (worker + beat); PostgreSQL 15; Redis 7.
 - Frontend: React (Vite), Tailwind. Dev server com proxy `vite` para `/api` → backend.
 - Compose oficial: `v2/infra/docker-compose.yml` com `COMPOSE_PROJECT_NAME=aprender_v2`.

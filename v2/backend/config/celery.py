@@ -11,6 +11,7 @@ Comandos:
 - Worker: celery -A config worker -l info
 - Beat: celery -A config beat -l info
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportCallIssue=false, reportUntypedFunctionDecorator=false
 
 from __future__ import annotations
 

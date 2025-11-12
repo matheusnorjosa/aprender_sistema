@@ -3,6 +3,7 @@ Funções para resolver Foreign Keys (FKs) a partir de nomes/emails.
 
 Usado pelo ETL de Acompanhamento para encontrar objetos existentes no banco.
 """
+# pyright: reportInvalidTypeForm=false, reportUnknownParameterType=false
 
 import re
 import unicodedata

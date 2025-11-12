@@ -4,6 +4,7 @@ ETL Processors - Classes para processar planilhas (Shim/Adapter para testes Issu
 Este módulo fornece wrappers/adapters mínimos para os testes sem reescrever toda a lógica.
 As implementações delegam para as funções parse_* e loaders existentes.
 """
+# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportUnknownVariableType=false, reportArgumentType=false, reportUnknownMemberType=false
 
 import hashlib
 from pathlib import Path

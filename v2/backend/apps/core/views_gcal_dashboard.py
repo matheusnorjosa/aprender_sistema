@@ -25,12 +25,14 @@ from django.db.models import QuerySet
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+import csv
 import logging
 import os
 from datetime import date, datetime
 
 from django.conf import settings
 from django.db.models import Count, Q
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
@@ -878,3 +880,146 @@ class GCalBatchResyncView(APIView):
             'dry_run': dry_run,
             'apply_blocked': apply_blocked
         }, status=status.HTTP_202_ACCEPTED)
+
+
+# ================================================================
+# Issue #96 - Export CSV/JSON
+# ================================================================
+
+class DashboardEventsExportView(APIView):
+    """
+    GET /api/gcal/dashboard/events/export/
+
+    Exporta eventos do Dashboard GCal em CSV ou JSON.
+
+    Query params:
+    - status: Filtro por gcal_status (NONE/PENDING/PUBLISHED/ERROR)
+    - start (ISO date): Filtro início >= start (formato: YYYY-MM-DD)
+    - end (ISO date): Filtro início <= end (formato: YYYY-MM-DD)
+    - format: csv|json (default: csv)
+
+    CSV Response:
+    - Content-Type: text/csv; charset=utf-8
+    - Content-Disposition: attachment; filename=gcal_events_{YYYYMMDD}.csv
+    - BOM UTF-8 para compatibilidade Excel
+    - Separador ","
+    - Datas em ISO 8601
+
+    JSON Response:
+    - Content-Type: application/json
+    - Estrutura: {count, results} (sem paginação)
+
+    Permissions: IsControleOrSuper
+    """
+    permission_classes = [IsAuthenticated, IsControleOrSuper]
+
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response | HttpResponse:
+        # Base queryset: apenas aprovadas, com select_related igual ao DashboardEventsView
+        qs = Solicitacao.objects.filter(status='aprovado').select_related(
+            'usuario', 'municipio', 'tipo_evento', 'projeto', 'coordenador'
+        )
+
+        # Aplicar mesmos filtros do DashboardEventsView
+        status_param = request.query_params.get('status')
+        if status_param:
+            qs = qs.filter(gcal_status=status_param)
+
+        start_param = request.query_params.get('start')
+        if start_param:
+            try:
+                start_date = date.fromisoformat(start_param)
+                qs = qs.filter(inicio__date__gte=start_date)
+            except (ValueError, TypeError):
+                pass
+
+        end_param = request.query_params.get('end')
+        if end_param:
+            try:
+                end_date = date.fromisoformat(end_param)
+                qs = qs.filter(inicio__date__lte=end_date)
+            except (ValueError, TypeError):
+                pass
+
+        # Ordenação: updated_at desc (mesma do DashboardEventsView)
+        qs = qs.order_by('-updated_at', '-id')
+
+        # Determinar formato (default: csv)
+        # Usamos 'export_format' em vez de 'format' para evitar conflito com DRF content negotiation
+        export_format = request.query_params.get('export_format', request.query_params.get('format', 'csv')).lower()
+
+        if export_format == 'json':
+            return self._export_json(qs)
+        else:
+            return self._export_csv(qs)
+
+    def _export_csv(self, qs: QuerySet[Solicitacao]) -> HttpResponse:
+        """Exporta queryset como CSV com BOM UTF-8 para Excel"""
+        # Gerar nome do arquivo com timestamp
+        today = date.today().strftime('%Y%m%d')
+        filename = f'gcal_events_{today}.csv'
+
+        # Criar response com Content-Type e Content-Disposition
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        # Escrever BOM UTF-8 para compatibilidade Excel
+        response.write('\ufeff')
+
+        # Criar writer CSV
+        writer = csv.writer(response)
+
+        # Escrever cabeçalhos (ordem definida na especificação)
+        writer.writerow([
+            'id',
+            'municipio',
+            'projeto',
+            'tipo_evento',
+            'inicio',
+            'fim',
+            'usuario',
+            'coordenador',
+            'fluxo',
+            'gcal_status',
+            'external_event_id',
+            'gcal_last_sync_at',
+            'gcal_last_error',
+            'meet_link',
+            'gcal_payload_hash',
+            'updated_at'
+        ])
+
+        # Escrever linhas
+        for s in qs.iterator():
+            # Determinar fluxo (SUPER ou NAO_SUPER)
+            fluxo = s.projeto.fluxo if s.projeto else ''
+
+            writer.writerow([
+                s.id,
+                s.municipio.nome if s.municipio else '',
+                s.projeto.nome if s.projeto else '',
+                s.tipo_evento.nome if s.tipo_evento else '',
+                s.inicio.isoformat() if s.inicio else '',
+                s.fim.isoformat() if s.fim else '',
+                s.usuario.username if s.usuario else '',
+                s.coordenador.username if s.coordenador else '',
+                fluxo,
+                s.gcal_status,
+                s.external_event_id or '',
+                s.gcal_last_sync_at.isoformat() if s.gcal_last_sync_at else '',
+                s.gcal_last_error or '',
+                s.meet_link or '',
+                s.gcal_payload_hash or '',
+                s.updated_at.isoformat() if s.updated_at else ''
+            ])
+
+        return response
+
+    def _export_json(self, qs: QuerySet[Solicitacao]) -> Response:
+        """Exporta queryset como JSON com estrutura {count, results}"""
+        # Serializar sem paginação (exporta tudo filtrado)
+        serializer = SolicitacaoSerializer(qs, many=True)
+
+        return Response({
+            'count': len(serializer.data),
+            'results': serializer.data
+        })

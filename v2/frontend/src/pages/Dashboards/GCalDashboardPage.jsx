@@ -26,6 +26,11 @@ import {
   Skeleton,
   Button,
   Dropdown,
+  Drawer,
+  Descriptions,
+  Timeline,
+  Divider,
+  Spin,
 } from 'antd';
 import {
   CheckCircleOutlined,
@@ -37,6 +42,9 @@ import {
   ReloadOutlined,
   DownloadOutlined,
   DownOutlined,
+  EyeOutlined,
+  RedoOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -84,6 +92,12 @@ export default function GCalDashboardPage() {
     dayjs().add(30, 'days'),
   ]);
   const [statusFilter, setStatusFilter] = useState(null);
+
+  // Drawer (Issue #98)
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState(null);
+  const [eventDetail, setEventDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     loadMetrics();
@@ -189,6 +203,114 @@ export default function GCalDashboardPage() {
     const exportUrl = `/api/gcal/dashboard/events/export/?${params}`;
     window.open(exportUrl, '_blank');
     message.success(`Exportação ${format.toUpperCase()} iniciada!`);
+  };
+
+  // Issue #98: Abrir Drawer com detalhes do evento
+  const handleRowClick = async (record) => {
+    setSelectedEventId(record.id);
+    setDrawerOpen(true);
+    await loadEventDetail(record.id);
+  };
+
+  // Issue #98: Buscar detalhes do evento
+  const loadEventDetail = async (eventId) => {
+    setDetailLoading(true);
+    try {
+      const response = await fetch(`/api/gcal/dashboard/events/${eventId}/detail/`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao carregar detalhes do evento');
+      }
+
+      const data = await response.json();
+      setEventDetail(data);
+    } catch (error) {
+      console.error('Erro ao carregar detalhes:', error);
+      message.error('Erro ao carregar detalhes do evento');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // Issue #98: Fechar Drawer
+  const handleDrawerClose = () => {
+    setDrawerOpen(false);
+    setEventDetail(null);
+    setSelectedEventId(null);
+  };
+
+  // Issue #98: Reapply (reutiliza endpoint batch com 1 ID)
+  const handleReapply = async () => {
+    if (!selectedEventId) return;
+
+    try {
+      const response = await fetch('/api/gcal/dashboard/batch/reapply/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ids: [selectedEventId],
+          dry_run: false,
+          apply_blocked: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Erro ao reapliar evento');
+      }
+
+      const data = await response.json();
+
+      if (data.queued > 0) {
+        message.success(`Evento reenfileirado para publicação (Reapply)`);
+        // Recarregar detalhes após 2 segundos
+        setTimeout(() => loadEventDetail(selectedEventId), 2000);
+      } else if (data.errors && data.errors.length > 0) {
+        message.error(`Erro: ${data.errors[0].detail}`);
+      }
+    } catch (error) {
+      console.error('Erro ao reapliar:', error);
+      message.error(error.message || 'Erro ao reapliar evento');
+    }
+  };
+
+  // Issue #98: Resync (reutiliza endpoint batch com 1 ID)
+  const handleResync = async () => {
+    if (!selectedEventId) return;
+
+    try {
+      const response = await fetch('/api/gcal/dashboard/batch/resync/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ids: [selectedEventId],
+          dry_run: false,
+          apply_blocked: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Erro ao ressincronizar evento');
+      }
+
+      const data = await response.json();
+
+      if (data.queued > 0) {
+        message.success(`Evento reenfileirado para ressincronização (Resync)`);
+        // Recarregar detalhes após 2 segundos
+        setTimeout(() => loadEventDetail(selectedEventId), 2000);
+      } else if (data.errors && data.errors.length > 0) {
+        message.error(`Erro: ${data.errors[0].detail}`);
+      }
+    } catch (error) {
+      console.error('Erro ao ressincronizar:', error);
+      message.error(error.message || 'Erro ao ressincronizar evento');
+    }
   };
 
   // Menu items para dropdown de Export
@@ -411,8 +533,156 @@ export default function GCalDashboardPage() {
           pagination={pagination}
           onChange={handleTableChange}
           scroll={{ x: 800 }}
+          onRow={(record) => ({
+            onClick: () => handleRowClick(record),
+            style: { cursor: 'pointer' },
+          })}
         />
       </Card>
+
+      {/* Drawer de Detalhes do Evento (Issue #98) */}
+      <Drawer
+        title={`Detalhes do Evento #${selectedEventId}`}
+        placement="right"
+        width={720}
+        onClose={handleDrawerClose}
+        open={drawerOpen}
+        extra={
+          <Space>
+            <Tooltip title="Reapliar evento (forçar update sem resetar hash)">
+              <Button icon={<EyeOutlined />} onClick={handleReapply}>
+                Reapply
+              </Button>
+            </Tooltip>
+            <Tooltip title="Ressincronizar evento (resetar hash + reprocessar)">
+              <Button icon={<RedoOutlined />} onClick={handleResync} type="primary">
+                Resync
+              </Button>
+            </Tooltip>
+          </Space>
+        }
+      >
+        {detailLoading ? (
+          <Spin size="large" style={{ display: 'block', textAlign: 'center', marginTop: 100 }} />
+        ) : eventDetail ? (
+          <>
+            {/* Resumo do Evento */}
+            <Descriptions title="Resumo" bordered column={1} size="small">
+              <Descriptions.Item label="ID">{eventDetail.id}</Descriptions.Item>
+              <Descriptions.Item label="Município">{eventDetail.municipio_nome || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Projeto">{eventDetail.projeto_nome || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Tipo de Evento">{eventDetail.tipo_evento_nome || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Início">
+                {eventDetail.inicio ? dayjs(eventDetail.inicio).format('DD/MM/YYYY HH:mm') : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Fim">
+                {eventDetail.fim ? dayjs(eventDetail.fim).format('DD/MM/YYYY HH:mm') : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Usuário">{eventDetail.usuario_username || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Coordenador">{eventDetail.coordenador_username || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Fluxo">
+                <Tag color={eventDetail.fluxo === 'SUPER' ? 'blue' : 'green'}>
+                  {eventDetail.fluxo}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Status GCal">
+                <Tag color={STATUS_COLORS[eventDetail.gcal_status]} icon={STATUS_ICONS[eventDetail.gcal_status]}>
+                  {STATUS_LABELS[eventDetail.gcal_status]}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Event ID">{eventDetail.external_event_id || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Última Sincronização">
+                {eventDetail.gcal_last_sync_at ? dayjs(eventDetail.gcal_last_sync_at).format('DD/MM/YYYY HH:mm') : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Meet Link">
+                {eventDetail.meet_link ? (
+                  <a href={eventDetail.meet_link} target="_blank" rel="noopener noreferrer">
+                    {eventDetail.meet_link}
+                  </a>
+                ) : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Payload Hash">
+                <Text ellipsis style={{ maxWidth: 500 }}>
+                  {eventDetail.gcal_payload_hash || '-'}
+                </Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Último Erro">
+                {eventDetail.gcal_last_error ? (
+                  <Text type="danger">{eventDetail.gcal_last_error}</Text>
+                ) : (
+                  <Text type="success">Nenhum erro</Text>
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="Atualizado em">
+                {eventDetail.updated_at ? dayjs(eventDetail.updated_at).format('DD/MM/YYYY HH:mm') : '-'}
+              </Descriptions.Item>
+            </Descriptions>
+
+            {/* Participações */}
+            {eventDetail.participations && eventDetail.participations.length > 0 && (
+              <>
+                <Divider orientation="left">Participações</Divider>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  {eventDetail.participations.map((p, idx) => (
+                    <Card key={idx} size="small">
+                      <Space>
+                        <UserOutlined />
+                        <Text strong>{p.email}</Text>
+                        <Tag>{p.role}</Tag>
+                        {p.ch_horas && <Text type="secondary">{p.ch_horas}h</Text>}
+                      </Space>
+                      {p.observacao && (
+                        <div style={{ marginTop: 8 }}>
+                          <Text type="secondary">{p.observacao}</Text>
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </Space>
+              </>
+            )}
+
+            {/* Timeline de Auditoria */}
+            <Divider orientation="left">Timeline de Auditoria</Divider>
+            {eventDetail.timeline && eventDetail.timeline.length > 0 ? (
+              <Timeline
+                items={eventDetail.timeline.map((log) => ({
+                  color: getTimelineColor(log.action),
+                  children: (
+                    <div>
+                      <Text strong>{log.action}</Text>
+                      <br />
+                      <Text type="secondary">
+                        {log.usuario_nome} - {dayjs(log.created_at).format('DD/MM/YYYY HH:mm:ss')}
+                      </Text>
+                      {log.details && Object.keys(log.details).length > 0 && (
+                        <div style={{ marginTop: 4 }}>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {JSON.stringify(log.details, null, 2)}
+                          </Text>
+                        </div>
+                      )}
+                    </div>
+                  ),
+                }))}
+              />
+            ) : (
+              <Alert message="Nenhum log de auditoria encontrado" type="info" />
+            )}
+          </>
+        ) : (
+          <Alert message="Nenhum dado disponível" type="warning" />
+        )}
+      </Drawer>
     </div>
   );
+}
+
+// Helper: Determinar cor da timeline baseado na action
+function getTimelineColor(action) {
+  if (action.includes('ERROR')) return 'red';
+  if (action.includes('PUBLISH') || action.includes('RESYNC')) return 'green';
+  if (action.includes('REQUESTED') || action.includes('PENDING')) return 'blue';
+  if (action.includes('CANCEL')) return 'orange';
+  return 'gray';
 }

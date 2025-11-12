@@ -13,8 +13,6 @@ Opções:
     --until DATETIME         Data fim (ISO8601), padrão: 180 dias à frente
     --ids CSV                IDs específicos (separados por vírgula)
     --no-delete              Não deleta eventos de solicitações não-aprovadas
-"""
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
     --dry-run                Simula sem alterar DB/Calendar
     --verbose                Imprime detalhes de cada operação
     --batch-size N           Processa em chunks de N registros (default: 200, 0=todos)
@@ -35,6 +33,8 @@ Exemplos:
     # IDs específicos
     python manage.py preagenda_to_gcal --ids 1,2,3 --dry-run
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
+
 from __future__ import annotations
 
 import json

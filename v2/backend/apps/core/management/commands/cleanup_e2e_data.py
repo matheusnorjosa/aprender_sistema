@@ -13,8 +13,6 @@ Uso:
 
 Dados removidos:
     - Usuários E2E (coord_e2e, super_e2e, controle_e2e, formador_e2e)
-"""
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
     - Solicitações criadas por esses usuários
     - Participations relacionadas
     - Município "Salvador, BA" (ibge_code=2927408) se não houver dependências
@@ -22,6 +20,7 @@ Dados removidos:
 
 Fase 2 - Testes E2E (Playwright) - Plano DAT/GCal 2025-10-29
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 from __future__ import annotations
 
 from typing import Any

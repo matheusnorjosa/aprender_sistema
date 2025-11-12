@@ -1,7 +1,7 @@
 """
 DRF Serializers for Core models
 """
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations
 

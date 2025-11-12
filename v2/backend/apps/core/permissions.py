@@ -4,7 +4,11 @@ DRF Permissions for RBAC
 PA-02: Apenas Superintendência pode aprovar/reprovar solicitações.
 """
 
+from __future__ import annotations
+
 from rest_framework import permissions
+from rest_framework.request import Request
+from rest_framework.views import APIView
 
 
 class IsSuperintendencia(permissions.BasePermission):
@@ -17,7 +21,7 @@ class IsSuperintendencia(permissions.BasePermission):
 
     message = "Apenas usuários da Superintendência podem realizar esta ação."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view: APIView) -> bool:
         return (
             request.user
             and request.user.is_authenticated
@@ -37,7 +41,7 @@ class IsCoordenadorOrDAT(permissions.BasePermission):
 
     message = "Apenas Coordenadores ou DAT podem criar solicitações."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view: APIView) -> bool:
         return (
             request.user
             and request.user.is_authenticated
@@ -58,7 +62,7 @@ class IsControleOrSuper(permissions.BasePermission):
 
     message = "Apenas Controle ou Superintendência podem realizar esta ação."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view: APIView) -> bool:
         return (
             request.user
             and request.user.is_authenticated
@@ -79,7 +83,7 @@ class IsDATOrSuper(permissions.BasePermission):
 
     message = "Apenas usuários do grupo DAT ou superusers podem realizar esta ação."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view: APIView) -> bool:
         return (
             request.user
             and request.user.is_authenticated
@@ -100,7 +104,7 @@ class IsDAT(permissions.BasePermission):
 
     message = "Apenas usuários do grupo DAT podem realizar esta ação."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view: APIView) -> bool:
         return (
             request.user
             and request.user.is_authenticated
@@ -121,7 +125,7 @@ class IsControleOrDAT(permissions.BasePermission):
 
     message = "Apenas Controle ou DAT podem realizar esta ação."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view: APIView) -> bool:
         return (
             request.user
             and request.user.is_authenticated

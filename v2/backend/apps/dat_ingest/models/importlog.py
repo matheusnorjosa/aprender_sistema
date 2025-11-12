@@ -35,8 +35,7 @@ class ImportLog(models.Model):
         default=dict, blank=True, help_text="Metadados adicionais"
     )
 
-    # type: ignore[misc]
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "dat_import_log"
         verbose_name = "Import Log"
         verbose_name_plural = "Import Logs"

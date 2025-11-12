@@ -29,8 +29,7 @@ class ImportLog(models.Model):
     records_failed = models.IntegerField(default=0)
     error_message = models.TextField(blank=True)
 
-    # type: ignore[misc]
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "dat_ingest_import_log"
         ordering = ["-started_at"]
 

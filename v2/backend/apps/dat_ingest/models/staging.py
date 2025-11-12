@@ -20,8 +20,7 @@ class StgUsuario(models.Model):
     src = models.CharField(max_length=100)  # nome do arquivo / aba
     rownum = models.IntegerField()
 
-    # type: ignore[misc]
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "stg_usuario"
         verbose_name = "Staging Usuario"
         verbose_name_plural = "Staging Usuarios"
@@ -43,8 +42,7 @@ class StgMunicipio(models.Model):
     src = models.CharField(max_length=100)
     rownum = models.IntegerField()
 
-    # type: ignore[misc]
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "stg_municipio"
         verbose_name = "Staging Municipio"
         verbose_name_plural = "Staging Municipios"
@@ -65,8 +63,7 @@ class StgProjeto(models.Model):
     src = models.CharField(max_length=100)
     rownum = models.IntegerField()
 
-    # type: ignore[misc]
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "stg_projeto"
         verbose_name = "Staging Projeto"
         verbose_name_plural = "Staging Projetos"
@@ -87,8 +84,7 @@ class StgTipoEvento(models.Model):
     src = models.CharField(max_length=100)
     rownum = models.IntegerField()
 
-    # type: ignore[misc]
-    class Meta:
+    class Meta:  # type: ignore[misc]
         db_table = "stg_tipo_evento"
         verbose_name = "Staging Tipo Evento"
         verbose_name_plural = "Staging Tipos Evento"

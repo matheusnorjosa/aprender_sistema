@@ -1,6 +1,7 @@
 """
 Core API URLs (v2-only, views ativas isoladas)
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false
 
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter

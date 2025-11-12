@@ -57,8 +57,7 @@ Sistema de gestão de eventos e agendamento com integração Google Calendar, ve
 
 ```
 .
-├── archive/v1_legado/       # Versão anterior (somente consulta)
-└── v2/                      # Versão atual (v2)
+└── v2/                      # Versão atual
     ├── backend/             # Django + DRF + Celery
     │   ├── apps/
     │   │   ├── core/        # Domínio principal

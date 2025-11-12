@@ -12,13 +12,15 @@ OUTPUTS:
 - external_hash_v2_collisions.json: relatório de colisões detectadas
 """
 
+from __future__ import annotations
+
 import json
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List
+from typing import Any
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 from django.utils import timezone
 
@@ -29,7 +31,7 @@ from apps.dat_ingest.services.acompanhamento_normalize import hash_event_v2
 class Command(BaseCommand):
     help = "Backfill external_hash v2 em Solicitações (PR21)"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--apply",
             action="store_true",
@@ -42,7 +44,7 @@ class Command(BaseCommand):
             help="Limitar processamento a N solicitações (para testes)",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         apply = options["apply"]
         limit = options["limit"]
 
@@ -79,7 +81,7 @@ class Command(BaseCommand):
         }
 
         # Mapeamento hash → list[Solicitacao IDs] para detectar colisões
-        hash_map: Dict[str, List[int]] = defaultdict(list)
+        hash_map: dict[str, list[int]] = defaultdict(list)
 
         # Processar cada solicitação
         for sol in queryset:
@@ -162,13 +164,13 @@ class Command(BaseCommand):
 
         self.stdout.write("\n✅ Backfill concluído!\n")
 
-    def _local_dt(self, dt):
+    def _local_dt(self, dt: Any) -> Any:
         """Converte datetime UTC para America/Fortaleza"""
         if dt is None:
             return None
         return timezone.localtime(dt)
 
-    def build_row_from_solicitacao(self, sol: Solicitacao) -> Dict[str, str]:
+    def build_row_from_solicitacao(self, sol: Solicitacao) -> dict[str, str]:
         """
         Constrói dicionário de dados para hash_event_v2 a partir de Solicitacao.
         Garante normalização compatível com a pipeline do PR21.
@@ -316,7 +318,7 @@ class Command(BaseCommand):
         else:
             return "Outros"
 
-    def generate_collisions_report(self, collisions: Dict[str, List[int]]):
+    def generate_collisions_report(self, collisions: dict[str, list[int]]) -> None:
         """
         Gera relatório JSON de colisões em v2/.agents/outbox/.
 

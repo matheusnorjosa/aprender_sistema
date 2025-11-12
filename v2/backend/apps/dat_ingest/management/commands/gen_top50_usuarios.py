@@ -14,12 +14,15 @@ HEURÍSTICA:
 - Frequência: contar ocorrências únicas (pessoa + papel)
 """
 
+from __future__ import annotations
+
 import csv
 from collections import Counter, defaultdict
 from pathlib import Path
+from typing import Any
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 
 from apps.dat_ingest.services.indicator_filter import should_create_participation
 
@@ -27,7 +30,7 @@ from apps.dat_ingest.services.indicator_filter import should_create_participatio
 class Command(BaseCommand):
     help = "Gera CSV com top-50 usuários para cadastro em lote (PR20)"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         outbox = Path(settings.BASE_DIR) / ".agents" / "outbox"
         parser.add_argument(
             "--input",
@@ -48,7 +51,7 @@ class Command(BaseCommand):
             help="Número máximo de usuários (padrão: 50)",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         input_path = Path(options["input"])
         output_path = Path(options["out"])
         limit = options["limit"]

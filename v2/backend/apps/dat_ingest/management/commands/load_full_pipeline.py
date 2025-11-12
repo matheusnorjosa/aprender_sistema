@@ -3,9 +3,12 @@ Management Command: load_full_pipeline
 Carrega todo o pipeline de dados: usuários, municípios, projetos, tipos de evento.
 """
 
-from pathlib import Path
+from __future__ import annotations
 
-from django.core.management.base import BaseCommand, CommandError
+from pathlib import Path
+from typing import Any
+
+from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.db import transaction
 
 from apps.core.models import Municipio, Projeto, TipoEvento, Usuario
@@ -21,7 +24,7 @@ from apps.dat_ingest.services.loaders import (
 class Command(BaseCommand):
     help = "Load full ETL pipeline from Excel files"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--users-file",
             type=str,
@@ -50,7 +53,7 @@ class Command(BaseCommand):
             help="Simulate without writing to DB",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         users_file = options["users_file"]
         agenda_file = options["agenda_file"]
         disponibilidade_file = options.get("disponibilidade_file")
@@ -92,7 +95,7 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("\n[PIPELINE] All entities loaded successfully"))
 
-    def _load_usuarios(self, filepath: Path):
+    def _load_usuarios(self, filepath: Path) -> None:
         """Load usuarios: parse → staging → SSOT"""
         self.stdout.write(f"\n[Usuarios] Loading from {filepath.name}...")
 
@@ -109,7 +112,7 @@ class Command(BaseCommand):
         self.stdout.write(f"SSOT: {created} created, {updated} updated, {unchanged} unchanged")
 
     @transaction.atomic
-    def _load_usuarios_staging(self, usuarios_data: list[dict]) -> int:
+    def _load_usuarios_staging(self, usuarios_data: list[dict[str, Any]]) -> int:
         """Load usuarios to StgUsuario (replace all)"""
         StgUsuario.objects.all().delete()
 
@@ -181,7 +184,7 @@ class Command(BaseCommand):
 
         return created_count, updated_count, unchanged_count
 
-    def _load_municipios_from_agenda(self, filepath: Path):
+    def _load_municipios_from_agenda(self, filepath: Path) -> None:
         """Extract municipios from agenda and load to SSOT"""
         self.stdout.write(f"\n[Municipios] Extracting from {filepath.name}...")
 
@@ -197,7 +200,7 @@ class Command(BaseCommand):
         created, updated, unchanged = self._upsert_municipios_ssot()
         self.stdout.write(f"SSOT: {created} created, {updated} updated, {unchanged} unchanged")
 
-    def _extract_municipios_from_agenda(self, filepath: Path) -> list[dict]:
+    def _extract_municipios_from_agenda(self, filepath: Path) -> list[dict[str, Any]]:
         """Extract unique municipios from agenda file"""
         from openpyxl import load_workbook
 
@@ -245,7 +248,7 @@ class Command(BaseCommand):
         return municipios_data
 
     @transaction.atomic
-    def _load_municipios_staging(self, municipios_data: list[dict]) -> int:
+    def _load_municipios_staging(self, municipios_data: list[dict[str, Any]]) -> int:
         """Load municipios to StgMunicipio"""
         StgMunicipio.objects.all().delete()
 
@@ -291,7 +294,7 @@ class Command(BaseCommand):
 
         return created_count, updated_count, unchanged_count
 
-    def _load_projetos_from_agenda(self, filepath: Path):
+    def _load_projetos_from_agenda(self, filepath: Path) -> None:
         """Extract projetos from agenda and load to SSOT"""
         self.stdout.write(f"\n[Projetos] Extracting from {filepath.name}...")
 
@@ -304,7 +307,7 @@ class Command(BaseCommand):
         created, updated, unchanged = self._upsert_projetos_ssot()
         self.stdout.write(f"SSOT: {created} created, {updated} updated, {unchanged} unchanged")
 
-    def _extract_projetos_from_agenda(self, filepath: Path) -> list[dict]:
+    def _extract_projetos_from_agenda(self, filepath: Path) -> list[dict[str, Any]]:
         """Extract unique projetos from agenda file"""
         from openpyxl import load_workbook
 
@@ -343,7 +346,7 @@ class Command(BaseCommand):
         return projetos_data
 
     @transaction.atomic
-    def _load_projetos_staging(self, projetos_data: list[dict]) -> int:
+    def _load_projetos_staging(self, projetos_data: list[dict[str, Any]]) -> int:
         """Load projetos to StgProjeto"""
         StgProjeto.objects.all().delete()
 
@@ -390,7 +393,7 @@ class Command(BaseCommand):
 
         return created_count, updated_count, unchanged_count
 
-    def _load_tipos_evento_from_agenda(self, filepath: Path):
+    def _load_tipos_evento_from_agenda(self, filepath: Path) -> None:
         """Extract tipos de evento from agenda and load to SSOT"""
         self.stdout.write(f"\n[Tipos Evento] Extracting from {filepath.name}...")
 
@@ -404,7 +407,7 @@ class Command(BaseCommand):
         self.stdout.write(f"SSOT: {created} created, {updated} updated, {unchanged} unchanged")
 
     @transaction.atomic
-    def _load_tipos_staging(self, tipos_data: list[dict]) -> int:
+    def _load_tipos_staging(self, tipos_data: list[dict[str, Any]]) -> int:
         """Load tipos to StgTipoEvento"""
         StgTipoEvento.objects.all().delete()
 

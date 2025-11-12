@@ -12,12 +12,15 @@ CSV ESPERADO:
 nome_display,email,papel_sugerido,gerente_sugerido,origem_mais_frequente,frequencia,papeis_observados,setores
 """
 
+from __future__ import annotations
+
 import csv
 import re
 from pathlib import Path
+from typing import Any
 
 from django.contrib.auth.models import Group
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 
 from apps.core.models import Usuario
@@ -26,7 +29,7 @@ from apps.core.models import Usuario
 class Command(BaseCommand):
     help = "Importa usuários a partir de CSV (PR20) - idempotente"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--file",
             type=str,
@@ -39,7 +42,7 @@ class Command(BaseCommand):
             help="Aplicar criação (sem este flag, apenas dry-run)",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         file_path = Path(options["file"])
         apply = options["apply"]
 

@@ -11,16 +11,18 @@ Agendamento via CELERY_BEAT_SCHEDULE no settings.py:
   - Janela padrão: 90 dias atrás até 180 dias à frente
 """
 
+from __future__ import annotations
+
 import json
 from io import StringIO
-
-from django.core.management import call_command
+from typing import Any
 
 from celery import shared_task
+from django.core.management import call_command
 
 
 @shared_task(bind=True)
-def debug_task(self):
+def debug_task(self: Any) -> str:
     """
     Debug task para testar o setup do Celery.
 
@@ -36,7 +38,7 @@ def debug_task(self):
 
 
 @shared_task
-def gcal_sync_task():
+def gcal_sync_task() -> None:
     """
     Tarefa stub para sincronização futura com Google Calendar.
 
@@ -61,7 +63,7 @@ def task_publish_solicitacao_to_gcal(
     dry_run: bool = False,
     apply_blocked: bool = False,
     operator_user_id: int | None = None,
-):
+) -> dict[str, Any]:
     """
     Publica uma Solicitacao no Google Calendar (via Celery).
 
@@ -219,7 +221,7 @@ def task_publish_solicitacao_to_gcal(
 
 
 @shared_task(name="apps.core.tasks.task_cancel_solicitacao_from_gcal")
-def task_cancel_solicitacao_from_gcal(solicitation_id: int):
+def task_cancel_solicitacao_from_gcal(solicitation_id: int) -> dict[str, Any]:
     """
     Cancela evento de uma Solicitacao no Google Calendar (via Celery) - Fase 4.
 
@@ -288,7 +290,7 @@ def task_cancel_solicitacao_from_gcal(solicitation_id: int):
 
 
 @shared_task(name="apps.core.tasks.preview_then_apply_gcal")
-def preview_then_apply_gcal():
+def preview_then_apply_gcal() -> dict[str, Any]:
     """
     Preview-then-apply pattern para sync com Google Calendar.
 

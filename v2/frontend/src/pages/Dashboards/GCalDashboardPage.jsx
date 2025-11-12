@@ -24,6 +24,8 @@ import {
   Tooltip,
   Alert,
   Skeleton,
+  Button,
+  Dropdown,
 } from 'antd';
 import {
   CheckCircleOutlined,
@@ -33,6 +35,8 @@ import {
   SyncOutlined,
   ExclamationCircleOutlined,
   ReloadOutlined,
+  DownloadOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -167,6 +171,42 @@ export default function GCalDashboardPage() {
     loadEvents(pagination.current, pagination.pageSize);
   };
 
+  const handleExport = (format) => {
+    // Construir URL de export com os mesmos filtros ativos
+    const params = new URLSearchParams();
+    params.append('export_format', format);
+
+    if (dateRange && dateRange[0] && dateRange[1]) {
+      params.append('start', dateRange[0].format('YYYY-MM-DD'));
+      params.append('end', dateRange[1].format('YYYY-MM-DD'));
+    }
+
+    if (statusFilter) {
+      params.append('status', statusFilter);
+    }
+
+    // Abrir URL em nova aba (download automático via Content-Disposition)
+    const exportUrl = `/api/gcal/dashboard/events/export/?${params}`;
+    window.open(exportUrl, '_blank');
+    message.success(`Exportação ${format.toUpperCase()} iniciada!`);
+  };
+
+  // Menu items para dropdown de Export
+  const exportMenuItems = [
+    {
+      key: 'csv',
+      label: 'Exportar CSV',
+      icon: <DownloadOutlined />,
+      onClick: () => handleExport('csv'),
+    },
+    {
+      key: 'json',
+      label: 'Exportar JSON',
+      icon: <DownloadOutlined />,
+      onClick: () => handleExport('json'),
+    },
+  ];
+
   const columns = [
     {
       title: 'ID',
@@ -278,6 +318,11 @@ export default function GCalDashboardPage() {
               spin={loading || tableLoading}
             />
           </Tooltip>
+          <Dropdown menu={{ items: exportMenuItems }} placement="bottomRight">
+            <Button icon={<DownloadOutlined />}>
+              Exportar <DownOutlined />
+            </Button>
+          </Dropdown>
         </Space>
       </Card>
 

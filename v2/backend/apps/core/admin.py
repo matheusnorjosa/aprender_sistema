@@ -48,7 +48,7 @@ class CPFFilter(admin.SimpleListFilter):
         return queryset
 
 
-class UsuarioAdmin(admin.ModelAdmin[Usuario]):
+class UsuarioAdmin(admin.ModelAdmin):
     list_display = ("username", "email", "cpf", "cargo", "is_active")
     search_fields = ("username", "email", "cpf", "first_name", "last_name")
     list_filter = ("is_active", "is_staff", "cargo", CPFFilter)
@@ -105,25 +105,25 @@ class UsuarioAdmin(admin.ModelAdmin[Usuario]):
         return response
 
 
-class MunicipioAdmin(admin.ModelAdmin[Municipio]):
+class MunicipioAdmin(admin.ModelAdmin):
     list_display = ("nome", "uf", "ativo")
     search_fields = ("nome", "uf")
     list_filter = ("uf", "ativo")
 
 
-class ProjetoAdmin(admin.ModelAdmin[Projeto]):
+class ProjetoAdmin(admin.ModelAdmin):
     list_display = ("nome", "ativo")
     search_fields = ("nome", "descricao")
     list_filter = ("ativo",)
 
 
-class TipoEventoAdmin(admin.ModelAdmin[TipoEvento]):
+class TipoEventoAdmin(admin.ModelAdmin):
     list_display = ("nome", "cor", "descricao")
     search_fields = ("nome", "descricao")
     list_filter = ()
 
 
-class AvailabilityBlockAdmin(admin.ModelAdmin[AvailabilityBlock]):
+class AvailabilityBlockAdmin(admin.ModelAdmin):
     list_display = ("usuario", "tipo", "inicio", "fim", "status", "created_at")
     search_fields = ("usuario__username", "usuario__email", "motivo")
     list_filter = ("tipo", "status", "created_at")
@@ -131,7 +131,7 @@ class AvailabilityBlockAdmin(admin.ModelAdmin[AvailabilityBlock]):
     date_hierarchy = "inicio"
 
 
-class SolicitacaoAdmin(admin.ModelAdmin[Solicitacao]):
+class SolicitacaoAdmin(admin.ModelAdmin):
     list_display = (
         "usuario",
         "tipo_evento",
@@ -152,7 +152,7 @@ class SolicitacaoAdmin(admin.ModelAdmin[Solicitacao]):
     date_hierarchy = "inicio"
 
 
-class ParticipationAdmin(admin.ModelAdmin[Participation]):
+class ParticipationAdmin(admin.ModelAdmin):
     list_display = ("solicitacao", "usuario", "role", "ch_horas", "created_at")
     list_filter = ("role",)
     search_fields = (
@@ -166,7 +166,7 @@ class ParticipationAdmin(admin.ModelAdmin[Participation]):
     list_select_related = ("solicitacao", "usuario")
 
 
-class CompraAdmin(admin.ModelAdmin[Compra]):
+class CompraAdmin(admin.ModelAdmin):
     list_display = ("codigo", "municipio", "projeto", "quantidade", "data", "uso")
     list_filter = ("projeto", "data")
     search_fields = ("codigo", "municipio__nome", "projeto__nome", "uso")
@@ -175,7 +175,7 @@ class CompraAdmin(admin.ModelAdmin[Compra]):
     date_hierarchy = "data"
 
 
-class DeslocamentoAdmin(admin.ModelAdmin[Deslocamento]):
+class DeslocamentoAdmin(admin.ModelAdmin):
     list_display = ("usuario", "origem", "destino", "start_date", "end_date")
     list_filter = ("usuario", "start_date")
     search_fields = ("origem", "destino", "usuario__username")
@@ -184,7 +184,7 @@ class DeslocamentoAdmin(admin.ModelAdmin[Deslocamento]):
     date_hierarchy = "start_date"
 
 
-class AcaoControleAdmin(admin.ModelAdmin[AcaoControle]):
+class AcaoControleAdmin(admin.ModelAdmin):
     list_display = (
         "municipio",
         "projeto",
@@ -207,7 +207,7 @@ class AcaoControleAdmin(admin.ModelAdmin[AcaoControle]):
     date_hierarchy = "data_reuniao"
 
 
-class AcaoDATAdmin(admin.ModelAdmin[AcaoDAT]):
+class AcaoDATAdmin(admin.ModelAdmin):
     list_display = ("municipio", "projeto", "tipo_acao", "responsavel", "data_registro")
     list_filter = ("projeto", "tipo_acao")
     search_fields = ("municipio__nome", "projeto__nome", "tipo_acao", "responsavel__email")
@@ -216,7 +216,7 @@ class AcaoDATAdmin(admin.ModelAdmin[AcaoDAT]):
     date_hierarchy = "data_registro"
 
 
-class AuditLogAdmin(admin.ModelAdmin[AuditLog]):
+class AuditLogAdmin(admin.ModelAdmin):
     """
     AuditLog Admin - Somente Leitura
 

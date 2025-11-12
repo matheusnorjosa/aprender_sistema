@@ -7,7 +7,7 @@ from .models import ImportLog
 
 
 @admin.register(ImportLog)
-class ImportLogAdmin(admin.ModelAdmin[ImportLog]):
+class ImportLogAdmin(admin.ModelAdmin):
     list_display = (
         "file",
         "ok",

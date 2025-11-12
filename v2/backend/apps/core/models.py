@@ -328,7 +328,7 @@ class Solicitacao(models.Model):
         related_name="eventos_coordenados",
         help_text="Coordenador responsável pelo evento",
     )
-    formadores = models.ManyToManyField(
+    formadores = models.ManyToManyField(  # type: ignore[misc]
         Usuario,
         blank=True,
         related_name="eventos_como_formador",
@@ -506,7 +506,7 @@ class Config(models.Model):
         db_index=True,
         help_text="Chave da configuração (ex: 'availability', 'gcal_sync')",
     )
-    value = models.JSONField(
+    value = models.JSONField(  # type: ignore[misc]
         default=dict, help_text="Valor da configuração (dict JSON)"
     )
     effective_at = models.DateTimeField(
@@ -668,13 +668,13 @@ class AcaoControle(models.Model):
     - observacao, external_hash (idempotência ETL)
     """
 
-    municipio = models.ForeignKey(
+    municipio = models.ForeignKey(  # type: ignore[misc]
         "Municipio",
         on_delete=models.PROTECT,
         related_name="acoes_controle",
         verbose_name="Município",
     )
-    projeto = models.ForeignKey(
+    projeto = models.ForeignKey(  # type: ignore[misc]
         "Projeto",
         on_delete=models.PROTECT,
         related_name="acoes_controle",
@@ -735,13 +735,13 @@ class AcaoDAT(models.Model):
     - data_registro, observacao, external_hash (idempotência ETL)
     """
 
-    municipio = models.ForeignKey(
+    municipio = models.ForeignKey(  # type: ignore[misc]
         "Municipio",
         on_delete=models.PROTECT,
         related_name="acoes_dat",
         verbose_name="Município",
     )
-    projeto = models.ForeignKey(
+    projeto = models.ForeignKey(  # type: ignore[misc]
         "Projeto",
         on_delete=models.PROTECT,
         related_name="acoes_dat",
@@ -813,7 +813,7 @@ class AuditLog(models.Model):
         db_index=True,
         help_text="Nome do modelo relacionado (opcional, ex: Solicitacao, Compra)"
     )
-    details = models.JSONField(
+    details = models.JSONField(  # type: ignore[misc]
         default=dict,
         help_text="Detalhes da operação (status, applied, reason, etc.)"
     )
@@ -853,7 +853,7 @@ class Participation(models.Model):
         COORD_ACOMPANHA = "COORD_ACOMPANHA", "Coord. Acompanha"
         CONVIDADO = "CONVIDADO", "Convidado"
 
-    solicitacao = models.ForeignKey(
+    solicitacao = models.ForeignKey(  # type: ignore[misc]
         "core.Solicitacao",
         on_delete=models.CASCADE,
         related_name="participations",
@@ -914,7 +914,7 @@ class Participation(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.solicitacao_id} — {self.usuario or self.guest_email} ({self.get_role_display()})"
+        return f"{self.solicitacao_id} — {self.usuario or self.guest_email} ({self.get_role_display()})"  # type: ignore[attr-defined]
 
 
 class GoogleOAuthCredential(models.Model):
@@ -983,7 +983,7 @@ class GoogleOAuthCredential(models.Model):
         verbose_name="Calendário Padrão",
         help_text="ID do calendário padrão (ex: 'primary' ou ID específico)"
     )
-    allowed_calendars = models.JSONField(
+    allowed_calendars = models.JSONField(  # type: ignore[misc]
         default=list,
         blank=True,
         verbose_name="Calendários Permitidos",

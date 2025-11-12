@@ -5,7 +5,7 @@ Implements CPF-based authentication alongside username authentication.
 """
 
 import re
-from typing import Any
+from typing import Any, cast
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
@@ -75,6 +75,6 @@ class CPFOrUsernameBackend(ModelBackend):
 
         # Validate password and user status
         if user.check_password(password) and self.user_can_authenticate(user):
-            return user
+            return cast(Usuario, user)
 
         return None

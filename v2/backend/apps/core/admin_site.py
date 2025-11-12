@@ -37,7 +37,7 @@ class SuperuserOnlyAdminSite(BaseAdminSite):
         Returns:
             bool: True se usuário é superuser, False caso contrário
         """
-        return bool(request.user.is_active and request.user.is_superuser)
+        return bool(request.user.is_active and getattr(request.user, 'is_superuser', False))
 
 
 # Instanciar custom admin site

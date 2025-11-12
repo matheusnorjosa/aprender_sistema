@@ -380,14 +380,6 @@ Para dúvidas ou problemas:
 
 ---
 
-## 🗂️ Legado (v1)
-
-A versão anterior (v1) foi arquivada em `archive/v1_legado/` e permanece apenas para consulta histórica. **Não execute scripts ou compose fora de `v2/`.**
-
-Documentação legado: [archive/v1_legado/README.md](archive/v1_legado/README.md)
-
----
-
 <p align="center">
   Desenvolvido com ❤️ por <a href="https://github.com/matheusnorjosa">Matheus Norjosa</a>
 </p>

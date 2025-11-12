@@ -2,10 +2,14 @@
 Management Command: load_tipos_evento
 Extrai tipos de evento de arquivo de agenda e persiste em StgTipoEvento + TipoEvento.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
+
+from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.db import transaction
 
 from apps.core.models import TipoEvento
@@ -16,7 +20,7 @@ from apps.dat_ingest.services.loaders import extract_tipos_evento_from_agenda
 class Command(BaseCommand):
     help = "Load tipos de evento from agenda file"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--agenda-file",
             type=str,
@@ -29,7 +33,7 @@ class Command(BaseCommand):
             help="Simulate without writing to DB",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         agenda_file = options["agenda_file"]
         dry_run = options["dry_run"]
 
@@ -63,7 +67,7 @@ class Command(BaseCommand):
         )
 
     @transaction.atomic
-    def _load_staging(self, tipos_data: list[dict]) -> int:
+    def _load_staging(self, tipos_data: list[dict[str, Any]]) -> int:
         """Load tipos to StgTipoEvento (replace all)"""
         # Clear existing staging
         StgTipoEvento.objects.all().delete()

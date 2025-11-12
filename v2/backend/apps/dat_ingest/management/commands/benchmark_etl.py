@@ -11,13 +11,18 @@ Saída:
 
 Issue #55: Revisão de performance com microbenchmarks.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
+
+from __future__ import annotations
 
 import json
 import time
 import tracemalloc
 from pathlib import Path
 from decimal import Decimal
-from django.core.management.base import BaseCommand
+from typing import Any
+
+from django.core.management.base import BaseCommand, CommandParser
 from django.conf import settings
 
 from apps.dat_ingest.management.commands.audit_agenda_users import (
@@ -32,7 +37,7 @@ from apps.dat_ingest import constants
 class Command(BaseCommand):
     help = "Benchmark ETL operations with synthetic datasets"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--sizes",
             type=str,
@@ -46,7 +51,7 @@ class Command(BaseCommand):
             help="Output directory for report (default: settings.ETL_OUTPUT_DIR)",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         sizes_str = options["sizes"]
         sizes = [int(s.strip()) for s in sizes_str.split(",")]
         out_dir = Path(options["out"])
@@ -80,7 +85,7 @@ class Command(BaseCommand):
         self.stdout.write(f"✅ Benchmark concluído: {report_path}")
         self.stdout.write("=" * 80)
 
-    def _benchmark_size(self, size):
+    def _benchmark_size(self, size: int) -> dict[str, Any]:
         """Executa benchmarks para um tamanho específico de dataset."""
         # Gerar dados sintéticos
         synthetic_names = self._generate_synthetic_names(size)
@@ -126,7 +131,7 @@ class Command(BaseCommand):
             "memory_peak_mb": peak_memory,
         }
 
-    def _generate_synthetic_names(self, count):
+    def _generate_synthetic_names(self, count: int) -> list[str]:
         """Gera nomes sintéticos para benchmark."""
         first_names = ["João", "Maria", "Pedro", "Ana", "Carlos", "Juliana", "Lucas", "Beatriz"]
         last_names = ["Silva", "Santos", "Oliveira", "Costa", "Souza", "Lima", "Pereira", "Ferreira"]

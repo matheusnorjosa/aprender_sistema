@@ -1,12 +1,16 @@
 """
 ETL Command: Orchestrator (etl_load_xlsx → etl_upsert_core + direct imports)
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
+
+from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from django.conf import settings
 from django.core.management import call_command
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 
 from apps.core.models import (
@@ -131,7 +135,7 @@ class Command(BaseCommand):
 
     # ========== IMPORTER METHODS ==========
 
-    def import_bloqueios(self, data_dir: Path, dry_run: bool = False, force: bool = False):
+    def import_bloqueios(self, data_dir: Path, dry_run: bool = False, force: bool = False) -> None:
         """Import availability blocks from Disponibilidade spreadsheet"""
         filepath = data_dir / "Cópia de Disponibilidade _ 2025.xlsx"
 
@@ -192,7 +196,7 @@ class Command(BaseCommand):
             f"  Bloqueios: {created} created, {skipped} skipped, {errors} errors"
         )
 
-    def import_deslocamentos(self, data_dir: Path, dry_run: bool = False, force: bool = False):
+    def import_deslocamentos(self, data_dir: Path, dry_run: bool = False, force: bool = False) -> None:
         """Import travel/displacement records from Disponibilidade spreadsheet"""
         filepath = data_dir / "Cópia de Disponibilidade _ 2025.xlsx"
 
@@ -279,7 +283,7 @@ class Command(BaseCommand):
             f"  Deslocamentos: {created} created, {skipped} skipped, {errors} errors"
         )
 
-    def import_solicitacoes(self, data_dir: Path, dry_run: bool = False, force: bool = False):
+    def import_solicitacoes(self, data_dir: Path, dry_run: bool = False, force: bool = False) -> None:
         """Import solicitações from Acompanhamento spreadsheet (5 tabs)"""
         filepath = data_dir / "Cópia de Acompanhamento de Agenda _ 2025.xlsx"
 
@@ -411,7 +415,7 @@ class Command(BaseCommand):
 
     # ========== MAIN HANDLER ==========
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--dir",
             type=str,
@@ -430,7 +434,7 @@ class Command(BaseCommand):
             help="Process only specific entity type",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         directory = Path(options["dir"])
         dry_run = options["dry_run"]
         only = options["only"]

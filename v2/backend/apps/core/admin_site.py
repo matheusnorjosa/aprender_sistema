@@ -10,6 +10,7 @@ Uso:
 """
 
 from django.contrib.admin import AdminSite as BaseAdminSite
+from django.http import HttpRequest
 
 
 class SuperuserOnlyAdminSite(BaseAdminSite):
@@ -26,7 +27,7 @@ class SuperuserOnlyAdminSite(BaseAdminSite):
     site_title = "AS v2 Admin"
     index_title = "Administração (Superusers apenas)"
 
-    def has_permission(self, request):
+    def has_permission(self, request: HttpRequest) -> bool:
         """
         Restringe acesso apenas a superusers.
 
@@ -36,7 +37,7 @@ class SuperuserOnlyAdminSite(BaseAdminSite):
         Returns:
             bool: True se usuário é superuser, False caso contrário
         """
-        return request.user.is_active and request.user.is_superuser
+        return bool(request.user.is_active and getattr(request.user, 'is_superuser', False))
 
 
 # Instanciar custom admin site

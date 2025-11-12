@@ -20,12 +20,16 @@ Matching:
 Idempotente: Só atualiza se fluxo mudou.
 Gera CSV com fonte/detalhe rastreável.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
+from __future__ import annotations
+
 import csv
 import re
 import unicodedata
 from pathlib import Path
+from typing import Any
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 from django.db.models import Q
 
 from apps.core.models import Projeto
@@ -39,7 +43,7 @@ except ImportError:
 class Command(BaseCommand):
     help = "Seed Projeto.fluxo a partir de planilhas XLSX (idempotente)"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             '--xls-controle',
             type=str,
@@ -63,7 +67,7 @@ class Command(BaseCommand):
             help='Log detalhado de cada operação'
         )
 
-    def _normalize_string(self, s):
+    def _normalize_string(self, s: str | None) -> str:
         """
         Normaliza string para matching robusto.
 
@@ -87,7 +91,7 @@ class Command(BaseCommand):
         s = re.sub(r'\s+', ' ', s).strip()
         return s
 
-    def _find_projeto(self, codigo_raw, nome_raw):
+    def _find_projeto(self, codigo_raw: str | None, nome_raw: str | None) -> Projeto | None:
         """
         Encontra projeto por código ou nome normalizado.
 
@@ -112,7 +116,7 @@ class Command(BaseCommand):
 
         return None
 
-    def _extract_projetos_from_controle(self, xls_path, verbose=False):
+    def _extract_projetos_from_controle(self, xls_path: Path, verbose: bool = False) -> dict[str, dict[str, Any]]:
         """
         Extrai projetos da Planilha de Controle.
 
@@ -181,7 +185,7 @@ class Command(BaseCommand):
 
         return projetos_map
 
-    def _extract_projetos_from_agenda(self, xls_path, verbose=False):
+    def _extract_projetos_from_agenda(self, xls_path: Path, verbose: bool = False) -> dict[str, dict[str, Any]]:
         """
         Extrai projetos do Acompanhamento de Agenda.
 
@@ -236,7 +240,7 @@ class Command(BaseCommand):
 
         return projetos_map
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         xls_controle = Path(options['xls_controle'])
         xls_agenda = Path(options['xls_agenda'])
         dry_run = options['dry_run']

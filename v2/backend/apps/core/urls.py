@@ -41,6 +41,7 @@ from .views_gcal_dashboard import (
     GCalPublishBatchView,
     DashboardMetricsView,
     DashboardEventsView,
+    DashboardEventsExportView,
     GCalBatchReapplyView,
     GCalBatchResyncView,
 )
@@ -172,6 +173,8 @@ urlpatterns = [
     # Sprint 5 - Dashboard/Monitoring
     path("gcal/dashboard/metrics/", DashboardMetricsView.as_view(), name="gcal-dashboard-metrics"),
     path("gcal/dashboard/events/", DashboardEventsView.as_view(), name="gcal-dashboard-events"),
+    # Issue #96 - Export CSV/JSON
+    path("gcal/dashboard/events/export/", DashboardEventsExportView.as_view(), name="gcal-dashboard-events-export"),
     # Issue #95 - Batch Reapply/Resync
     path("gcal/dashboard/batch/reapply/", GCalBatchReapplyView.as_view(), name="gcal-batch-reapply"),
     path("gcal/dashboard/batch/resync/", GCalBatchResyncView.as_view(), name="gcal-batch-resync"),

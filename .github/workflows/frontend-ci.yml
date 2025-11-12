@@ -1,4 +1,4 @@
-name: Frontend CI - Vite Build + ESLint
+name: frontend-ci
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
     # This is needed because the ruleset requires "frontend-ci" as a status check
 
 jobs:
-  frontend-ci:
+  build/lint do frontend:
     runs-on: ubuntu-latest
 
     defaults:

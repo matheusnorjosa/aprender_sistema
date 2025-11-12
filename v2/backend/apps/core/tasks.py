@@ -10,6 +10,7 @@ Agendamento via CELERY_BEAT_SCHEDULE no settings.py:
   - Executar a cada 5 minutos
   - Janela padrão: 90 dias atrás até 180 dias à frente
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ import json
 from io import StringIO
 from typing import Any
 
-from celery import shared_task
+from celery import shared_task  # type: ignore[attr-defined]
 from django.core.management import call_command
 
 

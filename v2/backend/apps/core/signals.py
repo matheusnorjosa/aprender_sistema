@@ -25,7 +25,7 @@ from apps.core.services.config_service import bust_cfg
 
 
 @receiver(post_save, sender=Config)
-def _cfg_invalidate(sender: type[Config], instance: Config, **kwargs: Any) -> None:
+def _cfg_invalidate(sender: type[Config], instance: Config, **kwargs: Any) -> None:  # pyright: ignore[reportUnusedFunction]
     """
     Invalida cache quando Config é salvo.
 

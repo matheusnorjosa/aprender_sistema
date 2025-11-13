@@ -1143,3 +1143,59 @@ class EventDetailAPIView(APIView):
         # Serializar
         serializer = EventDetailSerializer(solicitacao)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AlertsSummaryView(APIView):
+    """
+    GET /api/gcal/dashboard/alerts/summary/?start=&end=
+
+    Retorna contagens de eventos por gcal_status para exibir badge/toast no frontend.
+
+    Query params:
+        - start (YYYY-MM-DD, opcional): Filtrar eventos >= start (00:00 local)
+        - end (YYYY-MM-DD, opcional): Filtrar eventos <= end (23:59:59.999999 local)
+
+    Response 200:
+    {
+        "errors": int,
+        "pending": int,
+        "published": int,
+        "none": int,
+        "window": {
+            "start": "YYYY-MM-DD" | null,
+            "end": "YYYY-MM-DD" | null
+        }
+    }
+
+    Response 403:
+    {"detail": "Você não tem permissão para acessar este recurso"}
+
+    Permissions: IsControleOrSuper
+    Timezone-aware: Usa helper _filter_events_queryset (clamp local→UTC)
+    """
+    permission_classes = [IsAuthenticated, IsControleOrSuper]
+
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        # Reutilizar helper TZ-aware
+        qs = _filter_events_queryset(request, Solicitacao.objects.all())
+
+        # Contar por gcal_status
+        errors = qs.filter(gcal_status=Solicitacao.GCalStatus.ERROR).count()
+        pending = qs.filter(gcal_status=Solicitacao.GCalStatus.PENDING).count()
+        published = qs.filter(gcal_status=Solicitacao.GCalStatus.PUBLISHED).count()
+        none = qs.filter(gcal_status=Solicitacao.GCalStatus.NONE).count()
+
+        # Extrair janela de query params (retornar como strings ou null)
+        start_param = request.query_params.get('start')
+        end_param = request.query_params.get('end')
+
+        return Response({
+            'errors': errors,
+            'pending': pending,
+            'published': published,
+            'none': none,
+            'window': {
+                'start': start_param if start_param else None,
+                'end': end_param if end_param else None
+            }
+        }, status=status.HTTP_200_OK)

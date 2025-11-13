@@ -381,5 +381,5 @@ Para dúvidas ou problemas:
 ---
 
 <p align="center">
-  Desenvolvido com ❤️ por <a href="https://github.com/matheusnorjosa">Matheus Norjosa</a>
+  Desenvolvido por <a href="https://github.com/matheusnorjosa">Matheus Norjosa</a>
 </p>

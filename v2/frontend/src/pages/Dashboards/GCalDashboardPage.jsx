@@ -99,9 +99,16 @@ export default function GCalDashboardPage() {
   const [eventDetail, setEventDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Insights (Issue #99)
+  const [successRate, setSuccessRate] = useState(null);
+  const [topInsights, setTopInsights] = useState(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [topMetric, setTopMetric] = useState('municipios');
+
   useEffect(() => {
     loadMetrics();
     loadEvents(1, pagination.pageSize);
+    loadInsights();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange]);
 
@@ -109,6 +116,11 @@ export default function GCalDashboardPage() {
     loadEvents(1, pagination.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
+
+  useEffect(() => {
+    loadTopInsights();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topMetric, dateRange]);
 
   const loadMetrics = async () => {
     setLoading(true);
@@ -180,9 +192,72 @@ export default function GCalDashboardPage() {
     loadEvents(newPagination.current, newPagination.pageSize);
   };
 
+  // Issue #99: Carregar insights (success rate + top insights)
+  const loadInsights = async () => {
+    await Promise.all([loadSuccessRate(), loadTopInsights()]);
+  };
+
+  const loadSuccessRate = async () => {
+    setInsightsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (dateRange && dateRange[0] && dateRange[1]) {
+        params.append('start', dateRange[0].format('YYYY-MM-DD'));
+        params.append('end', dateRange[1].format('YYYY-MM-DD'));
+      }
+
+      const response = await fetch(`/api/gcal/dashboard/insights/success-rate/?${params}`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao carregar success rate');
+      }
+
+      const data = await response.json();
+      setSuccessRate(data);
+    } catch (error) {
+      console.error('Erro ao carregar success rate:', error);
+      message.error('Erro ao carregar taxa de sucesso');
+    } finally {
+      setInsightsLoading(false);
+    }
+  };
+
+  const loadTopInsights = async () => {
+    setInsightsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('metric', topMetric);
+      params.append('limit', 5);
+
+      if (dateRange && dateRange[0] && dateRange[1]) {
+        params.append('start', dateRange[0].format('YYYY-MM-DD'));
+        params.append('end', dateRange[1].format('YYYY-MM-DD'));
+      }
+
+      const response = await fetch(`/api/gcal/dashboard/insights/top/?${params}`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao carregar top insights');
+      }
+
+      const data = await response.json();
+      setTopInsights(data);
+    } catch (error) {
+      console.error('Erro ao carregar top insights:', error);
+      message.error('Erro ao carregar insights');
+    } finally {
+      setInsightsLoading(false);
+    }
+  };
+
   const handleRefresh = () => {
     loadMetrics();
     loadEvents(pagination.current, pagination.pageSize);
+    loadInsights();
   };
 
   const handleExport = (format) => {
@@ -380,6 +455,51 @@ export default function GCalDashboardPage() {
     },
   ];
 
+  // Issue #99: Colunas para Top Insights
+  const topInsightsColumns = [
+    {
+      title: 'Nome',
+      dataIndex: 'name',
+      key: 'name',
+      ellipsis: true,
+    },
+    {
+      title: 'Total',
+      dataIndex: 'count',
+      key: 'count',
+      width: 80,
+      align: 'center',
+    },
+    {
+      title: 'Publicados',
+      dataIndex: 'published',
+      key: 'published',
+      width: 100,
+      align: 'center',
+      render: (value) => <Text type="success">{value}</Text>,
+    },
+    {
+      title: 'Erros',
+      dataIndex: 'error',
+      key: 'error',
+      width: 80,
+      align: 'center',
+      render: (value) => <Text type="danger">{value}</Text>,
+    },
+    {
+      title: 'Taxa (%)',
+      dataIndex: 'rate',
+      key: 'rate',
+      width: 100,
+      align: 'center',
+      render: (rate) => {
+        const percentage = (rate * 100).toFixed(1);
+        const color = rate >= 0.8 ? '#52c41a' : rate >= 0.5 ? '#faad14' : '#f5222d';
+        return <Text style={{ color, fontWeight: 'bold' }}>{percentage}%</Text>;
+      },
+    },
+  ];
+
   return (
     <div style={{ padding: '24px' }}>
       <div
@@ -520,6 +640,90 @@ export default function GCalDashboardPage() {
               style={{ marginBottom: 24 }}
             />
           )}
+        </>
+      )}
+
+      {/* Insights - Success Rate + Top 5 (Issue #99) */}
+      {insightsLoading ? (
+        <Skeleton active paragraph={{ rows: 3 }} style={{ marginBottom: 24 }} />
+      ) : (
+        <>
+          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            {/* Success Rate Cards */}
+            <Col xs={24} md={8}>
+              <Card bordered={false}>
+                <Statistic
+                  title="Taxa de Sucesso"
+                  value={successRate?.rate ? (successRate.rate * 100).toFixed(1) : 0}
+                  suffix="%"
+                  valueStyle={{
+                    color: (successRate?.rate || 0) >= 0.8 ? '#52c41a' : '#f5222d',
+                    fontSize: 32,
+                    fontWeight: 'bold',
+                  }}
+                />
+                <Space size="small" style={{ marginTop: 16 }}>
+                  <Text type="secondary">Publicados:</Text>
+                  <Text strong style={{ color: '#52c41a' }}>{successRate?.published || 0}</Text>
+                </Space>
+                <br />
+                <Space size="small">
+                  <Text type="secondary">Erros:</Text>
+                  <Text strong style={{ color: '#f5222d' }}>{successRate?.error || 0}</Text>
+                </Space>
+              </Card>
+            </Col>
+            <Col xs={24} md={8}>
+              <Card bordered={false}>
+                <Statistic
+                  title="Publicados"
+                  value={successRate?.published || 0}
+                  valueStyle={{ color: '#52c41a' }}
+                  prefix={<CheckCircleOutlined />}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} md={8}>
+              <Card bordered={false}>
+                <Statistic
+                  title="Erros"
+                  value={successRate?.error || 0}
+                  valueStyle={{ color: '#f5222d' }}
+                  prefix={<CloseCircleOutlined />}
+                />
+              </Card>
+            </Col>
+          </Row>
+
+          {/* Top 5 Insights */}
+          <Card
+            title={
+              <Space>
+                <Text strong>Top 5 {topMetric === 'municipios' ? 'Municípios' : 'Projetos'}</Text>
+                <Select
+                  size="small"
+                  value={topMetric}
+                  onChange={setTopMetric}
+                  style={{ width: 130 }}
+                  options={[
+                    { value: 'municipios', label: 'Municípios' },
+                    { value: 'projetos', label: 'Projetos' },
+                  ]}
+                />
+              </Space>
+            }
+            bordered={false}
+            style={{ marginBottom: 24 }}
+          >
+            <Table
+              dataSource={topInsights?.items || []}
+              columns={topInsightsColumns}
+              rowKey="name"
+              pagination={false}
+              size="small"
+              loading={insightsLoading}
+            />
+          </Card>
         </>
       )}
 

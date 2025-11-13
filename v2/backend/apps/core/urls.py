@@ -47,6 +47,8 @@ from .views_gcal_dashboard import (
     GCalBatchReapplyView,
     GCalBatchResyncView,
     EventDetailAPIView,  # Issue #98
+    SuccessRateView,  # Issue #99
+    TopInsightsView,  # Issue #99
 )
 from .views_gcal import gcal_calendars, gcal_health
 from .views_lookup import (
@@ -180,6 +182,9 @@ urlpatterns = [
     path("gcal/dashboard/alerts/summary/", AlertsSummaryView.as_view(), name="gcal-alerts-summary"),
     # Issue #98 - Event Detail with Timeline
     path("gcal/dashboard/events/<int:pk>/detail/", EventDetailAPIView.as_view(), name="gcal-event-detail"),
+    # Issue #99 - Insights (Success Rate + Top 5)
+    path("gcal/dashboard/insights/success-rate/", SuccessRateView.as_view(), name="gcal-insights-success-rate"),
+    path("gcal/dashboard/insights/top/", TopInsightsView.as_view(), name="gcal-insights-top"),
     # Issue #96 - Export CSV/JSON
     path("gcal/dashboard/events/export/", DashboardEventsExportView.as_view(), name="gcal-dashboard-events-export"),
     # Issue #95 - Batch Reapply/Resync

@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message } from 'antd';
+import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge } from 'antd';
 import {
   CalendarOutlined,
   CheckCircleOutlined,
@@ -60,6 +60,11 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Issue #97: GCal Alerts (badge + toast)
+  const [alerts, setAlerts] = useState({ errors: 0, pending: 0, published: 0, none: 0 });
+  const [lastErrorsCount, setLastErrorsCount] = useState(0);
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+
   // Carregar dados do usuário
   const loadUser = async () => {
     try {
@@ -76,6 +81,72 @@ function App() {
   useEffect(() => {
     loadUser();
   }, []);
+
+  // Issue #97: Polling de alertas GCal (badge + toast)
+  useEffect(() => {
+    // Só ativar polling para Controle/Super
+    const canControle = user?.groups?.includes('Controle');
+    const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
+
+    if (!canControle && !canSuper) {
+      return; // Não tem permissão, não fazer polling
+    }
+
+    const POLL_MS = 30000; // 30 segundos
+    const COOLDOWN_MS = 120000; // 2 minutos de cooldown para toast
+
+    const fetchAlerts = async () => {
+      try {
+        const response = await fetch('/api/gcal/dashboard/alerts/summary/', {
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            console.warn('[Alerts] Sem permissão para acessar alerts');
+            return;
+          }
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        setAlerts(data);
+
+        // Toast quando errors aumentar (com cooldown)
+        const now = Date.now();
+        if (data.errors > lastErrorsCount && now > cooldownUntil) {
+          message.warning(
+            `Novos erros de publicação detectados (${lastErrorsCount} → ${data.errors})`,
+            5 // duração 5s
+          );
+          setCooldownUntil(now + COOLDOWN_MS);
+        }
+
+        // Atualizar lastErrorsCount e persistir em localStorage
+        if (data.errors !== lastErrorsCount) {
+          setLastErrorsCount(data.errors);
+          localStorage.setItem('gcalAlertsLastErrors', data.errors.toString());
+        }
+      } catch (error) {
+        console.error('[Alerts] Erro ao buscar alertas:', error);
+      }
+    };
+
+    // Carregar lastErrorsCount do localStorage na inicialização
+    const stored = localStorage.getItem('gcalAlertsLastErrors');
+    if (stored) {
+      setLastErrorsCount(parseInt(stored, 10) || 0);
+    }
+
+    // Fetch inicial
+    fetchAlerts();
+
+    // Polling a cada 30s
+    const intervalId = setInterval(fetchAlerts, POLL_MS);
+
+    // Cleanup: parar polling no unmount
+    return () => clearInterval(intervalId);
+  }, [user, lastErrorsCount, cooldownUntil]);
 
   if (loading) {
     return <Spin size="large" tip="Carregando..." fullscreen />;
@@ -169,10 +240,14 @@ function App() {
                 </Menu.Item>
               )}
 
-              {/* GCal Dashboard (Controle/Super) */}
+              {/* GCal Dashboard (Controle/Super) + Badge de erros (Issue #97) */}
               {(canControle || canSuper) && (
                 <Menu.Item key="gcal-dashboard" icon={<SyncOutlined />}>
-                  <Link to="/dashboard/gcal">Dashboard GCal</Link>
+                  <Link to="/dashboard/gcal">
+                    <Badge count={alerts.errors} offset={[10, 0]} size="small">
+                      Dashboard GCal
+                    </Badge>
+                  </Link>
                 </Menu.Item>
               )}
 

@@ -44,18 +44,20 @@ class TestGCalAlerts(TestCase):
         self.group_controle = Group.objects.get_or_create(name='Controle')[0]
         self.group_coordenador = Group.objects.get_or_create(name='Coordenador')[0]
 
-        # Criar usuários
+        # Criar usuários (com CPFs únicos para evitar unique constraint violation)
         self.user_controle = User.objects.create_user(
             username='controle_user',
             email='controle@example.com',
-            password='password123'
+            password='password123',
+            cpf='11111111111'
         )
         self.user_controle.groups.add(self.group_controle)
 
         self.user_coordenador = User.objects.create_user(
             username='coordenador_user',
             email='coordenador@example.com',
-            password='password123'
+            password='password123',
+            cpf='22222222222'
         )
         self.user_coordenador.groups.add(self.group_coordenador)
 

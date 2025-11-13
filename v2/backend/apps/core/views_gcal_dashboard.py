@@ -1024,3 +1024,89 @@ class DashboardEventsExportView(APIView):
             'count': len(serializer.data),
             'results': serializer.data
         })
+
+
+# ================================================================
+# Issue #98 - Event Detail with Timeline
+# ================================================================
+
+class EventDetailAPIView(APIView):
+    """
+    GET /api/gcal/dashboard/events/{id}/detail/
+
+    Retorna detalhes completos de um evento GCal com timeline de AuditLog.
+
+    Response 200:
+    {
+        "id": 123,
+        "municipio_nome": "Fortaleza",
+        "projeto_nome": "Gestão Escolar",
+        "tipo_evento_nome": "Formação Online",
+        "inicio": "2025-11-15T08:00:00-03:00",
+        "fim": "2025-11-15T12:00:00-03:00",
+        "usuario_username": "joao.silva",
+        "coordenador_username": "maria.coord",
+        "fluxo": "SUPER",
+        "gcal_status": "PUBLISHED",
+        "external_event_id": "asv2-123",
+        "gcal_last_sync_at": "2025-11-12T10:30:00Z",
+        "gcal_last_error": "",
+        "meet_link": "https://meet.google.com/abc-defg-hij",
+        "gcal_payload_hash": "a1b2c3...",
+        "updated_at": "2025-11-12T10:30:00Z",
+        "participations": [
+            {
+                "usuario": {"id": 10, "first_name": "João", "last_name": "Silva", "email": "joao@example.com"},
+                "guest_email": null,
+                "email": "joao@example.com",
+                "role": "instrutor",
+                "ch_horas": 4,
+                "observacao": ""
+            }
+        ],
+        "timeline": [
+            {
+                "id": 456,
+                "action": "PUBLISH_GCAL",
+                "usuario_nome": "Maria Coordenadora",
+                "details": {"solicitacao_id": 123, "dry_run": false, "status": "success"},
+                "created_at": "2025-11-12T10:30:00Z"
+            },
+            {
+                "id": 455,
+                "action": "PUBLISH_GCAL_REQUESTED",
+                "usuario_nome": "Sistema",
+                "details": {"solicitacao_id": 123},
+                "created_at": "2025-11-12T10:29:00Z"
+            }
+        ]
+    }
+
+    Response 404:
+    {"detail": "Solicitação não encontrada"}
+
+    Response 403:
+    {"detail": "Você não tem permissão para acessar este recurso"}
+
+    Permissions: IsControleOrSuper
+    """
+    permission_classes = [IsAuthenticated, IsControleOrSuper]
+
+    def get(self, request: Request, pk: int, *args: Any, **kwargs: Any) -> Response:
+        # Importar serializer
+        from .serializers import EventDetailSerializer
+
+        # Buscar solicitação com select_related para otimizar queries
+        try:
+            solicitacao = Solicitacao.objects.select_related(
+                'usuario', 'municipio', 'tipo_evento', 'projeto', 'coordenador'
+            ).prefetch_related('participations__usuario').get(pk=pk)
+        except Solicitacao.DoesNotExist:
+            return Response(
+                {'detail': 'Solicitação não encontrada'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Serializar
+        serializer = EventDetailSerializer(solicitacao)
+        return Response(serializer.data, status=status.HTTP_200_OK)

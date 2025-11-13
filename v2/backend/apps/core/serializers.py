@@ -565,3 +565,150 @@ class GroupSerializer(serializers.ModelSerializer):
     def get_user_count(self, obj: Group) -> int:
         """Return count of users in this group."""
         return obj.user_set.count()
+
+
+# ================================================================
+# Issue #98 - Event Detail with AuditLog Timeline
+# ================================================================
+
+class AuditLogTimelineSerializer(serializers.ModelSerializer):
+    """
+    Serializer para AuditLog na timeline de eventos.
+
+    Expõe apenas campos relevantes para exibição no Drawer:
+    - id, action, details, created_at
+    - usuario (nome completo ou "Sistema")
+
+    Usado em EventDetailSerializer para timeline.
+    """
+
+    usuario_nome = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            "id",
+            "action",
+            "usuario_nome",
+            "details",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_usuario_nome(self, obj: AuditLog) -> str:
+        """Retorna nome do usuário ou 'Sistema' se null."""
+        if obj.usuario:
+            full_name = obj.usuario.get_full_name()
+            return full_name if full_name.strip() else obj.usuario.username
+        return "Sistema"
+
+
+class EventDetailSerializer(serializers.ModelSerializer):
+    """
+    Serializer para detalhes completos de um evento GCal (Issue #98).
+
+    Campos expostos:
+    - Dados do evento: id, municipio_nome, projeto_nome, tipo_evento_nome,
+      inicio, fim, usuario_username, coordenador_username, fluxo
+    - Dados GCal: gcal_status, external_event_id, gcal_last_sync_at,
+      gcal_last_error, meet_link, gcal_payload_hash, updated_at
+    - participations: Lista de participantes (read-only)
+    - timeline: Últimos 20 AuditLog relacionados (actions GCal), ordenado desc
+
+    Permissions: IsControleOrSuper
+    Endpoint: GET /api/gcal/dashboard/events/{id}/detail/
+    """
+
+    # Campos legíveis (nomes em vez de IDs)
+    municipio_nome = serializers.CharField(source='municipio.nome', read_only=True)
+    projeto_nome = serializers.CharField(source='projeto.nome', read_only=True)
+    tipo_evento_nome = serializers.CharField(source='tipo_evento.nome', read_only=True)
+    usuario_username = serializers.SerializerMethodField()
+    coordenador_username = serializers.SerializerMethodField()
+    fluxo = serializers.SerializerMethodField()
+
+    # Participations (aninhado)
+    participations = ParticipationNestedSerializer(many=True, read_only=True)
+
+    # Timeline de AuditLog (últimos 20, ordenado desc)
+    timeline = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Solicitacao
+        fields = [
+            "id",
+            "municipio_nome",
+            "projeto_nome",
+            "tipo_evento_nome",
+            "inicio",
+            "fim",
+            "usuario_username",
+            "coordenador_username",
+            "fluxo",
+            "gcal_status",
+            "external_event_id",
+            "gcal_last_sync_at",
+            "gcal_last_error",
+            "meet_link",
+            "gcal_payload_hash",
+            "updated_at",
+            "participations",
+            "timeline",
+        ]
+        read_only_fields = fields
+
+    def get_usuario_username(self, obj: Solicitacao) -> str | None:
+        """Retorna username do usuário que criou a solicitação."""
+        return obj.usuario.username if obj.usuario else None
+
+    def get_coordenador_username(self, obj: Solicitacao) -> str | None:
+        """Retorna username do coordenador (ou usuario se coordenador null)."""
+        if obj.coordenador:
+            return obj.coordenador.username
+        if obj.usuario:
+            return obj.usuario.username
+        return None
+
+    def get_fluxo(self, obj: Solicitacao) -> str:
+        """Retorna fluxo do projeto (SUPER ou NAO_SUPER)."""
+        return obj.projeto.fluxo if obj.projeto else 'NAO_SUPER'
+
+    def get_timeline(self, obj: Solicitacao) -> list[dict[str, Any]]:
+        """
+        Retorna últimos 20 AuditLog relacionados ao evento.
+
+        Filtro por actions GCal relevantes:
+        - PUBLISH_GCAL_REQUESTED
+        - PUBLISH_GCAL
+        - PUBLISH_GCAL_ERROR
+        - CANCEL_GCAL
+        - CANCEL_GCAL_REQUESTED
+        - RESYNC_GCAL_REQUESTED
+        - GOOGLE_CONNECT
+        - GOOGLE_DISCONNECT
+        - GOOGLE_REFRESH_TOKEN
+
+        Ordenado por created_at desc (mais recentes primeiro).
+        Limite: 20 registros.
+        """
+        # Ações GCal relevantes para timeline
+        gcal_actions = [
+            'PUBLISH_GCAL_REQUESTED',
+            'PUBLISH_GCAL',
+            'PUBLISH_GCAL_ERROR',
+            'CANCEL_GCAL',
+            'CANCEL_GCAL_REQUESTED',
+            'RESYNC_GCAL_REQUESTED',
+            'GOOGLE_CONNECT',
+            'GOOGLE_DISCONNECT',
+            'GOOGLE_REFRESH_TOKEN',
+        ]
+
+        # Buscar logs relacionados ao evento (via details.solicitacao_id ou model_name)
+        logs = AuditLog.objects.filter(
+            action__in=gcal_actions,
+            details__solicitacao_id=obj.id
+        ).select_related('usuario').order_by('-created_at')[:20]
+
+        # Serializar
+        return AuditLogTimelineSerializer(logs, many=True).data

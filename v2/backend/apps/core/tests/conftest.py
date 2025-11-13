@@ -5,7 +5,6 @@ Issue #105: Fixtures para eliminar 403 RBAC failures sem alterar endpoints.
 """
 import pytest
 from django.conf import settings
-from django.core.cache import cache
 
 
 @pytest.fixture(autouse=True)
@@ -32,20 +31,3 @@ def force_service_account_mode():
     # Restore original value
     if original_value is not None:
         settings.GCAL_AUTH_MODE = original_value
-
-
-@pytest.fixture(autouse=True)
-def clear_cache_before_test():
-    """
-    Limpa cache Redis antes de cada teste para garantir isolamento.
-
-    Issue #105 (CI fix): Teste test_status_counts_cache_works falhava no CI
-    devido a cache residual de outros testes. Esta fixture garante que cada
-    teste comece com cache limpo, prevenindo test isolation issues.
-
-    Aplicado a TODOS os testes via autouse=True.
-    """
-    cache.clear()
-    yield
-    # Opcional: limpar também após o teste
-    cache.clear()

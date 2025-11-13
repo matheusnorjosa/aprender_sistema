@@ -29,7 +29,7 @@ from rest_framework.response import Response
 import csv
 import logging
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -100,7 +100,7 @@ def _filter_events_queryset(request: Request, base_qs: QuerySet[Solicitacao]) ->
                 microsecond=0
             )
             # Converter para UTC
-            start_utc = local_start.astimezone(timezone.utc)
+            start_utc = local_start.astimezone(dt_timezone.utc)
             # Aplicar filtro inclusivo
             qs = qs.filter(inicio__gte=start_utc)
         except (ValueError, TypeError):
@@ -118,7 +118,7 @@ def _filter_events_queryset(request: Request, base_qs: QuerySet[Solicitacao]) ->
                 microsecond=999999
             )
             # Converter para UTC
-            end_utc = local_end.astimezone(timezone.utc)
+            end_utc = local_end.astimezone(dt_timezone.utc)
             # Aplicar filtro inclusivo
             qs = qs.filter(inicio__lte=end_utc)
         except (ValueError, TypeError):

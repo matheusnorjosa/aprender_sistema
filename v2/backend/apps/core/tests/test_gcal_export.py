@@ -284,7 +284,6 @@ class TestGCalExport(TestCase):
         response = self.client.get(self.url, {'export_format': 'json', 'start': start_date})
         data = response.json()
         self.assertEqual(response.status_code, 200)
-
         # Deve retornar sol_error (dia+2) e sol_none (dia+3)
         self.assertEqual(data['count'], 2)
 

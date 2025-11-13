@@ -14,7 +14,7 @@ from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from ..models import Solicitacao, Municipio, Projeto, TipoEvento
+from apps.core.models import Solicitacao, Municipio, Projeto, TipoEvento
 from django.contrib.auth import get_user_model
 
 User = get_user_model()

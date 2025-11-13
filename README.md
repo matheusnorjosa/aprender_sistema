@@ -201,6 +201,10 @@ Dashboard completo de monitoramento:
 - 🔍 Filtros por período e status
 - 📋 Tabela paginada com ordenação
 - ⚠️ Alertas de erros recentes (top 5)
+- 🔎 **Drawer de detalhes**: Clique em qualquer linha da tabela para abrir painel lateral com:
+  - Informações completas do evento
+  - Timeline de auditoria (histórico de mudanças)
+  - Ações rápidas (Reapply/Resync)
 
 **Testes**: 12/12 passando (veja [Testing Policy](v2/docs/TESTING_POLICY.md))
 

@@ -279,19 +279,13 @@ class TestGCalExport(TestCase):
         self.assertEqual(data['results'][0]['gcal_status'], 'PUBLISHED')
 
         # Teste filtro por start (apenas eventos futuros +2 dias)
+        # Issue #124: Agora com helper timezone-aware, deve retornar corretamente
         start_date = (self.now + timedelta(days=2)).strftime('%Y-%m-%d')
         response = self.client.get(self.url, {'export_format': 'json', 'start': start_date})
         data = response.json()
         self.assertEqual(response.status_code, 200)
-
-        # FIXME: O filtro deveria retornar 2 eventos (sol_error dia+2 e sol_none dia+3),
-        # mas está retornando apenas 1. Problema identificado em Issue #98 pós-merge:
-        # - ORM direto com inicio__date__gte retorna corretamente as 2 solicitações
-        # - Mas o serializer/API retorna apenas 1
-        # Possível causa: problema com serialização de eventos com gcal_status=NONE ou timezone
-        # TODO: Criar issue separada para investigar e corrigir
-        self.assertGreaterEqual(data['count'], 1, "Deve retornar pelo menos sol_error")
-        # self.assertEqual(data['count'], 2)  # Expectativa correta quando bug for corrigido
+        # Deve retornar sol_error (dia+2) e sol_none (dia+3)
+        self.assertEqual(data['count'], 2)
 
         # Teste filtro por end (apenas eventos até +1 dia)
         end_date = (self.now + timedelta(days=1)).strftime('%Y-%m-%d')
@@ -312,3 +306,116 @@ class TestGCalExport(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(data['count'], 1)
         self.assertEqual(data['results'][0]['id'], self.sol_published.id)
+
+    def test_export_edge_cases_timezone_boundaries(self):
+        """
+        Teste 6: Casos de borda timezone-aware (Issue #124)
+
+        Valida que eventos exatamente em 00:00 e 23:59:59 são incluídos
+        corretamente na janela local (America/Fortaleza).
+        """
+        from zoneinfo import ZoneInfo
+        from django.utils import timezone as django_tz
+
+        # Timezone local
+        tz_local = ZoneInfo('America/Fortaleza')
+
+        # Data de referência para o teste
+        ref_date = datetime(2025, 2, 10, 0, 0, 0, tzinfo=tz_local)
+
+        # Evento exatamente às 00:00 (início do dia)
+        sol_midnight = Solicitacao.objects.create(
+            status='aprovado',
+            inicio=ref_date,  # 2025-02-10 00:00 BRT
+            fim=ref_date + timedelta(hours=1),
+            municipio=self.municipio,
+            projeto=self.projeto,
+            tipo_evento=self.tipo_evento,
+            usuario=self.user_controle,
+            coordenador=self.user_coordenador,
+            gcal_status=Solicitacao.GCalStatus.PUBLISHED
+        )
+
+        # Evento exatamente às 23:59:59 (fim do dia)
+        sol_eod = Solicitacao.objects.create(
+            status='aprovado',
+            inicio=ref_date.replace(hour=23, minute=59, second=59),  # 2025-02-10 23:59:59 BRT
+            fim=ref_date.replace(hour=23, minute=59, second=59) + timedelta(hours=1),
+            municipio=self.municipio,
+            projeto=self.projeto,
+            tipo_evento=self.tipo_evento,
+            usuario=self.user_controle,
+            coordenador=self.user_coordenador,
+            gcal_status=Solicitacao.GCalStatus.ERROR
+        )
+
+        # Evento um dia antes (deve ser excluído quando start=2025-02-10)
+        sol_before = Solicitacao.objects.create(
+            status='aprovado',
+            inicio=ref_date - timedelta(days=1),  # 2025-02-09
+            fim=ref_date - timedelta(days=1) + timedelta(hours=2),
+            municipio=self.municipio,
+            projeto=self.projeto,
+            tipo_evento=self.tipo_evento,
+            usuario=self.user_controle,
+            coordenador=self.user_coordenador,
+            gcal_status=Solicitacao.GCalStatus.PUBLISHED
+        )
+
+        # Evento um dia depois (deve ser excluído quando end=2025-02-10)
+        sol_after = Solicitacao.objects.create(
+            status='aprovado',
+            inicio=ref_date + timedelta(days=1),  # 2025-02-11
+            fim=ref_date + timedelta(days=1) + timedelta(hours=2),
+            municipio=self.municipio,
+            projeto=self.projeto,
+            tipo_evento=self.tipo_evento,
+            usuario=self.user_controle,
+            coordenador=self.user_coordenador,
+            gcal_status=Solicitacao.GCalStatus.NONE
+        )
+
+        # Teste 1: Filtro start=2025-02-10 deve incluir midnight e eod, excluir before
+        self.client.force_authenticate(user=self.user_controle)
+        response = self.client.get(self.url, {
+            'export_format': 'json',
+            'start': '2025-02-10'
+        })
+        data = response.json()
+        self.assertEqual(response.status_code, 200)
+        # Deve incluir: sol_midnight, sol_eod, sol_after, e os 3 do setUp (6 total)
+        # mas excluir sol_before (1 evento)
+        returned_ids = [item['id'] for item in data['results']]
+        self.assertIn(sol_midnight.id, returned_ids, "Evento às 00:00 deve ser incluído")
+        self.assertIn(sol_eod.id, returned_ids, "Evento às 23:59:59 deve ser incluído")
+        self.assertIn(sol_after.id, returned_ids, "Evento depois deve ser incluído")
+        self.assertNotIn(sol_before.id, returned_ids, "Evento antes deve ser excluído")
+
+        # Teste 2: Filtro end=2025-02-10 deve incluir midnight e eod, excluir after
+        response = self.client.get(self.url, {
+            'export_format': 'json',
+            'end': '2025-02-10'
+        })
+        data = response.json()
+        self.assertEqual(response.status_code, 200)
+        returned_ids = [item['id'] for item in data['results']]
+        self.assertIn(sol_midnight.id, returned_ids, "Evento às 00:00 deve ser incluído")
+        self.assertIn(sol_eod.id, returned_ids, "Evento às 23:59:59 deve ser incluído")
+        self.assertIn(sol_before.id, returned_ids, "Evento antes deve ser incluído")
+        self.assertNotIn(sol_after.id, returned_ids, "Evento depois deve ser excluído")
+
+        # Teste 3: Janela exata (start=end=2025-02-10) deve incluir apenas midnight e eod
+        response = self.client.get(self.url, {
+            'export_format': 'json',
+            'start': '2025-02-10',
+            'end': '2025-02-10'
+        })
+        data = response.json()
+        self.assertEqual(response.status_code, 200)
+        returned_ids = [item['id'] for item in data['results']]
+        self.assertIn(sol_midnight.id, returned_ids)
+        self.assertIn(sol_eod.id, returned_ids)
+        self.assertNotIn(sol_before.id, returned_ids)
+        self.assertNotIn(sol_after.id, returned_ids)
+        # Deve ter exatamente 2 eventos (midnight + eod)
+        self.assertEqual(data['count'], 2)

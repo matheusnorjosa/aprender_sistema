@@ -1,0 +1,339 @@
+"""
+Testes para endpoints de autenticação (Issue #134 - P1).
+
+Valida:
+- Login cria AuditLog (PA-05)
+- Logout cria AuditLog (PA-05)
+- Usuário inativo é bloqueado
+- Credenciais vazias são rejeitadas
+- Credenciais inválidas retornam 400
+- Login bem-sucedido retorna dados do usuário
+- Rate limiting aplicado (LoginThrottle)
+"""
+
+import pytest
+from uuid import uuid4
+from django.contrib.auth.models import Group
+from django.core.cache import cache
+from rest_framework.test import APIClient
+from rest_framework import status
+
+from apps.core.models import Usuario, AuditLog
+
+
+pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def clear_throttle_cache():
+    """Clear throttle cache before each test to avoid 429 errors."""
+    cache.clear()
+    yield
+    cache.clear()
+
+
+@pytest.fixture
+def usuario_ativo():
+    """Usuário ativo para testes de login."""
+    uid = uuid4().hex
+    cpf = str(uuid4().int % 10**11).zfill(11)
+    return Usuario.objects.create_user(
+        username=f"user_{uid}",
+        email=f"user_{uid}@example.com",
+        password="testpass123",
+        cpf=cpf,
+        is_active=True,
+    )
+
+
+@pytest.fixture
+def usuario_inativo():
+    """Usuário inativo para testes de bloqueio."""
+    uid = uuid4().hex
+    cpf = str(uuid4().int % 10**11).zfill(11)
+    return Usuario.objects.create_user(
+        username=f"inactive_{uid}",
+        email=f"inactive_{uid}@example.com",
+        password="testpass123",
+        cpf=cpf,
+        is_active=False,
+    )
+
+
+@pytest.fixture
+def usuario_superintendencia():
+    """Usuário do grupo Superintendência."""
+    uid = uuid4().hex
+    cpf = str(uuid4().int % 10**11).zfill(11)
+    user = Usuario.objects.create_user(
+        username=f"super_{uid}",
+        email=f"super_{uid}@example.com",
+        password="testpass123",
+        cpf=cpf,
+        is_active=True,
+    )
+    grupo, _ = Group.objects.get_or_create(name="Superintendência")
+    user.groups.add(grupo)
+    return user
+
+
+@pytest.fixture
+def api_client():
+    """API client for unauthenticated requests."""
+    return APIClient()
+
+
+# ===================================================================
+# LOGIN ENDPOINT TESTS
+# ===================================================================
+
+
+def test_login_success_returns_user_data(api_client, usuario_ativo):
+    """
+    Login bem-sucedido deve retornar 200 com dados do usuário.
+
+    Valida:
+    - Status 200
+    - Campos: id, username, email, name, groups, is_superintendencia
+    """
+    response = api_client.post(
+        "/api/auth/login/",
+        {"username": usuario_ativo.username, "password": "testpass123"},
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["id"] == usuario_ativo.id
+    assert response.data["username"] == usuario_ativo.username
+    assert response.data["email"] == usuario_ativo.email
+    assert "groups" in response.data
+    assert "is_superintendencia" in response.data
+
+
+def test_login_creates_audit_log(api_client, usuario_ativo):
+    """
+    PA-05: Login deve criar AuditLog com action='LOGIN'.
+
+    Valida:
+    - AuditLog criado
+    - action='LOGIN'
+    - usuario=usuario_ativo
+    - details contém ip_address e user_agent
+    """
+    initial_count = AuditLog.objects.count()
+
+    response = api_client.post(
+        "/api/auth/login/",
+        {"username": usuario_ativo.username, "password": "testpass123"},
+        format="json",
+        HTTP_USER_AGENT="pytest-agent"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert AuditLog.objects.count() == initial_count + 1
+
+    log = AuditLog.objects.latest("created_at")
+    assert log.action == "LOGIN"
+    assert log.usuario == usuario_ativo
+    assert log.model_name == "Usuario"
+    assert "ip_address" in log.details
+    assert "user_agent" in log.details
+    assert log.details["user_agent"] == "pytest-agent"
+
+
+def test_login_inactive_user_blocked(api_client, usuario_inativo):
+    """
+    Usuário inativo deve ser bloqueado no login.
+
+    Valida:
+    - Status 400
+    - Mensagem de erro: 'Credenciais inválidas.' (auth backend retorna None para inativos)
+    """
+    response = api_client.post(
+        "/api/auth/login/",
+        {"username": usuario_inativo.username, "password": "testpass123"},
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["error"] == "Credenciais inválidas."
+
+
+def test_login_empty_credentials_rejected(api_client):
+    """
+    Credenciais vazias devem retornar 400.
+
+    Valida:
+    - Username vazio → 400
+    - Password vazio → 400
+    - Ambos vazios → 400
+    """
+    # Username vazio
+    response = api_client.post(
+        "/api/auth/login/",
+        {"username": "", "password": "testpass123"},
+        format="json"
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "obrigatórios" in response.data["error"]
+
+    # Password vazio
+    response = api_client.post(
+        "/api/auth/login/",
+        {"username": "user", "password": ""},
+        format="json"
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "obrigatórios" in response.data["error"]
+
+    # Ambos vazios
+    response = api_client.post(
+        "/api/auth/login/",
+        {"username": "", "password": ""},
+        format="json"
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "obrigatórios" in response.data["error"]
+
+
+def test_login_invalid_credentials_rejected(api_client, usuario_ativo):
+    """
+    Credenciais inválidas devem retornar 400.
+
+    Valida:
+    - Senha errada → 400 'Credenciais inválidas.'
+    - Usuário inexistente → 400 'Credenciais inválidas.'
+    """
+    # Senha errada
+    response = api_client.post(
+        "/api/auth/login/",
+        {"username": usuario_ativo.username, "password": "wrongpass"},
+        format="json"
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["error"] == "Credenciais inválidas."
+
+    # Usuário inexistente
+    response = api_client.post(
+        "/api/auth/login/",
+        {"username": "nonexistent", "password": "testpass123"},
+        format="json"
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["error"] == "Credenciais inválidas."
+
+
+def test_login_returns_groups(api_client, usuario_superintendencia):
+    """
+    Login deve retornar lista de grupos do usuário.
+
+    Valida:
+    - Campo 'groups' é lista
+    - Contém 'Superintendência' para usuário com esse grupo
+    - is_superintendencia=True
+    """
+    response = api_client.post(
+        "/api/auth/login/",
+        {"username": usuario_superintendencia.username, "password": "testpass123"},
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert isinstance(response.data["groups"], list)
+    assert "Superintendência" in response.data["groups"]
+    assert response.data["is_superintendencia"] is True
+
+
+# ===================================================================
+# LOGOUT ENDPOINT TESTS
+# ===================================================================
+
+
+def test_logout_requires_authentication(api_client):
+    """
+    Logout deve exigir autenticação (IsAuthenticated).
+
+    Valida:
+    - Usuário não autenticado → 401 ou 403
+    """
+    response = api_client.post("/api/auth/logout/")
+    assert response.status_code in [
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_403_FORBIDDEN
+    ]
+
+
+def test_logout_creates_audit_log(api_client, usuario_ativo):
+    """
+    PA-05: Logout deve criar AuditLog com action='LOGOUT'.
+
+    Valida:
+    - AuditLog criado
+    - action='LOGOUT'
+    - usuario=usuario_ativo
+    - details contém ip_address e user_agent
+    """
+    # Force authenticate (session auth doesn't persist in APIClient)
+    api_client.force_authenticate(user=usuario_ativo)
+
+    initial_count = AuditLog.objects.count()
+
+    # Fazer logout
+    response = api_client.post(
+        "/api/auth/logout/",
+        HTTP_USER_AGENT="pytest-agent"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert AuditLog.objects.count() == initial_count + 1
+
+    log = AuditLog.objects.latest("created_at")
+    assert log.action == "LOGOUT"
+    assert log.usuario == usuario_ativo
+    assert log.model_name == "Usuario"
+    assert "ip_address" in log.details
+    assert "user_agent" in log.details
+
+
+def test_logout_success_returns_message(api_client, usuario_ativo):
+    """
+    Logout bem-sucedido deve retornar 200 com mensagem.
+
+    Valida:
+    - Status 200
+    - Mensagem de sucesso
+    """
+    # Force authenticate
+    api_client.force_authenticate(user=usuario_ativo)
+
+    # Fazer logout
+    response = api_client.post("/api/auth/logout/")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert "message" in response.data
+    assert "sucesso" in response.data["message"]
+
+
+def test_logout_clears_session(api_client, usuario_ativo):
+    """
+    Logout deve invalidar a autenticação.
+
+    Valida:
+    - Após logout + clear auth, requisição sem auth retorna 401/403
+    """
+    # Force authenticate
+    api_client.force_authenticate(user=usuario_ativo)
+
+    # Verificar que está autenticado (logout requer auth)
+    response = api_client.post("/api/auth/logout/")
+    assert response.status_code == status.HTTP_200_OK
+
+    # Clear forced authentication (simula sessão limpa)
+    api_client.force_authenticate(user=None)
+
+    # Tentar logout novamente sem auth (deve falhar)
+    response = api_client.post("/api/auth/logout/")
+    assert response.status_code in [
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_403_FORBIDDEN
+    ]

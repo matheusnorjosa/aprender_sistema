@@ -33,6 +33,14 @@ from apps.core.permissions import IsControleOrSuper, IsDATOrSuper
 from apps.core.services.controle_acoes_import import import_acoes_controle
 from apps.core.services.dat_cadastros_import import import_dat_cadastros
 
+# Issue #132: Upload validation (SEC-P0)
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
+ALLOWED_CONTENT_TYPES = {
+    'text/csv',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+}
+
 
 class ControleImportAcoesView(APIView):
     """
@@ -71,6 +79,20 @@ class ControleImportAcoesView(APIView):
         except (KeyError, MultiValueDictKeyError):
             return Response(
                 {"detail": "Campo 'file' é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Issue #132: Validar tamanho (DoS prevention)
+        if upload.size > MAX_UPLOAD_SIZE:
+            return Response(
+                {"detail": f"Arquivo muito grande. Máximo: {MAX_UPLOAD_SIZE / 1024 / 1024:.0f}MB"},
+                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+            )
+
+        # Issue #132: Validar MIME type (malicious file prevention)
+        if upload.content_type not in ALLOWED_CONTENT_TYPES:
+            return Response(
+                {"detail": f"Tipo de arquivo não permitido. Aceitos: CSV, XLS, XLSX. Recebido: {upload.content_type}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -141,6 +163,20 @@ class DATImportCadastrosView(APIView):
         except (KeyError, MultiValueDictKeyError):
             return Response(
                 {"detail": "Campo 'file' é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Issue #132: Validar tamanho (DoS prevention)
+        if upload.size > MAX_UPLOAD_SIZE:
+            return Response(
+                {"detail": f"Arquivo muito grande. Máximo: {MAX_UPLOAD_SIZE / 1024 / 1024:.0f}MB"},
+                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+            )
+
+        # Issue #132: Validar MIME type (malicious file prevention)
+        if upload.content_type not in ALLOWED_CONTENT_TYPES:
+            return Response(
+                {"detail": f"Tipo de arquivo não permitido. Aceitos: CSV, XLS, XLSX. Recebido: {upload.content_type}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

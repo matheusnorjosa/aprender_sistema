@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed:*)",
+      "Bash(__NEW_LINE__ echo \"=== ORGANIZAÇÃO COMPLETA ===\" echo \"\" echo \"Raiz (.):\" find . -maxdepth 1 -name \"*.md\" -type f)",
+      "Bash(__NEW_LINE__ echo '=== ORGANIZAÇÃO COMPLETA ===' echo echo 'Raiz (apenas README.md):' ls *.md)",
+      "Bash(head -5 echo echo 'v2/docs/ (arquivos principais):' ls v2/docs/*.md)",
+      "Bash(xargs -n1 basename echo echo 'v2/docs/memoria/ (histórico):' ls v2/docs/memoria/*.md)",
+      "Bash(xargs:*)",
+      "Bash(git --no-verify commit:*)",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)",
+      "Bash(git apply:*)",
+      "Bash(git restore:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

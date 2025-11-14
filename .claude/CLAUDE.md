@@ -1,5 +1,28 @@
 # Projeto: Aprender Sistema (AS) — Guia do Claude Code
 
+---
+
+## ⚠️ IMPORTANTE: Ao Retomar Sessão Resumida
+
+**Se você está lendo este arquivo após uma compactação/resumo de conversa:**
+
+1. ✅ **LEIA PRIMEIRO**: [.claude/CHECKLIST_FERRAMENTAS.md](.claude/CHECKLIST_FERRAMENTAS.md)
+   - Lista completa de 16 slash commands disponíveis
+   - 3 skills especializadas (aprender-domain, django-patterns, etl-guidelines)
+   - 4 hooks de notificação configurados
+   - Checklist: "Devo usar ferramenta ou fazer manual?"
+
+2. ✅ **EVITE**: Fazer tarefas manualmente quando existe ferramenta especializada
+   - ❌ Grep manual → ✅ Use `/review-enhanced` ou Task/Explore
+   - ❌ Análise manual de regras → ✅ Use skill `aprender-domain`
+   - ❌ Review básico → ✅ Use `/review-enhanced` (10 categorias)
+
+3. ✅ **SEMPRE PERGUNTE**: "Existe slash command, skill ou agent para isso?"
+
+**Objetivo**: Garantir que eu use consistentemente todas as ferramentas customizadas, mesmo após resumo de contexto.
+
+---
+
 ## Contexto do Projeto
 - Objetivo: Substituir planilhas pelo **AS** para solicitação → aprovação → criação de eventos (Google Calendar), com verificação de conflitos e logs de auditoria.
 - Stack: **Python 3.12.12 + Django 5.1.x + DRF + Celery + PostgreSQL 15 + Redis 7**, containers via **Docker + Docker Compose** (`v2/infra/docker-compose.yml`).
@@ -68,11 +91,16 @@ Use `Skill` tool com nome da skill para contexto especializado:
 **Estrutura .claude/**:
 ```
 .claude/
-├── CLAUDE.md              # Regras de negócio (este arquivo)
-├── CLAUDE-principles.md   # Qualidade de código (463L)
-├── GUIA_USO.md            # Guia completo ⭐
-├── commands/              # 16 slash commands
-└── skills/                # 3 skills (aprender-domain, django-patterns, etl-guidelines)
+├── CLAUDE.md                  # Regras de negócio (este arquivo)
+├── CLAUDE-principles.md       # Qualidade de código (463L)
+├── GUIA_USO.md                # Guia completo ⭐
+├── CHECKLIST_FERRAMENTAS.md   # Checklist pós-resumo ⭐ NOVO
+├── MELHORIAS_2025-11-14.md    # Histórico de melhorias
+├── settings.json              # Hooks + permissions
+├── commands/                  # 16 slash commands
+│   ├── review.md              # Original (170L)
+│   └── review-enhanced.md     # Novo (573L) ⭐
+└── skills/                    # 3 skills (aprender-domain, django-patterns, etl-guidelines)
 ```
 
 **Quick Start**:

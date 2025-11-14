@@ -10,7 +10,18 @@
       "Bash(git commit:*)",
       "Bash(git log:*)",
       "Bash(python manage.py:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(for:*)",
+      "Bash(gh pr list:*)",
+      "Bash(git merge:*)",
+      "Bash(__NEW_LINE__ echo '=== RESUMO DA ORGANIZAÇÃO ===' echo echo '📁 Raiz do Projeto:' ls -1 *.md)",
+      "Bash(sed:*)",
+      "Bash(sed:*)",
+      "Bash(__NEW_LINE__ echo \"=== ORGANIZAÇÃO COMPLETA ===\"  echo \"\" echo \"Raiz (.):\" find . -maxdepth 1 -name \"*.md\" -type f)",
+      "Bash(__NEW_LINE__ echo '=== ORGANIZAÇÃO COMPLETA ===' echo echo 'Raiz (apenas README.md):' ls *.md)",
+      "Bash(head -5 echo echo 'v2/docs/ (arquivos principais):' ls v2/docs/*.md)",
+      "Bash(xargs -n1 basename echo echo 'v2/docs/memoria/ (histórico):' ls v2/docs/memoria/*.md)",
+      "Bash(xargs:*)"
     ],
     "ask": [
       "Bash(git push:*)",
@@ -25,16 +36,62 @@
       "Read(./.env.*)",
       "Read(./secrets/**)"
     ],
-    "additionalDirectories": []
+    "additionalDirectories": [
+      "C:\\Users\\datsu\\OneDrive\\Documentos\\Aprender Sistema\\📄 v2\\docs\\memoria"
+    ]
   },
   "env": {
     "DJANGO_ENV": "development",
     "DB_HOST": "db",
     "DB_PORT": "5432"
   },
+  "hooks": {
+    "Bash": [
+      {
+        "description": "Notificação sonora ao completar testes (pytest)",
+        "matcher": "pytest.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -c \"[console]::beep(800,300); [console]::beep(1000,200)\""
+          }
+        ]
+      },
+      {
+        "description": "Notificação sonora ao completar ETL apply",
+        "matcher": "python manage.py.*--apply",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -c \"[console]::beep(800,300); [console]::beep(1000,200)\""
+          }
+        ]
+      },
+      {
+        "description": "Notificação sonora ao completar docker compose up",
+        "matcher": "docker compose up.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -c \"[console]::beep(600,200); [console]::beep(800,200)\""
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "description": "Notificação geral de sucesso",
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -c \"[console]::beep(1000,150)\""
+          }
+        ]
+      }
+    ]
+  },
   "enableAllProjectMcpServers": true,
-  "verbose": false
-  ,
-
-"includeCoAuthoredBy": false
+  "verbose": false,
+  "includeCoAuthoredBy": false
 }

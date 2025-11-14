@@ -243,6 +243,67 @@ def test_calendar_integration_not_called_before_approval(
     mock_celery_task.assert_not_called()
 
 
+@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='service_account')
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+def test_calendar_integration_is_called_after_approval(
+    mock_celery_task,
+    usuario_superintendencia,
+):
+    """
+    PA-03 (parte positiva): Integrações executam APÓS aprovação.
+
+    Verifica que:
+    - Publish de solicitação aprovada → sucesso (200/202/204)
+    - Task Celery É enfileirada para solicitações aprovadas
+
+    Complementa test_calendar_integration_not_called_before_approval para
+    cobertura completa de PA-03 (caminho negativo + positivo).
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+    from apps.core.models import Solicitacao, Municipio, Projeto, TipoEvento, Usuario
+
+    # Criar Solicitacao já aprovada (evita caminho lento de aprovação)
+    mun, _ = Municipio.objects.get_or_create(
+        nome="Fortaleza", defaults={"uf": "CE", "ativo": True}
+    )
+    proj, _ = Projeto.objects.get_or_create(
+        nome="Projeto Teste SUPER", defaults={"ativo": True, "fluxo": "SUPER"}
+    )
+    tipo, _ = TipoEvento.objects.get_or_create(nome="Formação")
+    coord = Usuario.objects.create_user(
+        username=f"coord_pa03_{uuid4().hex[:8]}",
+        email=f"coord_pa03_{uuid4().hex[:8]}@x.com",
+        password="x",
+        cpf=str(uuid4().int % 10**11).zfill(11),
+    )
+
+    sol = Solicitacao.objects.create(
+        usuario=coord,
+        municipio=mun,
+        projeto=proj,
+        tipo_evento=tipo,
+        inicio=timezone.now() + timedelta(days=1),
+        fim=timezone.now() + timedelta(days=1, hours=2),
+        status="aprovado",  # Já aprovada
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=usuario_superintendencia)
+
+    # Publish de solicitação aprovada → deve enfileirar task
+    response = client.post(f"/api/solicitacoes/{sol.id}/publish/")
+
+    # Endpoint deve aceitar (GCAL_CLIENT='google', não bloqueado)
+    assert response.status_code in (200, 202, 204), (
+        f"Publish de solicitação aprovada deve retornar 2xx, "
+        f"recebido: {response.status_code} - {getattr(response, 'data', None)}"
+    )
+
+    # Task Celery DEVE ser enfileirada
+    mock_celery_task.assert_called_once()
+
+
 # ===================================================================
 # PA-05: Auditoria completa
 # ===================================================================

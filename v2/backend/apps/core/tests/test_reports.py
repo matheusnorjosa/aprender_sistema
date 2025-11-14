@@ -17,8 +17,10 @@ Endpoints testados:
 
 import pytest
 from datetime import datetime, timedelta
+from uuid import uuid4
 from django.contrib.auth.models import Group
 from django.core.cache import cache
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -365,9 +367,25 @@ def test_status_counts_end_before_start(user_super, clear_cache):
     assert 'detail' in res.json()
 
 
-@pytest.mark.skip(reason="Flaky test - fails in CI with test isolation issue (cache not working). Passes locally. TODO: Fix test isolation in CI environment (Issue #105 follow-up)")
+@override_settings(
+    CACHES={
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'test-status-counts',
+            'KEY_PREFIX': f'test_status_counts_{uuid4().hex}',
+        }
+    }
+)
 def test_status_counts_cache_works(user_super, solicitacoes_variedade, clear_cache):
-    """status-counts utiliza cache corretamente."""
+    """
+    status-counts utiliza cache corretamente.
+
+    Issue #130: Isolado com LocMemCache + KEY_PREFIX único para evitar
+    flakiness no CI. Cache é limpo antes e depois do teste.
+    """
+    # Limpar cache no início do teste
+    cache.clear()
+
     client = APIClient()
     client.force_authenticate(user=user_super)
 
@@ -407,6 +425,9 @@ def test_status_counts_cache_works(user_super, solicitacoes_variedade, clear_cac
 
     # Dados devem ser idênticos (cache)
     assert data1 == data2
+
+    # Limpar cache no final do teste
+    cache.clear()
 
 
 # ============================================================================

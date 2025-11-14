@@ -392,7 +392,7 @@ If logs show sustained 429 errors from single IP:
 
 ### Planned (Issues Created)
 - [x] **Issue #135**: CSRF_COOKIE_HTTPONLY=True (XSS protection) ✅ **IMPLEMENTED** (see section 4)
-- [ ] **Issue #136**: CheckConstraints for model choices (data integrity)
+- [x] **Issue #136**: CheckConstraints for model choices (data integrity) ✅ **IMPLEMENTED** (PR #142)
 
 ### Backlog
 - [ ] Two-factor authentication (2FA) for Superintendência

@@ -16,6 +16,7 @@ from datetime import timedelta
 from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 from unittest.mock import patch, MagicMock
+from django.test import override_settings
 
 from apps.core.models import (
     Solicitacao,
@@ -207,6 +208,7 @@ def test_non_privileged_user_gets_403_on_approval_endpoint(
 # ===================================================================
 
 
+@override_settings(GCAL_CLIENT='fake', GCAL_AUTH_MODE='service_account')
 @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_calendar_integration_not_called_before_approval(
     mock_celery_task,
@@ -217,57 +219,95 @@ def test_calendar_integration_not_called_before_approval(
     PA-03: Integrações externas (Google Calendar) só executam após aprovação.
 
     Verifica que:
-    - Publish de solicitação pendente → falha ou skip
-    - Publish de solicitação aprovada → executa (ou enfileira task)
+    - Publish de solicitação pendente → falha com 400
+    - Task Celery NÃO é enfileirada para solicitações não-aprovadas
 
-    Nota: Assumindo que existe endpoint /api/solicitacoes/<id>/publish/
-    Se o endpoint for diferente, ajustar conforme a implementação real.
+    Issue #130: Simplificado para ser puramente unitário e rápido (<3s).
+    Foca apenas em validar que integração não é chamada antes de aprovação.
+    Override settings para evitar I/O pesado (OAuth, cliente real).
+    Removido mock de AuditLog pois não é criado no caminho de erro 400.
     """
     client = APIClient()
     client.force_authenticate(user=usuario_superintendencia)
 
-    # Teste 1: Tentar publish em status pendente → deve falhar
-    # Se o endpoint não existir, este teste documentará isso
+    # Tentar publish em status pendente → deve falhar
     response = client.post(f"/api/solicitacoes/{solicitacao_pendente.id}/publish/")
 
-    # Pode ser 400, 403, 404, ou 409 dependendo da implementação
-    # O importante é que NÃO seja 2xx (sucesso)
-    if response.status_code == 404:
-        # Endpoint não existe, documentar no relatório
-        pytest.skip("Endpoint /publish/ não implementado ainda")
+    # Endpoint deve rejeitar com 400 (apenas aprovadas podem publicar)
+    assert response.status_code == 400, (
+        f"Publish de solicitação pendente deve retornar 400, "
+        f"recebido: {response.status_code}"
+    )
 
-    assert (
-        response.status_code >= 400
-    ), "Publish de solicitação pendente deve falhar"
-    assert (
-        not mock_celery_task.called
-    ), "Task Celery não deve ser chamada para solicitação pendente"
+    # Task Celery não deve ser enfileirada
+    mock_celery_task.assert_not_called()
 
-    # Teste 2: Aprovar solicitação
-    client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/approve/")
-    solicitacao_pendente.refresh_from_db()
-    assert solicitacao_pendente.status == "aprovado"
 
-    # Teste 3: Agora publish deve executar ou enfileirar task
-    mock_celery_task.reset_mock()
-    response = client.post(f"/api/solicitacoes/{solicitacao_pendente.id}/publish/")
+@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='service_account')
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+def test_calendar_integration_is_called_after_approval(
+    mock_celery_task,
+    usuario_superintendencia,
+):
+    """
+    PA-03 (parte positiva): Integrações executam APÓS aprovação.
 
-    if response.status_code == 404:
-        pytest.skip("Endpoint /publish/ não implementado ainda")
+    Verifica que:
+    - Publish de solicitação aprovada → sucesso (200/202/204)
+    - Task Celery É enfileirada para solicitações aprovadas
 
-    # Deve ser sucesso (200, 202, 204) ou 409 (apply_blocked)
-    assert response.status_code in (
-        200,
-        202,
-        204,
-        409,
-    ), "Publish de solicitação aprovada deve ter sucesso ou retornar 409"
+    Complementa test_calendar_integration_not_called_before_approval para
+    cobertura completa de PA-03 (caminho negativo + positivo).
+    """
+    from unittest.mock import MagicMock
+    from django.utils import timezone
+    from datetime import timedelta
+    from apps.core.models import Solicitacao, Municipio, Projeto, TipoEvento, Usuario
 
-    # Se não for 409 (blocked), task deve ter sido enfileirada
-    if response.status_code != 409:
-        assert (
-            mock_celery_task.called
-        ), "Task Celery deve ser enfileirada após aprovação"
+    # Mock task.delay() para retornar objeto com id serializável (evita JSON error)
+    mock_task_result = MagicMock()
+    mock_task_result.id = "test-task-id-12345"
+    mock_celery_task.return_value = mock_task_result
+
+    # Criar Solicitacao já aprovada (evita caminho lento de aprovação)
+    mun, _ = Municipio.objects.get_or_create(
+        nome="Fortaleza", defaults={"uf": "CE", "ativo": True}
+    )
+    proj, _ = Projeto.objects.get_or_create(
+        nome="Projeto Teste SUPER", defaults={"ativo": True, "fluxo": "SUPER"}
+    )
+    tipo, _ = TipoEvento.objects.get_or_create(nome="Formação")
+    coord = Usuario.objects.create_user(
+        username=f"coord_pa03_{uuid4().hex[:8]}",
+        email=f"coord_pa03_{uuid4().hex[:8]}@x.com",
+        password="x",
+        cpf=str(uuid4().int % 10**11).zfill(11),
+    )
+
+    sol = Solicitacao.objects.create(
+        usuario=coord,
+        municipio=mun,
+        projeto=proj,
+        tipo_evento=tipo,
+        inicio=timezone.now() + timedelta(days=1),
+        fim=timezone.now() + timedelta(days=1, hours=2),
+        status="aprovado",  # Já aprovada
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=usuario_superintendencia)
+
+    # Publish de solicitação aprovada → deve enfileirar task
+    response = client.post(f"/api/solicitacoes/{sol.id}/publish/")
+
+    # Endpoint deve aceitar (GCAL_CLIENT='google', não bloqueado)
+    assert response.status_code in (200, 202, 204), (
+        f"Publish de solicitação aprovada deve retornar 2xx, "
+        f"recebido: {response.status_code} - {getattr(response, 'data', None)}"
+    )
+
+    # Task Celery DEVE ser enfileirada
+    mock_celery_task.assert_called_once()
 
 
 # ===================================================================

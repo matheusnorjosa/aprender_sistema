@@ -259,9 +259,15 @@ def test_calendar_integration_is_called_after_approval(
     Complementa test_calendar_integration_not_called_before_approval para
     cobertura completa de PA-03 (caminho negativo + positivo).
     """
+    from unittest.mock import MagicMock
     from django.utils import timezone
     from datetime import timedelta
     from apps.core.models import Solicitacao, Municipio, Projeto, TipoEvento, Usuario
+
+    # Mock task.delay() para retornar objeto com id serializável (evita JSON error)
+    mock_task_result = MagicMock()
+    mock_task_result.id = "test-task-id-12345"
+    mock_celery_task.return_value = mock_task_result
 
     # Criar Solicitacao já aprovada (evita caminho lento de aprovação)
     mun, _ = Municipio.objects.get_or_create(

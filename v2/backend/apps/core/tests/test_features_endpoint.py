@@ -11,6 +11,7 @@ Endpoint testado:
 """
 
 import pytest
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -76,8 +77,14 @@ def test_features_response_structure():
     assert "SHOW_PRE_AGENDA" in data
 
 
+@override_settings(GCAL_CLIENT='fake')
 def test_features_default_values():
-    """Flags padrão estão corretas (seguras para go-live)."""
+    """
+    Flags padrão estão corretas (seguras para go-live).
+
+    Issue #130: Forçar GCAL_CLIENT='fake' para garantir que GCAL_MODE derivado
+    seja 'fake' independente da configuração do ambiente Docker.
+    """
     user = Usuario.objects.create_user(
         username="user1", email="user@x.com", password="x", cpf="11111111111"
     )

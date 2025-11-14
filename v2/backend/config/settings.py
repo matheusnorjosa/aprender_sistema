@@ -244,7 +244,9 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
     "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:8000,http://localhost:8002",
 ).split(",")
 CSRF_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read CSRF token
+# Issue #135: XSS protection - JavaScript não pode ler o cookie diretamente
+# Frontend usa endpoint /api/csrf/ para obter token quando necessário
+CSRF_COOKIE_HTTPONLY = True
 
 # ================================================================
 # SESSION COOKIE

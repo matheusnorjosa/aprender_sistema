@@ -9,7 +9,7 @@ from rest_framework.routers import DefaultRouter
 # Imports de módulos isolados (GAP-001 fix)
 from .views_basic import CurrentUserView, api_root
 from .views_health import features, readyz
-from .views_auth import login, logout
+from .views_auth import csrf_token, login, logout
 from .views_solicitacao import SolicitacaoViewSet
 from .views_availability import (
     AvailabilityBlockViewSet,
@@ -97,6 +97,8 @@ urlpatterns = [
     path("readyz/", readyz, name="readyz"),
     path("features/", features, name="features"),
     path("me/", CurrentUserView.as_view(), name="current-user"),
+    # CSRF Token (Issue #135)
+    path("csrf/", csrf_token, name="csrf-token"),
     # Authentication
     path("auth/login/", login, name="auth-login"),
     path("auth/logout/", logout, name="auth-logout"),

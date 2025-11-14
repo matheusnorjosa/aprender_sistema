@@ -400,8 +400,7 @@ temp_*
 *_dev.*
 *_development.*
 
-# Arquivos de configuração local
-.claude/
+# Arquivos de configuração local (exceto .claude/ que é compartilhado no projeto)
 .serena/
 .config/
 .cursor/

@@ -112,6 +112,11 @@ class Projeto(models.Model):
                 condition=~models.Q(codigo=''),
                 name='unique_projeto_codigo_nonempty',
             ),
+            # Issue #136: Check constraint for fluxo choices
+            models.CheckConstraint(
+                check=models.Q(fluxo__in=['SUPER', 'NAO_SUPER']),
+                name='projeto_fluxo_valid',
+            ),
         ]
 
     def __str__(self) -> str:
@@ -187,6 +192,16 @@ class AvailabilityBlock(models.Model):
             models.CheckConstraint(
                 check=models.Q(fim__gt=models.F("inicio")),
                 name="availability_block_fim_gt_inicio",
+            ),
+            # Issue #136: Check constraint for status choices
+            models.CheckConstraint(
+                check=models.Q(status__in=['pendente', 'aprovado', 'reprovado']),
+                name='availability_block_status_valid',
+            ),
+            # Issue #136: Check constraint for tipo choices
+            models.CheckConstraint(
+                check=models.Q(tipo__in=['T', 'P']),
+                name='availability_block_tipo_valid',
             ),
         ]
 
@@ -399,6 +414,16 @@ class Solicitacao(models.Model):
             models.CheckConstraint(
                 check=models.Q(fim__gt=models.F("inicio")),
                 name="solicitacao_fim_gt_inicio",
+            ),
+            # Issue #136: Check constraint for status choices
+            models.CheckConstraint(
+                check=models.Q(status__in=['pendente', 'aprovado', 'reprovado']),
+                name='solicitacao_status_valid',
+            ),
+            # Issue #136: Check constraint for gcal_status choices
+            models.CheckConstraint(
+                check=models.Q(gcal_status__in=['NONE', 'PENDING', 'PUBLISHED', 'ERROR']),
+                name='solicitacao_gcal_status_valid',
             ),
         ]
 

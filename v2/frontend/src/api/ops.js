@@ -5,12 +5,16 @@
  * - COMPRAS (Controle)
  * - AÇÕES (Controle)
  * - CADASTROS (DAT)
+ *
+ * Issue #135: Usa ensureCsrfToken() para suportar CSRF_COOKIE_HTTPONLY=True
  */
 
-import { API_BASE, getCsrfToken, fetchAPI, buildUrl } from './config';
+import { API_BASE, ensureCsrfToken, fetchAPI, buildUrl } from './config';
 
 /**
  * Helper para upload de arquivo (multipart/form-data).
+ *
+ * Issue #135: Usa ensureCsrfToken() para suportar HttpOnly cookie
  *
  * @param {string} url - URL do endpoint (relativo, ex: '/controle/import-compras/')
  * @param {File} file - Arquivo a enviar
@@ -24,8 +28,8 @@ async function postMultipart(url, file, dryRun = true) {
   const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
   const queryParam = dryRun ? '?dry_run=true' : '?dry_run=false';
 
-  // Obter token CSRF
-  const csrfToken = getCsrfToken();
+  // Obter token CSRF (Issue #135: async ensureCsrfToken)
+  const csrfToken = await ensureCsrfToken();
   const headers = {};
   if (csrfToken) {
     headers['X-CSRFToken'] = csrfToken;

@@ -2,6 +2,7 @@
 Views de Autenticação - AS v2
 
 Endpoints:
+- GET /api/csrf/ - Obter CSRF token (Issue #135)
 - POST /api/auth/login/ - Login com username/password
 - POST /api/auth/logout/ - Logout
 """
@@ -14,6 +15,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from django.contrib.auth import authenticate, login as django_login, logout as django_logout
+from django.middleware.csrf import get_token
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -21,6 +24,31 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
 from .models import AuditLog
+
+
+# Issue #135: CSRF token endpoint (SEC-P2)
+@ensure_csrf_cookie
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def csrf_token(request: Request) -> Response:
+    """
+    Retorna CSRF token para uso com CSRF_COOKIE_HTTPONLY=True.
+
+    GET /api/csrf/
+
+    Comportamento:
+    - Define o cookie 'csrftoken' via @ensure_csrf_cookie (pode ser HttpOnly)
+    - Retorna o token no body da resposta (acessível ao JavaScript)
+    - Permite que frontend use o token mesmo com HttpOnly cookie
+
+    Issue #135: Habilita CSRF_COOKIE_HTTPONLY=True (proteção XSS) sem quebrar frontend.
+
+    Returns:
+        200: {"csrfToken": "..."}
+    """
+    return Response({
+        'csrfToken': get_token(request)
+    }, status=status.HTTP_200_OK)
 
 
 # Issue #133: Rate limiting para prevenir brute force (SEC-P1)

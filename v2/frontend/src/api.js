@@ -6,11 +6,13 @@
  * - Credentials: include (for session cookies)
  * - CSRF token in headers for mutating requests
  *
+ * Issue #135: Usa ensureCsrfToken() para suportar CSRF_COOKIE_HTTPONLY=True
+ *
  * Used by hooks and components.
  */
 
 import axios from 'axios';
-import { getCsrfToken, API_BASE } from './api/config';
+import { ensureCsrfToken, API_BASE } from './api/config';
 
 // Create axios instance
 const api = axios.create({
@@ -21,17 +23,18 @@ const api = axios.create({
   },
 });
 
-// Add CSRF token to all mutating requests
-api.interceptors.request.use((config) => {
+// Add CSRF token to all mutating requests (Issue #135: async interceptor)
+api.interceptors.request.use(async (config) => {
   const method = config.method?.toUpperCase();
 
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-    const csrfToken = getCsrfToken();
+    const csrfToken = await ensureCsrfToken();
 
     if (csrfToken) {
       config.headers['X-CSRFToken'] = csrfToken;
     } else {
       console.warn('CSRF token not found for mutating request');
+      throw new Error('CSRF token ausente. Faça login novamente.');
     }
   }
 

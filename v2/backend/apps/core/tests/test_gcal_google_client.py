@@ -318,6 +318,7 @@ class TestGcalClientFactory(TestCase):
         assert client.__class__.__name__ == "FakeCalendarClient"
         assert calendar_id == "primary"
 
+    @override_settings(GCAL_CLIENT='fake')
     def test_factory_defaults_to_fake(self):
         """
         Factory usa fake como padrão quando GCAL_CLIENT não definido.
@@ -327,12 +328,15 @@ class TestGcalClientFactory(TestCase):
 
         Expectativa:
         - get_gcal_client_and_calendar_id() retorna FakeCalendarClient
+
+        Issue #130: Forçar GCAL_CLIENT='fake' para evitar tentativa de
+        inicialização do GoogleCalendarClient que requer Service Account
+        credentials.
         """
         from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
 
-        # Obter client e calendar_id (sem override_settings, usa defaults)
-        with override_settings(GCAL_CLIENT=None):
-            client, calendar_id = get_gcal_client_and_calendar_id()
+        # Obter client e calendar_id com fake client forçado
+        client, calendar_id = get_gcal_client_and_calendar_id()
 
         # Validar tipo
         assert client.__class__.__name__ == "FakeCalendarClient"

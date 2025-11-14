@@ -172,7 +172,100 @@ recent = AuditLog.objects.filter(
 
 ---
 
-### 4. Inactive User Blocking ✅
+### 4. CSRF HttpOnly Protection (SEC-P2) ✅
+
+**Endpoint**: `GET /api/csrf/`
+
+**Protection**: XSS protection by preventing JavaScript from reading CSRF cookie directly.
+
+**Configuration**:
+```python
+# config/settings.py
+CSRF_COOKIE_HTTPONLY = True  # JavaScript cannot read cookie
+CSRF_COOKIE_SAMESITE = 'Lax'  # CSRF attack prevention
+```
+
+**Behavior**:
+- ✅ CSRF cookie is set with `HttpOnly=True` (not accessible via `document.cookie`)
+- ✅ Frontend calls `/api/csrf/` to get token in response body (JSON)
+- ✅ Token is sent in `X-CSRFToken` header for mutating requests (POST/PUT/PATCH/DELETE)
+- ✅ Protects against XSS attacks stealing CSRF tokens
+
+**How It Works**:
+```mermaid
+sequenceDiagram
+    Frontend->>Backend: GET /api/csrf/
+    Backend->>Frontend: Set-Cookie: csrftoken=... (HttpOnly=True)
+    Backend->>Frontend: {"csrfToken": "..."}
+    Frontend->>Frontend: Cache token in memory
+    Frontend->>Backend: POST /api/... (X-CSRFToken: ...)
+    Backend->>Backend: Validate token
+    Backend->>Frontend: 200 OK
+```
+
+**Frontend Implementation**:
+```javascript
+// v2/frontend/src/api/config.js
+export async function ensureCsrfToken() {
+  // 1. Try reading from cookie (backward compatibility)
+  let token = getCsrfToken();
+  if (token) return token;
+
+  // 2. Use memory cache
+  if (cachedCsrfToken) return cachedCsrfToken;
+
+  // 3. Fetch from endpoint (Issue #135)
+  const response = await fetch('/api/csrf/');
+  const data = await response.json();
+  cachedCsrfToken = data.csrfToken;
+  return cachedCsrfToken;
+}
+```
+
+**HTTP Status Codes**:
+| Scenario | Status Code | Description |
+|----------|-------------|-------------|
+| Get token | `200 OK` | Token returned in body |
+| Missing CSRF | `403 Forbidden` | Mutating request without token |
+
+**Example Request/Response**:
+```bash
+# Get CSRF token
+curl http://localhost:8002/api/csrf/ -c cookies.txt
+
+# Response
+{"csrfToken": "abc123..."}
+
+# Use token in mutating request
+curl http://localhost:8002/api/solicitacoes/ \
+  -X POST \
+  -H "X-CSRFToken: abc123..." \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{"titulo": "..."}'
+```
+
+**Security Notes**:
+- ⚠️ Login endpoint (`/api/auth/login/`) does NOT require CSRF (entry point for authentication)
+- 🛡️ CSRF is enforced on endpoints using `SessionAuthentication` after login
+- 📊 Token is cached in memory (not localStorage to avoid XSS)
+- 🚫 HttpOnly prevents XSS attacks from stealing token
+
+**Testing**:
+```bash
+# Run CSRF HttpOnly tests
+cd v2/infra
+docker compose exec -T web pytest apps/core/tests/test_csrf_httponly.py -v
+```
+
+**Backward Compatibility**:
+- Frontend tries to read from cookie first (if HttpOnly=False)
+- Falls back to `/api/csrf/` endpoint if cookie not readable
+- Works with both HttpOnly=True (secure) and HttpOnly=False (legacy)
+
+---
+
+### 5. Inactive User Blocking ✅
 
 **Protection**: Prevents login by deactivated users.
 
@@ -298,7 +391,7 @@ If logs show sustained 429 errors from single IP:
 ## Future Security Improvements
 
 ### Planned (Issues Created)
-- [ ] **Issue #135**: CSRF_COOKIE_HTTPONLY=True (XSS protection)
+- [x] **Issue #135**: CSRF_COOKIE_HTTPONLY=True (XSS protection) ✅ **IMPLEMENTED** (see section 4)
 - [ ] **Issue #136**: CheckConstraints for model choices (data integrity)
 
 ### Backlog

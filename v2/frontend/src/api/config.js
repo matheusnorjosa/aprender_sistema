@@ -35,20 +35,36 @@ export function getCsrfToken() {
   return cookieValue;
 }
 
+// Cache de token CSRF em memória (Issue #135 - suporte a HttpOnly)
+let cachedCsrfToken = null;
+
 /**
  * Garante que CSRF token existe, caso contrário faz request para obtê-lo.
- * (Opcional - útil se backend fornecer endpoint GET /api/csrf/)
+ *
+ * Issue #135: Suporta CSRF_COOKIE_HTTPONLY=True usando endpoint /api/csrf/
+ * que retorna o token no body da resposta (acessível ao JavaScript).
+ *
+ * Estratégia:
+ * 1. Tenta ler do cookie (retrocompatibilidade se HttpOnly=False)
+ * 2. Se não conseguir, usa cache em memória
+ * 3. Se cache vazio, chama /api/csrf/ e lê do body da resposta
  *
  * @returns {Promise<string|null>} CSRF token
  */
 export async function ensureCsrfToken() {
+  // Tentativa 1: Ler do cookie (retrocompatibilidade)
   let token = getCsrfToken();
-
   if (token) {
+    cachedCsrfToken = token; // Atualizar cache
     return token;
   }
 
-  // Tentar obter via endpoint (se existir)
+  // Tentativa 2: Usar cache em memória
+  if (cachedCsrfToken) {
+    return cachedCsrfToken;
+  }
+
+  // Tentativa 3: Obter via endpoint /api/csrf/ (Issue #135)
   try {
     const response = await fetch(`${API_BASE}/csrf/`, {
       method: 'GET',
@@ -56,13 +72,16 @@ export async function ensureCsrfToken() {
     });
 
     if (response.ok) {
-      token = getCsrfToken();
+      const data = await response.json();
+      token = data.csrfToken;
+
       if (token) {
+        cachedCsrfToken = token; // Cachear em memória
         return token;
       }
     }
   } catch (error) {
-    console.warn('CSRF endpoint não disponível:', error);
+    console.warn('Erro ao obter CSRF token via /api/csrf/:', error);
   }
 
   // Fallback: retornar null e deixar request falhar com mensagem clara
@@ -71,6 +90,8 @@ export async function ensureCsrfToken() {
 
 /**
  * Wrapper genérico para fetch com autenticação, CSRF e tratamento de erros.
+ *
+ * Issue #135: Usa ensureCsrfToken() para suportar CSRF_COOKIE_HTTPONLY=True
  *
  * @param {string} url - URL relativa (ex: '/solicitacoes/') ou absoluta
  * @param {object} options - Opções do fetch (method, body, headers, etc.)
@@ -85,10 +106,10 @@ export async function fetchAPI(url, options = {}) {
     ...options.headers,
   };
 
-  // Adicionar CSRF para métodos mutantes
+  // Adicionar CSRF para métodos mutantes (Issue #135: usa ensureCsrfToken)
   const method = options.method?.toUpperCase() || 'GET';
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-    const csrfToken = getCsrfToken();
+    const csrfToken = await ensureCsrfToken();
 
     if (!csrfToken) {
       console.error('CSRF token não encontrado! Verifique se está autenticado.');

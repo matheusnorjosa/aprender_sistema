@@ -15,15 +15,27 @@ from rest_framework.response import Response
 
 from django.contrib.auth import authenticate, login as django_login, logout as django_logout
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 
 from .models import AuditLog
 
 
+# Issue #133: Rate limiting para prevenir brute force (SEC-P1)
+class LoginThrottle(AnonRateThrottle):
+    """
+    Rate limiting para endpoint de login: 5 tentativas por minuto por IP.
+
+    Previne brute force attacks mantendo taxa aceitável para uso legítimo.
+    """
+    rate = '5/minute'
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([LoginThrottle])  # Issue #133: Rate limiting (5 req/min)
 def login(request: Request) -> Response:
     """
     Endpoint de login com username/password.
@@ -34,9 +46,12 @@ def login(request: Request) -> Response:
         "password": "string"
     }
 
+    Rate Limiting: 5 tentativas por minuto por IP (previne brute force)
+
     Returns:
         200: Login bem-sucedido com dados do usuário
         400: Credenciais inválidas
+        429: Too Many Requests (rate limit excedido)
     """
     username = request.data.get('username')
     password = request.data.get('password')

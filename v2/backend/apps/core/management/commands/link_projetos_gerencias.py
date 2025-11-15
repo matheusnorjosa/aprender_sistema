@@ -69,8 +69,8 @@ class Command(BaseCommand):
         parser.add_argument("--apply", action="store_true", help="Apply changes")
 
     def handle(self, *args: tuple, **options: dict) -> None:  # type: ignore[type-arg]
-        dry_run = options.get("dry_run", False)
-        apply_mode = options.get("apply", False)
+        dry_run: bool = bool(options.get("dry_run", False))
+        apply_mode: bool = bool(options.get("apply", False))
 
         if not dry_run and not apply_mode:
             self.stdout.write(
@@ -107,7 +107,7 @@ class Command(BaseCommand):
                         stats["skipped"] += 1
                     else:
                         if apply_mode:
-                            projeto.gerencia = gerencia
+                            projeto.gerencia = gerencia  # type: ignore[assignment]
                             projeto.save(update_fields=["gerencia"])
                             self.stdout.write(
                                 self.style.SUCCESS(
@@ -129,7 +129,7 @@ class Command(BaseCommand):
                     stats["not_found"] += 1
 
         # Summary
-        self.stdout.write(
+        summary = (
             f"\n{'=' * 60}\n"
             f"Mode: {mode}\n"
             f"Linked: {stats['linked']}\n"
@@ -137,6 +137,7 @@ class Command(BaseCommand):
             f"Not found: {stats['not_found']}\n"
             f"{'=' * 60}"
         )
+        self.stdout.write(summary)
 
         if dry_run:
             self.stdout.write(

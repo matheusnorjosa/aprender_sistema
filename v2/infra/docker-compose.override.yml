@@ -1,0 +1,35 @@
+# docker-compose.override.yml
+# Overrides for local development
+#
+# This file is automatically loaded by docker-compose and overrides
+# settings from docker-compose.yml for local development.
+#
+# Benefits:
+# - Code changes reflect immediately (no rebuild needed)
+# - Faster iteration during development
+# - Pyright/IDE can see live changes
+#
+# Production: This file should NOT be deployed to production.
+# Use docker-compose.yml only for production builds.
+
+name: aprender_v2
+
+services:
+  web:
+    volumes:
+      # Mount backend code as volume for live reload
+      - ../backend:/app:delegated
+      # Keep csv-import as read-only
+      - ../data/csv-import:/app/data/csv-import:ro
+
+  worker:
+    volumes:
+      # Mount backend code as volume for live reload
+      - ../backend:/app:delegated
+      - ../data/csv-import:/app/data/csv-import:ro
+
+  beat:
+    volumes:
+      # Mount backend code as volume for live reload
+      - ../backend:/app:delegated
+      - ../data/csv-import:/app/data/csv-import:ro

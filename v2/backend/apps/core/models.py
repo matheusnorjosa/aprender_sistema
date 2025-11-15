@@ -554,6 +554,63 @@ class Config(models.Model):
         return f"{self.key} (updated: {self.updated_at.strftime('%Y-%m-%d %H:%M')})"
 
 
+class Produto(models.Model):
+    """
+    SSOT: Produtos disponíveis (substitui produtos.xlsx).
+
+    Fonte: produtos.xlsx (139 produtos)
+    Cross-ref: Compras.xlsx (valida códigos)
+
+    Relacionamentos:
+        - Produto → Projeto (many-to-one, obrigatório)
+        - Compra → Produto (many-to-one, obrigatório após migration)
+
+    Exemplo:
+        NL-C1 → "Novo Lendo - Coleção 1" → Projeto "Novo Lendo"
+    """
+
+    codigo = models.CharField(
+        max_length=50,
+        unique=True,
+        db_index=True,
+        help_text="Código único (ex: NL-C1, GE-KB)"
+    )
+    nome = models.CharField(
+        max_length=200,
+        help_text="Nome completo do produto"
+    )
+    descricao = models.TextField(
+        blank=True,
+        help_text="Descrição detalhada"
+    )
+    projeto = models.ForeignKey(
+        "Projeto",
+        on_delete=models.PROTECT,
+        related_name="produtos",
+        help_text="Projeto vinculado"
+    )
+    ativo = models.BooleanField(
+        default=True,
+        help_text="Produto disponível"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:  # type: ignore[misc]
+        db_table = "core_produto"
+        verbose_name = "Produto"
+        verbose_name_plural = "Produtos"
+        ordering = ["codigo"]
+        indexes = [
+            models.Index(fields=["codigo", "ativo"]),
+            models.Index(fields=["projeto"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.codigo} - {self.nome}"
+
+
 class Compra(models.Model):
     """
     Registro de compras de materiais/produtos para projetos.
@@ -566,7 +623,15 @@ class Compra(models.Model):
     codigo = models.CharField(
         max_length=50,
         db_index=True,
-        help_text="Código da compra (ex: COMP-001)"
+        help_text="Código da compra (ex: COMP-001) - DEPRECATED: Use produto FK"
+    )
+    produto = models.ForeignKey(
+        "Produto",
+        on_delete=models.PROTECT,
+        related_name="compras",
+        null=True,  # Temporary: Migration 0035 will populate and make NOT NULL
+        blank=True,
+        help_text="Produto comprado (substitui codigo string)"
     )
     projeto = models.ForeignKey(
         Projeto,

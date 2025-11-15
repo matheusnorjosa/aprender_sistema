@@ -33,6 +33,7 @@ from .models import (
     AvailabilityBlock,
     Compra,
     Municipio,
+    Produto,
     Projeto,
     Solicitacao,
     TipoEvento,
@@ -46,6 +47,7 @@ from .serializers import (
     GroupSerializer,
     MunicipioOptionSerializer,
     MunicipioSerializer,
+    ProdutoSerializer,
     ProjetoOptionSerializer,
     ProjetoSerializer,
     SolicitacaoSerializer,
@@ -663,6 +665,39 @@ class ProjetoViewSet(viewsets.ModelViewSet):
     search_fields = ["nome", "codigo", "descricao"]
     ordering_fields = ["nome", "id"]
     ordering = ["nome"]
+
+
+class ProdutoViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
+    """
+    ViewSet para CRUD de Produtos.
+
+    Endpoints:
+        - GET /api/produtos/ - Listar produtos
+        - POST /api/produtos/ - Criar produto (DAT only)
+        - GET /api/produtos/{id}/ - Detalhe
+        - PUT/PATCH /api/produtos/{id}/ - Atualizar (DAT only)
+        - DELETE /api/produtos/{id}/ - Deletar (DAT only)
+
+    Filtros:
+        - ativo (bool)
+        - projeto (FK)
+        - codigo (icontains via search)
+    """
+
+    queryset = Produto.objects.select_related("projeto").order_by("codigo")
+    serializer_class = ProdutoSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["ativo", "projeto"]
+    search_fields = ["codigo", "nome"]
+    ordering_fields = ["codigo", "nome"]
+    ordering = ["codigo"]
+
+    def get_permissions(self) -> list:  # type: ignore[type-arg]
+        """DAT pode criar/editar/deletar. Outros apenas leitura."""
+        if self.action in ["create", "update", "partial_update", "destroy"]:
+            return [IsAuthenticated(), IsDAT()]
+        return [IsAuthenticated()]
 
 
 # ==========================

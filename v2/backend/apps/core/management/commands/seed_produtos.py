@@ -100,8 +100,8 @@ class Command(BaseCommand):
                     if produto.nome != nome:
                         produto.nome = nome
                         updated = True
-                    if produto.projeto != projeto:
-                        produto.projeto = projeto
+                    if produto.projeto != projeto:  # type: ignore[misc]
+                        produto.projeto = projeto  # type: ignore[assignment]
                         updated = True
 
                     if updated:

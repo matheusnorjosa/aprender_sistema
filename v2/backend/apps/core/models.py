@@ -583,7 +583,7 @@ class Produto(models.Model):
         blank=True,
         help_text="Descrição detalhada"
     )
-    projeto = models.ForeignKey(
+    projeto: models.ForeignKey["Projeto"] = models.ForeignKey(  # type: ignore[assignment]
         "Projeto",
         on_delete=models.PROTECT,
         related_name="produtos",

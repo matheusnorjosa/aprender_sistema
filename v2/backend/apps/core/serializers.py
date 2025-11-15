@@ -21,6 +21,7 @@ from .models import (
     Compra,
     Municipio,
     Participation,
+    Produto,
     Projeto,
     Solicitacao,
     TipoEvento,
@@ -216,16 +217,46 @@ class AvailabilityBlockSerializer(serializers.ModelSerializer):
         return super().validate(attrs)
 
 
+class ProdutoSerializer(serializers.ModelSerializer["Produto"]):
+    """
+    Serializer para modelo Produto.
+    """
+
+    projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+
+    class Meta:
+        model = Produto
+        fields = [
+            "id",
+            "codigo",
+            "nome",
+            "descricao",
+            "projeto",
+            "projeto_nome",
+            "ativo",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+
 class CompraSerializer(serializers.ModelSerializer):
     """
     Serializer for Compra model (basic CRUD).
+    Includes nested fields from Produto FK.
     """
+
+    produto_codigo = serializers.CharField(source="produto.codigo", read_only=True, allow_null=True)
+    produto_nome = serializers.CharField(source="produto.nome", read_only=True, allow_null=True)
 
     class Meta:
         model = Compra
         fields = [
             "id",
-            "codigo",
+            "codigo",  # DEPRECATED: Use produto FK
+            "produto",
+            "produto_codigo",
+            "produto_nome",
             "projeto",
             "municipio",
             "quantidade",

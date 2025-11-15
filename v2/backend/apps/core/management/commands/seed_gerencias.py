@@ -5,6 +5,8 @@ Usage:
     python manage.py seed_gerencias
 """
 
+from typing import Any
+
 from django.core.management.base import BaseCommand
 
 from apps.core.models import Gerencia
@@ -52,7 +54,7 @@ GERENCIAS = [
 class Command(BaseCommand):
     help = "Seed inicial de gerências (7 registros)"
 
-    def handle(self, *args: tuple, **options: dict) -> None:  # type: ignore[type-arg]
+    def handle(self, *args: str, **options: dict[str, Any]) -> None:
         self.stdout.write("Seeding gerências...")
 
         created_count = 0

@@ -70,7 +70,7 @@ class Command(BaseCommand):
         parser.add_argument("--dry-run", action="store_true", help="Preview only")
         parser.add_argument("--apply", action="store_true", help="Apply changes")
 
-    def handle(self, *args: tuple, **options: dict[str, Any]) -> None:
+    def handle(self, *args: str, **options: dict[str, Any]) -> None:
         dry_run: bool = bool(options.get("dry_run", False))
         apply_mode: bool = bool(options.get("apply", False))
 

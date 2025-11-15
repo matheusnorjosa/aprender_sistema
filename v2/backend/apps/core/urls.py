@@ -69,6 +69,7 @@ from .views_oauth import (
 from .views import (
     MunicipioViewSet,
     ProjetoViewSet,
+    ProdutoViewSet,
     CompraViewSet,
     UsuarioAdminViewSet,  # Reativado (Fase 1 Iteração 2, GAP-001)
     GroupViewSet,  # Criado (Fase 1 Iteração 2, GAP-002)
@@ -87,6 +88,7 @@ router.register(
 # Admin API ViewSets
 router.register(r"municipios", MunicipioViewSet, basename="municipio")
 router.register(r"projetos", ProjetoViewSet, basename="projeto")
+router.register(r"produtos", ProdutoViewSet, basename="produto")
 router.register(r"compras", CompraViewSet, basename="compra")
 router.register(r"usuarios-admin", UsuarioAdminViewSet, basename="usuario-admin")  # Reativado (Fase 1 Iteração 2, GAP-001)
 router.register(r"grupos", GroupViewSet, basename="grupo")  # Criado (Fase 1 Iteração 2, GAP-002)

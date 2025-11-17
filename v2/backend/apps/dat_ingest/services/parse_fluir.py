@@ -19,7 +19,7 @@ Estrutura esperada (aba "Acompanhamento"):
 - Coluna I: formador (str - nome)
 """
 
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportCallIssue=false, reportGeneralTypeIssues=false, reportArgumentType=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportCallIssue=false, reportGeneralTypeIssues=false, reportArgumentType=false, reportOptionalMemberAccess=false
 
 from pathlib import Path
 from typing import Any

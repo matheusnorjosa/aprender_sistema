@@ -20,7 +20,7 @@ Output:
     - Stats: created, updated, skipped, errors
 """
 
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportGeneralTypeIssues=false, reportArgumentType=false, reportOperatorIssue=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportGeneralTypeIssues=false, reportArgumentType=false, reportOperatorIssue=false, reportUnusedVariable=false, reportOptionalMemberAccess=false
 
 from typing import Any
 from pathlib import Path

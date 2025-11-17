@@ -46,23 +46,51 @@ class TestImportFluirCommand:
             ativo=True,
         )
 
-        # Criar formador
+        # Criar TODOS os 9 formadores Fluir (Gate 3 exige)
         grupo_formador, _ = Group.objects.get_or_create(name="Formador")
-        formador = Usuario.objects.create(
-            username="fernanda_matthews_juca",
-            email="fernanda@aprender.local",
-            first_name="Fernanda",
-            last_name="Matthews Jucá",
-            cargo="Formador",
-        )
-        formador.groups.add(grupo_formador)
+        formadores_nomes = [
+            "Adeliana Mówima Falcao Machado",
+            "Fernanda Matthews Jucá",
+            "Janaína Bezerra de Aquino Faria",
+            "Jennifer Kerolly de Oliveira Barros Bathaus",
+            "Juliana Cruz Maciel",
+            "Jéssica Nunes Apolonio",
+            "Natália de Araújo Loiola",
+            "Priscilla Laysa Mota Pereira",
+            "Talitha Lousada Teixeira",
+        ]
+
+        formadores = []
+        for idx, nome_completo in enumerate(formadores_nomes, 1):
+            # Normalizar username
+            username = self._normalize_username(nome_completo)
+            formador = Usuario.objects.create(
+                username=username,
+                cpf=f"999{idx:08d}",
+                email=f"{username}@aprender.local",
+                first_name=nome_completo.split()[0],
+                last_name=" ".join(nome_completo.split()[1:]),
+                cargo="Formador",
+            )
+            formador.groups.add(grupo_formador)
+            formadores.append(formador)
 
         return {
             "tipo_evento": tipo_evento,
             "projeto": projeto,
             "municipio": municipio,
-            "formador": formador,
+            "formador": formadores[1],  # Fernanda (índice 1)
         }
+
+    def _normalize_username(self, nome_completo: str) -> str:
+        """Normaliza nome completo para username."""
+        import unicodedata
+        nome_sem_acento = "".join(
+            c for c in unicodedata.normalize("NFD", nome_completo)
+            if unicodedata.category(c) != "Mn"
+        )
+        username = nome_sem_acento.lower().replace(" ", "_")
+        return username
 
     def test_command_requires_mode_flag(self) -> None:
         """Deve exigir --dry-run ou --apply."""

@@ -18,6 +18,7 @@ Mapping (Planilha Gerência → Database Gerencia.nome_setor):
 - "Sou da Paz" → nome_setor="Sou da Paz" (GERENCIA 6)
 - "Individual" → nome_setor="Individual" (GERENCIA INDIVIDUAL)
 """
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
 
@@ -209,7 +210,7 @@ class Command(BaseCommand):
                     # Special case: SUPERINTENDENCIA has 4 managers
                     # Only link if gerente is not already set
                     if gerencia.gerente is None:
-                        gerencia.gerente = usuario
+                        gerencia.gerente = usuario  # type: ignore[misc]
                         gerencia.save()
                         gerencia_links += 1
                         self.stdout.write(
@@ -277,7 +278,7 @@ class Command(BaseCommand):
 
             # Verification
             self.stdout.write("\n🔍 Verification:")
-            gerencia_count = Group.objects.get(name="Gerência").user_set.count()
+            gerencia_count = Group.objects.get(name="Gerência").user_set.count()  # type: ignore[attr-defined]
             self.stdout.write(f"  - Users in 'Gerência' group: {gerencia_count}")
 
             gerencias_with_gerente = Gerencia.objects.filter(

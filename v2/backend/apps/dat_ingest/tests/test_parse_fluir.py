@@ -13,7 +13,13 @@ from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from django.conf import settings
+
 from apps.dat_ingest.services.parse_fluir import parse_fluir_eventos, get_formadores_fluir
+
+
+# Path to Fluir file (either Docker /app or CI path)
+FLUIR_FILE = Path(settings.BASE_DIR).parent / "data" / "csv-import" / "Acompanhamento de Agenda _ Fluir (1).xlsx"
 
 
 class TestParseFluir:
@@ -35,12 +41,12 @@ class TestParseFluir:
             parse_fluir_eventos(filepath)
 
     @pytest.mark.skipif(
-        not Path("/app/data/csv-import/Acompanhamento de Agenda _ Fluir (1).xlsx").exists(),
+        not FLUIR_FILE.exists(),
         reason="Planilha Fluir não encontrada",
     )
     def test_parse_fluir_eventos_structure(self) -> None:
         """Deve retornar lista de dicts com estrutura correta."""
-        filepath = Path("/app/data/csv-import/Acompanhamento de Agenda _ Fluir (1).xlsx")
+        filepath = FLUIR_FILE
 
         eventos = parse_fluir_eventos(filepath)
 
@@ -77,12 +83,12 @@ class TestParseFluir:
         assert evento["src"] == "fluir/Acompanhamento"
 
     @pytest.mark.skipif(
-        not Path("/app/data/csv-import/Acompanhamento de Agenda _ Fluir (1).xlsx").exists(),
+        not FLUIR_FILE.exists(),
         reason="Planilha Fluir não encontrada",
     )
     def test_parse_fluir_timezone_aware(self) -> None:
         """Deve retornar datetimes timezone-aware (America/Fortaleza)."""
-        filepath = Path("/app/data/csv-import/Acompanhamento de Agenda _ Fluir (1).xlsx")
+        filepath = FLUIR_FILE
 
         eventos = parse_fluir_eventos(filepath)
 
@@ -97,12 +103,12 @@ class TestParseFluir:
         assert evento["inicio"].tzinfo == fortaleza_tz or str(evento["inicio"].tzinfo) == "America/Fortaleza"
 
     @pytest.mark.skipif(
-        not Path("/app/data/csv-import/Acompanhamento de Agenda _ Fluir (1).xlsx").exists(),
+        not FLUIR_FILE.exists(),
         reason="Planilha Fluir não encontrada",
     )
     def test_parse_fluir_external_hash_uniqueness(self) -> None:
         """Deve gerar external_hash único para cada evento."""
-        filepath = Path("/app/data/csv-import/Acompanhamento de Agenda _ Fluir (1).xlsx")
+        filepath = FLUIR_FILE
 
         eventos = parse_fluir_eventos(filepath)
 

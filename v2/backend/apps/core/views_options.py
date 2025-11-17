@@ -53,6 +53,9 @@ def projetos_options(request: Request) -> Response:
 
     Retorna lista de projetos ativos para dropdowns/selects.
 
+    Issue #153: Filtra is_test=False por padrão (oculta projetos de teste)
+    Para incluir projetos de teste, use query param ?include_test=true
+
     Response:
     [
         {"id": 1, "nome": "Alfabetização", "codigo": "ALF"},
@@ -62,7 +65,16 @@ def projetos_options(request: Request) -> Response:
 
     Permissions: IsAuthenticated
     """
-    projetos = Projeto.objects.filter(ativo=True).order_by("nome")
+    # Filter active projects
+    projetos = Projeto.objects.filter(ativo=True)
+
+    # Issue #153: Filter out test projects by default
+    include_test = request.query_params.get("include_test", "false").lower() == "true"
+    if not include_test:
+        projetos = projetos.filter(is_test=False)
+
+    projetos = projetos.order_by("nome")
+
     serializer = ProjetoOptionSerializer(projetos, many=True)
     return Response(serializer.data)
 

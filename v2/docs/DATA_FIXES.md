@@ -217,6 +217,155 @@ Isso restaura os 4 projetos para `fluxo='NAO_SUPER'`.
 
 ---
 
+## Issue #153 — Isolamento de Projetos de Teste (2025-11-17)
+
+**Problema**: 8 projetos usados exclusivamente para testes automatizados (smoke tests, testes E2E, etc.) apareciam misturados com projetos de produção em dropdowns e listagens, criando poluição visual e risco de seleção acidental.
+
+**Solução**: Data migration `0038_mark_test_projects.py` que marca 8 projetos de teste com `is_test=True`, combinado com filtros em endpoints API para ocultá-los por padrão.
+
+### Projetos de Teste Marcados
+
+Total: **8 projetos**
+
+| Nome do Projeto | Fluxo | Propósito |
+|---|---|---|
+| `SMOKE SUPER` | SUPER | Smoke test para fluxo SUPER |
+| `SMOKE NAO_SUPER` | NAO_SUPER | Smoke test para fluxo NAO_SUPER |
+| `TESTE E2E` | SUPER | Testes end-to-end (Playwright) |
+| `Test Detail` | SUPER | Testes de detalhamento |
+| `Test Proj` | SUPER | Projeto genérico de testes |
+| `Test Project` | SUPER | Projeto genérico de testes |
+| `Teste Auto SUPER` | SUPER | Testes automatizados SUPER |
+| `Teste Auto NAO_SUPER` | NAO_SUPER | Testes automatizados NAO_SUPER |
+
+### Comportamento dos Endpoints
+
+**GET /api/projetos/** (ProjetoViewSet - requer permissão DAT):
+- **Default**: Filtra `is_test=False` (oculta projetos de teste)
+- **Com `?include_test=true`**: Retorna todos os projetos (incluindo teste)
+- Parâmetro é **case-insensitive** (`true`, `True`, `TRUE` funcionam)
+- Valores inválidos (`yes`, `1`, etc.) são tratados como `false`
+
+**GET /api/options/projetos/** (função `projetos_options()` - autenticação obrigatória):
+- **Default**: Filtra `ativo=True AND is_test=False` (apenas produção ativa)
+- **Com `?include_test=true`**: Retorna `ativo=True` (produção + teste, mas ainda filtra inativos)
+- Usado em dropdowns/selects do frontend
+
+### Exemplos de Uso
+
+**Frontend - Dropdown de Projetos (padrão)**:
+```javascript
+// Retorna apenas projetos de produção ativos
+const response = await fetch('/api/options/projetos/');
+// Response: [{id: 1, nome: "CIRANDAR"}, {id: 2, nome: "ACERTA MATEMÁTICA"}, ...]
+```
+
+**Frontend - Incluir Projetos de Teste**:
+```javascript
+// Útil em telas de administração/debug
+const response = await fetch('/api/options/projetos/?include_test=true');
+// Response: [{id: 1, nome: "CIRANDAR"}, ..., {id: 10, nome: "SMOKE SUPER"}, ...]
+```
+
+**Backend - Queries Diretas**:
+```python
+# Apenas produção
+projetos_prod = Projeto.objects.filter(ativo=True, is_test=False)
+
+# Incluir teste
+projetos_all = Projeto.objects.filter(ativo=True)
+```
+
+### Reversibilidade
+
+A migration é totalmente reversível:
+
+```bash
+# Reverter (desmarca is_test=True)
+docker compose exec web python manage.py migrate core 0037
+
+# Reaplicar (marca is_test=True)
+docker compose exec web python manage.py migrate core 0038
+```
+
+### Testes
+
+**Migration** (`apps/core/tests/test_mark_test_projects_migration.py`):
+- **8 testes** cobrindo:
+  - Marcação de todos os 8 projetos de teste
+  - Preservação de projetos de produção
+  - Idempotência (rodar 2x não quebra)
+  - Skip de projetos já marcados
+  - Reversibilidade (rollback)
+  - Graceful handling de projetos ausentes
+  - Contadores corretos
+  - Cenário misto (alguns marcados, alguns não)
+
+**Endpoints** (`apps/core/tests/test_projeto_is_test_filter.py`):
+- **12 testes** cobrindo:
+  - **ProjetoViewSet** (5 testes):
+    - Filtro padrão (`is_test=False`)
+    - Query param `?include_test=true`
+    - Query param explícito `?include_test=false`
+    - Case insensitive (`True`, `TRUE`, `tRuE`)
+    - Valores inválidos (default para `false`)
+  - **Options Endpoint** (5 testes):
+    - Filtro padrão em `/api/options/projetos/`
+    - Query param `?include_test=true`
+    - Query param explícito `?include_test=false`
+    - Rejeição de requests não-autenticados (403)
+    - Combinação com filtro de busca (`?search=`)
+  - **Permissions** (2 testes):
+    - ProjetoViewSet requer permissão DAT
+    - Options endpoint permite qualquer autenticado
+
+**Todos os 20 testes passando** ✅ (8 migration + 12 endpoints)
+
+### Arquivos Relacionados
+
+**Migration**:
+- `v2/backend/apps/core/migrations/0038_mark_test_projects.py` (117 linhas)
+
+**Views Modificadas**:
+- `v2/backend/apps/core/views.py` (`ProjetoViewSet.get_queryset()`)
+- `v2/backend/apps/core/views_options.py` (`projetos_options()` function)
+
+**Testes**:
+- `v2/backend/apps/core/tests/test_mark_test_projects_migration.py` (8 testes, 224 linhas)
+- `v2/backend/apps/core/tests/test_projeto_is_test_filter.py` (12 testes, 309 linhas)
+
+**Documentação**:
+- `v2/docs/DATA_FIXES.md` (este arquivo)
+
+### Impacto UX/UI
+
+**Antes**:
+- Dropdowns de projeto mostravam 24 projetos (16 produção + 8 teste)
+- Coordenadores podiam acidentalmente selecionar "SMOKE SUPER" em vez de um projeto real
+- Listagens poluídas com projetos internos de testes
+
+**Depois**:
+- Dropdowns mostram apenas 16 projetos de produção
+- Projetos de teste invisíveis para usuários finais
+- Apenas administradores/desenvolvedores veem projetos de teste (via `?include_test=true`)
+
+### Notas Técnicas
+
+**Por que função em vez de ViewSet para `/api/options/projetos/`?**
+- Options endpoints (`views_options.py`) usam **function-based views** (`@api_view`)
+- CRUD endpoints (`views.py`) usam **class-based ViewSets** (`ModelViewSet`)
+- Razão: Options retornam estrutura simplificada (ID + nome), sem paginação/filtros complexos
+- ViewSets são overkill para endpoints de dropdown simples
+
+**URL Routing**:
+```python
+# v2/backend/apps/core/urls.py
+path("options/projetos/", projetos_options, name="options-projetos"),  # Função
+path("projetos/", ProjetoViewSet.as_view(...), name="projetos"),      # ViewSet
+```
+
+---
+
 ## Template para Futuras Correções
 
 Ao aplicar correções de dados no futuro, documente aqui seguindo o template:
@@ -237,4 +386,4 @@ Ao aplicar correções de dados no futuro, documente aqui seguindo o template:
 
 ---
 
-**Última atualização**: 2025-11-17 (Issue #152)
+**Última atualização**: 2025-11-17 (Issue #153)

@@ -64,7 +64,18 @@ def consolidate_projetos(apps, schema_editor):
         duplicates = consolidation["duplicates"]
         fluxo = consolidation["fluxo"]
 
-        # Get or create canonical project
+        # Check if any duplicates exist before creating canonical
+        found_duplicates = []
+        for dup_name in duplicates:
+            if Projeto.objects.filter(nome=dup_name).exists():
+                found_duplicates.append(dup_name)
+
+        # Skip this consolidation if no duplicates found
+        if not found_duplicates:
+            print(f"⏭️  No duplicates found for '{canonical_name}', skipping")
+            continue
+
+        # Get or create canonical project (only if duplicates exist)
         canonical, created = Projeto.objects.get_or_create(
             nome=canonical_name,
             defaults={"fluxo": fluxo, "ativo": True}
@@ -76,34 +87,29 @@ def consolidate_projetos(apps, schema_editor):
             print(f"ℹ️  Canonical project already exists: '{canonical_name}' (ID: {canonical.id})")
 
         # Process each duplicate
-        for dup_name in duplicates:
-            try:
-                dup_project = Projeto.objects.get(nome=dup_name)
-                print(f"🔄 Processing duplicate: '{dup_name}' (ID: {dup_project.id})")
+        for dup_name in found_duplicates:
+            dup_project = Projeto.objects.get(nome=dup_name)
+            print(f"🔄 Processing duplicate: '{dup_name}' (ID: {dup_project.id})")
 
-                # Update FK references
-                solicitacao_count = Solicitacao.objects.filter(projeto=dup_project).update(projeto=canonical)
-                print(f"   → Updated {solicitacao_count} Solicitacao records")
+            # Update FK references
+            solicitacao_count = Solicitacao.objects.filter(projeto=dup_project).update(projeto=canonical)
+            print(f"   → Updated {solicitacao_count} Solicitacao records")
 
-                if AcaoControle:
-                    controle_count = AcaoControle.objects.filter(projeto=dup_project).update(projeto=canonical)
-                    print(f"   → Updated {controle_count} AcaoControle records")
+            if AcaoControle:
+                controle_count = AcaoControle.objects.filter(projeto=dup_project).update(projeto=canonical)
+                print(f"   → Updated {controle_count} AcaoControle records")
 
-                if AcaoDAT:
-                    dat_count = AcaoDAT.objects.filter(projeto=dup_project).update(projeto=canonical)
-                    print(f"   → Updated {dat_count} AcaoDAT records")
+            if AcaoDAT:
+                dat_count = AcaoDAT.objects.filter(projeto=dup_project).update(projeto=canonical)
+                print(f"   → Updated {dat_count} AcaoDAT records")
 
-                if Compra:
-                    compra_count = Compra.objects.filter(projeto=dup_project).update(projeto=canonical)
-                    print(f"   → Updated {compra_count} Compra records")
+            if Compra:
+                compra_count = Compra.objects.filter(projeto=dup_project).update(projeto=canonical)
+                print(f"   → Updated {compra_count} Compra records")
 
-                # Delete duplicate project
-                dup_project.delete()
-                print(f"   ✅ Deleted duplicate project: '{dup_name}'")
-
-            except Projeto.DoesNotExist:
-                print(f"   ⚠️  Duplicate '{dup_name}' not found in database, skipping")
-                continue
+            # Delete duplicate project
+            dup_project.delete()
+            print(f"   ✅ Deleted duplicate project: '{dup_name}'")
 
     print("\n🎉 Consolidation complete!")
 

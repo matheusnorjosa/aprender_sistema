@@ -381,22 +381,22 @@ class TestMigrationEdgeCases:
 
     def test_migration_handles_empty_database(self):
         """
-        Migration deve rodar sem erros em banco vazio.
+        Migration deve rodar sem erros em banco vazio (não cria canônicos sem duplicados).
         """
         # Garantir que não há projetos
         Projeto.objects.all().delete()
 
         # Executar migration (não deve crashar)
-
         try:
             consolidate_projetos(apps, None)
         except Exception as e:
             pytest.fail(f"Migration deve lidar com banco vazio sem crash: {e}")
 
-        # Verificar que canônicos foram criados
-        assert Projeto.objects.filter(nome="LEIO, ESCREVO E CALCULO").exists()
-        assert Projeto.objects.filter(nome="GESTÃO ESCOLAR").exists()
-        assert Projeto.objects.filter(nome="LER, OUVIR E CONTAR").exists()
+        # Verificar que NENHUM canônico foi criado (não havia duplicados)
+        assert not Projeto.objects.filter(nome="LEIO, ESCREVO E CALCULO").exists()
+        assert not Projeto.objects.filter(nome="GESTÃO ESCOLAR").exists()
+        assert not Projeto.objects.filter(nome="LER, OUVIR E CONTAR").exists()
+        assert Projeto.objects.count() == 0
 
     def test_migration_preserves_other_projects(self):
         """

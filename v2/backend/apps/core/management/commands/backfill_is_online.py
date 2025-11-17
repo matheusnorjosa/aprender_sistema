@@ -41,7 +41,10 @@ class Command(BaseCommand):
                     data = row.get('data')
                     tipo = str(row.get('tipo', '')).strip().lower()
 
-                    if not municipio or pd.isna(data):
+                    # Skip if municipio is empty or data is null/NaT
+                    if not municipio:
+                        continue
+                    if data is None or (hasattr(data, '__class__') and pd.isna(data)):
                         continue
 
                     # Converter data para buscar no banco

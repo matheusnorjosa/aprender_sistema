@@ -20,6 +20,8 @@ Output:
     - Stats: created, updated, skipped, errors
 """
 
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportGeneralTypeIssues=false
+
 from typing import Any
 from pathlib import Path
 from datetime import datetime

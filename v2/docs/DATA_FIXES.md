@@ -131,6 +131,92 @@ projeto, created = Projeto.objects.get_or_create(
 
 ---
 
+## Issue #152 — Correção de Fluxo de Projetos SUPER (2025-11-17)
+
+**Problema**: 4 projetos estavam incorretamente marcados com `fluxo='NAO_SUPER'` (auto-aprovação) quando deveriam ser `fluxo='SUPER'` (aprovação manual pela Superintendência), violando a Política de Aprovação Manual (PA-01 a PA-07).
+
+**Solução**: Data migration `0037_fix_superintendencia_fluxo.py` que atualiza o campo `fluxo` de NAO_SUPER para SUPER nos 4 projetos afetados.
+
+### Projetos Corrigidos
+
+| Projeto | Fluxo Anterior | Fluxo Corrigido | Razão |
+|---|---|---|---|
+| `LER OUVIR E CONTAR` | NAO_SUPER | SUPER | Listado na aba "Super" da planilha |
+| `LER, OUVIR E CONTAR` | NAO_SUPER | SUPER | Listado na aba "Super" da planilha |
+| `PROJETO CATAVENTO 2` | NAO_SUPER | SUPER | Variante de Cataventos (projeto SUPER) |
+| `PROJETO CATAVENTO 3` | NAO_SUPER | SUPER | Variante de Cataventos (projeto SUPER) |
+
+**Nota**: Ambas variantes "LER OUVIR E CONTAR" (sem vírgulas) e "LER, OUVIR E CONTAR" (com vírgulas) foram corrigidas.
+
+### Impacto
+
+**Comportamento Anterior** (INCORRETO):
+- Solicitações para estes 4 projetos eram auto-aprovadas (`status='aprovado'` na criação)
+- Violação de PA-01: "Sem auto-aprovação"
+
+**Comportamento Após Correção** (CORRETO):
+- Novas solicitações para estes projetos iniciam com `status='pendente'`
+- Requerem aprovação manual pela Superintendência (conforme PA-01 a PA-07)
+- Histórico de solicitações antigas permanece intacto (apenas lógica futura muda)
+
+### Auditoria Recomendada
+
+Para verificar se há solicitações que foram auto-aprovadas indevidamente no passado:
+
+```sql
+-- Solicitações aprovadas para os 4 projetos (potencialmente auto-aprovadas)
+SELECT s.id, s.created_at, s.status, p.nome AS projeto_nome
+FROM core_solicitacao s
+JOIN core_projeto p ON s.projeto_id = p.id
+WHERE p.nome IN (
+  'LER OUVIR E CONTAR',
+  'LER, OUVIR E CONTAR',
+  'PROJETO CATAVENTO 2',
+  'PROJETO CATAVENTO 3'
+)
+AND s.status = 'aprovado'
+ORDER BY s.created_at DESC;
+```
+
+### Testes
+
+**Migration** (`apps/core/tests/test_fix_superintendencia_migration.py`):
+- 9 testes cobrindo:
+  - Correção de variantes LER/OUVIR/CONTAR
+  - Correção de CATAVENTO 2/3
+  - Preservação de outros projetos
+  - Idempotência (rodar 2x não quebra)
+  - Skip de projetos já SUPER
+  - Reversibilidade (rollback)
+  - Graceful handling de projetos ausentes
+  - Contadores corretos
+
+**Todos os 9 testes passando** ✅
+
+### Arquivos Relacionados
+
+**Migration**:
+- `v2/backend/apps/core/migrations/0037_fix_superintendencia_fluxo.py`
+
+**Testes**:
+- `v2/backend/apps/core/tests/test_fix_superintendencia_migration.py` (9 testes)
+
+**Documentação**:
+- `v2/docs/PLANO_GERENCIAS_SETORES.md` (Task 5 - status atualizado)
+- `v2/docs/DATA_FIXES.md` (este arquivo)
+
+### Reversão (Se Necessário)
+
+A migration é reversível. Para reverter:
+
+```bash
+docker compose exec web python manage.py migrate core 0036
+```
+
+Isso restaura os 4 projetos para `fluxo='NAO_SUPER'`.
+
+---
+
 ## Template para Futuras Correções
 
 Ao aplicar correções de dados no futuro, documente aqui seguindo o template:
@@ -151,4 +237,4 @@ Ao aplicar correções de dados no futuro, documente aqui seguindo o template:
 
 ---
 
-**Última atualização**: 2025-11-17 (Issue #150)
+**Última atualização**: 2025-11-17 (Issue #152)

@@ -255,7 +255,6 @@ class Command(BaseCommand):
         # Get or create default TipoEvento
         tipo_evento, _ = TipoEvento.objects.get_or_create(
             nome="Evento Fluir",
-            defaults={"ativo": True},
         )
 
         # Criar Solicitacao

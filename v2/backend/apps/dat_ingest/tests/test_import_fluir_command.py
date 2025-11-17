@@ -30,7 +30,6 @@ class TestImportFluirCommand:
         # Criar tipo de evento
         tipo_evento = TipoEvento.objects.create(
             nome="Evento Teste",
-            ativo=True,
         )
 
         # Criar projeto Fluir

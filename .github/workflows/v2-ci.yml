@@ -83,7 +83,6 @@ jobs:
         run: |
           cd v2/backend
           pyright apps/core apps/dat_ingest config
-        continue-on-error: true  # Não bloquear CI por enquanto (baseline)
 
       - name: Django Check
         env:

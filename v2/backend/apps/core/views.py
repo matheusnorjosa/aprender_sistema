@@ -9,7 +9,7 @@ PA-05: Registrar usuário, data/hora e justificativa em AuditLog.
 
 from __future__ import annotations
 from typing import Any
-from django.db.models import QuerySet
+from django.db.models import Count, Q, QuerySet
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -32,6 +32,7 @@ from .models import (
     AuditLog,
     AvailabilityBlock,
     Compra,
+    Gerencia,
     Municipio,
     Produto,
     Projeto,
@@ -44,6 +45,7 @@ from .serializers import (
     AuditLogSerializer,
     AvailabilityBlockSerializer,
     CompraSerializer,
+    GerenciaSerializer,
     GroupSerializer,
     MunicipioOptionSerializer,
     MunicipioSerializer,
@@ -669,7 +671,7 @@ class ProjetoViewSet(viewsets.ModelViewSet):
 
 class ProdutoViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
     """
-    ViewSet para CRUD de Produtos.
+    ViewSet para CRUD de Produtos (Issue #146).
 
     Endpoints:
         - GET /api/produtos/ - Listar produtos
@@ -692,6 +694,40 @@ class ProdutoViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
     search_fields = ["codigo", "nome"]
     ordering_fields = ["codigo", "nome"]
     ordering = ["codigo"]
+
+    def get_permissions(self) -> list:  # type: ignore[type-arg]
+        """DAT pode criar/editar/deletar. Outros apenas leitura."""
+        if self.action in ["create", "update", "partial_update", "destroy"]:
+            return [IsAuthenticated(), IsDAT()]
+        return [IsAuthenticated()]
+
+
+class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
+    """
+    ViewSet para CRUD de Gerências (Issue #145).
+
+    Endpoints:
+        - GET /api/gerencias/ - Listar gerências
+        - POST /api/gerencias/ - Criar gerência (DAT only)
+        - GET /api/gerencias/{id}/ - Detalhe de gerência
+        - PUT/PATCH /api/gerencias/{id}/ - Atualizar (DAT only)
+        - DELETE /api/gerencias/{id}/ - Deletar (DAT only)
+
+    Filtros:
+        - ativo (bool)
+        - nome_setor (search)
+    """
+
+    queryset = Gerencia.objects.annotate(
+        projetos_count=Count("projetos", filter=Q(projetos__ativo=True))
+    ).order_by("nome")
+    serializer_class = GerenciaSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["ativo"]
+    search_fields = ["nome", "nome_setor"]
+    ordering_fields = ["nome", "nome_setor"]
+    ordering = ["nome"]
 
     def get_permissions(self) -> list:  # type: ignore[type-arg]
         """DAT pode criar/editar/deletar. Outros apenas leitura."""

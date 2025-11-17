@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 from django.core.management import call_command
 from django.contrib.auth.models import Group
 
-from apps.core.models import Solicitacao, Projeto, Municipio, Usuario, Participation
+from apps.core.models import Solicitacao, Projeto, Municipio, Usuario, Participation, TipoEvento
 
 
 @pytest.mark.django_db
@@ -27,6 +27,12 @@ class TestImportFluirCommand:
     @pytest.fixture
     def setup_data(self) -> dict:
         """Setup dados necessários para testes."""
+        # Criar tipo de evento
+        tipo_evento = TipoEvento.objects.create(
+            nome="Evento Teste",
+            ativo=True,
+        )
+
         # Criar projeto Fluir
         projeto = Projeto.objects.create(
             nome="FLUIR DAS EMOÇÕES",
@@ -53,6 +59,7 @@ class TestImportFluirCommand:
         formador.groups.add(grupo_formador)
 
         return {
+            "tipo_evento": tipo_evento,
             "projeto": projeto,
             "municipio": municipio,
             "formador": formador,
@@ -149,7 +156,7 @@ class TestImportFluirCommand:
         solicitacao_existente = Solicitacao.objects.create(
             projeto=setup_data["projeto"],
             municipio=setup_data["municipio"],
-            tipo_evento_id=1,
+            tipo_evento=setup_data["tipo_evento"],
             status="aprovado",
             inicio=datetime(2025, 1, 15, 14, 0, tzinfo=ZoneInfo("America/Fortaleza")),
             fim=datetime(2025, 1, 15, 17, 0, tzinfo=ZoneInfo("America/Fortaleza")),

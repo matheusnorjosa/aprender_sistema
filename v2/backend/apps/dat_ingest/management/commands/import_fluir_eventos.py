@@ -30,7 +30,7 @@ import json
 from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 
-from apps.core.models import Solicitacao, Projeto, Municipio, Usuario, Participation
+from apps.core.models import Solicitacao, Projeto, Municipio, Usuario, Participation, TipoEvento
 from apps.dat_ingest.services.parse_fluir import parse_fluir_eventos, get_formadores_fluir
 
 
@@ -252,12 +252,18 @@ class Command(BaseCommand):
                 "message": f"[DRY-RUN] Criaria: {municipio_nome_uf} - {evento_data['inicio'].date()}",
             }
 
+        # Get or create default TipoEvento
+        tipo_evento, _ = TipoEvento.objects.get_or_create(
+            nome="Evento Fluir",
+            defaults={"ativo": True},
+        )
+
         # Criar Solicitacao
         with transaction.atomic():
             solicitacao = Solicitacao.objects.create(
                 projeto=projeto,
                 municipio=municipio,
-                tipo_evento_id=1,  # Default (ajustar se necessário)
+                tipo_evento=tipo_evento,
                 status=evento_data["status"],
                 inicio=evento_data["inicio"],
                 fim=evento_data["fim"],

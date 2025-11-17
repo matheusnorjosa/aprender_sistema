@@ -45,7 +45,8 @@
       "Bash(gh label:*)",
       "Bash(cd:*)",
       "Bash(git cherry-pick --continue)",
-      "Bash(git cherry-pick d3f534c 6521730 14eabba)"
+      "Bash(git cherry-pick d3f534c 6521730 14eabba)",
+      "Bash(docker cp:*)"
     ],
     "deny": [],
     "ask": []

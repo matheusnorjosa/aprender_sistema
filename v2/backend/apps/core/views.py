@@ -654,8 +654,12 @@ class ProjetoViewSet(viewsets.ModelViewSet):
 
     Filtros disponíveis:
     - ativo: booleano (true/false)
+    - is_test: booleano (oculto por padrão, use ?include_test=true para exibir)
     - search: busca textual em nome, codigo, descricao
     - ordering: nome, id
+
+    Issue #153: Projetos de teste (is_test=True) são ocultos por padrão.
+    Para incluir projetos de teste, use query param ?include_test=true
     """
 
     queryset = Projeto.objects.all()
@@ -667,6 +671,21 @@ class ProjetoViewSet(viewsets.ModelViewSet):
     search_fields = ["nome", "codigo", "descricao"]
     ordering_fields = ["nome", "id"]
     ordering = ["nome"]
+
+    def get_queryset(self) -> QuerySet[Projeto]:
+        """
+        Filtra projetos.
+
+        Default: exclude is_test=True (produção)
+        Query param ?include_test=true: mostra todos (incluindo projetos de teste)
+
+        Issue #153: Isolamento de projetos de teste da visualização padrão
+        """
+        qs = super().get_queryset()
+        include_test = self.request.query_params.get("include_test", "false").lower() == "true"
+        if not include_test:
+            qs = qs.filter(is_test=False)
+        return qs
 
 
 class ProdutoViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
@@ -976,6 +995,9 @@ class ProjetoOptionViewSet(viewsets.ReadOnlyModelViewSet):
 
     Permissões: IsAuthenticated (todos usuários logados)
     Busca: Server-side por nome e código
+
+    Issue #153: Filtra is_test=False por padrão (oculta projetos de teste)
+    Para incluir projetos de teste, use query param ?include_test=true
     """
 
     queryset = Projeto.objects.filter(ativo=True).order_by("nome")
@@ -984,6 +1006,43 @@ class ProjetoOptionViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None  # Sem paginação para dropdowns
     filter_backends = [SearchFilter]
     search_fields = ["nome", "codigo"]
+
+    def filter_queryset(self, queryset: QuerySet[Projeto]) -> QuerySet[Projeto]:
+        """
+        Apply filters to the queryset, including is_test filter.
+
+        This is called AFTER get_queryset() but BEFORE serialization.
+
+        Issue #153: Filter out test projects by default
+        """
+        import sys
+
+        sys.stderr.write(f"\n=== ProjetoOptionViewSet.filter_queryset() CALLED ===\n")
+        sys.stderr.write(f"Initial queryset count: {queryset.count()}\n")
+
+        # First apply standard filter backends (Search, etc.)
+        queryset = super().filter_queryset(queryset)
+
+        sys.stderr.write(f"After super().filter_queryset(): {queryset.count()}\n")
+
+        # Then apply is_test filter
+        param_val = self.request.query_params.get("include_test", "false")
+        include_test = param_val.lower() == "true"
+
+        sys.stderr.write(f"include_test param: '{param_val}' -> {include_test}\n")
+
+        if not include_test:
+            sys.stderr.write(f"Before is_test filter: {queryset.count()}\n")
+            sys.stderr.write(f"Projects: {list(queryset.values_list('nome', 'is_test')[:10])}\n")
+            queryset = queryset.filter(is_test=False)
+            sys.stderr.write(f"After is_test=False filter: {queryset.count()}\n")
+            sys.stderr.write(f"Filtered projects: {list(queryset.values_list('nome', 'is_test')[:10])}\n")
+        else:
+            sys.stderr.write(f"Skipping is_test filter (include_test=true)\n")
+
+        sys.stderr.write(f"Final queryset count: {queryset.count()}\n")
+
+        return queryset
 
 
 class CoordenadorOptionViewSet(viewsets.ReadOnlyModelViewSet):

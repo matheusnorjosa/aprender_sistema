@@ -198,7 +198,7 @@ GERÊNCIA (estrutura organizacional)
 | Coordenador | 12 | Criar solicitações |
 | Controle | 3 | Publicar eventos no Google Calendar |
 | DAT | 1 | CRUD usuários e municípios |
-| Gerência | 0 | Visualizar solicitações (sem usuários) |
+| Gerência | 7 | Visualizar solicitações ✅ (seeded 2025-11-17) |
 
 ---
 
@@ -238,10 +238,10 @@ GERÊNCIA (estrutura organizacional)
 - ❌ Mapeamento existe apenas na planilha de produtos
 - ⚠️ Impacto: Impossível filtrar projetos por gerência no sistema
 
-### 3. **Gerente não modelado no sistema**
-- ❌ Não existe campo `gerente` em `Projeto` ou `Usuario`
-- ❌ Grupo "Gerência" existe mas tem 0 usuários
-- ⚠️ CSV de importação tem campo `gerente_sugerido` que não é usado
+### 3. **Gerente modelado no sistema** ✅ RESOLVIDO (2025-11-17)
+- ✅ Campo `gerente` FK existe em `Gerencia` (vincula Usuario)
+- ✅ Grupo "Gerência" tem 7 usuários (seeded com `seed_gerentes`)
+- ✅ 4 gerências com gerente vinculado (SUPERINTENDENCIA, GERENCIA 2, 4, 5)
 
 ### 4. **Duplicação de projetos**
 - ⚠️ "LEIO ESCREVO E CALCULO" (com vírgulas) e "LEIO, ESCREVO E CALCULO" são 2 registros

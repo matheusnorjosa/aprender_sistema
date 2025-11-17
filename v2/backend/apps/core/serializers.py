@@ -19,6 +19,7 @@ from .models import (
     AuditLog,
     AvailabilityBlock,
     Compra,
+    Gerencia,
     Municipio,
     Participation,
     Produto,
@@ -398,9 +399,28 @@ class ProjetoSerializer(serializers.ModelSerializer):
     Full serializer for Projeto model (Admin CRUD).
     """
 
+    gerencia_nome = serializers.CharField(
+        source="gerencia.nome_setor", read_only=True, allow_null=True
+    )
+    setor = serializers.SerializerMethodField()
+
+    def get_setor(self, obj: Projeto) -> str:
+        """Retorna nome do setor (derivado de gerencia)."""
+        return obj.gerencia.nome_setor if obj.gerencia else ""
+
     class Meta:
         model = Projeto
-        fields = ["id", "nome", "codigo", "fluxo", "ativo"]
+        fields = [
+            "id",
+            "nome",
+            "codigo",
+            "fluxo",
+            "ativo",
+            "gerencia",
+            "gerencia_nome",
+            "setor",
+            "is_test",
+        ]
         read_only_fields = ["id"]
 
 
@@ -412,6 +432,37 @@ class ProjetoOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Projeto
         fields = ["id", "nome", "codigo"]
+
+
+class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
+    """
+    Serializer para modelo Gerencia.
+
+    Fields:
+        - id, nome, nome_setor, gerente (nested), ativo
+        - projetos_count (annotated, read-only)
+    """
+
+    gerente_nome = serializers.CharField(
+        source="gerente.get_full_name", read_only=True, allow_null=True
+    )
+    projetos_count = serializers.IntegerField(read_only=True, required=False)
+
+    class Meta:  # type: ignore[misc]
+        model = Gerencia
+        fields = [
+            "id",
+            "nome",
+            "nome_setor",
+            "gerente",
+            "gerente_nome",
+            "ativo",
+            "descricao",
+            "projetos_count",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
 
 
 class TipoEventoOptionSerializer(serializers.ModelSerializer):

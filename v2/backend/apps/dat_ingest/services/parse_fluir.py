@@ -60,27 +60,24 @@ def parse_fluir_eventos(filepath: Path) -> list[dict[str, Any]]:
     # Ler aba "Acompanhamento"
     df = pd.read_excel(filepath, sheet_name="Acompanhamento")
 
-    # Mapear colunas esperadas (ajustar se necessário após análise real)
+    # Mapear colunas esperadas (nomes EXATOS da planilha)
     col_map = {
         "foi Configurado": "configurado",
-        "Município": "municipio",
-        "Turma": "turma",
-        "Encontro": "encontro",
-        "Presencial": "presencial",
-        "Data": "data",
-        "Hora": "hora_inicio",
-        "Tema": "tema",
-        "Formador(a)": "formador",
+        "município": "municipio",  # Com acento!
+        "turma": "turma",
+        "encontro": "encontro",
+        "presencial": "presencial",
+        "data": "data",
+        "hora início": "hora_inicio",  # Com acento!
+        "tema": "tema",
+        "formador": "formador",
     }
 
-    # Renomear colunas (case-insensitive)
-    df_renamed = df.rename(columns=lambda col: col.strip())
-    for old_col, new_col in col_map.items():
-        if old_col in df_renamed.columns:
-            df_renamed.rename(columns={old_col: new_col}, inplace=True)
+    # Renomear colunas
+    df_renamed = df.rename(columns=col_map)
 
-    # Remover linhas vazias
-    df_clean = df_renamed.dropna(subset=["municipio", "data"], how="all")
+    # Remover linhas vazias (usar nome normalizado 'municipio')
+    df_clean = df_renamed.dropna(subset=["municipio", "data"], how="any")
 
     eventos = []
 
@@ -125,7 +122,7 @@ def parse_fluir_eventos(filepath: Path) -> list[dict[str, Any]]:
 
             # Combinar data + hora em datetime timezone-aware
             inicio_dt = datetime.combine(data_dt, hora_inicio)
-            inicio_aware = FORTALEZA_TZ.localize(inicio_dt)
+            inicio_aware = inicio_dt.replace(tzinfo=FORTALEZA_TZ)
 
             # Fim (estimado: início + 3h)
             fim_aware = inicio_aware + timedelta(hours=3)

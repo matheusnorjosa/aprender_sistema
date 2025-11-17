@@ -38,7 +38,7 @@ class Command(BaseCommand):
         formadores_nomes = get_formadores_fluir()
         stats = {"created": 0, "updated": 0, "skipped": 0}
 
-        for nome_completo in formadores_nomes:
+        for idx, nome_completo in enumerate(formadores_nomes, 1):
             # Normalizar username (remover acentos, espaços → underscore, lowercase)
             username = self._normalize_username(nome_completo)
 
@@ -46,6 +46,7 @@ class Command(BaseCommand):
             usuario, created = Usuario.objects.get_or_create(
                 username=username,
                 defaults={
+                    "cpf": f"999{idx:08d}",  # CPF fictício: 99900000001, 99900000002, etc.
                     "email": f"{username}@aprender.local",
                     "first_name": self._get_first_name(nome_completo),
                     "last_name": self._get_last_name(nome_completo),

@@ -19,6 +19,8 @@ Estrutura esperada (aba "Acompanhamento"):
 - Coluna I: formador (str - nome)
 """
 
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportCallIssue=false, reportGeneralTypeIssues=false
+
 from pathlib import Path
 from typing import Any
 from datetime import datetime, time as dtime, timedelta

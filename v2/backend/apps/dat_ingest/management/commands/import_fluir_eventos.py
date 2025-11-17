@@ -260,6 +260,7 @@ class Command(BaseCommand):
         # Criar Solicitacao
         with transaction.atomic():
             solicitacao = Solicitacao.objects.create(
+                usuario=formadores_objs[0],  # Primeiro formador como solicitante
                 projeto=projeto,
                 municipio=municipio,
                 tipo_evento=tipo_evento,

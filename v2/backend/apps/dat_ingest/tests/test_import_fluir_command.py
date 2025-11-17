@@ -153,6 +153,7 @@ class TestImportFluirCommand:
         """Deve pular eventos duplicados (mesmo external_hash)."""
         # Criar evento manualmente
         solicitacao_existente = Solicitacao.objects.create(
+            usuario=setup_data["formador"],
             projeto=setup_data["projeto"],
             municipio=setup_data["municipio"],
             tipo_evento=setup_data["tipo_evento"],

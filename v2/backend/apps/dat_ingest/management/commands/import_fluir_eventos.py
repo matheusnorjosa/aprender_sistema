@@ -262,9 +262,8 @@ class Command(BaseCommand):
                 inicio=evento_data["inicio"],
                 fim=evento_data["fim"],
                 is_online=evento_data["is_online"],
-                observacoes=f"Turma: {evento_data['turma']}\nEncontro: {evento_data['encontro']}\nTema: {evento_data['tema']}",
+                observacoes=f"Fonte: {evento_data['src']}\nTurma: {evento_data['turma']}\nEncontro: {evento_data['encontro']}\nTema: {evento_data['tema']}",
                 external_hash=external_hash,
-                external_src=evento_data["src"],
             )
 
             # Criar Participation para formadores

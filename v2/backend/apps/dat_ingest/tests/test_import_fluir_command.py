@@ -154,7 +154,6 @@ class TestImportFluirCommand:
             inicio=datetime(2025, 1, 15, 14, 0, tzinfo=ZoneInfo("America/Fortaleza")),
             fim=datetime(2025, 1, 15, 17, 0, tzinfo=ZoneInfo("America/Fortaleza")),
             external_hash="duplicate_hash_123",
-            external_src="fluir/Acompanhamento",
         )
 
         # Mock parse retorna evento com mesmo hash

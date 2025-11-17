@@ -43,7 +43,9 @@
       "Bash(docker compose:*)",
       "Bash(gh issue create:*)",
       "Bash(gh label:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(git cherry-pick --continue)",
+      "Bash(git cherry-pick d3f534c 6521730 14eabba)"
     ],
     "deny": [],
     "ask": []

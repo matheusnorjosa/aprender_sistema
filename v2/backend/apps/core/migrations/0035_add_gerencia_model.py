@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("core", "0032_add_choice_constraints"),
+        ("core", "0034_populate_compra_produto"),
     ]
 
     operations = [

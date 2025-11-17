@@ -29,6 +29,7 @@ import json
 
 from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
+from django.conf import settings
 
 from apps.core.models import Solicitacao, Projeto, Municipio, Usuario, Participation, TipoEvento
 from apps.dat_ingest.services.parse_fluir import parse_fluir_eventos, get_formadores_fluir
@@ -76,7 +77,7 @@ class Command(BaseCommand):
         self.stdout.write("=" * 60)
 
         # 1. Parse planilha
-        filepath = Path("/app") / filepath_rel
+        filepath = Path(settings.BASE_DIR).parent / filepath_rel
         self.stdout.write(f"\n📂 Lendo planilha: {filepath_rel}")
 
         try:
@@ -317,8 +318,8 @@ class Command(BaseCommand):
 
     def _save_report(self, stats: dict[str, Any], eventos: list[dict[str, Any]]) -> None:
         """Salva relatório JSON em out_etl/."""
-        out_dir = Path("/app/out_etl")
-        out_dir.mkdir(exist_ok=True)
+        out_dir = Path(settings.BASE_DIR) / "out_etl"
+        out_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         report_path = out_dir / f"import_fluir_{timestamp}.json"

@@ -74,6 +74,61 @@ class Municipio(models.Model):
         return f"{self.nome}-{self.uf}"
 
 
+class Gerencia(models.Model):
+    """
+    Gerência organizacional (GERENCIA 2, GERENCIA 3, SUPERINTENDENCIA, etc.).
+
+    Cada gerência agrupa projetos relacionados e pode ter um gerente responsável.
+
+    Examples:
+        - GERENCIA 2 → Setor "Vidas" (VIDA E CIÊNCIAS, LINGUAGEM, MATEMÁTICA)
+        - GERENCIA 3 → Setor "Fluir" (FLUIR DAS EMOÇÕES)
+        - GERENCIA 4 → Setor "ACerta" (ACERTA MATEMÁTICA, PORTUGUÊS, ECS)
+        - SUPERINTENDENCIA → Setor "Super" (projetos SUPER que requerem aprovação)
+        - GERENCIA INDIVIDUAL → Setor "Individual" (projetos com gerência individual)
+
+    Attributes:
+        nome (str): Nome da gerência (ex: GERENCIA 2, SUPERINTENDENCIA)
+        nome_setor (str): Nome comercial/operacional do setor (ex: Vidas, ACerta, Fluir)
+        gerente (FK Usuario): Gerente responsável pela gerência (nullable)
+        ativo (bool): Se a gerência está ativa
+        descricao (str): Descrição adicional
+    """
+
+    nome = models.CharField(
+        max_length=50,
+        unique=True,
+        db_index=True,
+        help_text="Nome da gerência (ex: GERENCIA 2, SUPERINTENDENCIA)",
+    )
+    nome_setor = models.CharField(
+        max_length=100,
+        help_text="Nome comercial/operacional do setor (ex: Vidas, ACerta, Fluir)",
+    )
+    gerente = models.ForeignKey(  # type: ignore[misc]
+        "Usuario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="gerencias_gerenciadas",
+        help_text="Gerente responsável pela gerência",
+    )
+    ativo = models.BooleanField(default=True)
+    descricao = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:  # type: ignore[misc]
+        db_table = "core_gerencia"
+        verbose_name = "Gerência"
+        verbose_name_plural = "Gerências"
+        ordering = ["nome"]
+
+    def __str__(self) -> str:
+        return f"{self.nome} ({self.nome_setor})"
+
+
 class Projeto(models.Model):
     """SSOT: Substitui IMPORTRANGE de Projetos"""
 
@@ -100,6 +155,20 @@ class Projeto(models.Model):
     )
     descricao = models.TextField(blank=True)
     ativo = models.BooleanField(default=True)
+
+    # Issue #145: Hierarquia organizacional
+    gerencia = models.ForeignKey(  # type: ignore[misc]
+        "Gerencia",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="projetos",
+        help_text="Gerência à qual o projeto pertence (ex: GERENCIA 2 - Vidas)",
+    )
+    is_test = models.BooleanField(
+        default=False,
+        help_text="Marca projeto como teste (não exibir em produção)",
+    )
 
     class Meta:  # type: ignore[misc]
         db_table = "core_projeto"

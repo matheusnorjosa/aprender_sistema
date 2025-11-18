@@ -32,8 +32,9 @@ max_requests_jitter = 50  # Previne restart sincronizado de workers
 worker_tmp_dir = "/dev/shm" if os.path.exists("/dev/shm") else None
 
 # ================================================================
-# LOGGING
+# LOGGING (MP2: Structured Logging)
 # ================================================================
+# Logs vão para stdout/stderr, Django LOGGING (settings.py) define formato JSON
 accesslog = "-"  # stdout
 errorlog = "-"   # stderr
 loglevel = os.getenv("GUNICORN_LOG_LEVEL", "info")

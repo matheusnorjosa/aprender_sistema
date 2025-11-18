@@ -40,7 +40,8 @@ class TestAuthPing:
         client = APIClient()
         response = client.post('/api/auth/ping/')
 
-        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        # DRF with IsAuthenticated returns 403 Forbidden for unauthenticated requests
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_ping_renews_session(self, authenticated_client):
         """POST /api/auth/ping/ renews session successfully."""

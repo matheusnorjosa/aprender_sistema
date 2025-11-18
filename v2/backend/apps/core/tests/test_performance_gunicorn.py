@@ -12,7 +12,6 @@ import time
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
-from django.urls import reverse
 
 User = get_user_model()
 
@@ -50,7 +49,7 @@ class TestGunicornPerformance:
         api_client.force_login(authenticated_user)
 
         # Endpoint to test (lightweight endpoint)
-        url = reverse("usuario-me")
+        url = "/api/me/"
 
         # Test parameters
         num_requests = 50  # Total requests
@@ -103,7 +102,7 @@ class TestGunicornPerformance:
         Validates GUNICORN_TIMEOUT=120 configuration.
         """
         api_client.force_login(authenticated_user)
-        url = reverse("usuario-me")
+        url = "/api/me/"
 
         # Sustained load test: 100 requests over 10 seconds
         num_requests = 100

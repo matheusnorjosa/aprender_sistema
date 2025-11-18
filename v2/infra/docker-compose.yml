@@ -14,6 +14,17 @@ services:
     image: redis:7-alpine
     ports:
       - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    # CP2: Redis persistence com RDB snapshots
+    # save 60 1 = snapshot a cada 60s se houver >= 1 mudança
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
   web:
     build:
       context: ..
@@ -64,3 +75,4 @@ services:
 
 volumes:
   db_data:
+  redis_data:  # CP2: Persistência Redis (sessões)

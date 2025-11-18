@@ -93,9 +93,10 @@ class TestRedisSessionsCP2:
 
         session_key = session.session_key
 
-        # Simulate request cycle: load and save (renewal)
+        # Simulate request cycle: load, modify, and save (renewal)
         time.sleep(1)  # 1 second passed
         session2 = SessionStore(session_key=session_key)
+        session2["last_activity"] = "renewed"  # Modify to trigger save
         session2.save()  # Renews expiry
 
         # Wait another second (total 2s from original, but renewed at 1s)
@@ -104,6 +105,7 @@ class TestRedisSessionsCP2:
         # Session should still be valid (renewed at 1s mark)
         session3 = SessionStore(session_key=session_key)
         assert session3.get("user_id") == 456
+        assert session3.get("last_activity") == "renewed"
 
     def test_session_delete(self):
         """

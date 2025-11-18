@@ -12,14 +12,12 @@ Refs: Issue #166
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
-from io import StringIO
 from typing import TYPE_CHECKING
 
 import pytest
-from django.test import RequestFactory, override_settings
+from django.test import RequestFactory
 
 from apps.core.logging_filters import ContextFilter, RequestIDFilter
 from apps.core.middleware import RequestIDMiddleware
@@ -152,14 +150,14 @@ class TestContextFilter:
 
 
 @pytest.mark.django_db
-@override_settings(ENVIRONMENT="staging")
 class TestStructuredLoggingIntegration:
     """Testa integração completa de logging estruturado."""
 
-    def test_json_logging_in_staging(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Testa que logs em staging usam JSON format (integration test)."""
-        # Nota: Este teste é simplificado. Em produção, logs JSON vão para stdout
-        # e podem ser capturados por agregadores (Loki, ELK, etc.)
+    def test_logging_integration(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Testa integração básica de logging."""
+        # Nota: Em produção, logs JSON vão para stdout (staging/production)
+        # Em desenvolvimento, logs são human-readable (verbose format)
+        # Este teste valida apenas que a infraestrutura de logging funciona
 
         # Simular request_id
         threading.current_thread().request_id = "integration-test-123"  # type: ignore[attr-defined]

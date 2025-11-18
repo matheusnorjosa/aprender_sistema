@@ -14,6 +14,11 @@ class CoreConfig(AppConfig):
 
         Signals registrados:
         - post_save(Config): Invalida cache quando Config é salvo
+        - post_save/delete(Solicitacao): Invalida cache de availability (CP3)
+        - post_save/delete(AvailabilityBlock): Invalida cache de availability (CP3)
+        - post_save/delete(Municipio): Invalida cache de endpoints estáticos (CP3)
+        - post_save/delete(Projeto): Invalida cache de endpoints estáticos (CP3)
+        - post_save/delete(TipoEvento): Invalida cache de endpoints estáticos (CP3)
 
         Admin registrado:
         - Registro explícito de modelos essenciais (Usuario, Projeto, Municipio, etc.)

@@ -5,6 +5,7 @@ Endpoints:
 - GET /api/csrf/ - Obter CSRF token (Issue #135)
 - POST /api/auth/login/ - Login com username/password
 - POST /api/auth/logout/ - Logout
+- POST /api/auth/ping/ - Renovar sessão (CP5 - Issue #164)
 """
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
@@ -161,4 +162,37 @@ def logout(request: Request) -> Response:
 
     return Response({
         'message': 'Logout realizado com sucesso.'
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def ping(request: Request) -> Response:
+    """
+    Endpoint para renovar sessão (keep-alive).
+
+    POST /api/auth/ping/
+
+    CP5 (Issue #164): Monitor de sessão - permite que frontend renove sessão
+    antes da expiração (30 min desde CP2).
+
+    Comportamento:
+    - Apenas toca a sessão (request.session.modified = True)
+    - SESSION_SAVE_EVERY_REQUEST=True já renova automaticamente
+    - Retorna tempo restante da sessão (se disponível)
+
+    Returns:
+        200: {"message": "Session renewed", "session_age": 1800}
+    """
+    # Django com SESSION_SAVE_EVERY_REQUEST=True já renova a sessão
+    # Basta acessar request.session para trigger o save
+    request.session.modified = True
+
+    # Retornar configuração de timeout (do settings)
+    from django.conf import settings
+    session_age = getattr(settings, 'SESSION_COOKIE_AGE', 1800)
+
+    return Response({
+        'message': 'Session renewed',
+        'session_age': session_age  # Em segundos (default: 1800 = 30 min)
     }, status=status.HTTP_200_OK)

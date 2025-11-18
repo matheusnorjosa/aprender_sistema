@@ -297,6 +297,184 @@ scrape_configs:
 
 ---
 
+## 🔍 Sentry APM (MP3)
+
+**Status**: ✅ Implementado
+**Issue**: #167
+
+### O que é Sentry?
+
+Sentry é uma plataforma de **Application Performance Monitoring (APM)** e **Error Tracking** que fornece:
+- **Error Tracking**: Captura exceções com stack traces completos
+- **Performance Monitoring**: Detecta queries lentas, N+1 queries, endpoints lentos
+- **Distributed Tracing**: Rastreia requests across services (Django → Celery → DB)
+- **Release Tracking**: Correlaciona erros com deploys específicos (commit SHA)
+- **User Context**: Identifica quais usuários foram afetados por erros
+
+### Configuração
+
+**1. Criar projeto no Sentry.io**
+
+1. Acessar [sentry.io](https://sentry.io) e criar conta/projeto
+2. Selecionar platform: **Django**
+3. Copiar o **DSN** (Data Source Name)
+
+**2. Configurar variáveis de ambiente** (`.env`):
+
+```bash
+# Sentry DSN (obrigatório para habilitar Sentry)
+SENTRY_DSN=https://your-key@sentry.io/your-project-id
+
+# Performance tracing (% de transactions)
+SENTRY_TRACES_SAMPLE_RATE=0.1  # 10% (ajustar conforme tráfego)
+
+# Profiling (experimental, desabilitado por padrão)
+SENTRY_PROFILES_SAMPLE_RATE=0.0
+
+# Release tracking (opcional, set automaticamente no CI/CD)
+GIT_COMMIT_SHA=abc123def456
+```
+
+**3. Restart dos serviços**:
+
+```bash
+cd v2/infra
+docker compose restart web worker beat
+```
+
+### Features Habilitadas
+
+#### ✅ Django Integration
+
+- **Error tracking**: Todas as exceções não tratadas são capturadas
+- **SQL queries**: Detecta N+1 queries e slow queries
+- **Middleware tracking**: Monitora execução de cada middleware
+- **Signals tracking**: Monitora Django signals (pre_save, post_save, etc.)
+
+#### ✅ Celery Integration
+
+- **Task monitoring**: Rastreia todas as tasks assíncronas (worker)
+- **Beat monitoring**: Monitora agendamento de tasks (beat scheduler)
+- **Distributed tracing**: Correlaciona requests HTTP → tasks Celery
+
+#### ✅ Privacy & Compliance (LGPD/GDPR)
+
+- **send_default_pii = False**: Não envia PII (Personally Identifiable Information)
+- **User context**: Pode ser habilitado manualmente com `set_user()` quando necessário
+- **Data residency**: Escolher region do servidor Sentry (EU/US) no projeto
+
+### Como Usar
+
+#### Ver Erros no Dashboard
+
+1. Acessar [sentry.io](https://sentry.io) → Seu Projeto
+2. Navegue para **Issues** → Ver erros capturados
+3. Filtrar por:
+   - **Environment** (`development`/`staging`/`production`)
+   - **Release** (commit SHA)
+   - **User** (se context habilitado)
+
+#### Performance Monitoring
+
+1. Navegar para **Performance** → **Transactions**
+2. Ordenar por:
+   - **P95 Latency** (endpoints mais lentos)
+   - **Throughput** (endpoints com mais tráfego)
+   - **Failure Rate** (endpoints com mais erros)
+3. Clicar em transaction para ver:
+   - **Span waterfall** (breakdown de tempo: DB, cache, external APIs)
+   - **Slow queries** (SQL queries > 100ms)
+   - **N+1 queries** detectadas automaticamente
+
+#### Release Tracking
+
+1. Configurar `GIT_COMMIT_SHA` no CI/CD pipeline:
+   ```yaml
+   # .github/workflows/deploy.yml
+   - name: Deploy to production
+     env:
+       GIT_COMMIT_SHA: ${{ github.sha }}
+   ```
+
+2. Ver deploys em **Releases** → Correlacionar erros com deploys
+
+### Validação Manual
+
+**1. Disparar erro intencional**:
+
+```python
+# Em qualquer view Django:
+def test_sentry(request):
+    division_by_zero = 1 / 0  # Dispara exceção
+    return HttpResponse("OK")
+```
+
+**2. Verificar no dashboard Sentry**:
+
+- Acessar **Issues** → Novo erro aparece em ~5-10 segundos
+- Ver stack trace completo
+- Ver request context (URL, método HTTP, headers)
+
+**3. Verificar performance tracing**:
+
+```python
+# Em view com query N+1:
+solicitacoes = Solicitacao.objects.all()
+for sol in solicitacoes:
+    print(sol.municipio.nome)  # N+1 query!
+```
+
+- Acessar **Performance** → Ver transaction lenta
+- Span waterfall mostra N queries ao banco
+
+### Sample Rates Recomendados
+
+| Environment | Errors | Traces | Profiles | Justificativa |
+|-------------|--------|--------|----------|---------------|
+| **Development** | 100% | 100% | 0% | Debug completo, baixo tráfego |
+| **Staging** | 100% | 50% | 0% | Validação pré-produção |
+| **Production** | 100% | 10% | 0% | Custos controlados, amostra representativa |
+
+**Ajustar conforme tráfego**:
+- Tráfego baixo (<1k req/dia) → Traces 100%
+- Tráfego médio (1k-10k req/dia) → Traces 10-50%
+- Tráfego alto (>10k req/dia) → Traces 1-10%
+
+### Troubleshooting
+
+#### Sentry não captura erros
+
+**Problema**: Erros não aparecem no dashboard
+**Soluções**:
+1. Verificar `SENTRY_DSN` está configurado e não vazio
+2. Verificar logs do container: `docker compose logs web | grep sentry`
+3. Testar DSN manualmente:
+   ```python
+   import sentry_sdk
+   sentry_sdk.init(dsn="your-dsn")
+   sentry_sdk.capture_message("Test from Django")
+   ```
+
+#### Performance overhead
+
+**Problema**: Sentry está deixando aplicação lenta
+**Soluções**:
+1. Reduzir `SENTRY_TRACES_SAMPLE_RATE` (ex: 0.1 → 0.01)
+2. Desabilitar profiling: `SENTRY_PROFILES_SAMPLE_RATE=0.0`
+3. Filtrar transactions desnecessárias com `traces_sampler`:
+   ```python
+   def traces_sampler(sampling_context):
+       if sampling_context["parent_sampled"] is not None:
+           return sampling_context["parent_sampled"]
+       if "health" in sampling_context["wsgi_environ"]["PATH_INFO"]:
+           return 0  # Nunca trace healthchecks
+       return 0.1  # 10% de outros endpoints
+
+   sentry_sdk.init(dsn=..., traces_sampler=traces_sampler)
+   ```
+
+---
+
 ## 📚 Referências
 
 - [django-prometheus docs](https://github.com/korfuri/django-prometheus)
@@ -306,9 +484,12 @@ scrape_configs:
 - [redis_exporter](https://github.com/oliver006/redis_exporter)
 - [python-json-logger docs](https://github.com/madzak/python-json-logger)
 - [Grafana Loki docs](https://grafana.com/docs/loki/)
+- [Sentry docs](https://docs.sentry.io/)
+- [Sentry Django Integration](https://docs.sentry.io/platforms/python/integrations/django/)
+- [Sentry Celery Integration](https://docs.sentry.io/platforms/python/integrations/celery/)
 
 ---
 
 **Última atualização**: 2025-11-18
 **Responsável**: Claude Code
-**Issues**: #165 (MP1 - Prometheus + Grafana), #166 (MP2 - Structured Logging)
+**Issues**: #165 (MP1 - Prometheus + Grafana), #166 (MP2 - Structured Logging), #167 (MP3 - Sentry APM)

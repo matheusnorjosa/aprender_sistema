@@ -110,6 +110,7 @@ AUTHENTICATION_BACKENDS = [
 # ================================================================
 MIDDLEWARE = [
     "django_prometheus.middleware.PrometheusBeforeMiddleware",  # MP1: Metrics start
+    "apps.core.middleware.RequestIDMiddleware",  # MP2: Correlation ID for structured logging
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -352,36 +353,68 @@ else:
     CELERY_BEAT_SCHEDULE = {}
 
 # ================================================================
-# LOGGING
+# LOGGING (MP2: Structured Logging)
 # ================================================================
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
+        # JSON formatter para structured logging (MP2)
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s %(request_id)s %(environment)s %(service)s",
+            "timestamp": True,
+        },
+        # Fallback para desenvolvimento local (human-readable)
         "verbose": {
             "format": "[{levelname}] {asctime} {module} {process:d} {thread:d} {message}",
             "style": "{",
         },
     },
+    "filters": {
+        # Filtro para adicionar request_id aos logs (MP2)
+        "request_id": {
+            "()": "apps.core.logging_filters.RequestIDFilter",
+        },
+        # Filtro para adicionar contexto (environment, service)
+        "context": {
+            "()": "apps.core.logging_filters.ContextFilter",
+            "environment": ENVIRONMENT,
+            "service": os.getenv("SERVICE_NAME", "web"),  # web/worker/beat
+        },
+    },
     "handlers": {
+        # Handler JSON para stdout (production/staging)
+        "console_json": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "filters": ["request_id", "context"],
+        },
+        # Handler human-readable para development
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
     },
     "root": {
-        "handlers": ["console"],
+        # Usar JSON em produção/staging, verbose em dev
+        "handlers": ["console_json"] if ENVIRONMENT in ["production", "staging"] else ["console"],
         "level": "INFO",
     },
     "loggers": {
         "django": {
-            "handlers": ["console"],
+            "handlers": ["console_json"] if ENVIRONMENT in ["production", "staging"] else ["console"],
             "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
             "propagate": False,
         },
         "apps": {
-            "handlers": ["console"],
+            "handlers": ["console_json"] if ENVIRONMENT in ["production", "staging"] else ["console"],
             "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
+        },
+        "celery": {
+            "handlers": ["console_json"] if ENVIRONMENT in ["production", "staging"] else ["console"],
+            "level": "INFO",
             "propagate": False,
         },
     },

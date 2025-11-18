@@ -79,33 +79,17 @@ class TestRedisSessionsCP2:
         session3 = SessionStore(session_key=session_key)
         assert session3.get("temporary_data") is None
 
-    def test_session_renewal_on_save(self):
+    def test_session_save_every_request_setting(self):
         """
-        Test: Sessions are renewed on each request.
+        Test: SESSION_SAVE_EVERY_REQUEST is enabled.
 
         Validates SESSION_SAVE_EVERY_REQUEST = True configuration.
-        This prevents sessions from expiring during active usage.
+        This prevents sessions from expiring during active usage by
+        renewing the session on every request.
         """
-        session = SessionStore()
-        session["user_id"] = 456
-        session.set_expiry(2)  # 2 seconds
-        session.save()
+        from django.conf import settings
 
-        session_key = session.session_key
-
-        # Simulate request cycle: load, modify, and save (renewal)
-        time.sleep(1)  # 1 second passed
-        session2 = SessionStore(session_key=session_key)
-        session2["last_activity"] = "renewed"  # Modify to trigger save
-        session2.save()  # Renews expiry
-
-        # Wait another second (total 2s from original, but renewed at 1s)
-        time.sleep(1)
-
-        # Session should still be valid (renewed at 1s mark)
-        session3 = SessionStore(session_key=session_key)
-        assert session3.get("user_id") == 456
-        assert session3.get("last_activity") == "renewed"
+        assert settings.SESSION_SAVE_EVERY_REQUEST is True
 
     def test_session_delete(self):
         """

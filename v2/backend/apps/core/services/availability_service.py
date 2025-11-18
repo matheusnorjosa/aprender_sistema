@@ -28,6 +28,7 @@ import pytz
 from apps.core.models import AvailabilityBlock, Municipio, Solicitacao, Usuario
 from apps.core.services.config_service import get_cfg
 from apps.core.types import ConflictCode
+from apps.core.utils.cache_utils import cache_availability_check
 
 
 @dataclass
@@ -110,6 +111,7 @@ def _fmt_interval_local(start: datetime, end: datetime) -> str:
     return f"{s:%H:%M %d/%m}–{e:%H:%M %d/%m}"
 
 
+@cache_availability_check(timeout=300)  # CP3: Cache 5 min (TTL curto, dados mudam frequentemente)
 def check_conflicts(
     *, usuario: Usuario, inicio: datetime, fim: datetime, municipio: Municipio | None = None
 ) -> CheckResult:

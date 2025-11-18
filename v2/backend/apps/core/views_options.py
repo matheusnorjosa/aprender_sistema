@@ -156,7 +156,20 @@ def usuarios_options(request: Request) -> Response:
     ]
 
     Permissions: IsAuthenticated
+    Cache: 5 minutos (CP5 - Issue #164)
     """
+    # CP5: Cache manual (otimização autocomplete)
+    cache_key = "static_endpoint:usuarios_options"
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return Response(cached_data)
+
+    # Cache miss: buscar do banco
     usuarios = Usuario.objects.filter(is_active=True).order_by("first_name", "last_name")
     serializer = UsuarioOptionSerializer(usuarios, many=True)
-    return Response(serializer.data)
+    data = serializer.data
+
+    # Salvar no cache
+    cache.set(cache_key, data, timeout=300)  # 5 min
+
+    return Response(data)

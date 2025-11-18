@@ -196,6 +196,107 @@ curl http://localhost:8002/metrics | head -20
 
 ---
 
+## 📝 Structured Logging (MP2)
+
+**Status**: ✅ Implementado
+**Issue**: #166
+
+### Formato JSON
+
+Logs em produção/staging são estruturados em JSON para agregação e análise:
+
+```json
+{
+  "asctime": "2025-11-18T18:30:00.123456Z",
+  "levelname": "INFO",
+  "name": "apps.core.services.availability_service",
+  "message": "check_conflicts called",
+  "request_id": "abc123-def456-ghi789",
+  "environment": "staging",
+  "service": "web"
+}
+```
+
+### Campos Disponíveis
+
+- `asctime`: Timestamp ISO 8601 (UTC)
+- `levelname`: DEBUG/INFO/WARNING/ERROR/CRITICAL
+- `name`: Logger name (módulo)
+- `message`: Mensagem do log
+- `request_id`: Correlation ID único por requisição HTTP
+- `environment`: development/staging/production
+- `service`: web/worker/beat
+
+### Visualizar Logs
+
+**Docker Compose**:
+```bash
+# Logs de todos os serviços (JSON)
+docker compose logs -f
+
+# Logs apenas do web (formatados)
+docker compose logs -f web | jq
+
+# Filtrar por request_id
+docker compose logs web | jq 'select(.request_id == "abc123")'
+
+# Filtrar por nível ERROR
+docker compose logs web | jq 'select(.levelname == "ERROR")'
+```
+
+**Logs locais (development)**:
+```bash
+# Em development, logs são human-readable (verbose format)
+[INFO] 2025-11-18 15:30:00,123 availability_service 1234 5678 check_conflicts called
+```
+
+### Correlation ID (request_id)
+
+Cada requisição HTTP recebe um `request_id` único (UUID4) que:
+- Está presente em todos os logs da requisição
+- É retornado no header `X-Request-ID` da response
+- Permite rastrear toda a jornada de uma requisição (view → service → database → cache)
+
+**Exemplo**:
+```bash
+curl -i http://localhost:8002/api/solicitacoes/ | grep X-Request-ID
+# X-Request-ID: abc123-def456-ghi789
+
+docker compose logs web | jq 'select(.request_id == "abc123-def456-ghi789")'
+```
+
+### Serviços Identificados
+
+| Serviço | SERVICE_NAME | Logs |
+|---------|--------------|------|
+| Django Web | `web` | Requests HTTP, views, services |
+| Celery Worker | `worker` | Tasks assíncronas, ETL |
+| Celery Beat | `beat` | Agendamento de tasks |
+
+### Agregação de Logs (Futuro)
+
+Para agregação centralizada, considere:
+- **Loki** (Grafana): Integra com Grafana existente
+- **ELK Stack**: Elasticsearch + Logstash + Kibana
+- **CloudWatch** / **Datadog** / **New Relic**: SaaS
+
+**Integração com Loki** (exemplo):
+```yaml
+# promtail.yml (agent de coleta)
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        target_label: 'container'
+```
+
+---
+
 ## 📚 Referências
 
 - [django-prometheus docs](https://github.com/korfuri/django-prometheus)
@@ -203,9 +304,11 @@ curl http://localhost:8002/metrics | head -20
 - [Grafana docs](https://grafana.com/docs/)
 - [postgres_exporter](https://github.com/prometheus-community/postgres_exporter)
 - [redis_exporter](https://github.com/oliver006/redis_exporter)
+- [python-json-logger docs](https://github.com/madzak/python-json-logger)
+- [Grafana Loki docs](https://grafana.com/docs/loki/)
 
 ---
 
 **Última atualização**: 2025-11-18
 **Responsável**: Claude Code
-**Issue**: #165 (MP1 - Prometheus + Grafana)
+**Issues**: #165 (MP1 - Prometheus + Grafana), #166 (MP2 - Structured Logging)

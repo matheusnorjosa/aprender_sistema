@@ -31,6 +31,8 @@ urlpatterns = [
     path("admin/", admin_site.urls),
     # Health check
     path("healthz/", healthz, name="healthz"),
+    # Prometheus metrics (MP1) - django_prometheus.urls defines 'metrics' internally
+    path("", include("django_prometheus.urls")),
     # API
     path("api/", include("apps.core.urls")),
     path("api/", include("apps.dat_ingest.urls")),  # Fase 5: ETL Observability

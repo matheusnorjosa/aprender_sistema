@@ -43,7 +43,8 @@ SECRET_KEY = os.getenv(
 # ================================================================
 # ALLOWED HOSTS
 # ================================================================
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0,testserver").split(",")
+# MP1: Include 'web' for Prometheus internal scraping
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0,testserver,web").split(",")
 
 # ================================================================
 # PRODUCTION GUARD RAILS (P1.4)

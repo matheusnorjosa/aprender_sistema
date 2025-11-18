@@ -328,9 +328,25 @@ Ordem obrigatória de trabalho para agentes autônomos:
 
 ### 📊 OTIMIZAÇÕES DE PERFORMANCE:
 - **venv/** ignorado: Elimina milhares de arquivos Python
-- **backup_*.json** ignorado: Remove temporários  
+- **backup_*.json** ignorado: Remove temporários
 - **docs/memoria/** ignorado: Evita duplicação de contexto
 - **MCPs silenciosos**: Sem mais warnings verbosos nos comandos
+
+### 📝 OBSERVABILIDADE COMPLETA (MP1 + MP2):
+- **MP1 - Prometheus + Grafana** (Issue #165): ✅ Implementado e merged
+  - Stack completa: Prometheus 2.54.0, Grafana 11.2.0, exporters (PostgreSQL, Redis)
+  - Dashboard "AS v2 - System Overview" com 6 painéis
+  - Métricas: HTTP requests, latência, error rate, cache hit rate, DB operations
+  - Documentação: OBSERVABILITY.md (seção MP1)
+
+- **MP2 - Structured Logging** (Issue #166): ✅ Implementado e merged (PR #182)
+  - JSON structured logging para staging/production
+  - Correlation ID (request_id) via RequestIDMiddleware
+  - Service identification (web/worker/beat)
+  - Custom logging filters (RequestIDFilter, ContextFilter)
+  - Logs human-readable em development, JSON em staging/production
+  - Documentação: OBSERVABILITY.md (seção MP2)
+  - Testes: 5/5 passando (test_structured_logging.py)
 
 ---
 

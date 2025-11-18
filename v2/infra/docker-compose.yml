@@ -18,8 +18,16 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000
+    command: gunicorn config.wsgi:application --config /app/infra/gunicorn.conf.py
     env_file: .env
+    environment:
+      # Gunicorn Configuration (CP1 - Performance Optimization)
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-2}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
+      GUNICORN_LOG_LEVEL: ${GUNICORN_LOG_LEVEL:-info}
+      GUNICORN_MAX_REQUESTS: ${GUNICORN_MAX_REQUESTS:-1000}
+      GUNICORN_BIND: ${GUNICORN_BIND:-0.0.0.0:8000}
     depends_on:
       - db
       - redis

@@ -1,0 +1,120 @@
+/**
+ * AS v2 — useSessionMonitor Hook (CP5 - Issue #164)
+ *
+ * Hook para monitorar tempo de sessão e avisar antes da expiração.
+ *
+ * State:
+ * - timeLeft: number (segundos restantes de sessão)
+ * - showWarning: bool (exibir aviso quando < 5 min)
+ * - sessionAge: number (duração total da sessão em segundos, do backend)
+ *
+ * Methods:
+ * - renewSession(): Chama /api/auth/ping/ para renovar sessão
+ *
+ * Comportamento:
+ * - Monitora tempo de sessão a cada 60s
+ * - Mostra aviso quando faltam < 5 min (300s)
+ * - Permite renovação manual via botão "Continuar logado"
+ *
+ * Refs:
+ * - CP5 (Issue #164): Monitor de sessão
+ * - CP2: SESSION_COOKIE_AGE=1800 (30 min)
+ * - PA-06: Controle explícito (ISO 9241-110)
+ */
+
+import { useState, useEffect, useCallback } from 'react';
+import api from '../api';
+
+const WARNING_THRESHOLD = 300; // 5 minutos em segundos
+const CHECK_INTERVAL = 60000; // Verificar a cada 60 segundos
+
+const useSessionMonitor = () => {
+  const [sessionAge, setSessionAge] = useState(1800); // Default: 30 min
+  const [lastActivity, setLastActivity] = useState(Date.now());
+  const [showWarning, setShowWarning] = useState(false);
+
+  /**
+   * Calcula tempo restante de sessão.
+   */
+  const getTimeLeft = useCallback(() => {
+    const elapsed = Math.floor((Date.now() - lastActivity) / 1000);
+    const timeLeft = sessionAge - elapsed;
+    return Math.max(0, timeLeft);
+  }, [lastActivity, sessionAge]);
+
+  /**
+   * Renova sessão chamando /api/auth/ping/.
+   */
+  const renewSession = useCallback(async () => {
+    try {
+      const response = await api.post('/auth/ping/');
+      const { session_age } = response.data;
+
+      setSessionAge(session_age);
+      setLastActivity(Date.now());
+      setShowWarning(false);
+
+      console.log('✅ Sessão renovada com sucesso');
+      return true;
+    } catch (err) {
+      console.error('❌ Erro ao renovar sessão:', err);
+
+      // Se retornar 401/403, sessão expirou
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        window.location.href = '/login'; // Redirecionar para login
+      }
+
+      return false;
+    }
+  }, []);
+
+  /**
+   * Atualiza lastActivity em qualquer interação do usuário.
+   */
+  useEffect(() => {
+    const handleActivity = () => {
+      // SESSION_SAVE_EVERY_REQUEST=True renova automaticamente
+      // Apenas atualizamos o timestamp local
+      setLastActivity(Date.now());
+      setShowWarning(false);
+    };
+
+    // Eventos de atividade do usuário
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach((event) => window.addEventListener(event, handleActivity));
+
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, handleActivity));
+    };
+  }, []);
+
+  /**
+   * Timer para verificar tempo restante periodicamente.
+   */
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const timeLeft = getTimeLeft();
+
+      // Mostrar aviso se faltam menos de 5 min
+      if (timeLeft <= WARNING_THRESHOLD && timeLeft > 0) {
+        setShowWarning(true);
+      } else if (timeLeft === 0) {
+        // Sessão expirou
+        console.warn('⏰ Sessão expirada');
+        setShowWarning(false);
+        window.location.href = '/login';
+      }
+    }, CHECK_INTERVAL);
+
+    return () => clearInterval(intervalId);
+  }, [getTimeLeft]);
+
+  return {
+    timeLeft: getTimeLeft(),
+    showWarning,
+    sessionAge,
+    renewSession,
+  };
+};
+
+export default useSessionMonitor;

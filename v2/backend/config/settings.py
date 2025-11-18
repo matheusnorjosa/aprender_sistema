@@ -513,3 +513,50 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
+
+# ================================================================
+# SENTRY APM (MP3: Distributed Tracing & Error Tracking)
+# ================================================================
+# Refs: Issue #167, PLANO_MELHORIAS_DETALHADO.md (MP3)
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")  # Empty string disables Sentry
+
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        # Integrations
+        integrations=[
+            DjangoIntegration(
+                # Capture SQL queries (useful for N+1 detection)
+                transaction_style="url",  # Group by URL pattern
+                middleware_spans=True,  # Track middleware execution
+                signals_spans=True,  # Track Django signals
+            ),
+            CeleryIntegration(
+                # Monitor async tasks (worker + beat)
+                monitor_beat_tasks=True,  # Track beat scheduler
+                propagate_traces=True,  # Distributed tracing across tasks
+            ),
+        ],
+        # Performance monitoring
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),  # 10% of transactions
+        # Error sampling (100% = capture all errors)
+        sample_rate=1.0,
+        # Environment & Release tracking
+        environment=ENVIRONMENT,  # development/staging/production
+        release=os.getenv("GIT_COMMIT_SHA", "unknown"),  # Track deployments
+        # Additional context
+        send_default_pii=False,  # Don't send PII (LGPD/GDPR compliance)
+        attach_stacktrace=True,  # Include stack traces for breadcrumbs
+        # Performance options
+        profiles_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.0")),  # Profiling (disabled by default)
+        # Before send hook (optional: filter errors)
+        # before_send=lambda event, hint: event if should_send_to_sentry(event) else None,
+    )
+
+    # Optional: Set user context in views/middleware
+    # from sentry_sdk import set_user
+    # set_user({"id": user.id, "email": user.email, "username": user.username})

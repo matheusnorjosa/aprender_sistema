@@ -65,6 +65,8 @@ services:
       dockerfile: infra/Dockerfile
     command: celery -A config worker -l info
     env_file: .env
+    environment:
+      SERVICE_NAME: worker  # MP2: Structured logging service identification
     depends_on:
       - db
       - redis
@@ -84,6 +86,8 @@ services:
       dockerfile: infra/Dockerfile
     command: celery -A config beat -l info
     env_file: .env
+    environment:
+      SERVICE_NAME: beat  # MP2: Structured logging service identification
     depends_on:
       - db
       - redis

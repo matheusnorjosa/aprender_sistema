@@ -21,6 +21,7 @@ from .serializers import (
     TipoEventoOptionSerializer,
     UsuarioOptionSerializer,
 )
+from django.core.cache import cache
 
 
 @api_view(["GET"])
@@ -39,10 +40,23 @@ def municipios_options(request: Request) -> Response:
     ]
 
     Permissions: IsAuthenticated
+    Cache: 5 minutos (CP3)
     """
+    # CP3: Cache manual (não usar decorator com DRF views)
+    cache_key = "static_endpoint:municipios_options"
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return Response(cached_data)
+
+    # Cache miss: buscar do banco
     municipios = Municipio.objects.filter(ativo=True).order_by("nome")
     serializer = MunicipioOptionSerializer(municipios, many=True)
-    return Response(serializer.data)
+    data = serializer.data
+
+    # Salvar no cache
+    cache.set(cache_key, data, timeout=300)  # 5 min
+
+    return Response(data)
 
 
 @api_view(["GET"])
@@ -64,19 +78,32 @@ def projetos_options(request: Request) -> Response:
     ]
 
     Permissions: IsAuthenticated
+    Cache: 5 minutos (CP3)
     """
+    # CP3: Cache manual (não usar decorator com DRF views)
+    include_test = request.query_params.get("include_test", "false").lower() == "true"
+    cache_key = f"static_endpoint:projetos_options:include_test={include_test}"
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return Response(cached_data)
+
+    # Cache miss: buscar do banco
     # Filter active projects
     projetos = Projeto.objects.filter(ativo=True)
 
     # Issue #153: Filter out test projects by default
-    include_test = request.query_params.get("include_test", "false").lower() == "true"
     if not include_test:
         projetos = projetos.filter(is_test=False)
 
     projetos = projetos.order_by("nome")
 
     serializer = ProjetoOptionSerializer(projetos, many=True)
-    return Response(serializer.data)
+    data = serializer.data
+
+    # Salvar no cache
+    cache.set(cache_key, data, timeout=300)  # 5 min
+
+    return Response(data)
 
 
 @api_view(["GET"])
@@ -95,10 +122,23 @@ def tipos_evento_options(request: Request) -> Response:
     ]
 
     Permissions: IsAuthenticated
+    Cache: 5 minutos (CP3)
     """
-    tipos = TipoEvento.objects.filter(ativo=True).order_by("nome")
+    # CP3: Cache manual (não usar decorator com DRF views)
+    cache_key = "static_endpoint:tipos_evento_options"
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return Response(cached_data)
+
+    # Cache miss: buscar do banco
+    tipos = TipoEvento.objects.all().order_by("nome")
     serializer = TipoEventoOptionSerializer(tipos, many=True)
-    return Response(serializer.data)
+    data = serializer.data
+
+    # Salvar no cache
+    cache.set(cache_key, data, timeout=300)  # 5 min
+
+    return Response(data)
 
 
 @api_view(["GET"])

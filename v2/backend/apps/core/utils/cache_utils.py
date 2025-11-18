@@ -88,9 +88,9 @@ def invalidate_availability_cache(usuario_id: int | None = None) -> None:
     # django-redis suporta keys() e delete_many()
     # Abordagem simples: deletar todas as keys de availability
     try:
-        keys = cache.keys(pattern) if hasattr(cache, "keys") else []
+        keys = cache.keys(pattern) if hasattr(cache, "keys") else []  # type: ignore[attr-defined]
         if keys:
-            cache.delete_many(keys)
+            cache.delete_many(keys)  # type: ignore[arg-type]
     except Exception:
         # Fallback: se keys() não funcionar, ignorar
         # TTL de 5 min garante que cache expira automaticamente
@@ -174,9 +174,9 @@ def invalidate_static_cache(model_name: str) -> None:
     pattern = "static_endpoint:*"
 
     try:
-        keys = cache.keys(pattern) if hasattr(cache, "keys") else []
+        keys = cache.keys(pattern) if hasattr(cache, "keys") else []  # type: ignore[attr-defined]
         if keys:
-            cache.delete_many(keys)
+            cache.delete_many(keys)  # type: ignore[arg-type]
     except Exception:
         # Fallback: se keys() não funcionar, ignorar
         # TTL de 5 min garante que cache expira automaticamente

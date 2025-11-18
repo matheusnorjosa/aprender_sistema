@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # === Dev tools sempre instaladas (modo único) ===
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    jq httpie vim nano tree less tzdata ca-certificates libpq5 \
+    curl jq httpie vim nano tree less tzdata ca-certificates libpq5 \
  && rm -rf /var/lib/apt/lists/*
 
 # === Python pacotes de dados/cli (modo único) ===
@@ -27,6 +27,10 @@ RUN pip install --no-cache-dir \
     pytest-watch==4.2.0
 
 COPY backend /app
+
+# Copy gunicorn config (used by web service)
+RUN mkdir -p /app/infra
+COPY infra/gunicorn.conf.py /app/infra/gunicorn.conf.py
 
 # === BUILD INFO ===
 ARG GIT_SHA=unknown

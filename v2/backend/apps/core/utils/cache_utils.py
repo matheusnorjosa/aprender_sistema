@@ -6,12 +6,14 @@ Provides caching decorator for availability checks and invalidation utilities.
 import hashlib
 import json
 from functools import wraps
-from typing import Any, Callable
+from typing import Any, Callable, TypeVar, cast
 
 from django.core.cache import cache
 
+F = TypeVar("F", bound=Callable[..., Any])
 
-def cache_availability_check(timeout: int = 300):
+
+def cache_availability_check(timeout: int = 300) -> Callable[[F], F]:
     """
     Decorator para cachear check_conflicts.
 
@@ -31,9 +33,9 @@ def cache_availability_check(timeout: int = 300):
             return result
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: F) -> F:
         @wraps(func)
-        def wrapper(*, usuario, inicio, fim, municipio=None, **kwargs):
+        def wrapper(*, usuario: Any, inicio: Any, fim: Any, municipio: Any = None, **kwargs: Any) -> Any:
             # Gerar cache key baseado nos parâmetros
             key_data = {
                 "usuario_id": usuario.id,
@@ -60,12 +62,12 @@ def cache_availability_check(timeout: int = 300):
 
             return result
 
-        return wrapper
+        return cast(F, wrapper)
 
     return decorator
 
 
-def invalidate_availability_cache(usuario_id: int | None = None):
+def invalidate_availability_cache(usuario_id: int | None = None) -> None:
     """
     Invalida cache de availability para um ou todos os usuários.
 
@@ -95,7 +97,7 @@ def invalidate_availability_cache(usuario_id: int | None = None):
         pass
 
 
-def cache_static_endpoint(timeout: int = 300):
+def cache_static_endpoint(timeout: int = 300) -> Callable[[F], F]:
     """
     Decorator para cachear endpoints estáticos (municípios, projetos, tipos).
 
@@ -117,9 +119,9 @@ def cache_static_endpoint(timeout: int = 300):
             return Response(data)
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: F) -> F:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             from rest_framework.response import Response
 
             # Gerar cache key baseado no nome da função (incluir query params se presente)
@@ -151,12 +153,12 @@ def cache_static_endpoint(timeout: int = 300):
 
             return result
 
-        return wrapper
+        return cast(F, wrapper)
 
     return decorator
 
 
-def invalidate_static_cache(model_name: str):
+def invalidate_static_cache(model_name: str) -> None:
     """
     Invalida cache de endpoints estáticos para um modelo específico.
 

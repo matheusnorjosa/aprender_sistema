@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     # Third-party
     "rest_framework",
     "corsheaders",
+    "django_prometheus",  # MP1: Metrics collection
     "django_celery_beat",
     "django_celery_results",
     # AS v2 apps
@@ -107,6 +108,7 @@ AUTHENTICATION_BACKENDS = [
 # MIDDLEWARE
 # ================================================================
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",  # MP1: Metrics start
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -116,6 +118,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",  # MP1: Metrics end
 ]
 
 # ================================================================
@@ -153,7 +156,8 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Cláusula Pétrea: PostgreSQL obrigatório (SSOT)
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
+        # MP1: Use Prometheus-wrapped PostgreSQL backend for query metrics
+        "ENGINE": "django_prometheus.db.backends.postgresql",
         "NAME": os.getenv("DB_NAME", "aprender_db"),
         "USER": os.getenv("DB_USER", "aprender_user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "aprender_password"),
@@ -171,7 +175,8 @@ DATABASES = {
 # ================================================================
 CACHES = {
     "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
+        # MP1: Use Prometheus-wrapped Redis cache for cache hit/miss metrics
+        "BACKEND": "django_prometheus.cache.backends.redis.RedisCache",
         "LOCATION": f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}/0",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",

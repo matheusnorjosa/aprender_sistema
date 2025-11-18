@@ -9,7 +9,7 @@ from rest_framework.routers import DefaultRouter
 # Imports de módulos isolados (GAP-001 fix)
 from .views_basic import CurrentUserView, api_root
 from .views_health import features, readyz
-from .views_auth import csrf_token, login, logout
+from .views_auth import csrf_token, login, logout, ping
 from .views_solicitacao import SolicitacaoViewSet
 from .views_availability import (
     AvailabilityBlockViewSet,
@@ -106,6 +106,7 @@ urlpatterns = [
     # Authentication
     path("auth/login/", login, name="auth-login"),
     path("auth/logout/", logout, name="auth-logout"),
+    path("auth/ping/", ping, name="auth-ping"),  # CP5 - Session keep-alive
     # Google OAuth 2.0 (Sprint 1 - Issue #1)
     path("oauth/google/start/", google_oauth_start, name="google-oauth-start"),
     path("oauth/google/callback/", google_oauth_callback, name="google-oauth-callback"),

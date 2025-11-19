@@ -52,6 +52,8 @@ services:
       - "8002:8000"
     volumes:
       - ../data/csv-import:/app/data/csv-import:ro
+      - backup_data:/backups  # MP5: Database backups storage
+      - ./scripts:/app/infra/scripts:ro  # MP5: Backup scripts
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/readyz/"]
       interval: 30s
@@ -183,5 +185,6 @@ services:
 volumes:
   db_data:
   redis_data:  # CP2: Persistência Redis (sessões)
+  backup_data:  # MP5: PostgreSQL backups storage
   prometheus_data:  # MP1: Prometheus metrics storage
   grafana_data:  # MP1: Grafana dashboards and config

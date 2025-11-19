@@ -12,7 +12,7 @@
  */
 
 import { Card, Row, Col, Typography } from 'antd';
-import { UserOutlined, EnvironmentOutlined, TeamOutlined, ProjectOutlined } from '@ant-design/icons';
+import { UserOutlined, EnvironmentOutlined, TeamOutlined, ProjectOutlined, SettingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
@@ -51,6 +51,14 @@ export default function AdminDATHomePage() {
       description: 'CRUD de projetos, fluxo (SUPER/NAO_SUPER) e municípios',
       icon: <ProjectOutlined style={{ fontSize: '48px', color: '#722ed1' }} />,
       path: '/admin-dat/projetos',
+      status: 'Disponível',
+    },
+    {
+      key: 'configuracoes',
+      title: 'Configurações',
+      description: 'Configurações do sistema (disponibilidade, GCal, sessões, features)',
+      icon: <SettingOutlined style={{ fontSize: '48px', color: '#13c2c2' }} />,
+      path: '/admin-dat/configuracoes',
       status: 'Disponível',
     },
   ];

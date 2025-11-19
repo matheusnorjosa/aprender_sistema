@@ -21,7 +21,12 @@ from .views_controle_imports import ImportComprasView
 from .views_imports import ControleImportAcoesView, DATImportCadastrosView
 from .views_compras import ControleComprasListView
 from .views_controle_dat import ControleAcoesListView, DATAcoesListCreateView
-from .views_metrics import metrics_map
+from .views_metrics import (
+    metrics_map,
+    productivity_metrics,
+    formadores_metrics,
+    quality_metrics,
+)
 from .views_reports import (
     reports_status_counts,
     reports_top_projects,
@@ -205,6 +210,10 @@ urlpatterns = [
     path("gcal/health/", gcal_health, name="gcal-health"),
     # Metrics and Reports
     path("metrics/map/", metrics_map, name="metrics-map"),
+    # Issue #189: Team Metrics Endpoints
+    path("metrics/team/productivity/", productivity_metrics, name="metrics-team-productivity"),
+    path("metrics/team/formadores/", formadores_metrics, name="metrics-team-formadores"),
+    path("metrics/team/quality/", quality_metrics, name="metrics-team-quality"),
     path("reports/status-counts/", reports_status_counts, name="reports-status-counts"),
     path("reports/top-projects/", reports_top_projects, name="reports-top-projects"),
     path("reports/weekly-approved/", reports_weekly_approved, name="reports-weekly-approved"),

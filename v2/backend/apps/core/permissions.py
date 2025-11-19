@@ -134,3 +134,45 @@ class IsControleOrDAT(permissions.BasePermission):  # type: ignore[misc]
                 or request.user.groups.filter(name__in=["Controle", "DAT", "Superintendência"]).exists()  # type: ignore[attr-defined]
             )
         )
+
+
+class IsControle(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Permissão: apenas usuários do grupo 'Controle' ou superusers podem executar.
+
+    Usado para operações específicas de controle (métricas, dashboards).
+    Nota: Superusers sempre têm acesso completo.
+    """
+
+    message = "Apenas usuários do grupo Controle podem realizar esta ação."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                getattr(request.user, 'is_superuser', False)
+                or request.user.groups.filter(name="Controle").exists()  # type: ignore[attr-defined]
+            )
+        )
+
+
+class IsGerencia(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Permissão: apenas usuários do grupo 'Gerência' ou superusers podem executar.
+
+    Usado para operações de gerenciamento e métricas executivas.
+    Nota: Superusers sempre têm acesso completo.
+    """
+
+    message = "Apenas usuários do grupo Gerência podem realizar esta ação."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                getattr(request.user, 'is_superuser', False)
+                or request.user.groups.filter(name="Gerência").exists()  # type: ignore[attr-defined]
+            )
+        )

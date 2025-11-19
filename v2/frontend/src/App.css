@@ -6,3 +6,25 @@
   margin: 0;
   padding: 0;
 }
+
+/* Fix: Links dentro do Menu dark devem ter cor branca */
+.ant-menu-dark .ant-menu-item a,
+.ant-menu-dark .ant-menu-submenu-title a {
+  color: rgba(255, 255, 255, 0.65) !important;
+  text-decoration: none;
+}
+
+.ant-menu-dark .ant-menu-item-selected a,
+.ant-menu-dark .ant-menu-item:hover a {
+  color: #fff !important;
+}
+
+/* Fix específico: Badge dentro de Link no Menu dark */
+.ant-menu-dark .ant-menu-item a .ant-badge {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+.ant-menu-dark .ant-menu-item-selected a .ant-badge,
+.ant-menu-dark .ant-menu-item:hover a .ant-badge {
+  color: #fff !important;
+}

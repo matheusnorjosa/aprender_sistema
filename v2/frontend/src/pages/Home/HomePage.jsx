@@ -106,11 +106,12 @@ export default function HomePage() {
   const isAdmin = user?.is_superuser || user?.groups?.includes('Superintendência') || user?.groups?.includes('Gerência');
   const isManager = user?.groups?.includes('Controle') || user?.groups?.includes('Gerência');
   const isCoordenador = user?.groups?.includes('Coordenador') || user?.groups?.includes('DAT');
+  const canDAT = user?.is_superuser || user?.groups?.includes('DAT');
 
   return (
     <div style={{ padding: '24px' }}>
       <div style={{ marginBottom: 32 }}>
-        <Title level={2}>Home</Title>
+        <Title level={2}>Página Inicial</Title>
         <Text type="secondary">
           Atalhos e KPIs resumidos para suas tarefas diárias.
         </Text>
@@ -123,15 +124,16 @@ export default function HomePage() {
             Acesso Administrativo
           </Title>
           <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12} md={8}>
-              <AccessCard
-                icon={<UserOutlined />}
-                title="Gerenciamento de Usuários"
-                description="Gerenciar usuários, grupos e permissões."
-                link="/admin/usuarios"
-                disabled={true}
-              />
-            </Col>
+            {canDAT && (
+              <Col xs={24} sm={12} md={8}>
+                <AccessCard
+                  icon={<UserOutlined />}
+                  title="Gerenciamento de Usuários"
+                  description="Gerenciar usuários, grupos e permissões."
+                  link="/admin-dat/usuarios"
+                />
+              </Col>
+            )}
             <Col xs={24} sm={12} md={8}>
               <AccessCard
                 icon={<SettingOutlined />}
@@ -147,7 +149,6 @@ export default function HomePage() {
                 title="Análises"
                 description="Visualizar relatórios detalhados e métricas do sistema."
                 link="/dashboards"
-                disabled={true}
               />
             </Col>
           </Row>

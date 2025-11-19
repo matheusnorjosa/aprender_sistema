@@ -297,10 +297,11 @@ class GCalDriftView(APIView):
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas PUBLISHED
+        # MP4: select_related para evitar N+1 (compute_payload_hash acessa 5 FKs)
         qs = Solicitacao.objects.filter(
             status='aprovado',
             gcal_status=Solicitacao.GCalStatus.PUBLISHED
-        ).select_related('municipio', 'projeto')
+        ).select_related('municipio', 'projeto', 'tipo_evento', 'usuario', 'coordenador')
 
         # Aplicar filtros comuns (exceto status, já filtrado)
         date_from = request.query_params.get('date_from')
@@ -716,6 +717,9 @@ class GCalBatchReapplyView(APIView):
         # Buscar solicitações
         solicitacoes = Solicitacao.objects.filter(id__in=ids)
 
+        # MP4: Otimização O(N) - dict lookup em vez de linear search O(N²)
+        solicitacoes_dict = {s.id: s for s in solicitacoes}
+
         # Verificar GCAL_CLIENT
         gcal_client = getattr(settings, 'GCAL_CLIENT', 'fake')
 
@@ -723,8 +727,8 @@ class GCalBatchReapplyView(APIView):
         errors = []
 
         for sol_id in ids:
-            # Verificar se existe
-            sol = next((s for s in solicitacoes if s.id == sol_id), None)
+            # Verificar se existe (O(1) dict lookup)
+            sol = solicitacoes_dict.get(sol_id)
             if not sol:
                 errors.append({
                     'id': sol_id,
@@ -863,6 +867,9 @@ class GCalBatchResyncView(APIView):
         # Buscar solicitações
         solicitacoes = Solicitacao.objects.filter(id__in=ids)
 
+        # MP4: Otimização O(N) - dict lookup em vez de linear search O(N²)
+        solicitacoes_dict = {s.id: s for s in solicitacoes}
+
         # Verificar GCAL_CLIENT
         gcal_client = getattr(settings, 'GCAL_CLIENT', 'fake')
 
@@ -870,8 +877,8 @@ class GCalBatchResyncView(APIView):
         errors = []
 
         for sol_id in ids:
-            # Verificar se existe
-            sol = next((s for s in solicitacoes if s.id == sol_id), None)
+            # Verificar se existe (O(1) dict lookup)
+            sol = solicitacoes_dict.get(sol_id)
             if not sol:
                 errors.append({
                     'id': sol_id,
@@ -971,10 +978,12 @@ class DashboardEventsExportView(APIView):
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response | HttpResponse:
         # Usar helper unificado timezone-aware (Issue #96 follow-up #124)
-        # Export precisa de 'coordenador' adicional para CSV
+        # MP4: select_related para evitar N+1 em CSV export (.iterator() bypassa cache)
         qs = _filter_events_queryset(
             request,
-            Solicitacao.objects.select_related('coordenador')
+            Solicitacao.objects.select_related(
+                'municipio', 'projeto', 'tipo_evento', 'usuario', 'coordenador'
+            )
         )
 
         # Determinar formato (default: csv)

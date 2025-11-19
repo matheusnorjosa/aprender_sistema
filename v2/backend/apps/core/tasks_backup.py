@@ -9,7 +9,7 @@ Implements MP5: Automated Backup System with:
 
 Refs: Issue #169
 """
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
 

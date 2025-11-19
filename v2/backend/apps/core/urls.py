@@ -66,6 +66,7 @@ from .views_oauth import (
     google_oauth_list_calendars,
     google_oauth_select_calendar,
 )
+from .views_config import config_view  # Issue #187
 from .views import (
     MunicipioViewSet,
     ProjetoViewSet,
@@ -218,5 +219,7 @@ urlpatterns = [
     path("lookup/usuarios/", UsuarioLookup.as_view(), name="lookup-usuarios"),
     # PR16: Validation API
     path("solicitacoes/validate/", SolicitationValidateView.as_view(), name="solicitacao-validate"),
+    # Issue #187: Config API
+    path("config/", config_view, name="config"),
     path("", include(router.urls)),
 ]

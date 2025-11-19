@@ -159,7 +159,6 @@ export default function DeslocamentosPage() {
     async function loadUser() {
       try {
         const userData = await getMe();
-        setUser(userData);
 
         // Check RBAC: Controle, Coordenador, or DAT
         const canControle = userData.groups?.includes('Controle');
@@ -306,7 +305,7 @@ export default function DeslocamentosPage() {
       await deleteDeslocamento(id);
       message.success('Deslocamento deletado com sucesso!');
       loadDeslocamentos(pagination.current);
-    } catch (_error) {
+    } catch {
       message.error('Erro ao deletar deslocamento');
     }
   };

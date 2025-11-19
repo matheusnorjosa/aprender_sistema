@@ -17,7 +17,7 @@
  * - DELETE /api/deslocamentos/{id}/ (delete)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   Button,
@@ -143,7 +143,6 @@ async function deleteDeslocamento(id) {
 }
 
 export default function DeslocamentosPage() {
-  const [user, setUser] = useState(null);
   const [canAccess, setCanAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [deslocamentos, setDeslocamentos] = useState([]);
@@ -181,7 +180,7 @@ export default function DeslocamentosPage() {
   }, []);
 
   // Load deslocamentos
-  const loadDeslocamentos = async (page = 1) => {
+  const loadDeslocamentos = useCallback(async (page = 1) => {
     setLoading(true);
     try {
       const data = await fetchDeslocamentos({ ...filters, page });
@@ -196,24 +195,24 @@ export default function DeslocamentosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   // Load usuarios for select
-  const loadUsuarios = async () => {
+  const loadUsuarios = useCallback(async () => {
     try {
       const data = await fetchUsuarios();
       setUsuarios(data);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (canAccess) {
       loadDeslocamentos();
       loadUsuarios();
     }
-  }, [canAccess, filters]);
+  }, [canAccess, filters, loadDeslocamentos, loadUsuarios]);
 
   // Handle table change (pagination)
   const handleTableChange = (paginationConfig) => {
@@ -235,7 +234,7 @@ export default function DeslocamentosPage() {
       }));
     } else {
       setFilters((prev) => {
-        const { data_inicio, data_fim, ...rest } = prev;
+        const { data_inicio: _data_inicio, data_fim: _data_fim, ...rest } = prev;
         return rest;
       });
     }
@@ -307,7 +306,7 @@ export default function DeslocamentosPage() {
       await deleteDeslocamento(id);
       message.success('Deslocamento deletado com sucesso!');
       loadDeslocamentos(pagination.current);
-    } catch (error) {
+    } catch (_error) {
       message.error('Erro ao deletar deslocamento');
     }
   };

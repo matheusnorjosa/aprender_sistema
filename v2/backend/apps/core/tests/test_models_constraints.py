@@ -183,13 +183,17 @@ class TestDefaultStatusPendente:
 
         assert solicitacao.status == "pendente", "Status deve ser 'pendente' por padrão (PA-01)"
 
-    def test_defaults_status_pendente_availabilityblock(self, usuario_test):
+    def test_defaults_status_aprovado_availabilityblock(self, usuario_test):
         """
-        Test: AvailabilityBlock sem informar status → default pendente (model).
+        Test: AvailabilityBlock sem informar status → default aprovado (auto-aprovação).
 
-        IMPORTANTE: Este teste valida o comportamento do MODEL.
-        Na prática, a API (ViewSet.perform_create) sempre define status='aprovado'
-        porque bloqueios são informações factuais e não requerem aprovação.
+        Bloqueios são informações factuais e não requerem aprovação manual.
+        Comportamento garantido em três níveis:
+        1. Campo status tem default='aprovado' no modelo
+        2. Método save() força status='aprovado' se vier como 'pendente'
+        3. API ViewSet sempre cria com status='aprovado'
+
+        Diferente de Solicitações (PA-01 a PA-07), bloqueios são sempre auto-aprovados.
         """
         now = timezone.now()
 
@@ -202,7 +206,7 @@ class TestDefaultStatusPendente:
             # status NÃO informado explicitamente
         )
 
-        assert block.status == "pendente", "Status default do MODEL deve ser 'pendente' (mas API sobrescreve com 'aprovado')"
+        assert block.status == "aprovado", "Status default do bloqueio deve ser 'aprovado' (auto-aprovação)"
 
     def test_solicitacao_cannot_be_created_approved(
         self, usuario_test, tipo_evento_test, municipio_test

@@ -193,7 +193,9 @@ Além disso, identifica **3 gaps funcionais críticos** descobertos na análise.
 ### ✅ Fase 3: Endpoints de Desempenho da Equipe
 **Esforço estimado:** 8-12h
 **Prioridade:** 🟡 Média (métricas de negócio)
-**Issue:** #XXX
+**Issue:** #189
+**Status:** ✅ **COMPLETA** (2025-11-19)
+**PR:** #XXX
 
 #### Motivação
 - Sistema tem métricas técnicas (Prometheus: requests, latência, cache) mas **falta métricas de negócio**
@@ -203,7 +205,7 @@ Além disso, identifica **3 gaps funcionais críticos** descobertos na análise.
 #### Escopo
 
 **Backend:**
-- [ ] Endpoint `GET /api/metrics/team/productivity/`
+- [x] Endpoint `GET /api/metrics/team/productivity/`
   - Query params: `days` (default: 7)
   - Retorna:
     ```json
@@ -224,7 +226,7 @@ Além disso, identifica **3 gaps funcionais críticos** descobertos na análise.
     - `gcal_error_rate = erros / aprovados * 100`
   - Permissão: `IsControle | IsGerencia`
 
-- [ ] Endpoint `GET /api/metrics/team/formadores/`
+- [x] Endpoint `GET /api/metrics/team/formadores/`
   - Query params: `days` (default: 30)
   - Retorna:
     ```json
@@ -249,7 +251,7 @@ Além disso, identifica **3 gaps funcionais críticos** descobertos na análise.
   - Ordenação: `-eventos` (top 10)
   - Permissão: `IsControle | IsGerencia`
 
-- [ ] Endpoint `GET /api/metrics/team/quality/`
+- [x] Endpoint `GET /api/metrics/team/quality/`
   - Query params: `days` (default: 30)
   - Retorna:
     ```json
@@ -270,15 +272,31 @@ Além disso, identifica **3 gaps funcionais críticos** descobertos na análise.
   - Permissão: `IsControle | IsGerencia`
 
 **Testes:**
-- [ ] `test_metrics_productivity` - Cálculos corretos
-- [ ] `test_metrics_formadores` - Ranking top 10
-- [ ] `test_metrics_quality` - KPIs de qualidade
-- [ ] `test_metrics_rbac` - Permissões corretas
+- [x] `test_metrics_productivity` - Cálculos corretos
+- [x] `test_metrics_formadores` - Ranking top 10
+- [x] `test_metrics_quality` - KPIs de qualidade
+- [x] `test_metrics_rbac` - Permissões corretas
 
 #### Entregáveis
 - ✅ Métricas de negócio expostas via REST
 - ✅ Grafana pode consumir endpoints (dashboard opcional)
 - ✅ Base para dashboard React (Fase 4)
+
+#### Resultado da Implementação
+**Data de conclusão:** 2025-11-19
+**Arquivos criados/modificados:**
+- `v2/backend/apps/core/permissions.py` (+41 linhas): `IsControle`, `IsGerencia`
+- `v2/backend/apps/core/views_metrics.py` (+415 linhas): 3 endpoints de métricas
+- `v2/backend/apps/core/urls.py` (+4 linhas): Rotas `/api/metrics/team/*`
+- `v2/backend/apps/core/tests/test_metrics_api.py` (+774 linhas): 13 testes completos
+
+**Testes:** 13/13 passando (100% cobertura)
+- 3 testes de produtividade (cálculos, empty dataset, custom days)
+- 3 testes de ranking de formadores (ranking, top 10, exclusão de convidados)
+- 2 testes de qualidade (KPIs, empty dataset)
+- 5 testes de RBAC (Controle/Gerência allowed, Formador/Coordenador forbidden, anonymous forbidden)
+
+**Total de código:** 1,234 linhas adicionadas
 
 ---
 

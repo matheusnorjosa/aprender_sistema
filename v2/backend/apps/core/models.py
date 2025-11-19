@@ -277,7 +277,7 @@ class AvailabilityBlock(models.Model):
     def __str__(self) -> str:
         return f"{self.usuario.get_full_name()} - {self.get_tipo_display()} ({self.inicio.strftime('%d/%m/%Y %H:%M')} - {self.fim.strftime('%d/%m/%Y %H:%M')})"  # type: ignore[attr-defined]
 
-    def save(self, *args, **kwargs) -> None:
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """
         Override save para auto-aprovar bloqueios.
 

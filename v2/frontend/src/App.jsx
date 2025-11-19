@@ -45,6 +45,7 @@ import MunicipiosPage from './pages/AdminDAT/MunicipiosPage';
 import ProjetosPage from './pages/AdminDAT/ProjetosPage';
 import GruposPage from './pages/AdminDAT/GruposPage';
 import ConfiguracoesPage from './pages/AdminDAT/ConfiguracoesPage';
+import DeslocamentosPage from './pages/Deslocamentos/DeslocamentosPage';
 import { getMe } from './api/availability';
 import './App.css';
 
@@ -289,14 +290,21 @@ function App() {
                 </Menu.Item>
               )}
 
-              {/* Ops Panels (Controle) */}
-              {canControle && (
+              {/* Ops Panels (Controle/Coordenador) */}
+              {(canControle || canCoordenador) && (
                 <SubMenu key="ops-submenu" icon={<ShoppingOutlined />} title="Ops">
-                  <Menu.Item key="controle-ops">
-                    <Link to="/controle">Controle</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-ops">
-                    <Link to="/dat">DAT</Link>
+                  {canControle && (
+                    <>
+                      <Menu.Item key="controle-ops">
+                        <Link to="/controle">Controle</Link>
+                      </Menu.Item>
+                      <Menu.Item key="dat-ops">
+                        <Link to="/dat">DAT</Link>
+                      </Menu.Item>
+                    </>
+                  )}
+                  <Menu.Item key="deslocamentos">
+                    <Link to="/deslocamentos">Deslocamentos</Link>
                   </Menu.Item>
                 </SubMenu>
               )}
@@ -392,6 +400,12 @@ function App() {
                 <Route
                   path="/pre-agenda"
                   element={canControle ? <PreAgendaPage /> : <Forbidden />}
+                />
+
+                {/* Issue #188: Deslocamentos (Controle/Coordenador/DAT) */}
+                <Route
+                  path="/deslocamentos"
+                  element={(canControle || canCoordenador || canDAT) ? <DeslocamentosPage /> : <Forbidden />}
                 />
 
                 {/* Admin DAT (Fase 1 - Plano DAT/GCal) */}

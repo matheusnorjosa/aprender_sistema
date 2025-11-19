@@ -6,14 +6,11 @@ Provides aggregated metrics for dashboard and monitoring.
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
-from typing import Any
-from django.db.models import QuerySet
-from rest_framework.request import Request
-from rest_framework.response import Response
 
 from django.db.models import Count
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .models import Solicitacao

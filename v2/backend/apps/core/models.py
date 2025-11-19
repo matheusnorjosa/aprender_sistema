@@ -242,7 +242,7 @@ class AvailabilityBlock(models.Model):
     motivo = models.CharField(
         max_length=255, blank=True, help_text="Motivo do bloqueio"
     )
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pendente")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="aprovado")
 
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -276,6 +276,21 @@ class AvailabilityBlock(models.Model):
 
     def __str__(self) -> str:
         return f"{self.usuario.get_full_name()} - {self.get_tipo_display()} ({self.inicio.strftime('%d/%m/%Y %H:%M')} - {self.fim.strftime('%d/%m/%Y %H:%M')})"  # type: ignore[attr-defined]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Override save para auto-aprovar bloqueios.
+
+        Bloqueios são informações factuais (o formador/coordenador SABE quando está indisponível),
+        portanto não requerem aprovação manual da Superintendência.
+
+        Diferente de Solicitações (PA-01 a PA-07), bloqueios são sempre status='aprovado'.
+        """
+        # Auto-aprovar sempre (criação ou atualização)
+        if self.status == "pendente":
+            self.status = "aprovado"
+
+        super().save(*args, **kwargs)
 
 
 class Solicitacao(models.Model):

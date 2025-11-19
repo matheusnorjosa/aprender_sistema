@@ -9,6 +9,7 @@ Implements MP5: Automated Backup System with:
 
 Refs: Issue #169
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
 
@@ -166,7 +167,7 @@ def perform_database_backup(
 
 
 @shared_task(name="backup.verify_backup_health")
-def verify_backup_health() -> dict[str, str | int]:
+def verify_backup_health() -> dict[str, str | int | list[str]]:
     """
     Verify backup system health (run weekly).
 

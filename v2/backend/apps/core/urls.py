@@ -67,6 +67,7 @@ from .views_oauth import (
     google_oauth_select_calendar,
 )
 from .views_config import config_view  # Issue #187
+from .views_deslocamento import DeslocamentoViewSet  # Issue #188
 from .views import (
     MunicipioViewSet,
     ProjetoViewSet,
@@ -96,6 +97,7 @@ router.register(r"compras", CompraViewSet, basename="compra")
 router.register(r"usuarios-admin", UsuarioAdminViewSet, basename="usuario-admin")  # Reativado (Fase 1 Iteração 2, GAP-001)
 router.register(r"grupos", GroupViewSet, basename="grupo")  # Criado (Fase 1 Iteração 2, GAP-002)
 router.register(r"audit-logs", AuditLogViewSet, basename="audit-log")
+router.register(r"deslocamentos", DeslocamentoViewSet, basename="deslocamento")  # Issue #188
 
 urlpatterns = [
     path("", api_root, name="api-root"),

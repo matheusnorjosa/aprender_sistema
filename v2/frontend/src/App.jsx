@@ -37,6 +37,7 @@ import PreAgendaPage from './pages/PreAgenda/PreAgendaPage';
 import LoginPage from './pages/Auth/LoginPage';
 import HomePage from './pages/Home/HomePage';
 import DashboardsPage from './pages/Dashboards/DashboardsPage';
+import EquipeDashboardPage from './pages/Dashboards/EquipeDashboardPage';
 import GCalDashboardPage from './pages/Dashboards/GCalDashboardPage';
 import MapaBrasilPage from './pages/MapaBrasil/MapaBrasilPage';
 import AdminDATHomePage from './pages/AdminDAT/AdminDATHomePage';
@@ -242,6 +243,13 @@ function App() {
                 </Menu.Item>
               )}
 
+              {/* Dashboard Equipe (Controle/Gerência) - Issue #190 */}
+              {(canControle || isManager) && (
+                <Menu.Item key="dashboard-equipe" icon={<BarChartOutlined />}>
+                  <Link to="/dashboards/equipe">Dashboard Equipe</Link>
+                </Menu.Item>
+              )}
+
               {/* GCal Dashboard (Controle/Super) + Badge de erros (Issue #97) */}
               {(canControle || canSuper) && (
                 <Menu.Item key="gcal-dashboard" icon={<SyncOutlined />}>
@@ -363,6 +371,12 @@ function App() {
                 <Route
                   path="/dashboards"
                   element={isManager ? <DashboardsPage /> : <Forbidden />}
+                />
+
+                {/* Dashboard Equipe (Controle/Gerência) - Issue #190 */}
+                <Route
+                  path="/dashboards/equipe"
+                  element={(canControle || isManager) ? <EquipeDashboardPage /> : <Forbidden />}
                 />
 
                 {/* GCal Dashboard (Controle/Super) */}

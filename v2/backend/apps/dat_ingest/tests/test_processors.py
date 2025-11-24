@@ -194,7 +194,7 @@ def temp_controle_xlsx(tmp_path):
 
     # Data rows (uma linha pode ter várias pessoas)
     ws.append([
-        "Fortaleza",           # Origem
+        "Fortaleza - CE",      # Origem (com UF)
         "Deslocamento",        # Tipo
         "Caucaia - CE",        # Destino
         datetime(2025, 1, 15), # Data completa
@@ -203,7 +203,7 @@ def temp_controle_xlsx(tmp_path):
         None, None, None, None # Demais pessoas vazias
     ])
     ws.append([
-        "Caucaia",             # Origem
+        "Caucaia - CE",        # Origem (com UF)
         "Retorno",             # Tipo
         "Maracanaú - CE",      # Destino
         datetime(2025, 1, 20), # Data completa

@@ -25,7 +25,63 @@ Plan and implement a new feature: $ARGUMENTS
 - Consider RBAC (permission classes: `IsSuperintendencia`, etc.)
 - Validate against Cláusulas Pétreas (CP-01 to CP-06)
 
-### 3. Implementation Guidelines
+### 3. Architecture Checklist (Before Implementation)
+
+Review these points BEFORE starting implementation:
+
+#### Type Safety & Code Quality
+- [ ] **e2e type-safety** (API → Services → Models → Database)
+  - Type hints on all functions/methods
+  - Pyright strict mode passing (0 errors)
+  - Django QuerySet typed with `Self`
+  - DRF Serializers with `ModelSerializer[Model]`
+
+#### Observability & Monitoring
+- [ ] **Error monitoring** (MP1: Prometheus, MP2: Structured Logging)
+  - AuditLog for critical operations (PA-05)
+  - Structured logging with context (request_id, usuario_id)
+  - Performance metrics for slow operations (>1s)
+
+#### Testing Strategy
+- [ ] **Automated tests** (pytest + Django tests)
+  - Coverage 90%+ (critical paths 100%)
+  - Test behavior, not implementation
+  - 3rd person verbs (not "should")
+  - Bug coverage (test for each fixed bug)
+
+#### Accessibility (ISO 9241-110 / WCAG 2.0)
+- [ ] **Frontend accessibility**
+  - Semantic HTML (`<button>` not `<div onclick>`)
+  - ARIA labels for complex UI
+  - Keyboard navigation support
+  - Color contrast sufficient (4.5:1 for text)
+
+#### Security (OWASP Best Practices)
+- [ ] **Security checklist**
+  - Input validation (DRF serializers)
+  - SQL injection prevention (ORM only, no raw SQL)
+  - RBAC enforced (permission classes)
+  - CSRF protection (Django default)
+  - No hardcoded secrets (use `.env`)
+
+#### Infrastructure & Database
+- [ ] **Docker compatibility** (CP-01)
+  - Feature runs ONLY in Docker
+  - Validate `/.dockerenv` exists if CP-01 applies
+
+- [ ] **Database migrations**
+  - Constraints at DB level (CHECK, UNIQUE, FK)
+  - Indexes on filter/order fields
+  - Timezone-aware (America/Fortaleza, store UTC)
+
+#### Scalability Path
+- [ ] **Performance considerations**
+  - select_related/prefetch_related for FKs/M2M
+  - Caching strategy (Redis, 5-15 min)
+  - Pagination for large datasets
+  - Avoid N+1 queries
+
+### 4. Implementation Guidelines
 
 #### Clarity (CLAUDE-principles.md)
 - **Descriptive names**: `solicitacao_aprovada` > `data_list`
@@ -44,7 +100,7 @@ Plan and implement a new feature: $ARGUMENTS
 - **Permissions**: RBAC classes (`IsSuperintendencia`, `IsControleOrSuper`)
 - **Throttling**: Para endpoints sensíveis
 
-### 4. Core Implementation Focus
+### 5. Core Implementation Focus
 
 #### Type Safety
 - **Type hints** em todos os services
@@ -73,7 +129,7 @@ Plan and implement a new feature: $ARGUMENTS
 - **Cache Redis**: 5 min para monthly grid
 - **Avoid N+1**: Usar prefetch
 
-### 5. Testing Strategy
+### 6. Testing Strategy
 
 #### pytest
 - **Behavior, not implementation**: Testar o QUE faz
@@ -92,7 +148,7 @@ class TestFeatureName:
             ...
 ```
 
-### 6. Compliance Checks
+### 7. Compliance Checks
 
 #### Cláusulas Pétreas (CP-01 to CP-05)
 - [ ] **CP-01**: Feature runs ONLY in Docker
@@ -120,7 +176,7 @@ class TestFeatureName:
 - [ ] **PA-06**: UI buttons hidden for non-authorized
 - [ ] **PA-07**: 5 mandatory tests passing
 
-### 7. Code Quality (CLAUDE-principles.md)
+### 8. Code Quality (CLAUDE-principles.md)
 
 - [ ] **Type hints** em todas as funções
 - [ ] **Naming descritivo** (sem vagos)
@@ -130,7 +186,7 @@ class TestFeatureName:
 - [ ] **Services**: Business logic fora de views
 - [ ] **PEP8**: flake8 sem erros
 
-### 8. Final Checks
+### 9. Final Checks
 
 - [ ] **Migrations**: `make migrate` executado
 - [ ] **Tests**: `pytest -v` passando (90%+)

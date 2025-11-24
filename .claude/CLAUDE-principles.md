@@ -22,18 +22,90 @@
 
 ## 🎯 Foco Principal (Aplicar em TODO Código)
 
-### 1. Type-Safety
-- **Python**: Type hints obrigatórios em functions/methods
-  ```python
-  def check_conflicts(
-      usuario: Usuario,
-      inicio: datetime,
-      fim: datetime,
-      municipio: Municipio
-  ) -> AvailabilityResult:
-  ```
-- **DRF**: Serializers com validação explícita
-- **Django ORM**: Nunca raw SQL (proteção SQL injection)
+### 1. Type-Safety (e2e: API → Database)
+
+**Goal**: End-to-end type-safety from API requests to database queries.
+
+#### Python Type Hints (Pyright Strict)
+- **Obrigatório** em todas as functions/methods
+- **PEP 695** type aliases (Python 3.12+)
+- **Pyright strict mode**: Zero errors allowed
+- **Never use `Any`** without documented justification
+
+**Example**:
+```python
+# PEP 695: Modern type aliases
+type UserId = int
+type Status = Literal["pendente", "aprovado", "reprovado"]
+
+def check_conflicts(
+    usuario: Usuario,
+    inicio: datetime,
+    fim: datetime,
+    municipio: Municipio
+) -> AvailabilityResult:
+    """Check conflicts with full type safety."""
+```
+
+#### Django ORM Typed
+- **QuerySet with Self**: Type-safe queries
+- **No raw SQL**: ORM protects against SQL injection
+- **select_related/prefetch_related**: Typed chains
+
+**Example**:
+```python
+from typing import Self
+from django.db import models
+
+class SolicitacaoQuerySet(models.QuerySet["Solicitacao"]):
+    def pendentes(self) -> Self:
+        return self.filter(status="pendente")
+
+    def aprovadas(self) -> Self:
+        return self.filter(status="aprovado")
+
+class Solicitacao(models.Model):
+    objects = SolicitacaoQuerySet.as_manager()
+```
+
+#### DRF Serializers Typed
+- **Serializers with generics**: Type-safe validation
+- **Explicit field types**: No `__all__` in production
+- **Custom validation**: Typed methods
+
+**Example**:
+```python
+from rest_framework import serializers
+
+class SolicitacaoSerializer(serializers.ModelSerializer[Solicitacao]):
+    municipio = serializers.PrimaryKeyRelatedField(
+        queryset=Municipio.objects.filter(ativo=True)
+    )
+
+    def validate_fim(self, value: datetime) -> datetime:
+        if value <= self.initial_data.get('inicio'):
+            raise serializers.ValidationError("fim must be > inicio")
+        return value
+
+    class Meta:
+        model = Solicitacao
+        fields = ['id', 'projeto', 'municipio', 'inicio', 'fim', 'status']
+```
+
+#### Type Safety Checklist
+- [ ] Type hints on all public functions/methods
+- [ ] PEP 695 aliases for complex types
+- [ ] Pyright strict mode passing (0 errors)
+- [ ] Django QuerySet typed with `Self`
+- [ ] DRF Serializers with `ModelSerializer[Model]`
+- [ ] No `Any` usage (or documented exceptions)
+- [ ] CI blocks PRs with type errors
+
+**Why e2e type-safety matters**:
+- Catches errors at dev time (not runtime/production)
+- Autocomplete 3x better (95% vs 30% accuracy)
+- Refactoring safe (IDE detects breakages)
+- Self-documenting code (type hints never outdated)
 
 ### 2. Observability
 - **AuditLog**: Todas as ações críticas (APPROVE, REJECT, PUBLISH)

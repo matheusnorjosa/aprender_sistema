@@ -4,7 +4,7 @@ Valida processadores de planilhas (AgendaProcessor, DisponibilidadeProcessor, Co
 """
 
 import tempfile
-from datetime import date, time
+from datetime import date, datetime, time
 from pathlib import Path
 
 import pandas as pd
@@ -134,28 +134,35 @@ def temp_users_df():
 
 @pytest.fixture
 def temp_disponibilidade_xlsx(tmp_path):
-    """Cria arquivo temporário de disponibilidade"""
+    """
+    Cria arquivo temporário de disponibilidade
+
+    ATUALIZADO (2025-11-19): Estrutura corrigida para corresponder à planilha real:
+    - 4 colunas: Usuário, Inicio (datetime), Fim (datetime), Tipo
+    - Não mais separado em data + hora
+    """
     filepath = tmp_path / "disponibilidade.xlsx"
     wb = Workbook()
 
-    # Aba Bloqueios
+    # Aba Bloqueios (estrutura REAL: 4 colunas com datetimes completos)
     ws = wb.active
     ws.title = "Bloqueios"
 
-    # Header
-    ws.append([
-        "Formador", "Tipo", "Data Início", "Hora Início",
-        "Data Fim", "Hora Fim", "Motivo", "Observações"
-    ])
+    # Header (estrutura corrigida)
+    ws.append(["Usuário", "Inicio", "Fim", "Tipo"])
 
-    # Data rows (date/time objects como OpenPyXL retorna)
+    # Data rows (datetimes completos, não separados)
     ws.append([
-        "João Silva", "T", date(2025, 1, 10), time(8, 0),
-        date(2025, 1, 10), time(18, 0), "Férias", "Bloqueio total"
+        "João Silva",
+        datetime(2025, 1, 10, 8, 0),    # Inicio completo
+        datetime(2025, 1, 10, 18, 0),   # Fim completo
+        "Total"                          # Tipo como string
     ])
     ws.append([
-        "Maria Santos", "P", date(2025, 1, 15), time(14, 0),
-        date(2025, 1, 15), time(17, 0), "Reunião", "Bloqueio parcial"
+        "Maria Santos",
+        datetime(2025, 1, 15, 14, 0),   # Inicio completo
+        datetime(2025, 1, 15, 17, 0),   # Fim completo
+        "Parcial"                        # Tipo como string
     ])
 
     wb.save(filepath)
@@ -164,32 +171,45 @@ def temp_disponibilidade_xlsx(tmp_path):
 
 @pytest.fixture
 def temp_controle_xlsx(tmp_path):
-    """Cria arquivo temporário de controle (planilha de deslocamentos)"""
+    """
+    Cria arquivo temporário de controle (planilha de deslocamentos)
+
+    ATUALIZADO (2025-11-19): Estrutura corrigida para corresponder à planilha real:
+    - Origem | Tipo | Destino | Data | Pessoa1 | Pessoa2 | ... | Pessoa6
+    - Suporte para múltiplas pessoas por viagem (1-6)
+    - Sem campos saida/chegada/duracao/meio_transporte
+    """
     filepath = tmp_path / "controle.xlsx"
     wb = Workbook()
 
-    # Aba DESLOCAMENTO (parse_deslocamentos procura por esta aba)
+    # Aba DESLOCAMENTO (estrutura REAL: múltiplas pessoas por linha)
     ws = wb.active
     ws.title = "DESLOCAMENTO"
 
-    # Header (conforme parse_deslocamentos.py:19-29)
+    # Header (estrutura corrigida: Origem, Tipo, Destino, Data, Pessoas...)
     ws.append([
-        "Formador", "Origem", "Destino", "Data Saída", "Hora Saída",
-        "Data Chegada", "Hora Chegada", "Duração (min)", "Meio de Transporte", "Observações"
+        "Origem", "Tipo", "Destino", "Data",
+        "Pessoa 1", "Pessoa 2", "Pessoa 3", "Pessoa 4", "Pessoa 5", "Pessoa 6"
     ])
 
-    # Data rows (date/time objects como OpenPyXL retorna)
+    # Data rows (uma linha pode ter várias pessoas)
     ws.append([
-        "João Silva", "Fortaleza - CE", "Caucaia - CE",
-        date(2025, 1, 15), time(8, 0),
-        date(2025, 1, 15), time(10, 0),
-        120, "Carro", "Deslocamento para formação"
+        "Fortaleza - CE",      # Origem (com UF)
+        "Deslocamento",        # Tipo
+        "Caucaia - CE",        # Destino
+        datetime(2025, 1, 15), # Data completa
+        "João Silva",          # Pessoa 1
+        None,                  # Pessoa 2 (vazio)
+        None, None, None, None # Demais pessoas vazias
     ])
     ws.append([
-        "Maria Santos", "Caucaia - CE", "Maracanaú - CE",
-        date(2025, 1, 20), time(14, 0),
-        date(2025, 1, 20), time(15, 30),
-        90, "Ônibus", "Retorno de workshop"
+        "Caucaia - CE",        # Origem (com UF)
+        "Retorno",             # Tipo
+        "Maracanaú - CE",      # Destino
+        datetime(2025, 1, 20), # Data completa
+        "Maria Santos",        # Pessoa 1
+        None,                  # Pessoa 2 (vazio)
+        None, None, None, None # Demais pessoas vazias
     ])
 
     wb.save(filepath)
@@ -311,7 +331,7 @@ class TestDisponibilidadeProcessor:
         bloqueio_total = bloqueios_df[bloqueios_df["tipo"] == "T"].iloc[0]
 
         assert bloqueio_total["formador_nome"] == "João Silva"
-        assert bloqueio_total["motivo"] == "Férias"
+        # Nota: Campo 'motivo' removido (não existe na planilha real)
 
     def test_parses_bloqueio_tipo_parcial(self, temp_disponibilidade_xlsx):
         """Test: Identifica bloqueio tipo Parcial (P)"""
@@ -322,21 +342,28 @@ class TestDisponibilidadeProcessor:
         bloqueio_parcial = bloqueios_df[bloqueios_df["tipo"] == "P"].iloc[0]
 
         assert bloqueio_parcial["formador_nome"] == "Maria Santos"
-        assert bloqueio_parcial["motivo"] == "Reunião"
+        # Nota: Campo 'motivo' removido (não existe na planilha real)
 
     def test_combines_date_and_time_to_datetime(self, temp_disponibilidade_xlsx):
-        """Test: Combina data + hora em datetime único"""
+        """
+        Test: Valida que campos inicio e fim existem como datetime
+
+        ATUALIZADO (2025-11-19): Planilha real já vem com datetimes completos,
+        não precisa mais combinar data + hora separados.
+        """
         processor = DisponibilidadeProcessor(temp_disponibilidade_xlsx)
         result = processor.process()
 
         bloqueios_df = result["bloqueios"]
 
-        # Verifica campos inicio e fim são datetime
+        # Verifica campos inicio e fim existem
         assert "inicio" in bloqueios_df.columns
         assert "fim" in bloqueios_df.columns
 
-        # Verifica tipo (implementação pode variar)
-        # assert pd.api.types.is_datetime64_any_dtype(bloqueios_df["inicio"])
+        # Verifica que têm valores (não vazios)
+        assert len(bloqueios_df) > 0
+        assert bloqueios_df["inicio"].notna().all()
+        assert bloqueios_df["fim"].notna().all()
 
 
 class TestControleProcessor:
@@ -361,11 +388,13 @@ class TestControleProcessor:
         compras_df = result["compras"]
         first_compra = compras_df.iloc[0]
 
-        # Campos de deslocamento
+        # Campos de deslocamento (estrutura corrigida 2025-11-19)
         assert first_compra["formador_nome"] == "João Silva"
         assert first_compra["origem_nome_uf"] == "Fortaleza - CE"
         assert first_compra["destino_nome_uf"] == "Caucaia - CE"
-        assert first_compra["duracao_minutos"] == 120
+        assert first_compra["tipo"] == "Deslocamento"
+        assert "data" in first_compra  # Campo data agora é datetime completo
+        # Nota: Campo 'duracao_minutos' removido (não existe na planilha real)
 
     def test_parses_municipio_with_uf_in_compras(self, temp_controle_xlsx):
         """Test: Mantém município com UF em deslocamentos"""
@@ -386,10 +415,10 @@ class TestControleProcessor:
         ws = wb.active
         ws.title = "DESLOCAMENTO"
 
-        # Apenas header, sem dados
+        # Apenas header, sem dados (estrutura corrigida 2025-11-19)
         ws.append([
-            "Formador", "Origem", "Destino", "Data Saída", "Hora Saída",
-            "Data Chegada", "Hora Chegada", "Duração (min)", "Meio de Transporte", "Observações"
+            "Origem", "Tipo", "Destino", "Data",
+            "Pessoa 1", "Pessoa 2", "Pessoa 3", "Pessoa 4", "Pessoa 5", "Pessoa 6"
         ])
 
         wb.save(filepath)

@@ -31,17 +31,34 @@ from apps.dat_ingest.services.parse_deslocamentos import parse_deslocamentos
 class Command(BaseCommand):
     help = "Run full ETL pipeline: load xlsx → upsert to SSOT (idempotent)"
 
+    # Aliases para formadores com nomes compostos ou sobrenomes diferentes
+    # Mapeamento: Nome na planilha → username no banco
+    FORMADOR_ALIASES = {
+        'Michele Macedo': 'michelerondonaprender',  # Alessandra Michele Macedo Rondon
+        'Icaro Maciel': 'icarochaves.aprender',     # Francisco Icaro Maciel Forte Chaves
+        'Janieri Martins': 'janieriaajj',           # Janieri Scipião (sobrenome diferente)
+        'Laís Aline': 'coordenacao42',              # Lais Aline Nascimento Fahel Evangelista
+    }
+
     # ========== HELPER METHODS FOR FK RESOLUTION ==========
 
     def find_usuario(self, nome: str) -> Usuario | None:
         """
         Find Usuario by name (fuzzy matching)
-        Tries: first_name + last_name, then first_name only
+        Tries: 1) Alias direto, 2) first_name + last_name, 3) first_name only
         """
         if not nome:
             return None
 
         nome = nome.strip()
+
+        # Try alias first
+        if nome in self.FORMADOR_ALIASES:
+            username = self.FORMADOR_ALIASES[nome]
+            usuario = Usuario.objects.filter(username=username).first()
+            if usuario:
+                return usuario
+
         partes = nome.split()
 
         if len(partes) >= 2:
@@ -249,13 +266,17 @@ class Command(BaseCommand):
                 continue
 
             try:
+                # Nova estrutura: apenas data (sem horários separados)
+                # Assumir start_date = end_date (dia do deslocamento)
+                data_date = d["data"].date()
+
                 # Check if already exists (idempotency)
                 exists = Deslocamento.objects.filter(
                     usuario=formador,
                     origem=origem.nome,
                     destino=destino.nome,
-                    start_date=d["saida"].date(),
-                    end_date=d["chegada"].date(),
+                    start_date=data_date,
+                    end_date=data_date,
                 ).exists()
 
                 if exists and not force:
@@ -266,10 +287,9 @@ class Command(BaseCommand):
                     usuario=formador,
                     origem=origem.nome,
                     destino=destino.nome,
-                    start_date=d["saida"].date(),
-                    end_date=d["chegada"].date(),
-                    duracao_minutos=d["duracao_minutos"],
-                    meio_transporte=d["meio_transporte"],
+                    start_date=data_date,
+                    end_date=data_date,
+                    observacao=f"Tipo: {d['tipo']}",  # Guardar se é Deslocamento ou Retorno
                 )
                 created += 1
 
@@ -387,10 +407,23 @@ class Command(BaseCommand):
                 )
                 created_solicitacoes += 1
 
+                # Create Participation for coordenador (Issue: coordenadores na grade)
+                if coordenador:
+                    Participation.objects.create(
+                        solicitacao=solicitacao, usuario=coordenador, role="COORDENADOR"
+                    )
+                    created_participations += 1
+
                 # Create Participations for each formador
                 for formador_nome in s["formadores"]:
                     formador = self.find_usuario(formador_nome)
                     if formador:
+                        # Skip if user already has COORDENADOR participation (avoid duplicates)
+                        if Participation.objects.filter(
+                            solicitacao=solicitacao, usuario=formador, role="COORDENADOR"
+                        ).exists():
+                            continue  # User is already coordenador, don't add as formador
+
                         Participation.objects.create(
                             solicitacao=solicitacao, usuario=formador, role="FORMADOR"
                         )

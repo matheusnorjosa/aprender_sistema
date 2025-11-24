@@ -413,6 +413,96 @@ def get_monthly_grid(year, month):
 
 ---
 
+## ✍️ Writing Standards
+
+### Core Principles (From Premium Package)
+
+#### Be Concise
+- Every word must earn its place
+- Delete redundant words
+- Short sentences convey ideas clearly (max 25 words)
+
+#### Active Voice
+- ✅ "We fixed the bug" / "The service validates"
+- ❌ "The bug was fixed" / "Validation is performed"
+
+#### One Idea Per Sentence
+- Each sentence expresses one clear idea
+- Complex ideas get multiple sentences
+- Don't nest multiple concepts
+
+#### Lead with Results
+- Put the outcome first
+- Make conclusions obvious
+- Don't bury the lead
+
+### Docstrings (PEP 257 Required)
+
+**Python requires docstrings** for public functions/classes:
+
+```python
+def check_conflicts(
+    usuario: Usuario,
+    inicio: datetime,
+    fim: datetime,
+    municipio: Municipio
+) -> AvailabilityResult:
+    """
+    Check availability conflicts following RD-01 to RD-08.
+
+    Args:
+        usuario: Usuario instance (formador)
+        inicio: Start datetime (aware, America/Fortaleza)
+        fim: End datetime (aware, America/Fortaleza)
+        municipio: Municipio instance for the event
+
+    Returns:
+        AvailabilityResult with list of ConflictDetail instances
+
+    Raises:
+        ValueError: If fim <= inicio
+    """
+```
+
+### Commit Messages (Conventional Commits)
+
+```
+<type>(<scope>): <message>
+
+feat(core): add conflict detection service (RD-01 to RD-08)
+fix(etl): handle empty CSV files gracefully
+```
+
+- Use imperative mood ("Add" not "Added")
+- Be specific about what changed
+- Max 72 characters for first line
+- **Never include "Claude Code"**
+
+### Error Messages (User-Facing)
+
+**Format**: `<What happened>. <What to do>.`
+
+- ✅ `Solicitação not found. Check the ID and try again.`
+- ✅ `Conflict detected (RD-02): Total block from 09:00 to 12:00.`
+- ❌ `An error occurred.`
+- ❌ `Something went wrong.`
+
+### Writing Anti-Patterns
+
+**Avoid**:
+- Redundant words: "in order to" → "to"
+- Weak verbs: "is able to" → "can"
+- Passive voice
+- Hedging: "might", "possibly" (when you know)
+- Jargon without explanation
+
+**Watch for**:
+- Long sentences (>25 words)
+- Dense paragraphs (>5 sentences)
+- Ambiguous pronouns ("it", "this" without clear referent)
+
+---
+
 ## 🔗 When to Use What Skill
 
 | Task | Use Skill | Why |
@@ -420,6 +510,7 @@ def get_monthly_grid(year, month):
 | Implementar RF/RD/PA | `aprender-domain` | Regras de negócio AS v2 |
 | Criar model/ViewSet | `django-patterns` | Padrões Django/DRF |
 | Implementar ETL | `etl-guidelines` | Idempotência, quality gates |
+| Escrever docs/commits/PRs | `writing-standards` | Clareza, concisão, PEP 257 |
 | Aplicar princípios qualidade | Este arquivo | Type-safety, naming, testing |
 
 ---

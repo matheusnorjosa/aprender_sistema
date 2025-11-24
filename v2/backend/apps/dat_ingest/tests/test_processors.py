@@ -4,7 +4,7 @@ Valida processadores de planilhas (AgendaProcessor, DisponibilidadeProcessor, Co
 """
 
 import tempfile
-from datetime import date, time
+from datetime import date, datetime, time
 from pathlib import Path
 
 import pandas as pd

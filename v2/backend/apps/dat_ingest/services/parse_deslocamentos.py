@@ -3,7 +3,7 @@ Parser para aba DESLOCAMENTO da planilha Disponibilidade
 """
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
-from datetime import datetime
+from datetime import datetime, time
 from pathlib import Path
 from typing import Any
 
@@ -17,23 +17,26 @@ def parse_deslocamentos(filepath: Path) -> list[dict[str, Any]]:
     """
     Parse aba DESLOCAMENTO
 
-    Estrutura:
-    A: Formador
-    B: Origem (Município - UF)
-    C: Destino (Município - UF)
-    D: Data Saída
-    E: Hora Saída
-    F: Data Chegada
-    G: Hora Chegada
-    H: Duração (min)
-    I: Meio de Transporte
-    J: Observações
+    Estrutura REAL da planilha (corrigida 2025-11-19):
+    A (Col 1): Origem (cidade, ex: "Fortaleza")
+    B (Col 2): Tipo ("Deslocamento" ou "Retorno")
+    C (Col 3): Destino (cidade - UF, ex: "Bocaiúva do Sul - PR")
+    D (Col 4): Data (datetime, ex: 2025-03-24 00:00:00)
+    E-J (Col 5-10): Pessoa 1 a Pessoa 6 (múltiplas pessoas por viagem)
+
+    NOTA: Estrutura antiga (INCORRETA) tinha 10 colunas com 1 pessoa por linha e
+    campos saida/chegada/duracao_minutos/meio_transporte que NÃO existem no modelo.
+
+    A planilha real suporta até 6 pessoas por viagem. Cada pessoa gera um registro.
+
+    Modelo Deslocamento tem apenas:
+    - usuario, origem, destino, start_date, end_date, observacao, external_hash
 
     Args:
         filepath: Caminho do arquivo Excel
 
     Returns:
-        Lista de dicts com deslocamentos
+        Lista de dicts com deslocamentos (1 por pessoa)
     """
     wb = load_workbook(filepath, data_only=True)
 
@@ -52,60 +55,55 @@ def parse_deslocamentos(filepath: Path) -> list[dict[str, Any]]:
     tz = pytz.timezone('America/Fortaleza')
 
     for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-        if not row or len(row) < 7:
+        if not row or len(row) < 5:
             continue
 
-        formador_nome = normalize_str(row[0]) if len(row) > 0 else ""
-        origem_uf = normalize_str(row[1]) if len(row) > 1 else ""
-        destino_uf = normalize_str(row[2]) if len(row) > 2 else ""
-        data_saida = row[3] if len(row) > 3 else None
-        hora_saida = row[4] if len(row) > 4 else None
-        data_chegada = row[5] if len(row) > 5 else None
-        hora_chegada = row[6] if len(row) > 6 else None
-        duracao_min = row[7] if len(row) > 7 else None
-        meio_transporte = normalize_str(row[8]) if len(row) > 8 else ""
-        observacoes = normalize_str(row[9]) if len(row) > 9 else ""
+        # Estrutura correta: Origem | Tipo | Destino | Data | Pessoa1...Pessoa6
+        origem = normalize_str(row[0]) if row[0] else ""
+        tipo = normalize_str(row[1]) if row[1] else ""
+        destino = normalize_str(row[2]) if row[2] else ""
+        data = row[3] if row[3] else None
 
-        # Validar dados obrigatórios
-        if not formador_nome or not origem_uf or not destino_uf:
+        # Validar campos obrigatórios
+        if not origem or not destino or not data:
             continue
 
-        if not data_saida or not hora_saida or not data_chegada or not hora_chegada:
-            continue
-
-        # Combinar data + hora
+        # Processar data
         try:
-            if isinstance(hora_saida, str):
-                hora_saida = datetime.strptime(hora_saida, '%H:%M').time()
-            if isinstance(hora_chegada, str):
-                hora_chegada = datetime.strptime(hora_chegada, '%H:%M').time()
+            # Se já é datetime, usar direto; se é date, converter
+            if isinstance(data, datetime):
+                data_aware = data
+            else:
+                data_aware = datetime.combine(data, time(0, 0))
 
-            saida = tz.localize(datetime.combine(data_saida, hora_saida))
-            chegada = tz.localize(datetime.combine(data_chegada, hora_chegada))
+            # Localizar para America/Fortaleza se naive
+            if data_aware.tzinfo is None:
+                data_aware = tz.localize(data_aware)
+
         except Exception as e:
             continue
 
-        # Calcular duração se não fornecida
-        if not duracao_min or duracao_min <= 0:  # type: ignore[operator]
-            duracao_min = int((chegada - saida).total_seconds() / 60)
+        # Extrair pessoas (colunas 5-10)
+        pessoas = []
+        for col_idx in range(4, min(10, len(row))):
+            pessoa = normalize_str(row[col_idx]) if row[col_idx] else ""
+            if pessoa:
+                pessoas.append(pessoa)
 
-        # Converter para int
-        try:
-            duracao_min = int(duracao_min)
-        except:
-            duracao_min = 0
+        # Se não encontrou nenhuma pessoa, pular linha
+        if not pessoas:
+            continue
 
-        deslocamentos.append({
-            'formador_nome': formador_nome,
-            'origem_nome_uf': origem_uf,
-            'destino_nome_uf': destino_uf,
-            'saida': saida,
-            'chegada': chegada,
-            'duracao_minutos': duracao_min,
-            'meio_transporte': meio_transporte,
-            'observacoes': observacoes,
-            'src': f"{filepath.name}/{aba_name}",
-            'rownum': i,
-        })
+        # Criar um registro para cada pessoa
+        for pessoa_nome in pessoas:
+            deslocamentos.append({
+                'formador_nome': pessoa_nome,
+                'origem_nome_uf': origem,
+                'destino_nome_uf': destino,
+                'data': data_aware,
+                'tipo': tipo,  # Guardado em observacao pelo ETL
+                'src': f"{filepath.name}/{aba_name}",
+                'rownum': i,
+            })
 
     return deslocamentos

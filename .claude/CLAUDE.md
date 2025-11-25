@@ -350,166 +350,13 @@ Ordem obrigatória de trabalho para agentes autônomos:
 
 ---
 
-## Documento Consolidado — Projeto Aprender Sistema (AS)
+## 📖 Origem do Projeto e Arquitetura
 
-### 1. Origem do Projeto: Lógica das Planilhas
-O sistema original funcionava integralmente sobre planilhas Google/Excel, que acumulavam regras complexas de negócio. O novo sistema busca substituir essas planilhas por uma plataforma web automatizada.
+**Resumo**: AS v2 substitui planilhas Google/Excel por plataforma web automatizada (Django + React).
 
-#### 1.1 Planilhas Originais
-- Disponibilidade_2025.xlsx  
-- Planilha de Controle - 2025.xlsx  
-- Usuários.xlsx  
-- Produtos.xlsx  
+**Documentação Completa**: [v2/docs/PROJETO_ORIGEM.md](../v2/docs/PROJETO_ORIGEM.md)
 
-#### 1.2 Regras de Negócio Embutidas
-- **Códigos de Disponibilidade**  
-  - E → Evento confirmado  
-  - M → Mais de um evento  
-  - D → Deslocamento  
-  - P → Bloqueio parcial  
-  - T → Bloqueio total  
-  - X → Conflito  
-
-- **Verificação de Disponibilidade**: fórmulas cruzadas verificavam automaticamente se o formador podia ser agendado.  
-- **Consistência de Dados**: uso de IMPORTRANGE e referências cruzadas para manter sincronizados nomes de usuários, municípios e tipos de eventos.  
-
-- **Fluxo Operacional**:  
-  1. Solicitação feita por coordenadores em uma planilha.  
-  2. Verificação manual de disponibilidade e conflitos.  
-  3. Aprovação (ou reprovação) pela Superintendência.  
-  4. Lançamento no Google Calendar manual.  
-
----
-
-### 2. O Novo Sistema (Aprender Sistema - AS)
-
-#### 2.1 Tecnologias
-- **Backend**: Python 3.11 (imagem base) + Django 5.1.x + DRF + Celery (worker e beat)  
-- **Banco de Dados**: PostgreSQL 15  
-- **Cache & Filas**: Redis 7 (cache e broker Celery)  
-- **Infraestrutura**: Docker + Docker Compose (`v2/infra/docker-compose.yml`) orquestrado via `make`  
-- **Frontend**: React (Vite) + Tailwind + Ant Design; build Docker-first e dev server com proxy `/api`  
-
-#### 2.2 Estrutura de Código
-- **Backend (`v2/backend`)**
-  - Apps: `apps.core` (domínio principal) e `apps.dat_ingest` (ETLs e ingestão)
-  - Configurações Django em `config/`
-  - Comandos ETL em `apps/dat_ingest/management/commands`
-- **Frontend (`v2/frontend`)**
-  - Projeto React com Vite, Tailwind e Ant Design
-  - Páginas: Pré-agenda, Grade Mensal (Formadores/Coordenadores), painéis Controle/DAT
-
-**Modelos principais**:  
-- Usuario → usuários do sistema  
-- Formador → instrutores com disponibilidade e área de atuação  
-- Projeto → agrupamento de ações  
-- Municipio → municípios atendidos  
-- TipoEvento → classificações dos eventos  
-- Solicitacao → pedido de evento  
-- Aprovacao → status de análise de uma solicitação  
-- Deslocamento → registros de deslocamentos  
-- DisponibilidadeFormador → agenda consolidada  
-- LogAuditoria → rastreamento de ações  
-
-**ETLs**: Management commands para Acompanhamento, Deslocamento, Ações (Controle) e Cadastros (DAT) com suporte a `--dry-run` e relatórios em `out_etl/`
-
-#### 2.3 Funcionalidades Atuais
-- Autenticação e RBAC via Django (grupos: Superintendência, Controle, Coordenador, Formador, DAT, Gerência)  
-- API REST: `/api/solicitacoes/`, `/api/availability/monthly/`, `/api/controle/acoes/`, `/api/dat/acoes/`, `/api/features/`, `/api/me/`  
-- Pré-agenda React: fluxo de approve/reject (Superintendência) e preview/publish (Controle) respeitando `apply_blocked`  
-- Grade Mensal React com duas grades (Formadores/Coordenadores), filtros compartilhados, detalhes por célula e export CSV  
-- ETLs CSV/XLSX com relatórios em `out_etl/*.json` e idempotência por `external_hash`  
-- Integração Google Calendar real (`asv2-{id}`, `sendUpdates='none'`) com fallback fake controlado por feature flags  
-
----
-
-### 3. Papéis, Perfis e Autorizações
-
-#### 3.1 Perfis de Usuário
-- **Superintendência**: autoriza/reprova solicitações, resolve conflitos, valida agenda final  
-- **Coordenadores**: podem solicitar eventos, mas não aprovar  
-- **Formadores**: podem bloquear sua agenda (parcial/total), mas não solicitam/aprovam eventos  
-
-#### 3.2 Fluxo de Autorização
-1. Coordenador envia solicitação.  
-2. Sistema checa disponibilidade do formador (conflitos, bloqueios, deslocamentos).  
-3. Se sem conflito → solicitação vai para Superintendência.  
-4. Superintendência aprova → cria evento no Google Calendar.  
-5. Superintendência reprova → retorna com justificativa.  
-
----
-
-### 4. Requisitos Funcionais (RFs)
-- RF01: Importação de dados (usuários, municípios, projetos, tipos de evento, produtos).  
-- RF02: Solicitação de eventos.  
-- RF03: Verificação de conflitos (sobreposição, deslocamentos, bloqueios).  
-- RF04: Fluxo de aprovações com controle de perfis.  
-- RF05: Integração com Google Calendar.  
-- RF06: Criação automática de link Google Meet.  
-- RF07: Auditoria de todas as operações críticas.  
-- RF08: Interface de mapa mensal (disponibilidade).  
-
----
-
-### 5. Integrações Externas
-- **Google Calendar API**  
-  - Credenciais no Google Cloud  
-  - Evento aprovado → gera evento no calendário  
-  - Evento gera link Meet automaticamente via API  
-
----
-
-### 6. Situação Atual vs. Próximos Passos
-
-✅ Concluído até agora:
-- Estrutura base Django + PostgreSQL em Docker
-- Modelos principais criados
-- Migrações aplicadas
-- Importação inicial de formadores concluída
-- API de disponibilidades + página de visualização
-- Cadastro de bloqueio de agenda
-- Solicitação de eventos simples
-- Fluxo de aprovações iniciado
-- Home consolidando links
-- **PR16**: RF03 - Verificação de Conflitos (17 testes passando)
-- **PR17**: PA-01 a PA-07 - Política de Aprovação Manual (5 testes passando, frontend conforme)
-
-🚧 Próximos Passos:
-- Criar scripts de importação para municípios, projetos, tipos de evento
-- ~~Implementar RF03 (checagem automática de conflitos)~~ ✅ Completo (PR16)
-- ~~Finalizar RF04 (workflow completo de aprovações)~~ ✅ PA-01 a PA-07 completo (PR17)
-- Conectar com Google Calendar API (RF05/RF06)
-- Implementar testes end-to-end (Playwright)
-- Refinar interface (baseada em mapa mensal como referência)
-
----
-
-### 6.1. Importação de Usuários e Grupos
-
-**Estrutura da Planilha (Acompanhamento de Agenda):**
-- Coluna **N**: Coordenador
-- Colunas **O-S**: Formador 1, Formador 2, ..., Formador 5
-
-**Regra de Atribuição de Grupos:**
-- Usuários com username `coordenacao*` → Grupo "Coordenador"
-- Demais usuários com participações → Grupo "Formador"
-
-**Comando de Backfill:**
-```bash
-python manage.py backfill_user_groups --apply
-```
-- Atribui grupos faltantes baseado no padrão do username
-- Usado após importação inicial de usuários (122 usuários importados)
-- Resultado: 65 Formadores + 10 Coordenadores atribuídos corretamente
-
----
-
-### 7. Benefícios Esperados
-- Fim da dependência de planilhas manuais  
-- Fluxo de solicitações, aprovações e conflitos totalmente digital  
-- Registro auditável e confiável das agendas  
-- Integração automática com Google Calendar e Meet  
-- Escalabilidade para múltiplos anos e centenas de formadores  
+**Conteúdo**: Lógica das planilhas originais, códigos de disponibilidade (E/M/D/P/T/X), stack tecnológica (Python 3.12 + Django 5.1 + PostgreSQL + Redis), modelos principais, funcionalidades atuais, perfis RBAC, RFs (RF01-RF08), situação atual vs próximos passos.
 
 ---
 
@@ -655,154 +502,16 @@ As regras abaixo consolidam a lógica original das planilhas e devem ser aplicad
 
 ---
 
-## Implementação PA-01 a PA-07 (PR17)
+## Implementação PA-01 a PA-07 (PR17) ✅
 
-**Branch**: `feat/pr17-politica-aprovacao`
-**Status**: ✅ Implementado e testado (commit ab1858b + PA-06 frontend)
-**Data**: 2025-10-23
+**Status**: Implementado e testado (5/5 testes passando)
+**Documentação Completa**: [v2/docs/IMPLEMENTACAO_PA.md](../v2/docs/IMPLEMENTACAO_PA.md)
 
-### Resumo da Implementação
+**Resumo**: PR17 implementou conformidade total com Política de Aprovação Manual (CP-02): sem auto-aprovação (PA-01), apenas Superintendência aprova (PA-02), integrações após aprovação (PA-03), AuditLog persistente (PA-05), botões ocultos (PA-06), 5 testes obrigatórios (PA-07).
 
-PR17 implementa conformidade total com a Política de Aprovação Manual (CP-02), garantindo que:
-1. Nenhuma solicitação é auto-aprovada (PA-01)
-2. Apenas Superintendência pode aprovar/reprovar (PA-02)
-3. Integrações externas só executam após aprovação (PA-03)
-4. Auditoria completa em AuditLog (PA-05)
-5. Botões ocultos para não-autorizados no frontend (PA-06)
-6. 5 testes obrigatórios implementados e passando (PA-07)
+**Arquivos modificados**: `models.py` (Solicitacao.save), `views.py` (approve/reject + AuditLog), `test_approval_policy_PA.py` (5 testes), `ApprovalsPage.jsx` (PA-06).
 
-### Mudanças Implementadas
-
-#### Backend (Django)
-
-**1. models.py - Remoção de Auto-Aprovação (PA-01)**
-- **Arquivo**: `v2/backend/apps/core/models.py` (linhas 412-436)
-- **Problema**: `Solicitacao.save()` auto-aprovava quando `projeto.fluxo == "NAO_SUPER"`
-- **Correção**: Removida lógica de auto-aprovação completamente
-- **Código**:
-```python
-def save(self, *args, **kwargs):
-    """
-    Override save para garantir conformidade com PA-01.
-
-    PA-01: Nenhuma solicitação é auto-aprovada, independentemente do fluxo do projeto.
-
-    Histórico:
-    - PR 13/N: Auto-aprovação implementada (REMOVIDA em PR17)
-    - PR17: Conformidade com PA-01 (Política de Aprovação Manual obrigatória)
-    """
-    # PA-01: Sem auto-aprovação. Status sempre começa 'pendente'.
-    if self.pk is None and not hasattr(self, '_status_explicitly_set'):
-        pass  # Mantém o default do campo (status='pendente')
-
-    super().save(*args, **kwargs)
-```
-
-**2. views.py - Auditoria Persistente (PA-05)**
-- **Arquivo**: `v2/backend/apps/core/views.py`
-- **Métodos**: `approve()` (linhas 165-220), `reject()` (linhas 236-290)
-- **Problema**: Métodos só faziam `logger.info()`, sem AuditLog persistente
-- **Correção**: Adicionado `AuditLog.objects.create()` em ambos os métodos
-- **Código**:
-```python
-# PA-05: AuditLog persistente (compliance)
-AuditLog.objects.create(
-    usuario=request.user,
-    action="APPROVE",  # ou "REJECT"
-    model_name="Solicitacao",
-    details={
-        "solicitacao_id": solicitacao.id,
-        "prev_status": prev_status,
-        "new_status": "aprovado",  # ou "reprovado"
-        "justificativa": justificativa,
-        "ip_address": client_ip,
-        "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-    },
-)
-```
-
-**3. Testes Obrigatórios (PA-07)**
-- **Arquivo**: `v2/backend/apps/core/tests/test_approval_policy_PA.py` (344 linhas)
-- **5 testes implementados e passando**:
-  1. `test_never_auto_approves_on_clean_or_save` - Valida PA-01
-  2. `test_only_superintendencia_can_approve_or_reject` - Valida PA-02
-  3. `test_non_privileged_user_gets_403_on_approval_endpoint` - Valida PA-02 (complementar)
-  4. `test_calendar_integration_not_called_before_approval` - Valida PA-03
-  5. `test_approval_flow_records_audit_log` - Valida PA-05
-
-#### Frontend (React)
-
-**4. ApprovalsPage.jsx - Botões Ocultos (PA-06)**
-- **Arquivo**: `v2/frontend/src/pages/Aprovacoes/ApprovalsPage.jsx`
-- **Linhas**: 66-68 (estado), 89-109 (useEffect), 211 (botões)
-- **Implementação**:
-  - Importa `getMe` da API
-  - Carrega dados do usuário no mount
-  - Verifica `is_superuser || is_superintendencia || groups.includes('Superintendência')`
-  - Armazena em `canApprove` state
-  - Botões só renderizam se `record.status === 'pendente' && canApprove`
-- **Conformidade ISO 9241-110**: Controle explícito (usuário vê apenas ações permitidas)
-
-### Resultados dos Testes
-
-```bash
-cd v2/infra && docker compose exec -T web pytest apps/core/tests/test_approval_policy_PA.py -v
-
-test_approval_policy_PA.py::test_never_auto_approves_on_clean_or_save PASSED
-test_approval_policy_PA.py::test_only_superintendencia_can_approve_or_reject PASSED
-test_approval_policy_PA.py::test_non_privileged_user_gets_403_on_approval_endpoint PASSED
-test_approval_policy_PA.py::test_calendar_integration_not_called_before_approval PASSED
-test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
-
-========================= 5 passed in 2.34s =========================
-```
-
-### Conformidade PA-01 a PA-07
-
-| Requisito | Status | Implementação | Arquivo |
-|-----------|--------|---------------|---------|
-| **PA-01** | ✅ | Sem auto-aprovação em `Solicitacao.save()` | `models.py:412-436` |
-| **PA-02** | ✅ | Permission class `IsSuperintendencia` + endpoints protegidos | `permissions.py`, `views.py` |
-| **PA-03** | ✅ | Celery task `task_publish_solicitacao_to_gcal` validado via mock | `test_approval_policy_PA.py:201-262` |
-| **PA-04** | ✅ | Campo `status` tem `default='pendente'` | `models.py:120` |
-| **PA-05** | ✅ | `AuditLog.objects.create()` em approve/reject | `views.py:165-220, 236-290` |
-| **PA-06** | ✅ | Botões ocultos para não-Superintendência | `ApprovalsPage.jsx:66-68, 211` |
-| **PA-07** | ✅ | 5 testes obrigatórios implementados e passando | `test_approval_policy_PA.py` |
-
-### ⚠️ Nota Importante: Aprovação Manual NÃO Revalida Conflitos
-
-**Comportamento intencional**: O endpoint `approve()` (views_solicitacao.py:268-323) **NÃO** chama `check_conflicts()` antes de aprovar.
-
-**Razão**: Superintendência toma decisões com **contexto humano** que o sistema não captura:
-- Exceções autorizadas
-- Prioridades políticas/organizacionais
-- Contexto específico do município/projeto
-- Negociações não-formalizadas
-
-**Fluxo**: Superintendência acessa `/disponibilidade` (visualização da grade) e verifica **manualmente** antes de aprovar em `/aprovacoes`.
-
-**Sistema = ferramenta de suporte à decisão, NÃO automatização total.**
-
-### Arquivos Modificados
-
-**Backend**:
-- `v2/backend/apps/core/models.py` (Solicitacao.save)
-- `v2/backend/apps/core/views.py` (approve/reject methods)
-- `v2/backend/apps/core/tests/test_approval_policy_PA.py` (novo, 344 linhas)
-
-**Frontend**:
-- `v2/frontend/src/pages/Aprovacoes/ApprovalsPage.jsx` (PA-06)
-
-### Commits
-
-- `ab1858b` - fix(approval): remove auto-approval, add AuditLog, fix tests (5/5 passing)
-- `[próximo]` - feat(frontend): add PA-06 permission check in ApprovalsPage
-
-### Próximos Passos
-
-✅ PA-01 a PA-07 completo
-⏳ Push branch + criar PR17
-⏳ Review e merge
+**⚠️ Nota**: Aprovação manual NÃO revalida conflitos (intencional - decisões com contexto humano).
 
 ---
 
@@ -964,109 +673,25 @@ Todo o sistema deve seguir os princípios ergonômicos para design de sistemas i
 
 ---
 
-## RF05/RF06: Google Calendar + Meet (Implementado ✅)
+## RF05/RF06: Google Calendar + Meet ✅
 
-**Status**: Completo (PRs #32, #33, #41, #42; Issues #35–#40)
+**Status**: Completo (PRs #32, #33, #41, #42)
+**Documentação Completa**: [v2/docs/GUIDE_GCAL.md](../v2/docs/GUIDE_GCAL.md)
 
-### Funcionalidades
+**Funcionalidades**:
+- RF05: Publicação eventos (endpoint `/publish/`, dry-run/apply, fake/google client)
+- RF06: Google Meet links (campo `meet_link`, geração automática via `conferenceData`)
+- Modalidade: `is_online` (presencial vs online)
 
-#### 1. Publicação de Eventos (RF05)
-- **Endpoint**: `POST /api/solicitacoes/{id}/publish/`
-- **Parâmetros**:
-  - `dry_run` (bool): `true` = simulação (não persiste), `false` = publicação real
-  - `apply_blocked` (bool): `true` = força publicação mesmo com `GCAL_CLIENT=fake`
-- **Comportamento**:
-  - **Preview** (`/preview-gcal/`): Sempre retorna payload completo mas **não persiste** no DB
-  - **409 CONFLICT**: Quando `GCAL_CLIENT != "google"` e `apply_blocked=false`, retorna 409 e **não persiste**
-  - **APPLY real**: Apenas quando `GCAL_CLIENT=google` ou `apply_blocked=true` **persiste no DB**
-
-#### 2. Google Meet Link (RF06)
-- **Campo**: `meet_link` (TextField, read-only no serializer)
-- **Geração**: Automática via `conferenceData` com `requestId` único
-- **Persistência**:
-  - ✅ **APPLY real**: Persiste `meet_link` no banco
-  - ❌ **Preview**: Retorna no payload mas **não persiste**
-  - ❌ **409 blocked**: Não persiste
-  - ❌ **dry_run=true**: Não persiste
-- **Exposição**: Serializer `SolicitacaoSerializer` inclui `meet_link` em GET `/api/solicitacoes/`
-
-#### 3. Modalidade Online/Presencial (`is_online`)
-- **Campo**: `is_online` (BooleanField, default=False)
-- **Comportamento**:
-  - `is_online=false`: Evento presencial, **sem `conferenceData`**, sem Meet link
-  - `is_online=true`: Evento online, **com `conferenceData`**, gera Meet link automaticamente
-- **UI**: Checkbox no wizard de solicitação (passo 3 "Detalhes")
-- **Migration**: `0023_add_is_online.py`
-
-### Variáveis de Ambiente
-
+**Variáveis principais**:
 ```bash
-# Google Calendar client type ('fake' ou 'google')
-GCAL_CLIENT=fake  # default: 'fake' (seguro para dev)
-
-# Calendar ID (primary ou ID específico)
+GCAL_CLIENT=fake|google
 GCAL_CALENDAR_ID=your_calendar_id@group.calendar.google.com
-
-# Service Account credentials (escolher UMA das opções)
 GOOGLE_SERVICE_ACCOUNT_FILE=/secrets/aprender-sa-key.json
-# ou
-GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
-
-# Email notifications ('none', 'all', 'externalOnly')
-GCAL_SEND_UPDATES=none  # default: 'none'
+GCAL_SEND_UPDATES=none
 ```
 
-### Arquivos Principais
-
-**Backend**:
-- `v2/backend/apps/core/models.py`: Campo `is_online` (linha 86), `meet_link` (linha 126)
-- `v2/backend/apps/core/serializers.py`: Serializer com `meet_link` e `is_online` (linhas 82-98)
-- `v2/backend/apps/core/services/gcal_sync_service.py`: Lógica de payload com `conferenceData`
-- `v2/backend/apps/core/services/gcal_google_client.py`: Cliente real Google Calendar API
-- `v2/backend/apps/core/migrations/0022_add_meet_link.py`: Migration `meet_link`
-- `v2/backend/apps/core/migrations/0023_add_is_online.py`: Migration `is_online`
-
-**Frontend**:
-- `v2/frontend/src/pages/Solicitacoes/NewSolicitacaoWizard.jsx`: Checkbox `is_online` (linhas 358-365)
-- `v2/frontend/src/components/MeetLink.jsx`: Componente reutilizável para exibir/copiar link Meet
-
-**Documentação**:
-- `v2/docs/GUIDE_GCAL.md`: Guia completo de configuração GCal + Meet
-- `.claude/CLAUDE.md`: Esta seção
-
-### Testes
-
-**Backend** (`v2/backend/apps/core/tests/`):
-- `test_gcal_publish_apply_blocked.py`: Testa 409 quando `GCAL_CLIENT=fake` + `apply_blocked=false`
-- `test_gcal_retry_backoff.py`: Retry com exponential backoff
-- `test_gcal_send_updates.py`: Validação de `sendUpdates` parameter
-- `test_gcal_conference_version.py`: `conferenceDataVersion=1` obrigatório
-- `test_gcal_meet_link_persist.py`: Persistência de `meet_link` apenas em APPLY real
-- `test_solicitacao_serializer_meet_link.py`: Serializer expõe `meet_link`
-
-**Status**: ✅ Todos os testes passando
-
-### Issues e PRs Relacionados
-
-**PRs Principais**:
-- **#32**: Implementação inicial GCal (fake client + migrations)
-- **#33**: Google Calendar Client real + retry/backoff
-- **#41**: Campo `meet_link` + persistência APPLY-only
-- **#42**: Campo `is_online` + modalidade online/presencial
-
-**Issues**:
-- **#35**: Integração Google Calendar API (fechada por #32)
-- **#36**: Geração de Meet links (fechada por #41)
-- **#37**: Retry policy para GCal API (fechada por #33)
-- **#38**: Testes de integração GCal (fechada por #33)
-- **#39**: Quarentena testes `dat_ingest` (em andamento)
-- **#40**: Remover quarentena após #39 (pendente)
-
-### Próximos Passos
-
-- ⏳ Fechar issue #39 (resolver testes `dat_ingest`)
-- ⏳ Remover quarentena `-k 'not dat_ingest'` dos workflows CI (#40)
-- ✅ Smoke test com `GCAL_CLIENT=google` em ambiente staging
+**Testes**: 6 testes backend passando (publish, retry, send_updates, conference_version, meet_link_persist, serializer).
 
 ---
 

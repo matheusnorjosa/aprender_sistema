@@ -22,18 +22,90 @@
 
 ## 🎯 Foco Principal (Aplicar em TODO Código)
 
-### 1. Type-Safety
-- **Python**: Type hints obrigatórios em functions/methods
-  ```python
-  def check_conflicts(
-      usuario: Usuario,
-      inicio: datetime,
-      fim: datetime,
-      municipio: Municipio
-  ) -> AvailabilityResult:
-  ```
-- **DRF**: Serializers com validação explícita
-- **Django ORM**: Nunca raw SQL (proteção SQL injection)
+### 1. Type-Safety (e2e: API → Database)
+
+**Goal**: End-to-end type-safety from API requests to database queries.
+
+#### Python Type Hints (Pyright Strict)
+- **Obrigatório** em todas as functions/methods
+- **PEP 695** type aliases (Python 3.12+)
+- **Pyright strict mode**: Zero errors allowed
+- **Never use `Any`** without documented justification
+
+**Example**:
+```python
+# PEP 695: Modern type aliases
+type UserId = int
+type Status = Literal["pendente", "aprovado", "reprovado"]
+
+def check_conflicts(
+    usuario: Usuario,
+    inicio: datetime,
+    fim: datetime,
+    municipio: Municipio
+) -> AvailabilityResult:
+    """Check conflicts with full type safety."""
+```
+
+#### Django ORM Typed
+- **QuerySet with Self**: Type-safe queries
+- **No raw SQL**: ORM protects against SQL injection
+- **select_related/prefetch_related**: Typed chains
+
+**Example**:
+```python
+from typing import Self
+from django.db import models
+
+class SolicitacaoQuerySet(models.QuerySet["Solicitacao"]):
+    def pendentes(self) -> Self:
+        return self.filter(status="pendente")
+
+    def aprovadas(self) -> Self:
+        return self.filter(status="aprovado")
+
+class Solicitacao(models.Model):
+    objects = SolicitacaoQuerySet.as_manager()
+```
+
+#### DRF Serializers Typed
+- **Serializers with generics**: Type-safe validation
+- **Explicit field types**: No `__all__` in production
+- **Custom validation**: Typed methods
+
+**Example**:
+```python
+from rest_framework import serializers
+
+class SolicitacaoSerializer(serializers.ModelSerializer[Solicitacao]):
+    municipio = serializers.PrimaryKeyRelatedField(
+        queryset=Municipio.objects.filter(ativo=True)
+    )
+
+    def validate_fim(self, value: datetime) -> datetime:
+        if value <= self.initial_data.get('inicio'):
+            raise serializers.ValidationError("fim must be > inicio")
+        return value
+
+    class Meta:
+        model = Solicitacao
+        fields = ['id', 'projeto', 'municipio', 'inicio', 'fim', 'status']
+```
+
+#### Type Safety Checklist
+- [ ] Type hints on all public functions/methods
+- [ ] PEP 695 aliases for complex types
+- [ ] Pyright strict mode passing (0 errors)
+- [ ] Django QuerySet typed with `Self`
+- [ ] DRF Serializers with `ModelSerializer[Model]`
+- [ ] No `Any` usage (or documented exceptions)
+- [ ] CI blocks PRs with type errors
+
+**Why e2e type-safety matters**:
+- Catches errors at dev time (not runtime/production)
+- Autocomplete 3x better (95% vs 30% accuracy)
+- Refactoring safe (IDE detects breakages)
+- Self-documenting code (type hints never outdated)
 
 ### 2. Observability
 - **AuditLog**: Todas as ações críticas (APPROVE, REJECT, PUBLISH)
@@ -413,6 +485,96 @@ def get_monthly_grid(year, month):
 
 ---
 
+## ✍️ Writing Standards
+
+### Core Principles (From Premium Package)
+
+#### Be Concise
+- Every word must earn its place
+- Delete redundant words
+- Short sentences convey ideas clearly (max 25 words)
+
+#### Active Voice
+- ✅ "We fixed the bug" / "The service validates"
+- ❌ "The bug was fixed" / "Validation is performed"
+
+#### One Idea Per Sentence
+- Each sentence expresses one clear idea
+- Complex ideas get multiple sentences
+- Don't nest multiple concepts
+
+#### Lead with Results
+- Put the outcome first
+- Make conclusions obvious
+- Don't bury the lead
+
+### Docstrings (PEP 257 Required)
+
+**Python requires docstrings** for public functions/classes:
+
+```python
+def check_conflicts(
+    usuario: Usuario,
+    inicio: datetime,
+    fim: datetime,
+    municipio: Municipio
+) -> AvailabilityResult:
+    """
+    Check availability conflicts following RD-01 to RD-08.
+
+    Args:
+        usuario: Usuario instance (formador)
+        inicio: Start datetime (aware, America/Fortaleza)
+        fim: End datetime (aware, America/Fortaleza)
+        municipio: Municipio instance for the event
+
+    Returns:
+        AvailabilityResult with list of ConflictDetail instances
+
+    Raises:
+        ValueError: If fim <= inicio
+    """
+```
+
+### Commit Messages (Conventional Commits)
+
+```
+<type>(<scope>): <message>
+
+feat(core): add conflict detection service (RD-01 to RD-08)
+fix(etl): handle empty CSV files gracefully
+```
+
+- Use imperative mood ("Add" not "Added")
+- Be specific about what changed
+- Max 72 characters for first line
+- **Never include "Claude Code"**
+
+### Error Messages (User-Facing)
+
+**Format**: `<What happened>. <What to do>.`
+
+- ✅ `Solicitação not found. Check the ID and try again.`
+- ✅ `Conflict detected (RD-02): Total block from 09:00 to 12:00.`
+- ❌ `An error occurred.`
+- ❌ `Something went wrong.`
+
+### Writing Anti-Patterns
+
+**Avoid**:
+- Redundant words: "in order to" → "to"
+- Weak verbs: "is able to" → "can"
+- Passive voice
+- Hedging: "might", "possibly" (when you know)
+- Jargon without explanation
+
+**Watch for**:
+- Long sentences (>25 words)
+- Dense paragraphs (>5 sentences)
+- Ambiguous pronouns ("it", "this" without clear referent)
+
+---
+
 ## 🔗 When to Use What Skill
 
 | Task | Use Skill | Why |
@@ -420,6 +582,7 @@ def get_monthly_grid(year, month):
 | Implementar RF/RD/PA | `aprender-domain` | Regras de negócio AS v2 |
 | Criar model/ViewSet | `django-patterns` | Padrões Django/DRF |
 | Implementar ETL | `etl-guidelines` | Idempotência, quality gates |
+| Escrever docs/commits/PRs | `writing-standards` | Clareza, concisão, PEP 257 |
 | Aplicar princípios qualidade | Este arquivo | Type-safety, naming, testing |
 
 ---

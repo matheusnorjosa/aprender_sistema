@@ -1,5 +1,5 @@
 ---
-description: Comprehensive code review for AS v2 - 10 categories (clarity, security, a11y, performance, compliance)
+description: Comprehensive code review for AS v2 - 10 categories (clarity, security, a11y, performance, compliance). Adapted from premium Claude Code package with focus on Python/Django.
 argument-hint: [file or directory to review]
 allowed-tools: Bash(git:*)
 ---
@@ -8,9 +8,17 @@ allowed-tools: Bash(git:*)
 
 Review code: $ARGUMENTS
 
+**Review Framework**: 10-category comprehensive analysis (adapted from premium package)
+- **Primary Focus**: Clarity (naming, anti-patterns, specificity)
+- **Context**: Python/Django/DRF + AS v2 business rules (CP, RD, PA)
+
 ## Review Process
 
-### 1. **Clarity Review** (Primary Focus)
+### 1. **Clarity Review** ⭐ PRIMARY FOCUS
+
+**Goal**: Code that reads like a journal - clear, specific, maintainable.
+
+**Why clarity first**: Unclear code causes 60%+ of bugs and maintenance issues.
 
 #### Naming Standards
 - [ ] **Descriptive names** that say what they mean
@@ -519,3 +527,15 @@ Suggestion:
 - **Business Rules**: `.claude/skills/aprender-domain/SKILL.md`
 - **Django Patterns**: `.claude/skills/django-patterns/SKILL.md`
 - **Main Context**: `.claude/CLAUDE.md`
+
+---
+
+**Framework Origin**: Adapted from Premium Claude Code Package (TypeScript/React)
+**Customized For**: AS v2 (Python/Django/DRF)
+**Adaptations Applied**:
+- Removed React/TypeScript specific checks
+- Added Python/Django/DRF standards
+- Added AS v2 compliance checks (CP, RD, PA)
+- Focus on PEP 257, Pyright strict, Django ORM
+
+**Last Updated**: 2025-11-24

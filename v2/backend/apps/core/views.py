@@ -58,7 +58,6 @@ from .serializers import (
     UsuarioOptionSerializer,
 )
 from .services.availability_service import check_conflicts
-# from .services.import_compras import import_compras_from_file  # TODO: service depende de modelo Compra (GAP-004)
 
 # Logger estruturado para auditoria
 logger = logging.getLogger(__name__)
@@ -916,50 +915,6 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ["action", "model_name"]
     ordering_fields = ["created_at", "action", "id"]
     ordering = ["-created_at"]
-
-
-# TODO(GAP-004): ImportComprasView requer import_compras_from_file não implementado
-class ImportComprasView(APIView):
-    """
-    Endpoint de importação de Compras via CSV/XLSX.
-
-    POST /api/import/compras/
-    Content-Type: multipart/form-data
-    Body: file (CSV ou XLSX)
-    Query params: dry_run=true (opcional, para validação sem salvar)
-
-    Permissões: Controle ou DAT
-
-    Retorna:
-        {
-            "success": true,
-            "result": {
-                "inserted": int,
-                "updated": int,
-                "skipped": int,
-                "rejected": int,
-                "errors": [str]
-            }
-        }
-
-    Observações:
-    - Idempotência via external_hash (SHA256)
-    - Auto-cria Município e Projeto se não existirem
-    - Transacional: rollback em caso de erro crítico
-    - Salva resultado em out/etl/last_run.json
-    - Cria entrada em AuditLog
-
-    NOTA: Temporariamente desabilitado até implementação de import_compras_from_file
-    """
-
-    permission_classes = [IsControleOrDAT]
-
-    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        # TODO(GAP-004): Implementar import_compras_from_file antes de habilitar
-        return Response(
-            {"detail": "Import de compras temporariamente desabilitado (GAP-004)"},
-            status=status.HTTP_501_NOT_IMPLEMENTED
-        )
 
 
 # ==========================

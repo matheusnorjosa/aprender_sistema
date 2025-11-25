@@ -130,6 +130,30 @@ make coverage
 
 **Meta de cobertura**: 90%+ (crítico: 100%)
 
+### ⚠️ Pytest Best Practices
+
+**IMPORTANTE**: Execute pytest apenas **UMA vez por sessão** para evitar race conditions no banco de teste.
+
+```bash
+# ✅ Correto - Execução única
+make test
+# ou
+docker compose exec web pytest apps/core
+
+# ❌ Errado - Múltiplas execuções simultâneas
+pytest apps/core & pytest apps/dat_ingest  # Pode causar erro de DB
+
+# ✅ Alternativa - Use --reuse-db para execuções repetidas
+docker compose exec web pytest apps/core --reuse-db
+```
+
+**Por quê?** Múltiplos processos pytest tentam criar o mesmo banco de teste (`test_aprender_db`) simultaneamente, causando erro:
+```
+django.db.utils.IntegrityError: duplicate key value violates unique constraint "pg_database_datname_index"
+```
+
+📖 **Detalhes**: [docs/TESTING_RACE_CONDITION.md](docs/TESTING_RACE_CONDITION.md)
+
 ---
 
 ## 🔄 ETL (Migração de Dados)

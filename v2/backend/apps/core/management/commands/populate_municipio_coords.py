@@ -63,19 +63,23 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"CSV file not found: {csv_file}"))
             return
 
-        # Read CSV into dict: {(nome_normalized, uf): (lat, lng)}
-        coords_map: dict[tuple[str, str], tuple[str, str]] = {}
+        # Read CSV into dict: {(nome_normalized, uf): (lat_decimal, lng_decimal)}
+        coords_map: dict[tuple[str, str], tuple[Decimal, Decimal]] = {}
         with open(csv_file, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                nome: str = row['nome'].strip()  # type: ignore[union-attr]
-                uf: str = row['uf'].strip().upper()  # type: ignore[union-attr]
-                lat: str = row['latitude'].strip()  # type: ignore[union-attr]
-                lng: str = row['longitude'].strip()  # type: ignore[union-attr]
+                nome_str = row.get('nome', '').strip()
+                uf_str = row.get('uf', '').strip().upper()
+                lat_str = row.get('latitude', '').strip()
+                lng_str = row.get('longitude', '').strip()
+
+                # Convert to Decimal immediately
+                lat_dec = Decimal(lat_str)
+                lng_dec = Decimal(lng_str)
 
                 # Normalize nome for matching (remove accents, lowercase)
-                nome_normalized: str = remove_accents(nome).lower()
-                coords_map[(nome_normalized, uf)] = (lat, lng)  # type: ignore[assignment]
+                nome_normalized: str = remove_accents(nome_str).lower()
+                coords_map[(nome_normalized, uf_str)] = (lat_dec, lng_dec)
 
         self.stdout.write(f"Loaded {len(coords_map)} coordinates from CSV")
 
@@ -108,21 +112,17 @@ class Command(BaseCommand):
 
             # Try to find coordinates in CSV
             if key in coords_map:
-                lat_str: str
-                lng_str: str
-                lat_str, lng_str = coords_map[key]
                 try:
-                    lat: Decimal = Decimal(lat_str)
-                    lng: Decimal = Decimal(lng_str)
+                    lat_dec, lng_dec = coords_map[key]
 
                     self.stdout.write(
                         f"[{i}/{total}] ✓ {municipio.nome}-{municipio.uf}: "
-                        f"{lat}, {lng}"
+                        f"{lat_dec}, {lng_dec}"
                     )
 
                     if apply_mode:
-                        municipio.latitude = lat
-                        municipio.longitude = lng
+                        municipio.latitude = lat_dec
+                        municipio.longitude = lng_dec
                         municipio.save(update_fields=["latitude", "longitude"])
 
                     success_count += 1

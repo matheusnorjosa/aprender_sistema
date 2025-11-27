@@ -75,7 +75,7 @@ class Command(BaseCommand):
 
                 # Normalize nome for matching (remove accents, lowercase)
                 nome_normalized: str = remove_accents(nome).lower()
-                coords_map[(nome_normalized, uf)] = (lat, lng)
+                coords_map[(nome_normalized, uf)] = (lat, lng)  # type: ignore[assignment]
 
         self.stdout.write(f"Loaded {len(coords_map)} coordinates from CSV")
 

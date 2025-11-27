@@ -415,4 +415,94 @@ test('fetches and displays real data from API', async () => {
 ## Commits de Referência
 
 - Auditoria inicial: df60e67 (#203)
+
+---
+
+## ✅ Status de Implementação
+
+**Concluído**: 2025-11-27 (Branch: `feat/mapa-brasil-real`)
+
+### Fases Implementadas
+
+- [x] **Fase 1**: Modelo + Coordenadas (migration 0040) — commit 1b8ae3a
+- [x] **Fase 2**: ETL coordenadas (command populate_municipio_coords) — commit 35029be
+- [x] **Fase 3**: Endpoint /api/metrics/map/ (agregação por município) — commit ecda195
+- [x] **Fase 4**: Frontend integração (MapaBrasilPage.jsx) — commit 6f440be
+- [x] **Fase 5**: Documentação atualizada
+
+### Resultados
+
+**Backend**:
+- ✓ Campos latitude/longitude adicionados ao modelo Municipio
+- ✓ Migration 0040_add_municipio_coordinates aplicada
+- ✓ CSV com 96 coordenadas criado
+- ✓ Command ETL populou 14 municípios com coordenadas
+- ✓ Endpoint `/api/metrics/map/` retorna dados por município (não UF)
+- ✓ Resposta inclui: municipio, uf, latitude, longitude, projetos, eventos, coordenadores
+- ✓ Limitado a top 50 municípios (performance)
+
+**Frontend**:
+- ✓ Mock data removido completamente
+- ✓ Integração com API real via axios
+- ✓ Markers com coordenadas reais (11 municípios visíveis)
+- ✓ Popup mostra 4 métricas: projetos, eventos, coordenadores, município/UF
+- ✓ Loading states e error handling implementados
+- ✓ Build passou sem erros (bundle 1.75 MB)
+
+**ETL**:
+- ✓ Command `populate_municipio_coords` com dry-run/apply
+- ✓ Fuzzy matching por nome+UF (accent-insensitive)
+- ✓ 14/99 municípios populados (CSV coverage: ~15%)
+- ✓ 0 erros durante população
+
+### Métricas
+
+- Municípios no banco: 99
+- Municípios com coordenadas: 14 (14%)
+- Endpoint performance: <200ms (11 municípios retornados)
+- Frontend bundle: +61 linhas (107 ins, 46 del)
+- Commits: 4 (1 por fase)
+
+### Arquivos Modificados
+
+**Backend** (3 arquivos):
+- `apps/core/models.py` — Modelo Municipio
+- `apps/core/migrations/0040_add_municipio_coordinates.py` — Migration
+- `apps/core/management/commands/populate_municipio_coords.py` — ETL command
+- `apps/core/views_metrics.py` — Endpoint metrics_map
+- `data/municipios_coordenadas.csv` — Coordenadas (96 cidades)
+
+**Frontend** (1 arquivo):
+- `src/pages/MapaBrasil/MapaBrasilPage.jsx` — Integração com API
+
+**Docs** (2 arquivos):
+- `docs/PLANO_MAPA_BRASIL.md` — Plano detalhado de implementação
+- `docs/BACKLOG_MAPA_BRASIL.md` — Status atualizado (este arquivo)
+
+### Próximos Passos (Opcional)
+
+1. **Expandir cobertura de coordenadas**: Popular mais municípios (85/99 faltantes)
+2. **Testes automatizados**: Criar test_metrics_map.py, test_populate_coordinates.py
+3. **Melhoria de performance**: Considerar cache de coordenadas (Redis)
+4. **Filtros adicionais**: Implementar filtros por status e data (já no frontend)
+
+### Validação Manual
+
+```bash
+# Backend: Testar endpoint
+curl -X GET http://localhost:8002/api/metrics/map/ \
+  -H "Cookie: sessionid=..." \
+  | python -m json.tool
+
+# Frontend: Build
+cd v2/frontend && npm run build
+# ✓ Build passed (exit code 0)
+```
+
+---
+
+**Implementado por**: Claude Code (assistido)
+**Data**: 2025-11-27
+**Issue**: #208
+**Branch**: feat/mapa-brasil-real
 - Análise TODO MapaBrasil: 2025-11-25

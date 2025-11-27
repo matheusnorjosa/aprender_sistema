@@ -8,7 +8,7 @@
  * - Toggle Map/List view
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   Row,
@@ -24,6 +24,8 @@ import {
   Collapse,
   Radio,
   Tag,
+  Alert,
+  message,
 } from 'antd';
 import {
   SearchOutlined,
@@ -34,6 +36,7 @@ import { MapContainer, TileLayer, Marker, Popup, GeoJSON } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import brazilGeoJSON from '../../data/brazil-states.json';
+import api from '../../api';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -57,48 +60,81 @@ const createCustomIcon = (count) => {
   });
 };
 
-// Mock data - Substituir por chamadas API reais
-const mockProjetos = [
-  { id: 1, nome: 'Todos os Projetos' },
-  { id: 2, nome: 'Formação Continuada' },
-  { id: 3, nome: 'Educação Infantil' },
-  { id: 4, nome: 'BNCC Implementação' },
-];
-
-const mockProjetosPorMunicipio = [
-  { municipio: 'São Paulo', uf: 'SP', projetos: 12, coords: [-23.5505, -46.6333] },
-  { municipio: 'Rio de Janeiro', uf: 'RJ', projetos: 8, coords: [-22.9068, -43.1729] },
-  { municipio: 'Belo Horizonte', uf: 'MG', projetos: 7, coords: [-19.9167, -43.9378] },
-  { municipio: 'Salvador', uf: 'BA', projetos: 5, coords: [-12.9714, -38.5108] },
-  { municipio: 'Fortaleza', uf: 'CE', projetos: 6, coords: [-3.7172, -38.5434] },
-];
-
-const mockEventosPorMunicipio = [
-  { municipio: 'São Paulo', eventos: 128, coordenadores: 15, coords: [-23.5505, -46.6333] },
-  { municipio: 'Rio de Janeiro', eventos: 95, coordenadores: 12, coords: [-22.9068, -43.1729] },
-  { municipio: 'Belo Horizonte', eventos: 72, coordenadores: 8, coords: [-19.9167, -43.9378] },
-  { municipio: 'Salvador', eventos: 54, coordenadores: 7, coords: [-12.9714, -38.5108] },
-  { municipio: 'Fortaleza', eventos: 63, coordenadores: 9, coords: [-3.7172, -38.5434] },
-];
-
 export default function MapaBrasilPage() {
   const [viewMode, setViewMode] = useState('map'); // 'map' ou 'list'
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedProjeto, setSelectedProjeto] = useState(1);
+  const [selectedProjeto, setSelectedProjeto] = useState(null); // null = todos
   const [dateRange, setDateRange] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Estados para dados da API
+  const [municipiosData, setMunicipiosData] = useState([]);
+  const [projetos, setProjetos] = useState([]);
+
+  // Fetch projetos no mount
+  useEffect(() => {
+    const fetchProjetos = async () => {
+      try {
+        const response = await api.get('/projetos/', { params: { page_size: 100 } });
+        setProjetos([{ id: null, nome: 'Todos os Projetos' }, ...(response.data.results || [])]);
+      } catch (err) {
+        console.error('Erro ao carregar projetos:', err);
+      }
+    };
+    fetchProjetos();
+  }, []);
+
+  // Fetch dados do mapa no mount
+  useEffect(() => {
+    fetchMapData();
+  }, []);
+
+  const fetchMapData = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Construir query params
+      const params = {};
+      if (selectedProjeto) params.projeto_id = selectedProjeto;
+      if (dateRange?.[0]) params.data_inicio = dateRange[0].format('YYYY-MM-DD');
+      if (dateRange?.[1]) params.data_fim = dateRange[1].format('YYYY-MM-DD');
+
+      // Chamada à API
+      const response = await api.get('/metrics/map/', { params });
+
+      // Mapear resposta para formato esperado pelos markers
+      const municipios = response.data.by_municipio.map(item => ({
+        municipio: item.municipio,
+        uf: item.uf,
+        projetos: item.projetos,
+        eventos: item.eventos,
+        coordenadores: item.coordenadores,
+        coords: [item.latitude, item.longitude],
+      }));
+
+      setMunicipiosData(municipios);
+
+    } catch (err) {
+      console.error('Erro ao buscar dados do mapa:', err);
+      setError('Erro ao carregar dados. Tente novamente.');
+      message.error('Erro ao carregar dados do mapa');
+      setMunicipiosData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleApplyFilters = () => {
-    setLoading(true);
-    // TODO: Chamar API com filtros
-    console.log('Aplicando filtros:', { selectedProjeto, dateRange, searchTerm });
-    setTimeout(() => setLoading(false), 500);
+    fetchMapData();
   };
 
   const handleClearFilters = () => {
-    setSelectedProjeto(1);
+    setSelectedProjeto(null);
     setDateRange(null);
     setSearchTerm('');
+    fetchMapData();
   };
 
   const onEachFeature = (feature, layer) => {
@@ -152,7 +188,8 @@ export default function MapaBrasilPage() {
                     style={{ width: '100%' }}
                     value={selectedProjeto}
                     onChange={setSelectedProjeto}
-                    options={mockProjetos.map((p) => ({ label: p.nome, value: p.id }))}
+                    options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
+                    loading={projetos.length === 0}
                   />
                 </Panel>
 
@@ -192,8 +229,21 @@ export default function MapaBrasilPage() {
 
         {/* Área Principal */}
         <Col xs={24} md={18}>
+          {/* Alert de erro */}
+          {error && (
+            <Alert
+              message="Erro"
+              description={error}
+              type="error"
+              showIcon
+              closable
+              onClose={() => setError(null)}
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
           {viewMode === 'map' ? (
-            <Card style={{ marginBottom: 16 }}>
+            <Card style={{ marginBottom: 16 }} loading={loading}>
               {/* Mapa Leaflet com GeoJSON */}
               <div style={{ height: '600px', borderRadius: '8px', overflow: 'hidden' }}>
                 <MapContainer
@@ -210,10 +260,10 @@ export default function MapaBrasilPage() {
                   {/* GeoJSON layer for states */}
                   <GeoJSON data={brazilGeoJSON} onEachFeature={onEachFeature} />
 
-                  {/* Markers para eventos por município */}
-                  {mockEventosPorMunicipio.map((item) => (
+                  {/* Markers para eventos por município (dados reais da API) */}
+                  {municipiosData.map((item) => (
                     <Marker
-                      key={item.municipio}
+                      key={`${item.municipio}-${item.uf}`}
                       position={item.coords}
                       icon={createCustomIcon(item.eventos)}
                     >
@@ -221,8 +271,14 @@ export default function MapaBrasilPage() {
                         <div style={{ minWidth: '200px' }}>
                           <Text strong style={{ fontSize: 16 }}>{item.municipio}</Text>
                           <br />
+                          <Text type="secondary">{item.uf}</Text>
+                          <br />
                           <br />
                           <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <Text>Projetos:</Text>
+                              <Tag color="purple">{item.projetos}</Tag>
+                            </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <Text>Eventos:</Text>
                               <Tag color="blue">{item.eventos}</Tag>
@@ -260,17 +316,22 @@ export default function MapaBrasilPage() {
               </div>
             </Card>
           ) : (
-            <Card title="Lista de Municípios" style={{ marginBottom: 16 }}>
+            <Card title="Lista de Municípios" style={{ marginBottom: 16 }} loading={loading}>
               <List
-                dataSource={mockProjetosPorMunicipio}
+                dataSource={municipiosData}
                 renderItem={(item) => (
                   <List.Item
-                    extra={<Tag color="blue">{item.projetos} projetos</Tag>}
+                    extra={
+                      <Space>
+                        <Tag color="purple">{item.projetos} projetos</Tag>
+                        <Tag color="blue">{item.eventos} eventos</Tag>
+                      </Space>
+                    }
                   >
                     <List.Item.Meta
                       avatar={<EnvironmentOutlined style={{ fontSize: 24, color: '#1890ff' }} />}
-                      title={item.municipio}
-                      description={item.uf}
+                      title={`${item.municipio}-${item.uf}`}
+                      description={`${item.coordenadores} coordenadores`}
                     />
                   </List.Item>
                 )}
@@ -282,9 +343,9 @@ export default function MapaBrasilPage() {
           <Row gutter={[16, 16]}>
             {/* Projetos por Município */}
             <Col xs={24} lg={12}>
-              <Card title="Projetos por Município" bordered={false}>
+              <Card title="Projetos por Município" bordered={false} loading={loading}>
                 <List
-                  dataSource={mockProjetosPorMunicipio}
+                  dataSource={municipiosData}
                   renderItem={(item) => (
                     <List.Item>
                       <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
@@ -303,10 +364,10 @@ export default function MapaBrasilPage() {
 
             {/* Eventos + Coordenadores por Município */}
             <Col xs={24} lg={12}>
-              <Card title="Eventos + Coordenadores por Município" bordered={false}>
+              <Card title="Eventos + Coordenadores por Município" bordered={false} loading={loading}>
                 <Table
-                  dataSource={mockEventosPorMunicipio}
-                  rowKey="municipio"
+                  dataSource={municipiosData}
+                  rowKey={(record) => `${record.municipio}-${record.uf}`}
                   pagination={false}
                   size="small"
                   columns={[

@@ -64,11 +64,37 @@ class Municipio(models.Model):
     )
     ativo = models.BooleanField(default=True)
 
+    # Coordenadas geográficas para visualização em mapa
+    latitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Latitude em graus decimais (-90 a 90)"
+    )
+    longitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Longitude em graus decimais (-180 a 180)"
+    )
+
     class Meta:  # type: ignore[misc]
         db_table = "core_municipio"
         verbose_name = "Município"
         verbose_name_plural = "Municípios"
         ordering = ["nome"]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(latitude__gte=-90, latitude__lte=90) | models.Q(latitude__isnull=True),
+                name="latitude_range"
+            ),
+            models.CheckConstraint(
+                check=models.Q(longitude__gte=-180, longitude__lte=180) | models.Q(longitude__isnull=True),
+                name="longitude_range"
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.nome}-{self.uf}"

@@ -8,9 +8,10 @@ Usage:
 import csv
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 from unicodedata import normalize
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 from apps.core.models import Municipio
 
 
@@ -24,7 +25,7 @@ def remove_accents(text: str) -> str:
 class Command(BaseCommand):
     help = "Populate latitude/longitude for Municipio from CSV file"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--dry-run",
             action="store_true",
@@ -42,10 +43,10 @@ class Command(BaseCommand):
             help="Path to CSV file with coordinates (relative to backend/)",
         )
 
-    def handle(self, *args, **options):
-        dry_run = options["dry_run"]
-        apply_mode = options["apply"]
-        csv_path = options["csv"]
+    def handle(self, *args: Any, **options: Any) -> None:
+        dry_run: bool = options["dry_run"]
+        apply_mode: bool = options["apply"]
+        csv_path: str = options["csv"]
 
         if not dry_run and not apply_mode:
             self.stdout.write(self.style.ERROR("Must specify --dry-run or --apply"))
@@ -63,17 +64,17 @@ class Command(BaseCommand):
             return
 
         # Read CSV into dict: {(nome_normalized, uf): (lat, lng)}
-        coords_map = {}
+        coords_map: dict[tuple[str, str], tuple[str, str]] = {}
         with open(csv_file, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                nome = row['nome'].strip()
-                uf = row['uf'].strip().upper()
-                lat = row['latitude'].strip()
-                lng = row['longitude'].strip()
+                nome: str = row['nome'].strip()  # type: ignore[union-attr]
+                uf: str = row['uf'].strip().upper()  # type: ignore[union-attr]
+                lat: str = row['latitude'].strip()  # type: ignore[union-attr]
+                lng: str = row['longitude'].strip()  # type: ignore[union-attr]
 
                 # Normalize nome for matching (remove accents, lowercase)
-                nome_normalized = remove_accents(nome).lower()
+                nome_normalized: str = remove_accents(nome).lower()
                 coords_map[(nome_normalized, uf)] = (lat, lng)
 
         self.stdout.write(f"Loaded {len(coords_map)} coordinates from CSV")
@@ -87,11 +88,11 @@ class Command(BaseCommand):
         total = municipios.count()
         self.stdout.write(f"Found {total} municipalities without coordinates")
 
-        success_count = 0
-        not_found_count = 0
-        error_count = 0
-        not_found_list = []
-        errors = []
+        success_count: int = 0
+        not_found_count: int = 0
+        error_count: int = 0
+        not_found_list: list[str] = []
+        errors: list[str] = []
 
         for i, municipio in enumerate(municipios, start=1):
             # Skip if no UF
@@ -107,10 +108,12 @@ class Command(BaseCommand):
 
             # Try to find coordinates in CSV
             if key in coords_map:
+                lat_str: str
+                lng_str: str
                 lat_str, lng_str = coords_map[key]
                 try:
-                    lat = Decimal(lat_str)
-                    lng = Decimal(lng_str)
+                    lat: Decimal = Decimal(lat_str)
+                    lng: Decimal = Decimal(lng_str)
 
                     self.stdout.write(
                         f"[{i}/{total}] ✓ {municipio.nome}-{municipio.uf}: "
@@ -126,7 +129,7 @@ class Command(BaseCommand):
 
                 except Exception as e:
                     error_count += 1
-                    error_msg = f"{municipio.nome}-{municipio.uf}: {str(e)}"
+                    error_msg: str = f"{municipio.nome}-{municipio.uf}: {str(e)}"
                     errors.append(error_msg)
                     self.stdout.write(self.style.ERROR(f"  ✗ {str(e)}"))
             else:

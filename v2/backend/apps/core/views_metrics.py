@@ -78,14 +78,55 @@ def metrics_map(request: Request) -> Response:
         queryset = queryset.filter(municipio__uf=uf_filter)
         filters_applied["uf"] = uf_filter
 
-    # Agregações
-    by_uf = (
+    # Agregações por município (com coordenadas)
+    by_municipio = (
         queryset
         .exclude(municipio__isnull=True)
-        .values("municipio__uf")
-        .annotate(count=Count("id"))
-        .order_by("-count")
+        .exclude(municipio__latitude__isnull=True)  # Apenas municípios com coordenadas
+        .exclude(municipio__longitude__isnull=True)
+        .values(
+            "municipio__nome",
+            "municipio__uf",
+            "municipio__latitude",
+            "municipio__longitude",
+        )
+        .annotate(
+            projetos=Count("projeto_id", distinct=True),
+            eventos=Count("id"),
+        )
+        .order_by("-eventos")[:50]  # Top 50 municípios
     )
+
+    # Contagem de coordenadores por município
+    coordenadores_por_municipio = {}
+
+    participations = (
+        Participation.objects
+        .filter(
+            role=Participation.Role.COORDENADOR,
+            solicitacao__in=queryset,
+            solicitacao__municipio__isnull=False,
+        )
+        .values("solicitacao__municipio__nome")
+        .annotate(coordenadores=Count("usuario_id", distinct=True))
+    )
+
+    for item in participations:
+        coordenadores_por_municipio[item["solicitacao__municipio__nome"]] = item["coordenadores"]
+
+    # Formatar resposta com coordenadores
+    by_municipio_list = []
+    for item in by_municipio:
+        municipio_nome = item["municipio__nome"]
+        by_municipio_list.append({
+            "municipio": municipio_nome,
+            "uf": item["municipio__uf"],
+            "latitude": float(item["municipio__latitude"]),
+            "longitude": float(item["municipio__longitude"]),
+            "projetos": item["projetos"],
+            "eventos": item["eventos"],
+            "coordenadores": coordenadores_por_municipio.get(municipio_nome, 0),
+        })
 
     top_projetos = (
         queryset
@@ -99,8 +140,7 @@ def metrics_map(request: Request) -> Response:
     status_counts = queryset.values("status").annotate(count=Count("id"))
     by_status = {item["status"]: item["count"] for item in status_counts}
 
-    # Formatar resposta
-    by_uf_list = [{"uf": item["municipio__uf"], "count": item["count"]} for item in by_uf]
+    # Formatar top projetos
     top_projetos_list = [
         {"nome": item["projeto__nome"], "count": item["count"]}
         for item in top_projetos
@@ -115,7 +155,7 @@ def metrics_map(request: Request) -> Response:
             "all": queryset.count(),
             "by_status": by_status,
         },
-        "by_uf": by_uf_list,
+        "by_municipio": by_municipio_list,  # Mudou de "by_uf"
         "top_projetos": top_projetos_list,
     })
 

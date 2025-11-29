@@ -95,8 +95,11 @@ def build_monthly_grid(
         datetime.combine(year_end, datetime.max.time()), tz
     )
 
-    # 1. Pessoas (via Participation)
-    participations_qs = Participation.objects.filter(role=role)
+    # 1. Pessoas (via Participation em projetos SUPER apenas)
+    participations_qs = Participation.objects.filter(
+        role=role,
+        solicitacao__projeto__fluxo='SUPER'  # Apenas projetos SUPER (Superintendência)
+    )
 
     if q and q.strip():
         q_lower = q.strip().lower()

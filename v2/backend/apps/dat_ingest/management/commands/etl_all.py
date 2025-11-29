@@ -5,6 +5,7 @@ ETL Command: Orchestrator (etl_load_xlsx → etl_upsert_core + direct imports)
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -366,12 +367,14 @@ class Command(BaseCommand):
                 continue
 
             try:
-                # Check if already exists (idempotency by municipio + projeto + inicio + fim)
+                # Generate external_hash for idempotency (Issue #XXX: Fix duplicate imports)
+                # Hash based on: municipio + projeto + inicio + fim + tipo + encontro
+                hash_string = f"{municipio.id}-{projeto.id}-{s['inicio']}-{s['fim']}-{s['tipo']}-{s['encontro']}"
+                external_hash = hashlib.sha1(hash_string.encode()).hexdigest()
+
+                # Check if already exists (idempotency by external_hash)
                 solicitacao = Solicitacao.objects.filter(
-                    municipio=municipio,
-                    projeto=projeto,
-                    inicio=s["inicio"],
-                    fim=s["fim"],
+                    external_hash=external_hash
                 ).first()
 
                 if solicitacao and not force:
@@ -404,6 +407,7 @@ class Command(BaseCommand):
                     inicio=s["inicio"],
                     fim=s["fim"],
                     status=s["status"],
+                    external_hash=external_hash,  # Add external_hash for idempotency
                 )
                 created_solicitacoes += 1
 

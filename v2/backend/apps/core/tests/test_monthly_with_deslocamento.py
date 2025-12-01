@@ -52,6 +52,7 @@ class TestMonthlyWithDeslocamento:
         self.projeto = Projeto.objects.create(
             nome="Projeto Teste",
             ativo=True,
+            fluxo="SUPER",  # Required for monthly_grid_service.py filter
         )
 
         self.tipo_evento = TipoEvento.objects.create(

@@ -504,6 +504,9 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
     # Read-only: retorna nomes dos grupos para a API/frontend
     groups = serializers.StringRelatedField(many=True, read_only=True)
 
+    # Read-only: retorna IDs dos grupos para edição no frontend
+    group_ids_display = serializers.SerializerMethodField()
+
     # Write-only: aceita IDs dos grupos para criar/atualizar (P1.1)
     group_ids = serializers.PrimaryKeyRelatedField(
         many=True,
@@ -515,6 +518,10 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
     )
 
     password = serializers.CharField(write_only=True, required=False)
+
+    def get_group_ids_display(self, obj: Any) -> list[int]:
+        """Return group IDs for frontend editing."""
+        return [g.id for g in obj.groups.all()]
 
     # Whitelist of allowed groups (P1.1) - incluindo Gerência
     ALLOWED_GROUPS = {"DAT", "Controle", "Superintendência", "Coordenador", "Formador", "Gerência"}
@@ -532,8 +539,9 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             "is_active",
             "is_staff",
             "is_superuser",
-            "groups",       # Read-only (nomes)
-            "group_ids",    # Write-only (IDs)
+            "groups",            # Read-only (nomes)
+            "group_ids",         # Write-only (IDs para criar/editar)
+            "group_ids_display", # Read-only (IDs para popular form de edição)
             "date_joined",
             "last_login",
         ]

@@ -2,40 +2,32 @@
  * API Client for Admin DAT endpoints
  *
  * GAP-001/002 resolved: Endpoints reactivated/created in Phase 1 Iteration 2
+ *
+ * Issue #135: Uses axios instance with CSRF token handling for all requests
  */
 
-const API_BASE = '/api';
+import api from '../api';
 
 /**
- * Fetch with credentials and error handling
+ * Helper to handle axios responses and errors
  */
-async function apiFetch(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
-
-    // Status-specific error handling
+async function apiRequest(requestFn) {
+  try {
+    const response = await requestFn();
+    return response.data;
+  } catch (error) {
+    // Extract error message from axios error
     let message;
-    if (response.status === 403) {
+    if (error.response?.status === 403) {
       message = 'Você não tem permissão para realizar esta ação.';
-    } else if (response.status === 404) {
+    } else if (error.response?.status === 404) {
       message = 'Recurso não encontrado.';
     } else {
-      message = error.detail || `Erro HTTP ${response.status}`;
+      message = error.response?.data?.detail || error.message || `Erro HTTP ${error.response?.status}`;
     }
 
     throw new Error(message);
   }
-
-  return response.json();
 }
 
 // ========== USUARIOS ==========
@@ -46,8 +38,7 @@ async function apiFetch(url, options = {}) {
  * @returns {Promise<Object>} Paginated response with results[]
  */
 export async function listUsers(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  return apiFetch(`${API_BASE}/usuarios-admin/?${query}`);
+  return apiRequest(() => api.get('/usuarios-admin/', { params }));
 }
 
 /**
@@ -55,7 +46,7 @@ export async function listUsers(params = {}) {
  * @param {number} id - User ID
  */
 export async function getUser(id) {
-  return apiFetch(`${API_BASE}/usuarios-admin/${id}/`);
+  return apiRequest(() => api.get(`/usuarios-admin/${id}/`));
 }
 
 /**
@@ -63,10 +54,7 @@ export async function getUser(id) {
  * @param {Object} data - User data (username, email, password, first_name, last_name, cpf, etc.)
  */
 export async function createUser(data) {
-  return apiFetch(`${API_BASE}/usuarios-admin/`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+  return apiRequest(() => api.post('/usuarios-admin/', data));
 }
 
 /**
@@ -75,10 +63,7 @@ export async function createUser(data) {
  * @param {Object} data - Updated fields
  */
 export async function updateUser(id, data) {
-  return apiFetch(`${API_BASE}/usuarios-admin/${id}/`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  });
+  return apiRequest(() => api.patch(`/usuarios-admin/${id}/`, data));
 }
 
 /**
@@ -86,9 +71,7 @@ export async function updateUser(id, data) {
  * @param {number} id - User ID
  */
 export async function deleteUser(id) {
-  return apiFetch(`${API_BASE}/usuarios-admin/${id}/`, {
-    method: 'DELETE',
-  });
+  return apiRequest(() => api.delete(`/usuarios-admin/${id}/`));
 }
 
 /**
@@ -101,10 +84,7 @@ export async function deleteUser(id) {
  * Phase 1 Iteration 3 - DAT/GCal Plan.
  */
 export async function assignGroups(userId, data) {
-  return apiFetch(`${API_BASE}/usuarios-admin/${userId}/assign_groups/`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+  return apiRequest(() => api.post(`/usuarios-admin/${userId}/assign_groups/`, data));
 }
 
 // ========== GRUPOS ==========
@@ -114,8 +94,7 @@ export async function assignGroups(userId, data) {
  * @param {Object} params - Query parameters (search, ordering, page)
  */
 export async function listGroups(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  return apiFetch(`${API_BASE}/grupos/?${query}`);
+  return apiRequest(() => api.get('/grupos/', { params }));
 }
 
 /**
@@ -123,7 +102,7 @@ export async function listGroups(params = {}) {
  * @param {number} id - Group ID
  */
 export async function getGroup(id) {
-  return apiFetch(`${API_BASE}/grupos/${id}/`);
+  return apiRequest(() => api.get(`/grupos/${id}/`));
 }
 
 /**
@@ -131,10 +110,7 @@ export async function getGroup(id) {
  * @param {Object} data - Group data (name)
  */
 export async function createGroup(data) {
-  return apiFetch(`${API_BASE}/grupos/`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+  return apiRequest(() => api.post('/grupos/', data));
 }
 
 /**
@@ -143,10 +119,7 @@ export async function createGroup(data) {
  * @param {Object} data - Updated fields
  */
 export async function updateGroup(id, data) {
-  return apiFetch(`${API_BASE}/grupos/${id}/`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  });
+  return apiRequest(() => api.patch(`/grupos/${id}/`, data));
 }
 
 /**
@@ -154,9 +127,7 @@ export async function updateGroup(id, data) {
  * @param {number} id - Group ID
  */
 export async function deleteGroup(id) {
-  return apiFetch(`${API_BASE}/grupos/${id}/`, {
-    method: 'DELETE',
-  });
+  return apiRequest(() => api.delete(`/grupos/${id}/`));
 }
 
 // ========== MUNICIPIOS ==========
@@ -166,8 +137,7 @@ export async function deleteGroup(id) {
  * @param {Object} params - Query parameters (uf, ativo, search, ordering, page)
  */
 export async function listMunicipios(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  return apiFetch(`${API_BASE}/municipios/?${query}`);
+  return apiRequest(() => api.get('/municipios/', { params }));
 }
 
 /**
@@ -175,7 +145,7 @@ export async function listMunicipios(params = {}) {
  * @param {number} id - Municipality ID
  */
 export async function getMunicipio(id) {
-  return apiFetch(`${API_BASE}/municipios/${id}/`);
+  return apiRequest(() => api.get(`/municipios/${id}/`));
 }
 
 /**
@@ -183,10 +153,7 @@ export async function getMunicipio(id) {
  * @param {Object} data - Municipality data (nome, uf, ibge_code, ativo)
  */
 export async function createMunicipio(data) {
-  return apiFetch(`${API_BASE}/municipios/`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+  return apiRequest(() => api.post('/municipios/', data));
 }
 
 /**
@@ -195,10 +162,7 @@ export async function createMunicipio(data) {
  * @param {Object} data - Updated fields
  */
 export async function updateMunicipio(id, data) {
-  return apiFetch(`${API_BASE}/municipios/${id}/`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  });
+  return apiRequest(() => api.patch(`/municipios/${id}/`, data));
 }
 
 /**
@@ -206,9 +170,7 @@ export async function updateMunicipio(id, data) {
  * @param {number} id - Municipality ID
  */
 export async function deleteMunicipio(id) {
-  return apiFetch(`${API_BASE}/municipios/${id}/`, {
-    method: 'DELETE',
-  });
+  return apiRequest(() => api.delete(`/municipios/${id}/`));
 }
 
 // ========== PROJETOS ==========
@@ -218,8 +180,7 @@ export async function deleteMunicipio(id) {
  * @param {Object} params - Query parameters (ativo, search, ordering, page)
  */
 export async function listProjetos(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  return apiFetch(`${API_BASE}/projetos/?${query}`);
+  return apiRequest(() => api.get('/projetos/', { params }));
 }
 
 /**
@@ -227,7 +188,7 @@ export async function listProjetos(params = {}) {
  * @param {number} id - Project ID
  */
 export async function getProjeto(id) {
-  return apiFetch(`${API_BASE}/projetos/${id}/`);
+  return apiRequest(() => api.get(`/projetos/${id}/`));
 }
 
 /**
@@ -235,10 +196,7 @@ export async function getProjeto(id) {
  * @param {Object} data - Project data (nome, codigo, fluxo, ativo)
  */
 export async function createProjeto(data) {
-  return apiFetch(`${API_BASE}/projetos/`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+  return apiRequest(() => api.post('/projetos/', data));
 }
 
 /**
@@ -247,10 +205,7 @@ export async function createProjeto(data) {
  * @param {Object} data - Updated fields
  */
 export async function updateProjeto(id, data) {
-  return apiFetch(`${API_BASE}/projetos/${id}/`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  });
+  return apiRequest(() => api.patch(`/projetos/${id}/`, data));
 }
 
 /**
@@ -258,7 +213,5 @@ export async function updateProjeto(id, data) {
  * @param {number} id - Project ID
  */
 export async function deleteProjeto(id) {
-  return apiFetch(`${API_BASE}/projetos/${id}/`, {
-    method: 'DELETE',
-  });
+  return apiRequest(() => api.delete(`/projetos/${id}/`));
 }

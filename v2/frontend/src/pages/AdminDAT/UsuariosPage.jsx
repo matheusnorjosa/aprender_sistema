@@ -9,10 +9,10 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form } from 'antd';
-import { UserAddOutlined, ReloadOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Select } from 'antd';
+import { UserAddOutlined, ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
-import { listUsers, createUser, updateUser } from '../../api/adminDAT';
+import { listUsers, createUser, updateUser, deleteUser, listGroups } from '../../api/adminDAT';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -28,6 +28,7 @@ export default function UsuariosPage() {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [grupos, setGrupos] = useState([]);
 
   const [form] = Form.useForm();
 
@@ -37,18 +38,32 @@ export default function UsuariosPage() {
   const fetchUsuarios = async (params = {}) => {
     setLoading(true);
     try {
-      const data = await listUsers({
-        search: searchText,
-        page: params.current || pagination.current,
-        page_size: params.pageSize || pagination.pageSize,
-        ordering: params.ordering || 'username',
-      });
+      const apiParams = {};
+
+      // Only add non-empty search
+      if (searchText) {
+        apiParams.search = searchText;
+      }
+
+      // Add pagination params
+      apiParams.page = params.current || pagination.current;
+      apiParams.page_size = params.pageSize || pagination.pageSize;
+
+      // Add ordering if provided
+      if (params.ordering) {
+        apiParams.ordering = params.ordering;
+      } else {
+        apiParams.ordering = 'username';
+      }
+
+      console.log('fetchUsuarios - API params:', apiParams);
+      const data = await listUsers(apiParams);
 
       // DRF pagination response structure
       setUsuarios(data.results || data);
       setPagination({
-        ...pagination,
         current: params.current || pagination.current,
+        pageSize: params.pageSize || pagination.pageSize,
         total: data.count || (data.results || data).length,
       });
     } catch (error) {
@@ -59,17 +74,41 @@ export default function UsuariosPage() {
     }
   };
 
-  // Load users on mount and search change
+  // Fetch groups on mount
+  const fetchGrupos = async () => {
+    try {
+      const data = await listGroups();
+      setGrupos(data.results || data);
+    } catch (error) {
+      console.error('Erro ao carregar grupos:', error);
+    }
+  };
+
+  // Load groups only on mount
   useEffect(() => {
-    fetchUsuarios();
+    fetchGrupos();
+  }, []);
+
+  // Load users on mount and search change (reset to page 1)
+  useEffect(() => {
+    fetchUsuarios({ current: 1 });
   }, [searchText]);
 
   const handleTableChange = (newPagination, filters, sorter) => {
-    fetchUsuarios({
+    console.log('handleTableChange called:', { newPagination, filters, sorter });
+
+    const params = {
       current: newPagination.current,
       pageSize: newPagination.pageSize,
-      ordering: sorter.field ? `${sorter.order === 'descend' ? '-' : ''}${sorter.field}` : undefined,
-    });
+    };
+
+    // Only add ordering if it exists
+    if (sorter && sorter.field) {
+      params.ordering = `${sorter.order === 'descend' ? '-' : ''}${sorter.field}`;
+    }
+
+    console.log('Calling fetchUsuarios with:', params);
+    fetchUsuarios(params);
   };
 
   const handleCreate = () => {
@@ -86,8 +125,28 @@ export default function UsuariosPage() {
       first_name: user.first_name,
       last_name: user.last_name,
       cpf: user.cpf,
+      group_ids: user.group_ids_display || [],
     });
     setModalVisible(true);
+  };
+
+  const handleDelete = (user) => {
+    Modal.confirm({
+      title: 'Confirmar exclusão',
+      content: `Tem certeza que deseja excluir o usuário "${user.username}"? Esta ação não pode ser desfeita.`,
+      okText: 'Excluir',
+      okType: 'danger',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          await deleteUser(user.id);
+          message.success('Usuário excluído com sucesso');
+          fetchUsuarios();
+        } catch (error) {
+          message.error(`Erro ao excluir: ${error.message}`);
+        }
+      },
+    });
   };
 
   const handleSave = async (values) => {
@@ -166,7 +225,7 @@ export default function UsuariosPage() {
     {
       title: 'Ações',
       key: 'acoes',
-      width: 150,
+      width: 200,
       render: (_, record) => (
         <Space size="small">
           <Button
@@ -176,6 +235,15 @@ export default function UsuariosPage() {
             onClick={() => handleEdit(record)}
           >
             Editar
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record)}
+          >
+            Excluir
           </Button>
         </Space>
       ),
@@ -282,6 +350,18 @@ export default function UsuariosPage() {
             ]}
           >
             <Input placeholder="12345678901 (apenas números)" maxLength={11} />
+          </Form.Item>
+
+          <Form.Item
+            name="group_ids"
+            label="Grupos"
+            rules={[{ required: true, message: 'Selecione pelo menos um grupo' }]}
+          >
+            <Select
+              mode="multiple"
+              placeholder="Selecione os grupos"
+              options={grupos.map((g) => ({ label: g.name, value: g.id }))}
+            />
           </Form.Item>
 
           {!editingUser && (

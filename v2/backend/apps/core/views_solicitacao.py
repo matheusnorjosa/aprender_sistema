@@ -45,7 +45,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     ViewSet para Solicitações de Evento.
 
     PA-01: Status sempre começa pendente.
-    PA-02: Apenas Superintendência pode aprovar/reprovar.
+    PA-02 (Adaptada): Superintendência, DAT e Superusuários podem aprovar/reprovar.
     PR 8/N: Apenas Coordenador ou DAT podem criar solicitações.
     """
 
@@ -273,7 +273,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         url_path="approve",
     )
     def approve(self, request, pk=None):
-        """Aprovar solicitação (PA-02: apenas Superintendência)."""
+        """Aprovar solicitação (PA-02 Adaptada: Superintendência, DAT e Superusuários)."""
         solicitacao = self.get_object()
 
         if solicitacao.status == "aprovado":
@@ -336,7 +336,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         url_path="reject",
     )
     def reject(self, request, pk=None):
-        """Reprovar solicitação (PA-02: apenas Superintendência)."""
+        """Reprovar solicitação (PA-02 Adaptada: Superintendência, DAT e Superusuários)."""
         solicitacao = self.get_object()
 
         # PR15: Accept 'reason' as alias for 'justificativa'

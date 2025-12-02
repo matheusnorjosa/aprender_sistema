@@ -8,7 +8,7 @@ PA-05: Registrar usuário, data/hora e justificativa em AuditLog.
 This file maintains backwards compatibility by re-exporting
 all views from the modular views/ package submodules.
 """
-# pyright: reportUnusedImport=false
+# pyright: reportUnusedImport=false, reportPrivateUsage=false
 
 # Import directly from submodules to avoid circular import with views/ package
 from apps.core.views.utils import _get_client_ip, api_root

@@ -202,7 +202,7 @@ class EquipeGerencia(models.Model):
 
     def __str__(self) -> str:
         papel = self.get_papel_display()  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]
-        return f"{self.usuario.get_full_name() or self.usuario.username} - {papel} ({self.gerencia.nome_setor})"
+        return f"{self.usuario.get_full_name() or self.usuario.username} - {papel} ({self.gerencia.nome_setor})"  # type: ignore[reportUnknownMemberType]
 
 
 class Projeto(models.Model):

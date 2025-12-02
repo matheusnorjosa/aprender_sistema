@@ -237,7 +237,7 @@ class Solicitacao(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.usuario.get_full_name()} - {self.tipo_evento.nome} ({self.inicio.strftime('%d/%m/%Y %H:%M')})"
+        return f"{self.usuario.get_full_name()} - {self.tipo_evento.nome} ({self.inicio.strftime('%d/%m/%Y %H:%M')})"  # type: ignore[reportUnknownMemberType]
 
     def mark_gcal(
         self,

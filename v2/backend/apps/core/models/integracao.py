@@ -101,7 +101,7 @@ class GoogleOAuthCredential(models.Model):
 
     def __str__(self) -> str:
         expiry_fmt = self.token_expiry.strftime('%d/%m/%Y %H:%M') if self.token_expiry else "N/A"
-        return f"{self.user.username} ({self.google_email}) - expira: {expiry_fmt}"
+        return f"{self.user.username} ({self.google_email}) - expira: {expiry_fmt}"  # type: ignore[reportUnknownMemberType]
 
     def is_expired(self) -> bool:
         """Verifica se o access token esta expirado (com margem de 5 minutos)."""

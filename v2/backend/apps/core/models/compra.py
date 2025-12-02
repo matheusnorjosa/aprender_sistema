@@ -80,4 +80,4 @@ class Compra(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.codigo} - {self.projeto.nome} ({self.data.strftime('%d/%m/%Y')})"
+        return f"{self.codigo} - {self.projeto.nome} ({self.data.strftime('%d/%m/%Y')})"  # type: ignore[reportUnknownMemberType]

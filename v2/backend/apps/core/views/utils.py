@@ -7,12 +7,10 @@ Helper functions and API root endpoint.
 
 from __future__ import annotations
 
-from django.http import JsonResponse
-from rest_framework.request import Request
-from rest_framework.response import Response
+from django.http import HttpRequest, JsonResponse
 
 
-def _get_client_ip(request: Request) -> str:
+def _get_client_ip(request: HttpRequest) -> str:
     """
     Extrai o IP real do cliente, considerando proxies reversos.
 
@@ -37,7 +35,7 @@ def _get_client_ip(request: Request) -> str:
     return request.META.get("REMOTE_ADDR", "unknown")
 
 
-def api_root(request: Request) -> Response:
+def api_root(request: HttpRequest) -> JsonResponse:
     """API root endpoint"""
     return JsonResponse(
         {

@@ -1,7 +1,10 @@
 # 📊 Mapeamento Completo: Setores, Gerências, Projetos, Cargos e Pessoas
 
-**Data**: 2025-11-14
+**Data Original**: 2025-11-14
+**Última Atualização**: 2025-12-01 (estatísticas de usuários)
 **Fontes**: Planilhas originais + Banco de dados PostgreSQL (v2)
+
+> **📌 NOTA**: Para informações detalhadas sobre RBAC (grupos, permissões, páginas acessíveis), consulte [`docs/RBAC_COMPLETO.md`](./RBAC_COMPLETO.md)
 
 ---
 
@@ -191,14 +194,17 @@ GERÊNCIA (estrutura organizacional)
 
 ## 🏢 GRUPOS/PERFIS NO SISTEMA (Django)
 
+⚠️ **ATUALIZADO**: 2025-12-01 (128 usuários totais)
+
 | Grupo | Total no Banco | Permissões |
 |-------|----------------|------------|
-| Superintendência | 4 | Aprovar/reprovar solicitações SUPER |
-| Formador | 65 | Bloquear agenda, participar de eventos |
-| Coordenador | 12 | Criar solicitações |
-| Controle | 3 | Publicar eventos no Google Calendar |
+| Superintendência | 1 | Aprovar/reprovar solicitações SUPER |
+| Formador | 90 | Bloquear agenda, participar de eventos |
+| Coordenador | 37 | Criar solicitações |
+| Controle | 2 | Publicar eventos no Google Calendar |
 | DAT | 1 | CRUD usuários e municípios |
-| Gerência | 7 | Visualizar solicitações ✅ (seeded 2025-11-17) |
+| Gerência | 0 | Visualizar solicitações ⚠️ (grupo existe mas sem usuários) |
+| Superuser (flag) | 1 | Bypass total de permissões |
 
 ---
 
@@ -336,7 +342,7 @@ UPDATE core_projeto SET fluxo = 'SUPER' WHERE nome IN (
 | **Setores** | 10 (Super, Vidas, Fluir, ACerta, Brincando, Sou da Paz, +individual) | ❌ Apenas em ETL | 🔴 GAP |
 | **Projetos** | 31 únicos + variantes | ✅ 46 (incluindo 8 teste) | 🟡 Duplicação |
 | **Cargos** | 3 (Formador, Coordenador, Gerente) | ✅ 6 grupos Django | ✅ OK |
-| **Usuários** | 117 ativos | ✅ 85 (65 Form + 12 Coord + 4 Super + 4 outros) | 🟡 Diferença |
+| **Usuários** | 117 ativos (planilha) | ✅ **128** (90 Form + 37 Coord + 1 Super + outros) **[ATUALIZADO 01/12]** | ✅ OK |
 | **Eventos Fluir** | 174 (planilha própria) | ❌ Não importados | 🔴 GAP |
 
 ---

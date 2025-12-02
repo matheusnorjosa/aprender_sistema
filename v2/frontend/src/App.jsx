@@ -184,7 +184,7 @@ function App() {
   };
 
   // Calcular flags de permissão
-  const canCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('DAT');
+  const canCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('Apoio de Coordenação') || user?.groups?.includes('DAT');
   const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
   const canControle = user?.is_superuser || user?.groups?.includes('Controle');
   const canDAT = user?.is_superuser || user?.groups?.includes('DAT');

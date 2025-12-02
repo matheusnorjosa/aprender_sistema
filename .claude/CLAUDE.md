@@ -169,6 +169,108 @@ pyright apps/core apps/dat_ingest config
 
 ---
 
+## 📁 Estrutura Modular do Backend (PRs #213-#217)
+
+**Status**: ✅ **100% Implementado** (5 PRs, ~5,500 linhas refatoradas)
+**Conclusão**: 2025-12-02
+
+O backend foi modularizado para melhor organização e manutenibilidade. Arquivos monolíticos foram convertidos em pacotes Python com submódulos por domínio/feature.
+
+### Pacotes Modulares
+
+#### `apps/core/models/` (PR #213)
+```
+models/
+├── __init__.py          # Re-exports todos os models
+├── usuario.py           # Usuario (custom user model)
+├── projeto.py           # Projeto, Gerencia
+├── municipio.py         # Municipio, Deslocamento
+├── solicitacao.py       # Solicitacao, Participation
+├── availability.py      # AvailabilityBlock
+├── compra.py            # Compra, Produto
+├── controle.py          # AcaoControle, AcaoDAT
+├── config.py            # SystemConfig
+└── audit.py             # AuditLog
+```
+
+#### `apps/core/serializers/` (PR #214)
+```
+serializers/
+├── __init__.py          # Re-exports todos os serializers
+├── usuario.py           # UsuarioSerializer, UsuarioAdminSerializer
+├── projeto.py           # ProjetoSerializer, GerenciaSerializer
+├── municipio.py         # MunicipioSerializer, DeslocamentoSerializer
+├── solicitacao.py       # SolicitacaoSerializer, ParticipationSerializer
+├── availability.py      # AvailabilityBlockSerializer
+├── compra.py            # CompraSerializer, ProdutoSerializer
+├── controle.py          # AcaoControleSerializer, AcaoDATSerializer
+├── config.py            # SystemConfigSerializer
+├── audit.py             # AuditLogSerializer
+└── options.py           # Option serializers para dropdowns
+```
+
+#### `apps/core/views/` (PR #217)
+```
+views/
+├── __init__.py          # Re-exports todas as views
+├── utils.py             # _get_client_ip, api_root
+├── solicitacao.py       # SolicitacaoViewSet (approve/reject)
+├── availability.py      # AvailabilityBlockViewSet, Check views
+├── user.py              # CurrentUserView
+├── admin.py             # CRUD ViewSets (Municipio, Projeto, etc.)
+└── options.py           # Dropdown option ViewSets
+```
+
+#### `apps/core/views_gcal/` (PR #215)
+```
+views_gcal/
+├── __init__.py          # Re-exports
+├── gcal.py              # gcal_calendars, gcal_health
+├── helpers.py           # Funções auxiliares, paginação
+├── summary.py           # 4 views de métricas/sumário
+├── batch.py             # 3 views de operações em lote
+├── detail.py            # 4 views de detalhe/export
+└── insights.py          # 2 views de analytics
+```
+
+#### `apps/core/services/gcal/` (PR #216)
+```
+services/gcal/
+├── __init__.py          # Re-exports
+├── types.py             # SyncOutcome, Action type alias
+├── utils.py             # _retry_with_backoff, _payload_hash
+├── client.py            # CalendarClientAdapter
+├── validation.py        # Event ID validation
+├── payload.py           # Payload building functions
+└── sync.py              # Core sync operations
+```
+
+### Compatibilidade
+
+Todos os imports antigos continuam funcionando:
+```python
+# Import antigo (ainda funciona)
+from apps.core.models import Solicitacao
+from apps.core.views import SolicitacaoViewSet
+from apps.core.services.gcal_sync_service import apply_one_solicitacao
+
+# Import novo (mais específico)
+from apps.core.models.solicitacao import Solicitacao
+from apps.core.views.solicitacao import SolicitacaoViewSet
+from apps.core.services.gcal.sync import apply_one_solicitacao
+```
+
+### Testes de Compatibilidade
+
+~100 testes garantem que os re-exports funcionam:
+- `test_modular_models.py`
+- `test_modular_serializers.py`
+- `test_modular_views.py`
+- `test_modular_views_gcal.py`
+- `test_modular_gcal_service.py`
+
+---
+
 ## 📊 Estrutura das Planilhas Source (v2/backend/data/csv-import/)
 
 ### Acompanhamento de Agenda _ 2025.xlsx

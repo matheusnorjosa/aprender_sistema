@@ -4,12 +4,14 @@ Seed RBAC — Criar grupos e permissões mínimas (idempotente).
 Grupos criados:
 - Superintendência
 - Coordenador
+- Apoio de Coordenação
 - Formador
 - Controle
 - DAT
 - Gerência
 
 Permissões atribuídas por grupo conforme PR 12/N.
+Atualizado em 2025-12-01: Adicionado grupo "Apoio de Coordenação".
 """
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 from __future__ import annotations
@@ -32,6 +34,7 @@ from apps.core.models import (
 GROUPS = [
     "Superintendência",
     "Coordenador",
+    "Apoio de Coordenação",
     "Formador",
     "Controle",
     "DAT",
@@ -77,6 +80,14 @@ PERMS_BY_GROUP = {
         ("view", Solicitacao),
         ("view", Municipio),
         ("view", Projeto),
+    ],
+    # Apoio de Coordenação: Mesmas permissões que Coordenador + view usuários
+    "Apoio de Coordenação": [
+        ("add", Solicitacao),
+        ("view", Solicitacao),
+        ("view", Municipio),
+        ("view", Projeto),
+        ("view", Usuario),  # Para auxiliar coordenador
     ],
     # Formador: Bloqueio de agenda + read solicitações
     "Formador": [

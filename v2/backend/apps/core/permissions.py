@@ -1,7 +1,7 @@
 """
 DRF Permissions for RBAC
 
-PA-02: Apenas Superintendência pode aprovar/reprovar solicitações.
+PA-02 (Adaptada): Superintendência, DAT e Superusuários podem aprovar/reprovar solicitações.
 """
 
 from __future__ import annotations
@@ -13,13 +13,13 @@ from rest_framework.views import APIView
 
 class IsSuperintendencia(permissions.BasePermission):  # type: ignore[misc]
     """
-    Permissão: apenas usuários do grupo 'Superintendência' ou superusers podem executar.
-    PA-02: Aprovação/reprovação restrita à Superintendência.
+    Permissão: usuários dos grupos 'Superintendência', 'DAT' ou superusers podem executar.
+    PA-02 (Adaptada): Aprovação/reprovação permitida para Superintendência, DAT e Superusuários.
 
     Nota: Superusers sempre têm acesso completo.
     """
 
-    message = "Apenas usuários da Superintendência podem realizar esta ação."
+    message = "Apenas usuários da Superintendência, DAT ou Superusuários podem realizar esta ação."
 
     def has_permission(self, request: Request, view: APIView) -> bool:
         return (
@@ -27,7 +27,7 @@ class IsSuperintendencia(permissions.BasePermission):  # type: ignore[misc]
             and request.user.is_authenticated
             and (
                 getattr(request.user, 'is_superuser', False)
-                or request.user.groups.filter(name="Superintendência").exists()  # type: ignore[attr-defined]
+                or request.user.groups.filter(name__in=["Superintendência", "DAT"]).exists()  # type: ignore[attr-defined]
             )
         )
 

@@ -41,10 +41,10 @@ class Solicitacao(models.Model):
         PUBLISHED = "PUBLISHED", "Publicado"
         ERROR = "ERROR", "Erro na publicacao"
 
-    usuario = models.ForeignKey(
+    usuario = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario", on_delete=models.PROTECT, related_name="solicitacoes"
     )
-    municipio = models.ForeignKey(
+    municipio = models.ForeignKey(  # type: ignore[misc]
         "core.Municipio",
         on_delete=models.PROTECT,
         related_name="solicitacoes",
@@ -52,7 +52,7 @@ class Solicitacao(models.Model):
         blank=True,
         help_text="Municipio onde ocorrera o evento",
     )
-    projeto = models.ForeignKey(
+    projeto = models.ForeignKey(  # type: ignore[misc]
         "core.Projeto",
         on_delete=models.PROTECT,
         related_name="solicitacoes",
@@ -60,7 +60,7 @@ class Solicitacao(models.Model):
         blank=True,
         help_text="Projeto associado ao evento (determina fluxo de aprovacao)",
     )
-    tipo_evento = models.ForeignKey(
+    tipo_evento = models.ForeignKey(  # type: ignore[misc]
         "core.TipoEvento", on_delete=models.PROTECT, related_name="solicitacoes"
     )
 
@@ -144,7 +144,7 @@ class Solicitacao(models.Model):
         default=False,
         help_text="Indica se o coordenador acompanha o evento",
     )
-    coordenador = models.ForeignKey(
+    coordenador = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",
         on_delete=models.SET_NULL,
         null=True,
@@ -336,7 +336,7 @@ class Participation(models.Model):
         verbose_name="Solicitacao",
     )
     # Usuario ou guest_email e obrigatorio (pelo menos um deve estar preenchido)
-    usuario = models.ForeignKey(
+    usuario = models.ForeignKey(  # type: ignore[misc]
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="event_participations",

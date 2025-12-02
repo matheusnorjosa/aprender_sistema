@@ -21,7 +21,7 @@ class Deslocamento(models.Model):
     - Import via ETL (CSV/XLSX)
     """
 
-    usuario = models.ForeignKey(
+    usuario = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",
         on_delete=models.PROTECT,
         related_name="deslocamentos",
@@ -96,7 +96,7 @@ class AcaoControle(models.Model):
         related_name="acoes_controle",
         verbose_name="Projeto",
     )
-    coordenador = models.ForeignKey(
+    coordenador = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",
         null=True,
         blank=True,
@@ -164,7 +164,7 @@ class AcaoDAT(models.Model):
         verbose_name="Projeto",
     )
     tipo_acao = models.CharField(max_length=120, verbose_name="Tipo de acao")
-    responsavel = models.ForeignKey(
+    responsavel = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",
         null=True,
         blank=True,

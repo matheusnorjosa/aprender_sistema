@@ -40,7 +40,7 @@ class GoogleOAuthCredential(models.Model):
     - GAP-5: Multi-calendar preparado (allowed_calendars)
     """
 
-    user = models.OneToOneField(
+    user = models.OneToOneField(  # type: ignore[misc]
         "core.Usuario",
         on_delete=models.CASCADE,
         related_name="google_oauth",

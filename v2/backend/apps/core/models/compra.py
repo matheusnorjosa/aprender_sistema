@@ -24,7 +24,7 @@ class Compra(models.Model):
         db_index=True,
         help_text="Codigo da compra (ex: COMP-001) - DEPRECATED: Use produto FK"
     )
-    produto = models.ForeignKey(
+    produto = models.ForeignKey(  # type: ignore[misc]
         "core.Produto",
         on_delete=models.PROTECT,
         related_name="compras",
@@ -32,13 +32,13 @@ class Compra(models.Model):
         blank=True,
         help_text="Produto comprado (substitui codigo string)"
     )
-    projeto = models.ForeignKey(
+    projeto = models.ForeignKey(  # type: ignore[misc]
         "core.Projeto",
         on_delete=models.PROTECT,
         related_name="compras",
         help_text="Projeto vinculado a compra"
     )
-    municipio = models.ForeignKey(
+    municipio = models.ForeignKey(  # type: ignore[misc]
         "core.Municipio",
         on_delete=models.PROTECT,
         related_name="compras",

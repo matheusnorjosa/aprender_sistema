@@ -20,7 +20,7 @@ class AuditLog(models.Model):
     - PA-05: Obrigatorio para aprovacoes/reprovacoes
     """
 
-    usuario = models.ForeignKey(
+    usuario = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",
         on_delete=models.SET_NULL,
         null=True,

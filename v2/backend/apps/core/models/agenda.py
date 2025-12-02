@@ -37,7 +37,7 @@ class AvailabilityBlock(models.Model):
         ("reprovado", "Reprovado"),
     ]
 
-    usuario = models.ForeignKey(
+    usuario = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario", on_delete=models.PROTECT, related_name="availability_blocks"
     )
     inicio = models.DateTimeField(help_text="Inicio do bloqueio (UTC)")

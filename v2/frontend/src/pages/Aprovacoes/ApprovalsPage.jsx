@@ -8,8 +8,8 @@
  * - Modal para reprovação com justificativa obrigatória
  *
  * PA-06 (Política de Aprovação Manual):
- * - Botões de aprovar/reprovar só aparecem para usuários do grupo Superintendência
- * - Verifica: is_superuser || is_superintendencia || groups.includes('Superintendência')
+ * - Botões de aprovar/reprovar aparecem para: Superintendência, DAT, e Superusuários
+ * - Verifica: is_superuser || is_superintendencia || groups.includes('Superintendência') || groups.includes('DAT')
  * - Conformidade ISO 9241-110: Controle explícito (usuário vê apenas ações permitidas)
  */
 
@@ -68,7 +68,7 @@ export default function ApprovalsPage() {
   const [rejectId, setRejectId] = useState(null);
   const [rejectForm] = Form.useForm();
 
-  // PA-06: Estado para verificar permissão do usuário
+  // PA-06: Estado para verificar permissão do usuário (Superintendência, DAT, Superusuários)
   const [canApprove, setCanApprove] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -97,12 +97,14 @@ export default function ApprovalsPage() {
         const userData = await getMe();
 
         // Verificar se usuário tem permissão para aprovar/reprovar
-        const isSuperintendencia =
+        // Permitido para: Superintendência, DAT, e Superusuários
+        const hasApprovalPermission =
           userData?.is_superuser ||
           userData?.is_superintendencia ||
-          userData?.groups?.includes('Superintendência');
+          userData?.groups?.includes('Superintendência') ||
+          userData?.groups?.includes('DAT');
 
-        setCanApprove(isSuperintendencia);
+        setCanApprove(hasApprovalPermission);
       } catch (error) {
         console.error('Erro ao carregar usuário:', error);
         setCanApprove(false);
@@ -257,7 +259,7 @@ export default function ApprovalsPage() {
             onClick={() => handlePreview(record.id)}
             title="Preview"
           />
-          {/* PA-06: Botões de aprovar/reprovar só aparecem para Superintendência */}
+          {/* PA-06: Botões de aprovar/reprovar para Superintendência, DAT e Superusuários */}
           {record.status === 'pendente' && canApprove && (
             <>
               <Button
@@ -286,7 +288,7 @@ export default function ApprovalsPage() {
       <Card>
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           {/* Header */}
-          <Title level={2}>Aprovações (Superintendência)</Title>
+          <Title level={2}>Aprovações</Title>
 
           {/* Filtros */}
           <Space>

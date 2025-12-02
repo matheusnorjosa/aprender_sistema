@@ -41,7 +41,7 @@ class TestRetryBackoff:
         assert result == "success"
         assert mock_func.call_count == 1
 
-    @patch('apps.core.services.gcal_sync_service.time.sleep')
+    @patch('apps.core.services.gcal.utils.time.sleep')
     def test_retry_429_rate_limit_until_success(self, mock_sleep):
         """
         RF05: Rate limit (429) deve retentar até sucesso.
@@ -74,7 +74,7 @@ class TestRetryBackoff:
         assert calls[0] == pytest.approx(0.01, rel=0.1)
         assert calls[1] == pytest.approx(0.02, rel=0.1)
 
-    @patch('apps.core.services.gcal_sync_service.time.sleep')
+    @patch('apps.core.services.gcal.utils.time.sleep')
     def test_retry_500_server_error_until_success(self, mock_sleep):
         """
         RF05: Server error (5xx) deve retentar até sucesso.
@@ -100,7 +100,7 @@ class TestRetryBackoff:
         assert mock_func.call_count == 2
         assert mock_sleep.call_count == 1
 
-    @patch('apps.core.services.gcal_sync_service.time.sleep')
+    @patch('apps.core.services.gcal.utils.time.sleep')
     def test_retry_503_service_unavailable(self, mock_sleep):
         """RF05: 503 Service Unavailable deve retentar"""
         mock_func = Mock()
@@ -204,7 +204,7 @@ class TestRetryBackoff:
         assert result is None
         assert mock_func.call_count == 1
 
-    @patch('apps.core.services.gcal_sync_service.time.sleep')
+    @patch('apps.core.services.gcal.utils.time.sleep')
     def test_max_retries_exhausted(self, mock_sleep):
         """
         RF05: Após esgotar retries, deve lançar última exceção.
@@ -231,7 +231,7 @@ class TestRetryBackoff:
         # 3 sleeps (entre as tentativas)
         assert mock_sleep.call_count == 3
 
-    @patch('apps.core.services.gcal_sync_service.time.sleep')
+    @patch('apps.core.services.gcal.utils.time.sleep')
     def test_retry_after_header_respected(self, mock_sleep):
         """
         RF05: Header Retry-After deve ser respeitado.
@@ -256,7 +256,7 @@ class TestRetryBackoff:
         # Deve usar Retry-After (5s) em vez de backoff exponencial
         assert mock_sleep.call_args[0][0] == 5.0
 
-    @patch('apps.core.services.gcal_sync_service.time.sleep')
+    @patch('apps.core.services.gcal.utils.time.sleep')
     def test_exponential_backoff_sequence(self, mock_sleep):
         """
         RF05: Backoff exponencial deve seguir sequência 1s, 2s, 4s.
@@ -285,7 +285,7 @@ class TestRetryBackoff:
         calls = [c[0][0] for c in mock_sleep.call_args_list]
         assert calls == [1.0, 2.0, 4.0]
 
-    @patch('apps.core.services.gcal_sync_service.time.sleep')
+    @patch('apps.core.services.gcal.utils.time.sleep')
     def test_string_error_with_429_in_message(self, mock_sleep):
         """
         RF05: Deve detectar 429 por string matching quando objeto não tem resp.status.
@@ -309,7 +309,7 @@ class TestRetryBackoff:
         assert mock_func.call_count == 2
         assert mock_sleep.call_count == 1
 
-    @patch('apps.core.services.gcal_sync_service.time.sleep')
+    @patch('apps.core.services.gcal.utils.time.sleep')
     def test_string_error_with_500_in_message(self, mock_sleep):
         """RF05: Deve detectar 5xx por string matching"""
         mock_func = Mock()
@@ -328,7 +328,7 @@ class TestRetryBackoff:
         assert result == "success"
         assert mock_func.call_count == 2
 
-    @patch('apps.core.services.gcal_sync_service.time.sleep')
+    @patch('apps.core.services.gcal.utils.time.sleep')
     def test_unknown_error_retries_conservatively(self, mock_sleep):
         """
         RF05: Erro desconhecido deve retentar conservadoramente.

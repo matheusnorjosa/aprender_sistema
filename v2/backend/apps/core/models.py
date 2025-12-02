@@ -155,6 +155,88 @@ class Gerencia(models.Model):
         return f"{self.nome} ({self.nome_setor})"
 
 
+class EquipeGerencia(models.Model):
+    """
+    Hierarquia de equipe dentro de uma gerência.
+
+    Define a estrutura organizacional: quem pertence a qual setor e qual papel exerce.
+
+    Hierarquia típica:
+    Gerente (1) → Coordenador (N) → Apoio de Coordenação (N) → Formadores (N)
+
+    Example:
+        GERENCIA 2 (Vidas):
+        - Gerente: João Silva (papel=GERENTE)
+        - Coordenador: Maria Santos (papel=COORDENADOR)
+          - Apoio: Ana Costa (papel=APOIO, coordenador_supervisor=Maria)
+        - Formadores: Carlos, Luiza, Rafael (papel=FORMADOR)
+
+    Nota sobre Gerências Individuais:
+        Para projetos com gerência individual (ex: A COR DA GENTE),
+        a mesma pessoa pode ter múltiplos registros com papéis diferentes
+        (GERENTE + COORDENADOR + FORMADOR).
+    """
+
+    PAPEL_CHOICES = [
+        ('GERENTE', 'Gerente'),
+        ('COORDENADOR', 'Coordenador'),
+        ('APOIO', 'Apoio de Coordenação'),
+        ('FORMADOR', 'Formador'),
+    ]
+
+    gerencia = models.ForeignKey(  # type: ignore[misc]
+        Gerencia,
+        on_delete=models.CASCADE,
+        related_name="equipes",
+        help_text="Gerência/setor ao qual o usuário pertence",
+    )
+    usuario = models.ForeignKey(  # type: ignore[misc]
+        Usuario,
+        on_delete=models.CASCADE,
+        related_name="equipes",
+        help_text="Usuário membro da equipe",
+    )
+    papel = models.CharField(
+        max_length=15,
+        choices=PAPEL_CHOICES,
+        help_text="Papel do usuário nesta gerência",
+    )
+    coordenador_supervisor = models.ForeignKey(  # type: ignore[misc]
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="apoios_supervisionados",
+        help_text="Coordenador que este apoio auxilia (apenas para papel APOIO)",
+    )
+    ativo = models.BooleanField(
+        default=True,
+        help_text="Se esta atribuição está ativa",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:  # type: ignore[misc]
+        db_table = "core_equipe_gerencia"
+        verbose_name = "Equipe de Gerência"
+        verbose_name_plural = "Equipes de Gerências"
+        ordering = ["gerencia", "papel", "usuario"]
+        unique_together = [('gerencia', 'usuario', 'papel')]
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    ~models.Q(papel='APOIO') | models.Q(coordenador_supervisor__isnull=False)
+                ),
+                name="apoio_requires_supervisor",
+                violation_error_message="Apoio de Coordenação deve ter um coordenador supervisor",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.usuario.get_full_name() or self.usuario.username} - {self.get_papel_display()} ({self.gerencia.nome_setor})"
+
+
 class Projeto(models.Model):
     """SSOT: Substitui IMPORTRANGE de Projetos"""
 

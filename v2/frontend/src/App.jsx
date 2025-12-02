@@ -3,9 +3,10 @@
  *
  * Roteamento para todas as páginas do sistema.
  * PR15: RBAC e menu dinâmico por perfil
+ * Issue #207: Code-splitting com React.lazy() para reduzir bundle size
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge } from 'antd';
 import {
@@ -25,34 +26,53 @@ import {
   SyncOutlined,
 } from '@ant-design/icons';
 import ptBR from 'antd/locale/pt_BR';
-import DisponibilidadeBlocks from './pages/Disponibilidade';
-import MonthlyPage from './pages/Disponibilidade/MonthlyPage';
-import ControlePage from './pages/Controle/ControlePage';
-import EtlReportsPage from './pages/Controle/EtlReportsPage';
-import DATPage from './pages/DAT/DATPage';
-import NewSolicitacaoWizard from './pages/Solicitacoes/NewSolicitacaoWizard';
-import MySolicitacoesPage from './pages/Solicitacoes/MySolicitacoesPage';
-import ApprovalsPage from './pages/Aprovacoes/ApprovalsPage';
-import PreAgendaPage from './pages/PreAgenda/PreAgendaPage';
-import LoginPage from './pages/Auth/LoginPage';
-import HomePage from './pages/Home/HomePage';
-import DashboardsPage from './pages/Dashboards/DashboardsPage';
-import EquipeDashboardPage from './pages/Dashboards/EquipeDashboardPage';
-import GCalDashboardPage from './pages/Dashboards/GCalDashboardPage';
-import MapaBrasilPage from './pages/MapaBrasil/MapaBrasilPage';
-import AdminDATHomePage from './pages/AdminDAT/AdminDATHomePage';
-import UsuariosPage from './pages/AdminDAT/UsuariosPage';
-import MunicipiosPage from './pages/AdminDAT/MunicipiosPage';
-import ProjetosPage from './pages/AdminDAT/ProjetosPage';
-import GruposPage from './pages/AdminDAT/GruposPage';
-import ConfiguracoesPage from './pages/AdminDAT/ConfiguracoesPage';
-import DeslocamentosPage from './pages/Deslocamentos/DeslocamentosPage';
 import { getMe } from './api/availability';
 import './App.css';
+
+// ============================================================================
+// Issue #207: Lazy loading de páginas para code-splitting
+// ============================================================================
+const DisponibilidadeBlocks = lazy(() => import('./pages/Disponibilidade'));
+const MonthlyPage = lazy(() => import('./pages/Disponibilidade/MonthlyPage'));
+const ControlePage = lazy(() => import('./pages/Controle/ControlePage'));
+const EtlReportsPage = lazy(() => import('./pages/Controle/EtlReportsPage'));
+const DATPage = lazy(() => import('./pages/DAT/DATPage'));
+const NewSolicitacaoWizard = lazy(() => import('./pages/Solicitacoes/NewSolicitacaoWizard'));
+const MySolicitacoesPage = lazy(() => import('./pages/Solicitacoes/MySolicitacoesPage'));
+const ApprovalsPage = lazy(() => import('./pages/Aprovacoes/ApprovalsPage'));
+const PreAgendaPage = lazy(() => import('./pages/PreAgenda/PreAgendaPage'));
+const LoginPage = lazy(() => import('./pages/Auth/LoginPage'));
+const HomePage = lazy(() => import('./pages/Home/HomePage'));
+const DashboardsPage = lazy(() => import('./pages/Dashboards/DashboardsPage'));
+const EquipeDashboardPage = lazy(() => import('./pages/Dashboards/EquipeDashboardPage'));
+const GCalDashboardPage = lazy(() => import('./pages/Dashboards/GCalDashboardPage'));
+const MapaBrasilPage = lazy(() => import('./pages/MapaBrasil/MapaBrasilPage'));
+const AdminDATHomePage = lazy(() => import('./pages/AdminDAT/AdminDATHomePage'));
+const UsuariosPage = lazy(() => import('./pages/AdminDAT/UsuariosPage'));
+const MunicipiosPage = lazy(() => import('./pages/AdminDAT/MunicipiosPage'));
+const ProjetosPage = lazy(() => import('./pages/AdminDAT/ProjetosPage'));
+const GruposPage = lazy(() => import('./pages/AdminDAT/GruposPage'));
+const ConfiguracoesPage = lazy(() => import('./pages/AdminDAT/ConfiguracoesPage'));
+const DeslocamentosPage = lazy(() => import('./pages/Deslocamentos/DeslocamentosPage'));
 
 const { Header, Content, Sider } = Layout;
 const { SubMenu } = Menu;
 const { Text } = Typography;
+
+// Componente de loading para Suspense
+function PageLoader() {
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100%',
+      minHeight: '300px'
+    }}>
+      <Spin size="large" tip="Carregando página..." />
+    </div>
+  );
+}
 
 // Componente 403 Forbidden
 function Forbidden() {
@@ -159,7 +179,9 @@ function App() {
   if (!user) {
     return (
       <ConfigProvider locale={ptBR}>
-        <LoginPage onLoginSuccess={loadUser} />
+        <Suspense fallback={<Spin size="large" tip="Carregando..." fullscreen />}>
+          <LoginPage onLoginSuccess={loadUser} />
+        </Suspense>
       </ConfigProvider>
     );
   }
@@ -361,101 +383,103 @@ function App() {
               </div>
             </Header>
 
-            {/* Conteúdo principal */}
+            {/* Conteúdo principal com Suspense para lazy loading */}
             <Content style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: '#f0f2f5' }}>
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/home" element={<HomePage />} />
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/home" element={<HomePage />} />
 
-                {/* Dashboards (Admin/Gerência) */}
-                <Route
-                  path="/dashboards"
-                  element={isManager ? <DashboardsPage /> : <Forbidden />}
-                />
+                  {/* Dashboards (Admin/Gerência) */}
+                  <Route
+                    path="/dashboards"
+                    element={isManager ? <DashboardsPage /> : <Forbidden />}
+                  />
 
-                {/* Dashboard Equipe (Controle/Gerência) - Issue #190 */}
-                <Route
-                  path="/dashboards/equipe"
-                  element={(canControle || isManager) ? <EquipeDashboardPage /> : <Forbidden />}
-                />
+                  {/* Dashboard Equipe (Controle/Gerência) - Issue #190 */}
+                  <Route
+                    path="/dashboards/equipe"
+                    element={(canControle || isManager) ? <EquipeDashboardPage /> : <Forbidden />}
+                  />
 
-                {/* GCal Dashboard (Controle/Super) */}
-                <Route
-                  path="/dashboard/gcal"
-                  element={(canControle || canSuper) ? <GCalDashboardPage /> : <Forbidden />}
-                />
+                  {/* GCal Dashboard (Controle/Super) */}
+                  <Route
+                    path="/dashboard/gcal"
+                    element={(canControle || canSuper) ? <GCalDashboardPage /> : <Forbidden />}
+                  />
 
-                {/* Mapa do Brasil (Admin/Gerência) */}
-                <Route
-                  path="/mapa-brasil"
-                  element={isManager ? <MapaBrasilPage /> : <Forbidden />}
-                />
+                  {/* Mapa do Brasil (Admin/Gerência) */}
+                  <Route
+                    path="/mapa-brasil"
+                    element={isManager ? <MapaBrasilPage /> : <Forbidden />}
+                  />
 
-                <Route path="/disponibilidade" element={<MonthlyPage />} />
-                <Route path="/bloqueios" element={<DisponibilidadeBlocks />} />
+                  <Route path="/disponibilidade" element={<MonthlyPage />} />
+                  <Route path="/bloqueios" element={<DisponibilidadeBlocks />} />
 
-                {/* PR15: Novas rotas de solicitações */}
-                <Route
-                  path="/solicitacoes/minhas"
-                  element={canCoordenador ? <MySolicitacoesPage /> : <Forbidden />}
-                />
-                <Route
-                  path="/solicitacoes/nova"
-                  element={canCoordenador ? <NewSolicitacaoWizard /> : <Forbidden />}
-                />
+                  {/* PR15: Novas rotas de solicitações */}
+                  <Route
+                    path="/solicitacoes/minhas"
+                    element={canCoordenador ? <MySolicitacoesPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/solicitacoes/nova"
+                    element={canCoordenador ? <NewSolicitacaoWizard /> : <Forbidden />}
+                  />
 
-                {/* PR15: Rota de aprovações */}
-                <Route
-                  path="/aprovacoes"
-                  element={canSuper ? <ApprovalsPage /> : <Forbidden />}
-                />
+                  {/* PR15: Rota de aprovações */}
+                  <Route
+                    path="/aprovacoes"
+                    element={canSuper ? <ApprovalsPage /> : <Forbidden />}
+                  />
 
-                {/* PR15: Rota de pré-agenda */}
-                <Route
-                  path="/pre-agenda"
-                  element={canControle ? <PreAgendaPage /> : <Forbidden />}
-                />
+                  {/* PR15: Rota de pré-agenda */}
+                  <Route
+                    path="/pre-agenda"
+                    element={canControle ? <PreAgendaPage /> : <Forbidden />}
+                  />
 
-                {/* Issue #188: Deslocamentos (Controle/Coordenador/DAT) */}
-                <Route
-                  path="/deslocamentos"
-                  element={(canControle || canCoordenador || canDAT) ? <DeslocamentosPage /> : <Forbidden />}
-                />
+                  {/* Issue #188: Deslocamentos (Controle/Coordenador/DAT) */}
+                  <Route
+                    path="/deslocamentos"
+                    element={(canControle || canCoordenador || canDAT) ? <DeslocamentosPage /> : <Forbidden />}
+                  />
 
-                {/* Admin DAT (Fase 1 - Plano DAT/GCal) */}
-                <Route
-                  path="/admin-dat"
-                  element={canDAT ? <AdminDATHomePage /> : <Forbidden />}
-                />
-                <Route
-                  path="/admin-dat/usuarios"
-                  element={canDAT ? <UsuariosPage /> : <Forbidden />}
-                />
-                <Route
-                  path="/admin-dat/municipios"
-                  element={canDAT ? <MunicipiosPage /> : <Forbidden />}
-                />
-                <Route
-                  path="/admin-dat/projetos"
-                  element={canDAT ? <ProjetosPage /> : <Forbidden />}
-                />
-                <Route
-                  path="/admin-dat/grupos"
-                  element={canDAT ? <GruposPage /> : <Forbidden />}
-                />
-                <Route
-                  path="/admin-dat/configuracoes"
-                  element={canDAT ? <ConfiguracoesPage /> : <Forbidden />}
-                />
+                  {/* Admin DAT (Fase 1 - Plano DAT/GCal) */}
+                  <Route
+                    path="/admin-dat"
+                    element={canDAT ? <AdminDATHomePage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/admin-dat/usuarios"
+                    element={canDAT ? <UsuariosPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/admin-dat/municipios"
+                    element={canDAT ? <MunicipiosPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/admin-dat/projetos"
+                    element={canDAT ? <ProjetosPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/admin-dat/grupos"
+                    element={canDAT ? <GruposPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/admin-dat/configuracoes"
+                    element={canDAT ? <ConfiguracoesPage /> : <Forbidden />}
+                  />
 
-                {/* Antigas rotas (manter compatibilidade) */}
-                <Route path="/controle" element={<ControlePage />} />
-                <Route
-                  path="/controle/etl-reports"
-                  element={canControle || canSuper ? <EtlReportsPage /> : <Forbidden />}
-                />
-                <Route path="/dat" element={<DATPage />} />
-              </Routes>
+                  {/* Antigas rotas (manter compatibilidade) */}
+                  <Route path="/controle" element={<ControlePage />} />
+                  <Route
+                    path="/controle/etl-reports"
+                    element={canControle || canSuper ? <EtlReportsPage /> : <Forbidden />}
+                  />
+                  <Route path="/dat" element={<DATPage />} />
+                </Routes>
+              </Suspense>
             </Content>
           </Layout>
         </Layout>

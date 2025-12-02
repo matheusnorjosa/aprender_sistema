@@ -1,37 +1,50 @@
 """
-Google Calendar Sync Service - Re-export Facade
+AS v2 — GCal Sync Service Package
 
-This file provides backwards-compatible re-exports from the modular
-apps.core.services.gcal package.
+Modular package containing all Google Calendar sync functionality:
+- types: SyncOutcome dataclass, Action type alias
+- utils: Retry with backoff, payload hashing
+- client: CalendarClientAdapter base class
+- validation: Event ID validation and generation
+- payload: Event payload building functions
+- sync: Core sync operations (apply, upsert, resync, cancel)
 
-For new code, prefer importing directly from:
-- apps.core.services.gcal.types (Action, SyncOutcome)
-- apps.core.services.gcal.utils (_retry_with_backoff, _payload_hash)
-- apps.core.services.gcal.client (CalendarClientAdapter)
-- apps.core.services.gcal.validation (_validate_event_id, _event_id_for)
-- apps.core.services.gcal.payload (build_*, compute_payload_hash)
-- apps.core.services.gcal.sync (apply_one_solicitacao, upsert_one, etc.)
+Backwards-compatible re-exports for existing imports.
 """
-# pyright: reportUnusedImport=false
 
-from apps.core.services.gcal import (
-    # Types
+# Types
+from apps.core.services.gcal.types import (
     Action,
     SyncOutcome,
-    # Utils
+)
+
+# Utils
+from apps.core.services.gcal.utils import (
     _payload_hash,
     _retry_with_backoff,
-    # Client
+)
+
+# Client
+from apps.core.services.gcal.client import (
     CalendarClientAdapter,
-    # Validation
+)
+
+# Validation
+from apps.core.services.gcal.validation import (
     _event_id_for,
     _validate_event_id,
-    # Payload
+)
+
+# Payload
+from apps.core.services.gcal.payload import (
     build_attendees_for_solicitacao,
     build_event_payload,
     build_preview_for_solicitacao,
     compute_payload_hash,
-    # Sync
+)
+
+# Sync operations
+from apps.core.services.gcal.sync import (
     apply_one_solicitacao,
     cancel_solicitacao,
     resync_solicitacao,

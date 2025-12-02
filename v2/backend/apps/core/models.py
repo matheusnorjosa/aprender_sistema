@@ -234,8 +234,8 @@ class EquipeGerencia(models.Model):
         ]
 
     def __str__(self) -> str:
-        # pyright: ignore[reportUnknownMemberType,reportAttributeAccessIssue]
-        return f"{self.usuario.get_full_name() or self.usuario.username} - {self.get_papel_display()} ({self.gerencia.nome_setor})"
+        papel = self.get_papel_display()  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]
+        return f"{self.usuario.get_full_name() or self.usuario.username} - {papel} ({self.gerencia.nome_setor})"
 
 
 class Projeto(models.Model):

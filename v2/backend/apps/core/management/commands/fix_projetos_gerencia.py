@@ -75,7 +75,7 @@ class Command(BaseCommand):
             gerencia_atual = acerta.gerencia.nome if acerta.gerencia else "SEM GERÊNCIA"
             self.stdout.write(f"   📝 {acerta.nome}")
             self.stdout.write(f"      De: {gerencia_atual} → Para: GERENCIA 4")
-            self.stdout.write(f"      Solicitações: {acerta.solicitacoes.count()}")
+            self.stdout.write(f"      Solicitações: {acerta.solicitacoes.count()}")  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]
 
             if not dry_run:
                 acerta.gerencia = gerencia_4  # pyright: ignore[reportAttributeAccessIssue]
@@ -93,7 +93,7 @@ class Command(BaseCommand):
             gerencia_atual = cataventos.gerencia.nome if cataventos.gerencia else "SEM GERÊNCIA"
             self.stdout.write(f"   📝 {cataventos.nome}")
             self.stdout.write(f"      De: {gerencia_atual} → Para: SUPERINTENDENCIA")
-            self.stdout.write(f"      Solicitações: {cataventos.solicitacoes.count()}")
+            self.stdout.write(f"      Solicitações: {cataventos.solicitacoes.count()}")  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]
             self.stdout.write(f"      Fluxo: {cataventos.fluxo}")
 
             if not dry_run:
@@ -111,7 +111,7 @@ class Command(BaseCommand):
             try:
                 projeto = Projeto.objects.get(nome=nome)
                 self.stdout.write(f"   📝 {projeto.nome}")
-                self.stdout.write(f"      Solicitações: {projeto.solicitacoes.count()}")
+                self.stdout.write(f"      Solicitações: {projeto.solicitacoes.count()}")  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]
                 self.stdout.write(f"      is_test: {projeto.is_test} → True")
 
                 if not dry_run:
@@ -134,7 +134,7 @@ class Command(BaseCommand):
             # Listar situação final
             self.stdout.write("\n📊 Situação Final:")
             for g in Gerencia.objects.all().order_by("nome"):
-                count = g.projetos.count()
+                count = g.projetos.count()  # type: ignore[reportUnknownMemberType,reportUnknownVariableType,reportAttributeAccessIssue]
                 self.stdout.write(f"   {g.nome:25} → {count:2} projetos")
 
         self.stdout.write("="*60)

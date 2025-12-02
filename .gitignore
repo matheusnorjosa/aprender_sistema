@@ -505,3 +505,11 @@ debug_*
 .DS_Store
 Thumbs.db
 v2/docs/issues/
+
+# Session-specific scripts and analysis (2025-11-28+)
+v2/backend/scripts/session-*/
+v2/docs/sessions/
+
+# Additional temporary files
+v2/docs/memoria/
+backup_*.json

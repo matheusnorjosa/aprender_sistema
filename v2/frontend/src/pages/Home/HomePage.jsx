@@ -102,10 +102,10 @@ export default function HomePage() {
     );
   }
 
-  // Calcular permissões
-  const isAdmin = user?.is_superuser || user?.groups?.includes('Superintendência') || user?.groups?.includes('Gerência');
-  const isManager = user?.groups?.includes('Controle') || user?.groups?.includes('Gerência');
-  const isCoordenador = user?.groups?.includes('Coordenador') || user?.groups?.includes('DAT');
+  // Calcular permissões (alinhado com App.jsx)
+  const isAdmin = user?.is_superuser || user?.groups?.includes('Superintendência');
+  const isManager = user?.groups?.includes('Gerência') || isAdmin;
+  const isCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('Apoio de Coordenação') || user?.groups?.includes('DAT');
   const canDAT = user?.is_superuser || user?.groups?.includes('DAT');
 
   return (

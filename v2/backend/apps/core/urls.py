@@ -40,7 +40,11 @@ from .views_options import (
     usuarios_options,
 )
 from .views_preagenda import PreAgendaListView
-from .views_gcal_dashboard import (
+from .views_gcal import (
+    # Core GCal
+    gcal_calendars,
+    gcal_health,
+    # Dashboard views
     GCalStatusSummaryView,
     GCalListView,
     GCalDriftView,
@@ -55,7 +59,6 @@ from .views_gcal_dashboard import (
     SuccessRateView,  # Issue #99
     TopInsightsView,  # Issue #99
 )
-from .views_gcal import gcal_calendars, gcal_health
 from .views_lookup import (
     MunicipioLookup,
     ProjetoLookup,

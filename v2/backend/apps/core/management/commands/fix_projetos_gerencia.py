@@ -62,7 +62,7 @@ class Command(BaseCommand):
             self.stdout.write(f"      De: {gerencia_atual} → Para: GERENCIA 2")
 
             if not dry_run:
-                projeto.gerencia = gerencia_2
+                projeto.gerencia = gerencia_2  # pyright: ignore[reportAttributeAccessIssue]
                 projeto.save()
                 self.stdout.write(self.style.SUCCESS("      ✅ Atualizado"))
             else:
@@ -78,7 +78,7 @@ class Command(BaseCommand):
             self.stdout.write(f"      Solicitações: {acerta.solicitacoes.count()}")
 
             if not dry_run:
-                acerta.gerencia = gerencia_4
+                acerta.gerencia = gerencia_4  # pyright: ignore[reportAttributeAccessIssue]
                 acerta.save()
                 self.stdout.write(self.style.SUCCESS("      ✅ Atualizado"))
             else:
@@ -97,7 +97,7 @@ class Command(BaseCommand):
             self.stdout.write(f"      Fluxo: {cataventos.fluxo}")
 
             if not dry_run:
-                cataventos.gerencia = superintendencia
+                cataventos.gerencia = superintendencia  # pyright: ignore[reportAttributeAccessIssue]
                 cataventos.save()
                 self.stdout.write(self.style.SUCCESS("      ✅ Atualizado"))
             else:

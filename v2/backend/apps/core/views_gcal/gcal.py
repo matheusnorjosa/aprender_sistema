@@ -1,21 +1,20 @@
 """
-Views para endpoints GCal (Sprint 2 - Issue #65)
+AS v2 — GCal Core Views
 
-Endpoints:
-- GET /api/gcal/calendars/ - Lista calendários disponíveis
-- GET /api/gcal/health/ - Health check da integração GCal
+Views for GCal basic operations: list calendars, health check.
+Type-checked with Pyright (strict mode).
 """
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
-from typing import Any
-from rest_framework.request import Request
-from rest_framework.response import Response
 
 import logging
+from typing import Any
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id

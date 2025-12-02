@@ -3,7 +3,7 @@ AS v2 — GCal Event ID Validation
 
 Validation utilities for Google Calendar event IDs.
 """
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
 

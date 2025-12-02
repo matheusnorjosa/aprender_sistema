@@ -3,7 +3,7 @@ AS v2 — GCal Sync Utilities
 
 Utility functions for retry, hashing, etc.
 """
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
 

@@ -1,50 +1,49 @@
 """
-Core views - Re-export Facade
+AS v2 — Core Views Package
 
-PA-01: Nenhuma solicitação é auto-aprovada.
-PA-02: Apenas Superintendência pode aprovar/reprovar.
-PA-05: Registrar usuário, data/hora e justificativa em AuditLog.
-
-This file maintains backwards compatibility by re-exporting
-all views from the modular views/ package submodules.
+Re-exports all views for backwards compatibility.
 """
-# pyright: reportUnusedImport=false, reportPrivateUsage=false
+# pyright: reportUnusedImport=false
 
-# Import directly from submodules to avoid circular import with views/ package
 from apps.core.views.utils import _get_client_ip, api_root
 from apps.core.views.solicitacao import SolicitacaoViewSet
 from apps.core.views.availability import (
     AvailabilityBlockViewSet,
-    AvailabilityCheckView,
     AvailabilityCheckManyView,
+    AvailabilityCheckView,
 )
 from apps.core.views.user import CurrentUserView
 from apps.core.views.admin import (
-    MunicipioViewSet,
-    ProjetoViewSet,
-    ProdutoViewSet,
-    GerenciaViewSet,
-    CompraViewSet,
-    UsuarioAdminViewSet,
-    GroupViewSet,
     AuditLogViewSet,
+    CompraViewSet,
+    GerenciaViewSet,
+    GroupViewSet,
+    MunicipioViewSet,
+    ProdutoViewSet,
+    ProjetoViewSet,
+    UsuarioAdminViewSet,
 )
 from apps.core.views.options import (
-    MunicipioOptionViewSet,
-    ProjetoOptionViewSet,
     CoordenadorOptionViewSet,
     FormadorOptionViewSet,
+    MunicipioOptionViewSet,
+    ProjetoOptionViewSet,
     TipoEventoOptionViewSet,
 )
 
 __all__ = [
+    # Utils
     "_get_client_ip",
     "api_root",
+    # Solicitacao
     "SolicitacaoViewSet",
+    # Availability
     "AvailabilityBlockViewSet",
     "AvailabilityCheckView",
     "AvailabilityCheckManyView",
+    # User
     "CurrentUserView",
+    # Admin
     "MunicipioViewSet",
     "ProjetoViewSet",
     "ProdutoViewSet",
@@ -53,6 +52,7 @@ __all__ = [
     "UsuarioAdminViewSet",
     "GroupViewSet",
     "AuditLogViewSet",
+    # Options
     "MunicipioOptionViewSet",
     "ProjetoOptionViewSet",
     "CoordenadorOptionViewSet",

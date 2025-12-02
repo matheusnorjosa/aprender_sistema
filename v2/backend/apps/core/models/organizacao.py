@@ -1,0 +1,342 @@
+"""
+AS v2 — Organizacao Models
+
+Models organizacionais: Municipio, Gerencia, EquipeGerencia, Projeto, TipoEvento, Produto.
+SSOT: Substitui IMPORTRANGE de planilhas organizacionais.
+Type-checked with Pyright (strict mode).
+"""
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from django.db import models
+
+if TYPE_CHECKING:
+    from apps.core.models.usuario import Usuario
+
+
+class Municipio(models.Model):
+    """SSOT: Substitui IMPORTRANGE de Municipios"""
+
+    nome = models.CharField(max_length=100, unique=True, db_index=True)
+    uf = models.CharField(max_length=2)
+    ibge_code = models.CharField(
+        max_length=7,
+        null=True,
+        blank=True,
+        unique=True,
+        db_index=True,
+        verbose_name="Codigo IBGE",
+        help_text="Codigo IBGE de 7 digitos do municipio"
+    )
+    ativo = models.BooleanField(default=True)
+
+    # Coordenadas geograficas para visualizacao em mapa
+    latitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Latitude em graus decimais (-90 a 90)"
+    )
+    longitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Longitude em graus decimais (-180 a 180)"
+    )
+
+    class Meta:  # type: ignore[misc]
+        db_table = "core_municipio"
+        verbose_name = "Municipio"
+        verbose_name_plural = "Municipios"
+        ordering = ["nome"]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(latitude__gte=-90, latitude__lte=90) | models.Q(latitude__isnull=True),
+                name="latitude_range"
+            ),
+            models.CheckConstraint(
+                check=models.Q(longitude__gte=-180, longitude__lte=180) | models.Q(longitude__isnull=True),
+                name="longitude_range"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.nome}-{self.uf}"
+
+
+class Gerencia(models.Model):
+    """
+    Gerencia organizacional (GERENCIA 2, GERENCIA 3, SUPERINTENDENCIA, etc.).
+
+    Cada gerencia agrupa projetos relacionados e pode ter um gerente responsavel.
+
+    Examples:
+        - GERENCIA 2 -> Setor "Vidas" (VIDA E CIENCIAS, LINGUAGEM, MATEMATICA)
+        - GERENCIA 3 -> Setor "Fluir" (FLUIR DAS EMOCOES)
+        - GERENCIA 4 -> Setor "ACerta" (ACERTA MATEMATICA, PORTUGUES, ECS)
+        - SUPERINTENDENCIA -> Setor "Super" (projetos SUPER que requerem aprovacao)
+        - GERENCIA INDIVIDUAL -> Setor "Individual" (projetos com gerencia individual)
+
+    Attributes:
+        nome (str): Nome da gerencia (ex: GERENCIA 2, SUPERINTENDENCIA)
+        nome_setor (str): Nome comercial/operacional do setor (ex: Vidas, ACerta, Fluir)
+        gerente (FK Usuario): Gerente responsavel pela gerencia (nullable)
+        ativo (bool): Se a gerencia esta ativa
+        descricao (str): Descricao adicional
+    """
+
+    nome = models.CharField(
+        max_length=50,
+        unique=True,
+        db_index=True,
+        help_text="Nome da gerencia (ex: GERENCIA 2, SUPERINTENDENCIA)",
+    )
+    nome_setor = models.CharField(
+        max_length=100,
+        help_text="Nome comercial/operacional do setor (ex: Vidas, ACerta, Fluir)",
+    )
+    gerente = models.ForeignKey(  # type: ignore[misc]
+        "core.Usuario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="gerencias_gerenciadas",
+        help_text="Gerente responsavel pela gerencia",
+    )
+    ativo = models.BooleanField(default=True)
+    descricao = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:  # type: ignore[misc]
+        db_table = "core_gerencia"
+        verbose_name = "Gerencia"
+        verbose_name_plural = "Gerencias"
+        ordering = ["nome"]
+
+    def __str__(self) -> str:
+        return f"{self.nome} ({self.nome_setor})"
+
+
+class EquipeGerencia(models.Model):
+    """
+    Hierarquia de equipe dentro de uma gerencia.
+
+    Define a estrutura organizacional: quem pertence a qual setor e qual papel exerce.
+
+    Hierarquia tipica:
+    Gerente (1) -> Coordenador (N) -> Apoio de Coordenacao (N) -> Formadores (N)
+
+    Example:
+        GERENCIA 2 (Vidas):
+        - Gerente: Joao Silva (papel=GERENTE)
+        - Coordenador: Maria Santos (papel=COORDENADOR)
+          - Apoio: Ana Costa (papel=APOIO, coordenador_supervisor=Maria)
+        - Formadores: Carlos, Luiza, Rafael (papel=FORMADOR)
+
+    Nota sobre Gerencias Individuais:
+        Para projetos com gerencia individual (ex: A COR DA GENTE),
+        a mesma pessoa pode ter multiplos registros com papeis diferentes
+        (GERENTE + COORDENADOR + FORMADOR).
+    """
+
+    PAPEL_CHOICES = [
+        ('GERENTE', 'Gerente'),
+        ('COORDENADOR', 'Coordenador'),
+        ('APOIO', 'Apoio de Coordenacao'),
+        ('FORMADOR', 'Formador'),
+    ]
+
+    gerencia = models.ForeignKey(  # type: ignore[misc]
+        Gerencia,
+        on_delete=models.CASCADE,
+        related_name="equipes",
+        help_text="Gerencia/setor ao qual o usuario pertence",
+    )
+    usuario = models.ForeignKey(  # type: ignore[misc]
+        "core.Usuario",
+        on_delete=models.CASCADE,
+        related_name="equipes",
+        help_text="Usuario membro da equipe",
+    )
+    papel = models.CharField(
+        max_length=15,
+        choices=PAPEL_CHOICES,
+        help_text="Papel do usuario nesta gerencia",
+    )
+    coordenador_supervisor = models.ForeignKey(  # type: ignore[misc]
+        "core.Usuario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="apoios_supervisionados",
+        help_text="Coordenador que este apoio auxilia (apenas para papel APOIO)",
+    )
+    ativo = models.BooleanField(
+        default=True,
+        help_text="Se esta atribuicao esta ativa",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:  # type: ignore[misc]
+        db_table = "core_equipe_gerencia"
+        verbose_name = "Equipe de Gerencia"
+        verbose_name_plural = "Equipes de Gerencias"
+        ordering = ["gerencia", "papel", "usuario"]
+        unique_together = [('gerencia', 'usuario', 'papel')]
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    ~models.Q(papel='APOIO') | models.Q(coordenador_supervisor__isnull=False)
+                ),
+                name="apoio_requires_supervisor",
+                violation_error_message="Apoio de Coordenacao deve ter um coordenador supervisor",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        papel = self.get_papel_display()  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]
+        return f"{self.usuario.get_full_name() or self.usuario.username} - {papel} ({self.gerencia.nome_setor})"
+
+
+class Projeto(models.Model):
+    """SSOT: Substitui IMPORTRANGE de Projetos"""
+
+    FLUXO_CHOICES = [
+        ('SUPER', 'Superintendencia'),
+        ('NAO_SUPER', 'Nao-Superintendencia'),
+    ]
+
+    nome = models.CharField(max_length=200, unique=True, db_index=True)
+    codigo = models.CharField(
+        max_length=50,
+        null=False,
+        blank=True,
+        default='',
+        db_index=True,
+        help_text="Codigo unico do projeto (ex: ACERTA, NLENDO). Unique apenas quando preenchido."
+    )
+    fluxo = models.CharField(
+        max_length=12,
+        choices=FLUXO_CHOICES,
+        default='NAO_SUPER',
+        db_index=True,
+        help_text="SUPER: requer aprovacao da Superintendencia. NAO_SUPER: auto-aprovado."
+    )
+    descricao = models.TextField(blank=True)
+    ativo = models.BooleanField(default=True)
+
+    # Issue #145: Hierarquia organizacional
+    gerencia = models.ForeignKey(  # type: ignore[misc]
+        "core.Gerencia",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="projetos",
+        help_text="Gerencia a qual o projeto pertence (ex: GERENCIA 2 - Vidas)",
+    )
+    is_test = models.BooleanField(
+        default=False,
+        help_text="Marca projeto como teste (nao exibir em producao)",
+    )
+
+    class Meta:  # type: ignore[misc]
+        db_table = "core_projeto"
+        verbose_name = "Projeto"
+        verbose_name_plural = "Projetos"
+        ordering = ["nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['codigo'],
+                condition=~models.Q(codigo=''),
+                name='unique_projeto_codigo_nonempty',
+            ),
+            # Issue #136: Check constraint for fluxo choices
+            models.CheckConstraint(
+                check=models.Q(fluxo__in=['SUPER', 'NAO_SUPER']),
+                name='projeto_fluxo_valid',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.nome
+
+
+class TipoEvento(models.Model):
+    """SSOT: Substitui IMPORTRANGE de Tipos de Evento"""
+
+    nome = models.CharField(max_length=100, unique=True, db_index=True)
+    descricao = models.TextField(blank=True)
+    cor = models.CharField(max_length=7, blank=True, help_text="Cor hex (#RRGGBB)")
+
+    class Meta:  # type: ignore[misc]
+        db_table = "core_tipo_evento"
+        verbose_name = "Tipo de Evento"
+        verbose_name_plural = "Tipos de Evento"
+        ordering = ["nome"]
+
+    def __str__(self) -> str:
+        return self.nome
+
+
+class Produto(models.Model):
+    """
+    SSOT: Produtos disponiveis (substitui produtos.xlsx).
+
+    Fonte: produtos.xlsx (139 produtos)
+    Cross-ref: Compras.xlsx (valida codigos)
+
+    Relacionamentos:
+        - Produto -> Projeto (many-to-one, obrigatorio)
+        - Compra -> Produto (many-to-one, obrigatorio apos migration)
+
+    Exemplo:
+        NL-C1 -> "Novo Lendo - Colecao 1" -> Projeto "Novo Lendo"
+    """
+
+    codigo = models.CharField(
+        max_length=50,
+        unique=True,
+        db_index=True,
+        help_text="Codigo unico (ex: NL-C1, GE-KB)"
+    )
+    nome = models.CharField(
+        max_length=200,
+        help_text="Nome completo do produto"
+    )
+    descricao = models.TextField(
+        blank=True,
+        help_text="Descricao detalhada"
+    )
+    projeto: models.ForeignKey[Projeto] = models.ForeignKey(  # type: ignore[assignment]
+        "core.Projeto",
+        on_delete=models.PROTECT,
+        related_name="produtos",
+        help_text="Projeto vinculado"
+    )
+    ativo = models.BooleanField(
+        default=True,
+        help_text="Produto disponivel"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:  # type: ignore[misc]
+        db_table = "core_produto"
+        verbose_name = "Produto"
+        verbose_name_plural = "Produtos"
+        ordering = ["codigo"]
+        indexes = [
+            models.Index(fields=["codigo", "ativo"]),
+            models.Index(fields=["projeto"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.codigo} - {self.nome}"

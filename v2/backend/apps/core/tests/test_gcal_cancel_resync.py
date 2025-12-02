@@ -156,7 +156,7 @@ class TestResyncHelper:
         with pytest.raises(ValueError, match="Apenas solicitações aprovadas"):
             resync_solicitacao(solicitacao_aprovada)
 
-    @patch("apps.core.services.gcal_sync_service.apply_one_solicitacao")
+    @patch("apps.core.services.gcal.sync.apply_one_solicitacao")
     def test_resync_resets_hash_and_calls_apply(self, mock_apply, solicitacao_publicada):
         """Resync reseta hash e chama apply_one_solicitacao."""
         # Configurar mock
@@ -201,7 +201,7 @@ class TestCancelHelper:
             cancel_solicitacao(solicitacao_aprovada)
 
     @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
-    @patch("apps.core.services.gcal_sync_service._retry_with_backoff")
+    @patch("apps.core.services.gcal.sync._retry_with_backoff")
     def test_cancel_deletes_and_clears_fields(
         self, mock_retry, mock_get_client, solicitacao_publicada
     ):
@@ -412,7 +412,7 @@ class TestCancelEndpoint:
         assert response.status_code == 403
 
     @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
-    @patch("apps.core.services.gcal_sync_service._retry_with_backoff")
+    @patch("apps.core.services.gcal.sync._retry_with_backoff")
     def test_cancel_endpoint_idempotent_404(
         self, mock_retry, mock_get_client, api_client, usuario_controle, solicitacao_publicada
     ):

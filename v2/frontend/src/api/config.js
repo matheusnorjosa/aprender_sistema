@@ -6,6 +6,7 @@
  * - CSRF helpers: getCsrfToken, ensureCsrfToken
  * - fetchAPI: Unified fetch wrapper with credentials and CSRF
  */
+import logger from '../utils/logger';
 
 /**
  * Base API URL (can be overridden by VITE_API_URL env var)
@@ -81,7 +82,7 @@ export async function ensureCsrfToken() {
       }
     }
   } catch (error) {
-    console.warn('Erro ao obter CSRF token via /api/csrf/:', error);
+    logger.warn('Erro ao obter CSRF token via /api/csrf/:', error);
   }
 
   // Fallback: retornar null e deixar request falhar com mensagem clara
@@ -112,19 +113,19 @@ export async function fetchAPI(url, options = {}) {
     const csrfToken = await ensureCsrfToken();
 
     if (!csrfToken) {
-      console.error('CSRF token não encontrado! Verifique se está autenticado.');
+      logger.error('CSRF token não encontrado! Verifique se está autenticado.');
       throw new Error('CSRF token ausente. Faça login novamente.');
     }
 
     headers['X-CSRFToken'] = csrfToken;
   }
 
-  console.log('=== fetchAPI DEBUG ===');
-  console.log('URL:', fullUrl);
-  console.log('Method:', method);
-  console.log('Headers:', headers);
+  logger.debug('=== fetchAPI ===');
+  logger.debug('URL:', fullUrl);
+  logger.debug('Method:', method);
+  logger.debug('Headers:', headers);
   if (options.body) {
-    console.log('Body:', options.body);
+    logger.debug('Body:', options.body);
   }
 
   const response = await fetch(fullUrl, {
@@ -134,12 +135,12 @@ export async function fetchAPI(url, options = {}) {
   });
 
   if (!response.ok) {
-    console.error('=== fetchAPI ERROR ===');
-    console.error('Status:', response.status);
-    console.error('StatusText:', response.statusText);
+    logger.error('=== fetchAPI ERROR ===');
+    logger.error('Status:', response.status);
+    logger.error('StatusText:', response.statusText);
 
     const errorBody = await response.text();
-    console.error('Response body:', errorBody);
+    logger.error('Response body:', errorBody);
 
     let error;
     try {

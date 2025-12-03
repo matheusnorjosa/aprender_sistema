@@ -255,7 +255,6 @@ class OAuthCalendarClient(CalendarClientAdapter):
         # Garantir que o payload tenha o event_id
         body = {**payload, "id": event_id}
 
-        # DEBUG: Log body antes de enviar
         logger.debug(
             f"🔍 OAuthClient.insert() - calendar_id={calendar_id}, "
             f"event_id={event_id}, body_has_id={'id' in body}, body_id={body.get('id')}"

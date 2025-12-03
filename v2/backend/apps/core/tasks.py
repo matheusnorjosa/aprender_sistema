@@ -15,11 +15,14 @@ Agendamento via CELERY_BEAT_SCHEDULE no settings.py:
 from __future__ import annotations
 
 import json
+import logging
 from io import StringIO
 from typing import Any
 
 from celery import shared_task  # type: ignore[attr-defined]
 from django.core.management import call_command
+
+logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True)
@@ -34,27 +37,26 @@ def debug_task(self: Any) -> str:
     Returns:
         str: "ok"
     """
-    print(f"Request: {self.request!r}")
+    logger.debug(f"Request: {self.request!r}")
     return "ok"
 
 
 @shared_task
 def gcal_sync_task() -> None:
     """
-    Tarefa stub para sincronização futura com Google Calendar.
+    DEPRECATED: Tarefa stub para sincronização com Google Calendar.
 
-    TODO: Implementar lógica de sincronização.
+    Esta task não está em uso. A sincronização real é feita via:
+    - preview_then_apply_gcal (Celery beat automático)
+    - task_publish_solicitacao_to_gcal (publicação individual)
+    - /pre-agenda UI (governança manual)
 
-    Possíveis implementações:
-    - Sincronizar eventos pendentes
-    - Atualizar eventos modificados
-    - Remover eventos cancelados
-    - Integrar com preview_then_apply_gcal
+    Mantida para backwards compatibility. Não implementar lógica aqui.
 
     Returns:
-        dict: Resultado da sincronização (quando implementado)
+        None
     """
-    # TODO: Implementar lógica de sincronização
+    logger.warning("gcal_sync_task is deprecated and does nothing. Use preview_then_apply_gcal instead.")
     pass
 
 

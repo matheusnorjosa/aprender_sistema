@@ -201,8 +201,8 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"  # Redis já configurado acima
 
 # Session cookie settings (CP2 + PLANO_OTIMIZACAO_COMPLETO Fase 1)
-# Timeout reduzido de 2 semanas para 30 minutos (segurança + performance)
-SESSION_COOKIE_AGE = int(os.getenv("SESSION_COOKIE_AGE", 60 * 30))  # 30 minutos (default)
+# Timeout de 2 horas (balanceamento entre segurança e usabilidade)
+SESSION_COOKIE_AGE = int(os.getenv("SESSION_COOKIE_AGE", 60 * 60 * 2))  # 2 horas (default)
 SESSION_SAVE_EVERY_REQUEST = os.getenv("SESSION_SAVE_EVERY_REQUEST", "True") == "True"  # Renova a cada request
 SESSION_EXPIRE_AT_BROWSER_CLOSE = os.getenv("SESSION_EXPIRE_AT_BROWSER_CLOSE", "True") == "True"
 SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "asv2sid")  # Custom name

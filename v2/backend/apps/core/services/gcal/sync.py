@@ -266,7 +266,6 @@ def upsert_one(
 
             if not dry_run:
                 try:
-                    # DEBUG: Log payload antes de enviar
                     logger.debug(
                         f"🔍 GCal INSERT #{s.id} - calendar_id={calendar_id}, "
                         f"event_id={deterministic_eid}, payload={payload}"

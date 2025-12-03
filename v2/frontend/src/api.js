@@ -13,6 +13,7 @@
 
 import axios from 'axios';
 import { ensureCsrfToken, API_BASE } from './api/config';
+import logger from './utils/logger';
 
 // Create axios instance
 const api = axios.create({
@@ -33,7 +34,7 @@ api.interceptors.request.use(async (config) => {
     if (csrfToken) {
       config.headers['X-CSRFToken'] = csrfToken;
     } else {
-      console.warn('CSRF token not found for mutating request');
+      logger.warn('CSRF token not found for mutating request');
       throw new Error('CSRF token ausente. Faça login novamente.');
     }
   }

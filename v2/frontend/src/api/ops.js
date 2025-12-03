@@ -10,6 +10,7 @@
  */
 
 import { API_BASE, ensureCsrfToken, fetchAPI, buildUrl } from './config';
+import logger from '../utils/logger';
 
 /**
  * Helper para upload de arquivo (multipart/form-data).
@@ -34,7 +35,7 @@ async function postMultipart(url, file, dryRun = true) {
   if (csrfToken) {
     headers['X-CSRFToken'] = csrfToken;
   } else {
-    console.error('CSRF token não encontrado para upload multipart!');
+    logger.error('CSRF token não encontrado para upload multipart!');
     throw new Error('CSRF token ausente. Faça login novamente.');
   }
 

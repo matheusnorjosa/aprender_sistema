@@ -139,17 +139,17 @@ class TestRedisSessionsCP2:
         assert settings.SESSION_COOKIE_SAMESITE == "Lax"
         assert settings.SESSION_EXPIRE_AT_BROWSER_CLOSE is True
 
-    def test_session_timeout_30_minutes(self):
+    def test_session_timeout_2_hours(self):
         """
-        Test: Default session timeout is 30 minutes.
+        Test: Default session timeout is 2 hours.
 
-        Validates SESSION_COOKIE_AGE = 1800 (60 * 30).
-        This is reduced from 2 weeks for security and performance.
+        Validates SESSION_COOKIE_AGE = 7200 (60 * 60 * 2).
+        Balances security with usability for extended work sessions.
         """
         from django.conf import settings
 
-        # 30 minutes = 1800 seconds
-        assert settings.SESSION_COOKIE_AGE == 60 * 30
+        # 2 hours = 7200 seconds
+        assert settings.SESSION_COOKIE_AGE == 60 * 60 * 2
 
     def test_redis_backend_configured(self):
         """

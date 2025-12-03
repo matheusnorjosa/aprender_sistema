@@ -5,6 +5,7 @@
  */
 
 import { fetchAPI, buildUrl } from './config';
+import logger from '../utils/logger';
 
 // Mapeamento de aliases de status (inglês → português)
 // Mantido para compatibilidade com código legado
@@ -48,9 +49,9 @@ export async function listSolicitacoes(filters = {}) {
  * @returns {Promise<object>} Solicitação criada
  */
 export async function createSolicitacao(body) {
-  console.log('=== createSolicitacao DEBUG ===');
-  console.log('Body enviado:', body);
-  console.log('JSON stringificado:', JSON.stringify(body));
+  logger.debug('=== createSolicitacao ===');
+  logger.debug('Body enviado:', body);
+  logger.debug('JSON stringificado:', JSON.stringify(body));
 
   return await fetchAPI('/solicitacoes/', {
     method: 'POST',

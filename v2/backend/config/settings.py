@@ -480,8 +480,9 @@ TRAVEL_BUFFER_MINUTES = int(os.getenv("TRAVEL_BUFFER_MINUTES", "120"))
 ETL_OUTPUT_DIR = os.getenv("ETL_OUTPUT_DIR", str(BASE_DIR / "out_etl"))
 ETL_DATA_DIR = os.getenv("ETL_DATA_DIR", str(BASE_DIR / "data" / "csv-import"))
 
-# ETL: Diretório padrão para importação de arquivos (legacy, deprecado)
-# TODO: Migrar para ETL_DATA_DIR após PR #53
+# ETL: Diretório padrão para importação de arquivos (backwards compatibility)
+# NOTE: ETL_DATA_DIR é o padrão preferido. DATA_IMPORT_DIR mantido para
+# compatibilidade com management commands existentes (etl_all, etl_load_xlsx).
 DATA_IMPORT_DIR = os.getenv("DATA_IMPORT_DIR", "/app/data/csv-import")
 
 # ================================================================

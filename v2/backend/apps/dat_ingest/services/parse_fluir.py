@@ -21,14 +21,16 @@ Estrutura esperada (aba "Acompanhamento"):
 
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportCallIssue=false, reportGeneralTypeIssues=false, reportArgumentType=false, reportOptionalMemberAccess=false
 
+import hashlib
+import logging
+from datetime import datetime, time as dtime, timedelta
 from pathlib import Path
 from typing import Any
-from datetime import datetime, time as dtime, timedelta
-import hashlib
 
 import pandas as pd
 from zoneinfo import ZoneInfo
 
+logger = logging.getLogger(__name__)
 
 FORTALEZA_TZ = ZoneInfo("America/Fortaleza")
 
@@ -160,7 +162,7 @@ def parse_fluir_eventos(filepath: Path) -> list[dict[str, Any]]:
 
         except Exception as e:
             # Log erro mas continua processando
-            print(f"⚠️  Erro ao processar linha {idx}: {e}")
+            logger.warning(f"Erro ao processar linha {idx}: {e}")
             continue
 
     return eventos

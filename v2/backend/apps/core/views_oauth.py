@@ -490,7 +490,6 @@ def google_oauth_list_calendars(request: Request) -> Response:
         logger.info(
             f"📅 Listed {len(calendars)} calendars for {request.user.username}"
         )
-        # DEBUG: Log calendar details
         for cal in calendars:
             logger.info(
                 f"  📅 {cal['summary']}: id={cal['id']}, "

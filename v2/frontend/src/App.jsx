@@ -9,6 +9,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge } from 'antd';
+import logger from './utils/logger';
 import {
   CalendarOutlined,
   CheckCircleOutlined,
@@ -94,7 +95,7 @@ function App() {
       const userData = await getMe();
       setUser(userData);
     } catch (error) {
-      console.error('Erro ao carregar usuário:', error);
+      logger.error('Erro ao carregar usuário:', error);
       setUser(null); // Explicitamente null se falhar
     } finally {
       setLoading(false);
@@ -126,7 +127,7 @@ function App() {
 
         if (!response.ok) {
           if (response.status === 401 || response.status === 403) {
-            console.warn('[Alerts] Sem permissão para acessar alerts');
+            logger.warn('[Alerts] Sem permissão para acessar alerts');
             return;
           }
           throw new Error(`HTTP ${response.status}`);
@@ -151,7 +152,7 @@ function App() {
           localStorage.setItem('gcalAlertsLastErrors', data.errors.toString());
         }
       } catch (error) {
-        console.error('[Alerts] Erro ao buscar alertas:', error);
+        logger.error('[Alerts] Erro ao buscar alertas:', error);
       }
     };
 
@@ -201,7 +202,7 @@ function App() {
       window.location.reload();
     } catch (error) {
       message.error('Erro ao fazer logout');
-      console.error('Erro no logout:', error);
+      logger.error('Erro no logout:', error);
     }
   };
 

@@ -1,8 +1,8 @@
 # Guia de Observabilidade - AS v2 (MP1)
 
-**Data**: 2025-11-18
+**Data**: 2025-12-03
 **Status**: ✅ Implementado
-**Issue**: #165
+**Issue**: #165, #234
 
 ---
 
@@ -16,26 +16,83 @@
 4. **postgres_exporter** (v0.15.0) - Métricas PostgreSQL
 5. **redis_exporter** (v1.62.0) - Métricas Redis
 
+### Arquitetura
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    docker-compose.yml                        │
+│  (Stack Principal - sempre disponível)                      │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐        │
+│  │   web   │  │   db    │  │  redis  │  │ worker  │        │
+│  │ :8002   │  │ :5434   │  │ :6380   │  │         │        │
+│  │/metrics │  │         │  │         │  │         │        │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘        │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│              docker-compose.observability.yml                │
+│  (Stack Opcional - desenvolvimento/staging local)           │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │ prometheus  │  │   grafana   │  │ postgres_exporter   │ │
+│  │   :9090     │  │   :3000     │  │      :9187          │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+│                                    ┌─────────────────────┐ │
+│                                    │  redis_exporter     │ │
+│                                    │      :9121          │ │
+│                                    └─────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ### Portas
 
-| Serviço | Porta | URL |
-|---------|-------|-----|
-| Prometheus UI | 9090 | http://localhost:9090 |
-| Grafana UI | 3000 | http://localhost:3000 |
-| Metrics endpoint | 8002 | http://localhost:8002/metrics |
-| PostgreSQL exporter | 9187 | http://localhost:9187/metrics |
-| Redis exporter | 9121 | http://localhost:9121/metrics |
+| Serviço | Porta | URL | Arquivo |
+|---------|-------|-----|---------|
+| Metrics endpoint | 8002 | http://localhost:8002/metrics | docker-compose.yml |
+| Prometheus UI | 9090 | http://localhost:9090 | docker-compose.observability.yml |
+| Grafana UI | 3000 | http://localhost:3000 | docker-compose.observability.yml |
+| PostgreSQL exporter | 9187 | http://localhost:9187/metrics | docker-compose.observability.yml |
+| Redis exporter | 9121 | http://localhost:9121/metrics | docker-compose.observability.yml |
 
 ---
 
 ## 🚀 Quick Start
 
-### Iniciar Stack Completa
+### Stack Principal (sem observabilidade local)
 
 ```bash
 cd v2/infra
+make up
+# ou
 docker compose up -d
 ```
+
+O endpoint `/metrics` está sempre disponível para scraping externo.
+
+### Stack com Observabilidade Local
+
+```bash
+cd v2/infra
+make up-obs
+# ou
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+```
+
+### Parar Serviços
+
+```bash
+make down      # Stack principal
+make down-obs  # Stack + observabilidade
+```
+
+### Produção
+
+Em produção, use o serviço de observabilidade do provedor de hospedagem:
+- **AWS**: CloudWatch
+- **GCP**: Cloud Monitoring
+- **Azure**: Azure Monitor
+- **Managed services**: Datadog, New Relic, Grafana Cloud
+
+O endpoint `/metrics` do Django permanece disponível e compatível com Prometheus.
 
 ### Acessar Dashboards
 
@@ -490,6 +547,6 @@ for sol in solicitacoes:
 
 ---
 
-**Última atualização**: 2025-11-18
+**Última atualização**: 2025-12-03
 **Responsável**: Claude Code
-**Issues**: #165 (MP1 - Prometheus + Grafana), #166 (MP2 - Structured Logging), #167 (MP3 - Sentry APM)
+**Issues**: #165 (MP1 - Prometheus + Grafana), #166 (MP2 - Structured Logging), #167 (MP3 - Sentry APM), #234 (Separar stack de observabilidade)

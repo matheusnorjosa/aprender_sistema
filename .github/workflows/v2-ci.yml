@@ -210,7 +210,21 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend
-          pytest -q --tb=short
+          # PR: Smoke tests (testes críticos ~1-2min)
+          # Push to main: Full suite
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "🚀 Running smoke tests (critical only)..."
+            pytest -q --tb=short \
+              apps/core/tests/test_availability_service.py \
+              apps/core/tests/test_approval_policy_PA.py \
+              apps/core/tests/test_solicitacao_fluxo.py \
+              apps/core/tests/test_models.py \
+              apps/core/tests/test_serializers.py \
+              apps/core/tests/test_sessions_redis.py
+          else
+            echo "🧪 Running full test suite..."
+            pytest -q --tb=short
+          fi
 
       - name: Upload coverage reports
         if: always()

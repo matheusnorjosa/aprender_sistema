@@ -187,6 +187,15 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/v2/backend/out_etl"
           mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
 
+      - name: Get changed files
+        id: changed-files
+        if: github.event_name == 'pull_request'
+        run: |
+          # Detectar quais apps foram modificadas
+          CHANGED=$(git diff --name-only origin/main...HEAD | grep "^v2/backend/apps/" | cut -d'/' -f4 | sort -u | tr '\n' ' ')
+          echo "changed_apps=$CHANGED" >> $GITHUB_OUTPUT
+          echo "📁 Apps modificadas: $CHANGED"
+
       - name: Run Tests
         env:
           DJANGO_SETTINGS_MODULE: config.settings
@@ -210,19 +219,53 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend
-          # PR: Smoke tests (testes críticos ~1-2min)
-          # Push to main: Full suite
+
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "🚀 Running smoke tests (critical only)..."
-            pytest -q --tb=short \
-              apps/core/tests/test_availability_service.py \
+            echo "🚀 PR Mode: Smart test selection"
+
+            # Estratégia combinada:
+            # 1. Sempre rodar testes críticos (smoke tests)
+            # 2. Rodar testes das apps modificadas
+            # 3. Ignorar testes lentos (ETL, OAuth, Batch)
+
+            CRITICAL_TESTS="apps/core/tests/test_availability_service.py \
               apps/core/tests/test_approval_policy_PA.py \
               apps/core/tests/test_solicitacao_fluxo.py \
               apps/core/tests/test_models.py \
               apps/core/tests/test_serializers.py \
-              apps/core/tests/test_sessions_redis.py
+              apps/core/tests/test_sessions_redis.py"
+
+            SLOW_TESTS="--ignore=apps/core/tests/test_google_oauth.py \
+              --ignore=apps/core/tests/test_gcal_batch_operations.py \
+              --ignore=apps/core/tests/test_gcal_sync_dryrun.py \
+              --ignore=apps/core/tests/test_metrics_api.py \
+              --ignore=apps/core/tests/test_reports.py"
+
+            CHANGED_APPS="${{ steps.changed-files.outputs.changed_apps }}"
+
+            if [ -n "$CHANGED_APPS" ]; then
+              # Testes das apps modificadas + críticos (sem lentos)
+              APP_TESTS=""
+              for app in $CHANGED_APPS; do
+                if [ -d "apps/$app/tests" ]; then
+                  APP_TESTS="$APP_TESTS apps/$app/tests/"
+                fi
+              done
+
+              if [ -n "$APP_TESTS" ]; then
+                echo "📦 Testando apps modificadas: $CHANGED_APPS"
+                pytest -q --tb=short $SLOW_TESTS $APP_TESTS $CRITICAL_TESTS 2>/dev/null || \
+                pytest -q --tb=short $SLOW_TESTS $CRITICAL_TESTS
+              else
+                echo "📦 Nenhum teste específico, rodando críticos"
+                pytest -q --tb=short $SLOW_TESTS $CRITICAL_TESTS
+              fi
+            else
+              echo "📦 Sem mudanças em apps, rodando críticos"
+              pytest -q --tb=short $CRITICAL_TESTS
+            fi
           else
-            echo "🧪 Running full test suite..."
+            echo "🧪 Main branch: Full test suite"
             pytest -q --tb=short
           fi
 

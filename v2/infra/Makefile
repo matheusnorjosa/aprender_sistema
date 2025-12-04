@@ -4,10 +4,11 @@
 # Comandos unificados para operações comuns
 # ================================================================
 
-.PHONY: help build up down restart logs shell migrate test clean
+.PHONY: help build up up-obs down down-obs restart logs shell migrate test clean
 
 # Variáveis
 COMPOSE_FILE := docker-compose.yml
+COMPOSE_OBS_FILE := docker-compose.observability.yml
 SERVICE_WEB := web
 SERVICE_DB := db
 SERVICE_WORKER := worker
@@ -40,9 +41,21 @@ up:  ## Iniciar todos os serviços
 	@echo "📊 Admin: http://localhost:8000/admin"
 	@echo "🔍 API Health: http://localhost:8000/api/health/"
 
+up-obs:  ## Iniciar com stack de observabilidade (Prometheus + Grafana)
+	@echo "🚀 Iniciando serviços com observabilidade..."
+	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_OBS_FILE) up -d
+	@echo "✅ Serviços iniciados!"
+	@echo "🌐 Web: http://localhost:8000"
+	@echo "📊 Grafana: http://localhost:3000 (admin/admin)"
+	@echo "🔍 Prometheus: http://localhost:9090"
+
 down:  ## Parar todos os serviços
 	@echo "⏹️  Parando serviços..."
 	docker compose -f $(COMPOSE_FILE) down
+
+down-obs:  ## Parar serviços + observabilidade
+	@echo "⏹️  Parando serviços com observabilidade..."
+	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_OBS_FILE) down
 
 restart:  ## Reiniciar todos os serviços
 	@echo "🔄 Reiniciando serviços..."

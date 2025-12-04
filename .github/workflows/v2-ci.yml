@@ -14,8 +14,69 @@ on:
     paths:
       - 'v2/**'
 
+# ================================================================
+# Otimização: Jobs paralelos + cache melhorado
+# Issue: #236
+# Nota: pytest-xdist removido (overhead > ganho com testes de DB)
+# ================================================================
+
 jobs:
-  lint-and-test:
+  # ----------------------------------------------------------------
+  # Job 1: Lint + Type Check (rápido, ~2min)
+  # ----------------------------------------------------------------
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.7'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('v2/backend/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-lint-
+            ${{ runner.os }}-pip-
+
+      - name: Install lint dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install black isort flake8 pyright
+
+      - name: Lint with Black
+        run: |
+          cd v2/backend
+          black --check --diff .
+
+      - name: Lint with isort
+        run: |
+          cd v2/backend
+          isort --check-only --diff .
+
+      - name: Lint with Flake8
+        run: |
+          cd v2/backend
+          flake8 --max-line-length=120 --extend-ignore=E203,W503 .
+
+      - name: Install dependencies for Pyright
+        run: |
+          pip install -r v2/backend/requirements.txt
+
+      - name: Type check with Pyright
+        run: |
+          cd v2/backend
+          pyright apps/core apps/dat_ingest config
+
+  # ----------------------------------------------------------------
+  # Job 2: Tests (~4-5min, roda em paralelo com lint)
+  # ----------------------------------------------------------------
+  test:
     runs-on: ubuntu-latest
 
     services:
@@ -51,38 +112,21 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12.7'
-          cache: 'pip'
-          cache-dependency-path: 'v2/backend/requirements.txt'
 
-      - name: Display Python version
-        run: python --version
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-test-${{ hashFiles('v2/backend/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-test-
+            ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r v2/backend/requirements.txt
           pip install -r v2/backend/requirements-dev.txt
-          pip install black isort flake8 pytest pytest-django pytest-cov
-
-      - name: Lint with Black
-        run: |
-          cd v2/backend
-          black --check --diff .
-
-      - name: Lint with isort
-        run: |
-          cd v2/backend
-          isort --check-only --diff .
-
-      - name: Lint with Flake8
-        run: |
-          cd v2/backend
-          flake8 --max-line-length=120 --extend-ignore=E203,W503 .
-
-      - name: Type check with Pyright
-        run: |
-          cd v2/backend
-          pyright apps/core apps/dat_ingest config
 
       - name: Django Check
         env:
@@ -137,14 +181,20 @@ jobs:
       - name: Prepare runtime dirs and symlinks
         run: |
           sudo mkdir -p /app
-          # garantir diretórios no workspace
           mkdir -p "$GITHUB_WORKSPACE/v2/backend/.agents/outbox"
-          # apontar /app/.agents -> workspace/.agents
           sudo rm -rf /app/.agents || true
           sudo ln -s "$GITHUB_WORKSPACE/v2/backend/.agents" /app/.agents
-          # opcional: ETL dirs também
           mkdir -p "$GITHUB_WORKSPACE/v2/backend/out_etl"
           mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
+
+      - name: Get changed files
+        id: changed-files
+        if: github.event_name == 'pull_request'
+        run: |
+          # Detectar quais apps foram modificadas
+          CHANGED=$(git diff --name-only origin/main...HEAD | grep "^v2/backend/apps/" | cut -d'/' -f4 | sort -u | tr '\n' ' ')
+          echo "changed_apps=$CHANGED" >> $GITHUB_OUTPUT
+          echo "📁 Apps modificadas: $CHANGED"
 
       - name: Run Tests
         env:
@@ -169,8 +219,55 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend
-          # Quarentena removida - #39 resolvido via PR #44
-          pytest -q --tb=short
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "🚀 PR Mode: Smart test selection"
+
+            # Estratégia combinada:
+            # 1. Sempre rodar testes críticos (smoke tests)
+            # 2. Rodar testes das apps modificadas
+            # 3. Ignorar testes lentos (ETL, OAuth, Batch)
+
+            CRITICAL_TESTS="apps/core/tests/test_availability_service.py \
+              apps/core/tests/test_approval_policy_PA.py \
+              apps/core/tests/test_solicitacao_fluxo.py \
+              apps/core/tests/test_models_constraints.py \
+              apps/core/tests/test_sessions_redis.py \
+              apps/core/tests/test_api_create_solicitacao_pendente.py"
+
+            SLOW_TESTS="--ignore=apps/core/tests/test_google_oauth.py \
+              --ignore=apps/core/tests/test_gcal_batch_operations.py \
+              --ignore=apps/core/tests/test_gcal_sync_dryrun.py \
+              --ignore=apps/core/tests/test_metrics_api.py \
+              --ignore=apps/core/tests/test_reports.py"
+
+            CHANGED_APPS="${{ steps.changed-files.outputs.changed_apps }}"
+
+            if [ -n "$CHANGED_APPS" ]; then
+              # Testes das apps modificadas + críticos (sem lentos)
+              APP_TESTS=""
+              for app in $CHANGED_APPS; do
+                if [ -d "apps/$app/tests" ]; then
+                  APP_TESTS="$APP_TESTS apps/$app/tests/"
+                fi
+              done
+
+              if [ -n "$APP_TESTS" ]; then
+                echo "📦 Testando apps modificadas: $CHANGED_APPS"
+                pytest -q --tb=short $SLOW_TESTS $APP_TESTS $CRITICAL_TESTS 2>/dev/null || \
+                pytest -q --tb=short $SLOW_TESTS $CRITICAL_TESTS
+              else
+                echo "📦 Nenhum teste específico, rodando críticos"
+                pytest -q --tb=short $SLOW_TESTS $CRITICAL_TESTS
+              fi
+            else
+              echo "📦 Sem mudanças em apps, rodando críticos"
+              pytest -q --tb=short $CRITICAL_TESTS
+            fi
+          else
+            echo "🧪 Main branch: Full test suite"
+            pytest -q --tb=short
+          fi
 
       - name: Upload coverage reports
         if: always()

@@ -130,9 +130,9 @@ jobs:
           CRITICAL_TESTS="apps/core/tests/test_availability_service.py \
             apps/core/tests/test_approval_policy_PA.py \
             apps/core/tests/test_solicitacao_fluxo.py \
-            apps/core/tests/test_models.py \
-            apps/core/tests/test_serializers.py \
-            apps/core/tests/test_sessions_redis.py"
+            apps/core/tests/test_models_constraints.py \
+            apps/core/tests/test_sessions_redis.py \
+            apps/core/tests/test_api_create_solicitacao_pendente.py"
 
           SLOW_TESTS="--ignore=apps/core/tests/test_google_oauth.py \
             --ignore=apps/core/tests/test_gcal_batch_operations.py \

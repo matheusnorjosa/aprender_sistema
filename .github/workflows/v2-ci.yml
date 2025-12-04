@@ -15,9 +15,9 @@ on:
       - 'v2/**'
 
 # ================================================================
-# Otimização: Jobs paralelos + pytest-xdist + cache melhorado
+# Otimização: Jobs paralelos + cache melhorado
 # Issue: #236
-# Estimativa: ~6-7min → ~3-4min (~50% mais rápido)
+# Nota: pytest-xdist removido (overhead > ganho com testes de DB)
 # ================================================================
 
 jobs:
@@ -74,7 +74,7 @@ jobs:
           pyright apps/core apps/dat_ingest config
 
   # ----------------------------------------------------------------
-  # Job 2: Tests (paralelo com xdist, ~3-4min)
+  # Job 2: Tests (~4-5min, roda em paralelo com lint)
   # ----------------------------------------------------------------
   test:
     runs-on: ubuntu-latest
@@ -187,7 +187,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/v2/backend/out_etl"
           mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
 
-      - name: Run Tests (parallel with xdist)
+      - name: Run Tests
         env:
           DJANGO_SETTINGS_MODULE: config.settings
           ENVIRONMENT: testing
@@ -210,8 +210,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           cd v2/backend
-          # pytest-xdist: -n auto usa todos os CPUs disponíveis (2 no GitHub Actions)
-          pytest -n auto -q --tb=short --dist=loadfile
+          pytest -q --tb=short
 
       - name: Upload coverage reports
         if: always()

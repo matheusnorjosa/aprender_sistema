@@ -17,7 +17,20 @@ from rest_framework.views import APIView
 
 
 # Definição dos grupos de SETOR e FUNÇÃO para RBAC
-SETOR_GROUPS = ['Superintendência', 'DAT', 'Controle', 'Gerência']
+# Setores baseados no mapeamento de gerências (docs/MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md)
+SETOR_GROUPS = [
+    # Gerências de projeto
+    'Superintendência',  # SUPERINTENDENCIA - Fluxo SUPER
+    'Vidas',             # GERENCIA 2 - Fluxo NAO_SUPER
+    'Fluir',             # GERENCIA 3 - Fluxo NAO_SUPER
+    'ACerta',            # GERENCIA 4 - Fluxo NAO_SUPER
+    'Brincando',         # GERENCIA 5 - Fluxo NAO_SUPER
+    'Sou da Paz',        # GERENCIA 6 - Fluxo NAO_SUPER
+    # Setores administrativos/operacionais
+    'DAT',               # Departamento de Apoio Técnico
+    'Controle',          # Setor de Controle
+    'Gerência',          # Gerência genérica
+]
 FUNCAO_GROUPS = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente']
 
 

@@ -513,3 +513,6 @@ v2/docs/sessions/
 # Additional temporary files
 v2/docs/memoria/
 backup_*.json
+
+# MCP config (local only)
+.mcp.json

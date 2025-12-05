@@ -89,6 +89,25 @@ Task tool:
 
 ---
 
+### 5. MCP Servers (4 disponíveis)
+
+Servidores MCP configurados localmente (`.mcp.json` - não vai pro git):
+
+| MCP | Ferramentas | Uso |
+|-----|-------------|-----|
+| **postgres** | `mcp__postgres__query` | Queries SQL diretas no banco Docker (`localhost:5434`) |
+| **github** | `mcp__github__*` | Issues, PRs, comentários via API GitHub |
+| **playwright** | `mcp__playwright__*` | Testes E2E, screenshots, automação browser |
+| **fetch** | `mcp__fetch__*` | Fetch URLs sem restrições |
+
+**Quando usar MCPs:**
+- **postgres**: Debug de dados, verificar estado do banco, queries complexas
+- **github**: Criar issues automaticamente, listar PRs, verificar CI
+- **playwright**: Testes E2E automatizados, validação visual
+- **fetch**: Buscar docs externas, APIs, verificar URLs
+
+---
+
 ## 🔍 Checklist: "Devo usar ferramenta ou fazer manual?"
 
 Antes de fazer análises manuais, SEMPRE perguntar:

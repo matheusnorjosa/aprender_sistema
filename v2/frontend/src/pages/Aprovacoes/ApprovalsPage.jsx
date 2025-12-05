@@ -26,7 +26,19 @@ import {
   message,
   Modal,
   Form,
+  Descriptions,
+  Divider,
+  List,
+  Avatar,
 } from 'antd';
+import {
+  CalendarOutlined,
+  EnvironmentOutlined,
+  TeamOutlined,
+  MailOutlined,
+  LinkOutlined,
+  VideoCameraOutlined,
+} from '@ant-design/icons';
 import { CheckOutlined, CloseOutlined, EyeOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -159,69 +171,57 @@ export default function ApprovalsPage() {
     }
   };
 
+  // Colunas da tabela (otimizadas para caber na tela)
   const columns = [
     {
-      title: 'Data',
-      dataIndex: 'inicio',
-      key: 'data',
-      render: (inicio) => dayjs(inicio).format('DD/MM/YYYY'),
-      width: 100,
-    },
-    {
-      title: 'Início',
-      dataIndex: 'inicio',
-      key: 'hora_inicio',
-      render: (inicio) => dayjs(inicio).format('HH:mm'),
-      width: 70,
-    },
-    {
-      title: 'Fim',
-      dataIndex: 'fim',
-      key: 'hora_fim',
-      render: (fim) => dayjs(fim).format('HH:mm'),
-      width: 70,
+      title: 'Data/Horário',
+      key: 'data_horario',
+      width: 140,
+      render: (_, record) => (
+        <div>
+          <div>{dayjs(record.inicio).format('DD/MM/YYYY')}</div>
+          <small style={{ color: '#666' }}>
+            {dayjs(record.inicio).format('HH:mm')} - {dayjs(record.fim).format('HH:mm')}
+          </small>
+        </div>
+      ),
     },
     {
       title: 'Município',
       dataIndex: 'municipio_nome',
       key: 'municipio_nome',
       render: (nome) => nome || '-',
-      width: 150,
+      width: 130,
+      ellipsis: true,
     },
     {
       title: 'Projeto',
       dataIndex: 'projeto_nome',
       key: 'projeto_nome',
       render: (nome) => nome || '-',
-      width: 150,
+      width: 130,
+      ellipsis: true,
     },
     {
-      title: 'Tipo',
-      dataIndex: 'tipo',
-      key: 'tipo',
-      render: (tipo) => tipo || '-',
+      title: 'Tipo/Enc./Seg.',
+      key: 'tipo_encontro_segmento',
       width: 100,
+      render: (_, record) => (
+        <div style={{ lineHeight: 1.3 }}>
+          {record.tipo && <div>{record.tipo}</div>}
+          {record.encontro && <small style={{ color: '#666' }}>{record.encontro}</small>}
+          {record.segmento && <div><small style={{ color: '#888' }}>{record.segmento}</small></div>}
+          {!record.tipo && !record.encontro && !record.segmento && '-'}
+        </div>
+      ),
     },
     {
       title: 'Coordenador',
-      dataIndex: 'coordenador_username',
-      key: 'coordenador_username',
-      render: (username) => username || '-',
-      width: 120,
-    },
-    {
-      title: 'Encontro',
-      dataIndex: 'encontro',
-      key: 'encontro',
-      render: (encontro) => encontro || '-',
-      width: 100,
-    },
-    {
-      title: 'Segmento',
-      dataIndex: 'segmento',
-      key: 'segmento',
-      render: (segmento) => segmento || '-',
-      width: 100,
+      dataIndex: 'coordenador_nome',
+      key: 'coordenador_nome',
+      render: (nome) => nome || '-',
+      width: 130,
+      ellipsis: true,
     },
     {
       title: 'Formadores',
@@ -236,7 +236,8 @@ export default function ApprovalsPage() {
           .join(', ');
         return formadores || '-';
       },
-      width: 200,
+      width: 150,
+      ellipsis: true,
     },
     {
       title: 'Status',
@@ -245,12 +246,13 @@ export default function ApprovalsPage() {
       render: (status) => (
         <Tag color={STATUS_COLORS[status]}>{STATUS_LABELS[status] || status}</Tag>
       ),
-      width: 100,
+      width: 90,
     },
     {
       title: 'Ações',
       key: 'actions',
-      width: 200,
+      width: 220,
+      fixed: 'right',
       render: (_, record) => (
         <Space size="small">
           <Button
@@ -260,24 +262,26 @@ export default function ApprovalsPage() {
             title="Preview"
           />
           {/* PA-06: Botões de aprovar/reprovar para Superintendência, DAT e Superusuários */}
-          {record.status === 'pendente' && canApprove && (
+          {record.status === 'pendente' && canApprove ? (
             <>
               <Button
                 size="small"
                 type="primary"
                 icon={<CheckOutlined />}
                 onClick={() => handleApprove(record.id)}
-                title="Aprovar"
-              />
+              >
+                Aprovar
+              </Button>
               <Button
                 size="small"
                 danger
                 icon={<CloseOutlined />}
                 onClick={() => handleRejectClick(record.id)}
-                title="Reprovar"
-              />
+              >
+                Reprovar
+              </Button>
             </>
-          )}
+          ) : null}
         </Space>
       ),
     },
@@ -326,7 +330,7 @@ export default function ApprovalsPage() {
             dataSource={rows}
             loading={loading}
             rowKey="id"
-            scroll={{ x: 1800 }}
+            scroll={{ x: 1090 }}
             pagination={{
               total,
               pageSize: 20,
@@ -336,9 +340,14 @@ export default function ApprovalsPage() {
         </Space>
       </Card>
 
-      {/* Modal Preview */}
+      {/* Modal Preview - Visualização Amigável */}
       <Modal
-        title="Preview do Payload GCal"
+        title={
+          <Space>
+            <CalendarOutlined />
+            <span>Preview do Evento no Google Calendar</span>
+          </Space>
+        }
         open={previewVisible}
         onCancel={() => setPreviewVisible(false)}
         footer={[
@@ -348,9 +357,112 @@ export default function ApprovalsPage() {
         ]}
         width={700}
       >
-        <pre style={{ maxHeight: 500, overflow: 'auto', backgroundColor: '#f5f5f5', padding: 12 }}>
-          {JSON.stringify(previewData, null, 2)}
-        </pre>
+        {previewData?.preview?.payload && (() => {
+          const payload = previewData.preview.payload;
+          const start = payload.start?.dateTime ? dayjs(payload.start.dateTime) : null;
+          const end = payload.end?.dateTime ? dayjs(payload.end.dateTime) : null;
+
+          return (
+            <div style={{ maxHeight: 500, overflow: 'auto' }}>
+              {/* Título do Evento */}
+              <Card size="small" style={{ marginBottom: 16, background: '#f0f5ff' }}>
+                <Typography.Title level={4} style={{ margin: 0 }}>
+                  {payload.summary}
+                </Typography.Title>
+              </Card>
+
+              {/* Informações Principais */}
+              <Descriptions column={1} bordered size="small">
+                <Descriptions.Item
+                  label={<><CalendarOutlined /> Data/Horário</>}
+                >
+                  {start && end ? (
+                    <>
+                      <Tag color="blue">{start.format('DD/MM/YYYY')}</Tag>
+                      <span style={{ marginLeft: 8 }}>
+                        {start.format('HH:mm')} às {end.format('HH:mm')}
+                      </span>
+                    </>
+                  ) : '-'}
+                </Descriptions.Item>
+
+                <Descriptions.Item
+                  label={<><EnvironmentOutlined /> Local</>}
+                >
+                  {payload.location || '-'}
+                </Descriptions.Item>
+
+                {previewData.preview.meet_link && (
+                  <Descriptions.Item
+                    label={<><VideoCameraOutlined /> Google Meet</>}
+                  >
+                    <a href={previewData.preview.meet_link} target="_blank" rel="noopener noreferrer">
+                      <LinkOutlined /> {previewData.preview.meet_link}
+                    </a>
+                  </Descriptions.Item>
+                )}
+              </Descriptions>
+
+              {/* Descrição */}
+              {payload.description && (
+                <>
+                  <Divider orientation="left" style={{ marginTop: 16 }}>Descrição</Divider>
+                  <Card size="small" style={{ background: '#fafafa' }}>
+                    <pre style={{
+                      whiteSpace: 'pre-wrap',
+                      margin: 0,
+                      fontFamily: 'inherit',
+                      fontSize: 13
+                    }}>
+                      {payload.description}
+                    </pre>
+                  </Card>
+                </>
+              )}
+
+              {/* Participantes */}
+              {payload.attendees && payload.attendees.length > 0 && (
+                <>
+                  <Divider orientation="left" style={{ marginTop: 16 }}>
+                    <TeamOutlined /> Participantes ({payload.attendees.length})
+                  </Divider>
+                  <List
+                    size="small"
+                    dataSource={payload.attendees}
+                    renderItem={(item) => (
+                      <List.Item>
+                        <List.Item.Meta
+                          avatar={<Avatar size="small" icon={<MailOutlined />} />}
+                          title={item.email}
+                        />
+                      </List.Item>
+                    )}
+                  />
+                </>
+              )}
+
+              {/* Metadados (colapsável) */}
+              <Divider orientation="left" style={{ marginTop: 16 }}>Metadados</Divider>
+              <Descriptions column={2} size="small">
+                <Descriptions.Item label="ID Evento">
+                  <Tag>{previewData.preview.event_id}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="Hash Payload">
+                  <Tag color="default" style={{ fontSize: 10 }}>
+                    {previewData.preview.payload_hash?.substring(0, 12)}...
+                  </Tag>
+                </Descriptions.Item>
+              </Descriptions>
+            </div>
+          );
+        })()}
+
+        {/* Fallback para JSON se não tiver payload */}
+        {!previewData?.preview?.payload && (
+          <pre style={{ maxHeight: 500, overflow: 'auto', backgroundColor: '#f5f5f5', padding: 12 }}>
+            {JSON.stringify(previewData, null, 2)}
+          </pre>
+        )}
       </Modal>
 
       {/* Modal Rejeitar */}

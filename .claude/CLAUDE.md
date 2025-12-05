@@ -110,6 +110,27 @@ Use `Skill` tool com nome da skill para contexto especializado:
 - ETL → `/etl-dry` depois `/etl-apply`
 - Deploy → `/deploy-staging full`
 
+### 🔌 MCP Servers (Model Context Protocol)
+
+Tenho acesso a 4 MCP servers configurados localmente (`.mcp.json` - não vai pro git):
+
+| MCP | Ferramenta | Uso |
+|-----|------------|-----|
+| **postgres** | `mcp__postgres__query` | Queries SQL diretas no banco (`localhost:5434`) |
+| **github** | `mcp__github__*` | Criar/listar issues, PRs, comentários via API |
+| **playwright** | `mcp__playwright__*` | Testes E2E automatizados no browser |
+| **fetch** | `mcp__fetch__*` | Fetch de URLs sem restrições |
+
+**Quando usar MCPs:**
+- **postgres**: Investigar dados, debug de queries, verificar estado do banco
+- **github**: Criar issues automaticamente, listar PRs, verificar CI status
+- **playwright**: Testes E2E, screenshots, validação visual
+- **fetch**: Buscar documentação externa, APIs, verificar URLs
+
+**Configuração:** `.mcp.json` (local only, no `.gitignore`)
+- PostgreSQL: `localhost:5434` (container Docker)
+- GitHub: Token configurado para o repositório
+
 ---
 
 ## 🐍 Type Hints (Python 3.12 + PEP 695) ✅ COMPLETO

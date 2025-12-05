@@ -23,7 +23,20 @@ from apps.core.models import Usuario
 
 
 # Definição dos grupos de SETOR e FUNÇÃO
-SETOR_GROUPS: list[str] = ['Superintendência', 'DAT', 'Controle', 'Gerência']
+# Setores baseados no mapeamento de gerências (docs/MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md)
+SETOR_GROUPS: list[str] = [
+    # Gerências de projeto
+    'Superintendência',  # SUPERINTENDENCIA - Fluxo SUPER
+    'Vidas',             # GERENCIA 2 - Fluxo NAO_SUPER
+    'Fluir',             # GERENCIA 3 - Fluxo NAO_SUPER
+    'ACerta',            # GERENCIA 4 - Fluxo NAO_SUPER
+    'Brincando',         # GERENCIA 5 - Fluxo NAO_SUPER
+    'Sou da Paz',        # GERENCIA 6 - Fluxo NAO_SUPER
+    # Setores administrativos/operacionais
+    'DAT',               # Departamento de Apoio Técnico
+    'Controle',          # Setor de Controle
+    'Gerência',          # Gerência genérica
+]
 FUNCAO_GROUPS: list[str] = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente']
 
 

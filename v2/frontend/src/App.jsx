@@ -28,6 +28,7 @@ import {
 } from '@ant-design/icons';
 import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
+import { logout as apiLogout } from './api/auth';
 import './App.css';
 
 // ============================================================================
@@ -190,13 +191,7 @@ function App() {
   // Função de logout
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout/', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      await apiLogout();
       message.success('Logout realizado com sucesso');
       // Recarregar a página para voltar para tela de login
       window.location.reload();
@@ -206,12 +201,15 @@ function App() {
     }
   };
 
-  // Calcular flags de permissão
+  // Calcular flags de permissão (RBAC correto)
   const canCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('Apoio de Coordenação') || user?.groups?.includes('DAT');
+  // canSuper = pode aprovar/reprovar (Superintendência) - NÃO dá acesso a dashboards
   const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
   const canControle = user?.is_superuser || user?.groups?.includes('Controle');
   const canDAT = user?.is_superuser || user?.groups?.includes('DAT');
-  const isAdmin = user?.is_superuser || user?.groups?.includes('Superintendência');
+  // isAdmin = apenas superusers (NÃO inclui Superintendência)
+  const isAdmin = user?.is_superuser;
+  // isManager = Gerência (dashboards, métricas) - NÃO inclui Superintendência
   const isManager = user?.groups?.includes('Gerência') || isAdmin;
 
   return (
@@ -273,8 +271,8 @@ function App() {
                 </Menu.Item>
               )}
 
-              {/* GCal Dashboard (Controle/Super) + Badge de erros (Issue #97) */}
-              {(canControle || canSuper) && (
+              {/* GCal Dashboard (Controle only) */}
+              {canControle && (
                 <Menu.Item key="gcal-dashboard" icon={<SyncOutlined />}>
                   <Link to="/dashboard/gcal">
                     <Badge count={alerts.errors} offset={[10, 0]} size="small">
@@ -291,9 +289,12 @@ function App() {
                 </Menu.Item>
               )}
 
-              <Menu.Item key="bloqueios" icon={<CalendarOutlined />}>
-                <Link to="/bloqueios">Bloqueios</Link>
-              </Menu.Item>
+              {/* Bloqueios (NOT for Superintendência) */}
+              {(canControle || canCoordenador || user?.groups?.includes('Formador')) && (
+                <Menu.Item key="bloqueios" icon={<CalendarOutlined />}>
+                  <Link to="/bloqueios">Bloqueios</Link>
+                </Menu.Item>
+              )}
 
               {/* Submenu Solicitações (Coordenador + DAT) */}
               {canCoordenador && (
@@ -340,8 +341,8 @@ function App() {
                 </SubMenu>
               )}
 
-              {/* Relatórios ETL (Controle + Superintendência) */}
-              {(canControle || canSuper) && (
+              {/* Relatórios ETL (Controle only) */}
+              {canControle && (
                 <Menu.Item key="etl-reports" icon={<FileTextOutlined />}>
                   <Link to="/controle/etl-reports">Relatórios ETL</Link>
                 </Menu.Item>

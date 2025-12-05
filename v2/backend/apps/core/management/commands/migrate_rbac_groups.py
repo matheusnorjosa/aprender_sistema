@@ -10,22 +10,27 @@ Este comando:
 2. Identifica usuários que precisam do grupo "Gerente"
 3. Adiciona o grupo "Gerente" aos usuários identificados
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false
 
-from django.core.management.base import BaseCommand
+from __future__ import annotations
+
+from typing import Any
+
+from django.core.management.base import BaseCommand, CommandParser
 from django.contrib.auth.models import Group
 
 from apps.core.models import Usuario
 
 
 # Definição dos grupos de SETOR e FUNÇÃO
-SETOR_GROUPS = ['Superintendência', 'DAT', 'Controle', 'Gerência']
-FUNCAO_GROUPS = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente']
+SETOR_GROUPS: list[str] = ['Superintendência', 'DAT', 'Controle', 'Gerência']
+FUNCAO_GROUPS: list[str] = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente']
 
 
 class Command(BaseCommand):
     help = 'Migra usuários para nova estrutura RBAC (Setor + Função)'
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             '--dry-run',
             action='store_true',
@@ -42,10 +47,10 @@ class Command(BaseCommand):
             help='Adicionar grupo Gerente a um usuário específico (username)',
         )
 
-    def handle(self, *args, **options):
-        dry_run = options['dry_run']
-        specific_user = options['user']
-        add_gerente_user = options['add_gerente']
+    def handle(self, *args: Any, **options: Any) -> None:
+        dry_run: bool = options['dry_run']
+        specific_user: str | None = options['user']
+        add_gerente_user: str | None = options['add_gerente']
 
         if dry_run:
             self.stdout.write(self.style.WARNING('=== MODO DRY-RUN (preview) ===\n'))
@@ -65,12 +70,12 @@ class Command(BaseCommand):
         self.stdout.write('-' * 80)
 
         gerente_group = Group.objects.get(name='Gerente')
-        users_to_update = []
+        users_to_update: list[tuple[Usuario, str]] = []
 
         for user in users:
-            groups = list(user.groups.values_list('name', flat=True))
-            setores = [g for g in groups if g in SETOR_GROUPS]
-            funcoes = [g for g in groups if g in FUNCAO_GROUPS]
+            groups: list[str] = list(user.groups.values_list('name', flat=True))
+            setores: list[str] = [g for g in groups if g in SETOR_GROUPS]
+            funcoes: list[str] = [g for g in groups if g in FUNCAO_GROUPS]
 
             # Identificar se o usuário precisa do grupo Gerente
             # Regra: Se é superuser ou está em Gerência, provavelmente é gerente
@@ -112,7 +117,7 @@ class Command(BaseCommand):
                 self.style.WARNING('\nUse sem --dry-run para aplicar as mudanças.')
             )
 
-    def _add_gerente_to_user(self, username, dry_run):
+    def _add_gerente_to_user(self, username: str, dry_run: bool) -> None:
         """Adiciona grupo Gerente a um usuário específico."""
         try:
             user = Usuario.objects.get(username=username)
@@ -121,7 +126,7 @@ class Command(BaseCommand):
             return
 
         gerente_group = Group.objects.get(name='Gerente')
-        groups = list(user.groups.values_list('name', flat=True))
+        groups: list[str] = list(user.groups.values_list('name', flat=True))
 
         self.stdout.write(f'\nUsuário: {user.username}')
         self.stdout.write(f'Grupos atuais: {groups}')

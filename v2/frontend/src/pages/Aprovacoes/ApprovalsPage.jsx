@@ -108,15 +108,9 @@ export default function ApprovalsPage() {
       try {
         const userData = await getMe();
 
-        // Verificar se usuário tem permissão para aprovar/reprovar
-        // Permitido para: Superintendência, DAT, e Superusuários
-        const hasApprovalPermission =
-          userData?.is_superuser ||
-          userData?.is_superintendencia ||
-          userData?.groups?.includes('Superintendência') ||
-          userData?.groups?.includes('DAT');
-
-        setCanApprove(hasApprovalPermission);
+        // Usar can_approve_super da API (Gerente + Superintendência)
+        // A API já calcula: is_superuser || (Gerente in funcoes && Superintendência in setores)
+        setCanApprove(userData?.can_approve_super || false);
       } catch (error) {
         console.error('Erro ao carregar usuário:', error);
         setCanApprove(false);

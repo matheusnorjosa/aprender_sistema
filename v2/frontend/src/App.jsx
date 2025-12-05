@@ -109,11 +109,10 @@ function App() {
 
   // Issue #97: Polling de alertas GCal (badge + toast)
   useEffect(() => {
-    // Só ativar polling para Controle/Super
-    const canControle = user?.groups?.includes('Controle');
-    const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
+    // Só ativar polling para Controle (Gerentes de Controle)
+    const inControle = user?.setores?.includes('Controle');
 
-    if (!canControle && !canSuper) {
+    if (!inControle && !user?.is_superuser) {
       return; // Não tem permissão, não fazer polling
     }
 
@@ -201,16 +200,33 @@ function App() {
     }
   };
 
-  // Calcular flags de permissão (RBAC correto)
-  const canCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('Apoio de Coordenação') || user?.groups?.includes('DAT');
-  // canSuper = pode aprovar/reprovar (Superintendência) - NÃO dá acesso a dashboards
-  const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
-  const canControle = user?.is_superuser || user?.groups?.includes('Controle');
-  const canDAT = user?.is_superuser || user?.groups?.includes('DAT');
-  // isAdmin = apenas superusers (NÃO inclui Superintendência)
+  // Calcular flags de permissão (RBAC com Setor + Função)
+  // Extrair setores e funções da API
+  const setores = user?.setores || [];
+  const funcoes = user?.funcoes || [];
+
+  // Permissões baseadas em FUNÇÃO
+  const isGerente = user?.is_superuser || funcoes.includes('Gerente');
+  const isCoordenador = funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação');
+
+  // Permissões baseadas em SETOR
+  const inDAT = setores.includes('DAT');
+  const inControle = setores.includes('Controle');
+  const inGerencia = setores.includes('Gerência');
+
+  // Permissões compostas (Setor + Função)
+  // canApproveSuper = pode aprovar solicitações SUPER (Gerente + Superintendência)
+  const canApproveSuper = user?.can_approve_super || false;
+  // canCoordenador = pode criar solicitações
+  const canCoordenador = user?.is_superuser || isCoordenador || inDAT;
+  // canControle = acesso a funcionalidades de Controle
+  const canControle = user?.is_superuser || inControle;
+  // canDAT = acesso a Admin DAT
+  const canDAT = user?.is_superuser || inDAT;
+  // isAdmin = apenas superusers
   const isAdmin = user?.is_superuser;
-  // isManager = Gerência (dashboards, métricas) - NÃO inclui Superintendência
-  const isManager = user?.groups?.includes('Gerência') || isAdmin;
+  // isManager = Gerente de qualquer setor (dashboards, métricas)
+  const isManager = isGerente && (inGerencia || isAdmin);
 
   return (
     <ConfigProvider locale={ptBR}>
@@ -308,8 +324,8 @@ function App() {
                 </SubMenu>
               )}
 
-              {/* Aprovações (Superintendência) */}
-              {canSuper && (
+              {/* Aprovações (Gerente + Superintendência) */}
+              {canApproveSuper && (
                 <Menu.Item key="aprovacoes" icon={<SafetyOutlined />}>
                   <Link to="/aprovacoes">Aprovações</Link>
                 </Menu.Item>
@@ -404,10 +420,10 @@ function App() {
                     element={(canControle || isManager) ? <EquipeDashboardPage /> : <Forbidden />}
                   />
 
-                  {/* GCal Dashboard (Controle/Super) */}
+                  {/* GCal Dashboard (Controle only) */}
                   <Route
                     path="/dashboard/gcal"
-                    element={(canControle || canSuper) ? <GCalDashboardPage /> : <Forbidden />}
+                    element={canControle ? <GCalDashboardPage /> : <Forbidden />}
                   />
 
                   {/* Mapa do Brasil (Admin/Gerência) */}
@@ -429,10 +445,10 @@ function App() {
                     element={canCoordenador ? <NewSolicitacaoWizard /> : <Forbidden />}
                   />
 
-                  {/* PR15: Rota de aprovações */}
+                  {/* PR15: Rota de aprovações (Gerente + Superintendência) */}
                   <Route
                     path="/aprovacoes"
-                    element={canSuper ? <ApprovalsPage /> : <Forbidden />}
+                    element={canApproveSuper ? <ApprovalsPage /> : <Forbidden />}
                   />
 
                   {/* PR15: Rota de pré-agenda */}
@@ -477,7 +493,7 @@ function App() {
                   <Route path="/controle" element={<ControlePage />} />
                   <Route
                     path="/controle/etl-reports"
-                    element={canControle || canSuper ? <EtlReportsPage /> : <Forbidden />}
+                    element={canControle ? <EtlReportsPage /> : <Forbidden />}
                   />
                   <Route path="/dat" element={<DATPage />} />
                 </Routes>

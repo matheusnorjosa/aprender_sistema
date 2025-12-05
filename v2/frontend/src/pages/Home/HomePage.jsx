@@ -102,10 +102,16 @@ export default function HomePage() {
     );
   }
 
-  // Calcular permissões (alinhado com App.jsx)
-  const isAdmin = user?.is_superuser || user?.groups?.includes('Superintendência');
-  const isManager = user?.groups?.includes('Gerência') || isAdmin;
+  // Calcular permissões (corrigido para RBAC correto)
+  // isAdmin = apenas superusers (acesso administrativo completo)
+  const isAdmin = user?.is_superuser;
+  // canSuper = pode aprovar/reprovar (Superintendência)
+  const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
+  // isManager = Gerência (dashboards, métricas de equipe)
+  const isManager = user?.groups?.includes('Gerência');
+  // isCoordenador = pode criar solicitações
   const isCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('Apoio de Coordenação') || user?.groups?.includes('DAT');
+  // canDAT = acesso ao Admin DAT
   const canDAT = user?.is_superuser || user?.groups?.includes('DAT');
 
   return (
@@ -155,11 +161,11 @@ export default function HomePage() {
         </>
       )}
 
-      {/* Acesso Gerencial */}
-      {isManager && (
+      {/* Aprovações (Superintendência) */}
+      {canSuper && (
         <>
           <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
-            Acesso Gerencial
+            Aprovações
           </Title>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={8}>
@@ -171,13 +177,23 @@ export default function HomePage() {
                 badge={stats.pendingApprovals}
               />
             </Col>
+          </Row>
+        </>
+      )}
+
+      {/* Acesso Gerencial (Gerência) */}
+      {isManager && (
+        <>
+          <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
+            Acesso Gerencial
+          </Title>
+          <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={8}>
               <AccessCard
                 icon={<TeamOutlined />}
                 title="Desempenho da Equipe"
                 description="Monitorar métricas e desempenho da equipe."
-                link="/dashboards"
-                disabled={true}
+                link="/dashboards/equipe"
               />
             </Col>
           </Row>
@@ -242,7 +258,7 @@ export default function HomePage() {
               />
             </Col>
           )}
-          {isManager && (
+          {canSuper && (
             <Col xs={24} sm={8}>
               <Statistic
                 title="Aprovações Pendentes"

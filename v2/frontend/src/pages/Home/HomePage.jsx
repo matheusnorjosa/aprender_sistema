@@ -102,17 +102,21 @@ export default function HomePage() {
     );
   }
 
-  // Calcular permissões (corrigido para RBAC correto)
+  // Calcular permissões (RBAC com Setor + Função)
+  const setores = user?.setores || [];
+  const funcoes = user?.funcoes || [];
+
   // isAdmin = apenas superusers (acesso administrativo completo)
   const isAdmin = user?.is_superuser;
-  // canSuper = pode aprovar/reprovar (Superintendência)
-  const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
-  // isManager = Gerência (dashboards, métricas de equipe)
-  const isManager = user?.groups?.includes('Gerência');
+  // canApproveSuper = pode aprovar solicitações SUPER (Gerente + Superintendência)
+  const canApproveSuper = user?.can_approve_super || false;
+  // isManager = Gerente de qualquer setor (dashboards, métricas)
+  const isGerente = user?.is_superuser || funcoes.includes('Gerente');
+  const isManager = isGerente && (setores.includes('Gerência') || isAdmin);
   // isCoordenador = pode criar solicitações
-  const isCoordenador = user?.is_superuser || user?.groups?.includes('Coordenador') || user?.groups?.includes('Apoio de Coordenação') || user?.groups?.includes('DAT');
+  const isCoordenador = user?.is_superuser || funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação') || setores.includes('DAT');
   // canDAT = acesso ao Admin DAT
-  const canDAT = user?.is_superuser || user?.groups?.includes('DAT');
+  const canDAT = user?.is_superuser || setores.includes('DAT');
 
   return (
     <div style={{ padding: '24px' }}>
@@ -161,8 +165,8 @@ export default function HomePage() {
         </>
       )}
 
-      {/* Aprovações (Superintendência) */}
-      {canSuper && (
+      {/* Aprovações (Gerente + Superintendência) */}
+      {canApproveSuper && (
         <>
           <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
             Aprovações
@@ -258,7 +262,7 @@ export default function HomePage() {
               />
             </Col>
           )}
-          {canSuper && (
+          {canApproveSuper && (
             <Col xs={24} sm={8}>
               <Statistic
                 title="Aprovações Pendentes"

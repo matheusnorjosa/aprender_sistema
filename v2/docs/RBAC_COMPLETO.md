@@ -1,8 +1,8 @@
 # 🔐 RBAC Completo - Grupos, Permissões e Controle de Acesso - AS v2
 
-**Data**: 2025-12-01
-**Versão**: v2.0
-**Status**: ✅ Atualizado com dados reais do banco
+**Data**: 2025-12-05
+**Versão**: v3.0
+**Status**: ✅ Atualizado com estrutura RBAC Setor + Função (PRs #239, #240)
 
 ---
 
@@ -23,23 +23,52 @@
 
 ---
 
-## 🏷️ 1. GRUPOS DO SISTEMA (Django Groups)
+## 🏷️ 1. GRUPOS DO SISTEMA (Django Groups) - RBAC Setor + Função
 
-Grupos são **papéis/funções** atribuídos aos usuários para controle de acesso (RBAC).
+> **NOVA ESTRUTURA (PRs #239, #240)**: O sistema agora usa dois tipos de grupos:
+> - **Grupos de SETOR**: Onde o usuário trabalha (gerência/departamento)
+> - **Grupos de FUNÇÃO**: O que o usuário pode fazer (papel/cargo)
 
-### Grupos Cadastrados (seed_rbac.py)
+### Grupos de SETOR (onde trabalha)
 
-| # | Grupo | Descrição | Nível |
-|---|-------|-----------|-------|
-| 1 | **Superintendência** | Nível estratégico - aprovação final de solicitações SUPER | Estratégico |
-| 2 | **Gerência** | Nível gerencial - dashboards e métricas | Gerencial |
-| 3 | **Controle** | Operações - pré-agenda e publicações no Google Calendar | Operacional |
-| 4 | **DAT** | Administração de dados e usuários | Administrativo |
-| 5 | **Coordenador** | Cria solicitações de eventos | Operacional |
-| 6 | **Apoio de Coordenação** | Auxilia coordenadores - cria solicitações e gerencia formadores | Operacional |
-| 7 | **Formador** | Executa eventos, bloqueia agenda | Execução |
+| # | Grupo | Gerência | Fluxo | Descrição |
+|---|-------|----------|-------|-----------|
+| 1 | **Superintendência** | SUPERINTENDENCIA | SUPER | Setor estratégico - aprovação de solicitações SUPER |
+| 2 | **Vidas** | GERENCIA 2 | NAO_SUPER | Projetos Vida e Ciências/Linguagem/Matemática |
+| 3 | **Fluir** | GERENCIA 3 | NAO_SUPER | Projeto Fluir das Emoções |
+| 4 | **ACerta** | GERENCIA 4 | NAO_SUPER | Projetos ACerta Matemática/Português |
+| 5 | **Brincando** | GERENCIA 5 | NAO_SUPER | Projeto Brincando e Aprendendo |
+| 6 | **Sou da Paz** | GERENCIA 6 | NAO_SUPER | Projeto Sou da Paz |
+| 7 | **DAT** | - | - | Departamento de Apoio Técnico |
+| 8 | **Controle** | - | - | Setor de Controle (operações) |
+| 9 | **Gerência** | - | - | Gerência genérica |
 
-**Nota**: Um usuário pode pertencer a **múltiplos grupos** simultaneamente.
+### Grupos de FUNÇÃO (o que pode fazer)
+
+| # | Grupo | Descrição | Permissões Principais |
+|---|-------|-----------|----------------------|
+| 1 | **Gerente** | Pode aprovar (se Superintendência) | Aprovar/reprovar, dashboards |
+| 2 | **Coordenador** | Cria solicitações de eventos | Criar solicitações |
+| 3 | **Apoio de Coordenação** | Auxilia coordenadores | Criar solicitações + view usuarios |
+| 4 | **Formador** | Executa eventos, bloqueia agenda | Gerenciar bloqueios |
+
+### Regra de Aprovação SUPER
+
+```python
+# Pode aprovar solicitações SUPER se:
+can_approve_super = is_superuser OR (
+    "Gerente" IN funcoes AND "Superintendência" IN setores
+)
+```
+
+**Exemplos**:
+| Usuário | Setor | Função | Pode aprovar SUPER? |
+|---------|-------|--------|---------------------|
+| Maria | Superintendência | Gerente | ✅ Sim |
+| João | Superintendência | Formador | ❌ Não |
+| Pedro | Vidas | Gerente | ❌ Não (setor diferente) |
+
+**Nota**: Um usuário pode pertencer a **múltiplos grupos** de ambos os tipos.
 
 ---
 
@@ -76,16 +105,44 @@ Cargos são **descritivos** (campo de texto livre), **não controlam acesso**.
 
 ## 🎯 4. PERFIS/PAPÉIS (Frontend - App.jsx)
 
-No frontend, existem **6 flags calculadas** baseadas nos grupos:
+No frontend, a lógica de permissões usa a estrutura **Setor + Função**:
 
 ```javascript
-// App.jsx linhas 186-192
-canCoordenador = is_superuser || groups.includes('Coordenador') || groups.includes('Apoio de Coordenação') || groups.includes('DAT')
-canSuper = is_superuser || is_superintendencia || groups.includes('Superintendência')
-canControle = is_superuser || groups.includes('Controle')
-canDAT = is_superuser || groups.includes('DAT')
-isAdmin = is_superuser || groups.includes('Superintendência')
-isManager = groups.includes('Gerência') || isAdmin
+// App.jsx - Nova estrutura RBAC (PR #239)
+
+// Extrair setores e funções da API
+const setores = user?.setores || [];
+const funcoes = user?.funcoes || [];
+
+// Permissões baseadas em FUNÇÃO
+const isGerente = user?.is_superuser || funcoes.includes('Gerente');
+const isCoordenador = funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação');
+
+// Permissões baseadas em SETOR
+const inDAT = setores.includes('DAT');
+const inControle = setores.includes('Controle');
+const inGerencia = setores.includes('Gerência');
+
+// Permissões compostas (Setor + Função)
+const canApproveSuper = user?.can_approve_super || false;  // Gerente + Superintendência
+const canCoordenador = user?.is_superuser || isCoordenador || inDAT;
+const canControle = user?.is_superuser || inControle;
+const canDAT = user?.is_superuser || inDAT;
+const isAdmin = user?.is_superuser;
+const isManager = isGerente && (inGerencia || isAdmin);
+```
+
+**Endpoint `/api/me/` retorna**:
+```json
+{
+  "id": 1,
+  "username": "maria",
+  "setores": ["Superintendência"],
+  "funcoes": ["Gerente"],
+  "can_approve_super": true,
+  "is_superintendencia": true,
+  "is_superuser": false
+}
 ```
 
 ---

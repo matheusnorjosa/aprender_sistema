@@ -12,7 +12,7 @@ from apps.core.views.availability import (
     AvailabilityCheckManyView,
     AvailabilityCheckView,
 )
-from apps.core.views.user import CurrentUserView
+from apps.core.views_basic import CurrentUserView
 from apps.core.views.admin import (
     AuditLogViewSet,
     CompraViewSet,

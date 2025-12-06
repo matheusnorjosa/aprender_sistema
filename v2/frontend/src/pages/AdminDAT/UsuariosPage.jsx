@@ -9,13 +9,20 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Select } from 'antd';
+import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Select, Divider } from 'antd';
 import { UserAddOutlined, ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { listUsers, createUser, updateUser, deleteUser, listGroups } from '../../api/adminDAT';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Search } = Input;
+
+// Grupos de SETOR e FUNÇÃO para RBAC (sincronizado com backend)
+const SETOR_GROUPS = [
+  'Superintendência', 'Vidas', 'Fluir', 'ACerta', 'Brincando', 'Sou da Paz',
+  'DAT', 'Controle', 'Gerência'
+];
+const FUNCAO_GROUPS = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente'];
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([]);
@@ -119,13 +126,23 @@ export default function UsuariosPage() {
 
   const handleEdit = (user) => {
     setEditingUser(user);
+    // Separar IDs de grupos por tipo
+    const userGroupIds = user.group_ids_display || [];
+    const setorIds = grupos
+      .filter(g => SETOR_GROUPS.includes(g.name) && userGroupIds.includes(g.id))
+      .map(g => g.id);
+    const funcaoIds = grupos
+      .filter(g => FUNCAO_GROUPS.includes(g.name) && userGroupIds.includes(g.id))
+      .map(g => g.id);
+
     form.setFieldsValue({
       username: user.username,
       email: user.email,
       first_name: user.first_name,
       last_name: user.last_name,
       cpf: user.cpf,
-      group_ids: user.group_ids_display || [],
+      setor_ids: setorIds,
+      funcao_ids: funcaoIds,
     });
     setModalVisible(true);
   };
@@ -151,11 +168,18 @@ export default function UsuariosPage() {
 
   const handleSave = async (values) => {
     try {
+      // Combinar setor_ids e funcao_ids em group_ids
+      const { setor_ids = [], funcao_ids = [], ...rest } = values;
+      const payload = {
+        ...rest,
+        group_ids: [...setor_ids, ...funcao_ids],
+      };
+
       if (editingUser) {
-        await updateUser(editingUser.id, values);
+        await updateUser(editingUser.id, payload);
         message.success('Usuário atualizado com sucesso');
       } else {
-        await createUser(values);
+        await createUser(payload);
         message.success('Usuário criado com sucesso');
       }
       setModalVisible(false);
@@ -202,16 +226,34 @@ export default function UsuariosPage() {
       render: (cpf) => cpf || <Tag color="orange">Sem CPF</Tag>,
     },
     {
-      title: 'Grupos',
-      dataIndex: 'groups',
-      key: 'groups',
-      render: (groups) =>
-        (groups || []).map((g) => (
-          <Tag key={g} color="blue">
-            {g}
-          </Tag>
-        )),
-      width: 250,
+      title: 'Setor',
+      key: 'setor',
+      render: (_, record) => {
+        const setores = (record.groups || []).filter(g => SETOR_GROUPS.includes(g));
+        return setores.length > 0 ? (
+          setores.map((g) => (
+            <Tag key={g} color="purple">{g}</Tag>
+          ))
+        ) : (
+          <Text type="secondary">-</Text>
+        );
+      },
+      width: 150,
+    },
+    {
+      title: 'Função',
+      key: 'funcao',
+      render: (_, record) => {
+        const funcoes = (record.groups || []).filter(g => FUNCAO_GROUPS.includes(g));
+        return funcoes.length > 0 ? (
+          funcoes.map((g) => (
+            <Tag key={g} color={g === 'Gerente' ? 'gold' : 'blue'}>{g}</Tag>
+          ))
+        ) : (
+          <Text type="secondary">-</Text>
+        );
+      },
+      width: 180,
     },
     {
       title: 'Status',
@@ -352,17 +394,41 @@ export default function UsuariosPage() {
             <Input placeholder="12345678901 (apenas números)" maxLength={11} />
           </Form.Item>
 
+          <Divider orientation="left">Grupos RBAC</Divider>
+
           <Form.Item
-            name="group_ids"
-            label="Grupos"
-            rules={[{ required: true, message: 'Selecione pelo menos um grupo' }]}
+            name="setor_ids"
+            label="Setor (onde trabalha)"
+            tooltip="Gerência ou departamento do usuário"
+            rules={[{ required: true, message: 'Selecione pelo menos um setor' }]}
           >
             <Select
               mode="multiple"
-              placeholder="Selecione os grupos"
-              options={grupos.map((g) => ({ label: g.name, value: g.id }))}
+              placeholder="Selecione o(s) setor(es)"
+              options={grupos
+                .filter((g) => SETOR_GROUPS.includes(g.name))
+                .map((g) => ({ label: g.name, value: g.id }))}
             />
           </Form.Item>
+
+          <Form.Item
+            name="funcao_ids"
+            label="Função (o que pode fazer)"
+            tooltip="Papel/cargo que define permissões"
+            rules={[{ required: true, message: 'Selecione pelo menos uma função' }]}
+          >
+            <Select
+              mode="multiple"
+              placeholder="Selecione a(s) função(ões)"
+              options={grupos
+                .filter((g) => FUNCAO_GROUPS.includes(g.name))
+                .map((g) => ({ label: g.name, value: g.id }))}
+            />
+          </Form.Item>
+
+          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            Nota: Apenas <Tag color="gold">Gerente</Tag> + <Tag color="purple">Superintendência</Tag> pode aprovar solicitações SUPER.
+          </Text>
 
           {!editingUser && (
             <Form.Item

@@ -24,13 +24,6 @@ const SETOR_GROUPS = [
 ];
 const FUNCAO_GROUPS = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente'];
 
-// Helper para classificar grupos
-const classifyGroup = (groupName) => {
-  if (SETOR_GROUPS.includes(groupName)) return 'setor';
-  if (FUNCAO_GROUPS.includes(groupName)) return 'funcao';
-  return 'outro';
-};
-
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(false);

@@ -192,19 +192,46 @@ GERÊNCIA (estrutura organizacional)
 
 ---
 
-## 🏢 GRUPOS/PERFIS NO SISTEMA (Django)
+## 🏢 GRUPOS/PERFIS NO SISTEMA (Django) — RBAC Setor + Função
 
-⚠️ **ATUALIZADO**: 2025-12-01 (128 usuários totais)
+⚠️ **ATUALIZADO**: 2025-12-05 (PRs #239, #240)
 
-| Grupo | Total no Banco | Permissões |
-|-------|----------------|------------|
-| Superintendência | 1 | Aprovar/reprovar solicitações SUPER |
-| Formador | 90 | Bloquear agenda, participar de eventos |
-| Coordenador | 37 | Criar solicitações |
-| Controle | 2 | Publicar eventos no Google Calendar |
-| DAT | 1 | CRUD usuários e municípios |
-| Gerência | 0 | Visualizar solicitações ⚠️ (grupo existe mas sem usuários) |
-| Superuser (flag) | 1 | Bypass total de permissões |
+> **NOVA ESTRUTURA RBAC**: O sistema agora usa dois tipos de grupos:
+> - **Grupos de SETOR**: Onde o usuário trabalha (gerência/departamento)
+> - **Grupos de FUNÇÃO**: O que o usuário pode fazer (papel/cargo)
+
+### Grupos de SETOR (9 grupos)
+
+| Grupo | Gerência | Fluxo | Descrição |
+|-------|----------|-------|-----------|
+| **Superintendência** | SUPERINTENDENCIA | SUPER | Setor estratégico |
+| **Vidas** | GERENCIA 2 | NAO_SUPER | Projetos Vida |
+| **Fluir** | GERENCIA 3 | NAO_SUPER | Projeto Fluir |
+| **ACerta** | GERENCIA 4 | NAO_SUPER | Projetos ACerta |
+| **Brincando** | GERENCIA 5 | NAO_SUPER | Projeto Brincando |
+| **Sou da Paz** | GERENCIA 6 | NAO_SUPER | Projeto Sou da Paz |
+| **DAT** | - | - | Apoio Técnico |
+| **Controle** | - | - | Operações |
+| **Gerência** | - | - | Genérico |
+
+### Grupos de FUNÇÃO (4 grupos)
+
+| Grupo | Permissões |
+|-------|------------|
+| **Gerente** | Aprovar (se Superintendência), dashboards |
+| **Coordenador** | Criar solicitações |
+| **Apoio de Coordenação** | Auxiliar coordenação |
+| **Formador** | Gerenciar bloqueios |
+
+### Regra de Aprovação SUPER
+
+```python
+can_approve_super = is_superuser or (
+    "Gerente" in funcoes and "Superintendência" in setores
+)
+```
+
+**Nota**: Consulte [`docs/RBAC_COMPLETO.md`](./RBAC_COMPLETO.md) para documentação detalhada.
 
 ---
 
@@ -234,10 +261,11 @@ GERÊNCIA (estrutura organizacional)
 
 ## ⚠️ GAPS E INCONSISTÊNCIAS
 
-### 1. **Setor não modelado no sistema**
-- ❌ Não existe campo "setor" em `Projeto`
-- ❌ Setor é apenas derivado da aba da planilha durante ETL
-- ✅ Workaround: Usar filtro `sector` na API `/api/availability/monthly/`
+### 1. **Setor modelado via grupos RBAC** ✅ RESOLVIDO (2025-12-05)
+- ✅ Grupos de SETOR criados (migration 0042 + 0043)
+- ✅ 9 setores disponíveis: Superintendência, Vidas, Fluir, ACerta, Brincando, Sou da Paz, DAT, Controle, Gerência
+- ✅ Endpoint `/api/me/` retorna `setores` do usuário
+- ⚠️ Campo `setor` em Projeto ainda não existe (setores são atribuídos a usuários, não projetos)
 
 ### 2. **Gerência não modelada no sistema**
 - ❌ Não existe modelo `Gerencia` ou campo `gerencia` em `Projeto`
@@ -338,11 +366,11 @@ UPDATE core_projeto SET fluxo = 'SUPER' WHERE nome IN (
 
 | Conceito | Na Planilha | No Sistema | Status |
 |----------|-------------|------------|--------|
-| **Gerências** | 8 (SUPER, G2-G6, GINDIVIDUAL) | ❌ Não modelado | 🔴 GAP |
-| **Setores** | 10 (Super, Vidas, Fluir, ACerta, Brincando, Sou da Paz, +individual) | ❌ Apenas em ETL | 🔴 GAP |
+| **Gerências** | 8 (SUPER, G2-G6, GINDIVIDUAL) | ❌ Modelo Gerencia existe mas não vinculado a projetos | 🟡 PARCIAL |
+| **Setores** | 10 (Super, Vidas, Fluir, ACerta, Brincando, Sou da Paz, +individual) | ✅ **9 grupos RBAC** (migration 0042+0043) **[ATUALIZADO 05/12]** | ✅ OK |
 | **Projetos** | 31 únicos + variantes | ✅ 46 (incluindo 8 teste) | 🟡 Duplicação |
-| **Cargos** | 3 (Formador, Coordenador, Gerente) | ✅ 6 grupos Django | ✅ OK |
-| **Usuários** | 117 ativos (planilha) | ✅ **128** (90 Form + 37 Coord + 1 Super + outros) **[ATUALIZADO 01/12]** | ✅ OK |
+| **Cargos** | 3 (Formador, Coordenador, Gerente) | ✅ **13 grupos Django** (9 SETOR + 4 FUNÇÃO) **[ATUALIZADO 05/12]** | ✅ OK |
+| **Usuários** | 117 ativos (planilha) | ✅ **128** (90 Form + 37 Coord + 1 Super + outros) | ✅ OK |
 | **Eventos Fluir** | 174 (planilha própria) | ❌ Não importados | 🔴 GAP |
 
 ---

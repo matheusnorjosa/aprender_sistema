@@ -18,7 +18,7 @@ from apps.core.views.availability import (
     AvailabilityCheckView,
     AvailabilityCheckManyView,
 )
-from apps.core.views.user import CurrentUserView
+from apps.core.views_basic import CurrentUserView
 from apps.core.views.admin import (
     MunicipioViewSet,
     ProjetoViewSet,

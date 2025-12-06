@@ -139,8 +139,8 @@ class TestViewsPackageDirectImports:
         assert AvailabilityCheckManyView is not None
 
     def test_user_module_importable(self):
-        """User module should be importable."""
-        from apps.core.views.user import CurrentUserView
+        """User module should be importable from views_basic."""
+        from apps.core.views_basic import CurrentUserView
         assert CurrentUserView is not None
 
     def test_admin_module_importable(self):
@@ -194,13 +194,13 @@ class TestViewsPackageStructure:
         from apps.core.views import utils
         from apps.core.views import solicitacao
         from apps.core.views import availability
-        from apps.core.views import user
         from apps.core.views import admin
         from apps.core.views import options
+        from apps.core import views_basic  # CurrentUserView moved here
 
         assert utils is not None
         assert solicitacao is not None
         assert availability is not None
-        assert user is not None
         assert admin is not None
         assert options is not None
+        assert views_basic is not None

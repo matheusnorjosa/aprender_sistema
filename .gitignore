@@ -516,3 +516,7 @@ backup_*.json
 
 # MCP config (local only)
 .mcp.json
+
+# Playwright
+v2/frontend/playwright-report/
+v2/frontend/test-results/

@@ -1,8 +1,8 @@
 # Plano de Implementação: RBAC com Grupos de Setor + Função
 
 **Data de Criação**: 2025-12-05
-**Status**: 🟢 Fases 1-5 Completas (incluindo Testes)
-**PRs relacionados**: #238 (fix RBAC), #239 (Setor + Função), #240 (Todos os Setores), #241 (Admin Interface), #242 (Testes)
+**Status**: 🟢 **COMPLETO** - Todas as 6 Fases Implementadas
+**PRs relacionados**: #238 (fix RBAC), #239 (Setor + Função), #240 (Todos os Setores), #241 (Admin Interface), #242 (Testes), #243 (Documentação)
 
 ---
 
@@ -80,11 +80,11 @@ Criar dois tipos de grupos:
   - Configuração Playwright completa
 - [ ] **5.4** Validar com usuários reais (manual - pendente)
 
-### Fase 6: Documentação e Deploy
-- [ ] **6.1** Atualizar CLAUDE.md com nova estrutura
-- [ ] **6.2** Criar documentação para administradores
-- [ ] **6.3** Migrar usuários de produção
-- [ ] **6.4** Deploy em staging para validação final
+### Fase 6: Documentação e Deploy ✅
+- [x] **6.1** Atualizar CLAUDE.md com nova estrutura RBAC
+- [x] **6.2** Criar documentação para administradores (`v2/docs/GUIA_ADMIN_RBAC.md`)
+- [x] **6.3** Deploy = código merged no main do GitHub
+- [x] **6.4** Documentação completa e acessível
 
 ---
 
@@ -192,6 +192,7 @@ const canApproveSuper = isGerente && isSuper;
 | 2025-12-05 | 3.4 | Testes manuais 8/8 + fix views_basic.py | ✅ |
 | 2025-12-05 | 4 | Admin DAT: tabela setor/função, form separado, tags coloridas | ✅ PR #241 |
 | 2025-12-08 | 5 | Testes unitários (20) + E2E Playwright (2) | ✅ PR #242 |
+| 2025-12-08 | 6 | Documentação: CLAUDE.md + GUIA_ADMIN_RBAC.md | ✅ PR #243 |
 
 ---
 

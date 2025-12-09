@@ -364,7 +364,7 @@ from apps.core.services.gcal.sync import apply_one_solicitacao
 Estas regras estão definidas em `.claude/CLAUDE.md` e são **imutáveis**:
 
 - **PA-01**: Sem auto-aprovação. Uma Solicitação **nunca** muda para "Aprovada" automaticamente.
-- **PA-02**: Apenas usuários com perfil **Superintendência** (ou Admin delegado) podem aprovar/reprovar.
+- **PA-02**: Apenas usuários com **Gerente + Superintendência** (ou superuser) podem aprovar/reprovar. Ver seção RBAC.
 - **PA-03**: Integrações externas (Google Calendar, etc.) só executam **após** aprovação manual concluída.
 - **PA-04**: Toda solicitação nasce com `status = pendente`.
 - **PA-05**: Registrar usuário, data/hora e justificativa em `Aprovacao` e `LogAuditoria`.
@@ -480,6 +480,74 @@ Ordem obrigatória de trabalho para agentes autônomos:
 **Documentação Completa**: [v2/docs/PROJETO_ORIGEM.md](../v2/docs/PROJETO_ORIGEM.md)
 
 **Conteúdo**: Lógica das planilhas originais, códigos de disponibilidade (E/M/D/P/T/X), stack tecnológica (Python 3.12 + Django 5.1 + PostgreSQL + Redis), modelos principais, funcionalidades atuais, perfis RBAC, RFs (RF01-RF08), situação atual vs próximos passos.
+
+---
+
+## 🔐 RBAC: Sistema de Permissões (Setor + Função)
+
+**Status**: ✅ Implementado (PRs #238-#242)
+**Documentação Completa**: [.claude/PLANO_RBAC_SETOR_FUNCAO.md](.claude/PLANO_RBAC_SETOR_FUNCAO.md)
+
+### Conceito
+O sistema RBAC usa **duas dimensões** de grupos:
+- **SETOR**: Onde o usuário trabalha (ex: Superintendência, DAT, Vidas)
+- **FUNÇÃO**: O que o usuário pode fazer (ex: Formador, Coordenador, Gerente)
+
+### Grupos de SETOR (9 grupos)
+| Grupo | Descrição |
+|-------|-----------|
+| Superintendência | Setor estratégico (fluxo SUPER) |
+| Vidas | Gerência 2 - Projetos Vida |
+| Fluir | Gerência 3 - Projeto Fluir |
+| ACerta | Gerência 4 - Projetos ACerta |
+| Brincando | Gerência 5 - Brincando e Aprendendo |
+| Sou da Paz | Gerência 6 - Projeto Sou da Paz |
+| DAT | Departamento de Apoio Técnico |
+| Controle | Setor de Controle (operações) |
+| Gerência | Gerência genérica |
+
+### Grupos de FUNÇÃO (4 grupos)
+| Grupo | Permissões |
+|-------|------------|
+| Formador | Visualiza grade, gerencia bloqueios pessoais |
+| Coordenador | Cria solicitações de eventos |
+| Apoio de Coordenação | Auxilia coordenação, visualiza solicitações |
+| Gerente | Aprova/reprova, acessa dashboards e relatórios |
+
+### Regra de Aprovação SUPER
+```python
+can_approve_super = is_superuser OR (
+    "Gerente" IN funcoes AND "Superintendência" IN setores
+)
+```
+
+**Exemplos:**
+| Usuário | Setor | Função | Pode Aprovar SUPER? |
+|---------|-------|--------|---------------------|
+| Maria | Superintendência | Gerente | ✅ Sim |
+| João | DAT | Gerente | ❌ Não |
+| Pedro | Superintendência | Formador | ❌ Não |
+
+### API /api/me/
+Retorna dados RBAC do usuário autenticado:
+```json
+{
+  "id": 1,
+  "username": "maria",
+  "groups": ["Superintendência", "Gerente"],
+  "setores": ["Superintendência"],
+  "funcoes": ["Gerente"],
+  "is_superuser": false,
+  "is_superintendencia": true,
+  "can_approve_super": true
+}
+```
+
+### Arquivos Principais
+- `apps/core/views_basic.py`: SETOR_GROUPS, FUNCAO_GROUPS, CurrentUserView
+- `apps/core/tests/test_rbac_permissions.py`: 20 testes unitários
+- `v2/frontend/src/pages/AdminDAT/UsuariosPage.jsx`: Interface de gestão
+- `v2/frontend/e2e/rbac-approval.spec.ts`: Testes E2E Playwright
 
 ---
 
@@ -611,7 +679,7 @@ As regras abaixo consolidam a lógica original das planilhas e devem ser aplicad
 ## Política de Aprovação Manual (Obrigatória)
 
 - **PA-01 — Sem auto-aprovação**: Uma `Solicitacao` **nunca** muda para “Aprovada” automaticamente, mesmo se não houver conflitos.  
-- **PA-02 — Perfil exigido**: Apenas usuários com perfil **Superintendência** (ou Admin delegado) podem aprovar/reprovar.  
+- **PA-02 — Perfil exigido**: Apenas usuários com **Gerente + Superintendência** (ou superuser) podem aprovar/reprovar. Ver seção RBAC.  
 - **PA-03 — Gatilhos pós-aprovação**: Integrações externas (RF05/RF06) só executam **após** aprovação manual concluída.  
 - **PA-04 — Estado inicial**: Toda solicitação nasce com `status = pendente`.  
 - **PA-05 — Auditoria**: Registrar usuário, data/hora e justificativa (quando houver) em `Aprovacao` e `LogAuditoria`.  

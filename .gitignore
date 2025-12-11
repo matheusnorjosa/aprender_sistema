@@ -520,3 +520,9 @@ backup_*.json
 # Playwright
 v2/frontend/playwright-report/
 v2/frontend/test-results/
+
+# Observability stack (opcional - não utilizado atualmente)
+v2/infra/docker-compose.observability.yml
+v2/infra/prometheus.yml
+v2/infra/grafana/
+v2/docs/OBSERVABILITY.md

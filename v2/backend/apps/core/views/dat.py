@@ -15,14 +15,14 @@ from django.db.models import Count, Q, QuerySet
 
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.core.models import DATRegistro, ProjetoGeral
-from apps.core.permissions import IsControleOrDAT, IsDATOrSuper, IsSuperintendenciaOnly
+from apps.core.permissions import IsDATOrSuper, IsSuperintendenciaOnly
 from apps.core.serializers import (
     DATRegistroCreateSerializer,
     DATRegistroDetailSerializer,
@@ -322,7 +322,7 @@ class ProjetoGeralViewSet(viewsets.ModelViewSet):
         if self.action in ["list", "retrieve", "projetos"]:
             return [IsAuthenticated()]
         elif self.action == "destroy":
-            return [IsSuperintendencia()]
+            return [IsSuperintendenciaOnly()]
         return [IsDATOrSuper()]
 
     @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated])

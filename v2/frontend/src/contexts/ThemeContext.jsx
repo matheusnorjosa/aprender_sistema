@@ -5,6 +5,7 @@
  * A preferência é salva no localStorage.
  */
 
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect } from 'react';
 import { theme } from 'antd';
 

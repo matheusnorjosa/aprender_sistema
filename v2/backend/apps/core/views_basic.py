@@ -44,6 +44,7 @@ SETOR_GROUPS = [
     'DAT',               # Departamento de Apoio Técnico
     'Controle',          # Setor de Controle
     'Gerência',          # Gerência genérica
+    'Diretoria',         # Diretoria - Acesso a dashboards
 ]
 FUNCAO_GROUPS = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente']
 

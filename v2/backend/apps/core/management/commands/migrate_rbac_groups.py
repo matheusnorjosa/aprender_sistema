@@ -36,6 +36,7 @@ SETOR_GROUPS: list[str] = [
     'DAT',               # Departamento de Apoio Técnico
     'Controle',          # Setor de Controle
     'Gerência',          # Gerência genérica
+    'Diretoria',         # Diretoria - Acesso a dashboards
 ]
 FUNCAO_GROUPS: list[str] = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente']
 

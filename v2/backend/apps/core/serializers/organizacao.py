@@ -1,7 +1,7 @@
 """
 AS v2 — Organizacao Serializers
 
-Serializers para Municipio, Projeto, Gerencia, TipoEvento, Produto.
+Serializers para Municipio, ProjetoGeral, Projeto, Gerencia, TipoEvento, Produto.
 Type-checked with Pyright (strict mode).
 """
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from rest_framework import serializers  # type: ignore[attr-defined]
 
-from apps.core.models import Gerencia, Municipio, Produto, Projeto, TipoEvento
+from apps.core.models import Gerencia, Municipio, Produto, Projeto, ProjetoGeral, TipoEvento
 
 
 class MunicipioSerializer(serializers.ModelSerializer):
@@ -34,6 +34,43 @@ class MunicipioOptionSerializer(serializers.ModelSerializer):
         fields = ["id", "nome", "uf"]
 
 
+class ProjetoGeralSerializer(serializers.ModelSerializer["ProjetoGeral"]):
+    """
+    Full serializer for ProjetoGeral model (Admin CRUD).
+
+    Ref: SPEC_DAT_REGISTROS.md seção 2.1
+    """
+
+    projetos_count = serializers.IntegerField(read_only=True, required=False)
+
+    class Meta:
+        model = ProjetoGeral
+        fields = [
+            "id",
+            "nome",
+            "usa_avaliar",
+            "tipo_calculo_codigos",
+            "divisor_aluno",
+            "multiplicador_professor",
+            "ativo",
+            "descricao",
+            "projetos_count",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+
+class ProjetoGeralOptionSerializer(serializers.ModelSerializer):
+    """
+    Minimal serializer for ProjetoGeral (dropdowns/selects).
+    """
+
+    class Meta:
+        model = ProjetoGeral
+        fields = ["id", "nome", "usa_avaliar", "tipo_calculo_codigos"]
+
+
 class ProjetoSerializer(serializers.ModelSerializer):
     """
     Full serializer for Projeto model (Admin CRUD).
@@ -43,6 +80,9 @@ class ProjetoSerializer(serializers.ModelSerializer):
         source="gerencia.nome_setor", read_only=True, allow_null=True
     )
     setor = serializers.SerializerMethodField()
+    projeto_geral_nome = serializers.CharField(
+        source="projeto_geral.nome", read_only=True, allow_null=True
+    )
 
     def get_setor(self, obj: Projeto) -> str:
         """Retorna nome do setor (derivado de gerencia)."""
@@ -58,6 +98,8 @@ class ProjetoSerializer(serializers.ModelSerializer):
             "ativo",
             "gerencia",
             "gerencia_nome",
+            "projeto_geral",
+            "projeto_geral_nome",
             "setor",
             "is_test",
         ]

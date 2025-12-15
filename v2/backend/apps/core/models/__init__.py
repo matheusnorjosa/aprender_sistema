@@ -11,14 +11,15 @@ Estrutura:
     models/
     ├── __init__.py          # Este arquivo (re-exports)
     ├── usuario.py           # Usuario
-    ├── organizacao.py       # Municipio, Gerencia, EquipeGerencia, Projeto, TipoEvento, Produto
+    ├── organizacao.py       # Municipio, Gerencia, EquipeGerencia, ProjetoGeral, Projeto, TipoEvento, Produto
     ├── solicitacao.py       # Solicitacao, Participation
     ├── agenda.py            # AvailabilityBlock
     ├── compra.py            # Compra
     ├── workflow.py          # Deslocamento, AcaoControle, AcaoDAT
     ├── config.py            # Config
     ├── auditoria.py         # AuditLog
-    └── integracao.py        # GoogleOAuthCredential
+    ├── integracao.py        # GoogleOAuthCredential
+    └── dat_registro.py      # DATRegistro
 
 Type-checked with Pyright (strict mode).
 """
@@ -26,6 +27,7 @@ from apps.core.models.agenda import AvailabilityBlock
 from apps.core.models.auditoria import AuditLog
 from apps.core.models.compra import Compra
 from apps.core.models.config import Config
+from apps.core.models.dat_registro import DATRegistro
 from apps.core.models.integracao import GoogleOAuthCredential
 from apps.core.models.organizacao import (
     EquipeGerencia,
@@ -33,6 +35,7 @@ from apps.core.models.organizacao import (
     Municipio,
     Produto,
     Projeto,
+    ProjetoGeral,
     TipoEvento,
 )
 from apps.core.models.solicitacao import Participation, Solicitacao
@@ -46,6 +49,7 @@ __all__ = [
     "Municipio",
     "Gerencia",
     "EquipeGerencia",
+    "ProjetoGeral",
     "Projeto",
     "TipoEvento",
     "Produto",
@@ -60,6 +64,8 @@ __all__ = [
     "Deslocamento",
     "AcaoControle",
     "AcaoDAT",
+    # DAT Registros
+    "DATRegistro",
     # Config
     "Config",
     # Auditoria

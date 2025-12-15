@@ -23,6 +23,7 @@ from .views_compras import ControleComprasListView
 from .views_controle_dat import ControleAcoesListView, DATAcoesListCreateView
 from .views_metrics import (
     metrics_map,
+    metrics_map_coordinators,
     productivity_metrics,
     formadores_metrics,
     quality_metrics,
@@ -218,6 +219,7 @@ urlpatterns = [
     path("gcal/health/", gcal_health, name="gcal-health"),
     # Metrics and Reports
     path("metrics/map/", metrics_map, name="metrics-map"),
+    path("metrics/map/coordinators/", metrics_map_coordinators, name="metrics-map-coordinators"),
     # Issue #189: Team Metrics Endpoints
     path("metrics/team/productivity/", productivity_metrics, name="metrics-team-productivity"),
     path("metrics/team/formadores/", formadores_metrics, name="metrics-team-formadores"),

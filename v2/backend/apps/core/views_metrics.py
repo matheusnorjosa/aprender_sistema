@@ -161,6 +161,110 @@ def metrics_map(request: Request) -> Response:
 
 
 @api_view(["GET"])
+@permission_classes([IsControleOrDAT])
+def metrics_map_coordinators(request: Request) -> Response:
+    """
+    GET /api/metrics/map/coordinators/
+
+    Retorna detalhes dos coordenadores para um estado específico (UF).
+
+    Query parameters:
+    - uf (required): UF do estado (ex: CE, SP, RJ)
+
+    Response:
+    {
+        "uf": "CE",
+        "coordenadores": [
+            {
+                "id": 1,
+                "nome": "João Silva",
+                "eventos": 10,
+                "projetos": [{"nome": "Projeto A", "eventos": 5}, ...],
+                "municipios": [{"nome": "Fortaleza", "eventos": 3}, ...]
+            },
+            ...
+        ]
+    }
+
+    Permissions: IsControleOrDAT (Controle, DAT ou Superintendência)
+    """
+    uf = request.query_params.get("uf")
+    if not uf:
+        return Response({"detail": "Parâmetro 'uf' é obrigatório"}, status=400)
+
+    # Buscar participações de coordenadores para o estado especificado
+    participations = (
+        Participation.objects
+        .filter(
+            role=Participation.Role.COORDENADOR,
+            solicitacao__municipio__uf=uf,
+            usuario__isnull=False,
+        )
+        .select_related("usuario", "solicitacao", "solicitacao__projeto", "solicitacao__municipio")
+    )
+
+    # Agregar por coordenador com contagem detalhada
+    coordenadores_data: dict[int, dict] = {}
+    for p in participations:
+        user_id = p.usuario_id
+        if user_id not in coordenadores_data:
+            nome = f"{p.usuario.first_name} {p.usuario.last_name}".strip()
+            if not nome:
+                nome = p.usuario.username
+            coordenadores_data[user_id] = {
+                "id": user_id,
+                "nome": nome,
+                "eventos": 0,
+                "projetos": {},  # {nome_projeto: count}
+                "municipios": {},  # {nome_municipio: count}
+            }
+
+        coordenadores_data[user_id]["eventos"] += 1
+
+        # Contagem por projeto
+        if p.solicitacao.projeto:
+            proj_nome = p.solicitacao.projeto.nome
+            coordenadores_data[user_id]["projetos"][proj_nome] = (
+                coordenadores_data[user_id]["projetos"].get(proj_nome, 0) + 1
+            )
+
+        # Contagem por município
+        if p.solicitacao.municipio:
+            mun_nome = p.solicitacao.municipio.nome
+            coordenadores_data[user_id]["municipios"][mun_nome] = (
+                coordenadores_data[user_id]["municipios"].get(mun_nome, 0) + 1
+            )
+
+    # Converter dicts para listas ordenadas por eventos desc
+    coordenadores_list: list[dict[str, object]] = []
+    for data in coordenadores_data.values():
+        # Ordenar projetos por quantidade de eventos desc
+        projetos_items: list[tuple[str, int]] = list(data["projetos"].items())
+        projetos_items.sort(key=lambda x: x[1], reverse=True)
+        projetos_list = [{"nome": nome, "eventos": count} for nome, count in projetos_items]
+
+        # Ordenar municípios por quantidade de eventos desc
+        municipios_items: list[tuple[str, int]] = list(data["municipios"].items())
+        municipios_items.sort(key=lambda x: x[1], reverse=True)
+        municipios_list = [{"nome": nome, "eventos": count} for nome, count in municipios_items]
+
+        coordenadores_list.append({
+            "id": data["id"],
+            "nome": data["nome"],
+            "eventos": data["eventos"],
+            "projetos": projetos_list,
+            "municipios": municipios_list,
+        })
+
+    coordenadores_list.sort(key=lambda x: int(x["eventos"] or 0), reverse=True)
+
+    return Response({
+        "uf": uf,
+        "coordenadores": coordenadores_list,
+    })
+
+
+@api_view(["GET"])
 @permission_classes([IsControle | IsGerencia])
 def productivity_metrics(request: Request) -> Response:
     """

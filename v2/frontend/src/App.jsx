@@ -14,7 +14,6 @@ import {
   CalendarOutlined,
   CheckCircleOutlined,
   TableOutlined,
-  ShoppingOutlined,
   DatabaseOutlined,
   FileTextOutlined,
   SafetyOutlined,
@@ -214,13 +213,12 @@ function AppContent() {
   const funcoes = user?.funcoes || [];
 
   // Permissões baseadas em FUNÇÃO
-  const isGerente = user?.is_superuser || funcoes.includes('Gerente');
   const isCoordenador = funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação');
 
   // Permissões baseadas em SETOR
   const inDAT = setores.includes('DAT');
   const inControle = setores.includes('Controle');
-  const inGerencia = setores.includes('Gerência');
+  const inDiretoria = setores.includes('Diretoria');
 
   // Permissões compostas (Setor + Função)
   // canApproveSuper = pode aprovar solicitações SUPER (Gerente + Superintendência)
@@ -231,10 +229,8 @@ function AppContent() {
   const canControle = user?.is_superuser || inControle;
   // canDAT = acesso a Admin DAT
   const canDAT = user?.is_superuser || inDAT;
-  // isAdmin = apenas superusers
-  const isAdmin = user?.is_superuser;
-  // isManager = Gerente de qualquer setor (dashboards, métricas)
-  const isManager = isGerente && (inGerencia || isAdmin);
+  // canDashboards = acesso aos dashboards (Diretoria, DAT, superuser)
+  const canDashboards = user?.is_superuser || inDiretoria || inDAT;
 
   return (
     <ConfigProvider locale={ptBR} theme={antThemeConfig}>
@@ -267,61 +263,103 @@ function AppContent() {
               Aprender Sistema
             </div>
 
-            {/* Menu vertical */}
+            {/* Menu vertical - Ordem alfabética (exceto Página Inicial) */}
             <Menu
               theme="dark"
               mode="inline"
-              defaultSelectedKeys={['disponibilidade']}
+              defaultSelectedKeys={['home']}
               style={{ borderRight: 0 }}
             >
+              {/* 1. Página Inicial (sempre primeiro) */}
               <Menu.Item key="home" icon={<HomeOutlined />}>
                 <Link to="/home">Página Inicial</Link>
               </Menu.Item>
 
-              <Menu.Item key="grade-mensal" icon={<TableOutlined />}>
-                <Link to="/disponibilidade">Grade Mensal</Link>
-              </Menu.Item>
-
-              {/* Dashboards (Admin/Gerência) */}
-              {isManager && (
-                <Menu.Item key="dashboards" icon={<BarChartOutlined />}>
-                  <Link to="/dashboards">Dashboards</Link>
+              {/* 2. Aprovações */}
+              {canApproveSuper && (
+                <Menu.Item key="aprovacoes" icon={<SafetyOutlined />}>
+                  <Link to="/aprovacoes">Aprovações</Link>
                 </Menu.Item>
               )}
 
-              {/* Dashboard Equipe (Controle/Gerência) - Issue #190 */}
-              {(canControle || isManager) && (
-                <Menu.Item key="dashboard-equipe" icon={<BarChartOutlined />}>
-                  <Link to="/dashboards/equipe">Dashboard Equipe</Link>
-                </Menu.Item>
-              )}
-
-              {/* GCal Dashboard (Controle only) */}
-              {canControle && (
-                <Menu.Item key="gcal-dashboard" icon={<SyncOutlined />}>
-                  <Link to="/dashboard/gcal">
-                    <Badge count={alerts.errors} offset={[10, 0]} size="small">
-                      Dashboard GCal
-                    </Badge>
-                  </Link>
-                </Menu.Item>
-              )}
-
-              {/* Mapa do Brasil (Admin/Gerência) */}
-              {isManager && (
-                <Menu.Item key="mapa-brasil" icon={<GlobalOutlined />}>
-                  <Link to="/mapa-brasil">Mapa do Brasil</Link>
-                </Menu.Item>
-              )}
-
-              {/* Bloqueios (NOT for Superintendência) */}
+              {/* 3. Bloqueios */}
               {(canControle || canCoordenador || user?.groups?.includes('Formador')) && (
                 <Menu.Item key="bloqueios" icon={<CalendarOutlined />}>
                   <Link to="/bloqueios">Bloqueios</Link>
                 </Menu.Item>
               )}
 
-              {/* Submenu Solicitações (Coordenador + DAT) */}
+              {/* 4. Controle */}
+              {canControle && (
+                <SubMenu key="controle-submenu" icon={<CheckCircleOutlined />} title="Controle">
+                  <Menu.Item key="deslocamentos">
+                    <Link to="/deslocamentos">Deslocamentos</Link>
+                  </Menu.Item>
+                  <Menu.Item key="controle-ops">
+                    <Link to="/controle">Painel de Controle</Link>
+                  </Menu.Item>
+                  <Menu.Item key="pre-agenda">
+                    <Link to="/pre-agenda">Pré-agenda</Link>
+                  </Menu.Item>
+                </SubMenu>
+              )}
+
+              {/* 5. Dashboards */}
+              {(canDashboards || canControle) && (
+                <SubMenu key="dashboards-submenu" icon={<BarChartOutlined />} title="Dashboards">
+                  {canDashboards && (
+                    <Menu.Item key="dashboard-geral">
+                      <Link to="/dashboards">Dashboard Geral</Link>
+                    </Menu.Item>
+                  )}
+                  {canDashboards && (
+                    <Menu.Item key="dashboard-equipe">
+                      <Link to="/dashboards/equipe">Dashboard Equipe</Link>
+                    </Menu.Item>
+                  )}
+                  {canDashboards && (
+                    <Menu.Item key="gcal-dashboard">
+                      <Link to="/dashboard/gcal">
+                        <Badge count={alerts.errors} offset={[10, 0]} size="small">
+                          Dashboard GCal
+                        </Badge>
+                      </Link>
+                    </Menu.Item>
+                  )}
+                  {canDashboards && (
+                    <Menu.Item key="mapa-brasil">
+                      <Link to="/mapa-brasil">Mapa do Brasil</Link>
+                    </Menu.Item>
+                  )}
+                  {canControle && (
+                    <Menu.Item key="etl-reports">
+                      <Link to="/controle/etl-reports">Relatórios ETL</Link>
+                    </Menu.Item>
+                  )}
+                </SubMenu>
+              )}
+
+              {/* 6. DAT */}
+              {canDAT && (
+                <SubMenu key="dat-module-submenu" icon={<SolutionOutlined />} title="DAT">
+                  <Menu.Item key="admin-dat">
+                    <Link to="/admin-dat">Administração</Link>
+                  </Menu.Item>
+                  <Menu.Item key="importacao">
+                    <Link to="/importacao">Importação</Link>
+                  </Menu.Item>
+                  <Menu.Item key="dat-registros">
+                    <Link to="/dat-module/registros">Registros de Turmas</Link>
+                  </Menu.Item>
+                </SubMenu>
+              )}
+
+              {/* 7. Grade Mensal */}
+              <Menu.Item key="grade-mensal" icon={<TableOutlined />}>
+                <Link to="/disponibilidade">Grade Mensal</Link>
+              </Menu.Item>
+
+              {/* 8. Solicitações */}
               {canCoordenador && (
                 <SubMenu key="solicitacoes-submenu" icon={<FileTextOutlined />} title="Solicitações">
                   <Menu.Item key="minhas-solicitacoes">
@@ -329,58 +367,6 @@ function AppContent() {
                   </Menu.Item>
                   <Menu.Item key="nova-solicitacao">
                     <Link to="/solicitacoes/nova">Nova Solicitação</Link>
-                  </Menu.Item>
-                </SubMenu>
-              )}
-
-              {/* Aprovações (Gerente + Superintendência) */}
-              {canApproveSuper && (
-                <Menu.Item key="aprovacoes" icon={<SafetyOutlined />}>
-                  <Link to="/aprovacoes">Aprovações</Link>
-                </Menu.Item>
-              )}
-
-              {/* Pré-agenda (Controle) */}
-              {canControle && (
-                <Menu.Item key="pre-agenda" icon={<CheckCircleOutlined />}>
-                  <Link to="/pre-agenda">Pré-agenda</Link>
-                </Menu.Item>
-              )}
-
-              {/* Ops Panels (Controle/Coordenador) */}
-              {(canControle || canCoordenador) && (
-                <SubMenu key="ops-submenu" icon={<ShoppingOutlined />} title="Ops">
-                  {canControle && (
-                    <>
-                      <Menu.Item key="controle-ops">
-                        <Link to="/controle">Controle</Link>
-                      </Menu.Item>
-                      <Menu.Item key="dat-ops">
-                        <Link to="/dat">DAT</Link>
-                      </Menu.Item>
-                    </>
-                  )}
-                  <Menu.Item key="deslocamentos">
-                    <Link to="/deslocamentos">Deslocamentos</Link>
-                  </Menu.Item>
-                </SubMenu>
-              )}
-
-              {/* Relatórios ETL (Controle only) */}
-              {canControle && (
-                <Menu.Item key="etl-reports" icon={<FileTextOutlined />}>
-                  <Link to="/controle/etl-reports">Relatórios ETL</Link>
-                </Menu.Item>
-              )}
-
-              {/* DAT Module - Acompanhamento de Turmas + Admin DAT */}
-              {canDAT && (
-                <SubMenu key="dat-module-submenu" icon={<SolutionOutlined />} title="DAT">
-                  <Menu.Item key="dat-registros">
-                    <Link to="/dat-module/registros">Registros de Turmas</Link>
-                  </Menu.Item>
-                  <Menu.Item key="admin-dat">
-                    <Link to="/admin-dat">Administração</Link>
                   </Menu.Item>
                 </SubMenu>
               )}
@@ -431,28 +417,28 @@ function AppContent() {
                   <Route path="/" element={<HomePage />} />
                   <Route path="/home" element={<HomePage />} />
 
-                  {/* Dashboards (Admin/Gerência) */}
+                  {/* Dashboards (Diretoria, DAT, superuser) */}
                   <Route
                     path="/dashboards"
-                    element={isManager ? <DashboardsPage /> : <Forbidden />}
+                    element={canDashboards ? <DashboardsPage /> : <Forbidden />}
                   />
 
-                  {/* Dashboard Equipe (Controle/Gerência) - Issue #190 */}
+                  {/* Dashboard Equipe (Diretoria, DAT, superuser) */}
                   <Route
                     path="/dashboards/equipe"
-                    element={(canControle || isManager) ? <EquipeDashboardPage /> : <Forbidden />}
+                    element={canDashboards ? <EquipeDashboardPage /> : <Forbidden />}
                   />
 
-                  {/* GCal Dashboard (Controle only) */}
+                  {/* GCal Dashboard (Diretoria, DAT, superuser) */}
                   <Route
                     path="/dashboard/gcal"
-                    element={canControle ? <GCalDashboardPage /> : <Forbidden />}
+                    element={canDashboards ? <GCalDashboardPage /> : <Forbidden />}
                   />
 
-                  {/* Mapa do Brasil (Admin/Gerência) */}
+                  {/* Mapa do Brasil (Diretoria, DAT, superuser) */}
                   <Route
                     path="/mapa-brasil"
-                    element={isManager ? <MapaBrasilPage /> : <Forbidden />}
+                    element={canDashboards ? <MapaBrasilPage /> : <Forbidden />}
                   />
 
                   <Route path="/disponibilidade" element={<MonthlyPage />} />
@@ -524,7 +510,7 @@ function AppContent() {
                     path="/controle/etl-reports"
                     element={canControle ? <EtlReportsPage /> : <Forbidden />}
                   />
-                  <Route path="/dat" element={<DATPage />} />
+                  <Route path="/importacao" element={canDAT ? <DATPage /> : <Forbidden />} />
                 </Routes>
               </Suspense>
             </Content>

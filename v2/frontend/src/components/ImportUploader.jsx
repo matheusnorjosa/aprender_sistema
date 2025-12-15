@@ -1,149 +1,366 @@
 /**
  * Componente Reutilizável para Upload de Importação.
  *
- * Permite selecionar arquivo, executar dry-run (preview) e apply (persistir).
- * Exibe relatório JSON do backend com stats e pendências.
+ * Fluxo:
+ * 1. Selecionar arquivo
+ * 2. "Validar Importação" → dry-run
+ * 3. Se validação OK → mostrar "Realizar Importação"
+ * 4. Apply persiste no banco
  */
 
 import { useState } from 'react';
+import {
+  Upload,
+  Button,
+  Card,
+  Alert,
+  Statistic,
+  Row,
+  Col,
+  Typography,
+  Space,
+  Collapse,
+  Tag,
+  Result,
+  Spin
+} from 'antd';
+import {
+  UploadOutlined,
+  CheckCircleOutlined,
+  WarningOutlined,
+  CloseCircleOutlined,
+  FileExcelOutlined,
+  ReloadOutlined
+} from '@ant-design/icons';
+
+const { Text, Title } = Typography;
+const { Panel } = Collapse;
+const { Dragger } = Upload;
 
 export default function ImportUploader({ label, onDryRun, onApply, description }) {
   const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [validationResult, setValidationResult] = useState(null);
+  const [applyResult, setApplyResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingApply, setLoadingApply] = useState(false);
   const [error, setError] = useState(null);
 
-  /**
-   * Handler genérico para dry-run ou apply.
-   *
-   * @param {string} action - 'dry' ou 'apply'
-   */
-  async function handle(action) {
-    if (!file) {
-      alert('Selecione um arquivo primeiro');
-      return;
-    }
+  // Estado da validação
+  const isValidated = validationResult !== null && !error;
+  const hasErrors = validationResult?.errors?.length > 0;
+  const canApply = isValidated && !hasErrors && !applyResult;
 
-    setBusy(true);
+  /**
+   * Reset para nova importação
+   */
+  const handleReset = () => {
+    setFile(null);
+    setValidationResult(null);
+    setApplyResult(null);
+    setError(null);
+  };
+
+  /**
+   * Validar importação (dry-run)
+   */
+  const handleValidate = async () => {
+    if (!file) return;
+
+    setLoading(true);
+    setError(null);
+    setValidationResult(null);
+    setApplyResult(null);
+
+    try {
+      const report = await onDryRun(file);
+      setValidationResult(report);
+    } catch (err) {
+      setError(err.message || 'Erro ao validar arquivo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Realizar importação (apply)
+   */
+  const handleApply = async () => {
+    if (!file) return;
+
+    setLoadingApply(true);
     setError(null);
 
     try {
-      const report = await (action === 'dry' ? onDryRun(file) : onApply(file));
-      setPreview(report);
-
-      // Se aplicou, mostrar mensagem de sucesso
-      if (action === 'apply') {
-        alert(
-          `Importação concluída!\n\n` +
-          `Criados: ${report.stats?.created || 0}\n` +
-          `Atualizados: ${report.stats?.updated || 0}\n` +
-          `Inalterados: ${report.stats?.unchanged || 0}`
-        );
-      }
+      const report = await onApply(file);
+      setApplyResult(report);
+      setValidationResult(null); // Limpar validação após apply
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Erro ao importar arquivo');
     } finally {
-      setBusy(false);
+      setLoadingApply(false);
     }
-  }
+  };
+
+  /**
+   * Props do upload
+   */
+  const uploadProps = {
+    accept: '.csv,.xlsx,.xls',
+    maxCount: 1,
+    beforeUpload: (selectedFile) => {
+      setFile(selectedFile);
+      setValidationResult(null);
+      setApplyResult(null);
+      setError(null);
+      return false; // Prevent auto upload
+    },
+    onRemove: () => {
+      handleReset();
+    },
+    fileList: file ? [{
+      uid: '-1',
+      name: file.name,
+      status: 'done',
+      size: file.size
+    }] : [],
+  };
 
   return (
-    <div className="border rounded p-4 space-y-3 bg-white shadow">
-      {/* Label */}
-      <div className="font-semibold text-gray-900">{label}</div>
-
-      {/* Description */}
+    <Card
+      title={
+        <Space>
+          <FileExcelOutlined />
+          <span>{label}</span>
+        </Space>
+      }
+      extra={
+        (validationResult || applyResult) && (
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={handleReset}
+            size="small"
+          >
+            Nova Importação
+          </Button>
+        )
+      }
+    >
+      {/* Descrição */}
       {description && (
-        <p className="text-xs text-gray-500">{description}</p>
+        <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+          {description}
+        </Text>
       )}
 
-      {/* File input */}
-      <input
-        type="file"
-        accept=".csv,.xlsx"
-        onChange={(e) => {
-          const selectedFile = e.target.files?.[0] || null;
-          setFile(selectedFile);
-          setPreview(null); // Limpar preview anterior
-          setError(null);
-        }}
-        className="block w-full text-sm text-gray-900 border border-gray-300 rounded cursor-pointer bg-gray-50 focus:outline-none"
-      />
-
-      {/* Buttons */}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          className="px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!file || busy}
-          onClick={() => handle('dry')}
-        >
-          {busy ? 'Processando...' : 'Dry-run (Preview)'}
-        </button>
-        <button
-          type="button"
-          className="px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!file || busy}
-          onClick={() => handle('apply')}
-        >
-          {busy ? 'Processando...' : 'Apply (Persistir)'}
-        </button>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded">
-          <p className="text-sm text-red-800 font-medium">Erro</p>
-          <p className="text-xs text-red-700 mt-1">{error}</p>
-        </div>
+      {/* Resultado do Apply (sucesso final) */}
+      {applyResult && (
+        <Result
+          status="success"
+          title="Importação Realizada com Sucesso!"
+          subTitle={
+            <Space direction="vertical">
+              <Text>
+                <Tag color="green">{applyResult.stats?.created || 0}</Tag> registros criados
+              </Text>
+              <Text>
+                <Tag color="blue">{applyResult.stats?.updated || 0}</Tag> registros atualizados
+              </Text>
+              <Text>
+                <Tag>{applyResult.stats?.unchanged || 0}</Tag> registros inalterados
+              </Text>
+            </Space>
+          }
+          extra={
+            <Button type="primary" onClick={handleReset}>
+              Nova Importação
+            </Button>
+          }
+        />
       )}
 
-      {/* Preview */}
-      {preview && (
-        <div className="p-3 bg-gray-50 border border-gray-200 rounded">
-          <p className="text-sm font-medium text-gray-900 mb-2">
-            Relatório {preview.dry_run ? '(Dry-run)' : '(Aplicado)'}
-          </p>
+      {/* Fluxo de importação (quando não tem applyResult) */}
+      {!applyResult && (
+        <>
+          {/* Step 1: Upload de arquivo */}
+          <div style={{ marginBottom: 24 }}>
+            <Title level={5} style={{ marginBottom: 12 }}>
+              1. Selecione o arquivo
+            </Title>
+            <Dragger {...uploadProps} disabled={loading || loadingApply}>
+              <p className="ant-upload-drag-icon">
+                <UploadOutlined />
+              </p>
+              <p className="ant-upload-text">
+                Clique ou arraste o arquivo aqui
+              </p>
+              <p className="ant-upload-hint">
+                Formatos aceitos: CSV, XLSX, XLS
+              </p>
+            </Dragger>
+          </div>
 
-          {/* Stats */}
-          {preview.stats && (
-            <div className="space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Criados:</span>
-                <span className="font-semibold text-green-700">{preview.stats.created || 0}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Atualizados:</span>
-                <span className="font-semibold text-blue-700">{preview.stats.updated || 0}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Inalterados:</span>
-                <span className="font-semibold text-gray-700">{preview.stats.unchanged || 0}</span>
-              </div>
+          {/* Step 2: Botão de validação */}
+          {file && !validationResult && (
+            <div style={{ marginBottom: 24 }}>
+              <Title level={5} style={{ marginBottom: 12 }}>
+                2. Validar dados
+              </Title>
+              <Button
+                type="primary"
+                size="large"
+                icon={<CheckCircleOutlined />}
+                onClick={handleValidate}
+                loading={loading}
+                block
+              >
+                {loading ? 'Validando...' : 'Validar Importação'}
+              </Button>
             </div>
           )}
 
-          {/* Pendências */}
-          {preview.pendencias && Object.keys(preview.pendencias).length > 0 && (
-            <div className="mt-3">
-              <p className="text-xs font-medium text-yellow-800 mb-1">Pendências:</p>
-              <pre className="text-[10px] text-yellow-700 bg-yellow-50 p-2 rounded overflow-x-auto">
-                {JSON.stringify(preview.pendencias, null, 2)}
-              </pre>
-            </div>
+          {/* Erro */}
+          {error && (
+            <Alert
+              message="Erro"
+              description={error}
+              type="error"
+              showIcon
+              closable
+              onClose={() => setError(null)}
+              style={{ marginBottom: 16 }}
+            />
           )}
 
-          {/* JSON completo (colapsado) */}
-          <details className="mt-3">
-            <summary className="text-xs text-gray-600 cursor-pointer hover:text-gray-900">
-              Ver JSON completo
-            </summary>
-            <pre className="text-[10px] text-gray-700 bg-white p-2 rounded overflow-x-auto mt-2 border">
-              {JSON.stringify(preview, null, 2)}
-            </pre>
-          </details>
-        </div>
+          {/* Step 3: Resultado da validação */}
+          {validationResult && (
+            <div style={{ marginBottom: 24 }}>
+              <Title level={5} style={{ marginBottom: 12 }}>
+                {hasErrors ? (
+                  <Space>
+                    <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+                    Validação com Erros
+                  </Space>
+                ) : (
+                  <Space>
+                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                    Validação OK
+                  </Space>
+                )}
+              </Title>
+
+              {/* Estatísticas */}
+              <Card size="small" style={{ marginBottom: 16 }}>
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Statistic
+                      title="Serão Criados"
+                      value={validationResult.stats?.created || 0}
+                      valueStyle={{ color: '#3f8600' }}
+                      prefix={<CheckCircleOutlined />}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic
+                      title="Serão Atualizados"
+                      value={validationResult.stats?.updated || 0}
+                      valueStyle={{ color: '#1890ff' }}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic
+                      title="Inalterados"
+                      value={validationResult.stats?.unchanged || 0}
+                      valueStyle={{ color: '#8c8c8c' }}
+                    />
+                  </Col>
+                </Row>
+              </Card>
+
+              {/* Erros bloqueantes */}
+              {hasErrors && (
+                <Alert
+                  message="Erros encontrados"
+                  description={
+                    <ul style={{ margin: 0, paddingLeft: 20 }}>
+                      {validationResult.errors.slice(0, 10).map((err, i) => (
+                        <li key={i}>{err}</li>
+                      ))}
+                      {validationResult.errors.length > 10 && (
+                        <li>... e mais {validationResult.errors.length - 10} erros</li>
+                      )}
+                    </ul>
+                  }
+                  type="error"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+              )}
+
+              {/* Pendências (warnings) */}
+              {validationResult.pendencias && Object.keys(validationResult.pendencias).length > 0 && (
+                <Alert
+                  message="Pendências"
+                  description={
+                    <Collapse ghost size="small">
+                      <Panel header="Ver detalhes" key="1">
+                        <pre style={{ fontSize: 11, margin: 0, overflow: 'auto' }}>
+                          {JSON.stringify(validationResult.pendencias, null, 2)}
+                        </pre>
+                      </Panel>
+                    </Collapse>
+                  }
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+              )}
+
+              {/* JSON completo */}
+              <Collapse size="small" style={{ marginBottom: 16 }}>
+                <Panel header="Ver relatório completo (JSON)" key="1">
+                  <pre style={{ fontSize: 10, margin: 0, overflow: 'auto', maxHeight: 300 }}>
+                    {JSON.stringify(validationResult, null, 2)}
+                  </pre>
+                </Panel>
+              </Collapse>
+
+              {/* Step 4: Botão de aplicar (só se validação OK) */}
+              {canApply && (
+                <div>
+                  <Title level={5} style={{ marginBottom: 12 }}>
+                    3. Confirmar importação
+                  </Title>
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<CheckCircleOutlined />}
+                    onClick={handleApply}
+                    loading={loadingApply}
+                    block
+                    style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                  >
+                    {loadingApply ? 'Importando...' : 'Realizar Importação'}
+                  </Button>
+                  <Text type="secondary" style={{ display: 'block', marginTop: 8, textAlign: 'center' }}>
+                    Esta ação irá persistir os dados no banco
+                  </Text>
+                </div>
+              )}
+
+              {/* Se tem erros, mostrar botão para tentar novamente */}
+              {hasErrors && (
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={handleReset}
+                  block
+                >
+                  Corrigir arquivo e tentar novamente
+                </Button>
+              )}
+            </div>
+          )}
+        </>
       )}
-    </div>
+    </Card>
   );
 }

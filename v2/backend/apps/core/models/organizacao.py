@@ -7,6 +7,7 @@ Type-checked with Pyright (strict mode).
 """
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.db import models
@@ -62,7 +63,7 @@ class ProjetoGeral(models.Model):
     multiplicador_professor = models.DecimalField(
         max_digits=3,
         decimal_places=2,
-        default=1.1,
+        default=Decimal("1.1"),
         help_text="Multiplicador quando tipo = por_professor (ex: 10 professores * 1.1 = 11 códigos)"
     )
     ativo = models.BooleanField(default=True)

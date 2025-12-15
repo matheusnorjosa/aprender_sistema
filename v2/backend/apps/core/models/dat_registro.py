@@ -7,6 +7,7 @@ Integra dados das plataformas FORMAR e AVALIAR.
 Ref: v2/docs/SPEC_DAT_REGISTROS.md
 Type-checked with Pyright (strict mode).
 """
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
 import math

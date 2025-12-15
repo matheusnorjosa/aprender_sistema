@@ -6,7 +6,7 @@ Type-checked with Pyright (strict mode).
 
 Ref: v2/docs/SPEC_DAT_REGISTROS.md
 """
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
 

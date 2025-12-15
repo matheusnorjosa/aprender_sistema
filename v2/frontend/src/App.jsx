@@ -8,7 +8,7 @@
 
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge } from 'antd';
+import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge, Switch, Tooltip } from 'antd';
 import logger from './utils/logger';
 import {
   CalendarOutlined,
@@ -25,7 +25,11 @@ import {
   HomeOutlined,
   LogoutOutlined,
   SyncOutlined,
+  SolutionOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from '@ant-design/icons';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
 import { logout as apiLogout } from './api/auth';
@@ -56,6 +60,8 @@ const ProjetosPage = lazy(() => import('./pages/AdminDAT/ProjetosPage'));
 const GruposPage = lazy(() => import('./pages/AdminDAT/GruposPage'));
 const ConfiguracoesPage = lazy(() => import('./pages/AdminDAT/ConfiguracoesPage'));
 const DeslocamentosPage = lazy(() => import('./pages/Deslocamentos/DeslocamentosPage'));
+// DAT Module - Acompanhamento de Turmas (SPEC_DAT_REGISTROS.md)
+const DATRegistrosPage = lazy(() => import('./pages/DATModule/DATRegistrosPage'));
 
 const { Header, Content, Sider } = Layout;
 const { SubMenu } = Menu;
@@ -81,7 +87,9 @@ function Forbidden() {
   return <Result status="403" title="Sem permissão" subTitle="Você não tem permissão para acessar esta página." />;
 }
 
-function App() {
+// Componente principal que usa o tema
+function AppContent() {
+  const { isDark, toggleTheme, antThemeConfig } = useTheme();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -179,7 +187,7 @@ function App() {
   // Se não autenticado, mostrar página de login
   if (!user) {
     return (
-      <ConfigProvider locale={ptBR}>
+      <ConfigProvider locale={ptBR} theme={antThemeConfig}>
         <Suspense fallback={<Spin size="large" tip="Carregando..." fullscreen />}>
           <LoginPage onLoginSuccess={loadUser} />
         </Suspense>
@@ -229,9 +237,9 @@ function App() {
   const isManager = isGerente && (inGerencia || isAdmin);
 
   return (
-    <ConfigProvider locale={ptBR}>
+    <ConfigProvider locale={ptBR} theme={antThemeConfig}>
       <Router>
-        <Layout style={{ minHeight: '100vh' }}>
+        <Layout style={{ minHeight: '100vh', background: isDark ? '#141414' : undefined }}>
           {/* Sider lateral fixo */}
           <Sider
             width={250}
@@ -242,6 +250,7 @@ function App() {
               left: 0,
               top: 0,
               bottom: 0,
+              background: isDark ? '#141414' : undefined,
             }}
           >
             {/* Logo/Título */}
@@ -255,7 +264,7 @@ function App() {
               fontWeight: 'bold',
               borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
             }}>
-              AS v2
+              Aprender Sistema
             </div>
 
             {/* Menu vertical */}
@@ -364,28 +373,42 @@ function App() {
                 </Menu.Item>
               )}
 
-              {/* Admin DAT (DAT + Superusers) */}
+              {/* DAT Module - Acompanhamento de Turmas + Admin DAT */}
               {canDAT && (
-                <Menu.Item key="admin-dat" icon={<DatabaseOutlined />}>
-                  <Link to="/admin-dat">Admin DAT</Link>
-                </Menu.Item>
+                <SubMenu key="dat-module-submenu" icon={<SolutionOutlined />} title="DAT">
+                  <Menu.Item key="dat-registros">
+                    <Link to="/dat-module/registros">Registros de Turmas</Link>
+                  </Menu.Item>
+                  <Menu.Item key="admin-dat">
+                    <Link to="/admin-dat">Administração</Link>
+                  </Menu.Item>
+                </SubMenu>
               )}
             </Menu>
           </Sider>
 
           {/* Layout com margem para compensar Sider fixo */}
-          <Layout style={{ marginLeft: 250, minHeight: '100vh' }}>
+          <Layout style={{ marginLeft: 250, minHeight: '100vh', background: isDark ? '#141414' : undefined }}>
             {/* Header com info do usuário */}
             <Header style={{
-              background: '#fff',
+              background: isDark ? '#1f1f1f' : '#fff',
               padding: '0 24px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'flex-end',
-              borderBottom: '1px solid #f0f0f0',
+              borderBottom: isDark ? '1px solid #303030' : '1px solid #f0f0f0',
               width: '100%',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', whiteSpace: 'nowrap' }}>
+                {/* Toggle de tema */}
+                <Tooltip title={isDark ? 'Modo claro' : 'Modo escuro'}>
+                  <Button
+                    type="text"
+                    icon={isDark ? <SunOutlined /> : <MoonOutlined />}
+                    onClick={toggleTheme}
+                    style={{ color: isDark ? '#fff' : undefined }}
+                  />
+                </Tooltip>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <UserOutlined />
                   <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
@@ -402,7 +425,7 @@ function App() {
             </Header>
 
             {/* Conteúdo principal com Suspense para lazy loading */}
-            <Content style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: '#f0f2f5' }}>
+            <Content style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: isDark ? '#141414' : '#f0f2f5' }}>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   <Route path="/" element={<HomePage />} />
@@ -489,6 +512,12 @@ function App() {
                     element={canDAT ? <ConfiguracoesPage /> : <Forbidden />}
                   />
 
+                  {/* DAT Module - Acompanhamento de Turmas (SPEC_DAT_REGISTROS.md) */}
+                  <Route
+                    path="/dat-module/registros"
+                    element={canDAT ? <DATRegistrosPage /> : <Forbidden />}
+                  />
+
                   {/* Antigas rotas (manter compatibilidade) */}
                   <Route path="/controle" element={<ControlePage />} />
                   <Route
@@ -503,6 +532,15 @@ function App() {
         </Layout>
       </Router>
     </ConfigProvider>
+  );
+}
+
+// App wrapper com ThemeProvider
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 

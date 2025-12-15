@@ -85,6 +85,8 @@ from .views import (
     UsuarioAdminViewSet,  # Reativado (Fase 1 Iteração 2, GAP-001)
     GroupViewSet,  # Criado (Fase 1 Iteração 2, GAP-002)
     AuditLogViewSet,
+    DATRegistroViewSet,  # DAT Registros module
+    ProjetoGeralViewSet,  # DAT Registros module
 )
 
 app_name = "core"
@@ -106,6 +108,9 @@ router.register(r"usuarios-admin", UsuarioAdminViewSet, basename="usuario-admin"
 router.register(r"grupos", GroupViewSet, basename="grupo")  # Criado (Fase 1 Iteração 2, GAP-002)
 router.register(r"audit-logs", AuditLogViewSet, basename="audit-log")
 router.register(r"deslocamentos", DeslocamentoViewSet, basename="deslocamento")  # Issue #188
+# DAT Registros module (SPEC_DAT_REGISTROS.md)
+router.register(r"dat/registros", DATRegistroViewSet, basename="dat-registro")
+router.register(r"projetos-gerais", ProjetoGeralViewSet, basename="projeto-geral")
 
 urlpatterns = [
     path("", api_root, name="api-root"),

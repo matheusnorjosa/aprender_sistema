@@ -28,3 +28,283 @@
 .ant-menu-dark .ant-menu-item:hover a .ant-badge {
   color: #fff !important;
 }
+
+/* ============================================
+   TEMA ESCURO (Dark Mode)
+   ============================================ */
+
+/* Transição suave ao mudar de tema */
+html,
+body,
+#root,
+.ant-layout,
+.ant-layout-sider,
+.ant-layout-content,
+.ant-card,
+.ant-table,
+.ant-modal-content,
+.ant-drawer-content {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Background do body no tema escuro */
+html.dark body {
+  background-color: #141414;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* Layout no tema escuro */
+html.dark .ant-layout {
+  background: #141414;
+}
+
+html.dark .ant-layout-content {
+  background: #141414;
+}
+
+/* Header no tema escuro */
+html.dark .ant-layout-header {
+  background: #1f1f1f;
+  border-bottom: 1px solid #303030;
+}
+
+/* Sider no tema escuro */
+html.dark .ant-layout-sider {
+  background: #141414;
+}
+
+/* Cards no tema escuro */
+html.dark .ant-card {
+  background: #1f1f1f;
+  border-color: #303030;
+}
+
+html.dark .ant-card-head {
+  background: #1f1f1f;
+  border-bottom-color: #303030;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+html.dark .ant-card-body {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* Tabelas no tema escuro */
+html.dark .ant-table {
+  background: #1f1f1f;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+html.dark .ant-table-thead > tr > th {
+  background: #262626;
+  color: rgba(255, 255, 255, 0.88);
+  border-bottom-color: #303030;
+}
+
+html.dark .ant-table-tbody > tr > td {
+  border-bottom-color: #303030;
+}
+
+html.dark .ant-table-tbody > tr:hover > td {
+  background: #262626;
+}
+
+html.dark .ant-table-tbody > tr.ant-table-row-selected > td {
+  background: #2a2a2a;
+}
+
+/* Inputs e Selects no tema escuro */
+html.dark .ant-input,
+html.dark .ant-input-affix-wrapper,
+html.dark .ant-select-selector,
+html.dark .ant-picker {
+  background-color: #1f1f1f;
+  border-color: #424242;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+html.dark .ant-input::placeholder,
+html.dark .ant-select-selection-placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+html.dark .ant-input:hover,
+html.dark .ant-input-affix-wrapper:hover,
+html.dark .ant-select-selector:hover,
+html.dark .ant-picker:hover {
+  border-color: #ea2a33;
+}
+
+html.dark .ant-input:focus,
+html.dark .ant-input-affix-wrapper-focused,
+html.dark .ant-select-focused .ant-select-selector,
+html.dark .ant-picker-focused {
+  border-color: #ea2a33;
+  box-shadow: 0 0 0 2px rgba(234, 42, 51, 0.2);
+}
+
+/* Dropdowns no tema escuro */
+html.dark .ant-select-dropdown,
+html.dark .ant-picker-dropdown,
+html.dark .ant-dropdown-menu {
+  background-color: #1f1f1f;
+  border: 1px solid #303030;
+}
+
+html.dark .ant-select-item {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+html.dark .ant-select-item-option-active,
+html.dark .ant-select-item-option-selected {
+  background-color: #262626;
+}
+
+/* Modais no tema escuro */
+html.dark .ant-modal-content {
+  background-color: #1f1f1f;
+}
+
+html.dark .ant-modal-header {
+  background-color: #1f1f1f;
+  border-bottom-color: #303030;
+}
+
+html.dark .ant-modal-title {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+html.dark .ant-modal-close-x {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+html.dark .ant-modal-footer {
+  border-top-color: #303030;
+}
+
+/* Form labels no tema escuro */
+html.dark .ant-form-item-label > label {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* Descriptions no tema escuro */
+html.dark .ant-descriptions-bordered .ant-descriptions-item-label {
+  background: #262626;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+html.dark .ant-descriptions-bordered .ant-descriptions-item-content {
+  background: #1f1f1f;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* Dividers no tema escuro */
+html.dark .ant-divider {
+  border-color: #303030;
+}
+
+html.dark .ant-divider-inner-text {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* Botões no tema escuro */
+html.dark .ant-btn-default {
+  background: #1f1f1f;
+  border-color: #424242;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+html.dark .ant-btn-default:hover {
+  border-color: #ea2a33;
+  color: #ea2a33;
+}
+
+/* Tags no tema escuro */
+html.dark .ant-tag {
+  background: #262626;
+  border-color: #424242;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* Pagination no tema escuro */
+html.dark .ant-pagination-item {
+  background: #1f1f1f;
+  border-color: #424242;
+}
+
+html.dark .ant-pagination-item a {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+html.dark .ant-pagination-item-active {
+  border-color: #ea2a33;
+}
+
+html.dark .ant-pagination-item-active a {
+  color: #ea2a33;
+}
+
+/* Scrollbar customizada para tema escuro */
+html.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html.dark ::-webkit-scrollbar-track {
+  background: #1f1f1f;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 4px;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #5a5a5a;
+}
+
+/* Breadcrumb no tema escuro */
+html.dark .ant-breadcrumb-link,
+html.dark .ant-breadcrumb-separator {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* Statistic no tema escuro */
+html.dark .ant-statistic-title {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+html.dark .ant-statistic-content {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* Empty state no tema escuro */
+html.dark .ant-empty-description {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Tooltip no tema escuro (se necessário override) */
+html.dark .ant-tooltip-inner {
+  background-color: #262626;
+}
+
+/* Alert no tema escuro */
+html.dark .ant-alert {
+  border-color: #424242;
+}
+
+html.dark .ant-alert-info {
+  background-color: rgba(22, 119, 255, 0.15);
+}
+
+html.dark .ant-alert-warning {
+  background-color: rgba(250, 173, 20, 0.15);
+}
+
+html.dark .ant-alert-error {
+  background-color: rgba(255, 77, 79, 0.15);
+}
+
+html.dark .ant-alert-success {
+  background-color: rgba(82, 196, 26, 0.15);
+}

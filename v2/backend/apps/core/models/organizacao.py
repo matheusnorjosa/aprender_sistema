@@ -1,7 +1,7 @@
 """
 AS v2 — Organizacao Models
 
-Models organizacionais: Municipio, Gerencia, EquipeGerencia, Projeto, TipoEvento, Produto.
+Models organizacionais: Municipio, Gerencia, EquipeGerencia, ProjetoGeral, Projeto, TipoEvento, Produto.
 SSOT: Substitui IMPORTRANGE de planilhas organizacionais.
 Type-checked with Pyright (strict mode).
 """
@@ -13,6 +13,76 @@ from django.db import models
 
 if TYPE_CHECKING:
     from apps.core.models.usuario import Usuario
+
+
+class ProjetoGeral(models.Model):
+    """
+    Agrupa projetos relacionados e define regras de negócio para cálculo de códigos.
+
+    Exemplo:
+    - ProjetoGeral: "VIDA E LINGUAGEM"
+      - Projetos específicos: VIDA E LINGUAGEM 6, 7, 8, 9
+      - usa_avaliar: True (usa plataforma AVALIAR)
+      - tipo_calculo: por_professor, multiplicador: 1.1
+
+    Regras de cálculo de códigos FORMAR:
+    - por_aluno: ceil(qtde_alunos / divisor_aluno)
+    - por_professor: ceil(qtde_professores * multiplicador_professor)
+    - nao_aplicavel: não gera códigos
+
+    Ref: SPEC_DAT_REGISTROS.md seção 2.1
+    """
+
+    TIPO_CALCULO_CHOICES = [
+        ('por_aluno', 'Por Aluno (qtde_alunos / divisor)'),
+        ('por_professor', 'Por Professor (qtde_professores * multiplicador)'),
+        ('nao_aplicavel', 'Não Aplicável (não gera códigos)'),
+    ]
+
+    nome = models.CharField(
+        max_length=100,
+        unique=True,
+        db_index=True,
+        help_text="Ex: ACERTA MATEMÁTICA, VIDA E LINGUAGEM"
+    )
+    usa_avaliar = models.BooleanField(
+        default=False,
+        help_text="Se o projeto utiliza a plataforma AVALIAR"
+    )
+    tipo_calculo_codigos = models.CharField(
+        max_length=15,
+        choices=TIPO_CALCULO_CHOICES,
+        default='por_professor',
+        help_text="Como calcular número de códigos FORMAR"
+    )
+    divisor_aluno = models.PositiveIntegerField(
+        default=20,
+        help_text="Divisor quando tipo = por_aluno (ex: 200 alunos / 20 = 10 códigos)"
+    )
+    multiplicador_professor = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        default=1.1,
+        help_text="Multiplicador quando tipo = por_professor (ex: 10 professores * 1.1 = 11 códigos)"
+    )
+    ativo = models.BooleanField(default=True)
+    descricao = models.TextField(
+        blank=True,
+        help_text="Descrição adicional do projeto geral"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:  # type: ignore[misc]
+        db_table = "core_projeto_geral"
+        verbose_name = "Projeto Geral"
+        verbose_name_plural = "Projetos Gerais"
+        ordering = ["nome"]
+
+    def __str__(self) -> str:
+        avaliar = "✅" if self.usa_avaliar else "⭕"
+        return f"{self.nome} {avaliar}"
 
 
 class Municipio(models.Model):
@@ -241,6 +311,17 @@ class Projeto(models.Model):
         related_name="projetos",
         help_text="Gerencia a qual o projeto pertence (ex: GERENCIA 2 - Vidas)",
     )
+
+    # DAT Registros: Agrupamento por projeto geral
+    projeto_geral = models.ForeignKey(  # type: ignore[misc]
+        "core.ProjetoGeral",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="projetos_especificos",
+        help_text="Projeto geral pai (ex: VIDA E LINGUAGEM para VIDA E LINGUAGEM 6)"
+    )
+
     is_test = models.BooleanField(
         default=False,
         help_text="Marca projeto como teste (nao exibir em producao)",

@@ -12,7 +12,6 @@ import { Link } from 'react-router-dom';
 import { Row, Col, Card, Typography, Badge, Space, Spin, Statistic } from 'antd';
 import {
   UserOutlined,
-  SettingOutlined,
   BarChartOutlined,
   CheckCircleOutlined,
   TeamOutlined,
@@ -144,15 +143,6 @@ export default function HomePage() {
                 />
               </Col>
             )}
-            <Col xs={24} sm={12} md={8}>
-              <AccessCard
-                icon={<SettingOutlined />}
-                title="Configurações do Sistema"
-                description="Configurar parâmetros do sistema."
-                link="/admin/settings"
-                disabled={true}
-              />
-            </Col>
             <Col xs={24} sm={12} md={8}>
               <AccessCard
                 icon={<BarChartOutlined />}

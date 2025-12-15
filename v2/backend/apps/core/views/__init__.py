@@ -23,6 +23,10 @@ from apps.core.views.admin import (
     ProjetoViewSet,
     UsuarioAdminViewSet,
 )
+from apps.core.views.dat import (
+    DATRegistroViewSet,
+    ProjetoGeralViewSet,
+)
 from apps.core.views.options import (
     CoordenadorOptionViewSet,
     FormadorOptionViewSet,
@@ -52,6 +56,9 @@ __all__ = [
     "UsuarioAdminViewSet",
     "GroupViewSet",
     "AuditLogViewSet",
+    # DAT Registros
+    "DATRegistroViewSet",
+    "ProjetoGeralViewSet",
     # Options
     "MunicipioOptionViewSet",
     "ProjetoOptionViewSet",

@@ -32,6 +32,29 @@ class IsSuperintendencia(permissions.BasePermission):  # type: ignore[misc]
         )
 
 
+class IsSuperintendenciaOnly(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Permissão: APENAS usuários do grupo 'Superintendência' ou superusers podem executar.
+
+    Diferença de IsSuperintendencia: NÃO inclui DAT.
+    Usado para operações destrutivas (delete) que requerem maior privilégio.
+
+    Nota: Superusers sempre têm acesso completo.
+    """
+
+    message = "Apenas usuários da Superintendência podem realizar esta ação."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                getattr(request.user, 'is_superuser', False)
+                or request.user.groups.filter(name="Superintendência").exists()  # type: ignore[attr-defined]
+            )
+        )
+
+
 class IsCoordenadorOrDAT(permissions.BasePermission):  # type: ignore[misc]
     """
     Permissão: apenas Coordenadores ou DAT podem criar solicitações.

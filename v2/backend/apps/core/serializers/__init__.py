@@ -10,11 +10,19 @@ from apps.core.serializers.agenda import AvailabilityBlockSerializer
 from apps.core.serializers.auditoria import AuditLogSerializer
 from apps.core.serializers.compra import CompraSerializer
 from apps.core.serializers.config import ConfigSerializer
+from apps.core.serializers.dat_registro import (
+    DATRegistroCreateSerializer,
+    DATRegistroDetailSerializer,
+    DATRegistroListSerializer,
+    DATRegistroUpdateSerializer,
+)
 from apps.core.serializers.organizacao import (
     GerenciaSerializer,
     MunicipioOptionSerializer,
     MunicipioSerializer,
     ProdutoSerializer,
+    ProjetoGeralOptionSerializer,
+    ProjetoGeralSerializer,
     ProjetoOptionSerializer,
     ProjetoSerializer,
     TipoEventoOptionSerializer,
@@ -47,6 +55,8 @@ __all__ = [
     # Organizacao
     "MunicipioSerializer",
     "MunicipioOptionSerializer",
+    "ProjetoGeralSerializer",
+    "ProjetoGeralOptionSerializer",
     "ProjetoSerializer",
     "ProjetoOptionSerializer",
     "GerenciaSerializer",
@@ -66,6 +76,11 @@ __all__ = [
     "AcaoDATSerializer",
     "AcaoDATCreateSerializer",
     "DeslocamentoSerializer",
+    # DAT Registros
+    "DATRegistroListSerializer",
+    "DATRegistroCreateSerializer",
+    "DATRegistroUpdateSerializer",
+    "DATRegistroDetailSerializer",
     # Auditoria
     "AuditLogSerializer",
     # Config

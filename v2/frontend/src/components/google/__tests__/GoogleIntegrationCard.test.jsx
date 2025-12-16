@@ -95,9 +95,10 @@ describe('GoogleIntegrationCard', () => {
     // Validar tag "Conectado" (verde)
     expect(screen.getByText('Conectado')).toBeInTheDocument();
 
-    // Validar email
+    // Validar email (pode aparecer em múltiplos lugares: texto + select)
     expect(screen.getByText(/Conta conectada:/)).toBeInTheDocument();
-    expect(screen.getByText('controle@aprendereditora.com.br')).toBeInTheDocument();
+    const emailElements = screen.getAllByText('controle@aprendereditora.com.br');
+    expect(emailElements.length).toBeGreaterThanOrEqual(1);
 
     // Validar data de expiração
     expect(screen.getByText(/Token expira em:/)).toBeInTheDocument();
@@ -125,8 +126,9 @@ describe('GoogleIntegrationCard', () => {
     // Validar tag "Expira em X dias" (amarelo)
     expect(screen.getByText('Expira em 5 dias')).toBeInTheDocument();
 
-    // Email e desconectar devem estar presentes
-    expect(screen.getByText('controle@aprendereditora.com.br')).toBeInTheDocument();
+    // Email e desconectar devem estar presentes (email pode aparecer em múltiplos lugares)
+    const emailElements = screen.getAllByText('controle@aprendereditora.com.br');
+    expect(emailElements.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('button', { name: /Desconectar/i })).toBeInTheDocument();
 
     // Botão "Reconectar" NÃO deve estar presente
@@ -176,8 +178,9 @@ describe('GoogleIntegrationCard', () => {
       <GoogleIntegrationCard status={status} onConnect={() => {}} onDisconnect={() => {}} />
     );
 
-    // Email deve estar presente
-    expect(screen.getByText('controle@aprendereditora.com.br')).toBeInTheDocument();
+    // Email deve estar presente (pode aparecer em múltiplos lugares)
+    const emailElements = screen.getAllByText('controle@aprendereditora.com.br');
+    expect(emailElements.length).toBeGreaterThanOrEqual(1);
 
     // Texto "Token expira em:" NÃO deve estar presente
     expect(screen.queryByText(/Token expira em:/)).not.toBeInTheDocument();

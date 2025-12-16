@@ -9,15 +9,14 @@ Type-checked with Pyright (strict mode).
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from django.db import models
 from django.utils import timezone
 
 if TYPE_CHECKING:
     from apps.core.models.dat_coordenador import DATCoordenador
-    from apps.core.models.municipio import Municipio
-    from apps.core.models.projeto import Projeto
+    from apps.core.models.organizacao import Municipio, Projeto
     from apps.core.models.usuario import Usuario
 
 
@@ -216,7 +215,7 @@ class DATFormacao(models.Model):
     @property
     def duracao_horas(self) -> float:
         """Duração da formação em horas."""
-        from datetime import datetime, timedelta
+        from datetime import datetime
         inicio = datetime.combine(self.data_formacao, self.horario_inicio)
         fim = datetime.combine(self.data_formacao, self.horario_fim)
         delta = fim - inicio

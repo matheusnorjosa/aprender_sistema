@@ -9,15 +9,14 @@ Type-checked with Pyright (strict mode).
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from django.db import models
 from django.utils import timezone
 
 if TYPE_CHECKING:
     from apps.core.models.dat_coordenador import DATCoordenador
-    from apps.core.models.municipio import Municipio
-    from apps.core.models.projeto import Projeto
+    from apps.core.models.organizacao import Municipio, Projeto
     from apps.core.models.usuario import Usuario
 
 

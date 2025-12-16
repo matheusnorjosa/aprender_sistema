@@ -107,65 +107,13 @@ jobs:
         mkdir -p "$GITHUB_WORKSPACE/v2/backend/out_etl"
         mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
 
-    - name: Get changed files
-      id: changed-files
-      if: github.event_name == 'pull_request'
-      run: |
-        CHANGED=$(git diff --name-only origin/main...HEAD | grep "^v2/backend/apps/" | cut -d'/' -f4 | sort -u | tr '\n' ' ')
-        echo "changed_apps=$CHANGED" >> $GITHUB_OUTPUT
-        echo "📁 Apps modificadas: $CHANGED"
-
     - name: Run tests with coverage
       run: |
         cd v2/backend
-
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          echo "🚀 PR Mode: Smart test selection"
-
-          # Estratégia combinada:
-          # 1. Sempre rodar testes críticos (smoke tests)
-          # 2. Rodar testes das apps modificadas
-          # 3. Ignorar testes lentos (OAuth, Batch, Reports, Metrics)
-
-          CRITICAL_TESTS="apps/core/tests/test_availability_service.py \
-            apps/core/tests/test_approval_policy_PA.py \
-            apps/core/tests/test_solicitacao_fluxo.py \
-            apps/core/tests/test_models_constraints.py \
-            apps/core/tests/test_sessions_redis.py \
-            apps/core/tests/test_api_create_solicitacao_pendente.py"
-
-          SLOW_TESTS="--ignore=apps/core/tests/test_google_oauth.py \
-            --ignore=apps/core/tests/test_gcal_batch_operations.py \
-            --ignore=apps/core/tests/test_gcal_sync_dryrun.py \
-            --ignore=apps/core/tests/test_metrics_api.py \
-            --ignore=apps/core/tests/test_reports.py"
-
-          CHANGED_APPS="${{ steps.changed-files.outputs.changed_apps }}"
-
-          if [ -n "$CHANGED_APPS" ]; then
-            APP_TESTS=""
-            for app in $CHANGED_APPS; do
-              if [ -d "apps/$app/tests" ]; then
-                APP_TESTS="$APP_TESTS apps/$app/tests/"
-              fi
-            done
-
-            if [ -n "$APP_TESTS" ]; then
-              echo "📦 Testando apps modificadas: $CHANGED_APPS"
-              pytest -q --tb=short --cov=apps --cov-report=xml --cov-report=term $SLOW_TESTS $APP_TESTS $CRITICAL_TESTS || \
-              pytest -q --tb=short --cov=apps --cov-report=xml --cov-report=term $CRITICAL_TESTS
-            else
-              echo "📦 Sem testes específicos, rodando críticos"
-              pytest -q --tb=short --cov=apps --cov-report=xml --cov-report=term $CRITICAL_TESTS
-            fi
-          else
-            echo "📦 Sem mudanças em apps, rodando críticos"
-            pytest -q --tb=short --cov=apps --cov-report=xml --cov-report=term $CRITICAL_TESTS
-          fi
-        else
-          echo "🧪 Main branch: Full test suite"
-          pytest -q --tb=short --cov=apps --cov-report=xml --cov-report=term --cov-fail-under=80
-        fi
+        # Full test suite for both PRs and main branch
+        # This ensures no regressions slip through to main
+        echo "🧪 Running full test suite"
+        pytest -q --tb=short --cov=apps --cov-report=xml --cov-report=term --cov-fail-under=80
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

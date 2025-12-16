@@ -88,6 +88,13 @@ from .views import (
     AuditLogViewSet,
     DATRegistroViewSet,  # DAT Registros module
     ProjetoGeralViewSet,  # DAT Registros module
+    # DAT Module ViewSets
+    DATAreaViewSet,
+    DATCoordenadorViewSet,
+    DATAcaoViewSet,
+    DATCompraViewSet,
+    DATCadastroViewSet,
+    DATFormacaoViewSet,
 )
 
 app_name = "core"
@@ -112,6 +119,13 @@ router.register(r"deslocamentos", DeslocamentoViewSet, basename="deslocamento") 
 # DAT Registros module (SPEC_DAT_REGISTROS.md)
 router.register(r"dat/registros", DATRegistroViewSet, basename="dat-registro")
 router.register(r"projetos-gerais", ProjetoGeralViewSet, basename="projeto-geral")
+# DAT Module (5 páginas React)
+router.register(r"dat/areas", DATAreaViewSet, basename="dat-area")
+router.register(r"dat/coordenadores", DATCoordenadorViewSet, basename="dat-coordenador")
+router.register(r"dat/acoes-ciclo", DATAcaoViewSet, basename="dat-acao-ciclo")
+router.register(r"dat/compras-materiais", DATCompraViewSet, basename="dat-compra-material")
+router.register(r"dat/cadastros", DATCadastroViewSet, basename="dat-cadastro")
+router.register(r"dat/formacoes", DATFormacaoViewSet, basename="dat-formacao")
 
 urlpatterns = [
     path("", api_root, name="api-root"),

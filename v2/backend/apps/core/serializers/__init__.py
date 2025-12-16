@@ -10,6 +10,22 @@ from apps.core.serializers.agenda import AvailabilityBlockSerializer
 from apps.core.serializers.auditoria import AuditLogSerializer
 from apps.core.serializers.compra import CompraSerializer
 from apps.core.serializers.config import ConfigSerializer
+from apps.core.serializers.dat_module import (
+    DATAcaoListSerializer,
+    DATAcaoSerializer,
+    DATAreaOptionSerializer,
+    DATAreaSerializer,
+    DATCadastroListSerializer,
+    DATCadastroSerializer,
+    DATCompraListSerializer,
+    DATCompraSerializer,
+    DATCoordenadorListSerializer,
+    DATCoordenadorOptionSerializer,
+    DATCoordenadorSerializer,
+    DATFormacaoCalendarioSerializer,
+    DATFormacaoListSerializer,
+    DATFormacaoSerializer,
+)
 from apps.core.serializers.dat_registro import (
     DATRegistroCreateSerializer,
     DATRegistroDetailSerializer,
@@ -81,6 +97,21 @@ __all__ = [
     "DATRegistroCreateSerializer",
     "DATRegistroUpdateSerializer",
     "DATRegistroDetailSerializer",
+    # DAT Module
+    "DATAreaSerializer",
+    "DATAreaOptionSerializer",
+    "DATCoordenadorSerializer",
+    "DATCoordenadorOptionSerializer",
+    "DATCoordenadorListSerializer",
+    "DATAcaoSerializer",
+    "DATAcaoListSerializer",
+    "DATCompraSerializer",
+    "DATCompraListSerializer",
+    "DATCadastroSerializer",
+    "DATCadastroListSerializer",
+    "DATFormacaoSerializer",
+    "DATFormacaoListSerializer",
+    "DATFormacaoCalendarioSerializer",
     # Auditoria
     "AuditLogSerializer",
     # Config

@@ -173,3 +173,205 @@ export async function getMunicipiosOptions() {
 export async function getProjetosOptions() {
   return apiRequest(() => api.get('/options/projetos/'));
 }
+
+// ========== AÇÕES (Ciclo de Vida de Projetos) ==========
+
+/**
+ * Listar ações com filtros
+ * @param {Object} params - search, status_carta, status_contato, status_reuniao, status_entrega,
+ *                          projeto_id, municipio_id, coordenador_id, uf, page
+ */
+export async function listAcoes(params = {}) {
+  return apiRequest(() => api.get('/dat/acoes/', { params }));
+}
+
+export async function getAcao(id) {
+  return apiRequest(() => api.get(`/dat/acoes/${id}/`));
+}
+
+export async function createAcao(data) {
+  return apiRequest(() => api.post('/dat/acoes/', data));
+}
+
+export async function updateAcao(id, data) {
+  return apiRequest(() => api.patch(`/dat/acoes/${id}/`, data));
+}
+
+export async function deleteAcao(id) {
+  return apiRequest(() => api.delete(`/dat/acoes/${id}/`));
+}
+
+export async function getAcoesStats(params = {}) {
+  return apiRequest(() => api.get('/dat/acoes/stats/', { params }));
+}
+
+// ========== COMPRAS (Controle de Materiais) ==========
+
+/**
+ * Listar compras com filtros
+ * @param {Object} params - search, status, projeto_id, municipio_id, produto_id, uf, ano_uso, page
+ */
+export async function listCompras(params = {}) {
+  return apiRequest(() => api.get('/dat/compras/', { params }));
+}
+
+export async function getCompra(id) {
+  return apiRequest(() => api.get(`/dat/compras/${id}/`));
+}
+
+export async function createCompra(data) {
+  return apiRequest(() => api.post('/dat/compras/', data));
+}
+
+export async function updateCompra(id, data) {
+  return apiRequest(() => api.patch(`/dat/compras/${id}/`, data));
+}
+
+export async function deleteCompra(id) {
+  return apiRequest(() => api.delete(`/dat/compras/${id}/`));
+}
+
+export async function getComprasStats(params = {}) {
+  return apiRequest(() => api.get('/dat/compras/stats/', { params }));
+}
+
+// ========== CADASTROS (Workflow FORMAR/AVALIAR) ==========
+
+/**
+ * Listar cadastros com filtros
+ * @param {Object} params - search, plataforma, projeto_id, municipio_id, status_etapa, page
+ */
+export async function listCadastros(params = {}) {
+  return apiRequest(() => api.get('/dat/cadastros/', { params }));
+}
+
+export async function getCadastro(id) {
+  return apiRequest(() => api.get(`/dat/cadastros/${id}/`));
+}
+
+export async function createCadastro(data) {
+  return apiRequest(() => api.post('/dat/cadastros/', data));
+}
+
+export async function updateCadastro(id, data) {
+  return apiRequest(() => api.patch(`/dat/cadastros/${id}/`, data));
+}
+
+export async function deleteCadastro(id) {
+  return apiRequest(() => api.delete(`/dat/cadastros/${id}/`));
+}
+
+export async function updateCadastroEtapa(id, etapa, status) {
+  return apiRequest(() => api.patch(`/dat/cadastros/${id}/etapa/`, { etapa, status }));
+}
+
+export async function getCadastrosStats(params = {}) {
+  return apiRequest(() => api.get('/dat/cadastros/stats/', { params }));
+}
+
+// ========== FORMAÇÕES (Calendário de Treinamentos) ==========
+
+/**
+ * Listar formações com filtros
+ * @param {Object} params - search, status, projeto_id, municipio_id, coordenador_id,
+ *                          formador_id, data_inicio, data_fim, modalidade, page
+ */
+export async function listFormacoes(params = {}) {
+  return apiRequest(() => api.get('/dat/formacoes/', { params }));
+}
+
+export async function getFormacao(id) {
+  return apiRequest(() => api.get(`/dat/formacoes/${id}/`));
+}
+
+export async function createFormacao(data) {
+  return apiRequest(() => api.post('/dat/formacoes/', data));
+}
+
+export async function updateFormacao(id, data) {
+  return apiRequest(() => api.patch(`/dat/formacoes/${id}/`, data));
+}
+
+export async function deleteFormacao(id) {
+  return apiRequest(() => api.delete(`/dat/formacoes/${id}/`));
+}
+
+export async function getFormacoesStats(params = {}) {
+  return apiRequest(() => api.get('/dat/formacoes/stats/', { params }));
+}
+
+export async function getFormacoesCalendario(params = {}) {
+  return apiRequest(() => api.get('/dat/formacoes/calendario/', { params }));
+}
+
+// ========== COORDENADORES ==========
+
+/**
+ * Listar coordenadores com filtros
+ * @param {Object} params - search, area, ativo, page
+ */
+export async function listCoordenadoresDAT(params = {}) {
+  return apiRequest(() => api.get('/dat/coordenadores/', { params }));
+}
+
+export async function getCoordenadorDAT(id) {
+  return apiRequest(() => api.get(`/dat/coordenadores/${id}/`));
+}
+
+export async function createCoordenadorDAT(data) {
+  return apiRequest(() => api.post('/dat/coordenadores/', data));
+}
+
+export async function updateCoordenadorDAT(id, data) {
+  return apiRequest(() => api.patch(`/dat/coordenadores/${id}/`, data));
+}
+
+export async function deleteCoordenadorDAT(id) {
+  return apiRequest(() => api.delete(`/dat/coordenadores/${id}/`));
+}
+
+export async function getCoordenadorAlocacoes(id) {
+  return apiRequest(() => api.get(`/dat/coordenadores/${id}/alocacoes/`));
+}
+
+// ========== PRODUTOS ==========
+
+export async function listProdutosDAT(params = {}) {
+  return apiRequest(() => api.get('/dat/produtos/', { params }));
+}
+
+export async function getProdutoDAT(id) {
+  return apiRequest(() => api.get(`/dat/produtos/${id}/`));
+}
+
+export async function createProdutoDAT(data) {
+  return apiRequest(() => api.post('/dat/produtos/', data));
+}
+
+export async function updateProdutoDAT(id, data) {
+  return apiRequest(() => api.patch(`/dat/produtos/${id}/`, data));
+}
+
+export async function deleteProdutoDAT(id) {
+  return apiRequest(() => api.delete(`/dat/produtos/${id}/`));
+}
+
+// ========== ÁREAS ==========
+
+export async function listAreasDAT(params = {}) {
+  return apiRequest(() => api.get('/dat/areas/', { params }));
+}
+
+// ========== COORDENADORES OPTIONS ==========
+
+export async function getCoordenadoresOptions() {
+  return apiRequest(() => api.get('/options/coordenadores/'));
+}
+
+export async function getAreasOptions() {
+  return apiRequest(() => api.get('/options/areas/'));
+}
+
+export async function getProdutosOptions() {
+  return apiRequest(() => api.get('/options/produtos/'));
+}

@@ -61,6 +61,12 @@ const ConfiguracoesPage = lazy(() => import('./pages/AdminDAT/ConfiguracoesPage'
 const DeslocamentosPage = lazy(() => import('./pages/Deslocamentos/DeslocamentosPage'));
 // DAT Module - Acompanhamento de Turmas (SPEC_DAT_REGISTROS.md)
 const DATRegistrosPage = lazy(() => import('./pages/DATModule/DATRegistrosPage'));
+// DAT Module - Novas páginas de gestão
+const AcoesPage = lazy(() => import('./pages/DATModule/AcoesPage'));
+const ComprasPage = lazy(() => import('./pages/DATModule/ComprasPage'));
+const CadastrosPage = lazy(() => import('./pages/DATModule/CadastrosPage'));
+const FormacoesPage = lazy(() => import('./pages/DATModule/FormacoesPage'));
+const CoordenadoresPage = lazy(() => import('./pages/DATModule/CoordenadoresPage'));
 
 const { Header, Content, Sider } = Layout;
 const { SubMenu } = Menu;
@@ -351,6 +357,21 @@ function AppContent() {
                   <Menu.Item key="dat-registros">
                     <Link to="/dat-module/registros">Registros de Turmas</Link>
                   </Menu.Item>
+                  <Menu.Item key="dat-acoes">
+                    <Link to="/dat-module/acoes">Ações</Link>
+                  </Menu.Item>
+                  <Menu.Item key="dat-compras">
+                    <Link to="/dat-module/compras">Compras</Link>
+                  </Menu.Item>
+                  <Menu.Item key="dat-cadastros">
+                    <Link to="/dat-module/cadastros">Cadastros</Link>
+                  </Menu.Item>
+                  <Menu.Item key="dat-formacoes">
+                    <Link to="/dat-module/formacoes">Formações</Link>
+                  </Menu.Item>
+                  <Menu.Item key="dat-coordenadores">
+                    <Link to="/dat-module/coordenadores">Coordenadores</Link>
+                  </Menu.Item>
                 </SubMenu>
               )}
 
@@ -502,6 +523,28 @@ function AppContent() {
                   <Route
                     path="/dat-module/registros"
                     element={canDAT ? <DATRegistrosPage /> : <Forbidden />}
+                  />
+
+                  {/* DAT Module - Novas páginas de gestão */}
+                  <Route
+                    path="/dat-module/acoes"
+                    element={canDAT ? <AcoesPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/dat-module/compras"
+                    element={canDAT ? <ComprasPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/dat-module/cadastros"
+                    element={canDAT ? <CadastrosPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/dat-module/formacoes"
+                    element={canDAT ? <FormacoesPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/dat-module/coordenadores"
+                    element={canDAT ? <CoordenadoresPage /> : <Forbidden />}
                   />
 
                   {/* Antigas rotas (manter compatibilidade) */}

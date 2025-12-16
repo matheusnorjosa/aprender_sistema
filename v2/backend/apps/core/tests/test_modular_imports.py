@@ -136,7 +136,7 @@ class TestModelsBackwardsCompatibility:
         """Verifica que __all__ esta definido corretamente."""
         from apps.core import models
         assert hasattr(models, "__all__")
-        assert len(models.__all__) == 17  # Total de models exportados
+        assert len(models.__all__) == 25  # Total de models exportados (17 base + 8 DAT)
 
     def test_solicitacao_gcal_status_enum(self) -> None:
         """Verifica que GCalStatus enum esta acessivel."""

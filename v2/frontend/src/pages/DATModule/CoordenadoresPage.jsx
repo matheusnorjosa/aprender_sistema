@@ -57,7 +57,6 @@ import {
 } from '@ant-design/icons';
 import {
   listCoordenadoresDAT,
-  getCoordenadorDAT,
   createCoordenadorDAT,
   updateCoordenadorDAT,
   deleteCoordenadorDAT,
@@ -113,10 +112,10 @@ export default function CoordenadoresPage() {
     ativo: undefined,
   });
 
-  // Options for dropdowns
+  // Options for dropdowns (projetos/municipios reserved for future use)
   const [areas, setAreas] = useState([]);
-  const [projetos, setProjetos] = useState([]);
-  const [municipios, setMunicipios] = useState([]);
+  const [_projetos, setProjetos] = useState([]);
+  const [_municipios, setMunicipios] = useState([]);
 
   // Modal states
   const [modalVisible, setModalVisible] = useState(false);

@@ -27,6 +27,14 @@ from apps.core.views.dat import (
     DATRegistroViewSet,
     ProjetoGeralViewSet,
 )
+from apps.core.views.dat_module import (
+    DATAcaoViewSet,
+    DATAreaViewSet,
+    DATCadastroViewSet,
+    DATCompraViewSet,
+    DATCoordenadorViewSet,
+    DATFormacaoViewSet,
+)
 from apps.core.views.options import (
     CoordenadorOptionViewSet,
     FormadorOptionViewSet,
@@ -59,6 +67,13 @@ __all__ = [
     # DAT Registros
     "DATRegistroViewSet",
     "ProjetoGeralViewSet",
+    # DAT Module
+    "DATAreaViewSet",
+    "DATCoordenadorViewSet",
+    "DATAcaoViewSet",
+    "DATCompraViewSet",
+    "DATCadastroViewSet",
+    "DATFormacaoViewSet",
     # Options
     "MunicipioOptionViewSet",
     "ProjetoOptionViewSet",

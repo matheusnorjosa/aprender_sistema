@@ -19,7 +19,12 @@ Estrutura:
     ├── config.py            # Config
     ├── auditoria.py         # AuditLog
     ├── integracao.py        # GoogleOAuthCredential
-    └── dat_registro.py      # DATRegistro
+    ├── dat_registro.py      # DATRegistro
+    ├── dat_coordenador.py   # DATCoordenador, DATArea
+    ├── dat_acao.py          # DATAcao
+    ├── dat_compra.py        # DATCompra
+    ├── dat_cadastro.py      # DATCadastro
+    └── dat_formacao.py      # DATFormacao
 
 Type-checked with Pyright (strict mode).
 """
@@ -27,6 +32,11 @@ from apps.core.models.agenda import AvailabilityBlock
 from apps.core.models.auditoria import AuditLog
 from apps.core.models.compra import Compra
 from apps.core.models.config import Config
+from apps.core.models.dat_acao import DATAcao
+from apps.core.models.dat_cadastro import DATCadastro
+from apps.core.models.dat_compra import DATCompra
+from apps.core.models.dat_coordenador import DATArea, DATCoordenador
+from apps.core.models.dat_formacao import DATFormacao
 from apps.core.models.dat_registro import DATRegistro
 from apps.core.models.integracao import GoogleOAuthCredential
 from apps.core.models.organizacao import (
@@ -66,6 +76,13 @@ __all__ = [
     "AcaoDAT",
     # DAT Registros
     "DATRegistro",
+    # DAT Module
+    "DATArea",
+    "DATCoordenador",
+    "DATAcao",
+    "DATCompra",
+    "DATCadastro",
+    "DATFormacao",
     # Config
     "Config",
     # Auditoria

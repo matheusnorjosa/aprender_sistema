@@ -37,7 +37,7 @@
       "Read(./secrets/**)"
     ],
     "additionalDirectories": [
-      "C:\\Users\\datsu\\OneDrive\\Documentos\\Aprender Sistema\\📄 v2\\docs\\memoria"
+      "C:\\Users\\datsu\\Documents\\aprender_sistema\\v2\\docs\\memoria"
     ]
   },
   "env": {

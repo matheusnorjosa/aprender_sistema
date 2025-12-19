@@ -46,34 +46,34 @@
     "DB_PORT": "5432"
   },
   "hooks": {
-    "Bash": [
+    "PostToolUse": [
       {
         "description": "Notificação sonora ao completar testes (pytest)",
-        "matcher": "pytest.*",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -c \"[console]::beep(800,300); [console]::beep(1000,200)\""
+            "command": "powershell -c \"if ($env:TOOL_INPUT -match 'pytest') { [console]::beep(800,300); [console]::beep(1000,200) }\""
           }
         ]
       },
       {
         "description": "Notificação sonora ao completar ETL apply",
-        "matcher": "python manage.py.*--apply",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -c \"[console]::beep(800,300); [console]::beep(1000,200)\""
+            "command": "powershell -c \"if ($env:TOOL_INPUT -match '--apply') { [console]::beep(800,300); [console]::beep(1000,200) }\""
           }
         ]
       },
       {
         "description": "Notificação sonora ao completar docker compose up",
-        "matcher": "docker compose up.*",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -c \"[console]::beep(600,200); [console]::beep(800,200)\""
+            "command": "powershell -c \"if ($env:TOOL_INPUT -match 'docker compose up') { [console]::beep(600,200); [console]::beep(800,200) }\""
           }
         ]
       }

@@ -45,52 +45,6 @@
     "DB_HOST": "db",
     "DB_PORT": "5432"
   },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "description": "Notificação sonora ao completar testes (pytest)",
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -c \"if ($env:TOOL_INPUT -match 'pytest') { [console]::beep(800,300); [console]::beep(1000,200) }\""
-          }
-        ]
-      },
-      {
-        "description": "Notificação sonora ao completar ETL apply",
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -c \"if ($env:TOOL_INPUT -match '--apply') { [console]::beep(800,300); [console]::beep(1000,200) }\""
-          }
-        ]
-      },
-      {
-        "description": "Notificação sonora ao completar docker compose up",
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -c \"if ($env:TOOL_INPUT -match 'docker compose up') { [console]::beep(600,200); [console]::beep(800,200) }\""
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "description": "Notificação geral de sucesso",
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -c \"[console]::beep(1000,150)\""
-          }
-        ]
-      }
-    ]
-  },
   "enableAllProjectMcpServers": true,
   "verbose": false,
   "includeCoAuthoredBy": false

@@ -1,20 +1,17 @@
 /**
  * Página de Login - AS v2
  *
- * Design baseado em: paginadelogin/screen.png
- * - Login com CPF (com/sem máscara) ou username + senha
- * - Backend aceita CPF ou username no mesmo campo
- * - Link "Esqueci a senha?"
- * - Link "Cadastre-se" (futuro)
- * - Layout centralizado e clean
+ * Design baseado na identidade visual do Programa Aprender
+ * - Logo no topo
+ * - Card com cantos arredondados e fundo claro
+ * - Campos minimalistas
  */
 
 import { useState } from 'react';
-import { Form, Input, Button, Typography, Card, message } from 'antd';
+import { Form, Input, Button, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '../../api/auth';
-
-const { Title, Text, Link } = Typography;
+import logoAprender from '../../assets/logo-aprender.png';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -39,25 +36,45 @@ export default function LoginPage({ onLoginSuccess }) {
     <div style={{
       minHeight: '100vh',
       display: 'flex',
+      flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      justifyContent: 'flex-start',
+      paddingTop: '60px',
+      background: '#004B3D',
     }}>
-      <Card
+      {/* Logo */}
+      <div style={{ marginBottom: '40px' }}>
+        <img
+          src={logoAprender}
+          alt="Aprender"
+          style={{
+            width: '200px',
+            height: 'auto',
+            filter: 'brightness(0) invert(1)',
+          }}
+        />
+      </div>
+
+      {/* Card de Login */}
+      <div
         style={{
-          width: 450,
-          boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
-          borderRadius: '8px',
+          width: '100%',
+          maxWidth: '420px',
+          background: '#E5EDE5',
+          borderRadius: '24px 24px 24px 24px',
+          padding: '40px 32px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
         }}
       >
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <Title level={2} style={{ marginBottom: '8px' }}>
-            Bem-vindo de volta!
-          </Title>
-          <Text type="secondary">
-            Acesse sua conta para continuar.
-          </Text>
-        </div>
+        <h2 style={{
+          color: '#004B3D',
+          fontSize: '24px',
+          fontWeight: '500',
+          marginBottom: '32px',
+          textAlign: 'center',
+        }}>
+          Login
+        </h2>
 
         <Form
           name="login"
@@ -92,12 +109,6 @@ export default function LoginPage({ onLoginSuccess }) {
           </Form.Item>
 
           <Form.Item>
-            <Link href="#" style={{ float: 'right' }}>
-              Esqueci a senha?
-            </Link>
-          </Form.Item>
-
-          <Form.Item>
             <Button
               type="primary"
               htmlType="submit"
@@ -113,14 +124,7 @@ export default function LoginPage({ onLoginSuccess }) {
             </Button>
           </Form.Item>
         </Form>
-
-        <div style={{ textAlign: 'center', marginTop: '24px' }}>
-          <Text type="secondary">
-            Ainda não tem uma conta?{' '}
-            <Link href="#">Cadastre-se</Link>
-          </Text>
-        </div>
-      </Card>
+      </div>
     </div>
   );
 }

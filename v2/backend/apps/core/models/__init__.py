@@ -24,7 +24,11 @@ Estrutura:
     ├── dat_acao.py          # DATAcao
     ├── dat_compra.py        # DATCompra
     ├── dat_cadastro.py      # DATCadastro
-    └── dat_formacao.py      # DATFormacao
+    ├── dat_formacao.py      # DATFormacao
+    ├── plano_formacoes.py   # PlanoFormacoes
+    ├── formacao.py          # Formacao
+    ├── acompanhamento.py    # Acompanhamento
+    └── prova.py             # Prova
 
 Type-checked with Pyright (strict mode).
 """
@@ -38,6 +42,10 @@ from apps.core.models.dat_compra import DATCompra
 from apps.core.models.dat_coordenador import DATArea, DATCoordenador
 from apps.core.models.dat_formacao import DATFormacao
 from apps.core.models.dat_registro import DATRegistro
+from apps.core.models.plano_formacoes import PlanoFormacoes
+from apps.core.models.formacao import Formacao
+from apps.core.models.acompanhamento import Acompanhamento
+from apps.core.models.prova import Prova
 from apps.core.models.integracao import GoogleOAuthCredential
 from apps.core.models.organizacao import (
     EquipeGerencia,
@@ -83,6 +91,11 @@ __all__ = [
     "DATCompra",
     "DATCadastro",
     "DATFormacao",
+    # Plano Formacoes (novo modelo estruturado)
+    "PlanoFormacoes",
+    "Formacao",
+    "Acompanhamento",
+    "Prova",
     # Config
     "Config",
     # Auditoria

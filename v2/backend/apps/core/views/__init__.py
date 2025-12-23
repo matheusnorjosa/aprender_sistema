@@ -35,6 +35,7 @@ from apps.core.views.dat_module import (
     DATCoordenadorViewSet,
     DATFormacaoViewSet,
 )
+from apps.core.views.plano_formacoes import PlanoFormacoesViewSet
 from apps.core.views.options import (
     CoordenadorOptionViewSet,
     FormadorOptionViewSet,
@@ -74,6 +75,8 @@ __all__ = [
     "DATCompraViewSet",
     "DATCadastroViewSet",
     "DATFormacaoViewSet",
+    # Plano Formacoes
+    "PlanoFormacoesViewSet",
     # Options
     "MunicipioOptionViewSet",
     "ProjetoOptionViewSet",

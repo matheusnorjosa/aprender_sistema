@@ -375,3 +375,104 @@ export async function getAreasOptions() {
 export async function getProdutosOptions() {
   return apiRequest(() => api.get('/options/produtos/'));
 }
+
+// ========== PLANO FORMAÇÕES ==========
+
+/**
+ * List PlanoFormacoes records
+ * @param {Object} params - Query parameters (municipio, projeto, coordenador, uf, ativo, search, ordering, page)
+ * @returns {Promise<Object>} Paginated response with results[]
+ */
+export async function listPlanoFormacoes(params = {}) {
+  return apiRequest(() => api.get('/dat/plano-formacoes/', { params }));
+}
+
+/**
+ * Get single PlanoFormacoes
+ * @param {number} id - PlanoFormacoes ID
+ */
+export async function getPlanoFormacoes(id) {
+  return apiRequest(() => api.get(`/dat/plano-formacoes/${id}/`));
+}
+
+/**
+ * Create new PlanoFormacoes
+ * @param {Object} data - PlanoFormacoes data
+ */
+export async function createPlanoFormacoes(data) {
+  return apiRequest(() => api.post('/dat/plano-formacoes/', data));
+}
+
+/**
+ * Update PlanoFormacoes
+ * @param {number} id - PlanoFormacoes ID
+ * @param {Object} data - Updated fields
+ */
+export async function updatePlanoFormacoes(id, data) {
+  return apiRequest(() => api.patch(`/dat/plano-formacoes/${id}/`, data));
+}
+
+/**
+ * Delete PlanoFormacoes (requires Superintendencia)
+ * @param {number} id - PlanoFormacoes ID
+ */
+export async function deletePlanoFormacoes(id) {
+  return apiRequest(() => api.delete(`/dat/plano-formacoes/${id}/`));
+}
+
+/**
+ * Get PlanoFormacoes stats
+ * @param {Object} params - Filter parameters
+ * @returns {Promise<Object>} Stats aggregated
+ */
+export async function getPlanoFormacoesStats(params = {}) {
+  return apiRequest(() => api.get('/dat/plano-formacoes/stats/', { params }));
+}
+
+/**
+ * Get PlanoFormacoes calendar data
+ * @param {Object} params - { data_inicio, data_fim }
+ * @returns {Promise<Array>} List of formations with dates
+ */
+export async function getPlanoFormacoesCalendario(params = {}) {
+  return apiRequest(() => api.get('/dat/plano-formacoes/calendario/', { params }));
+}
+
+/**
+ * Get PlanoFormacoes summary by project
+ * @param {Object} params - Filter parameters
+ * @returns {Promise<Array>} List of projects with totals
+ */
+export async function getPlanoFormacoesResumoProjeto(params = {}) {
+  return apiRequest(() => api.get('/dat/plano-formacoes/resumo-projeto/', { params }));
+}
+
+/**
+ * Update a specific formacao inline
+ * @param {number} planoId - PlanoFormacoes ID
+ * @param {number} numero - Formacao number (1-15)
+ * @param {Object} data - Updated fields
+ */
+export async function updateFormacaoInline(planoId, numero, data) {
+  return apiRequest(() => api.patch(`/dat/plano-formacoes/${planoId}/formacao/${numero}/`, data));
+}
+
+/**
+ * Update a specific acompanhamento inline
+ * @param {number} planoId - PlanoFormacoes ID
+ * @param {string} tipo - 'primeiro' or 'segundo'
+ * @param {Object} data - Updated fields
+ */
+export async function updateAcompanhamentoInline(planoId, tipo, data) {
+  return apiRequest(() => api.patch(`/dat/plano-formacoes/${planoId}/acompanhamento/${tipo}/`, data));
+}
+
+/**
+ * Update a specific prova inline
+ * @param {number} planoId - PlanoFormacoes ID
+ * @param {number} numero - Prova number (1-3)
+ * @param {Object} data - Updated fields
+ */
+export async function updateProvaInline(planoId, numero, data) {
+  return apiRequest(() => api.patch(`/dat/plano-formacoes/${planoId}/prova/${numero}/`, data));
+}

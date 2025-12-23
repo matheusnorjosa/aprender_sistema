@@ -40,9 +40,12 @@ Use `/command-name` para executar comandos especializados:
 
 **Desenvolvimento e Qualidade:**
 - `/new-feat` - Criar nova feature seguindo padrões do projeto
+- `/create-feature` - Planejar e implementar feature com padrões AS v2 (type-safety, RBAC)
 - `/migrate` - Executar migrações Django e validar modelo
 - `/test-coverage` - Análise completa de cobertura de testes
 - `/review` - Review automático de código (style, security, best practices)
+- `/review-staged` - Review de mudanças staged contra padrões AS v2
+- `/trim` - Reduzir descrição de PR em 70% mantendo essencial
 
 **Fluxos de Negócio (Testes):**
 - `/approve-flow` - Testar fluxo completo de aprovação (PA-01 a PA-07)
@@ -54,6 +57,9 @@ Use `/command-name` para executar comandos especializados:
 
 **Deploy e Infraestrutura:**
 - `/deploy-staging` - Deploy completo para ambiente staging
+
+**Investigação e Planejamento:**
+- `/investigate-batch` - Discovery com perguntas agrupadas (economiza tokens)
 
 **Project Agents (Tasks Autônomas):**
 - `/project_git-pr` - Preparar commit limpo e descrição de PR
@@ -92,15 +98,18 @@ Use `Skill` tool com nome da skill para contexto especializado:
 ```
 .claude/
 ├── CLAUDE.md                  # Regras de negócio (este arquivo)
-├── CLAUDE-principles.md       # Qualidade de código (463L)
+├── CLAUDE-principles.md       # Qualidade de código (625L)
 ├── GUIA_USO.md                # Guia completo ⭐
-├── CHECKLIST_FERRAMENTAS.md   # Checklist pós-resumo ⭐ NOVO
-├── MELHORIAS_2025-11-14.md    # Histórico de melhorias
+├── CHECKLIST_FERRAMENTAS.md   # Checklist pós-resumo ⭐
 ├── settings.json              # Hooks + permissions
-├── commands/                  # 16 slash commands
-│   ├── review.md              # Original (170L)
-│   └── review-enhanced.md     # Novo (573L) ⭐
-└── skills/                    # 3 skills (aprender-domain, django-patterns, etl-guidelines)
+├── commands/                  # 20 slash commands
+│   ├── create-feature.md      # Feature com padrões AS v2 ⭐ NOVO
+│   ├── review-staged.md       # Review staged (Pyright, RBAC) ⭐ NOVO
+│   ├── investigate-batch.md   # Discovery batched ⭐ NOVO
+│   ├── trim.md                # Reduzir PR 70% ⭐ NOVO
+│   └── review-enhanced.md     # Review 10 categorias
+├── skills/                    # 3 skills (aprender-domain, django-patterns, etl-guidelines)
+└── songs/                     # Som notificação (duolingo-correct.mp3)
 ```
 
 **Quick Start**:

@@ -187,7 +187,7 @@ class TestViewsPackageStructure:
         """views package should have __all__ attribute."""
         from apps.core import views
         assert hasattr(views, '__all__')
-        assert len(views.__all__) == 28  # All 28 exports (20 base + 8 DAT)
+        assert len(views.__all__) == 29  # All 29 exports (20 base + 8 DAT + 1 PlanoFormacoes)
 
     def test_all_submodules_exist(self):
         """All submodules should be importable."""

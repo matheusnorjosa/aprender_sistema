@@ -32,6 +32,17 @@ from apps.core.serializers.dat_registro import (
     DATRegistroListSerializer,
     DATRegistroUpdateSerializer,
 )
+from apps.core.serializers.plano_formacoes import (
+    AcompanhamentoNestedSerializer,
+    AcompanhamentoSerializer,
+    FormacaoNestedSerializer,
+    FormacaoSerializer,
+    PlanoFormacoesListSerializer,
+    PlanoFormacoesOptionSerializer,
+    PlanoFormacoesSerializer,
+    ProvaNestedSerializer,
+    ProvaSerializer,
+)
 from apps.core.serializers.organizacao import (
     GerenciaSerializer,
     MunicipioOptionSerializer,
@@ -112,6 +123,16 @@ __all__ = [
     "DATFormacaoSerializer",
     "DATFormacaoListSerializer",
     "DATFormacaoCalendarioSerializer",
+    # Plano Formacoes (novo modelo estruturado)
+    "PlanoFormacoesSerializer",
+    "PlanoFormacoesListSerializer",
+    "PlanoFormacoesOptionSerializer",
+    "FormacaoSerializer",
+    "FormacaoNestedSerializer",
+    "AcompanhamentoSerializer",
+    "AcompanhamentoNestedSerializer",
+    "ProvaSerializer",
+    "ProvaNestedSerializer",
     # Auditoria
     "AuditLogSerializer",
     # Config

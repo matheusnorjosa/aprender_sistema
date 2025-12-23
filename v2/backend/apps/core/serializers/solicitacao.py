@@ -80,6 +80,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "fim",
             "status",
             "observacoes",
+            "local",
             # PR19: Modalidade online/presencial (gera Meet apenas quando online)
             "is_online",
             "external_event_id",

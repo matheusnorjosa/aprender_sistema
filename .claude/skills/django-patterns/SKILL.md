@@ -15,6 +15,44 @@ This skill provides implementation patterns for Django 5.1 + DRF 3.14+ specific 
 - Setting up permissions (RBAC)
 - Optimizing queries (N+1 prevention)
 
+### Backend Structure (Modular - PRs #213-#217)
+
+The backend uses a **modular structure** with Python packages:
+
+```
+apps/core/
+├── models/           # Models organized by domain
+│   ├── __init__.py   # Re-exports all models
+│   ├── usuario.py    # Usuario (custom user)
+│   ├── solicitacao.py # Solicitacao, Participation
+│   ├── plano_formacoes.py # PlanoFormacoes
+│   ├── formacao.py   # Formacao individual
+│   ├── dat_acao.py   # DATAcao (workflow 4 etapas)
+│   └── ...
+├── serializers/      # Serializers organized by domain
+│   ├── __init__.py   # Re-exports all serializers
+│   ├── usuario.py
+│   ├── solicitacao.py
+│   └── ...
+├── views/            # Views organized by feature
+│   ├── __init__.py   # Re-exports all views
+│   ├── solicitacao.py
+│   ├── availability.py
+│   └── ...
+├── views_gcal/       # GCal-specific views
+│   ├── summary.py
+│   ├── batch.py
+│   └── ...
+└── services/         # Business logic
+    ├── gcal/         # GCal sync services (modular)
+    │   ├── sync.py
+    │   ├── payload.py
+    │   └── ...
+    └── availability_service.py
+```
+
+**All old imports still work** (via re-exports in `__init__.py`).
+
 ---
 
 ## 📋 Quick Reference
@@ -830,29 +868,45 @@ def get_monthly_grid(year, month):
 
 ### Complete CRUD Example
 
-See implementation in:
-- Models: `apps/core/models.py` (Solicitacao, Usuario, Projeto)
-- Serializers: `apps/core/serializers.py` (SolicitacaoReadSerializer, SolicitacaoWriteSerializer)
-- Views: `apps/core/views.py` (SolicitacaoViewSet)
+See implementation in (modular structure):
+- Models: `apps/core/models/solicitacao.py`, `models/usuario.py`, `models/organizacao.py`
+- Serializers: `apps/core/serializers/solicitacao.py`, `serializers/usuario.py`
+- Views: `apps/core/views/solicitacao.py`
 - Permissions: `apps/core/permissions.py` (IsSuperintendencia)
 - Tests: `apps/core/tests/test_solicitacao.py`
+
+### DAT Module Example
+
+See implementation in:
+- Models: `apps/core/models/dat_acao.py`, `models/dat_cadastro.py`, `models/dat_registro.py`
+- Workflow patterns: 4-step workflow (Carta → Contato → Reunião → Entrega)
+- Auto-calculation: `DATRegistro.save()` calculates `nr_codigos` automatically
+
+### PlanoFormacoes Example
+
+See implementation in:
+- Models: `apps/core/models/plano_formacoes.py`, `formacao.py`, `acompanhamento.py`, `prova.py`
+- Relationships: PlanoFormacoes → 15 Formacoes, 2 Acompanhamentos, 3 Provas
+- Properties: `recalcular_ch()`, `taxa_realizacao`
 
 ### Service Layer Example
 
 See implementation in:
 - `apps/core/services/availability_service.py` - RD-01 to RD-08
-- `apps/core/services/gcal_sync_service.py` - RF05/RF06
+- `apps/core/services/gcal/sync.py` - RF05/RF06 (modular)
+- `apps/core/services/gcal/payload.py` - Payload building
 
 ---
 
 ## 🔗 Related Documentation
 
-- **Business Rules**: `.claude/skills/aprender-domain/SKILL.md` (CP, RD, PA, RF)
+- **Business Rules**: `.claude/skills/aprender-domain/SKILL.md` (CP, RD, PA, RF, DAT, PlanoFormacoes)
 - **Code Quality**: `.claude/CLAUDE-principles.md`
 - **Project Context**: `.claude/CLAUDE.md`
+- **ETL Guidelines**: `.claude/skills/etl-guidelines/SKILL.md`
 
 ---
 
-**Last Updated**: 04/11/2025
-**Version**: 1.0
+**Last Updated**: 23/12/2025
+**Version**: 1.1 (Updated: Modular structure, DAT/PlanoFormacoes examples)
 **Based on**: Django 5.1 + DRF 3.14 + AS v2 patterns

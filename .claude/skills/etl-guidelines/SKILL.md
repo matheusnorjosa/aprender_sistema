@@ -895,14 +895,62 @@ class TestETLAcompanhamento:
 
 ## 📚 Real Examples
 
-See implementations in:
-- `apps/dat_ingest/management/commands/etl_upsert_acompanhamento.py`
-- `apps/dat_ingest/management/commands/etl_upsert_deslocamento.py`
-- `apps/dat_ingest/management/commands/etl_import_acoes_controle.py`
-- `apps/dat_ingest/management/commands/etl_import_cadastros_dat.py`
+### ETL Commands Available (21 commands)
+
+**Core ETL Commands**:
+- `etl_upsert_acompanhamento.py` - Import events from Acompanhamento spreadsheet
+- `etl_upsert_deslocamento.py` - Import travel/displacement data
+- `etl_upsert_core.py` - Core entities (Municipio, Projeto, TipoEvento)
+- `etl_all.py` - Run all ETLs in sequence
+
+**DAT Module ETL**:
+- `etl_import_acoes_controle.py` - Import Ações Controle data
+- `etl_import_dat_cadastros.py` - Import DAT Cadastros
+- `etl_load_xlsx.py` - Generic XLSX loader
+
+**User Management**:
+- `import_usuarios_from_csv.py` - Import users from CSV
+- `assign_cpf_from_excel.py` - Assign CPF from Excel cross-reference
+- `backfill_user_groups.py` - Backfill user groups
+- `backfill_coordenador.py` - Backfill coordinator field
+- `audit_agenda_users.py` - Audit users from agenda
+
+**Seeding/Setup**:
+- `load_tipos_evento.py` - Load TipoEvento seed data
+- `seed_formadores_fluir.py` - Seed Fluir formadores
+- `seed_projetos_extras.py` - Seed additional projects
+- `import_fluir_eventos.py` - Import Fluir-specific events
+
+**Utilities**:
+- `backfill_external_hash_v2.py` - Recalculate external_hash
+- `benchmark_etl.py` - Performance benchmarking
+- `gen_top50_usuarios.py` - Generate test data
+- `load_full_pipeline.py` - Run complete pipeline
+
+### Usage Pattern
+
+```bash
+# Dry-run (default) - preview changes
+docker compose exec web python manage.py etl_upsert_acompanhamento
+
+# Apply mode - commit changes
+docker compose exec web python manage.py etl_upsert_acompanhamento --apply
+
+# Run all ETLs in sequence
+docker compose exec web python manage.py etl_all --apply
+```
 
 ---
 
-**Last Updated**: 04/11/2025
-**Version**: 1.0
+## 🔗 Related Documentation
+
+- **Commands**: `.claude/commands/etl-dry.md`, `.claude/commands/etl-apply.md`
+- **Business Rules**: `.claude/skills/aprender-domain/SKILL.md`
+- **Django Patterns**: `.claude/skills/django-patterns/SKILL.md`
+- **Project Context**: `.claude/CLAUDE.md`
+
+---
+
+**Last Updated**: 23/12/2025
+**Version**: 1.1 (Updated: Complete ETL command list, DAT module commands)
 **Based on**: AS v2 ETL patterns + idempotence best practices

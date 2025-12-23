@@ -15,14 +15,20 @@
 
 ## 📋 Ferramentas Disponíveis
 
-### 1. Slash Commands (16 disponíveis)
+### 1. Slash Commands (20 disponíveis)
 
 **Desenvolvimento e Qualidade:**
 - `/new-feat <descrição>` - Criar nova feature seguindo padrões
+- `/create-feature <descrição>` - Feature com padrões AS v2 (type-safety, RBAC) ⭐ **NOVO**
 - `/migrate [app]` - Criar e aplicar migrações Django
 - `/test-coverage [path]` - Análise de cobertura (90%+ required)
 - `/review <arquivo>` - Review básico (170 linhas, 8 categorias)
-- `/review-enhanced <arquivo>` - Review completo (573 linhas, 10 categorias) ⭐ **NOVO**
+- `/review-staged` - Review mudanças staged (Pyright, RBAC, compliance) ⭐ **NOVO**
+- `/review-enhanced <arquivo>` - Review completo (573 linhas, 10 categorias)
+- `/trim` - Reduzir descrição PR em 70% mantendo essencial ⭐ **NOVO**
+
+**Investigação e Planejamento:**
+- `/investigate-batch <tema>` - Discovery com perguntas agrupadas (economiza tokens) ⭐ **NOVO**
 
 **Fluxos de Negócio:**
 - `/approve-flow [test]` - Testar PA-01 a PA-07 (approval policy)
@@ -76,7 +82,7 @@ Task tool:
 
 ---
 
-### 4. Hooks (4 configurados)
+### 4. Hooks (5 configurados)
 
 **Automáticos** (disparam quando rodo comandos):
 
@@ -84,8 +90,10 @@ Task tool:
 - `python manage.py.*--apply` → 2 beeps (ETL apply)
 - `docker compose up.*` → 2 beeps (containers)
 - Notificação geral → 1 beep (sucesso)
+- **Notification** → Som Duolingo ao concluir tarefas ⭐ **NOVO**
 
 **Não preciso chamar**, são disparados automaticamente.
+**Som**: `.claude/songs/duolingo-correct.mp3` (Windows PowerShell)
 
 ---
 
@@ -146,19 +154,23 @@ Antes de fazer análises manuais, SEMPRE perguntar:
 ```
 .claude/
 ├── CLAUDE.md                  # Regras de negócio ⭐
-├── CLAUDE-principles.md       # Qualidade de código
+├── CLAUDE-principles.md       # Qualidade de código (625L)
 ├── GUIA_USO.md                # Guia completo ⭐
 ├── CHECKLIST_FERRAMENTAS.md   # Este arquivo ⭐
-├── MELHORIAS_2025-11-14.md    # Histórico de melhorias
 ├── settings.json              # Hooks + permissions
-├── commands/                  # 16 slash commands
-│   ├── review.md              # Original (170L)
-│   ├── review-enhanced.md     # Novo (573L) ⭐
-│   └── ... (14 outros)
-└── skills/
-    ├── aprender-domain/       # Domínio completo
-    ├── django-patterns/       # Padrões Django/DRF
-    └── etl-guidelines/        # ETL patterns
+├── commands/                  # 20 slash commands
+│   ├── create-feature.md      # Feature AS v2 ⭐ NOVO
+│   ├── review-staged.md       # Review staged ⭐ NOVO
+│   ├── investigate-batch.md   # Discovery batched ⭐ NOVO
+│   ├── trim.md                # Reduzir PR 70% ⭐ NOVO
+│   ├── review-enhanced.md     # Review 10 categorias
+│   └── ... (15 outros)
+├── skills/
+│   ├── aprender-domain/       # Domínio completo
+│   ├── django-patterns/       # Padrões Django/DRF
+│   └── etl-guidelines/        # ETL patterns
+└── songs/
+    └── duolingo-correct.mp3   # Som notificação ⭐ NOVO
 ```
 
 ---
@@ -175,6 +187,7 @@ Ao retomar sessão resumida, CONFIRMAR mentalmente:
 
 ---
 
-**Última atualização**: 2025-11-14
+**Última atualização**: 2025-12-23
 **Criado por**: Solicitação do usuário (sessão resumida causa esquecimento de ferramentas)
+**Atualizado**: Adaptação do pacote claude-v2 para stack Python/Django
 **Objetivo**: Garantir uso consistente de ferramentas customizadas mesmo após compactação de conversa

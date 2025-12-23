@@ -78,6 +78,13 @@ class Solicitacao(models.Model):
         blank=True, help_text="Observacoes adicionais sobre o evento"
     )
 
+    local = models.CharField(
+        max_length=300,
+        blank=True,
+        verbose_name="Local do Evento",
+        help_text="Endereco ou local especifico do evento (ex: Escola Municipal X, Sala 5)",
+    )
+
     # Reservado para integracao idempotente com Google Calendar (RF05/RF06)
     external_event_id = models.CharField(
         max_length=255,

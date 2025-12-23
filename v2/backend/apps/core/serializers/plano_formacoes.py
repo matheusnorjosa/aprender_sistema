@@ -5,7 +5,7 @@ Serializers para PlanoFormacoes, Formacao, Acompanhamento, Prova.
 
 Type-checked with Pyright (strict mode).
 """
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
 

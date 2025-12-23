@@ -80,6 +80,7 @@ export default function NewSolicitacaoWizard() {
     encontro: '',
     segmento: '',
     observacoes: '',
+    local: '',
     // PR19: Modalidade online/presencial
     is_online: false,
   });
@@ -186,6 +187,7 @@ export default function NewSolicitacaoWizard() {
         encontro: formData.encontro || null,
         segmento: formData.segmento || null,
         observacoes: formData.observacoes || null,
+        local: formData.local || '',
         // PR19: incluir modalidade no payload
         is_online: !!formData.is_online,
         coordenador_acompanha: coordenadores.length > 0,
@@ -380,6 +382,18 @@ export default function NewSolicitacaoWizard() {
           </Form.Item>
 
           <Form.Item
+            label="Local do Evento"
+            name="local"
+            rules={[{ max: 300, message: 'Máximo 300 caracteres' }]}
+          >
+            <Input
+              placeholder="Ex: Escola Municipal X, Sala 5 / Secretaria de Educação"
+              value={formData.local}
+              onChange={(e) => setFormData({ ...formData, local: e.target.value })}
+            />
+          </Form.Item>
+
+          <Form.Item
             label="Observações"
             name="observacoes"
           >
@@ -457,6 +471,9 @@ export default function NewSolicitacaoWizard() {
             )}
             {formData.segmento && (
               <Descriptions.Item label="Segmento">{formData.segmento}</Descriptions.Item>
+            )}
+            {formData.local && (
+              <Descriptions.Item label="Local">{formData.local}</Descriptions.Item>
             )}
             {formData.observacoes && (
               <Descriptions.Item label="Observações">{formData.observacoes}</Descriptions.Item>

@@ -178,3 +178,13 @@ class ProdutoSerializer(serializers.ModelSerializer["Produto"]):
             "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]
+
+
+class ProdutoOptionSerializer(serializers.ModelSerializer["Produto"]):
+    """
+    Serializer minimalista para dropdowns de Produto.
+    """
+
+    class Meta:
+        model = Produto
+        fields = ["id", "nome", "codigo"]

@@ -66,6 +66,7 @@ const AcoesPage = lazy(() => import('./pages/DATModule/AcoesPage'));
 const ComprasPage = lazy(() => import('./pages/DATModule/ComprasPage'));
 const CadastrosPage = lazy(() => import('./pages/DATModule/CadastrosPage'));
 const FormacoesPage = lazy(() => import('./pages/DATModule/FormacoesPage'));
+const PlanoFormacoesPage = lazy(() => import('./pages/DATModule/PlanoFormacoesPage'));
 const CoordenadoresPage = lazy(() => import('./pages/DATModule/CoordenadoresPage'));
 
 const { Header, Content, Sider } = Layout;
@@ -369,6 +370,9 @@ function AppContent() {
                   <Menu.Item key="dat-formacoes">
                     <Link to="/dat-module/formacoes">Formações</Link>
                   </Menu.Item>
+                  <Menu.Item key="dat-plano-formacoes">
+                    <Link to="/dat-module/plano-formacoes">Plano Anual</Link>
+                  </Menu.Item>
                   <Menu.Item key="dat-coordenadores">
                     <Link to="/dat-module/coordenadores">Coordenadores</Link>
                   </Menu.Item>
@@ -541,6 +545,10 @@ function AppContent() {
                   <Route
                     path="/dat-module/formacoes"
                     element={canDAT ? <FormacoesPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/dat-module/plano-formacoes"
+                    element={canDAT ? <PlanoFormacoesPage /> : <Forbidden />}
                   />
                   <Route
                     path="/dat-module/coordenadores"

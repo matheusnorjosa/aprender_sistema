@@ -48,6 +48,7 @@ from apps.core.serializers.organizacao import (
     MunicipioOptionSerializer,
     MunicipioSerializer,
     ProdutoSerializer,
+    ProdutoOptionSerializer,
     ProjetoGeralOptionSerializer,
     ProjetoGeralSerializer,
     ProjetoOptionSerializer,
@@ -89,6 +90,7 @@ __all__ = [
     "GerenciaSerializer",
     "TipoEventoOptionSerializer",
     "ProdutoSerializer",
+    "ProdutoOptionSerializer",
     # Solicitacao
     "ParticipationNestedSerializer",
     "SolicitacaoSerializer",

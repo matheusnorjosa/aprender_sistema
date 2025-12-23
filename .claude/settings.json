@@ -1,4 +1,17 @@
 {
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File C:\\Users\\datsu\\Documents\\aprender_sistema\\.claude\\songs\\play-notification.ps1"
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "Read",

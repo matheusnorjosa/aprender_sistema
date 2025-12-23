@@ -167,4 +167,4 @@ class TestSerializersBackwardsCompatibility:
         """Verifica que __all__ esta definido corretamente."""
         from apps.core import serializers
         assert hasattr(serializers, "__all__")
-        assert len(serializers.__all__) == 43  # Total de serializers exportados (23 base + 20 DAT)
+        assert len(serializers.__all__) == 52  # Total de serializers exportados (23 base + 20 DAT + 9 PlanoFormacoes)

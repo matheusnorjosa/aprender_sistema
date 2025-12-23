@@ -95,6 +95,8 @@ from .views import (
     DATCompraViewSet,
     DATCadastroViewSet,
     DATFormacaoViewSet,
+    # Plano Formacoes (novo modelo estruturado)
+    PlanoFormacoesViewSet,
 )
 
 app_name = "core"
@@ -126,6 +128,8 @@ router.register(r"dat/acoes-ciclo", DATAcaoViewSet, basename="dat-acao-ciclo")
 router.register(r"dat/compras-materiais", DATCompraViewSet, basename="dat-compra-material")
 router.register(r"dat/cadastros", DATCadastroViewSet, basename="dat-cadastro")
 router.register(r"dat/formacoes", DATFormacaoViewSet, basename="dat-formacao")
+# Plano Formacoes (novo modelo estruturado)
+router.register(r"dat/plano-formacoes", PlanoFormacoesViewSet, basename="plano-formacoes")
 
 urlpatterns = [
     path("", api_root, name="api-root"),

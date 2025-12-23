@@ -59,11 +59,12 @@ import {
   updatePlanoFormacoes,
   deletePlanoFormacoes,
   getPlanoFormacoesStats,
-  getPlanoFormacoesCalendario,
-  getPlanoFormacoesResumoProjeto,
   updateFormacaoInline,
-  updateAcompanhamentoInline,
-  updateProvaInline,
+  // TODO: Implementar views de Calendario e Resumo por Projeto
+  // getPlanoFormacoesCalendario,
+  // getPlanoFormacoesResumoProjeto,
+  // updateAcompanhamentoInline,
+  // updateProvaInline,
 } from '../../api/datModule';
 import { getMunicipiosOptions, getProjetosOptions, getCoordenadoresOptions } from '../../api/datModule';
 

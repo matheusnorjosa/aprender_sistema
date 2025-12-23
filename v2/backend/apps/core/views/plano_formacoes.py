@@ -9,13 +9,13 @@ Endpoints:
 
 Type-checked with Pyright (strict mode).
 """
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, Sum
 
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend

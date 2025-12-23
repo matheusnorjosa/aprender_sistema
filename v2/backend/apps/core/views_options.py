@@ -14,13 +14,15 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Municipio, Projeto, TipoEvento, Usuario
+from .models import Municipio, Projeto, TipoEvento, Usuario, Produto, DATArea, DATCoordenador
 from .serializers import (
     MunicipioOptionSerializer,
     ProjetoOptionSerializer,
     TipoEventoOptionSerializer,
     UsuarioOptionSerializer,
+    ProdutoOptionSerializer,
 )
+from .serializers.dat_module import DATAreaOptionSerializer, DATCoordenadorOptionSerializer
 from django.core.cache import cache
 
 
@@ -172,4 +174,94 @@ def usuarios_options(request: Request) -> Response:
     # Salvar no cache
     cache.set(cache_key, data, timeout=300)  # 5 min
 
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def produtos_options(request: Request) -> Response:
+    """
+    GET /api/options/produtos/
+
+    Retorna lista de produtos ativos para dropdowns/selects.
+
+    Response:
+    [
+        {"id": 1, "nome": "Kit Alfabetização", "codigo": "KIT-ALF"},
+        ...
+    ]
+
+    Permissions: IsAuthenticated
+    Cache: 5 minutos
+    """
+    cache_key = "static_endpoint:produtos_options"
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return Response(cached_data)
+
+    produtos = Produto.objects.filter(ativo=True).order_by("nome")
+    serializer = ProdutoOptionSerializer(produtos, many=True)
+    data = serializer.data
+
+    cache.set(cache_key, data, timeout=300)
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def coordenadores_options(request: Request) -> Response:
+    """
+    GET /api/options/coordenadores/
+
+    Retorna lista de coordenadores DAT para dropdowns/selects.
+
+    Response:
+    [
+        {"id": 1, "nome": "Maria Silva", "area_nome": "Formação"},
+        ...
+    ]
+
+    Permissions: IsAuthenticated
+    Cache: 5 minutos
+    """
+    cache_key = "static_endpoint:coordenadores_options"
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return Response(cached_data)
+
+    coordenadores = DATCoordenador.objects.all().order_by("nome")
+    serializer = DATCoordenadorOptionSerializer(coordenadores, many=True)
+    data = serializer.data
+
+    cache.set(cache_key, data, timeout=300)
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def areas_options(request: Request) -> Response:
+    """
+    GET /api/options/areas/
+
+    Retorna lista de áreas DAT para dropdowns/selects.
+
+    Response:
+    [
+        {"id": 1, "nome": "Formação", "cor": "#FF5733"},
+        ...
+    ]
+
+    Permissions: IsAuthenticated
+    Cache: 5 minutos
+    """
+    cache_key = "static_endpoint:areas_options"
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return Response(cached_data)
+
+    areas = DATArea.objects.all().order_by("ordem", "nome")
+    serializer = DATAreaOptionSerializer(areas, many=True)
+    data = serializer.data
+
+    cache.set(cache_key, data, timeout=300)
     return Response(data)

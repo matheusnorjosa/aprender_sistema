@@ -182,27 +182,27 @@ export async function getProjetosOptions() {
  *                          projeto_id, municipio_id, coordenador_id, uf, page
  */
 export async function listAcoes(params = {}) {
-  return apiRequest(() => api.get('/dat/acoes/', { params }));
+  return apiRequest(() => api.get('/dat/acoes-ciclo/', { params }));
 }
 
 export async function getAcao(id) {
-  return apiRequest(() => api.get(`/dat/acoes/${id}/`));
+  return apiRequest(() => api.get(`/dat/acoes-ciclo/${id}/`));
 }
 
 export async function createAcao(data) {
-  return apiRequest(() => api.post('/dat/acoes/', data));
+  return apiRequest(() => api.post('/dat/acoes-ciclo/', data));
 }
 
 export async function updateAcao(id, data) {
-  return apiRequest(() => api.patch(`/dat/acoes/${id}/`, data));
+  return apiRequest(() => api.patch(`/dat/acoes-ciclo/${id}/`, data));
 }
 
 export async function deleteAcao(id) {
-  return apiRequest(() => api.delete(`/dat/acoes/${id}/`));
+  return apiRequest(() => api.delete(`/dat/acoes-ciclo/${id}/`));
 }
 
 export async function getAcoesStats(params = {}) {
-  return apiRequest(() => api.get('/dat/acoes/stats/', { params }));
+  return apiRequest(() => api.get('/dat/acoes-ciclo/stats/', { params }));
 }
 
 // ========== COMPRAS (Controle de Materiais) ==========
@@ -212,27 +212,27 @@ export async function getAcoesStats(params = {}) {
  * @param {Object} params - search, status, projeto_id, municipio_id, produto_id, uf, ano_uso, page
  */
 export async function listCompras(params = {}) {
-  return apiRequest(() => api.get('/dat/compras/', { params }));
+  return apiRequest(() => api.get('/dat/compras-materiais/', { params }));
 }
 
 export async function getCompra(id) {
-  return apiRequest(() => api.get(`/dat/compras/${id}/`));
+  return apiRequest(() => api.get(`/dat/compras-materiais/${id}/`));
 }
 
 export async function createCompra(data) {
-  return apiRequest(() => api.post('/dat/compras/', data));
+  return apiRequest(() => api.post('/dat/compras-materiais/', data));
 }
 
 export async function updateCompra(id, data) {
-  return apiRequest(() => api.patch(`/dat/compras/${id}/`, data));
+  return apiRequest(() => api.patch(`/dat/compras-materiais/${id}/`, data));
 }
 
 export async function deleteCompra(id) {
-  return apiRequest(() => api.delete(`/dat/compras/${id}/`));
+  return apiRequest(() => api.delete(`/dat/compras-materiais/${id}/`));
 }
 
 export async function getComprasStats(params = {}) {
-  return apiRequest(() => api.get('/dat/compras/stats/', { params }));
+  return apiRequest(() => api.get('/dat/compras-materiais/stats/', { params }));
 }
 
 // ========== CADASTROS (Workflow FORMAR/AVALIAR) ==========

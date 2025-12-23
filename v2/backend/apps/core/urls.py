@@ -39,6 +39,9 @@ from .views_options import (
     projetos_options,
     tipos_evento_options,
     usuarios_options,
+    produtos_options,
+    coordenadores_options,
+    areas_options,
 )
 from .views_preagenda import PreAgendaListView
 from .views_gcal import (
@@ -251,6 +254,9 @@ urlpatterns = [
     path("options/projetos/", projetos_options, name="options-projetos"),
     path("options/tipos-evento/", tipos_evento_options, name="options-tipos-evento"),
     path("options/usuarios/", usuarios_options, name="options-usuarios"),
+    path("options/produtos/", produtos_options, name="options-produtos"),
+    path("options/coordenadores/", coordenadores_options, name="options-coordenadores"),
+    path("options/areas/", areas_options, name="options-areas"),
     # PR16: Lookup (Autocomplete) API
     path("lookup/municipios/", MunicipioLookup.as_view(), name="lookup-municipios"),
     path("lookup/projetos/", ProjetoLookup.as_view(), name="lookup-projetos"),

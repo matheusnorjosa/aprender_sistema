@@ -750,3 +750,187 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_202_ACCEPTED,
         )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[IsSuperintendencia],
+        url_path="batch-approve",
+    )
+    def batch_approve(self, request):
+        """
+        Aprovar múltiplas solicitações em lote.
+
+        POST /api/solicitacoes/batch-approve/
+        Body: { "ids": [1, 2, 3] }
+
+        Response 200: { "approved": 2, "errors": [{"id": 3, "detail": "..."}] }
+
+        PA-05: Cada solicitação gera um AuditLog individual com batch=true.
+        Limite: máximo 100 solicitações por requisição.
+        """
+        ids = request.data.get("ids", [])
+
+        if not ids:
+            return Response(
+                {"detail": "O campo 'ids' é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(ids) > 100:
+            return Response(
+                {"detail": "Máximo 100 solicitações por vez."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        approved = 0
+        errors = []
+        client_ip = _get_client_ip(request)
+
+        # Buscar solicitações pendentes
+        solicitacoes = Solicitacao.objects.filter(id__in=ids, status="pendente")
+        found_ids = set(solicitacoes.values_list("id", flat=True))
+
+        # Registrar erros para IDs não encontrados ou já processados
+        for sol_id in ids:
+            if sol_id not in found_ids:
+                sol = Solicitacao.objects.filter(id=sol_id).first()
+                if sol:
+                    errors.append({"id": sol_id, "detail": f"Status já é '{sol.status}'"})
+                else:
+                    errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
+
+        # Aprovar em lote
+        for sol in solicitacoes:
+            prev_status = sol.status
+            sol.status = "aprovado"
+            sol.save()
+
+            # PA-05: AuditLog individual com batch=true
+            AuditLog.objects.create(
+                usuario=request.user,
+                action="APPROVE",
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_id": sol.id,
+                    "prev_status": prev_status,
+                    "new_status": "aprovado",
+                    "batch": True,
+                    "ip_address": client_ip,
+                },
+            )
+
+            logger.info(
+                "solicitacao_batch_approved",
+                extra={
+                    "event": "solicitacao_batch_approved",
+                    "user_id": request.user.id,
+                    "username": request.user.username,
+                    "solicitacao_id": sol.id,
+                    "batch": True,
+                    "ip_address": client_ip,
+                    "timestamp": timezone.now().isoformat(),
+                },
+            )
+
+            approved += 1
+
+        return Response(
+            {
+                "approved": approved,
+                "errors": errors,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[IsSuperintendencia],
+        url_path="batch-reject",
+    )
+    def batch_reject(self, request):
+        """
+        Reprovar múltiplas solicitações em lote.
+
+        POST /api/solicitacoes/batch-reject/
+        Body: { "ids": [1, 2, 3] }
+
+        Response 200: { "rejected": 2, "errors": [{"id": 3, "detail": "..."}] }
+
+        PA-05: Cada solicitação gera um AuditLog individual com batch=true.
+        Limite: máximo 100 solicitações por requisição.
+        """
+        ids = request.data.get("ids", [])
+
+        if not ids:
+            return Response(
+                {"detail": "O campo 'ids' é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(ids) > 100:
+            return Response(
+                {"detail": "Máximo 100 solicitações por vez."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        rejected = 0
+        errors = []
+        client_ip = _get_client_ip(request)
+
+        # Buscar solicitações pendentes
+        solicitacoes = Solicitacao.objects.filter(id__in=ids, status="pendente")
+        found_ids = set(solicitacoes.values_list("id", flat=True))
+
+        # Registrar erros para IDs não encontrados ou já processados
+        for sol_id in ids:
+            if sol_id not in found_ids:
+                sol = Solicitacao.objects.filter(id=sol_id).first()
+                if sol:
+                    errors.append({"id": sol_id, "detail": f"Status já é '{sol.status}'"})
+                else:
+                    errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
+
+        # Reprovar em lote
+        for sol in solicitacoes:
+            prev_status = sol.status
+            sol.status = "reprovado"
+            sol.save()
+
+            # PA-05: AuditLog individual com batch=true
+            AuditLog.objects.create(
+                usuario=request.user,
+                action="REJECT",
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_id": sol.id,
+                    "prev_status": prev_status,
+                    "new_status": "reprovado",
+                    "batch": True,
+                    "ip_address": client_ip,
+                },
+            )
+
+            logger.info(
+                "solicitacao_batch_rejected",
+                extra={
+                    "event": "solicitacao_batch_rejected",
+                    "user_id": request.user.id,
+                    "username": request.user.username,
+                    "solicitacao_id": sol.id,
+                    "batch": True,
+                    "ip_address": client_ip,
+                    "timestamp": timezone.now().isoformat(),
+                },
+            )
+
+            rejected += 1
+
+        return Response(
+            {
+                "rejected": rejected,
+                "errors": errors,
+            },
+            status=status.HTTP_200_OK,
+        )

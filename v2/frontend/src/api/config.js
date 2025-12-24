@@ -40,6 +40,13 @@ export function getCsrfToken() {
 let cachedCsrfToken = null;
 
 /**
+ * Limpa o cache de CSRF token (usar no logout).
+ */
+export function clearCsrfCache() {
+  cachedCsrfToken = null;
+}
+
+/**
  * Garante que CSRF token existe, caso contrário faz request para obtê-lo.
  *
  * Issue #135: Suporta CSRF_COOKIE_HTTPONLY=True usando endpoint /api/csrf/

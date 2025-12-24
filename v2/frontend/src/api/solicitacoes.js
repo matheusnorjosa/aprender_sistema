@@ -77,13 +77,13 @@ export async function approveSolicitacao(id, reason = '') {
  * Reprova uma solicitação pendente.
  *
  * @param {number} id - ID da solicitação
- * @param {string} reason - Motivo/justificativa (obrigatório)
+ * @param {string} reason - Motivo/justificativa (opcional)
  * @returns {Promise<object>} Solicitação atualizada
  */
-export async function rejectSolicitacao(id, reason) {
+export async function rejectSolicitacao(id, reason = '') {
   return await fetchAPI(`/solicitacoes/${id}/reject/`, {
     method: 'PATCH',
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify(reason ? { reason } : {}),
   });
 }
 

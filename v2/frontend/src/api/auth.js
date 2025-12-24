@@ -7,7 +7,7 @@
  * - GET /api/me/ - Dados do usuário atual
  */
 
-import { fetchAPI } from './config';
+import { fetchAPI, clearCsrfCache } from './config';
 
 /**
  * Realiza login com username e senha
@@ -27,6 +27,8 @@ export async function logout() {
   const response = await fetchAPI('/auth/logout/', {
     method: 'POST',
   });
+  // Limpar cache de CSRF token após logout
+  clearCsrfCache();
   return response;
 }
 

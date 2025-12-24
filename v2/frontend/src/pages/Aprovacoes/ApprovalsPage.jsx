@@ -5,7 +5,7 @@
  * - Filtra solicitações pendentes do fluxo SUPER
  * - Botões para preview, aprovar e reprovar
  * - Modal para preview de payload JSON
- * - Modal para reprovação com justificativa obrigatória
+ * - Confirmação simples para reprovação (sem justificativa obrigatória)
  *
  * PA-06 (Política de Aprovação Manual):
  * - Botões de aprovar/reprovar aparecem para: Superintendência, DAT, e Superusuários
@@ -25,7 +25,6 @@ import {
   Typography,
   message,
   Modal,
-  Form,
   Descriptions,
   Divider,
   List,
@@ -51,7 +50,6 @@ import {
 import { getMe } from '../../api/availability';
 
 const { Title, Paragraph } = Typography;
-const { TextArea } = Input;
 
 const STATUS_COLORS = {
   pendente: 'orange',
@@ -75,10 +73,6 @@ export default function ApprovalsPage() {
 
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewData, setPreviewData] = useState(null);
-
-  const [rejectVisible, setRejectVisible] = useState(false);
-  const [rejectId, setRejectId] = useState(null);
-  const [rejectForm] = Form.useForm();
 
   // PA-06: Estado para verificar permissão do usuário (Superintendência, DAT, Superusuários)
   const [canApprove, setCanApprove] = useState(false);
@@ -148,21 +142,23 @@ export default function ApprovalsPage() {
     });
   };
 
-  const handleRejectClick = (id) => {
-    setRejectId(id);
-    setRejectVisible(true);
-    rejectForm.resetFields();
-  };
-
-  const handleRejectConfirm = async (values) => {
-    try {
-      await rejectSolicitacao(rejectId, values.reason);
-      message.success('Solicitação reprovada.');
-      setRejectVisible(false);
-      loadData();
-    } catch (error) {
-      message.error('Erro ao reprovar: ' + error.message);
-    }
+  const handleReject = (id) => {
+    Modal.confirm({
+      title: 'Confirmar Reprovação',
+      content: 'Deseja reprovar esta solicitação?',
+      okText: 'Reprovar',
+      okType: 'danger',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          await rejectSolicitacao(id);
+          message.success('Solicitação reprovada.');
+          loadData();
+        } catch (error) {
+          message.error('Erro ao reprovar: ' + error.message);
+        }
+      },
+    });
   };
 
   // Colunas da tabela (otimizadas para caber na tela)
@@ -270,7 +266,7 @@ export default function ApprovalsPage() {
                 size="small"
                 danger
                 icon={<CloseOutlined />}
-                onClick={() => handleRejectClick(record.id)}
+                onClick={() => handleReject(record.id)}
               >
                 Reprovar
               </Button>
@@ -459,25 +455,6 @@ export default function ApprovalsPage() {
         )}
       </Modal>
 
-      {/* Modal Rejeitar */}
-      <Modal
-        title="Reprovar Solicitação"
-        open={rejectVisible}
-        onCancel={() => setRejectVisible(false)}
-        onOk={() => rejectForm.submit()}
-        okText="Reprovar"
-        okButtonProps={{ danger: true }}
-      >
-        <Form form={rejectForm} layout="vertical" onFinish={handleRejectConfirm}>
-          <Form.Item
-            label="Motivo da Reprovação"
-            name="reason"
-            rules={[{ required: true, message: 'O motivo é obrigatório' }]}
-          >
-            <TextArea rows={4} placeholder="Digite o motivo da reprovação..." />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 }

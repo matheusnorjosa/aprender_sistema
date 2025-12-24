@@ -21,7 +21,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
 
 from .models import Solicitacao, AuditLog
-from .permissions import IsCoordenadorOrDAT, IsSuperintendencia, IsControleOrSuper
+from .permissions import IsCoordenadorOrDAT, IsSuperintendencia, IsControleOrSuper, IsGerenteSuperintendencia
 from .serializers import SolicitacaoSerializer
 
 logger = logging.getLogger(__name__)
@@ -754,7 +754,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=["post"],
-        permission_classes=[IsSuperintendencia],
+        permission_classes=[IsGerenteSuperintendencia],
         url_path="batch-approve",
     )
     def batch_approve(self, request):
@@ -766,6 +766,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Response 200: { "approved": 2, "errors": [{"id": 3, "detail": "..."}] }
 
+        Permissão: Apenas Gerentes da Superintendência ou superusers.
         PA-05: Cada solicitação gera um AuditLog individual com batch=true.
         Limite: máximo 100 solicitações por requisição.
         """
@@ -846,7 +847,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=["post"],
-        permission_classes=[IsSuperintendencia],
+        permission_classes=[IsGerenteSuperintendencia],
         url_path="batch-reject",
     )
     def batch_reject(self, request):
@@ -858,6 +859,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Response 200: { "rejected": 2, "errors": [{"id": 3, "detail": "..."}] }
 
+        Permissão: Apenas Gerentes da Superintendência ou superusers.
         PA-05: Cada solicitação gera um AuditLog individual com batch=true.
         Limite: máximo 100 solicitações por requisição.
         """

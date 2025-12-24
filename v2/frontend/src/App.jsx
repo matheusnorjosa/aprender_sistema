@@ -206,11 +206,15 @@ function AppContent() {
     try {
       await apiLogout();
       message.success('Logout realizado com sucesso');
+    } catch (error) {
+      // Log detalhado do erro
+      logger.error('Erro no logout:', error);
+      message.warning('Sessão encerrada localmente');
+    } finally {
+      // Sempre limpar estado local e redirecionar, mesmo se API falhar
+      setUser(null);
       // Recarregar a página para voltar para tela de login
       window.location.reload();
-    } catch (error) {
-      message.error('Erro ao fazer logout');
-      logger.error('Erro no logout:', error);
     }
   };
 

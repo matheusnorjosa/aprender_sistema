@@ -47,32 +47,11 @@ export function clearCsrfCache() {
 }
 
 /**
- * Garante que CSRF token existe, caso contrário faz request para obtê-lo.
+ * Busca um token CSRF fresco do servidor.
  *
- * Issue #135: Suporta CSRF_COOKIE_HTTPONLY=True usando endpoint /api/csrf/
- * que retorna o token no body da resposta (acessível ao JavaScript).
- *
- * Estratégia:
- * 1. Tenta ler do cookie (retrocompatibilidade se HttpOnly=False)
- * 2. Se não conseguir, usa cache em memória
- * 3. Se cache vazio, chama /api/csrf/ e lê do body da resposta
- *
- * @returns {Promise<string|null>} CSRF token
+ * @returns {Promise<string|null>} CSRF token fresco
  */
-export async function ensureCsrfToken() {
-  // Tentativa 1: Ler do cookie (retrocompatibilidade)
-  let token = getCsrfToken();
-  if (token) {
-    cachedCsrfToken = token; // Atualizar cache
-    return token;
-  }
-
-  // Tentativa 2: Usar cache em memória
-  if (cachedCsrfToken) {
-    return cachedCsrfToken;
-  }
-
-  // Tentativa 3: Obter via endpoint /api/csrf/ (Issue #135)
+async function fetchFreshCsrfToken() {
   try {
     const response = await fetch(`${API_BASE}/csrf/`, {
       method: 'GET',
@@ -81,32 +60,67 @@ export async function ensureCsrfToken() {
 
     if (response.ok) {
       const data = await response.json();
-      token = data.csrfToken;
+      const token = data.csrfToken;
 
       if (token) {
-        cachedCsrfToken = token; // Cachear em memória
+        cachedCsrfToken = token;
         return token;
       }
     }
   } catch (error) {
     logger.warn('Erro ao obter CSRF token via /api/csrf/:', error);
   }
-
-  // Fallback: retornar null e deixar request falhar com mensagem clara
   return null;
+}
+
+/**
+ * Garante que CSRF token existe, caso contrário faz request para obtê-lo.
+ *
+ * Issue #135: Suporta CSRF_COOKIE_HTTPONLY=True usando endpoint /api/csrf/
+ * que retorna o token no body da resposta (acessível ao JavaScript).
+ *
+ * Estratégia:
+ * 1. Tenta ler do cookie (retrocompatibilidade se HttpOnly=False)
+ * 2. Se não conseguir, busca token fresco do servidor
+ *
+ * @param {boolean} forceRefresh - Se true, ignora cache e busca token fresco
+ * @returns {Promise<string|null>} CSRF token
+ */
+export async function ensureCsrfToken(forceRefresh = false) {
+  // Se forceRefresh, buscar token fresco diretamente
+  if (forceRefresh) {
+    return await fetchFreshCsrfToken();
+  }
+
+  // Tentativa 1: Ler do cookie (retrocompatibilidade)
+  let token = getCsrfToken();
+  if (token) {
+    cachedCsrfToken = token; // Atualizar cache
+    return token;
+  }
+
+  // Tentativa 2: Usar cache em memória (se não muito antigo)
+  if (cachedCsrfToken) {
+    return cachedCsrfToken;
+  }
+
+  // Tentativa 3: Obter via endpoint /api/csrf/ (Issue #135)
+  return await fetchFreshCsrfToken();
 }
 
 /**
  * Wrapper genérico para fetch com autenticação, CSRF e tratamento de erros.
  *
  * Issue #135: Usa ensureCsrfToken() para suportar CSRF_COOKIE_HTTPONLY=True
+ * Retry automático: Se receber erro CSRF (403 com "CSRF"), busca token fresco e retenta.
  *
  * @param {string} url - URL relativa (ex: '/solicitacoes/') ou absoluta
  * @param {object} options - Opções do fetch (method, body, headers, etc.)
+ * @param {boolean} isRetry - Flag interna para evitar loop infinito de retry
  * @returns {Promise<object>} Response JSON
  * @throws {Error} Se request falhar ou CSRF estiver ausente
  */
-export async function fetchAPI(url, options = {}) {
+export async function fetchAPI(url, options = {}, isRetry = false) {
   const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
 
   const headers = {
@@ -117,7 +131,8 @@ export async function fetchAPI(url, options = {}) {
   // Adicionar CSRF para métodos mutantes (Issue #135: usa ensureCsrfToken)
   const method = options.method?.toUpperCase() || 'GET';
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-    const csrfToken = await ensureCsrfToken();
+    // Se é retry, forçar refresh do token
+    const csrfToken = await ensureCsrfToken(isRetry);
 
     if (!csrfToken) {
       logger.error('CSRF token não encontrado! Verifique se está autenticado.');
@@ -142,11 +157,18 @@ export async function fetchAPI(url, options = {}) {
   });
 
   if (!response.ok) {
+    const errorBody = await response.text();
+
+    // Detectar erro de CSRF e fazer retry com token fresco (apenas uma vez)
+    if (response.status === 403 && errorBody.includes('CSRF') && !isRetry) {
+      logger.warn('CSRF token inválido, buscando token fresco e retentando...');
+      clearCsrfCache();
+      return fetchAPI(url, options, true); // Retry com flag
+    }
+
     logger.error('=== fetchAPI ERROR ===');
     logger.error('Status:', response.status);
     logger.error('StatusText:', response.statusText);
-
-    const errorBody = await response.text();
     logger.error('Response body:', errorBody);
 
     let error;

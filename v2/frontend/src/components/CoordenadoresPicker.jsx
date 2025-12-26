@@ -63,9 +63,9 @@ export default function CoordenadoresPicker({ value = [], onChange }) {
     setSearch('');
   };
 
-  const handleRemove = (index) => {
+  const handleRemove = (id) => {
     if (onChange) {
-      onChange(value.filter((_, i) => i !== index));
+      onChange(value.filter((c) => c.id !== id));
     }
   };
 
@@ -74,11 +74,11 @@ export default function CoordenadoresPicker({ value = [], onChange }) {
       {/* Tags dos coordenadores selecionados */}
       {value.length > 0 && (
         <Space wrap style={{ marginBottom: 8 }}>
-          {value.map((coord, index) => (
+          {value.map((coord) => (
             <Tag
-              key={index}
+              key={coord.id}
               closable
-              onClose={() => handleRemove(index)}
+              onClose={() => handleRemove(coord.id)}
               color="green"
             >
               {coord.label || coord.name}

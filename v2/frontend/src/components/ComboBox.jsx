@@ -25,7 +25,6 @@ export default function ComboBox({
       try {
         setLoading(true);
         const results = await lookupFunction('');
-        console.log(`ComboBox: Carregadas ${results.length} opções iniciais`, results.slice(0, 3));
         setOptions(results.map(item => ({
           value: String(item.id),
           label: item.label,

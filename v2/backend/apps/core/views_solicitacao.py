@@ -68,9 +68,13 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     ordering = ["-inicio"]
 
     def get_permissions(self):
-        # Actions approve, reject, preview_gcal, publish, resync_gcal, cancel_gcal têm permission_classes específicas
-        # Não sobrescrever nesses casos
-        if self.action in ["approve", "reject", "preview_gcal", "publish", "resync_gcal", "cancel_gcal"]:
+        # Actions com permission_classes específicas definidas no decorator
+        # Não sobrescrever nesses casos - usar super() para pegar do decorator
+        actions_with_custom_permissions = [
+            "approve", "reject", "preview_gcal", "publish",
+            "resync_gcal", "cancel_gcal", "batch_approve", "batch_reject"
+        ]
+        if self.action in actions_with_custom_permissions:
             return super().get_permissions()
         if self.action == "create":
             return [IsCoordenadorOrDAT()]

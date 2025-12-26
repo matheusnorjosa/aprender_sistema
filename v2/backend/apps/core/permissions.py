@@ -32,6 +32,34 @@ class IsSuperintendencia(permissions.BasePermission):  # type: ignore[misc]
         )
 
 
+class IsGerenteSuperintendencia(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Permissão: apenas Gerentes vinculados à Superintendência ou superusers.
+
+    Requer AMBOS:
+    - Função "Gerente" (grupo de função)
+    - Setor "Superintendência" (grupo de setor)
+
+    Usado para operações críticas como aprovação/reprovação em lote.
+    Nota: Superusers sempre têm acesso completo.
+    """
+
+    message = "Apenas Gerentes da Superintendência podem realizar esta ação."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if getattr(request.user, 'is_superuser', False):
+            return True
+
+        user_groups = set(request.user.groups.values_list('name', flat=True))  # type: ignore[attr-defined]
+        has_gerente = 'Gerente' in user_groups
+        has_superintendencia = 'Superintendência' in user_groups
+
+        return has_gerente and has_superintendencia
+
+
 class IsSuperintendenciaOnly(permissions.BasePermission):  # type: ignore[misc]
     """
     Permissão: APENAS usuários do grupo 'Superintendência' ou superusers podem executar.

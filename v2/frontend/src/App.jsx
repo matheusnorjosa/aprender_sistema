@@ -6,7 +6,7 @@
  * Issue #207: Code-splitting com React.lazy() para reduzir bundle size
  */
 
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge, Switch, Tooltip } from 'antd';
 import logger from './utils/logger';
@@ -104,22 +104,37 @@ function AppContent() {
   const [lastErrorsCount, setLastErrorsCount] = useState(0);
   const [cooldownUntil, setCooldownUntil] = useState(0);
 
-  // Carregar dados do usuário
-  const loadUser = async () => {
+  // Issue #255: Ref para evitar memory leak (atualizações após unmount)
+  const isMountedRef = useRef(true);
+
+  // Carregar dados do usuário - useCallback para poder passar como prop
+  const loadUser = useCallback(async () => {
     try {
       const userData = await getMe();
-      setUser(userData);
+      if (isMountedRef.current) {
+        setUser(userData);
+      }
     } catch (error) {
-      logger.error('Erro ao carregar usuário:', error);
-      setUser(null); // Explicitamente null se falhar
+      if (isMountedRef.current) {
+        logger.error('Erro ao carregar usuário:', error);
+        setUser(null);
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
-
-  useEffect(() => {
-    loadUser();
   }, []);
+
+  // Carregar usuário no mount e cleanup no unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    loadUser();
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [loadUser]);
 
   // Issue #97: Polling de alertas GCal (badge + toast)
   useEffect(() => {

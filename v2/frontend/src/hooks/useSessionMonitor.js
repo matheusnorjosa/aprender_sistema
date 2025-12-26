@@ -54,10 +54,9 @@ const useSessionMonitor = () => {
       setLastActivity(Date.now());
       setShowWarning(false);
 
-      console.log('✅ Sessão renovada com sucesso');
       return true;
     } catch (err) {
-      console.error('❌ Erro ao renovar sessão:', err);
+      // Erro ao renovar sessão - pode ser 401/403 (sessão expirada)
 
       // Se retornar 401/403, sessão expirou
       if (err.response?.status === 401 || err.response?.status === 403) {
@@ -99,8 +98,7 @@ const useSessionMonitor = () => {
       if (timeLeft <= WARNING_THRESHOLD && timeLeft > 0) {
         setShowWarning(true);
       } else if (timeLeft === 0) {
-        // Sessão expirou
-        console.warn('⏰ Sessão expirada');
+        // Sessão expirou - redirecionar para login
         setShowWarning(false);
         window.location.href = '/login';
       }

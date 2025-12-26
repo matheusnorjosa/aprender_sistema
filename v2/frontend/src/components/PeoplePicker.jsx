@@ -127,10 +127,10 @@ export default function PeoplePicker({
     // Não limpar coordOptions para permitir múltiplas seleções
   };
 
-  const handleRemoveFormador = (index) => {
+  const handleRemoveFormador = (id) => {
     const updated = {
       ...value,
-      formadores: value.formadores.filter((_, i) => i !== index),
+      formadores: value.formadores.filter((f) => f.id !== id),
     };
 
     if (onChange) {
@@ -138,10 +138,10 @@ export default function PeoplePicker({
     }
   };
 
-  const handleRemoveCoord = (index) => {
+  const handleRemoveCoord = (id) => {
     const updated = {
       ...value,
-      coordAcompanha: value.coordAcompanha.filter((_, i) => i !== index),
+      coordAcompanha: value.coordAcompanha.filter((c) => c.id !== id),
     };
 
     if (onChange) {
@@ -156,11 +156,11 @@ export default function PeoplePicker({
         <div>
           <div style={{ marginBottom: 8, fontWeight: 500 }}>Formadores:</div>
           <Space wrap>
-            {value.formadores.map((formador, index) => (
+            {value.formadores.map((formador) => (
               <Tag
-                key={index}
+                key={formador.id}
                 closable
-                onClose={() => handleRemoveFormador(index)}
+                onClose={() => handleRemoveFormador(formador.id)}
                 color="blue"
               >
                 {formador.label || formador.email}
@@ -191,11 +191,11 @@ export default function PeoplePicker({
         <div>
           <div style={{ marginBottom: 8, fontWeight: 500 }}>Coordenadores Acompanhantes:</div>
           <Space wrap>
-            {value.coordAcompanha.map((coord, index) => (
+            {value.coordAcompanha.map((coord) => (
               <Tag
-                key={index}
+                key={coord.id}
                 closable
-                onClose={() => handleRemoveCoord(index)}
+                onClose={() => handleRemoveCoord(coord.id)}
                 color="green"
               >
                 {coord.label || coord.email}

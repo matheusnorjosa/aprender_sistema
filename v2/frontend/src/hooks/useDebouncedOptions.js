@@ -63,10 +63,8 @@ const useDebouncedOptions = (endpoint, params = {}) => {
         return null;
       }
 
-      console.log(`✅ Cache hit: ${key} (age: ${Math.floor(age / 1000)}s)`);
       return data;
-    } catch (err) {
-      console.warn('⚠️ Erro ao ler cache:', err);
+    } catch {
       return null;
     }
   }, []);
@@ -83,8 +81,8 @@ const useDebouncedOptions = (endpoint, params = {}) => {
           timestamp: Date.now(),
         })
       );
-    } catch (err) {
-      console.warn('⚠️ Erro ao salvar cache:', err);
+    } catch {
+      // Falha silenciosa ao salvar cache (não crítico)
     }
   }, []);
 
@@ -111,10 +109,7 @@ const useDebouncedOptions = (endpoint, params = {}) => {
 
       setOptions(data);
       saveToCache(cacheKey, data);
-
-      console.log(`📡 Fetched from backend: ${endpoint}`);
     } catch (err) {
-      console.error(`❌ Erro ao buscar ${endpoint}:`, err);
       setError(err.response?.data?.error || 'Erro ao carregar opções');
       setOptions([]);
     } finally {

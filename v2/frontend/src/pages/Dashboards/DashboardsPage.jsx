@@ -85,7 +85,6 @@ export default function DashboardsPage() {
 
   const handleExportCSV = () => {
     // TODO: Implementar export real
-    console.log('Exportando para CSV...');
   };
 
   return (

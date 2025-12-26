@@ -63,7 +63,6 @@ export default function UsuariosPage() {
         apiParams.ordering = 'username';
       }
 
-      console.log('fetchUsuarios - API params:', apiParams);
       const data = await listUsers(apiParams);
 
       // DRF pagination response structure
@@ -102,8 +101,6 @@ export default function UsuariosPage() {
   }, [searchText]);
 
   const handleTableChange = (newPagination, filters, sorter) => {
-    console.log('handleTableChange called:', { newPagination, filters, sorter });
-
     const params = {
       current: newPagination.current,
       pageSize: newPagination.pageSize,
@@ -114,7 +111,6 @@ export default function UsuariosPage() {
       params.ordering = `${sorter.order === 'descend' ? '-' : ''}${sorter.field}`;
     }
 
-    console.log('Calling fetchUsuarios with:', params);
     fetchUsuarios(params);
   };
 

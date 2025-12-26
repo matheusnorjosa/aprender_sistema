@@ -18,7 +18,7 @@ RD-08: Mensagens com formador, intervalo, tipo, detalhe
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 from django.conf import settings
 from django.db.models import Q
@@ -276,10 +276,24 @@ def check_conflicts(
     inicio_local: datetime = to_local(inicio)
     inicio_date = inicio_local.date()
 
-    # Seleção ampla: eventos que tocam o dia do início
+    # Issue #249: Usar range de datetime ao invés de .date() para evitar
+    # problemas de timezone (RD-06). Eventos próximos da meia-noite podem
+    # ter data diferente em UTC vs America/Fortaleza.
+    tz_name: str = getattr(settings, "TZ_PROJECT", "America/Fortaleza")
+    local_tz: pytz.BaseTzInfo = pytz.timezone(tz_name)
+
+    # Início e fim do dia no timezone local, convertidos para UTC para query
+    day_start: datetime = local_tz.localize(
+        datetime.combine(inicio_date, time.min)
+    )
+    day_end: datetime = local_tz.localize(
+        datetime.combine(inicio_date, time.max)
+    )
+
+    # Seleção ampla: eventos que tocam o dia do início (usando ranges UTC)
     same_day_events = Solicitacao.objects.filter(
         usuario=usuario, status="aprovado"
-    ).filter(Q(inicio__date=inicio_date) | Q(fim__date=inicio_date))
+    ).filter(Q(inicio__range=(day_start, day_end)) | Q(fim__range=(day_start, day_end)))
 
     # Somar duração dos eventos existentes no dia
     total_minutes: int = 0

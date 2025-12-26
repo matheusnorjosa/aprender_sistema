@@ -62,9 +62,9 @@ export default function FormadoresPicker({ value = [], onChange }) {
     setSearch('');
   };
 
-  const handleRemove = (index) => {
+  const handleRemove = (id) => {
     if (onChange) {
-      onChange(value.filter((_, i) => i !== index));
+      onChange(value.filter((f) => f.id !== id));
     }
   };
 
@@ -73,11 +73,11 @@ export default function FormadoresPicker({ value = [], onChange }) {
       {/* Tags dos formadores selecionados */}
       {value.length > 0 && (
         <Space wrap style={{ marginBottom: 8 }}>
-          {value.map((formador, index) => (
+          {value.map((formador) => (
             <Tag
-              key={index}
+              key={formador.id}
               closable
-              onClose={() => handleRemove(index)}
+              onClose={() => handleRemove(formador.id)}
               color="blue"
             >
               {formador.label || formador.name}

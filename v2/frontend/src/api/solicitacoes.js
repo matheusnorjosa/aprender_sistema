@@ -198,5 +198,35 @@ export async function listUsuariosOptions(params = {}) {
   return await fetchAPI(url);
 }
 
+// ========================================
+// Endpoints de operações em lote
+// ========================================
+
+/**
+ * Aprovar múltiplas solicitações em lote.
+ *
+ * @param {number[]} ids - IDs das solicitações a aprovar
+ * @returns {Promise<object>} { approved: N, errors: [...] }
+ */
+export async function approveSolicitacoesBatch(ids) {
+  return await fetchAPI('/solicitacoes/batch-approve/', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+}
+
+/**
+ * Reprovar múltiplas solicitações em lote.
+ *
+ * @param {number[]} ids - IDs das solicitações a reprovar
+ * @returns {Promise<object>} { rejected: N, errors: [...] }
+ */
+export async function rejectSolicitacoesBatch(ids) {
+  return await fetchAPI('/solicitacoes/batch-reject/', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+}
+
 // Re-exportar checkAvailability de availability.js
 export { checkAvailability } from './availability.js';

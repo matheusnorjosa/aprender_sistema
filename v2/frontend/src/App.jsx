@@ -104,21 +104,33 @@ function AppContent() {
   const [lastErrorsCount, setLastErrorsCount] = useState(0);
   const [cooldownUntil, setCooldownUntil] = useState(0);
 
-  // Carregar dados do usuário
-  const loadUser = async () => {
-    try {
-      const userData = await getMe();
-      setUser(userData);
-    } catch (error) {
-      logger.error('Erro ao carregar usuário:', error);
-      setUser(null); // Explicitamente null se falhar
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Carregar dados do usuário com cleanup para evitar memory leak
   useEffect(() => {
+    let isMounted = true;
+
+    const loadUser = async () => {
+      try {
+        const userData = await getMe();
+        if (isMounted) {
+          setUser(userData);
+        }
+      } catch (error) {
+        if (isMounted) {
+          logger.error('Erro ao carregar usuário:', error);
+          setUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
     loadUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Issue #97: Polling de alertas GCal (badge + toast)

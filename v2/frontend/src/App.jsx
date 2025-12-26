@@ -6,7 +6,7 @@
  * Issue #207: Code-splitting com React.lazy() para reduzir bundle size
  */
 
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge, Switch, Tooltip } from 'antd';
 import logger from './utils/logger';
@@ -104,34 +104,37 @@ function AppContent() {
   const [lastErrorsCount, setLastErrorsCount] = useState(0);
   const [cooldownUntil, setCooldownUntil] = useState(0);
 
-  // Carregar dados do usuário com cleanup para evitar memory leak
-  useEffect(() => {
-    let isMounted = true;
+  // Issue #255: Ref para evitar memory leak (atualizações após unmount)
+  const isMountedRef = useRef(true);
 
-    const loadUser = async () => {
-      try {
-        const userData = await getMe();
-        if (isMounted) {
-          setUser(userData);
-        }
-      } catch (error) {
-        if (isMounted) {
-          logger.error('Erro ao carregar usuário:', error);
-          setUser(null);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+  // Carregar dados do usuário - useCallback para poder passar como prop
+  const loadUser = useCallback(async () => {
+    try {
+      const userData = await getMe();
+      if (isMountedRef.current) {
+        setUser(userData);
       }
-    };
+    } catch (error) {
+      if (isMountedRef.current) {
+        logger.error('Erro ao carregar usuário:', error);
+        setUser(null);
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+    }
+  }, []);
 
+  // Carregar usuário no mount e cleanup no unmount
+  useEffect(() => {
+    isMountedRef.current = true;
     loadUser();
 
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
     };
-  }, []);
+  }, [loadUser]);
 
   // Issue #97: Polling de alertas GCal (badge + toast)
   useEffect(() => {

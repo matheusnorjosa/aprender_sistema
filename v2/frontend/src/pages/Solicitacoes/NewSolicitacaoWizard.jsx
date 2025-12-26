@@ -198,18 +198,6 @@ export default function NewSolicitacaoWizard() {
         },
       };
 
-      console.log('=== DEBUG: Payload sendo enviado ===');
-      console.log('FormData completo:', formData);
-      console.log('Payload preparado:', payload);
-      console.log('Tipos dos campos:');
-      console.log('- municipio:', typeof payload.municipio, payload.municipio);
-      console.log('- projeto:', typeof payload.projeto, payload.projeto);
-      console.log('- tipo_evento:', typeof payload.tipo_evento, payload.tipo_evento);
-      console.log('- inicio:', typeof payload.inicio, payload.inicio);
-      console.log('- fim:', typeof payload.fim, payload.fim);
-      console.log('- coordenador_acompanha:', typeof payload.coordenador_acompanha, payload.coordenador_acompanha);
-      console.log('- extra_participants:', payload.extra_participants);
-
       await createSolicitacao(payload);
       message.success('Solicitação criada com sucesso!');
       navigate('/solicitacoes');

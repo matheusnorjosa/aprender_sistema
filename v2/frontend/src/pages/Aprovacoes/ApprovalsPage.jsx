@@ -46,10 +46,12 @@ import {
   approveSolicitacao,
   rejectSolicitacao,
   previewSolicitacao,
+  approveSolicitacoesBatch,
+  rejectSolicitacoesBatch,
 } from '../../api/solicitacoes';
 import { getMe } from '../../api/availability';
 
-const { Title, Paragraph } = Typography;
+const { Title, Paragraph, Text } = Typography;
 
 const STATUS_COLORS = {
   pendente: 'orange',
@@ -76,6 +78,10 @@ export default function ApprovalsPage() {
 
   // PA-06: Estado para verificar permissão do usuário (Superintendência, DAT, Superusuários)
   const [canApprove, setCanApprove] = useState(false);
+
+  // Estados para seleção em lote
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [batchLoading, setBatchLoading] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -160,6 +166,81 @@ export default function ApprovalsPage() {
       },
     });
   };
+
+  // Handlers de operações em lote
+  const handleBatchApprove = () => {
+    Modal.confirm({
+      title: `Aprovar ${selectedRowKeys.length} solicitação(ões)?`,
+      content: 'Esta ação não pode ser desfeita.',
+      okText: 'Aprovar Todas',
+      okType: 'primary',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          setBatchLoading(true);
+          const result = await approveSolicitacoesBatch(selectedRowKeys);
+
+          if (result.approved > 0) {
+            message.success(`${result.approved} solicitação(ões) aprovada(s)!`);
+          }
+          if (result.errors?.length > 0) {
+            message.warning(`${result.errors.length} erro(s) encontrado(s)`);
+          }
+
+          setSelectedRowKeys([]);
+          loadData();
+        } catch (error) {
+          message.error('Erro ao aprovar em lote: ' + error.message);
+        } finally {
+          setBatchLoading(false);
+        }
+      },
+    });
+  };
+
+  const handleBatchReject = () => {
+    Modal.confirm({
+      title: `Reprovar ${selectedRowKeys.length} solicitação(ões)?`,
+      content: 'Esta ação não pode ser desfeita.',
+      okText: 'Reprovar Todas',
+      okType: 'danger',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          setBatchLoading(true);
+          const result = await rejectSolicitacoesBatch(selectedRowKeys);
+
+          if (result.rejected > 0) {
+            message.success(`${result.rejected} solicitação(ões) reprovada(s)!`);
+          }
+          if (result.errors?.length > 0) {
+            message.warning(`${result.errors.length} erro(s) encontrado(s)`);
+          }
+
+          setSelectedRowKeys([]);
+          loadData();
+        } catch (error) {
+          message.error('Erro ao reprovar em lote: ' + error.message);
+        } finally {
+          setBatchLoading(false);
+        }
+      },
+    });
+  };
+
+  // Configuração de seleção de linhas
+  const rowSelection = canApprove ? {
+    selectedRowKeys,
+    onChange: (keys) => setSelectedRowKeys(keys),
+    getCheckboxProps: (record) => ({
+      disabled: record.status !== 'pendente', // Só permite selecionar pendentes
+    }),
+    selections: [
+      Table.SELECTION_ALL,
+      Table.SELECTION_INVERT,
+      Table.SELECTION_NONE,
+    ],
+  } : undefined;
 
   // Colunas da tabela (otimizadas para caber na tela)
   const columns = [
@@ -314,8 +395,45 @@ export default function ApprovalsPage() {
             </Paragraph>
           )}
 
+          {/* Toolbar de ações em lote (PA-06: apenas para usuários com permissão) */}
+          {selectedRowKeys.length > 0 && canApprove && (
+            <div style={{
+              marginBottom: 16,
+              padding: '12px 16px',
+              background: '#e6f7ff',
+              borderRadius: 4,
+              border: '1px solid #91d5ff'
+            }}>
+              <Space>
+                <Text strong>
+                  {selectedRowKeys.length} solicitação(ões) selecionada(s)
+                </Text>
+                <Button
+                  type="primary"
+                  icon={<CheckOutlined />}
+                  onClick={handleBatchApprove}
+                  loading={batchLoading}
+                >
+                  Aprovar Selecionadas
+                </Button>
+                <Button
+                  danger
+                  icon={<CloseOutlined />}
+                  onClick={handleBatchReject}
+                  loading={batchLoading}
+                >
+                  Reprovar Selecionadas
+                </Button>
+                <Button type="link" onClick={() => setSelectedRowKeys([])}>
+                  Limpar Seleção
+                </Button>
+              </Space>
+            </div>
+          )}
+
           {/* Tabela */}
           <Table
+            rowSelection={rowSelection}
             columns={columns}
             dataSource={rows}
             loading={loading}

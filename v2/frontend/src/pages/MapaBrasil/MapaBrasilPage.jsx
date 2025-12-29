@@ -776,7 +776,7 @@ export default function MapaBrasilPage() {
                     }
                   >
                     <List.Item.Meta
-                      avatar={<EnvironmentOutlined style={{ fontSize: 24, color: '#1890ff' }} />}
+                      avatar={<EnvironmentOutlined className="text-2xl text-blue-500" />}
                       title={`${item.municipio}-${item.uf}`}
                       description={`${item.coordenadores} coordenadores`}
                     />

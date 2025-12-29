@@ -19,24 +19,12 @@ on:
   workflow_dispatch:
 
 # ================================================================
-# MkDocs Documentation Build and Deploy
+# MkDocs Documentation Build (validation only)
 # Issue #269: Automatic documentation generation
+# Note: Deploy disabled - GitHub Pages requires paid plan for private repos
 # ================================================================
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Allow only one concurrent deployment
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
-  # ----------------------------------------------------------------
-  # Job 1: Build documentation
-  # ----------------------------------------------------------------
   build:
     runs-on: ubuntu-latest
     steps:
@@ -65,22 +53,5 @@ jobs:
       - name: Build documentation
         run: mkdocs build --strict
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site/
-
-  # ----------------------------------------------------------------
-  # Job 2: Deploy to GitHub Pages (only on main branch push)
-  # ----------------------------------------------------------------
-  deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Report success
+        run: echo "✅ Documentation builds successfully"

@@ -408,7 +408,8 @@ from apps.core.services.gcal.sync import apply_one_solicitacao
 Estas regras estão definidas em `.claude/CLAUDE.md` e são **imutáveis**:
 
 - **PA-01**: Sem auto-aprovação. Uma Solicitação **nunca** muda para "Aprovada" automaticamente.
-- **PA-02**: Apenas usuários com **Gerente + Superintendência** (ou superuser) podem aprovar/reprovar. Ver seção RBAC.
+- **PA-02 (Adaptada)**: Usuários com **Superintendência**, **DAT** ou **superuser** podem aprovar/reprovar.
+  - _Histórico_: Originalmente era "Gerente + Superintendência". Adaptado para incluir DAT (ver `permissions.py`).
 - **PA-03**: Integrações externas (Google Calendar, etc.) só executam **após** aprovação manual concluída.
 - **PA-04**: Toda solicitação nasce com `status = pendente`.
 - **PA-05**: Registrar usuário, data/hora e justificativa em `Aprovacao` e `LogAuditoria`.
@@ -736,8 +737,9 @@ As regras abaixo consolidam a lógica original das planilhas e devem ser aplicad
 
 ## Política de Aprovação Manual (Obrigatória)
 
-- **PA-01 — Sem auto-aprovação**: Uma `Solicitacao` **nunca** muda para “Aprovada” automaticamente, mesmo se não houver conflitos.  
-- **PA-02 — Perfil exigido**: Apenas usuários com **Gerente + Superintendência** (ou superuser) podem aprovar/reprovar. Ver seção RBAC.  
+- **PA-01 — Sem auto-aprovação**: Uma `Solicitacao` **nunca** muda para "Aprovada" automaticamente, mesmo se não houver conflitos.
+- **PA-02 — Perfil exigido (Adaptada)**: Usuários com **Superintendência**, **DAT** ou **superuser** podem aprovar/reprovar.
+  - _Histórico_: Originalmente era "Gerente + Superintendência". Adaptado para incluir DAT (ver `permissions.py`).
 - **PA-03 — Gatilhos pós-aprovação**: Integrações externas (RF05/RF06) só executam **após** aprovação manual concluída.  
 - **PA-04 — Estado inicial**: Toda solicitação nasce com `status = pendente`.  
 - **PA-05 — Auditoria**: Registrar usuário, data/hora e justificativa (quando houver) em `Aprovacao` e `LogAuditoria`.  
@@ -756,7 +758,7 @@ As regras abaixo consolidam a lógica original das planilhas e devem ser aplicad
 **Status**: Implementado e testado (5/5 testes passando)
 **Documentação Completa**: [v2/docs/IMPLEMENTACAO_PA.md](../v2/docs/IMPLEMENTACAO_PA.md)
 
-**Resumo**: PR17 implementou conformidade total com Política de Aprovação Manual (CP-02): sem auto-aprovação (PA-01), apenas Superintendência aprova (PA-02), integrações após aprovação (PA-03), AuditLog persistente (PA-05), botões ocultos (PA-06), 5 testes obrigatórios (PA-07).
+**Resumo**: PR17 implementou conformidade total com Política de Aprovação Manual (CP-02): sem auto-aprovação (PA-01), Superintendência/DAT/superuser aprovam (PA-02 Adaptada), integrações após aprovação (PA-03), AuditLog persistente (PA-05), botões ocultos (PA-06), 5 testes obrigatórios (PA-07).
 
 **Arquivos modificados**: `models.py` (Solicitacao.save), `views.py` (approve/reject + AuditLog), `test_approval_policy_PA.py` (5 testes), `ApprovalsPage.jsx` (PA-06).
 

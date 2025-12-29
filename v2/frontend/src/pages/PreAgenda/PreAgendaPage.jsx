@@ -236,7 +236,7 @@ export default function PreAgendaPage() {
       content: (
         <div>
           <p>Deseja reenviar (forçar UPDATE) este evento no Google Calendar?</p>
-          <p style={{ color: '#888', fontSize: '12px' }}>
+          <p className="text-gray-500 text-xs">
             Esta ação irá sobrescrever o evento existente com os dados atualizados.
           </p>
         </div>
@@ -281,7 +281,7 @@ export default function PreAgendaPage() {
       content: (
         <div>
           <p>Deseja cancelar este evento no Google Calendar?</p>
-          <p style={{ color: '#ff4d4f', fontWeight: 'bold', fontSize: '12px' }}>
+          <p className="text-red-500 font-bold text-xs">
             ⚠️ ATENÇÃO: Esta ação irá deletar permanentemente o evento do Calendar e limpar todos os campos relacionados (event_id, meet_link, etc.).
           </p>
         </div>
@@ -333,7 +333,7 @@ export default function PreAgendaPage() {
       content: (
         <div>
           <p>Deseja reenviar (forçar UPDATE) estes {selectedRowKeys.length} eventos no Google Calendar?</p>
-          <p style={{ color: '#888', fontSize: '12px' }}>
+          <p className="text-gray-500 text-xs">
             Esta ação irá sobrescrever os eventos existentes com os dados atualizados.
           </p>
         </div>
@@ -428,7 +428,7 @@ export default function PreAgendaPage() {
       content: (
         <div>
           <p>Deseja forçar resync (resetar hash + PENDING) destes {selectedRowKeys.length} eventos?</p>
-          <p style={{ color: '#888', fontSize: '12px' }}>
+          <p className="text-gray-500 text-xs">
             Útil para corrigir drift ou reprocessar eventos com erros.
           </p>
         </div>

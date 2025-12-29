@@ -94,7 +94,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             )
         elif (
             self.request.user.is_superuser
-            or self.request.user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
+            or self.request.user.groups.filter(name__in=["Superintendência", "Controle", "DAT"]).exists()
         ):
             qs = Solicitacao.objects.select_related(
                 "usuario", "municipio", "tipo_evento", "projeto"

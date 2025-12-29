@@ -37,13 +37,29 @@ export function getCsrfToken() {
 }
 
 // Cache de token CSRF em memória (Issue #135 - suporte a HttpOnly)
+// Issue #258: Adiciona TTL para evitar token stale
 let cachedCsrfToken = null;
+let csrfTokenTimestamp = null;
+const CSRF_TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutos
 
 /**
- * Limpa o cache de CSRF token (usar no logout).
+ * Limpa o cache de CSRF token (usar no logout ou em erro 401/403).
  */
 export function clearCsrfCache() {
   cachedCsrfToken = null;
+  csrfTokenTimestamp = null;
+}
+
+/**
+ * Verifica se o token CSRF em cache ainda é válido (não expirou).
+ * @returns {boolean} true se o token é válido
+ */
+function isCsrfTokenValid() {
+  if (!cachedCsrfToken || !csrfTokenTimestamp) {
+    return false;
+  }
+  const elapsed = Date.now() - csrfTokenTimestamp;
+  return elapsed < CSRF_TOKEN_TTL_MS;
 }
 
 /**
@@ -64,6 +80,7 @@ async function fetchFreshCsrfToken() {
 
       if (token) {
         cachedCsrfToken = token;
+        csrfTokenTimestamp = Date.now(); // Issue #258: Salvar timestamp
         return token;
       }
     }
@@ -95,12 +112,13 @@ export async function ensureCsrfToken(forceRefresh = false) {
   // Tentativa 1: Ler do cookie (retrocompatibilidade)
   let token = getCsrfToken();
   if (token) {
-    cachedCsrfToken = token; // Atualizar cache
+    cachedCsrfToken = token;
+    csrfTokenTimestamp = Date.now(); // Issue #258: Atualizar timestamp
     return token;
   }
 
-  // Tentativa 2: Usar cache em memória (se não muito antigo)
-  if (cachedCsrfToken) {
+  // Tentativa 2: Usar cache em memória se válido (Issue #258: verificar TTL)
+  if (isCsrfTokenValid()) {
     return cachedCsrfToken;
   }
 
@@ -164,6 +182,11 @@ export async function fetchAPI(url, options = {}, isRetry = false) {
       logger.warn('CSRF token inválido, buscando token fresco e retentando...');
       clearCsrfCache();
       return fetchAPI(url, options, true); // Retry com flag
+    }
+
+    // Issue #258: Invalidar cache em 401 (sessão expirada)
+    if (response.status === 401) {
+      clearCsrfCache();
     }
 
     logger.error('=== fetchAPI ERROR ===');

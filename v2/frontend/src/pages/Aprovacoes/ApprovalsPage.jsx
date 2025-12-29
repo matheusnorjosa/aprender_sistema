@@ -332,7 +332,7 @@ export default function ApprovalsPage() {
             size="small"
             icon={<EyeOutlined />}
             onClick={() => handlePreview(record.id)}
-            title="Preview"
+            aria-label="Visualizar preview do evento"
           />
           {/* PA-06: Botões de aprovar/reprovar para Superintendência, DAT e Superusuários */}
           {record.status === 'pendente' && canApprove ? (

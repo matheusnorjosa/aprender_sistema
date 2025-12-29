@@ -432,6 +432,7 @@ export default function AcoesPage() {
               size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
+              aria-label="Editar ação"
             />
           </Tooltip>
           <Tooltip title="Excluir">
@@ -441,6 +442,7 @@ export default function AcoesPage() {
               danger
               icon={<DeleteOutlined />}
               onClick={() => handleDelete(record)}
+              aria-label="Excluir ação"
             />
           </Tooltip>
         </Space>

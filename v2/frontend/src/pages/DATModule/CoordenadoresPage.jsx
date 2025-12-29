@@ -464,6 +464,7 @@ export default function CoordenadoresPage() {
               size="small"
               icon={<EyeOutlined />}
               onClick={() => handleView(record)}
+              aria-label="Ver detalhes do coordenador"
             />
           </Tooltip>
           <Tooltip title="Editar">
@@ -472,6 +473,7 @@ export default function CoordenadoresPage() {
               size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
+              aria-label="Editar coordenador"
             />
           </Tooltip>
           <Tooltip title="Excluir">
@@ -481,6 +483,7 @@ export default function CoordenadoresPage() {
               danger
               icon={<DeleteOutlined />}
               onClick={() => handleDelete(record)}
+              aria-label="Excluir coordenador"
             />
           </Tooltip>
         </Space>
@@ -643,6 +646,7 @@ export default function CoordenadoresPage() {
                   type={viewMode === 'cards' ? 'primary' : 'default'}
                   icon={<AppstoreOutlined />}
                   onClick={() => setViewMode('cards')}
+                  aria-label="Visualizar como cards"
                 />
               </Tooltip>
               <Tooltip title="Lista">
@@ -650,6 +654,7 @@ export default function CoordenadoresPage() {
                   type={viewMode === 'table' ? 'primary' : 'default'}
                   icon={<TableOutlined />}
                   onClick={() => setViewMode('table')}
+                  aria-label="Visualizar como lista"
                 />
               </Tooltip>
               <Tooltip title="Por Área">
@@ -657,6 +662,7 @@ export default function CoordenadoresPage() {
                   type={viewMode === 'area' ? 'primary' : 'default'}
                   icon={<BarsOutlined />}
                   onClick={() => setViewMode('area')}
+                  aria-label="Visualizar por área"
                 />
               </Tooltip>
             </Button.Group>

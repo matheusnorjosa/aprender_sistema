@@ -451,6 +451,7 @@ export default function FormacoesPage() {
               size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
+              aria-label="Editar formação"
             />
           </Tooltip>
           <Tooltip title="Excluir">
@@ -460,6 +461,7 @@ export default function FormacoesPage() {
               danger
               icon={<DeleteOutlined />}
               onClick={() => handleDelete(record)}
+              aria-label="Excluir formação"
             />
           </Tooltip>
         </Space>

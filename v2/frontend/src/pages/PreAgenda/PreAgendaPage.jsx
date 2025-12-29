@@ -9,7 +9,7 @@
  * - Operações em lote (Reapply/Resync) via seleção múltipla
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Card,
@@ -142,7 +142,8 @@ export default function PreAgendaPage() {
     loadData();
   }, [loadData]);
 
-  const handlePreview = async (id) => {
+  // Issue #260: Memoizar handlers para evitar re-renderização desnecessária
+  const handlePreview = useCallback(async (id) => {
     try {
       const data = await previewSolicitacao(id);
       setPreviewData(data);
@@ -150,9 +151,9 @@ export default function PreAgendaPage() {
     } catch (error) {
       message.error('Erro ao visualizar payload: ' + error.message);
     }
-  };
+  }, []);
 
-  const handlePublish = (id) => {
+  const handlePublish = useCallback((id) => {
     // OAuth Phase 5: Guarda - verificar conexão Google
     if (googleStatus && !googleStatus.connected) {
       Modal.confirm({
@@ -206,9 +207,9 @@ export default function PreAgendaPage() {
         }
       },
     });
-  };
+  }, [googleStatus, loadData]);
 
-  const handleResync = (id) => {
+  const handleResync = useCallback((id) => {
     // OAuth Phase 5: Guarda - verificar conexão Google
     if (googleStatus && !googleStatus.connected) {
       Modal.confirm({
@@ -270,9 +271,9 @@ export default function PreAgendaPage() {
         }
       },
     });
-  };
+  }, [googleStatus, loadData]);
 
-  const handleCancel = (id) => {
+  const handleCancel = useCallback((id) => {
     Modal.confirm({
       title: 'Confirmar Cancelamento',
       icon: <StopOutlined style={{ color: '#ff4d4f' }} />,
@@ -297,7 +298,7 @@ export default function PreAgendaPage() {
         }
       },
     });
-  };
+  }, [loadData]);
 
   // Issue #95: Batch Reapply
   const handleBatchReapply = () => {
@@ -489,7 +490,8 @@ export default function PreAgendaPage() {
     });
   };
 
-  const columns = [
+  // Issue #260: Memoizar columns para evitar re-renderização desnecessária da tabela
+  const columns = useMemo(() => [
     {
       title: 'Data/Hora',
       dataIndex: 'inicio',
@@ -579,7 +581,7 @@ export default function PreAgendaPage() {
         );
       },
     },
-  ];
+  ], [handlePreview, handlePublish, handleResync, handleCancel]);
 
   // OAuth Phase 5: RBAC - verificar se é Controle ou Super
   const canControle = user?.is_superuser || user?.groups?.includes('Controle');

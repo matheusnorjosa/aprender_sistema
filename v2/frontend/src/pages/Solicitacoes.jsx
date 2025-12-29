@@ -39,6 +39,7 @@ import {
 } from '../api/solicitacoes';
 import { getMe } from '../api/availability';
 import { MeetLink } from '../components/MeetLink';
+import logger from '../utils/logger';
 
 const { TextArea } = Input;
 
@@ -103,7 +104,7 @@ function Solicitacoes() {
           false;
         setIsSuperintendencia(isSuper);
       } catch (error) {
-        console.error('Erro ao buscar usuário:', error);
+        logger.error('Erro ao buscar usuário:', error);
         setIsSuperintendencia(false);
       } finally {
         setLoadingUser(false);

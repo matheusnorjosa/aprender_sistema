@@ -469,6 +469,7 @@ export default function DATRegistrosPage() {
               size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
+              aria-label="Editar registro"
             />
           </Tooltip>
           <Tooltip title="Excluir">
@@ -478,6 +479,7 @@ export default function DATRegistrosPage() {
               danger
               icon={<DeleteOutlined />}
               onClick={() => handleDelete(record)}
+              aria-label="Excluir registro"
             />
           </Tooltip>
         </Space>

@@ -469,6 +469,7 @@ export default function PlanoFormacoesPage() {
               size="small"
               icon={<InfoCircleOutlined />}
               onClick={() => handleViewDetail(record)}
+              aria-label="Ver detalhes do plano"
             />
           </Tooltip>
           <Tooltip title="Editar">
@@ -477,6 +478,7 @@ export default function PlanoFormacoesPage() {
               size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
+              aria-label="Editar plano de formações"
             />
           </Tooltip>
           <Tooltip title="Excluir">
@@ -486,6 +488,7 @@ export default function PlanoFormacoesPage() {
               danger
               icon={<DeleteOutlined />}
               onClick={() => handleDelete(record)}
+              aria-label="Excluir plano de formações"
             />
           </Tooltip>
         </Space>

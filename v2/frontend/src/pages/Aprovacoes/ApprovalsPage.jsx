@@ -50,6 +50,7 @@ import {
   rejectSolicitacoesBatch,
 } from '../../api/solicitacoes';
 import { getMe } from '../../api/availability';
+import logger from '../../utils/logger';
 
 const { Title, Paragraph, Text } = Typography;
 

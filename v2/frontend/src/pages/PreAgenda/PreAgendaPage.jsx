@@ -62,6 +62,7 @@ import { MeetLink } from '../../components/MeetLink';
 import { getMe } from '../../api/availability';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
+import logger from '../../utils/logger';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;

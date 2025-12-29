@@ -13,7 +13,7 @@
  * - Conformidade ISO 9241-110: Controle explícito (usuário vê apenas ações permitidas)
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Card,
@@ -119,7 +119,8 @@ export default function ApprovalsPage() {
     loadUser();
   }, []);
 
-  const handlePreview = async (id) => {
+  // Issue #260: Memoizar handlers para evitar re-renderização desnecessária
+  const handlePreview = useCallback(async (id) => {
     try {
       const data = await previewSolicitacao(id);
       setPreviewData(data);
@@ -127,9 +128,9 @@ export default function ApprovalsPage() {
     } catch (error) {
       message.error('Erro ao visualizar payload: ' + error.message);
     }
-  };
+  }, []);
 
-  const handleApprove = (id) => {
+  const handleApprove = useCallback((id) => {
     Modal.confirm({
       title: 'Confirmar Aprovação',
       content: 'Deseja aprovar esta solicitação?',
@@ -146,9 +147,9 @@ export default function ApprovalsPage() {
         }
       },
     });
-  };
+  }, [loadData]);
 
-  const handleReject = (id) => {
+  const handleReject = useCallback((id) => {
     Modal.confirm({
       title: 'Confirmar Reprovação',
       content: 'Deseja reprovar esta solicitação?',
@@ -165,7 +166,7 @@ export default function ApprovalsPage() {
         }
       },
     });
-  };
+  }, [loadData]);
 
   // Handlers de operações em lote
   const handleBatchApprove = () => {
@@ -242,8 +243,8 @@ export default function ApprovalsPage() {
     ],
   } : undefined;
 
-  // Colunas da tabela (otimizadas para caber na tela)
-  const columns = [
+  // Issue #260: Memoizar columns para evitar re-renderização desnecessária da tabela
+  const columns = useMemo(() => [
     {
       title: 'Data/Horário',
       key: 'data_horario',
@@ -356,7 +357,7 @@ export default function ApprovalsPage() {
         </Space>
       ),
     },
-  ];
+  ], [handlePreview, handleApprove, handleReject, canApprove]);
 
   return (
     <div style={{ padding: '24px' }}>

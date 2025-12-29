@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
@@ -75,8 +76,9 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         """Return group IDs for frontend editing."""
         return [g.id for g in obj.groups.all()]
 
-    # Whitelist of allowed groups (P1.1) - incluindo Gerência
-    ALLOWED_GROUPS = {"DAT", "Controle", "Superintendência", "Coordenador", "Formador", "Gerência"}
+    # Whitelist of allowed groups (P1.1) - configurável via settings (Issue #254)
+    # Fallback para set vazio se não configurado (todos os grupos bloqueados)
+    ALLOWED_GROUPS: set[str] = getattr(settings, "ALLOWED_USER_GROUPS", set())
 
     class Meta:
         model = get_user_model()

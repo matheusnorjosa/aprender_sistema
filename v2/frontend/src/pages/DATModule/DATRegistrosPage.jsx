@@ -275,13 +275,13 @@ export default function DATRegistrosPage() {
   const renderStatusIcon = (status) => {
     switch (status) {
       case 'concluido':
-        return <CheckCircleFilled style={{ color: '#52c41a', fontSize: 18 }} />;
+        return <CheckCircleFilled className="text-green-500 text-lg" />;
       case 'em_andamento':
-        return <ClockCircleFilled style={{ color: '#faad14', fontSize: 18 }} />;
+        return <ClockCircleFilled className="text-yellow-500 text-lg" />;
       case 'pendente':
-        return <ExclamationCircleFilled style={{ color: '#ff4d4f', fontSize: 18 }} />;
+        return <ExclamationCircleFilled className="text-red-500 text-lg" />;
       default:
-        return <MinusCircleFilled style={{ color: '#999', fontSize: 18 }} />;
+        return <MinusCircleFilled className="text-gray-400 text-lg" />;
     }
   };
 
@@ -715,19 +715,19 @@ export default function DATRegistrosPage() {
             Legenda de Ícones:
           </Text>
           <Space>
-            <CheckCircleFilled style={{ color: '#52c41a' }} />
+            <CheckCircleFilled className="text-green-500" />
             <Text type="secondary">Concluído</Text>
           </Space>
           <Space>
-            <ClockCircleFilled style={{ color: '#faad14' }} />
+            <ClockCircleFilled className="text-yellow-500" />
             <Text type="secondary">Em Andamento</Text>
           </Space>
           <Space>
-            <ExclamationCircleFilled style={{ color: '#ff4d4f' }} />
+            <ExclamationCircleFilled className="text-red-500" />
             <Text type="secondary">Pendente</Text>
           </Space>
           <Space>
-            <MinusCircleFilled style={{ color: '#999' }} />
+            <MinusCircleFilled className="text-gray-400" />
             <Text type="secondary">Não Aplicável</Text>
           </Space>
           <Divider type="vertical" />
@@ -780,7 +780,7 @@ export default function DATRegistrosPage() {
             size="small"
             title={
               <Space>
-                <DatabaseOutlined style={{ color: '#1890ff' }} />
+                <DatabaseOutlined className="text-blue-500" />
                 <span>Dados Básicos</span>
               </Space>
             }
@@ -854,7 +854,7 @@ export default function DATRegistrosPage() {
                 size="small"
                 title={
                   <Space>
-                    <BookOutlined style={{ color: '#1890ff' }} />
+                    <BookOutlined className="text-blue-500" />
                     <span>Plataforma FORMAR</span>
                     <Tag color="blue">Integração</Tag>
                   </Space>
@@ -951,7 +951,7 @@ export default function DATRegistrosPage() {
                 title={
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                     <Space>
-                      <BarChartOutlined style={{ color: '#52c41a' }} />
+                      <BarChartOutlined className="text-green-500" />
                       <span>Plataforma AVALIAR</span>
                     </Space>
                     <Form.Item name="usa_avaliar" valuePropName="checked" noStyle>

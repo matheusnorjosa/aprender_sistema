@@ -526,3 +526,6 @@ v2/infra/docker-compose.observability.yml
 v2/infra/prometheus.yml
 v2/infra/grafana/
 v2/docs/OBSERVABILITY.md
+
+# Continuous Claude cache (local only)
+.claude/cache/

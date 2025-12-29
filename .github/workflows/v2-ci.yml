@@ -196,7 +196,7 @@ jobs:
           echo "changed_apps=$CHANGED" >> $GITHUB_OUTPUT
           echo "📁 Apps modificadas: $CHANGED"
 
-      - name: Run Tests
+      - name: Run Tests with Coverage
         env:
           DJANGO_SETTINGS_MODULE: config.settings
           ENVIRONMENT: testing
@@ -220,8 +220,13 @@ jobs:
         run: |
           cd v2/backend
 
+          # Coverage settings (Issue #268)
+          # Phase 1: 85% threshold
+          # Phase 2: 90% threshold (after stabilization)
+          COV_OPTS="--cov=apps --cov-report=term-missing --cov-report=xml --cov-fail-under=85"
+
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "🚀 PR Mode: Smart test selection"
+            echo "🚀 PR Mode: Smart test selection with coverage"
 
             # Estratégia combinada:
             # 1. Sempre rodar testes críticos (smoke tests)
@@ -254,19 +259,19 @@ jobs:
 
               if [ -n "$APP_TESTS" ]; then
                 echo "📦 Testando apps modificadas: $CHANGED_APPS"
-                pytest -q --tb=short $SLOW_TESTS $APP_TESTS $CRITICAL_TESTS 2>/dev/null || \
-                pytest -q --tb=short $SLOW_TESTS $CRITICAL_TESTS
+                pytest -q --tb=short $COV_OPTS $SLOW_TESTS $APP_TESTS $CRITICAL_TESTS 2>/dev/null || \
+                pytest -q --tb=short $COV_OPTS $SLOW_TESTS $CRITICAL_TESTS
               else
                 echo "📦 Nenhum teste específico, rodando críticos"
-                pytest -q --tb=short $SLOW_TESTS $CRITICAL_TESTS
+                pytest -q --tb=short $COV_OPTS $SLOW_TESTS $CRITICAL_TESTS
               fi
             else
               echo "📦 Sem mudanças em apps, rodando críticos"
-              pytest -q --tb=short $CRITICAL_TESTS
+              pytest -q --tb=short $COV_OPTS $CRITICAL_TESTS
             fi
           else
-            echo "🧪 Main branch: Full test suite"
-            pytest -q --tb=short
+            echo "🧪 Main branch: Full test suite with coverage"
+            pytest -q --tb=short $COV_OPTS
           fi
 
       - name: Upload coverage reports

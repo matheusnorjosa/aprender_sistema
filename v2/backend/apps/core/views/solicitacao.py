@@ -73,11 +73,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self) -> QuerySet:
         """
-        Filtrar solicitações por usuário (exceto Superintendência/superuser que vê todas).
+        Filtrar solicitações por usuário.
+
+        PA-02 (Adaptada): Superintendência, DAT e superusers veem todas as solicitações.
+        Outros usuários veem apenas suas próprias solicitações.
         """
         if (
             self.request.user.is_superuser
-            or self.request.user.groups.filter(name="Superintendência").exists()
+            or self.request.user.groups.filter(name__in=["Superintendência", "DAT"]).exists()
         ):
             return Solicitacao.objects.select_related(
                 "usuario", "municipio", "tipo_evento", "projeto"

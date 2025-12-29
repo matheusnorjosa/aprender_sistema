@@ -505,6 +505,33 @@ ETL_REQUIRE_ZERO_INVALID_DATES = (
 )  # Se True, aborta se houver datas/horas inválidas
 
 # ================================================================
+# RBAC: Grupos permitidos para usuários (Issue #254)
+# ================================================================
+# Lista de grupos que podem ser atribuídos a usuários via admin/API.
+# Estrutura: Setores (onde trabalha) + Funções (o que pode fazer)
+# Ref: .claude/PLANO_RBAC_SETOR_FUNCAO.md
+ALLOWED_USER_GROUPS: set[str] = {
+    # === SETORES (10) - Onde o usuário trabalha ===
+    # Gerências de projeto
+    "Superintendência",  # SUPERINTENDENCIA - Fluxo SUPER
+    "Vidas",             # GERENCIA 2 - Fluxo NAO_SUPER
+    "Fluir",             # GERENCIA 3 - Fluxo NAO_SUPER
+    "ACerta",            # GERENCIA 4 - Fluxo NAO_SUPER
+    "Brincando",         # GERENCIA 5 - Fluxo NAO_SUPER
+    "Sou da Paz",        # GERENCIA 6 - Fluxo NAO_SUPER
+    # Setores administrativos/operacionais
+    "DAT",               # Departamento de Apoio Técnico
+    "Controle",          # Setor de Controle
+    "Gerência",          # Gerência genérica
+    "Diretoria",         # Diretoria - Acesso a dashboards
+    # === FUNÇÕES (4) - O que o usuário pode fazer ===
+    "Formador",              # Visualiza grade, gerencia bloqueios pessoais
+    "Coordenador",           # Cria solicitações de eventos
+    "Apoio de Coordenação",  # Auxilia coordenação
+    "Gerente",               # Aprova/reprova, dashboards e relatórios
+}
+
+# ================================================================
 # SECURITY (Production)
 # ================================================================
 if not DEBUG:

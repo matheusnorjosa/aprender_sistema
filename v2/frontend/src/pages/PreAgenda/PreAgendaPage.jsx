@@ -232,7 +232,7 @@ export default function PreAgendaPage() {
 
     Modal.confirm({
       title: 'Confirmar Reenvio',
-      icon: <SyncOutlined style={{ color: '#faad14' }} />,
+      icon: <SyncOutlined className="text-yellow-500" />,
       content: (
         <div>
           <p>Deseja reenviar (forçar UPDATE) este evento no Google Calendar?</p>
@@ -277,7 +277,7 @@ export default function PreAgendaPage() {
   const handleCancel = useCallback((id) => {
     Modal.confirm({
       title: 'Confirmar Cancelamento',
-      icon: <StopOutlined style={{ color: '#ff4d4f' }} />,
+      icon: <StopOutlined className="text-red-500" />,
       content: (
         <div>
           <p>Deseja cancelar este evento no Google Calendar?</p>
@@ -329,7 +329,7 @@ export default function PreAgendaPage() {
 
     Modal.confirm({
       title: `Confirmar Reapply em Massa (${selectedRowKeys.length} eventos)`,
-      icon: <SyncOutlined style={{ color: '#faad14' }} />,
+      icon: <SyncOutlined className="text-yellow-500" />,
       content: (
         <div>
           <p>Deseja reenviar (forçar UPDATE) estes {selectedRowKeys.length} eventos no Google Calendar?</p>
@@ -424,7 +424,7 @@ export default function PreAgendaPage() {
 
     Modal.confirm({
       title: `Confirmar Resync em Massa (${selectedRowKeys.length} eventos)`,
-      icon: <SyncOutlined style={{ color: '#ff4d4f' }} />,
+      icon: <SyncOutlined className="text-red-500" />,
       content: (
         <div>
           <p>Deseja forçar resync (resetar hash + PENDING) destes {selectedRowKeys.length} eventos?</p>

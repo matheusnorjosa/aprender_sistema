@@ -483,6 +483,7 @@ export default function CadastrosPage() {
               icon={<LinkOutlined />}
               href={record.link_planilha}
               target="_blank"
+              aria-label="Abrir planilha externa"
             />
           </Tooltip>
         ) : (
@@ -502,6 +503,7 @@ export default function CadastrosPage() {
               size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
+              aria-label="Editar cadastro"
             />
           </Tooltip>
           <Tooltip title="Excluir">
@@ -511,6 +513,7 @@ export default function CadastrosPage() {
               danger
               icon={<DeleteOutlined />}
               onClick={() => handleDelete(record)}
+              aria-label="Excluir cadastro"
             />
           </Tooltip>
         </Space>
@@ -636,6 +639,7 @@ export default function CadastrosPage() {
               icon={<LinkOutlined />}
               href={record.link_plataforma}
               target="_blank"
+              aria-label="Abrir plataforma externa"
             />
           </Tooltip>
         ) : (
@@ -655,6 +659,7 @@ export default function CadastrosPage() {
               size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
+              aria-label="Editar avaliação"
             />
           </Tooltip>
           <Tooltip title="Excluir">
@@ -664,6 +669,7 @@ export default function CadastrosPage() {
               danger
               icon={<DeleteOutlined />}
               onClick={() => handleDelete(record)}
+              aria-label="Excluir avaliação"
             />
           </Tooltip>
         </Space>

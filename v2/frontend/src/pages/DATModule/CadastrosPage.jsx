@@ -299,15 +299,15 @@ export default function CadastrosPage() {
   const renderStatusIcon = (status) => {
     switch (status) {
       case 'concluido':
-        return <CheckCircleFilled style={{ color: '#52c41a', fontSize: 18 }} />;
+        return <CheckCircleFilled className="text-green-500 text-lg" />;
       case 'em_andamento':
-        return <ClockCircleFilled style={{ color: '#faad14', fontSize: 18 }} />;
+        return <ClockCircleFilled className="text-yellow-500 text-lg" />;
       case 'pendente':
-        return <ExclamationCircleFilled style={{ color: '#ff4d4f', fontSize: 18 }} />;
+        return <ExclamationCircleFilled className="text-red-500 text-lg" />;
       case 'na':
-        return <MinusCircleFilled style={{ color: '#999', fontSize: 18 }} />;
+        return <MinusCircleFilled className="text-gray-400 text-lg" />;
       default:
-        return <MinusCircleFilled style={{ color: '#999', fontSize: 18 }} />;
+        return <MinusCircleFilled className="text-gray-400 text-lg" />;
     }
   };
 
@@ -713,7 +713,7 @@ export default function CadastrosPage() {
               key: 'FORMAR',
               label: (
                 <Space>
-                  <BookOutlined style={{ color: '#1890ff' }} />
+                  <BookOutlined className="text-blue-500" />
                   <span>FORMAR</span>
                   <Badge count={stats?.total_formar || 0} style={{ backgroundColor: '#1890ff' }} />
                 </Space>
@@ -723,7 +723,7 @@ export default function CadastrosPage() {
               key: 'AVALIAR',
               label: (
                 <Space>
-                  <BarChartOutlined style={{ color: '#52c41a' }} />
+                  <BarChartOutlined className="text-green-500" />
                   <span>AVALIAR</span>
                   <Badge count={stats?.total_avaliar || 0} style={{ backgroundColor: '#52c41a' }} />
                 </Space>
@@ -927,19 +927,19 @@ export default function CadastrosPage() {
             Legenda (clique nos ícones para alterar):
           </Text>
           <Space>
-            <CheckCircleFilled style={{ color: '#52c41a' }} />
+            <CheckCircleFilled className="text-green-500" />
             <Text type="secondary">Concluído</Text>
           </Space>
           <Space>
-            <ClockCircleFilled style={{ color: '#faad14' }} />
+            <ClockCircleFilled className="text-yellow-500" />
             <Text type="secondary">Em Andamento</Text>
           </Space>
           <Space>
-            <ExclamationCircleFilled style={{ color: '#ff4d4f' }} />
+            <ExclamationCircleFilled className="text-red-500" />
             <Text type="secondary">Pendente</Text>
           </Space>
           <Space>
-            <MinusCircleFilled style={{ color: '#999' }} />
+            <MinusCircleFilled className="text-gray-400" />
             <Text type="secondary">N/A</Text>
           </Space>
         </Space>
@@ -1049,7 +1049,7 @@ export default function CadastrosPage() {
               size="small"
               title={
                 <Space>
-                  <BookOutlined style={{ color: '#1890ff' }} />
+                  <BookOutlined className="text-blue-500" />
                   <span>Workflow FORMAR</span>
                 </Space>
               }
@@ -1098,7 +1098,7 @@ export default function CadastrosPage() {
               size="small"
               title={
                 <Space>
-                  <BarChartOutlined style={{ color: '#52c41a' }} />
+                  <BarChartOutlined className="text-green-500" />
                   <span>Workflow AVALIAR</span>
                 </Space>
               }

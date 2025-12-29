@@ -416,7 +416,7 @@ export default function CoordenadoresPage() {
       sorter: true,
       render: (total) => (
         <Badge count={total || 0} showZero style={{ backgroundColor: total > 0 ? '#1890ff' : '#d9d9d9' }}>
-          <EnvironmentOutlined style={{ fontSize: 18, color: '#999' }} />
+          <EnvironmentOutlined className="text-gray-400 text-lg" />
         </Badge>
       ),
     },
@@ -429,7 +429,7 @@ export default function CoordenadoresPage() {
       sorter: true,
       render: (total) => (
         <Badge count={total || 0} showZero style={{ backgroundColor: total > 0 ? '#52c41a' : '#d9d9d9' }}>
-          <ProjectOutlined style={{ fontSize: 18, color: '#999' }} />
+          <ProjectOutlined className="text-gray-400 text-lg" />
         </Badge>
       ),
     },

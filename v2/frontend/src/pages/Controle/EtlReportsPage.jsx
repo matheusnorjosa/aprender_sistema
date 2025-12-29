@@ -42,13 +42,13 @@ function formatBytes(bytes) {
 function getFileIcon(kind) {
   switch (kind) {
     case 'json':
-      return <FileTextOutlined style={{ color: '#52c41a' }} />;
+      return <FileTextOutlined className="text-green-500" />;
     case 'csv':
-      return <FileExcelOutlined style={{ color: '#1890ff' }} />;
+      return <FileExcelOutlined className="text-blue-500" />;
     case 'txt':
-      return <FileTextOutlined style={{ color: '#8c8c8c' }} />;
+      return <FileTextOutlined className="text-gray-400" />;
     default:
-      return <FileUnknownOutlined style={{ color: '#d9d9d9' }} />;
+      return <FileUnknownOutlined className="text-gray-300" />;
   }
 }
 

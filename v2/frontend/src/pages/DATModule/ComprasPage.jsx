@@ -412,6 +412,7 @@ export default function ComprasPage() {
               size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
+              aria-label="Editar compra"
             />
           </Tooltip>
           <Tooltip title="Excluir">
@@ -421,6 +422,7 @@ export default function ComprasPage() {
               danger
               icon={<DeleteOutlined />}
               onClick={() => handleDelete(record)}
+              aria-label="Excluir compra"
             />
           </Tooltip>
         </Space>

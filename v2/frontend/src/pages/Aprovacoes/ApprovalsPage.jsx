@@ -253,7 +253,7 @@ export default function ApprovalsPage() {
       render: (_, record) => (
         <div>
           <div>{dayjs(record.inicio).format('DD/MM/YYYY')}</div>
-          <small style={{ color: '#666' }}>
+          <small className="text-gray-500">
             {dayjs(record.inicio).format('HH:mm')} - {dayjs(record.fim).format('HH:mm')}
           </small>
         </div>
@@ -282,8 +282,8 @@ export default function ApprovalsPage() {
       render: (_, record) => (
         <div style={{ lineHeight: 1.3 }}>
           {record.tipo && <div>{record.tipo}</div>}
-          {record.encontro && <small style={{ color: '#666' }}>{record.encontro}</small>}
-          {record.segmento && <div><small style={{ color: '#888' }}>{record.segmento}</small></div>}
+          {record.encontro && <small className="text-gray-500">{record.encontro}</small>}
+          {record.segmento && <div><small className="text-gray-400">{record.segmento}</small></div>}
           {!record.tipo && !record.encontro && !record.segmento && '-'}
         </div>
       ),

@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { AutoComplete, Spin } from 'antd';
+import logger from '../utils/logger';
 
 export default function ComboBox({
   value = null,
@@ -31,7 +32,7 @@ export default function ComboBox({
           data: item
         })));
       } catch (error) {
-        console.error('Erro ao carregar opções iniciais:', error);
+        logger.error('Erro ao carregar opções iniciais:', error);
       } finally {
         setLoading(false);
       }
@@ -62,7 +63,7 @@ export default function ComboBox({
           data: item
         })));
       } catch (error) {
-        console.error('Erro ao buscar:', error);
+        logger.error('Erro ao buscar:', error);
       } finally {
         setLoading(false);
       }
@@ -78,7 +79,7 @@ export default function ComboBox({
         data: item
       })));
     } catch (error) {
-      console.error('Erro ao buscar:', error);
+      logger.error('Erro ao buscar:', error);
     } finally {
       setLoading(false);
     }

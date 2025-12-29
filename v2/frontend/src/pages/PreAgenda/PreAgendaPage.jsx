@@ -62,6 +62,7 @@ import { MeetLink } from '../../components/MeetLink';
 import { getMe } from '../../api/availability';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
+import logger from '../../utils/logger';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -102,7 +103,7 @@ export default function PreAgendaPage() {
         const userData = await getMe();
         setUser(userData);
       } catch (error) {
-        console.error('Erro ao carregar usuário:', error);
+        logger.error('Erro ao carregar usuário:', error);
       }
     };
     loadUser();

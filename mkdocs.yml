@@ -1,0 +1,101 @@
+# MkDocs Configuration - Aprender Sistema v2
+# Issue #269: Automatic documentation generation
+
+site_name: Aprender Sistema v2
+site_description: Documentação do sistema de gestão de eventos e formações
+site_author: Equipe AS
+site_url: https://matheusnorjosa.github.io/aprender_sistema/
+
+repo_name: matheusnorjosa/aprender_sistema
+repo_url: https://github.com/matheusnorjosa/aprender_sistema
+
+theme:
+  name: material
+  language: pt-BR
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Modo escuro
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Modo claro
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search:
+      lang: pt
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [v2/backend]
+          options:
+            show_source: true
+            show_root_heading: true
+            heading_level: 2
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Instalação: getting-started/installation.md
+    - Configuração: getting-started/configuration.md
+    - Quick Start: getting-started/quickstart.md
+  - Arquitetura:
+    - Visão Geral: architecture/overview.md
+    - Backend: architecture/backend.md
+    - Frontend: architecture/frontend.md
+    - Infraestrutura: architecture/infrastructure.md
+  - Regras de Negócio:
+    - Cláusulas Pétreas (CP): business-rules/clausulas-petreas.md
+    - Política de Aprovação (PA): business-rules/politica-aprovacao.md
+    - Regras de Disponibilidade (RD): business-rules/regras-disponibilidade.md
+    - Requisitos Funcionais (RF): business-rules/requisitos-funcionais.md
+  - Guias:
+    - Google Calendar: guides/google-calendar.md
+    - RBAC e Permissões: guides/rbac.md
+    - ETL e Importação: guides/etl.md
+    - Observabilidade: guides/observability.md
+  - API Reference:
+    - Models: api/models.md
+    - Services: api/services.md
+    - Views: api/views.md
+  - Operações:
+    - Deploy: operations/deploy.md
+    - Backup: operations/backup.md
+    - Go-Live Checklist: operations/go-live.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/matheusnorjosa/aprender_sistema

@@ -260,8 +260,11 @@ class EquipeGerencia(models.Model):
         verbose_name = "Equipe de Gerencia"
         verbose_name_plural = "Equipes de Gerencias"
         ordering = ["gerencia", "papel", "usuario"]
-        unique_together = [('gerencia', 'usuario', 'papel')]
         constraints = [
+            models.UniqueConstraint(
+                fields=['gerencia', 'usuario', 'papel'],
+                name='unique_equipe_gerencia_usuario_papel',
+            ),
             models.CheckConstraint(
                 check=(
                     ~models.Q(papel='APOIO') | models.Q(coordenador_supervisor__isnull=False)

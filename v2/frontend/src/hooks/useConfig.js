@@ -24,6 +24,7 @@
 
 import { useState, useEffect } from 'react';
 import { message } from 'antd';
+import logger from '../utils/logger';
 
 /**
  * Hook to manage system configuration
@@ -56,7 +57,7 @@ export function useConfig() {
       setConfig(data);
     } catch (error) {
       message.error('Erro ao carregar configurações');
-      console.error('useConfig loadConfig error:', error);
+      logger.error('useConfig loadConfig error:', error);
     } finally {
       setLoading(false);
     }
@@ -81,7 +82,7 @@ export function useConfig() {
 
       if (!res.ok) {
         const errors = await res.json();
-        console.error('useConfig saveConfig validation errors:', errors);
+        logger.error('useConfig saveConfig validation errors:', errors);
 
         // Display validation errors
         if (typeof errors === 'object' && !Array.isArray(errors)) {
@@ -102,7 +103,7 @@ export function useConfig() {
       return true;
     } catch (error) {
       message.error('Erro ao salvar configurações');
-      console.error('useConfig saveConfig error:', error);
+      logger.error('useConfig saveConfig error:', error);
       return false;
     }
   };

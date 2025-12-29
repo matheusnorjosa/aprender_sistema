@@ -12,6 +12,7 @@ import { Form, Input, Button, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '../../api/auth';
 import logoAprender from '../../assets/logo-aprender.png';
+import logger from '../../utils/logger';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -25,7 +26,7 @@ export default function LoginPage({ onLoginSuccess }) {
         onLoginSuccess();
       }
     } catch (error) {
-      console.error('Erro no login:', error);
+      logger.error('Erro no login:', error);
       message.error('Usuário ou senha incorretos.');
     } finally {
       setLoading(false);

@@ -102,7 +102,7 @@ export default function PreAgendaPage() {
         const userData = await getMe();
         setUser(userData);
       } catch (error) {
-        console.error('Erro ao carregar usuário:', error);
+        logger.error('Erro ao carregar usuário:', error);
       }
     };
     loadUser();

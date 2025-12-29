@@ -44,6 +44,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getMe } from '../../api/availability';
+import logger from '../../utils/logger';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -168,7 +169,7 @@ export default function DeslocamentosPage() {
 
         setCanAccess(canControle || canCoordenador || canDAT || canSuper);
       } catch (error) {
-        console.error('Erro ao carregar usuário:', error);
+        logger.error('Erro ao carregar usuário:', error);
         setCanAccess(false);
       } finally {
         setLoading(false);
@@ -202,7 +203,7 @@ export default function DeslocamentosPage() {
       const data = await fetchUsuarios();
       setUsuarios(data);
     } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
+      logger.error('Erro ao carregar usuários:', error);
     }
   }, []);
 

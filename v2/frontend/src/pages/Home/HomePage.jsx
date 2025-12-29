@@ -21,6 +21,7 @@ import {
   SafetyOutlined,
 } from '@ant-design/icons';
 import { getMe } from '../../api/availability';
+import logger from '../../utils/logger';
 
 const { Title, Text } = Typography;
 
@@ -84,7 +85,7 @@ export default function HomePage() {
           upcomingEvents: 12,
         });
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        logger.error('Erro ao carregar dados:', error);
       } finally {
         setLoading(false);
       }

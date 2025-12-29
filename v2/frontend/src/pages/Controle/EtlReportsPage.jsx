@@ -22,6 +22,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { listLatestReports, getReportDownloadUrl } from '../../api/etl';
+import logger from '../../utils/logger';
 
 const { Option } = Select;
 
@@ -92,7 +93,7 @@ export default function EtlReportsPage() {
       setCount(data.count);
       setReports(data.reports || []);
     } catch (err) {
-      console.error('Erro ao buscar relatórios ETL:', err);
+      logger.error('Erro ao buscar relatórios ETL:', err);
 
       // Tratar erro 403 (permissão)
       if (err.message.includes('403') || err.message.includes('Forbidden')) {

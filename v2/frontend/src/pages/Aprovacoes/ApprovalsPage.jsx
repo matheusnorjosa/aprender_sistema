@@ -50,6 +50,7 @@ import {
   rejectSolicitacoesBatch,
 } from '../../api/solicitacoes';
 import { getMe } from '../../api/availability';
+import logger from '../../utils/logger';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -112,7 +113,7 @@ export default function ApprovalsPage() {
         // A API já calcula: is_superuser || (Gerente in funcoes && Superintendência in setores)
         setCanApprove(userData?.can_approve_super || false);
       } catch (error) {
-        console.error('Erro ao carregar usuário:', error);
+        logger.error('Erro ao carregar usuário:', error);
         setCanApprove(false);
       }
     };

@@ -237,12 +237,12 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
               <Title level={5} style={{ marginBottom: 12 }}>
                 {hasErrors ? (
                   <Space>
-                    <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+                    <CloseCircleOutlined className="text-red-500" />
                     Validação com Erros
                   </Space>
                 ) : (
                   <Space>
-                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                    <CheckCircleOutlined className="text-green-500" />
                     Validação OK
                   </Space>
                 )}

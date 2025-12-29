@@ -250,15 +250,15 @@ export default function AcoesPage() {
   const renderStatusIcon = (status) => {
     switch (status) {
       case 'concluido':
-        return <CheckCircleFilled style={{ color: '#52c41a', fontSize: 18 }} />;
+        return <CheckCircleFilled className="text-green-500 text-lg" />;
       case 'em_andamento':
-        return <ClockCircleFilled style={{ color: '#1890ff', fontSize: 18 }} />;
+        return <ClockCircleFilled className="text-blue-500 text-lg" />;
       case 'pendente':
-        return <ExclamationCircleFilled style={{ color: '#faad14', fontSize: 18 }} />;
+        return <ExclamationCircleFilled className="text-yellow-500 text-lg" />;
       case 'na':
-        return <MinusCircleFilled style={{ color: '#999', fontSize: 18 }} />;
+        return <MinusCircleFilled className="text-gray-400 text-lg" />;
       default:
-        return <MinusCircleFilled style={{ color: '#999', fontSize: 18 }} />;
+        return <MinusCircleFilled className="text-gray-400 text-lg" />;
     }
   };
 
@@ -716,19 +716,19 @@ export default function AcoesPage() {
             Legenda:
           </Text>
           <Space>
-            <CheckCircleFilled style={{ color: '#52c41a' }} />
+            <CheckCircleFilled className="text-green-500" />
             <Text type="secondary">Concluído</Text>
           </Space>
           <Space>
-            <ClockCircleFilled style={{ color: '#1890ff' }} />
+            <ClockCircleFilled className="text-blue-500" />
             <Text type="secondary">Em Andamento</Text>
           </Space>
           <Space>
-            <ExclamationCircleFilled style={{ color: '#faad14' }} />
+            <ExclamationCircleFilled className="text-yellow-500" />
             <Text type="secondary">Pendente</Text>
           </Space>
           <Space>
-            <MinusCircleFilled style={{ color: '#999' }} />
+            <MinusCircleFilled className="text-gray-400" />
             <Text type="secondary">N/A</Text>
           </Space>
         </Space>

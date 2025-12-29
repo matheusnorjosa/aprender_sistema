@@ -321,7 +321,7 @@ export default function PlanoFormacoesPage() {
               {formacao.ch}h {formacao.modalidade === 'online' ? 'Onl.' : 'Pres.'}
             </Tag>
             {formacao.realizada && (
-              <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 10, marginLeft: 2 }} />
+              <CheckCircleOutlined className="text-green-500 text-[10px] ml-0.5" />
             )}
           </>
         ) : (
@@ -338,9 +338,9 @@ export default function PlanoFormacoesPage() {
     return (
       <div style={{ textAlign: 'center' }}>
         {acomp.realizado ? (
-          <CheckCircleOutlined style={{ color: '#52c41a' }} />
+          <CheckCircleOutlined className="text-green-500" />
         ) : (
-          <ClockCircleOutlined style={{ color: '#999' }} />
+          <ClockCircleOutlined className="text-gray-400" />
         )}
         {acomp.data && (
           <div style={{ fontSize: 10 }}>{dayjs(acomp.data).format('DD/MM')}</div>
@@ -356,9 +356,9 @@ export default function PlanoFormacoesPage() {
     return (
       <div style={{ textAlign: 'center' }}>
         {prova.realizada ? (
-          <CheckCircleOutlined style={{ color: '#52c41a' }} />
+          <CheckCircleOutlined className="text-green-500" />
         ) : (
-          <ClockCircleOutlined style={{ color: '#999' }} />
+          <ClockCircleOutlined className="text-gray-400" />
         )}
         {prova.data && (
           <div style={{ fontSize: 10 }}>{dayjs(prova.data).format('DD/MM')}</div>
@@ -813,7 +813,7 @@ export default function PlanoFormacoesPage() {
                       { title: 'Data', dataIndex: 'data', render: (d) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
                       { title: 'CH', dataIndex: 'ch', render: (v) => `${v}h` },
                       { title: 'Modalidade', dataIndex: 'modalidade', render: (m) => m === 'online' ? 'Online' : 'Presencial' },
-                      { title: 'Realizada', dataIndex: 'realizada', render: (v) => v ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : '-' },
+                      { title: 'Realizada', dataIndex: 'realizada', render: (v) => v ? <CheckCircleOutlined className="text-green-500" /> : '-' },
                     ]}
                   />
                 ),
@@ -830,7 +830,7 @@ export default function PlanoFormacoesPage() {
                     columns={[
                       { title: 'Tipo', dataIndex: 'tipo', render: (t) => t === 'primeiro' ? '1o Acomp.' : '2o Acomp.' },
                       { title: 'Data', dataIndex: 'data', render: (d) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
-                      { title: 'Realizado', dataIndex: 'realizado', render: (v) => v ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : '-' },
+                      { title: 'Realizado', dataIndex: 'realizado', render: (v) => v ? <CheckCircleOutlined className="text-green-500" /> : '-' },
                     ]}
                   />
                 ),
@@ -847,7 +847,7 @@ export default function PlanoFormacoesPage() {
                     columns={[
                       { title: '#', dataIndex: 'numero', width: 50 },
                       { title: 'Data', dataIndex: 'data', render: (d) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
-                      { title: 'Realizada', dataIndex: 'realizada', render: (v) => v ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : '-' },
+                      { title: 'Realizada', dataIndex: 'realizada', render: (v) => v ? <CheckCircleOutlined className="text-green-500" /> : '-' },
                     ]}
                   />
                 ),

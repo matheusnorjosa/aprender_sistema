@@ -548,14 +548,14 @@ export default function PreAgendaPage() {
               size="small"
               icon={<EyeOutlined />}
               onClick={() => handlePreview(record.id)}
-              title="Preview"
+              aria-label="Visualizar preview do evento"
             />
             <Button
               size="small"
               type="primary"
               icon={<CloudUploadOutlined />}
               onClick={() => handlePublish(record.id)}
-              title="Publicar"
+              aria-label="Publicar evento no Google Calendar"
               disabled={isPublished}
             />
             {showResync && (
@@ -564,7 +564,7 @@ export default function PreAgendaPage() {
                 type="default"
                 icon={<SyncOutlined />}
                 onClick={() => handleResync(record.id)}
-                title="Reenviar (forçar UPDATE)"
+                aria-label="Reenviar evento (forçar atualização)"
                 style={{ color: '#faad14', borderColor: '#faad14' }}
               />
             )}
@@ -574,7 +574,7 @@ export default function PreAgendaPage() {
                 danger
                 icon={<StopOutlined />}
                 onClick={() => handleCancel(record.id)}
-                title="Cancelar evento no Calendar"
+                aria-label="Cancelar evento no Google Calendar"
               />
             )}
             <MeetLink href={record.meet_link} />

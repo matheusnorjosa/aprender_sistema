@@ -30,7 +30,7 @@ Object.defineProperty(window, 'scrollTo', {
 })
 
 // Mock ResizeObserver for Ant Design components
-global.ResizeObserver = class ResizeObserver {
+globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
   unobserve() {}
   disconnect() {}

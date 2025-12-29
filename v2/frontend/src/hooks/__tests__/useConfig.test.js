@@ -15,7 +15,7 @@ import { useConfig } from '../useConfig'
 
 // Mock fetch
 const mockFetch = vi.fn()
-global.fetch = mockFetch
+globalThis.fetch = mockFetch
 
 // Mock antd message
 vi.mock('antd', () => ({

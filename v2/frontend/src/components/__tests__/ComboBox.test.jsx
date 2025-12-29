@@ -8,7 +8,7 @@
  */
 
 import React from 'react'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import ComboBox from '../ComboBox'
 

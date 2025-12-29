@@ -15,7 +15,6 @@ import RemoteSelect from '../RemoteSelect'
 describe('RemoteSelect', () => {
   const mockFetchOptions = vi.fn()
   const mockRenderLabel = (item) => item.nome
-  const mockOnChange = vi.fn()
 
   const mockOptions = [
     { id: 1, nome: 'Fortaleza' },

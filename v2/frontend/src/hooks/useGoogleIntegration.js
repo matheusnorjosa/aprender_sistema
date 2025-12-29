@@ -23,6 +23,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import api from '../api';
+import logger from '../utils/logger';
 
 const useGoogleIntegration = () => {
   const [status, setStatus] = useState({
@@ -46,7 +47,7 @@ const useGoogleIntegration = () => {
       const response = await api.get('/integrations/google/status/');
       setStatus(response.data);
     } catch (err) {
-      console.error('❌ Erro ao carregar status Google:', err);
+      logger.error('Erro ao carregar status Google:', err);
       setError(err.response?.data?.error || 'Erro ao carregar status da integração');
     } finally {
       setLoading(false);
@@ -74,7 +75,7 @@ const useGoogleIntegration = () => {
 
       return { success: true };
     } catch (err) {
-      console.error('❌ Erro ao desconectar Google:', err);
+      logger.error('Erro ao desconectar Google:', err);
       setError(err.response?.data?.error || 'Erro ao desconectar conta Google');
       return { success: false, error: err.response?.data?.error };
     } finally {

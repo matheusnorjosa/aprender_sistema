@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { Card, Space, Tag, AutoComplete, Spin, Button } from 'antd';
 import { PlusOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { lookupUsuarios } from '../api/lookup';
+import logger from '../utils/logger';
 
 export default function PeoplePicker({
   value = { formadores: [], coordAcompanha: [] },
@@ -41,7 +42,7 @@ export default function PeoplePicker({
         }))
       );
     } catch (error) {
-      console.error('Erro ao buscar formadores:', error);
+      logger.error('Erro ao buscar formadores:', error);
     } finally {
       setLoadingFormadores(false);
     }
@@ -67,7 +68,7 @@ export default function PeoplePicker({
         }))
       );
     } catch (error) {
-      console.error('Erro ao buscar coordenadores:', error);
+      logger.error('Erro ao buscar coordenadores:', error);
     } finally {
       setLoadingCoord(false);
     }

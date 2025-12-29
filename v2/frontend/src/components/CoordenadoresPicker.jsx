@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { Space, Tag, AutoComplete, Spin } from 'antd';
 import { CloseCircleOutlined } from '@ant-design/icons';
 import { lookupUsuarios } from '../api/lookup';
+import logger from '../utils/logger';
 
 export default function CoordenadoresPicker({ value = [], onChange }) {
   const [options, setOptions] = useState([]);
@@ -35,7 +36,7 @@ export default function CoordenadoresPicker({ value = [], onChange }) {
         }))
       );
     } catch (error) {
-      console.error('Erro ao buscar coordenadores:', error);
+      logger.error('Erro ao buscar coordenadores:', error);
     } finally {
       setLoading(false);
     }

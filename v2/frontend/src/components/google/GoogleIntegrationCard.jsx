@@ -27,6 +27,7 @@ import {
   CalendarOutlined,
 } from '@ant-design/icons';
 import api from '../../api';
+import logger from '../../utils/logger';
 
 const { Text, Title } = Typography;
 
@@ -67,7 +68,7 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
       const response = await api.get('/integrations/google/calendars/');
       setCalendars(response.data.calendars || []);
     } catch (error) {
-      console.error('Erro ao carregar calendários:', error);
+      logger.error('Erro ao carregar calendários:', error);
       message.error('Não foi possível carregar seus calendários');
     } finally {
       setLoadingCalendars(false);
@@ -83,7 +84,7 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
       setSelectedCalendar(calendarId);
       message.success('Calendário selecionado com sucesso');
     } catch (error) {
-      console.error('Erro ao salvar calendário:', error);
+      logger.error('Erro ao salvar calendário:', error);
       message.error('Não foi possível salvar o calendário selecionado');
     } finally {
       setSavingCalendar(false);

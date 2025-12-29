@@ -41,6 +41,7 @@ import {
   SafetyOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
+import logger from '../../utils/logger';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -83,7 +84,7 @@ export default function EquipeDashboardPage() {
       setFormadoresData(form);
       setQualityData(qual);
     } catch (err) {
-      console.error('Erro ao carregar métricas:', err);
+      logger.error('Erro ao carregar métricas:', err);
       setError(err.message);
       message.error('Erro ao carregar métricas da equipe');
     } finally {

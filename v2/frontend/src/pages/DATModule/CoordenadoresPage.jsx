@@ -66,6 +66,7 @@ import {
   getMunicipiosOptions,
 } from '../../api/datModule';
 import dayjs from 'dayjs';
+import logger from '../../utils/logger';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -216,7 +217,7 @@ export default function CoordenadoresPage() {
       const data = await getCoordenadorAlocacoes(coordenadorId);
       setAlocacoes(data.results || data || []);
     } catch (error) {
-      console.error('Erro ao carregar alocações:', error);
+      logger.error('Erro ao carregar alocações:', error);
       setAlocacoes([]);
     } finally {
       setLoadingAlocacoes(false);

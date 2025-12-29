@@ -47,6 +47,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import logger from '../../utils/logger';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -142,7 +143,7 @@ export default function GCalDashboardPage() {
       const data = await response.json();
       setMetrics(data);
     } catch (error) {
-      console.error('Erro ao carregar métricas:', error);
+      logger.error('Erro ao carregar métricas:', error);
       message.error('Erro ao carregar métricas do dashboard');
     } finally {
       setLoading(false);
@@ -181,7 +182,7 @@ export default function GCalDashboardPage() {
         total: data.count || 0,
       });
     } catch (error) {
-      console.error('Erro ao carregar eventos:', error);
+      logger.error('Erro ao carregar eventos:', error);
       message.error('Erro ao carregar lista de eventos');
     } finally {
       setTableLoading(false);
@@ -217,7 +218,7 @@ export default function GCalDashboardPage() {
       const data = await response.json();
       setSuccessRate(data);
     } catch (error) {
-      console.error('Erro ao carregar success rate:', error);
+      logger.error('Erro ao carregar success rate:', error);
       message.error('Erro ao carregar taxa de sucesso');
     } finally {
       setInsightsLoading(false);
@@ -247,7 +248,7 @@ export default function GCalDashboardPage() {
       const data = await response.json();
       setTopInsights(data);
     } catch (error) {
-      console.error('Erro ao carregar top insights:', error);
+      logger.error('Erro ao carregar top insights:', error);
       message.error('Erro ao carregar insights');
     } finally {
       setInsightsLoading(false);
@@ -302,7 +303,7 @@ export default function GCalDashboardPage() {
       const data = await response.json();
       setEventDetail(data);
     } catch (error) {
-      console.error('Erro ao carregar detalhes:', error);
+      logger.error('Erro ao carregar detalhes:', error);
       message.error('Erro ao carregar detalhes do evento');
     } finally {
       setDetailLoading(false);
@@ -347,7 +348,7 @@ export default function GCalDashboardPage() {
         message.error(`Erro: ${data.errors[0].detail}`);
       }
     } catch (error) {
-      console.error('Erro ao reapliar:', error);
+      logger.error('Erro ao reapliar:', error);
       message.error(error.message || 'Erro ao reapliar evento');
     }
   };
@@ -383,7 +384,7 @@ export default function GCalDashboardPage() {
         message.error(`Erro: ${data.errors[0].detail}`);
       }
     } catch (error) {
-      console.error('Erro ao ressincronizar:', error);
+      logger.error('Erro ao ressincronizar:', error);
       message.error(error.message || 'Erro ao ressincronizar evento');
     }
   };

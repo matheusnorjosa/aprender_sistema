@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { Space, Tag, AutoComplete, Spin } from 'antd';
 import { lookupUsuarios } from '../api/lookup';
+import logger from '../utils/logger';
 
 export default function FormadoresPicker({ value = [], onChange }) {
   const [options, setOptions] = useState([]);
@@ -34,7 +35,7 @@ export default function FormadoresPicker({ value = [], onChange }) {
         }))
       );
     } catch (error) {
-      console.error('Erro ao buscar formadores:', error);
+      logger.error('Erro ao buscar formadores:', error);
     } finally {
       setLoading(false);
     }

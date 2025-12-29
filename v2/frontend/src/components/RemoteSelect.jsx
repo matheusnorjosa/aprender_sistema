@@ -7,6 +7,7 @@
 
 import { Select, Spin } from 'antd';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import logger from '../utils/logger';
 
 const { Option } = Select;
 
@@ -49,7 +50,7 @@ export default function RemoteSelect({
         const results = await fetchOptions({ search, ...extraParams });
         setOptions(results || []);
       } catch (error) {
-        console.error('Erro ao carregar opções:', error);
+        logger.error('Erro ao carregar opções:', error);
         setOptions([]);
       } finally {
         setLoading(false);

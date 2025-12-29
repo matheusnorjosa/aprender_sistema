@@ -35,6 +35,7 @@ import {
   FlagOutlined
 } from '@ant-design/icons';
 import { useConfig } from '../../hooks/useConfig';
+import logger from '../../utils/logger';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -60,7 +61,7 @@ export default function ConfiguracoesPage() {
         // Success message is shown by useConfig hook
       }
     } catch (error) {
-      console.error('Form validation error:', error);
+      logger.error('Form validation error:', error);
     } finally {
       setSaving(false);
     }

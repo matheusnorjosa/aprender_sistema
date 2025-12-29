@@ -13,6 +13,7 @@ import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, For
 import { UserAddOutlined, ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { listUsers, createUser, updateUser, deleteUser, listGroups } from '../../api/adminDAT';
+import logger from '../../utils/logger';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -74,7 +75,7 @@ export default function UsuariosPage() {
       });
     } catch (error) {
       message.error(`Erro ao carregar usuários: ${error.message}`);
-      console.error('Erro ao carregar usuários:', error);
+      logger.error('Erro ao carregar usuários:', error);
     } finally {
       setLoading(false);
     }
@@ -86,7 +87,7 @@ export default function UsuariosPage() {
       const data = await listGroups();
       setGrupos(data.results || data);
     } catch (error) {
-      console.error('Erro ao carregar grupos:', error);
+      logger.error('Erro ao carregar grupos:', error);
     }
   };
 

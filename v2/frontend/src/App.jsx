@@ -137,6 +137,7 @@ function AppContent() {
   }, [loadUser]);
 
   // Issue #97: Polling de alertas GCal (badge + toast)
+  // Issue #259: Pausar polling quando aba não está visível (Page Visibility API)
   useEffect(() => {
     // Só ativar polling para Controle (Gerentes de Controle)
     const inControle = user?.setores?.includes('Controle');
@@ -147,6 +148,7 @@ function AppContent() {
 
     const POLL_MS = 30000; // 30 segundos
     const COOLDOWN_MS = 120000; // 2 minutos de cooldown para toast
+    let intervalId = null;
 
     const fetchAlerts = async () => {
       try {
@@ -185,20 +187,50 @@ function AppContent() {
       }
     };
 
+    // Issue #259: Funções para controlar polling baseado em visibilidade
+    const startPolling = () => {
+      if (!intervalId) {
+        intervalId = setInterval(fetchAlerts, POLL_MS);
+      }
+    };
+
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        // Fetch imediato ao voltar, depois retomar polling
+        fetchAlerts();
+        startPolling();
+      }
+    };
+
     // Carregar lastErrorsCount do localStorage na inicialização
     const stored = localStorage.getItem('gcalAlertsLastErrors');
     if (stored) {
       setLastErrorsCount(parseInt(stored, 10) || 0);
     }
 
-    // Fetch inicial
+    // Setup: listener de visibilidade
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Fetch inicial e iniciar polling se aba está visível
     fetchAlerts();
+    if (!document.hidden) {
+      startPolling();
+    }
 
-    // Polling a cada 30s
-    const intervalId = setInterval(fetchAlerts, POLL_MS);
-
-    // Cleanup: parar polling no unmount
-    return () => clearInterval(intervalId);
+    // Cleanup: parar polling e remover listener
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [user, lastErrorsCount, cooldownUntil]);
 
   if (loading) {

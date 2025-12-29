@@ -8,7 +8,7 @@
 
 PR17 implementa conformidade total com a Política de Aprovação Manual (CP-02), garantindo que:
 1. Nenhuma solicitação é auto-aprovada (PA-01)
-2. Apenas Superintendência pode aprovar/reprovar (PA-02)
+2. Superintendência, DAT ou superuser podem aprovar/reprovar (PA-02 Adaptada)
 3. Integrações externas só executam após aprovação (PA-03)
 4. Auditoria completa em AuditLog (PA-05)
 5. Botões ocultos para não-autorizados no frontend (PA-06)
@@ -105,7 +105,7 @@ test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 | Requisito | Status | Implementação | Arquivo |
 |-----------|--------|---------------|---------|
 | **PA-01** | ✅ | Sem auto-aprovação em `Solicitacao.save()` | `models.py:412-436` |
-| **PA-02** | ✅ | Permission class `IsSuperintendencia` + endpoints protegidos | `permissions.py`, `views.py` |
+| **PA-02 (Adaptada)** | ✅ | Permission class `IsSuperintendencia` (inclui DAT) + endpoints protegidos | `permissions.py`, `views.py` |
 | **PA-03** | ✅ | Celery task `task_publish_solicitacao_to_gcal` validado via mock | `test_approval_policy_PA.py:201-262` |
 | **PA-04** | ✅ | Campo `status` tem `default='pendente'` | `models.py:120` |
 | **PA-05** | ✅ | `AuditLog.objects.create()` em approve/reject | `views.py:165-220, 236-290` |

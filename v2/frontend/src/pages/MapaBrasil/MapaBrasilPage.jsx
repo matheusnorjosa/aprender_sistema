@@ -40,6 +40,7 @@ import { MapContainer, GeoJSON, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import brazilGeoJSON from '../../data/brazil-states.json';
 import api from '../../api';
+import logger from '../../utils/logger';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -116,7 +117,7 @@ export default function MapaBrasilPage() {
         const response = await api.get('/projetos/', { params: { page_size: 100 } });
         setProjetos([{ id: null, nome: 'Todos os Projetos' }, ...(response.data.results || [])]);
       } catch (err) {
-        console.error('Erro ao carregar projetos:', err);
+        logger.error('Erro ao carregar projetos:', err);
       }
     };
     fetchProjetos();
@@ -173,7 +174,7 @@ export default function MapaBrasilPage() {
       setEstadosData(estadosAgregados);
 
     } catch (err) {
-      console.error('Erro ao buscar dados do mapa:', err);
+      logger.error('Erro ao buscar dados do mapa:', err);
       setError('Erro ao carregar dados. Tente novamente.');
       message.error('Erro ao carregar dados do mapa');
       setMunicipiosData([]);
@@ -194,7 +195,7 @@ export default function MapaBrasilPage() {
       const response = await api.get('/metrics/map/coordinators/', { params: { uf } });
       setCoordenadoresData(response.data.coordenadores || []);
     } catch (err) {
-      console.error('Erro ao buscar coordenadores:', err);
+      logger.error('Erro ao buscar coordenadores:', err);
       setCoordenadoresData([]);
     } finally {
       setLoadingCoordinators(false);

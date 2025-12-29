@@ -22,6 +22,7 @@ import {
   Progress,
   Divider,
 } from 'antd';
+import logger from '../../utils/logger';
 import {
   CalendarOutlined,
   CheckCircleOutlined,
@@ -79,7 +80,7 @@ export default function DashboardsPage() {
         setStats(mockStats);
       }, 300);
     } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
+      logger.error('Erro ao carregar estatísticas:', error);
     }
   };
 

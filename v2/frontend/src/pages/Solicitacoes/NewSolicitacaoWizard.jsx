@@ -46,6 +46,7 @@ import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
 import FormadoresPicker from '../../components/FormadoresPicker';
 import CoordenadoresPicker from '../../components/CoordenadoresPicker';
+import logger from '../../utils/logger';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -108,7 +109,7 @@ export default function NewSolicitacaoWizard() {
 
       setFormData(prev => ({ ...prev, inicio: isoInicio, fim: isoFim }));
     } catch (error) {
-      console.error('Erro ao converter data/hora:', error);
+      logger.error('Erro ao converter data/hora:', error);
       setFormData(prev => ({ ...prev, inicio: null, fim: null }));
     }
   };
@@ -128,7 +129,7 @@ export default function NewSolicitacaoWizard() {
       setFormData({ ...formData, ...values });
       setCurrentStep(currentStep + 1);
     }).catch(err => {
-      console.log('Validação falhou:', err);
+      logger.debug('Validação falhou:', err);
     });
   };
 
@@ -202,7 +203,7 @@ export default function NewSolicitacaoWizard() {
       message.success('Solicitação criada com sucesso!');
       navigate('/solicitacoes');
     } catch (error) {
-      console.error('Erro ao criar solicitação:', error);
+      logger.error('Erro ao criar solicitação:', error);
       message.error('Erro ao criar solicitação. Verifique os dados e tente novamente.');
     } finally {
       setLoading(false);

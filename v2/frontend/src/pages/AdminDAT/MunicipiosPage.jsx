@@ -138,14 +138,14 @@ export default function MunicipiosPage() {
   ];
 
   return (
-    <div style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
-      <div style={{ marginBottom: '16px' }}>
+    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
+      <div className="mb-4">
         <Link to="/admin-dat">← Voltar para Admin DAT</Link>
       </div>
 
       <Card>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <Title level={3} style={{ margin: 0 }}>
+        <div className="flex justify-between items-center mb-4">
+          <Title level={3} className="m-0">
             Municípios ({municipios.length})
           </Title>
           <Space>

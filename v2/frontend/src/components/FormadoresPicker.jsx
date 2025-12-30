@@ -73,7 +73,7 @@ export default function FormadoresPicker({ value = [], onChange }) {
     <div>
       {/* Tags dos formadores selecionados */}
       {value.length > 0 && (
-        <Space wrap style={{ marginBottom: 8 }}>
+        <Space wrap className="mb-2">
           {value.map((formador) => (
             <Tag
               key={formador.id}

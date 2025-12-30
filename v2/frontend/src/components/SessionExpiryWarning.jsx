@@ -84,7 +84,7 @@ export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }) {
           <ClockCircleOutlined
             style={{ fontSize: 48, color: '#faad14' }}
           />
-          <Title level={4} style={{ marginTop: 16 }}>
+          <Title level={4} className="mt-4">
             Sua sessão está prestes a expirar
           </Title>
         </div>

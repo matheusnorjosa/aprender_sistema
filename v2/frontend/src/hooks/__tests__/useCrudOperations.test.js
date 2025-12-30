@@ -9,7 +9,7 @@
  * - handleTableChange e refresh
  */
 
-import { renderHook, waitFor, act } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useCrudOperations } from '../useCrudOperations'
 

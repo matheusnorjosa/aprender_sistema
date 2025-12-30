@@ -75,7 +75,7 @@ export default function ConfiguracoesPage() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+      <div className="flex justify-center items-center" style={{ minHeight: '400px' }}>
         <Spin size="large" tip="Carregando configurações..." />
       </div>
     );
@@ -368,9 +368,9 @@ export default function ConfiguracoesPage() {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div className="p-6">
       <Card>
-        <div style={{ marginBottom: 24 }}>
+        <div className="mb-6">
           <Title level={2}>
             <SettingOutlined /> Configurações do Sistema
           </Title>

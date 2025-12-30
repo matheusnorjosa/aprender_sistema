@@ -431,13 +431,13 @@ export default function ComprasPage() {
   ];
 
   return (
-    <div style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
+    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+      <div className="mb-6">
+        <div className="flex justify-between items-start mb-2">
           <div>
-            <Title level={3} style={{ margin: 0 }}>
-              <ShoppingCartOutlined style={{ marginRight: 8 }} />
+            <Title level={3} className="m-0">
+              <ShoppingCartOutlined className="mr-2" />
               Gestão de Compras/Materiais
             </Title>
             <Text type="secondary">
@@ -455,7 +455,7 @@ export default function ComprasPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Row gutter={16} className="mb-4">
           <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
@@ -503,10 +503,10 @@ export default function ComprasPage() {
       )}
 
       {/* Filters Card */}
-      <Card style={{ marginBottom: 16 }} bodyStyle={{ paddingBottom: 12 }}>
+      <Card className="mb-4" bodyStyle={{ paddingBottom: 12 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Buscar
               </Text>
@@ -520,7 +520,7 @@ export default function ComprasPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Projeto
               </Text>
@@ -537,7 +537,7 @@ export default function ComprasPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Produto
               </Text>
@@ -554,7 +554,7 @@ export default function ComprasPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 UF
               </Text>
@@ -570,7 +570,7 @@ export default function ComprasPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Município
               </Text>
@@ -587,7 +587,7 @@ export default function ComprasPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Ano Uso
               </Text>
@@ -602,7 +602,7 @@ export default function ComprasPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Status
               </Text>
@@ -618,7 +618,7 @@ export default function ComprasPage() {
           </Col>
         </Row>
         <Divider style={{ margin: '16px 0 12px' }} />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div className="flex justify-end gap-2">
           <Button icon={<ClearOutlined />} onClick={handleClearFilters}>
             Limpar
           </Button>
@@ -697,7 +697,7 @@ export default function ComprasPage() {
       </Card>
 
       {/* Legend */}
-      <Card style={{ marginTop: 16 }} size="small">
+      <Card className="mt-4" size="small">
         <Space size="large" wrap>
           <Text strong style={{ textTransform: 'uppercase', fontSize: 12 }}>
             Legenda:
@@ -721,7 +721,7 @@ export default function ComprasPage() {
       <Modal
         title={
           <div>
-            <Title level={4} style={{ margin: 0 }}>
+            <Title level={4} className="m-0">
               {editingCompra ? 'Editar Compra' : 'Nova Compra'}
             </Title>
             <Text type="secondary" style={{ fontSize: 13 }}>
@@ -732,7 +732,7 @@ export default function ComprasPage() {
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         footer={
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div className="flex justify-between">
             <div>
               {editingCompra && (
                 <Button
@@ -761,7 +761,7 @@ export default function ComprasPage() {
       >
         <Form form={form} layout="vertical" onFinish={handleSave}>
           {/* Identificação */}
-          <Card size="small" title="Identificação do Material" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Identificação do Material" className="mb-4">
             <Row gutter={16}>
               <Col xs={24} sm={12}>
                 <Form.Item
@@ -807,7 +807,7 @@ export default function ComprasPage() {
           </Card>
 
           {/* Localização */}
-          <Card size="small" title="Localização" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Localização" className="mb-4">
             <Row gutter={16}>
               <Col xs={24} sm={8}>
                 <Form.Item
@@ -840,7 +840,7 @@ export default function ComprasPage() {
           </Card>
 
           {/* Quantidades */}
-          <Card size="small" title="Quantidades e Uso" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Quantidades e Uso" className="mb-4">
             <Row gutter={16}>
               <Col xs={12} sm={6}>
                 <Form.Item
@@ -870,7 +870,7 @@ export default function ComprasPage() {
           </Card>
 
           {/* Dados da Compra */}
-          <Card size="small" title="Dados da Compra" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Dados da Compra" className="mb-4">
             <Row gutter={16}>
               <Col xs={12} sm={6}>
                 <Form.Item name="data_compra" label="Data Compra">

@@ -361,7 +361,7 @@ export default function ApprovalsPage() {
   ], [handlePreview, handleApprove, handleReject, canApprove]);
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div className="p-6">
       <Card>
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           {/* Header */}
@@ -399,13 +399,7 @@ export default function ApprovalsPage() {
 
           {/* Toolbar de ações em lote (PA-06: apenas para usuários com permissão) */}
           {selectedRowKeys.length > 0 && canApprove && (
-            <div style={{
-              marginBottom: 16,
-              padding: '12px 16px',
-              background: '#e6f7ff',
-              borderRadius: 4,
-              border: '1px solid #91d5ff'
-            }}>
+            <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
               <Space>
                 <Text strong>
                   {selectedRowKeys.length} solicitação(ões) selecionada(s)
@@ -475,7 +469,7 @@ export default function ApprovalsPage() {
           return (
             <div style={{ maxHeight: 500, overflow: 'auto' }}>
               {/* Título do Evento */}
-              <Card size="small" style={{ marginBottom: 16, background: '#f0f5ff' }}>
+              <Card size="small" className="mb-4" style={{ background: '#f0f5ff' }}>
                 <Typography.Title level={4} style={{ margin: 0 }}>
                   {payload.summary}
                 </Typography.Title>
@@ -516,7 +510,7 @@ export default function ApprovalsPage() {
               {/* Descrição */}
               {payload.description && (
                 <>
-                  <Divider orientation="left" style={{ marginTop: 16 }}>Descrição</Divider>
+                  <Divider orientation="left" className="mt-4">Descrição</Divider>
                   <Card size="small" style={{ background: '#fafafa' }}>
                     <pre style={{
                       whiteSpace: 'pre-wrap',
@@ -533,7 +527,7 @@ export default function ApprovalsPage() {
               {/* Participantes */}
               {payload.attendees && payload.attendees.length > 0 && (
                 <>
-                  <Divider orientation="left" style={{ marginTop: 16 }}>
+                  <Divider orientation="left" className="mt-4">
                     <TeamOutlined /> Participantes ({payload.attendees.length})
                   </Divider>
                   <List
@@ -552,7 +546,7 @@ export default function ApprovalsPage() {
               )}
 
               {/* Metadados (colapsável) */}
-              <Divider orientation="left" style={{ marginTop: 16 }}>Metadados</Divider>
+              <Divider orientation="left" className="mt-4">Metadados</Divider>
               <Descriptions column={2} size="small">
                 <Descriptions.Item label="ID Evento">
                   <Tag>{previewData.preview.event_id}</Tag>

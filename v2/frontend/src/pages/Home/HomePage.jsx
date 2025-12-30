@@ -39,7 +39,7 @@ function AccessCard({ icon, title, description, link, badge, disabled = false })
       }}
     >
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="flex justify-between items-center">
           <div style={{ fontSize: '32px', color: '#1890ff' }}>
             {icon}
           </div>
@@ -48,7 +48,7 @@ function AccessCard({ icon, title, description, link, badge, disabled = false })
           )}
         </div>
         <div>
-          <Title level={5} style={{ marginBottom: 4 }}>{title}</Title>
+          <Title level={5} className="mb-1">{title}</Title>
           <Text type="secondary">{description}</Text>
         </div>
       </Space>
@@ -96,7 +96,7 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div style={{ padding: '24px', textAlign: 'center' }}>
+      <div className="p-6 text-center">
         <Spin size="large" tip="Carregando..." />
       </div>
     );
@@ -119,8 +119,8 @@ export default function HomePage() {
   const canDAT = user?.is_superuser || setores.includes('DAT');
 
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={{ marginBottom: 32 }}>
+    <div className="p-6">
+      <div className="mb-8">
         <Title level={2}>Página Inicial</Title>
         <Text type="secondary">
           Atalhos e KPIs resumidos para suas tarefas diárias.
@@ -130,7 +130,7 @@ export default function HomePage() {
       {/* Acesso Administrativo */}
       {isAdmin && (
         <>
-          <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
+          <Title level={4} className="mt-6 mb-4">
             Acesso Administrativo
           </Title>
           <Row gutter={[16, 16]}>
@@ -159,7 +159,7 @@ export default function HomePage() {
       {/* Aprovações (Gerente + Superintendência) */}
       {canApproveSuper && (
         <>
-          <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
+          <Title level={4} className="mt-6 mb-4">
             Aprovações
           </Title>
           <Row gutter={[16, 16]}>
@@ -179,7 +179,7 @@ export default function HomePage() {
       {/* Acesso Gerencial (Gerência) */}
       {isManager && (
         <>
-          <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
+          <Title level={4} className="mt-6 mb-4">
             Acesso Gerencial
           </Title>
           <Row gutter={[16, 16]}>
@@ -196,7 +196,7 @@ export default function HomePage() {
       )}
 
       {/* Acesso Geral */}
-      <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
+      <Title level={4} className="mt-6 mb-4">
         Acesso Geral
       </Title>
       <Row gutter={[16, 16]}>
@@ -232,8 +232,8 @@ export default function HomePage() {
       </Row>
 
       {/* KPIs Summary */}
-      <Card style={{ marginTop: 32 }}>
-        <Title level={4} style={{ marginBottom: 16 }}>
+      <Card className="mt-8">
+        <Title level={4} className="mb-4">
           Resumo Rápido
         </Title>
         <Row gutter={16}>

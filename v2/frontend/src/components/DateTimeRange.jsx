@@ -66,7 +66,7 @@ export default function DateTimeRange({ value = {}, onChange }) {
           onChange={handleDateChange}
           format="DD/MM/YYYY"
           placeholder="Selecione a data"
-          style={{ width: '100%', marginTop: 8 }}
+          className="w-full mt-2"
         />
       </div>
       <Space direction="horizontal" style={{ width: '100%' }}>
@@ -77,7 +77,7 @@ export default function DateTimeRange({ value = {}, onChange }) {
             onChange={handleStartChange}
             format="HH:mm"
             placeholder="HH:mm"
-            style={{ width: '100%', marginTop: 8 }}
+            className="w-full mt-2"
             minuteStep={15}
           />
         </div>
@@ -88,7 +88,7 @@ export default function DateTimeRange({ value = {}, onChange }) {
             onChange={handleEndChange}
             format="HH:mm"
             placeholder="HH:mm"
-            style={{ width: '100%', marginTop: 8 }}
+            className="w-full mt-2"
             minuteStep={15}
           />
         </div>

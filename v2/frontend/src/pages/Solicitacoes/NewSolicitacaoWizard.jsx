@@ -290,7 +290,7 @@ export default function NewSolicitacaoWizard() {
             description="Selecione os formadores que participarão do evento e, opcionalmente, os coordenadores acompanhantes."
             type="info"
             showIcon
-            style={{ marginBottom: 16 }}
+            className="mb-4"
           />
 
           <Form.Item
@@ -487,7 +487,7 @@ export default function NewSolicitacaoWizard() {
             }
             type={formData.projeto?.fluxo === 'SUPER' ? 'warning' : 'success'}
             showIcon
-            style={{ marginTop: 16 }}
+            className="mt-4"
           />
         </>
       ),
@@ -495,20 +495,20 @@ export default function NewSolicitacaoWizard() {
   ];
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto' }}>
+    <div className="p-6 max-w-4xl mx-auto">
       <Card>
         <Button
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate('/solicitacoes')}
-          style={{ marginBottom: 16 }}
+          className="mb-4"
         >
           Voltar
         </Button>
 
-        <Title level={2} style={{ marginBottom: 8 }}>Nova Solicitação</Title>
+        <Title level={2} className="mb-2">Nova Solicitação</Title>
         <Text type="secondary">Passo {currentStep + 1} de {steps.length}</Text>
 
-        <Steps current={currentStep} style={{ marginTop: 24, marginBottom: 32 }}>
+        <Steps current={currentStep} className="mt-6 mb-8">
           {steps.map((step, index) => (
             <Step key={index} title={step.title} icon={step.icon} />
           ))}
@@ -520,7 +520,7 @@ export default function NewSolicitacaoWizard() {
           </div>
         </Form>
 
-        <div style={{ marginTop: 24, display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <div className="mt-6 flex gap-2 justify-end">
           {currentStep > 0 && (
             <Button onClick={prev}>
               Anterior

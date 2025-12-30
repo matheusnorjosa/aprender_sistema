@@ -89,8 +89,8 @@ export default function DashboardsPage() {
   };
 
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="p-6">
+      <div className="mb-6 flex justify-between items-center">
         <div>
           <Title level={2}>Dashboards e Análises</Title>
           <Text type="secondary">
@@ -107,7 +107,7 @@ export default function DashboardsPage() {
       </div>
 
       {/* KPI Cards */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      <Row gutter={[16, 16]} className="mb-6">
         <Col xs={24} sm={12} md={6}>
           <Card bordered={false} style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
             <Statistic
@@ -152,7 +152,7 @@ export default function DashboardsPage() {
       </Row>
 
       {/* Gráficos */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      <Row gutter={[16, 16]} className="mb-6">
         {/* Eventos por Fluxo */}
         <Col xs={24} md={12}>
           <Card
@@ -162,7 +162,7 @@ export default function DashboardsPage() {
             <Space direction="vertical" style={{ width: '100%' }} size="large">
               {mockEventosPorFluxo.map((item) => (
                 <div key={item.fluxo}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div className="flex justify-between mb-2">
                     <Tag color={item.cor}>{item.fluxo}</Tag>
                     <Text strong>{item.quantidade} eventos</Text>
                   </div>
@@ -188,7 +188,7 @@ export default function DashboardsPage() {
                 const colors = ['#1890ff', '#52c41a', '#faad14', '#f5222d'];
                 return (
                   <div key={item.setor}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <div className="flex justify-between mb-1">
                       <Text>{item.setor}</Text>
                       <Text strong>{item.porcentagem}%</Text>
                     </div>

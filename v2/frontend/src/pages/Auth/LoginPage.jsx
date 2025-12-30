@@ -34,15 +34,10 @@ export default function LoginPage({ onLoginSuccess }) {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-      paddingTop: '60px',
-      background: '#004B3D',
-    }}>
+    <div
+      className="flex flex-col items-center justify-start"
+      style={{ minHeight: '100vh', paddingTop: '60px', background: '#004B3D' }}
+    >
       {/* Logo */}
       <div style={{ marginBottom: '40px' }}>
         <img

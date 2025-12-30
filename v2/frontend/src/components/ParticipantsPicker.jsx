@@ -82,7 +82,7 @@ export default function ParticipantsPicker({
         {/* Coordenador (read-only) */}
         <div>
           <Text strong>Coordenador:</Text>
-          <div style={{ marginTop: 8 }}>
+          <div className="mt-2">
             <Tag color="blue">
               {currentUser ? `${currentUser.first_name} ${currentUser.last_name} (você)` : 'Você'}
             </Tag>
@@ -133,7 +133,7 @@ export default function ParticipantsPicker({
                   key={`formador-id-${id}`}
                   closable
                   onClose={() => handleRemoveFormador(id, 'id')}
-                  style={{ marginBottom: 4 }}
+                  className="mb-1"
                 >
                   {getUserLabel(id)}
                 </Tag>
@@ -143,7 +143,7 @@ export default function ParticipantsPicker({
                   key={`formador-email-${email}`}
                   closable
                   onClose={() => handleRemoveFormador(email, 'email')}
-                  style={{ marginBottom: 4 }}
+                  className="mb-1"
                   color="orange"
                 >
                   {email}
@@ -197,7 +197,7 @@ export default function ParticipantsPicker({
                   key={`coord-id-${id}`}
                   closable
                   onClose={() => handleRemoveCoord(id, 'id')}
-                  style={{ marginBottom: 4 }}
+                  className="mb-1"
                   color="purple"
                 >
                   {getUserLabel(id)}
@@ -208,7 +208,7 @@ export default function ParticipantsPicker({
                   key={`coord-email-${email}`}
                   closable
                   onClose={() => handleRemoveCoord(email, 'email')}
-                  style={{ marginBottom: 4 }}
+                  className="mb-1"
                   color="magenta"
                 >
                   {email}

@@ -779,7 +779,7 @@ export default function CoordenadoresPage() {
             />
           </Col>
           <Col flex="auto">
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="flex justify-end gap-2">
               <Button icon={<ClearOutlined />} onClick={handleClearFilters}>
                 Limpar
               </Button>
@@ -867,7 +867,7 @@ export default function CoordenadoresPage() {
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         footer={
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div className="flex justify-between">
             <div>
               {editingCoordenador && (
                 <Button
@@ -1011,7 +1011,7 @@ export default function CoordenadoresPage() {
         {viewingCoordenador && (
           <div>
             {/* Header */}
-            <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
+            <div className="flex gap-4 mb-6">
               <Avatar
                 src={viewingCoordenador.foto_url}
                 size={80}

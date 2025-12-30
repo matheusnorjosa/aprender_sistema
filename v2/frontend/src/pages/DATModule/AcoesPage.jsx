@@ -652,13 +652,10 @@ export default function AcoesPage() {
       >
         {/* Column Group Headers */}
         <div
+          className="flex text-xs font-semibold uppercase"
           style={{
-            display: 'flex',
             borderBottom: '1px solid #f0f0f0',
             background: '#fafafa',
-            fontSize: 12,
-            fontWeight: 600,
-            textTransform: 'uppercase',
           }}
         >
           <div

@@ -290,15 +290,15 @@ export default function UsuariosPage() {
   ];
 
   return (
-    <div style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
+    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
       {/* Header */}
-      <div style={{ marginBottom: '16px' }}>
+      <div className="mb-4">
         <Link to="/admin-dat">← Voltar para Admin DAT</Link>
       </div>
 
       <Card>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <Title level={3} style={{ margin: 0 }}>
+        <div className="flex justify-between items-center mb-4">
+          <Title level={3} className="m-0">
             Usuários ({pagination.total})
           </Title>
           <Space>
@@ -423,7 +423,7 @@ export default function UsuariosPage() {
             />
           </Form.Item>
 
-          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+          <Text type="secondary" className="block mb-4">
             Nota: Apenas <Tag color="gold">Gerente</Tag> + <Tag color="purple">Superintendência</Tag> pode aprovar solicitações SUPER.
           </Text>
 

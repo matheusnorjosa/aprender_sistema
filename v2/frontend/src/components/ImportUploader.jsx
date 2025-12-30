@@ -147,7 +147,7 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
     >
       {/* Descrição */}
       {description && (
-        <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+        <Text type="secondary" className="block mb-4">
           {description}
         </Text>
       )}
@@ -182,8 +182,8 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
       {!applyResult && (
         <>
           {/* Step 1: Upload de arquivo */}
-          <div style={{ marginBottom: 24 }}>
-            <Title level={5} style={{ marginBottom: 12 }}>
+          <div className="mb-6">
+            <Title level={5} className="mb-3">
               1. Selecione o arquivo
             </Title>
             <Dragger {...uploadProps} disabled={loading || loadingApply}>
@@ -201,8 +201,8 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
 
           {/* Step 2: Botão de validação */}
           {file && !validationResult && (
-            <div style={{ marginBottom: 24 }}>
-              <Title level={5} style={{ marginBottom: 12 }}>
+            <div className="mb-6">
+              <Title level={5} className="mb-3">
                 2. Validar dados
               </Title>
               <Button
@@ -227,14 +227,14 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
               showIcon
               closable
               onClose={() => setError(null)}
-              style={{ marginBottom: 16 }}
+              className="mb-4"
             />
           )}
 
           {/* Step 3: Resultado da validação */}
           {validationResult && (
-            <div style={{ marginBottom: 24 }}>
-              <Title level={5} style={{ marginBottom: 12 }}>
+            <div className="mb-6">
+              <Title level={5} className="mb-3">
                 {hasErrors ? (
                   <Space>
                     <CloseCircleOutlined className="text-red-500" />
@@ -249,7 +249,7 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
               </Title>
 
               {/* Estatísticas */}
-              <Card size="small" style={{ marginBottom: 16 }}>
+              <Card size="small" className="mb-4">
                 <Row gutter={16}>
                   <Col span={8}>
                     <Statistic
@@ -292,7 +292,7 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
                   }
                   type="error"
                   showIcon
-                  style={{ marginBottom: 16 }}
+                  className="mb-4"
                 />
               )}
 
@@ -311,12 +311,12 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
                   }
                   type="warning"
                   showIcon
-                  style={{ marginBottom: 16 }}
+                  className="mb-4"
                 />
               )}
 
               {/* JSON completo */}
-              <Collapse size="small" style={{ marginBottom: 16 }}>
+              <Collapse size="small" className="mb-4">
                 <Panel header="Ver relatório completo (JSON)" key="1">
                   <pre style={{ fontSize: 10, margin: 0, overflow: 'auto', maxHeight: 300 }}>
                     {JSON.stringify(validationResult, null, 2)}
@@ -327,7 +327,7 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
               {/* Step 4: Botão de aplicar (só se validação OK) */}
               {canApply && (
                 <div>
-                  <Title level={5} style={{ marginBottom: 12 }}>
+                  <Title level={5} className="mb-3">
                     3. Confirmar importação
                   </Title>
                   <Button
@@ -341,7 +341,7 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
                   >
                     {loadingApply ? 'Importando...' : 'Realizar Importação'}
                   </Button>
-                  <Text type="secondary" style={{ display: 'block', marginTop: 8, textAlign: 'center' }}>
+                  <Text type="secondary" className="block mt-2 text-center">
                     Esta ação irá persistir os dados no banco
                   </Text>
                 </div>

@@ -103,6 +103,26 @@ services:
       retries: 3
       start_period: 30s
 
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_URL: http://web:8000  # Aponta para o backend interno
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../frontend/src:/app/src:ro  # Hot reload do código fonte
+      - ../frontend/public:/app/public:ro
+    depends_on:
+      - web
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 5173 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
   # ================================================================
   # Observability Stack (Prometheus + Grafana + Exporters)
   # ================================================================

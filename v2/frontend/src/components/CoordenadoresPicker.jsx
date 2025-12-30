@@ -74,7 +74,7 @@ export default function CoordenadoresPicker({ value = [], onChange }) {
     <div>
       {/* Tags dos coordenadores selecionados */}
       {value.length > 0 && (
-        <Space wrap style={{ marginBottom: 8 }}>
+        <Space wrap className="mb-2">
           {value.map((coord) => (
             <Tag
               key={coord.id}

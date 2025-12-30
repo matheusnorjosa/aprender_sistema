@@ -155,7 +155,7 @@ export default function PeoplePicker({
       <Space direction="vertical" style={{ width: '100%' }} size="middle">
         {/* Formadores */}
         <div>
-          <div style={{ marginBottom: 8, fontWeight: 500 }}>Formadores:</div>
+          <div className="mb-2 font-medium">Formadores:</div>
           <Space wrap>
             {value.formadores.map((formador) => (
               <Tag
@@ -168,7 +168,7 @@ export default function PeoplePicker({
               </Tag>
             ))}
           </Space>
-          <div style={{ marginTop: 8 }}>
+          <div className="mt-2">
             <AutoComplete
               value={formadorSearch}
               options={formadoresOptions}
@@ -190,7 +190,7 @@ export default function PeoplePicker({
 
         {/* Coordenadores Acompanhantes */}
         <div>
-          <div style={{ marginBottom: 8, fontWeight: 500 }}>Coordenadores Acompanhantes:</div>
+          <div className="mb-2 font-medium">Coordenadores Acompanhantes:</div>
           <Space wrap>
             {value.coordAcompanha.map((coord) => (
               <Tag
@@ -203,7 +203,7 @@ export default function PeoplePicker({
               </Tag>
             ))}
           </Space>
-          <div style={{ marginTop: 8 }}>
+          <div className="mt-2">
             <AutoComplete
               value={coordSearch}
               options={coordOptions}

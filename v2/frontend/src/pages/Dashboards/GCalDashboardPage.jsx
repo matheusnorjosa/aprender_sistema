@@ -502,15 +502,8 @@ export default function GCalDashboardPage() {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
-      <div
-        style={{
-          marginBottom: 24,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
+    <div className="p-6">
+      <div className="mb-6 flex justify-between items-center">
         <div>
           <Title level={2}>Dashboard Google Calendar</Title>
           <Text type="secondary">
@@ -521,7 +514,7 @@ export default function GCalDashboardPage() {
 
       {/* Filtros */}
       <Card
-        style={{ marginBottom: 24 }}
+        className="mb-6"
         bodyStyle={{ padding: '16px' }}
       >
         <Space size="middle" wrap>
@@ -574,7 +567,7 @@ export default function GCalDashboardPage() {
         <Skeleton active paragraph={{ rows: 2 }} />
       ) : (
         <>
-          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+          <Row gutter={[16, 16]} className="mb-6">
             <Col xs={24} sm={12} md={6}>
               <Card bordered={false} style={{ background: 'linear-gradient(135deg, #8e9eab 0%, #505965 100%)' }}>
                 <Statistic
@@ -638,7 +631,7 @@ export default function GCalDashboardPage() {
               type="error"
               showIcon
               icon={<CloseCircleOutlined />}
-              style={{ marginBottom: 24 }}
+              className="mb-6"
             />
           )}
         </>
@@ -646,10 +639,10 @@ export default function GCalDashboardPage() {
 
       {/* Insights - Success Rate + Top 5 (Issue #99) */}
       {insightsLoading ? (
-        <Skeleton active paragraph={{ rows: 3 }} style={{ marginBottom: 24 }} />
+        <Skeleton active paragraph={{ rows: 3 }} className="mb-6" />
       ) : (
         <>
-          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+          <Row gutter={[16, 16]} className="mb-6">
             {/* Success Rate Cards */}
             <Col xs={24} md={8}>
               <Card bordered={false}>
@@ -663,7 +656,7 @@ export default function GCalDashboardPage() {
                     fontWeight: 'bold',
                   }}
                 />
-                <Space size="small" style={{ marginTop: 16 }}>
+                <Space size="small" className="mt-4">
                   <Text type="secondary">Publicados:</Text>
                   <Text strong style={{ color: '#52c41a' }}>{successRate?.published || 0}</Text>
                 </Space>
@@ -714,7 +707,7 @@ export default function GCalDashboardPage() {
               </Space>
             }
             bordered={false}
-            style={{ marginBottom: 24 }}
+            className="mb-6"
           >
             <Table
               dataSource={topInsights?.items || []}
@@ -837,7 +830,7 @@ export default function GCalDashboardPage() {
                         {p.ch_horas && <Text type="secondary">{p.ch_horas}h</Text>}
                       </Space>
                       {p.observacao && (
-                        <div style={{ marginTop: 8 }}>
+                        <div className="mt-2">
                           <Text type="secondary">{p.observacao}</Text>
                         </div>
                       )}
@@ -861,7 +854,7 @@ export default function GCalDashboardPage() {
                         {log.usuario_nome} - {dayjs(log.created_at).format('DD/MM/YYYY HH:mm:ss')}
                       </Text>
                       {log.details && Object.keys(log.details).length > 0 && (
-                        <div style={{ marginTop: 4 }}>
+                        <div className="mt-1">
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             {JSON.stringify(log.details, null, 2)}
                           </Text>

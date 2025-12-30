@@ -95,16 +95,16 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
   if (!connected) {
     return (
       <Card
+        className="mb-4"
         style={{
           borderColor: '#ff4d4f',
           backgroundColor: '#fff2f0',
-          marginBottom: '16px',
         }}
       >
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           <Space>
             <GoogleOutlined style={{ fontSize: '24px', color: '#ff4d4f' }} />
-            <Title level={5} style={{ margin: 0 }}>
+            <Title level={5} className="m-0">
               Integração Google Calendar
             </Title>
           </Space>
@@ -154,16 +154,16 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
 
   return (
     <Card
+      className="mb-4"
       style={{
         borderColor: cardColor,
         backgroundColor: backgroundColor,
-        marginBottom: '16px',
       }}
     >
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Space>
           <GoogleOutlined style={{ fontSize: '24px', color: cardColor }} />
-          <Title level={5} style={{ margin: 0 }}>
+          <Title level={5} className="m-0">
             Integração Google Calendar
           </Title>
           <Tag color={isExpired ? 'error' : isExpiringSoon ? 'warning' : 'success'} icon={statusIcon}>
@@ -189,8 +189,8 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
           )}
 
           {/* Seletor de calendário */}
-          <div style={{ marginTop: '8px' }}>
-            <Text strong style={{ display: 'block', marginBottom: '8px' }}>
+          <div className="mt-2">
+            <Text strong className="block mb-2">
               <CalendarOutlined /> Calendário para eventos:
             </Text>
             <Select
@@ -205,14 +205,14 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
                 label: (
                   <span>
                     {cal.summary}
-                    {cal.primary && <Tag color="blue" style={{ marginLeft: '8px' }}>Principal</Tag>}
+                    {cal.primary && <Tag color="blue" className="ml-2">Principal</Tag>}
                   </span>
                 ),
               }))}
               notFoundContent={loadingCalendars ? 'Carregando...' : 'Nenhum calendário encontrado'}
             />
             {!defaultCalendarId && (
-              <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginTop: '4px' }}>
+              <Text type="secondary" className="block mt-1" style={{ fontSize: '12px' }}>
                 Usando calendário principal por padrão
               </Text>
             )}

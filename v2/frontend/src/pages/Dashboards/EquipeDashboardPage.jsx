@@ -144,7 +144,7 @@ export default function EquipeDashboardPage() {
 
   if (error) {
     return (
-      <div style={{ padding: '24px' }}>
+      <div className="p-6">
         <Alert
           message="Erro ao carregar dashboard"
           description={error}
@@ -156,9 +156,9 @@ export default function EquipeDashboardPage() {
   }
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div className="p-6">
       {/* Header com filtro e export */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+      <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
         <div>
           <Title level={2}>Dashboard da Equipe</Title>
           <Text type="secondary">
@@ -198,17 +198,17 @@ export default function EquipeDashboardPage() {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px 0' }}>
+        <div className="text-center py-16">
           <Spin size="large" tip="Carregando métricas..." />
         </div>
       ) : (
         <>
           {/* SEÇÃO 1: PRODUTIVIDADE */}
-          <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
+          <Title level={4} className="mt-6 mb-4">
             <BarChartOutlined /> Produtividade ({productivityData?.period || '7d'})
           </Title>
 
-          <Row gutter={[16, 16]} style={{ marginBottom: 32 }}>
+          <Row gutter={[16, 16]} className="mb-8">
             <Col xs={24} sm={12} md={6}>
               <Card bordered={false} style={{ background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)' }}>
                 <Statistic
@@ -270,11 +270,11 @@ export default function EquipeDashboardPage() {
           </Row>
 
           {/* SEÇÃO 2: RANKING DE FORMADORES */}
-          <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
+          <Title level={4} className="mt-6 mb-4">
             <TrophyOutlined /> Top 10 Formadores ({formadoresData?.period || '30d'})
           </Title>
 
-          <Row gutter={[16, 16]} style={{ marginBottom: 32 }}>
+          <Row gutter={[16, 16]} className="mb-8">
             <Col xs={24} md={12}>
               <Card title="Ranking por Eventos" bordered={false}>
                 <Space direction="vertical" style={{ width: '100%' }} size="middle">
@@ -290,7 +290,7 @@ export default function EquipeDashboardPage() {
 
                     return (
                       <div key={formador.id}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <div className="flex justify-between mb-1">
                           <Space>
                             <Tag color={index < 3 ? 'gold' : 'default'}>{index + 1}º</Tag>
                             <Text>{formador.nome}</Text>
@@ -363,7 +363,7 @@ export default function EquipeDashboardPage() {
           </Row>
 
           {/* SEÇÃO 3: QUALIDADE */}
-          <Title level={4} style={{ marginTop: 24, marginBottom: 16 }}>
+          <Title level={4} className="mt-6 mb-4">
             <SafetyOutlined /> Qualidade do Processo ({qualityData?.period || '30d'})
           </Title>
 
@@ -384,7 +384,7 @@ export default function EquipeDashboardPage() {
                   percent={qualityData?.rejection_rate || 0}
                   status={getThresholdStatus(qualityData?.rejection_rate || 0, 10, 'lower')}
                   size="small"
-                  style={{ marginTop: 8 }}
+                  className="mt-2"
                 />
                 <Text type="secondary" style={{ fontSize: '12px' }}>Meta: ≤ 10%</Text>
               </Card>
@@ -406,7 +406,7 @@ export default function EquipeDashboardPage() {
                   percent={qualityData?.conflict_rate || 0}
                   status={getThresholdStatus(qualityData?.conflict_rate || 0, 5, 'lower')}
                   size="small"
-                  style={{ marginTop: 8 }}
+                  className="mt-2"
                 />
                 <Text type="secondary" style={{ fontSize: '12px' }}>Meta: ≤ 5%</Text>
               </Card>
@@ -428,7 +428,7 @@ export default function EquipeDashboardPage() {
                   percent={qualityData?.rework_rate || 0}
                   status={getThresholdStatus(qualityData?.rework_rate || 0, 15, 'lower')}
                   size="small"
-                  style={{ marginTop: 8 }}
+                  className="mt-2"
                 />
                 <Text type="secondary" style={{ fontSize: '12px' }}>Meta: ≤ 15%</Text>
               </Card>
@@ -444,7 +444,7 @@ export default function EquipeDashboardPage() {
                   valueStyle={{ color: '#1890ff' }}
                   precision={1}
                 />
-                <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginTop: 8 }}>
+                <Text type="secondary" className="block mt-2" style={{ fontSize: '12px' }}>
                   Tempo entre aprovação e publicação no GCal
                 </Text>
               </Card>

@@ -470,13 +470,13 @@ export default function FormacoesPage() {
   ];
 
   return (
-    <div style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
+    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+      <div className="mb-6">
+        <div className="flex justify-between items-start mb-2">
           <div>
-            <Title level={3} style={{ margin: 0 }}>
-              <CalendarOutlined style={{ marginRight: 8 }} />
+            <Title level={3} className="m-0">
+              <CalendarOutlined className="mr-2" />
               Gestão de Formações
             </Title>
             <Text type="secondary">
@@ -510,7 +510,7 @@ export default function FormacoesPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Row gutter={16} className="mb-4">
           <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
@@ -554,10 +554,10 @@ export default function FormacoesPage() {
       )}
 
       {/* Filters Card */}
-      <Card style={{ marginBottom: 16 }} bodyStyle={{ paddingBottom: 12 }}>
+      <Card className="mb-4" bodyStyle={{ paddingBottom: 12 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={6} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Buscar
               </Text>
@@ -571,7 +571,7 @@ export default function FormacoesPage() {
             />
           </Col>
           <Col xs={12} sm={6} md={4} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Projeto
               </Text>
@@ -588,7 +588,7 @@ export default function FormacoesPage() {
             />
           </Col>
           <Col xs={12} sm={6} md={4} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 UF
               </Text>
@@ -604,7 +604,7 @@ export default function FormacoesPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={6} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Coordenador
               </Text>
@@ -621,7 +621,7 @@ export default function FormacoesPage() {
             />
           </Col>
           <Col xs={12} sm={6} md={4} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Status
               </Text>
@@ -636,7 +636,7 @@ export default function FormacoesPage() {
             />
           </Col>
           <Col xs={12} sm={6} md={4} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Modalidade
               </Text>
@@ -651,7 +651,7 @@ export default function FormacoesPage() {
             />
           </Col>
           <Col xs={12} sm={6} md={4} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Período
               </Text>
@@ -671,7 +671,7 @@ export default function FormacoesPage() {
           </Col>
         </Row>
         <Divider style={{ margin: '16px 0 12px' }} />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div className="flex justify-end gap-2">
           <Button icon={<ClearOutlined />} onClick={handleClearFilters}>
             Limpar
           </Button>
@@ -766,7 +766,7 @@ export default function FormacoesPage() {
       )}
 
       {/* Legend */}
-      <Card style={{ marginTop: 16 }} size="small">
+      <Card className="mt-4" size="small">
         <Space size="large" wrap>
           <Text strong style={{ textTransform: 'uppercase', fontSize: 12 }}>
             Status:
@@ -781,7 +781,7 @@ export default function FormacoesPage() {
       <Modal
         title={
           <div>
-            <Title level={4} style={{ margin: 0 }}>
+            <Title level={4} className="m-0">
               {editingFormacao ? 'Editar Formação' : 'Nova Formação'}
             </Title>
             <Text type="secondary" style={{ fontSize: 13 }}>
@@ -792,7 +792,7 @@ export default function FormacoesPage() {
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         footer={
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div className="flex justify-between">
             <div>
               {editingFormacao && (
                 <Button
@@ -821,7 +821,7 @@ export default function FormacoesPage() {
       >
         <Form form={form} layout="vertical" onFinish={handleSave}>
           {/* Identificação */}
-          <Card size="small" title="Identificação" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Identificação" className="mb-4">
             <Row gutter={16}>
               <Col xs={24} sm={8}>
                 <Form.Item
@@ -866,7 +866,7 @@ export default function FormacoesPage() {
           </Card>
 
           {/* Agendamento */}
-          <Card size="small" title="Agendamento" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Agendamento" className="mb-4">
             <Row gutter={16}>
               <Col xs={12} sm={6}>
                 <Form.Item
@@ -908,7 +908,7 @@ export default function FormacoesPage() {
           </Card>
 
           {/* Local */}
-          <Card size="small" title="Local e Formador" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Local e Formador" className="mb-4">
             <Row gutter={16}>
               <Col xs={24} sm={12}>
                 <Form.Item name="local_formacao" label="Local">
@@ -939,7 +939,7 @@ export default function FormacoesPage() {
           </Card>
 
           {/* Participantes */}
-          <Card size="small" title="Participantes" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Participantes" className="mb-4">
             <Row gutter={16}>
               <Col xs={8}>
                 <Form.Item name="quantidade_prevista" label="Prevista">
@@ -960,7 +960,7 @@ export default function FormacoesPage() {
           </Card>
 
           {/* Status e Documentação */}
-          <Card size="small" title="Status e Documentação" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Status e Documentação" className="mb-4">
             <Row gutter={16}>
               <Col xs={24} sm={8}>
                 <Form.Item name="status" label="Status">
@@ -982,7 +982,7 @@ export default function FormacoesPage() {
             </Row>
             <Divider style={{ margin: '12px 0' }} />
             <Text type="secondary" style={{ fontSize: 12 }}>Pós-formação:</Text>
-            <div style={{ marginTop: 8 }}>
+            <div className="mt-2">
               <Space>
                 <Form.Item name="lista_presenca_enviada" valuePropName="checked" noStyle>
                   <Checkbox>Lista de presença</Checkbox>

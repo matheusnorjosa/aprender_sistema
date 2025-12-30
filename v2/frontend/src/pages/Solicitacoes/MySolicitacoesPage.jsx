@@ -105,12 +105,12 @@ export default function MySolicitacoesPage() {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div className="p-6">
       <Card>
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={2} style={{ margin: 0 }}>
+          <div className="flex justify-between items-center">
+            <Title level={2} className="m-0">
               Minhas Solicitações
             </Title>
             <Link to="/solicitacoes/nova">

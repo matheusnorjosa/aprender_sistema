@@ -609,11 +609,11 @@ export default function PreAgendaPage() {
   };
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div className="p-6">
       <Space direction="vertical" style={{ width: '100%' }} size="large">
         {/* Header */}
         <Card>
-          <Title level={2} style={{ margin: 0 }}>
+          <Title level={2} className="m-0">
             Pré-agenda
           </Title>
         </Card>
@@ -691,7 +691,7 @@ export default function PreAgendaPage() {
         <Card>
           {/* Issue #95: Toolbar de Ações em Massa */}
           {selectedRowKeys.length > 0 && (
-            <div style={{ marginBottom: 16, padding: '12px', background: '#e6f7ff', borderRadius: '4px' }}>
+            <div className="mb-4 p-3 bg-blue-50 rounded">
               <Space>
                 <Text strong>{selectedRowKeys.length} evento(s) selecionado(s)</Text>
                 <Button
@@ -777,7 +777,7 @@ export default function PreAgendaPage() {
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
             {/* Título do Evento */}
             <Card size="small">
-              <Title level={4} style={{ margin: 0 }}>
+              <Title level={4} className="m-0">
                 {previewData.preview.payload?.summary || 'Sem título'}
               </Title>
             </Card>

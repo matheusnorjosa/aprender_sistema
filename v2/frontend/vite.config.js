@@ -3,6 +3,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // Backend URL - usa variável de ambiente ou fallback para localhost
+// eslint-disable-next-line no-undef
 const API_URL = process.env.VITE_API_URL || 'http://localhost:8002'
 
 // https://vite.dev/config/

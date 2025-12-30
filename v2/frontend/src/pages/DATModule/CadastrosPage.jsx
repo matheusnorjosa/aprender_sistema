@@ -681,13 +681,13 @@ export default function CadastrosPage() {
   const currentPlataforma = PLATAFORMAS[activeTab];
 
   return (
-    <div style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
+    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+      <div className="mb-6">
+        <div className="flex justify-between items-start mb-2">
           <div>
-            <Title level={3} style={{ margin: 0 }}>
-              <CloudServerOutlined style={{ marginRight: 8 }} />
+            <Title level={3} className="m-0">
+              <CloudServerOutlined className="mr-2" />
               Gestão de Cadastros em Plataformas
             </Title>
             <Text type="secondary">
@@ -704,7 +704,7 @@ export default function CadastrosPage() {
       </div>
 
       {/* Tabs for FORMAR / AVALIAR */}
-      <Card style={{ marginBottom: 16 }}>
+      <Card className="mb-4">
         <Tabs
           activeKey={activeTab}
           onChange={setActiveTab}
@@ -734,7 +734,7 @@ export default function CadastrosPage() {
 
         {/* Stats Cards */}
         {stats && (
-          <Row gutter={16} style={{ marginTop: 16 }}>
+          <Row gutter={16} className="mt-4">
             <Col xs={24} sm={12} md={6}>
               <Card size="small">
                 <Statistic
@@ -779,10 +779,10 @@ export default function CadastrosPage() {
       </Card>
 
       {/* Filters Card */}
-      <Card style={{ marginBottom: 16 }} bodyStyle={{ paddingBottom: 12 }}>
+      <Card className="mb-4" bodyStyle={{ paddingBottom: 12 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={8} lg={5}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Buscar
               </Text>
@@ -796,7 +796,7 @@ export default function CadastrosPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Projeto
               </Text>
@@ -813,7 +813,7 @@ export default function CadastrosPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 UF
               </Text>
@@ -829,7 +829,7 @@ export default function CadastrosPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={5}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Município
               </Text>
@@ -846,7 +846,7 @@ export default function CadastrosPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Status
               </Text>
@@ -865,8 +865,8 @@ export default function CadastrosPage() {
             />
           </Col>
         </Row>
-        <Divider style={{ margin: '16px 0 12px' }} />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <Divider className="my-4 mb-3" />
+        <div className="flex justify-end gap-2">
           <Button icon={<ClearOutlined />} onClick={handleClearFilters}>
             Limpar
           </Button>
@@ -921,7 +921,7 @@ export default function CadastrosPage() {
       </Card>
 
       {/* Legend */}
-      <Card style={{ marginTop: 16 }} size="small">
+      <Card className="mt-4" size="small">
         <Space size="large" wrap>
           <Text strong style={{ textTransform: 'uppercase', fontSize: 12 }}>
             Legenda (clique nos ícones para alterar):
@@ -949,7 +949,7 @@ export default function CadastrosPage() {
       <Modal
         title={
           <div>
-            <Title level={4} style={{ margin: 0 }}>
+            <Title level={4} className="m-0">
               {editingCadastro ? 'Editar Cadastro' : 'Novo Cadastro'}
             </Title>
             <Text type="secondary" style={{ fontSize: 13 }}>
@@ -960,7 +960,7 @@ export default function CadastrosPage() {
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         footer={
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div className="flex justify-between">
             <div>
               {editingCadastro && (
                 <Button
@@ -993,7 +993,7 @@ export default function CadastrosPage() {
           </Form.Item>
 
           {/* Identificação */}
-          <Card size="small" title="Identificação" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Identificação" className="mb-4">
             <Row gutter={16}>
               <Col xs={24} sm={12}>
                 <Form.Item
@@ -1053,7 +1053,7 @@ export default function CadastrosPage() {
                   <span>Workflow FORMAR</span>
                 </Space>
               }
-              style={{ marginBottom: 16 }}
+              className="mb-4"
             >
               <Row gutter={16}>
                 <Col xs={12} sm={6}>
@@ -1102,7 +1102,7 @@ export default function CadastrosPage() {
                   <span>Workflow AVALIAR</span>
                 </Space>
               }
-              style={{ marginBottom: 16 }}
+              className="mb-4"
             >
               <Row gutter={16}>
                 <Col xs={24} sm={8}>
@@ -1143,7 +1143,7 @@ export default function CadastrosPage() {
           )}
 
           {/* Links */}
-          <Card size="small" title="Links" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Links" className="mb-4">
             <Row gutter={16}>
               <Col xs={24} sm={12}>
                 <Form.Item name="link_planilha" label="Link da Planilha">

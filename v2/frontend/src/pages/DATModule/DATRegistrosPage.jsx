@@ -488,12 +488,12 @@ export default function DATRegistrosPage() {
   ];
 
   return (
-    <div style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
+    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+      <div className="mb-6">
+        <div className="flex justify-between items-start mb-2">
           <div>
-            <Title level={3} style={{ margin: 0 }}>
+            <Title level={3} className="m-0">
               Listagem de Registros DAT
             </Title>
             <Text type="secondary">
@@ -512,10 +512,10 @@ export default function DATRegistrosPage() {
       </div>
 
       {/* Filters Card */}
-      <Card style={{ marginBottom: 16 }} bodyStyle={{ paddingBottom: 12 }}>
+      <Card className="mb-4" bodyStyle={{ paddingBottom: 12 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Região
               </Text>
@@ -530,7 +530,7 @@ export default function DATRegistrosPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 UF
               </Text>
@@ -546,7 +546,7 @@ export default function DATRegistrosPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={5}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Município
               </Text>
@@ -563,7 +563,7 @@ export default function DATRegistrosPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Projeto Geral
               </Text>
@@ -578,7 +578,7 @@ export default function DATRegistrosPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Usa AVALIAR
               </Text>
@@ -596,7 +596,7 @@ export default function DATRegistrosPage() {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Status Geral
               </Text>
@@ -614,7 +614,7 @@ export default function DATRegistrosPage() {
             />
           </Col>
         </Row>
-        <Divider style={{ margin: '16px 0 12px' }} />
+        <Divider className="my-4 mb-3" />
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <Button icon={<ClearOutlined />} onClick={handleClearFilters}>
             Limpar
@@ -709,7 +709,7 @@ export default function DATRegistrosPage() {
       </Card>
 
       {/* Legend */}
-      <Card style={{ marginTop: 16 }} size="small">
+      <Card className="mt-4" size="small">
         <Space size="large" wrap>
           <Text strong style={{ textTransform: 'uppercase', fontSize: 12 }}>
             Legenda de Ícones:
@@ -744,7 +744,7 @@ export default function DATRegistrosPage() {
       <Modal
         title={
           <div>
-            <Title level={4} style={{ margin: 0 }}>
+            <Title level={4} className="m-0">
               {editingRegistro ? 'Editar Registro DAT' : 'Novo Registro DAT'}
             </Title>
             <Text type="secondary" style={{ fontSize: 13 }}>
@@ -784,7 +784,7 @@ export default function DATRegistrosPage() {
                 <span>Dados Básicos</span>
               </Space>
             }
-            style={{ marginBottom: 16 }}
+            className="mb-4"
           >
             <Row gutter={16}>
               <Col xs={24} sm={12} md={8}>
@@ -859,7 +859,7 @@ export default function DATRegistrosPage() {
                     <Tag color="blue">Integração</Tag>
                   </Space>
                 }
-                style={{ marginBottom: 16, height: '100%' }}
+                className="mb-4 h-full"
               >
                 <Row gutter={16}>
                   <Col span={12}>
@@ -887,7 +887,7 @@ export default function DATRegistrosPage() {
                   </Col>
                 </Row>
 
-                <Divider style={{ margin: '12px 0' }} dashed />
+                <Divider className="my-3" dashed />
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -936,9 +936,9 @@ export default function DATRegistrosPage() {
                   </div>
                 </div>
 
-                <Divider style={{ margin: '12px 0' }} dashed />
+                <Divider className="my-3" dashed />
 
-                <Form.Item name="obs_formar" label="Observações FORMAR" style={{ marginBottom: 0 }}>
+                <Form.Item name="obs_formar" label="Observações FORMAR" className="mb-0">
                   <Input.TextArea rows={3} placeholder="Observações sobre a integração com FORMAR..." />
                 </Form.Item>
               </Card>
@@ -959,9 +959,9 @@ export default function DATRegistrosPage() {
                     </Form.Item>
                   </div>
                 }
-                style={{ marginBottom: 16, height: '100%' }}
+                className="mb-4 h-full"
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div className="flex flex-col gap-3">
                   {/* Alunos Recebidos */}
                   <Card size="small" style={{ background: '#fafafa' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1023,9 +1023,9 @@ export default function DATRegistrosPage() {
                   </Card>
                 </div>
 
-                <Divider style={{ margin: '12px 0' }} dashed />
+                <Divider className="my-3" dashed />
 
-                <Form.Item name="obs_avaliar" label="Observações AVALIAR" style={{ marginBottom: 0 }}>
+                <Form.Item name="obs_avaliar" label="Observações AVALIAR" className="mb-0">
                   <Input.TextArea rows={3} placeholder="Detalhes sobre a importação no AVALIAR..." />
                 </Form.Item>
               </Card>

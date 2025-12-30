@@ -76,13 +76,7 @@ const { Text } = Typography;
 // Componente de loading para Suspense
 function PageLoader() {
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      height: '100%',
-      minHeight: '300px'
-    }}>
+    <div className="flex justify-center items-center" style={{ height: '100%', minHeight: '300px' }}>
       <Spin size="large" tip="Carregando página..." />
     </div>
   );
@@ -308,16 +302,15 @@ function AppContent() {
             }}
           >
             {/* Logo/Título */}
-            <div style={{
-              height: '64px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: '22px',
-              fontWeight: 'bold',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            }}>
+            <div
+              className="flex items-center justify-center font-bold"
+              style={{
+                height: '64px',
+                color: 'white',
+                fontSize: '22px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              }}
+            >
               Aprender Sistema
             </div>
 
@@ -452,16 +445,15 @@ function AppContent() {
           {/* Layout com margem para compensar Sider fixo */}
           <Layout style={{ marginLeft: 250, minHeight: '100vh', background: isDark ? '#141414' : undefined }}>
             {/* Header com info do usuário */}
-            <Header style={{
-              background: isDark ? '#1f1f1f' : '#fff',
-              padding: '0 24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              borderBottom: isDark ? '1px solid #303030' : '1px solid #f0f0f0',
-              width: '100%',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', whiteSpace: 'nowrap' }}>
+            <Header
+              className="flex items-center justify-end w-full"
+              style={{
+                background: isDark ? '#1f1f1f' : '#fff',
+                padding: '0 24px',
+                borderBottom: isDark ? '1px solid #303030' : '1px solid #f0f0f0',
+              }}
+            >
+              <div className="flex items-center gap-4" style={{ whiteSpace: 'nowrap' }}>
                 {/* Toggle de tema */}
                 <Tooltip title={isDark ? 'Modo claro' : 'Modo escuro'}>
                   <Button
@@ -471,7 +463,7 @@ function AppContent() {
                     style={{ color: isDark ? '#fff' : undefined }}
                   />
                 </Tooltip>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="flex items-center gap-2">
                   <UserOutlined />
                   <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
                 </div>

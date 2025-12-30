@@ -1,0 +1,75 @@
+/**
+ * Testes E2E para fluxo de Login/Logout
+ *
+ * Testes que verificam o fluxo de autenticação.
+ */
+
+import { test, expect } from '@playwright/test';
+
+// Credenciais de teste
+const ADMIN_USER = {
+  username: 'admin',
+  password: 'admin123',
+};
+
+test.describe('Fluxo de Autenticação', () => {
+  // Estes 3 primeiros testes NÃO usam o estado de autenticação salvo
+  test.describe('Login', () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test('1. Página de login carrega corretamente', async ({ page }) => {
+      await page.goto('/');
+
+      // Deve mostrar formulário de login
+      await expect(page.locator('h2:has-text("Login")')).toBeVisible();
+      await expect(page.locator('input[id="login_username"]')).toBeVisible();
+      await expect(page.locator('input[id="login_password"]')).toBeVisible();
+      await expect(page.locator('button[type="submit"]')).toBeVisible();
+    });
+
+    test('2. Login com superuser funciona e mostra dashboard', async ({ page }) => {
+      await page.goto('/');
+
+      // Preencher formulário
+      await page.fill('input[id="login_username"]', ADMIN_USER.username);
+      await page.fill('input[id="login_password"]', ADMIN_USER.password);
+
+      // Clicar no botão de login
+      await page.click('button[type="submit"]');
+
+      // Verificar que o sidebar está visível (indica que logou)
+      await expect(page.locator('.ant-layout-sider').first()).toBeVisible({ timeout: 15000 });
+    });
+
+    test('3. Login com credenciais inválidas mostra erro', async ({ page }) => {
+      await page.goto('/');
+
+      // Preencher com credenciais inválidas
+      await page.fill('input[id="login_username"]', 'usuario_invalido');
+      await page.fill('input[id="login_password"]', 'senha_errada');
+
+      // Clicar no botão de login
+      await page.click('button[type="submit"]');
+
+      // Deve mostrar mensagem de erro
+      await expect(page.locator('.ant-message-error')).toBeVisible({ timeout: 5000 });
+    });
+  });
+
+  // Este teste USA a sessão autenticada do setup
+  test.describe('Logout', () => {
+    test('4. Logout funciona corretamente', async ({ page }) => {
+      // Já está logado via setup - ir para home
+      await page.goto('/home');
+
+      // Verificar que está logado
+      await expect(page.locator('.ant-layout-sider').first()).toBeVisible({ timeout: 5000 });
+
+      // Clicar no botão de logout
+      await page.click('button:has-text("Sair")');
+
+      // Deve voltar para tela de login
+      await expect(page.locator('h2:has-text("Login")')).toBeVisible({ timeout: 10000 });
+    });
+  });
+});

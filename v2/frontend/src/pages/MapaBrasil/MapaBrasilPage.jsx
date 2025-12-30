@@ -393,7 +393,7 @@ export default function MapaBrasilPage() {
   return (
     <div style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
       {/* Header */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="mb-6 flex justify-between items-center">
         <div>
           <Title level={2} style={{ marginBottom: 0 }}>
             <EnvironmentOutlined style={{ marginRight: 8 }} />
@@ -795,7 +795,7 @@ export default function MapaBrasilPage() {
                   dataSource={Object.entries(estadosData).sort((a, b) => b[1].eventos - a[1].eventos)}
                   renderItem={([uf, data]) => (
                     <List.Item>
-                      <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
+                      <div className="w-full flex justify-between">
                         <div>
                           <Text strong>{uf}</Text>
                           <br />

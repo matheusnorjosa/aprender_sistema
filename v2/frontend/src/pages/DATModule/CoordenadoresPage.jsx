@@ -626,13 +626,13 @@ export default function CoordenadoresPage() {
   );
 
   return (
-    <div style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
+    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+      <div className="mb-6">
+        <div className="flex justify-between items-start mb-2">
           <div>
-            <Title level={3} style={{ margin: 0 }}>
-              <TeamOutlined style={{ marginRight: 8 }} />
+            <Title level={3} className="m-0">
+              <TeamOutlined className="mr-2" />
               Gestão de Coordenadores
             </Title>
             <Text type="secondary">
@@ -676,7 +676,7 @@ export default function CoordenadoresPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Row gutter={16} className="mb-4">
           <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
@@ -728,7 +728,7 @@ export default function CoordenadoresPage() {
       <Card style={{ marginBottom: 16 }} bodyStyle={{ paddingBottom: 12 }}>
         <Row gutter={[16, 16]} align="bottom">
           <Col xs={24} sm={12} md={8} lg={6}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Buscar
               </Text>
@@ -856,7 +856,7 @@ export default function CoordenadoresPage() {
       <Modal
         title={
           <div>
-            <Title level={4} style={{ margin: 0 }}>
+            <Title level={4} className="m-0">
               {editingCoordenador ? 'Editar Coordenador' : 'Novo Coordenador'}
             </Title>
             <Text type="secondary" style={{ fontSize: 13 }}>
@@ -896,7 +896,7 @@ export default function CoordenadoresPage() {
       >
         <Form form={form} layout="vertical" onFinish={handleSave}>
           {/* Dados Pessoais */}
-          <Card size="small" title="Dados Pessoais" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Dados Pessoais" className="mb-4">
             <Row gutter={16}>
               <Col xs={24} sm={16}>
                 <Form.Item
@@ -946,7 +946,7 @@ export default function CoordenadoresPage() {
           </Card>
 
           {/* Contato */}
-          <Card size="small" title="Contato" style={{ marginBottom: 16 }}>
+          <Card size="small" title="Contato" className="mb-4">
             <Row gutter={16}>
               <Col xs={24} sm={12}>
                 <Form.Item
@@ -1057,7 +1057,7 @@ export default function CoordenadoresPage() {
             </div>
 
             {/* Stats */}
-            <Row gutter={16} style={{ marginBottom: 24 }}>
+            <Row gutter={16} className="mb-6">
               <Col span={8}>
                 <Card size="small">
                   <Statistic
@@ -1088,7 +1088,7 @@ export default function CoordenadoresPage() {
             </Row>
 
             {/* Carga de Trabalho */}
-            <Card size="small" title="Carga de Trabalho" style={{ marginBottom: 16 }}>
+            <Card size="small" title="Carga de Trabalho" className="mb-4">
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div>
                   <Text type="secondary">Municípios: </Text>
@@ -1136,7 +1136,7 @@ export default function CoordenadoresPage() {
 
             {/* Observações */}
             {viewingCoordenador.observacoes && (
-              <Card size="small" title="Observações" style={{ marginTop: 16 }}>
+              <Card size="small" title="Observações" className="mt-4">
                 <Text>{viewingCoordenador.observacoes}</Text>
               </Card>
             )}

@@ -511,7 +511,7 @@ export default function ApprovalsPage() {
               {payload.description && (
                 <>
                   <Divider orientation="left" className="mt-4">Descrição</Divider>
-                  <Card size="small" style={{ background: '#fafafa' }}>
+                  <Card size="small" className="bg-gray-50">
                     <pre style={{
                       whiteSpace: 'pre-wrap',
                       margin: 0,

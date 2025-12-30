@@ -259,7 +259,7 @@ export default function GruposPage() {
         </div>
 
         <Checkbox.Group
-          style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}
+          className="w-full flex flex-col gap-2"
           value={selectedUsers}
           onChange={setSelectedUsers}
         >

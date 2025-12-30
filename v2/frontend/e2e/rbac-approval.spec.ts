@@ -21,7 +21,7 @@ test.describe('RBAC Basic Flow', () => {
     await page.goto('/');
 
     // Deve mostrar formulário de login
-    await expect(page.locator('text=Bem-vindo de volta!')).toBeVisible();
+    await expect(page.locator('h2:has-text("Login")')).toBeVisible();
     await expect(page.locator('input[id="login_username"]')).toBeVisible();
     await expect(page.locator('input[id="login_password"]')).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();

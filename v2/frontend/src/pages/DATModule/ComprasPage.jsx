@@ -54,6 +54,7 @@ import {
   getProjetosOptions,
   getProdutosOptions,
 } from '../../api/datModule';
+import { useCrudOperations } from '../../hooks/useCrudOperations';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -81,9 +82,16 @@ const UF_OPTIONS = [
 ].map((uf) => ({ label: uf, value: uf }));
 
 export default function ComprasPage() {
-  const [compras, setCompras] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
+  // Issue #302: Use useCrudOperations hook for standardized CRUD
+  const crud = useCrudOperations({
+    listFn: listCompras,
+    createFn: createCompra,
+    updateFn: updateCompra,
+    deleteFn: deleteCompra,
+    entityName: 'Compra',
+    pageSize: 15,
+  });
+
   const [stats, setStats] = useState(null);
 
   // Filter states
@@ -127,43 +135,30 @@ export default function ComprasPage() {
     loadOptions();
   }, []);
 
-  // Fetch data with filters
+  // Fetch data with filters (uses crud hook internally)
   const fetchData = useCallback(async (page = 1) => {
-    setLoading(true);
-    try {
-      const params = {
-        page,
-        page_size: pagination.pageSize,
-        ordering: '-updated_at',
-      };
+    const params = {
+      page,
+      ordering: '-updated_at',
+    };
 
-      // Apply filters
-      if (filters.search) params.search = filters.search;
-      if (filters.uf) params.uf = filters.uf;
-      if (filters.municipio) params.municipio_id = filters.municipio;
-      if (filters.projeto) params.projeto_id = filters.projeto;
-      if (filters.produto) params.produto_id = filters.produto;
-      if (filters.status) params.status = filters.status;
-      if (filters.ano_uso) params.ano_uso = filters.ano_uso;
+    // Apply filters
+    if (filters.search) params.search = filters.search;
+    if (filters.uf) params.uf = filters.uf;
+    if (filters.municipio) params.municipio_id = filters.municipio;
+    if (filters.projeto) params.projeto_id = filters.projeto;
+    if (filters.produto) params.produto_id = filters.produto;
+    if (filters.status) params.status = filters.status;
+    if (filters.ano_uso) params.ano_uso = filters.ano_uso;
 
-      const [data, statsData] = await Promise.all([
-        listCompras(params),
-        getComprasStats(params),
-      ]);
+    // Fetch data and stats in parallel
+    const [, statsData] = await Promise.all([
+      crud.fetchData(params),
+      getComprasStats(params).catch(() => null),
+    ]);
 
-      setCompras(data.results || data || []);
-      setPagination((prev) => ({
-        ...prev,
-        current: page,
-        total: data.count || (data.results || data || []).length,
-      }));
-      setStats(statsData);
-    } catch (error) {
-      message.error(`Erro ao carregar dados: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, pagination.pageSize]);
+    setStats(statsData);
+  }, [filters, crud]);
 
   useEffect(() => {
     fetchData();
@@ -199,45 +194,28 @@ export default function ComprasPage() {
     setModalVisible(true);
   };
 
+  // Issue #302: Simplified handleSave using crud hook
   const handleSave = async (values) => {
-    try {
-      const payload = {
-        ...values,
-        data_compra: values.data_compra ? values.data_compra.format('YYYY-MM-DD') : null,
-        data_entrega: values.data_entrega ? values.data_entrega.format('YYYY-MM-DD') : null,
-      };
+    const payload = {
+      ...values,
+      data_compra: values.data_compra ? values.data_compra.format('YYYY-MM-DD') : null,
+      data_entrega: values.data_entrega ? values.data_entrega.format('YYYY-MM-DD') : null,
+    };
 
-      if (editingCompra) {
-        await updateCompra(editingCompra.id, payload);
-        message.success('Compra atualizada com sucesso');
-      } else {
-        await createCompra(payload);
-        message.success('Compra criada com sucesso');
-      }
+    const result = await crud.handleSave(payload, editingCompra?.id);
+
+    if (result.success) {
       setModalVisible(false);
       form.resetFields();
-      fetchData(pagination.current);
-    } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      fetchData(crud.pagination.current);
     }
   };
 
+  // Issue #302: Simplified handleDelete using crud hook
   const handleDelete = (record) => {
-    Modal.confirm({
-      title: 'Confirmar exclusão',
-      content: `Excluir "${record.produto_nome}" de "${record.municipio_nome}"?`,
-      okText: 'Sim, excluir',
-      okType: 'danger',
-      cancelText: 'Cancelar',
-      onOk: async () => {
-        try {
-          await deleteCompra(record.id);
-          message.success('Compra excluída com sucesso');
-          fetchData(pagination.current);
-        } catch (error) {
-          message.error(`Erro ao excluir: ${error.message}`);
-        }
-      },
+    crud.confirmDelete(record, {
+      nameField: 'produto_nome',
+      onSuccess: () => fetchData(crud.pagination.current),
     });
   };
 
@@ -622,7 +600,7 @@ export default function ComprasPage() {
           <Button icon={<ClearOutlined />} onClick={handleClearFilters}>
             Limpar
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={() => fetchData(1)} loading={loading}>
+          <Button icon={<ReloadOutlined />} onClick={() => fetchData(1)} loading={crud.loading}>
             Atualizar
           </Button>
           <Button type="primary" icon={<FilterOutlined />} onClick={() => fetchData(1)}>
@@ -637,23 +615,23 @@ export default function ComprasPage() {
         title={
           <Space>
             <Text strong>Resultados:</Text>
-            <Text type="danger" strong>{pagination.total}</Text>
+            <Text type="danger" strong>{crud.pagination.total}</Text>
             <Text>registros</Text>
           </Space>
         }
       >
         <Table
           columns={columns}
-          dataSource={compras}
+          dataSource={crud.data}
           rowKey="id"
-          loading={loading}
+          loading={crud.loading}
           scroll={{ x: 1400 }}
           pagination={{
-            ...pagination,
+            ...crud.pagination,
             showSizeChanger: true,
             showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
             onChange: (page, pageSize) => {
-              setPagination((prev) => ({ ...prev, current: page, pageSize }));
+              crud.setPagination((prev) => ({ ...prev, current: page, pageSize }));
               fetchData(page);
             },
           }}

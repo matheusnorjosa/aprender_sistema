@@ -64,7 +64,7 @@ export default function AdminDATHomePage() {
   ];
 
   return (
-    <div style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
+    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <Title level={2}>Admin DAT</Title>

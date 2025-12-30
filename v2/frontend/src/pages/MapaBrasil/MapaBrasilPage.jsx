@@ -391,7 +391,7 @@ export default function MapaBrasilPage() {
   }, []);
 
   return (
-    <div style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
+    <div className="p-6 bg-gray-100" style={{ minHeight: '100vh' }}>
       {/* Header */}
       <div className="mb-6 flex justify-between items-center">
         <div>

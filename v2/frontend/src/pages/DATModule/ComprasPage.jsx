@@ -669,7 +669,7 @@ export default function ComprasPage() {
 
             return (
               <Table.Summary fixed>
-                <Table.Summary.Row style={{ background: '#fafafa', fontWeight: 'bold' }}>
+                <Table.Summary.Row className="bg-gray-50 font-bold">
                   <Table.Summary.Cell index={0} colSpan={4}>
                     Total da Página
                   </Table.Summary.Cell>

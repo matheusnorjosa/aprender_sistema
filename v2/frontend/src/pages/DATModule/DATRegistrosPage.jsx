@@ -641,8 +641,8 @@ export default function DATRegistrosPage() {
       >
         {/* Column Group Headers */}
         <div
-          className="flex text-xs font-semibold uppercase"
-          style={{ borderBottom: '1px solid #f0f0f0', background: '#fafafa' }}
+          className="flex text-xs font-semibold uppercase bg-gray-50"
+          style={{ borderBottom: '1px solid #f0f0f0' }}
         >
           <div
             className="flex items-center gap-1.5"
@@ -938,7 +938,7 @@ export default function DATRegistrosPage() {
               >
                 <div className="flex flex-col gap-3">
                   {/* Alunos Recebidos */}
-                  <Card size="small" style={{ background: '#fafafa' }}>
+                  <Card size="small" className="bg-gray-50">
                     <div className="flex justify-between items-center">
                       <Space>
                         <Form.Item name="alunos_recebidos_status" noStyle>
@@ -958,7 +958,7 @@ export default function DATRegistrosPage() {
                   </Card>
 
                   {/* Alunos Validados */}
-                  <Card size="small" style={{ background: '#fafafa' }}>
+                  <Card size="small" className="bg-gray-50">
                     <div className="flex justify-between items-center">
                       <Space>
                         <Form.Item name="alunos_validados_status" noStyle>
@@ -978,7 +978,7 @@ export default function DATRegistrosPage() {
                   </Card>
 
                   {/* Alunos Importados */}
-                  <Card size="small" style={{ background: '#fafafa' }}>
+                  <Card size="small" className="bg-gray-50">
                     <div className="flex justify-between items-center">
                       <Space>
                         <Form.Item name="alunos_importados_status" noStyle>

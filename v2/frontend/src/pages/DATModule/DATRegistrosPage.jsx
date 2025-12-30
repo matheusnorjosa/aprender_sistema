@@ -615,7 +615,7 @@ export default function DATRegistrosPage() {
           </Col>
         </Row>
         <Divider className="my-4 mb-3" />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div className="flex justify-end gap-2">
           <Button icon={<ClearOutlined />} onClick={handleClearFilters}>
             Limpar
           </Button>
@@ -641,49 +641,24 @@ export default function DATRegistrosPage() {
       >
         {/* Column Group Headers */}
         <div
-          style={{
-            display: 'flex',
-            borderBottom: '1px solid #f0f0f0',
-            background: '#fafafa',
-            fontSize: 12,
-            fontWeight: 600,
-            textTransform: 'uppercase',
-          }}
+          className="flex text-xs font-semibold uppercase"
+          style={{ borderBottom: '1px solid #f0f0f0', background: '#fafafa' }}
         >
           <div
-            style={{
-              flex: '0 0 640px',
-              padding: '8px 16px',
-              borderRight: '1px solid #f0f0f0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
+            className="flex items-center gap-1.5"
+            style={{ flex: '0 0 640px', padding: '8px 16px', borderRight: '1px solid #f0f0f0' }}
           >
             <DatabaseOutlined /> Dados Básicos
           </div>
           <div
-            style={{
-              flex: '0 0 580px',
-              padding: '8px 16px',
-              borderRight: '1px solid #f0f0f0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              color: '#1890ff',
-            }}
+            className="flex items-center gap-1.5 text-blue-500"
+            style={{ flex: '0 0 580px', padding: '8px 16px', borderRight: '1px solid #f0f0f0' }}
           >
             <BookOutlined /> Detalhes FORMAR
           </div>
           <div
-            style={{
-              flex: 1,
-              padding: '8px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              color: '#52c41a',
-            }}
+            className="flex items-center gap-1.5 text-green-500"
+            style={{ flex: 1, padding: '8px 16px' }}
           >
             <BarChartOutlined /> Detalhes AVALIAR
           </div>
@@ -755,7 +730,7 @@ export default function DATRegistrosPage() {
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         footer={
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div className="flex justify-between">
             <div>
               {editingRegistro && (
                 <Button danger type="text" icon={<DeleteOutlined />} onClick={() => { setModalVisible(false); handleDelete(editingRegistro); }}>
@@ -889,8 +864,8 @@ export default function DATRegistrosPage() {
 
                 <Divider className="my-3" dashed />
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="flex flex-col gap-3">
+                  <div className="flex justify-between items-center">
                     <Form.Item name="chaves_inscricao_status" noStyle>
                       <Select
                         placeholder="Status"
@@ -905,7 +880,7 @@ export default function DATRegistrosPage() {
                     </Form.Item>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="flex justify-between items-center">
                     <Form.Item name="instrucoes_status" noStyle>
                       <Select
                         placeholder="Status"
@@ -920,7 +895,7 @@ export default function DATRegistrosPage() {
                     </Form.Item>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="flex justify-between items-center">
                     <Form.Item name="envio_codigos_status" noStyle>
                       <Select
                         placeholder="Status"
@@ -949,7 +924,7 @@ export default function DATRegistrosPage() {
               <Card
                 size="small"
                 title={
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <div className="flex justify-between items-center w-full">
                     <Space>
                       <BarChartOutlined className="text-green-500" />
                       <span>Plataforma AVALIAR</span>
@@ -964,7 +939,7 @@ export default function DATRegistrosPage() {
                 <div className="flex flex-col gap-3">
                   {/* Alunos Recebidos */}
                   <Card size="small" style={{ background: '#fafafa' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="flex justify-between items-center">
                       <Space>
                         <Form.Item name="alunos_recebidos_status" noStyle>
                           <Select
@@ -984,7 +959,7 @@ export default function DATRegistrosPage() {
 
                   {/* Alunos Validados */}
                   <Card size="small" style={{ background: '#fafafa' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="flex justify-between items-center">
                       <Space>
                         <Form.Item name="alunos_validados_status" noStyle>
                           <Select
@@ -1004,7 +979,7 @@ export default function DATRegistrosPage() {
 
                   {/* Alunos Importados */}
                   <Card size="small" style={{ background: '#fafafa' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="flex justify-between items-center">
                       <Space>
                         <Form.Item name="alunos_importados_status" noStyle>
                           <Select

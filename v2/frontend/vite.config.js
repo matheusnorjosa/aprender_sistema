@@ -2,6 +2,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// Backend URL - usa variável de ambiente ou fallback para localhost
+const API_URL = process.env.VITE_API_URL || 'http://localhost:8002'
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -23,9 +26,14 @@ export default defineConfig({
     },
   },
   server: {
+    host: true, // Permite acesso externo (necessário para Docker)
+    port: 5173,
+    watch: {
+      usePolling: true, // Necessário para HMR funcionar em Docker no Windows
+    },
     proxy: {
       '/api': {
-        target: 'http://localhost:8002',
+        target: API_URL,
         changeOrigin: true,
         secure: false,
       },

@@ -501,11 +501,11 @@ export default function PlanoFormacoesPage() {
   // ============================================================
 
   return (
-    <div style={{ padding: 24 }}>
+    <div className="p-6">
       {/* Header */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="mb-6 flex justify-between items-center">
         <div>
-          <Title level={3} style={{ margin: 0 }}>Plano de Formacoes</Title>
+          <Title level={3} className="m-0">Plano de Formacoes</Title>
           <Text type="secondary">Gestao do plano anual de formacoes por municipio e projeto</Text>
         </div>
         <Space>
@@ -540,7 +540,7 @@ export default function PlanoFormacoesPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Row gutter={16} className="mb-4">
           <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
@@ -584,10 +584,10 @@ export default function PlanoFormacoesPage() {
       )}
 
       {/* Filters */}
-      <Card style={{ marginBottom: 16 }} bodyStyle={{ paddingBottom: 12 }}>
+      <Card className="mb-4" bodyStyle={{ paddingBottom: 12 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={6} lg={4}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Buscar</Text>
             </div>
             <Input.Search
@@ -599,7 +599,7 @@ export default function PlanoFormacoesPage() {
             />
           </Col>
           <Col xs={12} sm={6} md={4} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Municipio</Text>
             </div>
             <Select
@@ -614,7 +614,7 @@ export default function PlanoFormacoesPage() {
             />
           </Col>
           <Col xs={12} sm={6} md={4} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Projeto</Text>
             </div>
             <Select
@@ -629,7 +629,7 @@ export default function PlanoFormacoesPage() {
             />
           </Col>
           <Col xs={12} sm={6} md={4} lg={3}>
-            <div style={{ marginBottom: 4 }}>
+            <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Coordenador</Text>
             </div>
             <Select
@@ -644,8 +644,8 @@ export default function PlanoFormacoesPage() {
             />
           </Col>
         </Row>
-        <Divider style={{ margin: '16px 0 12px' }} />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <Divider className="my-4 mb-3" />
+        <div className="flex justify-end gap-2">
           <Button icon={<ClearOutlined />} onClick={handleClearFilters}>Limpar</Button>
           <Button icon={<ReloadOutlined />} onClick={() => fetchData(1)} loading={loading}>Atualizar</Button>
           <Button type="primary" icon={<FilterOutlined />} onClick={() => fetchData(1)}>Filtrar</Button>

@@ -472,6 +472,26 @@ Ordem obrigatória de trabalho para agentes autônomos:
 - Require: 1+ approval, CI verde, branch up-to-date
 - Merge strategy: **Squash and merge** recomendado
 
+### 🚫 CP-07: Nunca Commit/Push Direto na Main
+**REGRA ABSOLUTA**: Todas as mudanças devem passar por PR.
+
+**Fluxo obrigatório:**
+1. `git checkout -b <type>/<nome>` — Criar branch
+2. Fazer commits na branch
+3. `git push -u origin <type>/<nome>` — Push da branch
+4. `gh pr create` — Abrir PR
+5. Aguardar CI verde
+6. `gh pr merge` — Merge via GitHub
+
+**PROIBIDO:**
+- ❌ `git push origin main` — Push direto na main
+- ❌ `git commit` estando na branch main — Commit na main
+- ❌ Merge local na main — Sempre via PR
+
+**Exceção única:** Hotfix crítico de segurança COM aprovação explícita do usuário na mesma mensagem.
+
+**Enforcement:** Hook em `.claude/settings.json` bloqueia `git push origin main`.
+
 ---
 
 ## ✅ SESSÃO ATUAL: Sistema Completo + Módulo DAT (Dezembro 2025)

@@ -1,5 +1,16 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -Command \"if ($env:TOOL_INPUT -match 'push.*origin\\s+main' -or $env:TOOL_INPUT -match 'push\\s+origin\\s+main') { Write-Error 'CP-07 VIOLADO: Push direto na main bloqueado. Use branch + PR.'; exit 1 }\""
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "matcher": "",

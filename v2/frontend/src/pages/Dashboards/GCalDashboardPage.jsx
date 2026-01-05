@@ -48,6 +48,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import logger from '../../utils/logger';
+import { ensureCsrfToken } from '../../api/config';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -322,9 +323,13 @@ export default function GCalDashboardPage() {
     if (!selectedEventId) return;
 
     try {
+      const csrfToken = await ensureCsrfToken();
       const response = await fetch('/api/gcal/dashboard/batch/reapply/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+        },
         credentials: 'include',
         body: JSON.stringify({
           ids: [selectedEventId],
@@ -358,9 +363,13 @@ export default function GCalDashboardPage() {
     if (!selectedEventId) return;
 
     try {
+      const csrfToken = await ensureCsrfToken();
       const response = await fetch('/api/gcal/dashboard/batch/resync/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+        },
         credentials: 'include',
         body: JSON.stringify({
           ids: [selectedEventId],

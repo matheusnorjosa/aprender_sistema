@@ -80,6 +80,7 @@ from .views_oauth import (
 )
 from .views_config import config_view  # Issue #187
 from .views_deslocamento import DeslocamentoViewSet  # Issue #188
+from .views_dashboard import dashboard_overview  # Issue #311
 from .views import (
     MunicipioViewSet,
     ProjetoViewSet,
@@ -266,5 +267,7 @@ urlpatterns = [
     path("solicitacoes/validate/", SolicitationValidateView.as_view(), name="solicitacao-validate"),
     # Issue #187: Config API
     path("config/", config_view, name="config"),
+    # Issue #311: Dashboard Overview
+    path("dashboard/overview/", dashboard_overview, name="dashboard-overview"),
     path("", include(router.urls)),
 ]

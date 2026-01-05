@@ -50,11 +50,17 @@ class SuccessRateView(APIView):
         # Reutilizar helper TZ-aware
         qs = _filter_events_queryset(request, Solicitacao.objects.all())
 
-        # Contar por gcal_status
-        published = qs.filter(gcal_status=Solicitacao.GCalStatus.PUBLISHED).count()
-        error = qs.filter(gcal_status=Solicitacao.GCalStatus.ERROR).count()
-        pending = qs.filter(gcal_status=Solicitacao.GCalStatus.PENDING).count()
-        none = qs.filter(gcal_status=Solicitacao.GCalStatus.NONE).count()
+        # Contar por gcal_status em uma única query (Issue #308: fix N+1)
+        counts = qs.aggregate(
+            published=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.PUBLISHED)),
+            error=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.ERROR)),
+            pending=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.PENDING)),
+            none=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.NONE)),
+        )
+        published = counts['published']
+        error = counts['error']
+        pending = counts['pending']
+        none = counts['none']
 
         # Calcular rate (apenas published e error contam como "tentativas")
         denom = published + error

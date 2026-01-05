@@ -7,8 +7,6 @@ Read-only ViewSets for dropdown options (PR 8/N).
 
 from __future__ import annotations
 
-import sys
-
 from django.db.models import QuerySet
 
 from rest_framework import viewsets
@@ -72,30 +70,15 @@ class ProjetoOptionViewSet(viewsets.ReadOnlyModelViewSet):
 
         Issue #153: Filter out test projects by default
         """
-        sys.stderr.write(f"\n=== ProjetoOptionViewSet.filter_queryset() CALLED ===\n")
-        sys.stderr.write(f"Initial queryset count: {queryset.count()}\n")
-
         # First apply standard filter backends (Search, etc.)
         queryset = super().filter_queryset(queryset)
-
-        sys.stderr.write(f"After super().filter_queryset(): {queryset.count()}\n")
 
         # Then apply is_test filter
         param_val = self.request.query_params.get("include_test", "false")
         include_test = param_val.lower() == "true"
 
-        sys.stderr.write(f"include_test param: '{param_val}' -> {include_test}\n")
-
         if not include_test:
-            sys.stderr.write(f"Before is_test filter: {queryset.count()}\n")
-            sys.stderr.write(f"Projects: {list(queryset.values_list('nome', 'is_test')[:10])}\n")
             queryset = queryset.filter(is_test=False)
-            sys.stderr.write(f"After is_test=False filter: {queryset.count()}\n")
-            sys.stderr.write(f"Filtered projects: {list(queryset.values_list('nome', 'is_test')[:10])}\n")
-        else:
-            sys.stderr.write(f"Skipping is_test filter (include_test=true)\n")
-
-        sys.stderr.write(f"Final queryset count: {queryset.count()}\n")
 
         return queryset
 

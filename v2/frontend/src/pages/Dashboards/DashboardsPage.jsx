@@ -1,14 +1,16 @@
 /**
- * Página de Dashboards e Analytics
+ * Pagina de Dashboards e Analytics
  *
  * Design: paginadashboards/screen.png
- * - KPI cards (Eventos Futuros, Aprovados, Total Participantes, Aprovações Pendentes)
- * - Gráfico de barras: Eventos por Fluxo
- * - Gráfico de pizza: Eventos por Setor
- * - Botão de export CSV
+ * - KPI cards (Eventos Futuros, Aprovados, Total Participantes, Aprovacoes Pendentes)
+ * - Grafico de barras: Eventos por Fluxo
+ * - Grafico de pizza: Eventos por Setor
+ * - Botao de export CSV
+ *
+ * Ref: Issue #311 - Substituir mock data por API real
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   Row,
@@ -20,7 +22,9 @@ import {
   Typography,
   Space,
   Progress,
-  Divider,
+  Spin,
+  Alert,
+  Empty,
 } from 'antd';
 import logger from '../../utils/logger';
 import {
@@ -32,87 +36,134 @@ import {
   PieChartOutlined,
   DownloadOutlined,
   RiseOutlined,
-  FallOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 
-// Mock data - Substituir por chamadas API reais
-const mockStats = {
-  eventosFuturos: 45,
-  eventosAprovados: 128,
-  totalParticipantes: 342,
-  aprovaçõesPendentes: 12,
+// Cores para os graficos
+const FLUXO_COLORS = {
+  SUPER: '#1890ff',
+  NAO_SUPER: '#52c41a',
 };
 
-const mockEventosPorFluxo = [
-  { fluxo: 'SUPER', quantidade: 78, cor: '#1890ff' },
-  { fluxo: 'NAO_SUPER', quantidade: 50, cor: '#52c41a' },
-];
-
-const mockEventosPorSetor = [
-  { setor: 'Educação Infantil', quantidade: 45, porcentagem: 35.2 },
-  { setor: 'Fundamental I', quantidade: 38, porcentagem: 29.7 },
-  { setor: 'Fundamental II', quantidade: 30, porcentagem: 23.4 },
-  { setor: 'EJA', quantidade: 15, porcentagem: 11.7 },
-];
-
-const mockTopCoordenadores = [
-  { nome: 'João Silva', eventos: 23 },
-  { nome: 'Maria Santos', eventos: 19 },
-  { nome: 'Pedro Costa', eventos: 15 },
-  { nome: 'Ana Oliveira', eventos: 12 },
-  { nome: 'Carlos Souza', eventos: 10 },
-];
+const GERENCIA_COLORS = ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1'];
 
 export default function DashboardsPage() {
-  const [stats, setStats] = useState(mockStats);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadStats();
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/dashboard/overview/', {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      setData(result);
+    } catch (err) {
+      logger.error('Erro ao carregar dashboard:', err);
+      setError(err.message || 'Erro ao carregar dados do dashboard');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const loadStats = async () => {
-    try {
-      // TODO: Chamar API real de estatísticas
-      // const data = await fetchDashboardStats();
-      setTimeout(() => {
-        setStats(mockStats);
-      }, 300);
-    } catch (error) {
-      logger.error('Erro ao carregar estatísticas:', error);
-    }
-  };
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleExportCSV = () => {
     // TODO: Implementar export real
+    logger.info('Export CSV solicitado');
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="p-6 flex justify-center items-center min-h-96">
+        <Spin size="large" tip="Carregando dashboard..." />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="p-6">
+        <Alert
+          message="Erro ao carregar dashboard"
+          description={error}
+          type="error"
+          showIcon
+          action={
+            <Button size="small" onClick={loadData} icon={<ReloadOutlined />}>
+              Tentar novamente
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  // No data state
+  if (!data) {
+    return (
+      <div className="p-6">
+        <Empty description="Nenhum dado disponivel" />
+      </div>
+    );
+  }
+
+  const { kpis, por_fluxo, por_gerencia, top_coordenadores } = data;
+
+  // Calcular max para Progress bars
+  const maxFluxo = Math.max(...por_fluxo.map((f) => f.quantidade), 1);
+  const maxCoord = top_coordenadores.length > 0 ? top_coordenadores[0].eventos : 1;
 
   return (
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <Title level={2}>Dashboards e Análises</Title>
+          <Title level={2}>Dashboards e Analises</Title>
           <Text type="secondary">
-            Visualize métricas detalhadas e relatórios do sistema
+            Visualize metricas detalhadas e relatorios do sistema
           </Text>
         </div>
-        <Button
-          type="primary"
-          icon={<DownloadOutlined />}
-          onClick={handleExportCSV}
-        >
-          Exportar para CSV
-        </Button>
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={loadData}>
+            Atualizar
+          </Button>
+          <Button
+            type="primary"
+            icon={<DownloadOutlined />}
+            onClick={handleExportCSV}
+          >
+            Exportar para CSV
+          </Button>
+        </Space>
       </div>
 
       {/* KPI Cards */}
       <Row gutter={[16, 16]} className="mb-6">
         <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+          <Card
+            bordered={false}
+            style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            }}
+          >
             <Statistic
               title={<span style={{ color: 'white' }}>Eventos Futuros</span>}
-              value={stats.eventosFuturos}
+              value={kpis.eventos_futuros}
               prefix={<CalendarOutlined />}
               valueStyle={{ color: 'white' }}
               suffix={<RiseOutlined />}
@@ -120,30 +171,47 @@ export default function DashboardsPage() {
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} style={{ background: 'linear-gradient(135deg, #52c41a 0%, #237804 100%)' }}>
+          <Card
+            bordered={false}
+            style={{
+              background: 'linear-gradient(135deg, #52c41a 0%, #237804 100%)',
+            }}
+          >
             <Statistic
               title={<span style={{ color: 'white' }}>Aprovados</span>}
-              value={stats.eventosAprovados}
+              value={kpis.eventos_aprovados}
               prefix={<CheckCircleOutlined />}
               valueStyle={{ color: 'white' }}
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} style={{ background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)' }}>
+          <Card
+            bordered={false}
+            style={{
+              background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+            }}
+          >
             <Statistic
-              title={<span style={{ color: 'white' }}>Total Participantes</span>}
-              value={stats.totalParticipantes}
+              title={<span style={{ color: 'white' }}>Total Formadores</span>}
+              value={kpis.total_formadores}
               prefix={<TeamOutlined />}
               valueStyle={{ color: 'white' }}
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} style={{ background: 'linear-gradient(135deg, #fa8c16 0%, #d46b08 100%)' }}>
+          <Card
+            bordered={false}
+            style={{
+              background: 'linear-gradient(135deg, #fa8c16 0%, #d46b08 100%)',
+            }}
+          >
             <Statistic
-              title={<span style={{ color: 'white' }}>Aprovações Pendentes</span>}
-              value={stats.aprovaçõesPendentes}
+              title={
+                <span style={{ color: 'white' }}>Aprovacoes Pendentes</span>
+              }
+              value={kpis.aprovacoes_pendentes}
               prefix={<ClockCircleOutlined />}
               valueStyle={{ color: 'white' }}
             />
@@ -151,56 +219,75 @@ export default function DashboardsPage() {
         </Col>
       </Row>
 
-      {/* Gráficos */}
+      {/* Graficos */}
       <Row gutter={[16, 16]} className="mb-6">
         {/* Eventos por Fluxo */}
         <Col xs={24} md={12}>
           <Card
-            title={<Space><BarChartOutlined /> Eventos por Fluxo</Space>}
+            title={
+              <Space>
+                <BarChartOutlined /> Eventos por Fluxo (ultimos 30 dias)
+              </Space>
+            }
             bordered={false}
           >
-            <Space direction="vertical" style={{ width: '100%' }} size="large">
-              {mockEventosPorFluxo.map((item) => (
-                <div key={item.fluxo}>
-                  <div className="flex justify-between mb-2">
-                    <Tag color={item.cor}>{item.fluxo}</Tag>
-                    <Text strong>{item.quantidade} eventos</Text>
+            {por_fluxo.length === 0 ? (
+              <Empty description="Nenhum evento no periodo" />
+            ) : (
+              <Space direction="vertical" style={{ width: '100%' }} size="large">
+                {por_fluxo.map((item) => (
+                  <div key={item.fluxo}>
+                    <div className="flex justify-between mb-2">
+                      <Tag color={FLUXO_COLORS[item.fluxo] || '#666'}>
+                        {item.fluxo}
+                      </Tag>
+                      <Text strong>{item.quantidade} eventos</Text>
+                    </div>
+                    <Progress
+                      percent={(item.quantidade / maxFluxo) * 100}
+                      strokeColor={FLUXO_COLORS[item.fluxo] || '#666'}
+                      showInfo={false}
+                    />
                   </div>
-                  <Progress
-                    percent={(item.quantidade / 128) * 100}
-                    strokeColor={item.cor}
-                    showInfo={false}
-                  />
-                </div>
-              ))}
-            </Space>
+                ))}
+              </Space>
+            )}
           </Card>
         </Col>
 
-        {/* Eventos por Setor */}
+        {/* Eventos por Gerencia */}
         <Col xs={24} md={12}>
           <Card
-            title={<Space><PieChartOutlined /> Eventos por Setor</Space>}
+            title={
+              <Space>
+                <PieChartOutlined /> Eventos por Gerencia (ultimos 30 dias)
+              </Space>
+            }
             bordered={false}
           >
-            <Space direction="vertical" style={{ width: '100%' }} size="middle">
-              {mockEventosPorSetor.map((item, idx) => {
-                const colors = ['#1890ff', '#52c41a', '#faad14', '#f5222d'];
-                return (
-                  <div key={item.setor}>
+            {por_gerencia.length === 0 ? (
+              <Empty description="Nenhum evento no periodo" />
+            ) : (
+              <Space
+                direction="vertical"
+                style={{ width: '100%' }}
+                size="middle"
+              >
+                {por_gerencia.map((item, idx) => (
+                  <div key={item.gerencia}>
                     <div className="flex justify-between mb-1">
-                      <Text>{item.setor}</Text>
+                      <Text>{item.gerencia}</Text>
                       <Text strong>{item.porcentagem}%</Text>
                     </div>
                     <Progress
                       percent={item.porcentagem}
-                      strokeColor={colors[idx % colors.length]}
+                      strokeColor={GERENCIA_COLORS[idx % GERENCIA_COLORS.length]}
                       size="small"
                     />
                   </div>
-                );
-              })}
-            </Space>
+                ))}
+              </Space>
+            )}
           </Card>
         </Col>
       </Row>
@@ -209,49 +296,53 @@ export default function DashboardsPage() {
       <Row gutter={[16, 16]}>
         <Col xs={24}>
           <Card
-            title="Top 5 Coordenadores (por número de eventos)"
+            title="Top 5 Coordenadores (por numero de eventos - ultimos 30 dias)"
             bordered={false}
           >
-            <Table
-              dataSource={mockTopCoordenadores}
-              rowKey="nome"
-              pagination={false}
-              columns={[
-                {
-                  title: 'Posição',
-                  key: 'posicao',
-                  width: 100,
-                  render: (_, __, index) => (
-                    <Tag color={index < 3 ? 'gold' : 'default'}>
-                      {index + 1}º
-                    </Tag>
-                  ),
-                },
-                {
-                  title: 'Coordenador',
-                  dataIndex: 'nome',
-                  key: 'nome',
-                },
-                {
-                  title: 'Eventos',
-                  dataIndex: 'eventos',
-                  key: 'eventos',
-                  align: 'right',
-                  render: (eventos) => <Text strong>{eventos}</Text>,
-                },
-                {
-                  title: 'Progresso',
-                  key: 'progresso',
-                  render: (_, record) => (
-                    <Progress
-                      percent={(record.eventos / 23) * 100}
-                      showInfo={false}
-                      strokeColor="#52c41a"
-                    />
-                  ),
-                },
-              ]}
-            />
+            {top_coordenadores.length === 0 ? (
+              <Empty description="Nenhum coordenador no periodo" />
+            ) : (
+              <Table
+                dataSource={top_coordenadores}
+                rowKey="nome"
+                pagination={false}
+                columns={[
+                  {
+                    title: 'Posicao',
+                    key: 'posicao',
+                    width: 100,
+                    render: (_, __, index) => (
+                      <Tag color={index < 3 ? 'gold' : 'default'}>
+                        {index + 1}o
+                      </Tag>
+                    ),
+                  },
+                  {
+                    title: 'Coordenador',
+                    dataIndex: 'nome',
+                    key: 'nome',
+                  },
+                  {
+                    title: 'Eventos',
+                    dataIndex: 'eventos',
+                    key: 'eventos',
+                    align: 'right',
+                    render: (eventos) => <Text strong>{eventos}</Text>,
+                  },
+                  {
+                    title: 'Progresso',
+                    key: 'progresso',
+                    render: (_, record) => (
+                      <Progress
+                        percent={(record.eventos / maxCoord) * 100}
+                        showInfo={false}
+                        strokeColor="#52c41a"
+                      />
+                    ),
+                  },
+                ]}
+              />
+            )}
           </Card>
         </Col>
       </Row>

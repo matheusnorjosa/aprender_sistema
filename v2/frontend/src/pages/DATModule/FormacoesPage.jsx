@@ -1,11 +1,10 @@
 /**
  * DAT Module - Gestão de Formações/Treinamentos
  *
+ * Issue #303: Refactored - extracted constants, columns, and helpers to ./Formacoes/
+ *
  * Interface de gestão do calendário de formações.
  * Agendamentos, formadores, locais e acompanhamento.
- *
- * Baseado na análise da planilha de controle - aba FORMAÇÕES
- * 807 registros
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -35,24 +34,15 @@ import {
 } from 'antd';
 import {
   ReloadOutlined,
-  EditOutlined,
   PlusOutlined,
-  DeleteOutlined,
   DownloadOutlined,
   FilterOutlined,
   ClearOutlined,
   CalendarOutlined,
   TableOutlined,
-  EnvironmentOutlined,
-  UserOutlined,
   TeamOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  CloseCircleOutlined,
-  FileTextOutlined,
-  CameraOutlined,
-  VideoCameraOutlined,
-  GlobalOutlined,
 } from '@ant-design/icons';
 import {
   listFormacoes,
@@ -66,54 +56,28 @@ import {
   getCoordenadoresOptions,
 } from '../../api/datModule';
 import dayjs from 'dayjs';
+import {
+  STATUS_OPTIONS,
+  MODALIDADE_OPTIONS,
+  UF_OPTIONS,
+  DEFAULT_FILTERS,
+  VIEW_MODES,
+} from './Formacoes/constants';
+import { getColumns } from './Formacoes/columns';
+import { renderStatusTag } from './Formacoes/helpers';
 
 const { Title, Text } = Typography;
-
-// Status options
-const STATUS_OPTIONS = [
-  { label: 'Agendada', value: 'agendada', color: 'blue' },
-  { label: 'Confirmada', value: 'confirmada', color: 'cyan' },
-  { label: 'Em Andamento', value: 'em_andamento', color: 'orange' },
-  { label: 'Realizada', value: 'realizada', color: 'green' },
-  { label: 'Cancelada', value: 'cancelada', color: 'red' },
-  { label: 'Reagendada', value: 'reagendada', color: 'purple' },
-  { label: 'Pend. Docs', value: 'pendente_docs', color: 'gold' },
-];
-
-// Modalidade options
-const MODALIDADE_OPTIONS = [
-  { label: 'Presencial', value: 'presencial', icon: <EnvironmentOutlined /> },
-  { label: 'Online', value: 'online', icon: <VideoCameraOutlined /> },
-  { label: 'Híbrida', value: 'hibrida', icon: <GlobalOutlined /> },
-];
-
-// UF options
-const UF_OPTIONS = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
-  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
-  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
-].map((uf) => ({ label: uf, value: uf }));
 
 export default function FormacoesPage() {
   const [formacoes, setFormacoes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
   const [stats, setStats] = useState(null);
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'calendar'
+  const [viewMode, setViewMode] = useState(VIEW_MODES.TABLE);
   const [calendarData, setCalendarData] = useState([]);
 
-  // Filter states
-  const [filters, setFilters] = useState({
-    search: '',
-    uf: undefined,
-    municipio: undefined,
-    projeto: undefined,
-    coordenador: undefined,
-    status: undefined,
-    modalidade: undefined,
-    data_inicio: undefined,
-    data_fim: undefined,
-  });
+  // Filter states - using DEFAULT_FILTERS from constants
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
   // Options for dropdowns
   const [municipios, setMunicipios] = useState([]);
@@ -180,7 +144,7 @@ export default function FormacoesPage() {
       setStats(statsData);
 
       // Load calendar data if in calendar view
-      if (viewMode === 'calendar') {
+      if (viewMode === VIEW_MODES.CALENDAR) {
         const calData = await getFormacoesCalendario(params);
         setCalendarData(calData.results || calData || []);
       }
@@ -197,17 +161,7 @@ export default function FormacoesPage() {
 
   // Clear all filters
   const handleClearFilters = () => {
-    setFilters({
-      search: '',
-      uf: undefined,
-      municipio: undefined,
-      projeto: undefined,
-      coordenador: undefined,
-      status: undefined,
-      modalidade: undefined,
-      data_inicio: undefined,
-      data_fim: undefined,
-    });
+    setFilters(DEFAULT_FILTERS);
   };
 
   // CRUD handlers
@@ -271,22 +225,6 @@ export default function FormacoesPage() {
     });
   };
 
-  // Status tag renderer
-  const renderStatusTag = (status) => {
-    const statusConfig = STATUS_OPTIONS.find((s) => s.value === status);
-    return <Tag color={statusConfig?.color || 'default'}>{statusConfig?.label || status}</Tag>;
-  };
-
-  // Modalidade tag renderer
-  const renderModalidadeTag = (modalidade) => {
-    const modalidadeConfig = MODALIDADE_OPTIONS.find((m) => m.value === modalidade);
-    return (
-      <Tag icon={modalidadeConfig?.icon}>
-        {modalidadeConfig?.label || modalidade}
-      </Tag>
-    );
-  };
-
   // Calendar cell renderer
   const dateCellRender = (date) => {
     const dayFormacoes = calendarData.filter(
@@ -323,151 +261,8 @@ export default function FormacoesPage() {
     );
   };
 
-  // Table columns
-  const columns = [
-    {
-      title: 'Data',
-      dataIndex: 'data_formacao',
-      key: 'data',
-      width: 100,
-      fixed: 'left',
-      sorter: true,
-      render: (data) => (
-        <div>
-          <Text strong>{data ? dayjs(data).format('DD/MM/YYYY') : '-'}</Text>
-        </div>
-      ),
-    },
-    {
-      title: 'Horário',
-      key: 'horario',
-      width: 100,
-      render: (_, record) => (
-        <Text type="secondary">
-          {record.horario_inicio || '--:--'} - {record.horario_fim || '--:--'}
-        </Text>
-      ),
-    },
-    {
-      title: 'Projeto',
-      dataIndex: 'projeto_nome',
-      key: 'projeto',
-      width: 120,
-      render: (nome) => <Tag color="blue">{nome}</Tag>,
-    },
-    {
-      title: 'Município - UF',
-      key: 'municipio_uf',
-      width: 180,
-      render: (_, record) => (
-        <Text>
-          {record.municipio_nome} - {record.uf}
-        </Text>
-      ),
-    },
-    {
-      title: 'Coordenador',
-      dataIndex: 'coordenador_nome',
-      key: 'coordenador',
-      width: 150,
-      ellipsis: true,
-    },
-    {
-      title: 'Formador',
-      dataIndex: 'formador_nome',
-      key: 'formador',
-      width: 150,
-      ellipsis: true,
-    },
-    {
-      title: 'Modalidade',
-      dataIndex: 'modalidade',
-      key: 'modalidade',
-      width: 110,
-      render: (modalidade) => renderModalidadeTag(modalidade),
-    },
-    {
-      title: 'Participantes',
-      key: 'participantes',
-      width: 120,
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            Prev: {record.quantidade_prevista || 0}
-          </Text>
-          <Text style={{ fontSize: 11 }}>
-            Pres: <Text strong>{record.quantidade_presente || 0}</Text>
-          </Text>
-        </Space>
-      ),
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 120,
-      render: (status) => renderStatusTag(status),
-    },
-    {
-      title: 'Docs',
-      key: 'docs',
-      width: 100,
-      render: (_, record) => (
-        <Space size={4}>
-          <Tooltip title={record.lista_presenca_enviada ? 'Lista enviada' : 'Lista pendente'}>
-            <FileTextOutlined
-              style={{
-                color: record.lista_presenca_enviada ? '#52c41a' : '#999',
-              }}
-            />
-          </Tooltip>
-          <Tooltip title={record.relatorio_enviado ? 'Relatório enviado' : 'Relatório pendente'}>
-            <FileTextOutlined
-              style={{
-                color: record.relatorio_enviado ? '#52c41a' : '#999',
-              }}
-            />
-          </Tooltip>
-          <Tooltip title={record.fotos_enviadas ? 'Fotos enviadas' : 'Fotos pendentes'}>
-            <CameraOutlined
-              style={{
-                color: record.fotos_enviadas ? '#52c41a' : '#999',
-              }}
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
-    {
-      title: 'Ações',
-      key: 'acoes',
-      width: 100,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Editar">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-              aria-label="Editar formação"
-            />
-          </Tooltip>
-          <Tooltip title="Excluir">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record)}
-              aria-label="Excluir formação"
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ];
+  // Table columns - using extracted getColumns from ./Formacoes/columns
+  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete });
 
   return (
     <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
@@ -486,16 +281,16 @@ export default function FormacoesPage() {
           <Space>
             <Button.Group>
               <Button
-                type={viewMode === 'table' ? 'primary' : 'default'}
+                type={viewMode === VIEW_MODES.TABLE ? 'primary' : 'default'}
                 icon={<TableOutlined />}
-                onClick={() => setViewMode('table')}
+                onClick={() => setViewMode(VIEW_MODES.TABLE)}
               >
                 Lista
               </Button>
               <Button
-                type={viewMode === 'calendar' ? 'primary' : 'default'}
+                type={viewMode === VIEW_MODES.CALENDAR ? 'primary' : 'default'}
                 icon={<CalendarOutlined />}
-                onClick={() => setViewMode('calendar')}
+                onClick={() => setViewMode(VIEW_MODES.CALENDAR)}
               >
                 Calendário
               </Button>
@@ -685,7 +480,7 @@ export default function FormacoesPage() {
       </Card>
 
       {/* Content - Table or Calendar */}
-      {viewMode === 'table' ? (
+      {viewMode === VIEW_MODES.TABLE ? (
         <Card
           bodyStyle={{ padding: 0 }}
           title={

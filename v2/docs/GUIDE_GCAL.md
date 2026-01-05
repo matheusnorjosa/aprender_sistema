@@ -132,24 +132,24 @@ export GCAL_CLIENT=fake
 export GCAL_SEND_UPDATES=none
 
 # 2. Preview (sempre permitido)
-curl -X POST http://localhost:8000/api/solicitacoes/123/preview-gcal/ \
+curl -X POST http://localhost:8002/api/solicitacoes/123/preview-gcal/ \
   -H "Authorization: Bearer $TOKEN"
 
 # 3. Dry-run (simula publicação)
-curl -X POST http://localhost:8000/api/solicitacoes/123/publish/ \
+curl -X POST http://localhost:8002/api/solicitacoes/123/publish/ \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"dry_run": true, "apply_blocked": false}'
 
 # 4. Publicação real (bloqueada por GCAL_CLIENT=fake)
-curl -X POST http://localhost:8000/api/solicitacoes/123/publish/ \
+curl -X POST http://localhost:8002/api/solicitacoes/123/publish/ \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"dry_run": false, "apply_blocked": false}'
 # → Retorna 409 CONFLICT
 
 # 5. Forçar publicação (teste com fake client)
-curl -X POST http://localhost:8000/api/solicitacoes/123/publish/ \
+curl -X POST http://localhost:8002/api/solicitacoes/123/publish/ \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"dry_run": false, "apply_blocked": true}'

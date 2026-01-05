@@ -60,7 +60,7 @@ Quando algo parecer impossível, é hora de ultrathink mais forte. As pessoas lo
 
 ## Contexto do Projeto
 - Objetivo: Substituir planilhas pelo **AS** para solicitação → aprovação → criação de eventos (Google Calendar), com verificação de conflitos e logs de auditoria.
-- Stack: **Python 3.12.12 + Django 5.1.x + DRF + Celery + PostgreSQL 15 + Redis 7**, containers via **Docker + Docker Compose** (`v2/infra/docker-compose.yml`).
+- Stack: **Python 3.12 + Django 5.2 + DRF + Celery + PostgreSQL 15 + Redis 7**, containers via **Docker + Docker Compose** (`v2/infra/docker-compose.yml`).
 - Frontend: **React (Vite) + Tailwind + Ant Design**, dev server com proxy `/api → http://localhost:8002` e chamadas com `credentials: 'include'`.
 - Fuso horário padrão: `America/Fortaleza`.
 - Type Checking: **Pyright (strict mode)** com suporte a **PEP 695** (Python 3.12)
@@ -407,11 +407,12 @@ from apps.core.services.gcal.sync import apply_one_solicitacao
 ### 🔒 CP-02: Política de Aprovação Manual (PA-01 a PA-07)
 Estas regras estão definidas em `.claude/CLAUDE.md` e são **imutáveis**:
 
-- **PA-01**: Sem auto-aprovação. Uma Solicitação **nunca** muda para "Aprovada" automaticamente.
+- **PA-01**: Sem auto-aprovação para projetos **SUPER**. Projetos NAO_SUPER são auto-aprovados na criação.
+  - _Nota_: Implementado em `Solicitacao.save()` - verifica `projeto.fluxo` antes de definir status.
 - **PA-02 (Adaptada)**: Usuários com **Superintendência**, **DAT** ou **superuser** podem aprovar/reprovar.
   - _Histórico_: Originalmente era "Gerente + Superintendência". Adaptado para incluir DAT (ver `permissions.py`).
-- **PA-03**: Integrações externas (Google Calendar, etc.) só executam **após** aprovação manual concluída.
-- **PA-04**: Toda solicitação nasce com `status = pendente`.
+- **PA-03**: Integrações externas (Google Calendar, etc.) só executam **após** aprovação concluída.
+- **PA-04**: Estado inicial depende do fluxo: `pendente` (SUPER) ou `aprovado` (NAO_SUPER).
 - **PA-05**: Registrar usuário, data/hora e justificativa em `Aprovacao` e `LogAuditoria`.
 - **PA-06**: UI/UX: esconder botões de ação para perfis sem permissão (ISO 9241-110).
 - **PA-07**: Testes obrigatórios:
@@ -538,7 +539,7 @@ Ordem obrigatória de trabalho para agentes autônomos:
 
 **Documentação Completa**: [v2/docs/PROJETO_ORIGEM.md](../v2/docs/PROJETO_ORIGEM.md)
 
-**Conteúdo**: Lógica das planilhas originais, códigos de disponibilidade (E/M/D/P/T/X), stack tecnológica (Python 3.12 + Django 5.1 + PostgreSQL + Redis), modelos principais, funcionalidades atuais, perfis RBAC, RFs (RF01-RF08), situação atual vs próximos passos.
+**Conteúdo**: Lógica das planilhas originais, códigos de disponibilidade (E/M/D/P/T/X), stack tecnológica (Python 3.12 + Django 5.2 + PostgreSQL + Redis), modelos principais, funcionalidades atuais, perfis RBAC, RFs (RF01-RF08), situação atual vs próximos passos.
 
 ---
 
@@ -737,11 +738,11 @@ As regras abaixo consolidam a lógica original das planilhas e devem ser aplicad
 
 ## Política de Aprovação Manual (Obrigatória)
 
-- **PA-01 — Sem auto-aprovação**: Uma `Solicitacao` **nunca** muda para "Aprovada" automaticamente, mesmo se não houver conflitos.
+- **PA-01 — Sem auto-aprovação (SUPER)**: Projetos com `fluxo=SUPER` **nunca** são auto-aprovados. Projetos `NAO_SUPER` são aprovados automaticamente na criação.
 - **PA-02 — Perfil exigido (Adaptada)**: Usuários com **Superintendência**, **DAT** ou **superuser** podem aprovar/reprovar.
   - _Histórico_: Originalmente era "Gerente + Superintendência". Adaptado para incluir DAT (ver `permissions.py`).
-- **PA-03 — Gatilhos pós-aprovação**: Integrações externas (RF05/RF06) só executam **após** aprovação manual concluída.  
-- **PA-04 — Estado inicial**: Toda solicitação nasce com `status = pendente`.  
+- **PA-03 — Gatilhos pós-aprovação**: Integrações externas (RF05/RF06) só executam **após** aprovação concluída.
+- **PA-04 — Estado inicial**: Depende do fluxo: `pendente` (SUPER) ou `aprovado` (NAO_SUPER).  
 - **PA-05 — Auditoria**: Registrar usuário, data/hora e justificativa (quando houver) em `Aprovacao` e `LogAuditoria`.  
 - **PA-06 — UI/UX**: Nas telas do solicitante/coordenador, exibir status e orientações; esconder botões de ação para perfis sem permissão (ISO 9241-110: controle explícito).  
 - **PA-07 — Testes obrigatórios**:

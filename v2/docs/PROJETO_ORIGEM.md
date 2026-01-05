@@ -1,13 +1,17 @@
 # Documento Consolidado — Projeto Aprender Sistema (AS)
 
+> **Última atualização**: Janeiro 2026
+> **Versão do Sistema**: 2.0 (Produção)
+
 ## 1. Origem do Projeto: Lógica das Planilhas
-O sistema original funcionava integralmente sobre planilhas Google/Excel, que acumulavam regras complexas de negócio. O novo sistema busca substituir essas planilhas por uma plataforma web automatizada.
+
+O sistema original funcionava integralmente sobre planilhas Google/Excel, que acumulavam regras complexas de negócio. O AS v2 substitui essas planilhas por uma plataforma web automatizada.
 
 ### 1.1 Planilhas Originais
-- Disponibilidade_2025.xlsx
+- Acompanhamento de Agenda _ 2025.xlsx
+- Disponibilidade _ 2025.xlsx
 - Planilha de Controle - 2025.xlsx
 - Usuários.xlsx
-- Produtos.xlsx
 
 ### 1.2 Regras de Negócio Embutidas
 - **Códigos de Disponibilidade**
@@ -29,132 +33,227 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 
 ---
 
-## 2. O Novo Sistema (Aprender Sistema - AS)
+## 2. O Novo Sistema (Aprender Sistema - AS v2)
 
 ### 2.1 Tecnologias
-- **Backend**: Python 3.11 (imagem base) + Django 5.1.x + DRF + Celery (worker e beat)
+- **Backend**: Python 3.12 + Django 5.2 + DRF + Celery (worker e beat)
 - **Banco de Dados**: PostgreSQL 15
 - **Cache & Filas**: Redis 7 (cache e broker Celery)
-- **Infraestrutura**: Docker + Docker Compose (`v2/infra/docker-compose.yml`) orquestrado via `make`
-- **Frontend**: React (Vite) + Tailwind + Ant Design; build Docker-first e dev server com proxy `/api`
+- **Infraestrutura**: Docker + Docker Compose (`v2/infra/docker-compose.yml`)
+- **Frontend**: React (Vite) + Tailwind + Ant Design
+- **Type Checking**: Pyright (strict mode)
+- **Testes E2E**: Playwright (46 testes)
 
 ### 2.2 Estrutura de Código
-- **Backend (`v2/backend`)**
-  - Apps: `apps.core` (domínio principal) e `apps.dat_ingest` (ETLs e ingestão)
-  - Configurações Django em `config/`
-  - Comandos ETL em `apps/dat_ingest/management/commands`
-- **Frontend (`v2/frontend`)**
-  - Projeto React com Vite, Tailwind e Ant Design
-  - Páginas: Pré-agenda, Grade Mensal (Formadores/Coordenadores), painéis Controle/DAT
 
-**Modelos principais**:
-- Usuario → usuários do sistema
-- Formador → instrutores com disponibilidade e área de atuação
-- Projeto → agrupamento de ações
-- Municipio → municípios atendidos
-- TipoEvento → classificações dos eventos
-- Solicitacao → pedido de evento
-- Aprovacao → status de análise de uma solicitação
-- Deslocamento → registros de deslocamentos
-- DisponibilidadeFormador → agenda consolidada
-- LogAuditoria → rastreamento de ações
+#### Backend (`v2/backend`)
+- **Apps**: `apps.core` (domínio principal) e `apps.dat_ingest` (ETLs e ingestão)
+- **Configurações**: `config/` (settings, urls, wsgi, celery)
+- **Comandos ETL**: `apps/dat_ingest/management/commands/` (21 comandos)
 
-**ETLs**: Management commands para Acompanhamento, Deslocamento, Ações (Controle) e Cadastros (DAT) com suporte a `--dry-run` e relatórios em `out_etl/`
+#### Frontend (`v2/frontend`)
+- **Framework**: React 18 + Vite 7
+- **UI**: Ant Design 5 + Tailwind CSS
+- **Páginas**: 45+ páginas organizadas em módulos
 
-### 2.3 Funcionalidades Atuais
-- Autenticação e RBAC via Django (grupos: Superintendência, Controle, Coordenador, Formador, DAT, Gerência)
-- API REST: `/api/solicitacoes/`, `/api/availability/monthly/`, `/api/controle/acoes/`, `/api/dat/acoes/`, `/api/features/`, `/api/me/`
-- Pré-agenda React: fluxo de approve/reject (Superintendência) e preview/publish (Controle) respeitando `apply_blocked`
-- Grade Mensal React com duas grades (Formadores/Coordenadores), filtros compartilhados, detalhes por célula e export CSV
-- ETLs CSV/XLSX com relatórios em `out_etl/*.json` e idempotência por `external_hash`
-- Integração Google Calendar real (`asv2-{id}`, `sendUpdates='none'`) com fallback fake controlado por feature flags
+### 2.3 Modelos do Sistema (28 modelos)
+
+#### Usuários e Organização
+| Modelo | Descrição |
+|--------|-----------|
+| `Usuario` | Usuário do sistema (extends AbstractUser) |
+| `Gerencia` | Gerências da organização |
+| `ProjetoGeral` | Projetos gerais da organização |
+| `EquipeGerencia` | Relação usuário-gerência |
+
+#### Solicitações e Agenda
+| Modelo | Descrição |
+|--------|-----------|
+| `Solicitacao` | Pedido de evento (status: pendente/aprovado/reprovado) |
+| `Participation` | Participantes de uma solicitação (role: COORDENADOR/FORMADOR/APOIO) |
+| `AvailabilityBlock` | Bloqueios de agenda (tipos: P=parcial, T=total) |
+| `Deslocamento` | Registros de deslocamentos entre municípios |
+
+#### Domínio Principal
+| Modelo | Descrição |
+|--------|-----------|
+| `Projeto` | Projetos (fluxo: SUPER/NAO_SUPER) |
+| `Municipio` | Municípios atendidos |
+| `TipoEvento` | Classificações de eventos |
+
+#### Módulo DAT (Departamento de Apoio Técnico)
+| Modelo | Descrição |
+|--------|-----------|
+| `DATAcao` | Ações do DAT (workflow: NOT_STARTED→IN_PROGRESS→COMPLETED→ARCHIVED) |
+| `DATRegistro` | Registros de turmas |
+| `DATCadastro` | Cadastros em plataformas (etapas: ABERTA→COLETA→PREENCHIMENTO→REVISAO→FINALIZADA) |
+| `DATCompra` | Compras de materiais |
+| `DATCoordenador` | Coordenadores DAT |
+| `DATFormacao` | Formações DAT |
+| `DATArea` | Áreas de atuação DAT |
+
+#### Módulo PlanoFormações
+| Modelo | Descrição |
+|--------|-----------|
+| `PlanoFormacoes` | Plano anual de formações |
+| `Formacao` | Formação individual |
+| `Acompanhamento` | Acompanhamento de formação |
+| `Prova` | Provas/avaliações |
+
+#### Controle e Compras
+| Modelo | Descrição |
+|--------|-----------|
+| `AcaoControle` | Ações do setor Controle |
+| `AcaoDAT` | Ações DAT (legado) |
+| `Compra` | Registro de compras |
+| `Produto` | Produtos para compra |
+
+#### Sistema e Auditoria
+| Modelo | Descrição |
+|--------|-----------|
+| `Config` | Configurações do sistema |
+| `AuditLog` | Log de auditoria (todas operações críticas) |
+| `GoogleOAuthCredential` | Credenciais OAuth criptografadas |
+
+### 2.4 ETLs Disponíveis (21 comandos)
+
+```bash
+# Importação de dados base
+import_municipios, import_projetos, import_tipos_evento, import_usuarios
+
+# Acompanhamento e Agenda
+import_acompanhamento, import_disponibilidade, import_deslocamentos
+
+# Módulo DAT
+import_dat_acoes, import_dat_registros, import_dat_cadastros
+import_dat_compras, import_dat_coordenadores, import_dat_formacoes
+
+# Controle
+import_acoes_controle, import_compras
+
+# Utilitários
+backfill_user_groups, fix_duplicate_users, validate_data
+```
+
+Todos suportam `--dry-run` e geram relatórios em `out_etl/*.json`.
 
 ---
 
-## 3. Papéis, Perfis e Autorizações
+## 3. Papéis, Perfis e Autorizações (RBAC)
 
-### 3.1 Perfis de Usuário
-- **Superintendência**: autoriza/reprova solicitações, resolve conflitos, valida agenda final
-- **Coordenadores**: podem solicitar eventos, mas não aprovar
-- **Formadores**: podem bloquear sua agenda (parcial/total), mas não solicitam/aprovam eventos
+### 3.1 Grupos de SETOR (onde trabalha)
+- Superintendência, DAT, Controle, Vidas, ACerta, Brincando, Fluir, Sou da Paz, Gerência
 
-### 3.2 Fluxo de Autorização
-1. Coordenador envia solicitação.
-2. Sistema checa disponibilidade do formador (conflitos, bloqueios, deslocamentos).
-3. Se sem conflito → solicitação vai para Superintendência.
-4. Superintendência aprova → cria evento no Google Calendar.
-5. Superintendência reprova → retorna com justificativa.
+### 3.2 Grupos de FUNÇÃO (o que pode fazer)
+- **Formador**: Visualiza grade, gerencia bloqueios pessoais
+- **Coordenador**: Cria solicitações de eventos
+- **Apoio de Coordenação**: Auxilia coordenação
+- **Gerente**: Aprova/reprova, acessa dashboards
+
+### 3.3 Fluxos de Aprovação
+
+#### Fluxo SUPER (Requer Aprovação Manual)
+1. Coordenador envia solicitação → `status = pendente`
+2. Sistema checa disponibilidade (RD-01 a RD-08)
+3. Superintendência aprova/reprova
+4. Se aprovado → Controle publica no Google Calendar
+
+#### Fluxo NAO_SUPER (Auto-Aprovado)
+1. Coordenador envia solicitação → `status = aprovado` (automático)
+2. Vai direto para Controle publicar
 
 ---
 
 ## 4. Requisitos Funcionais (RFs)
-- RF01: Importação de dados (usuários, municípios, projetos, tipos de evento, produtos).
-- RF02: Solicitação de eventos.
-- RF03: Verificação de conflitos (sobreposição, deslocamentos, bloqueios).
-- RF04: Fluxo de aprovações com controle de perfis.
-- RF05: Integração com Google Calendar.
-- RF06: Criação automática de link Google Meet.
-- RF07: Auditoria de todas as operações críticas.
-- RF08: Interface de mapa mensal (disponibilidade).
+
+| RF | Descrição | Status |
+|----|-----------|--------|
+| RF01 | Importação de dados (usuários, municípios, projetos) | ✅ Completo |
+| RF02 | Solicitação de eventos | ✅ Completo |
+| RF03 | Verificação de conflitos (RD-01 a RD-08) | ✅ Completo |
+| RF04 | Fluxo de aprovações (PA-01 a PA-07) | ✅ Completo |
+| RF05 | Integração com Google Calendar | ✅ Completo |
+| RF06 | Criação automática de link Google Meet | ✅ Completo |
+| RF07 | Auditoria de operações críticas | ✅ Completo |
+| RF08 | Interface de grade mensal | ✅ Completo |
 
 ---
 
-## 5. Integrações Externas
-- **Google Calendar API**
-  - Credenciais no Google Cloud
-  - Evento aprovado → gera evento no calendário
-  - Evento gera link Meet automaticamente via API
+## 5. Regras de Negócio Implementadas
+
+### 5.1 Regras de Disponibilidade (RD-01 a RD-08)
+- **RD-01**: Não-sobreposição (overlap ≥1min = conflito)
+- **RD-02**: Bloqueio total (T) impede eventos
+- **RD-03**: Bloqueio parcial (P) impede no subintervalo
+- **RD-04**: Buffer de deslocamento (D) entre municípios
+- **RD-05**: Capacidade diária (M) por formador
+- **RD-06**: Timezone America/Fortaleza (armazena UTC)
+- **RD-07**: Prioridade: Bloqueios → Conflitos → Buffer → Limite
+- **RD-08**: Mensagens estruturadas com código/tipo
+
+### 5.2 Política de Aprovação (PA-01 a PA-07)
+- **PA-01**: Projetos SUPER nunca auto-aprovam
+- **PA-02**: Superintendência/DAT/superuser podem aprovar
+- **PA-03**: Integrações executam após aprovação
+- **PA-04**: Estado inicial = pendente (SUPER) ou aprovado (NAO_SUPER)
+- **PA-05**: Auditoria em AuditLog
+- **PA-06**: UI esconde ações sem permissão
+- **PA-07**: Testes obrigatórios de conformidade
 
 ---
 
-## 6. Situação Atual vs. Próximos Passos
+## 6. Integrações Externas
 
-✅ Concluído até agora:
-- Estrutura base Django + PostgreSQL em Docker
-- Modelos principais criados
-- Migrações aplicadas
-- Importação inicial de formadores concluída
-- API de disponibilidades + página de visualização
-- Cadastro de bloqueio de agenda
-- Solicitação de eventos simples
-- Fluxo de aprovações iniciado
-- Home consolidando links
-- **PR16**: RF03 - Verificação de Conflitos (17 testes passando)
-- **PR17**: PA-01 a PA-07 - Política de Aprovação Manual (5 testes passando, frontend conforme)
-
-🚧 Próximos Passos:
-- Criar scripts de importação para municípios, projetos, tipos de evento
-- ~~Implementar RF03 (checagem automática de conflitos)~~ ✅ Completo (PR16)
-- ~~Finalizar RF04 (workflow completo de aprovações)~~ ✅ PA-01 a PA-07 completo (PR17)
-- Conectar com Google Calendar API (RF05/RF06)
-- Implementar testes end-to-end (Playwright)
-- Refinar interface (baseada em mapa mensal como referência)
+### Google Calendar API
+- Credenciais via Service Account ou OAuth
+- Eventos aprovados → criados no calendário
+- Google Meet link gerado automaticamente
+- `sendUpdates` configurável (none/all/externalOnly)
+- Fallback para cliente fake em desenvolvimento
 
 ---
 
-## 6.1. Importação de Usuários e Grupos
+## 7. Observabilidade
 
-**Estrutura da Planilha (Acompanhamento de Agenda):**
-- Coluna **N**: Coordenador
-- Colunas **O-S**: Formador 1, Formador 2, ..., Formador 5
+### Prometheus + Grafana (Opcional)
+- Métricas: HTTP requests, latência, error rate, cache hit rate
+- Dashboard "AS v2 - System Overview"
 
-**Regra de Atribuição de Grupos:**
-- Usuários com username `coordenacao*` → Grupo "Coordenador"
-- Demais usuários com participações → Grupo "Formador"
-
-**Comando de Backfill:**
-```bash
-python manage.py backfill_user_groups --apply
-```
-- Atribui grupos faltantes baseado no padrão do username
-- Usado após importação inicial de usuários (122 usuários importados)
-- Resultado: 65 Formadores + 10 Coordenadores atribuídos corretamente
+### Structured Logging
+- JSON em staging/production
+- Correlation ID (request_id) para rastreamento
+- Service identification (web/worker/beat)
 
 ---
 
-## 7. Benefícios Esperados
-- Fim da dependência de planilhas manuais
-- Fluxo de solicitações, aprovações e conflitos totalmente digital
-- Registro auditável e confiável das agendas
-- Integração automática com Google Calendar e Meet
-- Escalabilidade para múltiplos anos e centenas de formadores
+## 8. Portas e URLs
+
+| Serviço | Porta | URL |
+|---------|-------|-----|
+| Frontend | 5173 | http://localhost:5173 |
+| Backend API | 8002 | http://localhost:8002/api/ |
+| PostgreSQL | 5434 | localhost:5434 |
+| Redis | 6380 | localhost:6380 |
+
+---
+
+## 9. Cobertura de Testes
+
+| Área | Testes | Status |
+|------|--------|--------|
+| Availability Service (RD-01→RD-08) | 17 | ✅ |
+| Approval Policy (PA-01→PA-07) | 5 | ✅ |
+| RBAC Permissions | 20+ | ✅ |
+| Google Calendar | 6+ | ✅ |
+| ETL Imports | 40+ | ✅ |
+| E2E Playwright | 46 | ✅ |
+
+---
+
+## 10. Referências
+
+- **CLAUDE.md**: Regras completas e cláusulas pétreas
+- **GUIDE_GCAL.md**: Integração Google Calendar
+- **RBAC_COMPLETO.md**: Sistema de permissões
+- **TESTING_POLICY.md**: Políticas de teste
+- **OBSERVABILITY.md**: Prometheus/Grafana/Logging

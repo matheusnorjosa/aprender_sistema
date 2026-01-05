@@ -3,7 +3,7 @@
 ## Reporting Security Vulnerabilities
 
 If you discover a security vulnerability, please report it to:
-- **Email**: [adicionar email do time de segurança]
+- **Email**: security@aprender.gov.br (ou via GitHub Security Advisories)
 - **GitHub Security Advisories**: https://github.com/matheusnorjosa/aprender_sistema/security/advisories
 
 **DO NOT** create public issues for security vulnerabilities.
@@ -426,7 +426,7 @@ If logs show sustained 429 errors from single IP:
 ## Contact
 
 For security concerns, contact:
-- **Security Team**: [adicionar email]
+- **Security Team**: security@aprender.gov.br
 - **Project Lead**: Matheus Norjosa (@matheusnorjosa)
 
-Last updated: 2025-11-14
+Last updated: 2026-01-05

@@ -1,11 +1,10 @@
 /**
  * DAT Module - Gestão de Coordenadores
  *
+ * Issue #303: Refactored - extracted constants, columns, and helpers to ./Coordenadores/
+ *
  * Interface de gestão de coordenadores e suas áreas de atuação.
  * Alocação por área, projetos e municípios, visualização de carga de trabalho.
- *
- * Baseado na análise da planilha de controle - aba COORD
- * 29 registros
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -27,12 +26,10 @@ import {
   Row,
   Col,
   Statistic,
-  Switch,
   Progress,
   DatePicker,
   Collapse,
   List,
-  Badge,
 } from 'antd';
 import {
   ReloadOutlined,
@@ -46,12 +43,8 @@ import {
   TeamOutlined,
   AppstoreOutlined,
   TableOutlined,
-  MailOutlined,
-  PhoneOutlined,
   EnvironmentOutlined,
   ProjectOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
   BarsOutlined,
   EyeOutlined,
 } from '@ant-design/icons';
@@ -67,51 +60,27 @@ import {
 } from '../../api/datModule';
 import dayjs from 'dayjs';
 import logger from '../../utils/logger';
+import {
+  AREAS_DEFAULT,
+  AREA_COLORS,
+  DEFAULT_FILTERS,
+  VIEW_MODES,
+} from './Coordenadores/constants';
+import { getColumns } from './Coordenadores/columns';
+import { getAreaColor, getInitials, groupByArea } from './Coordenadores/helpers';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
-
-// Áreas padrão
-const AREAS_DEFAULT = [
-  'DAT',
-  'Tecnologia',
-  'Pedagógico',
-  'Administrativo',
-  'Comercial',
-  'Financeiro',
-  'RH',
-  'Marketing',
-  'Logística',
-  'Suporte',
-];
-
-// Cores por área
-const AREA_COLORS = {
-  DAT: 'red',
-  Tecnologia: 'blue',
-  Pedagógico: 'green',
-  Administrativo: 'orange',
-  Comercial: 'purple',
-  Financeiro: 'gold',
-  RH: 'cyan',
-  Marketing: 'magenta',
-  Logística: 'volcano',
-  Suporte: 'geekblue',
-};
 
 export default function CoordenadoresPage() {
   const [coordenadores, setCoordenadores] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
   const [stats, setStats] = useState(null);
-  const [viewMode, setViewMode] = useState('cards'); // 'cards', 'table', 'area'
+  const [viewMode, setViewMode] = useState(VIEW_MODES.CARDS);
 
-  // Filter states
-  const [filters, setFilters] = useState({
-    search: '',
-    area: undefined,
-    ativo: undefined,
-  });
+  // Filter states - using DEFAULT_FILTERS from constants
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
   // Options for dropdowns (projetos/municipios reserved for future use)
   const [areas, setAreas] = useState([]);
@@ -203,11 +172,7 @@ export default function CoordenadoresPage() {
 
   // Clear all filters
   const handleClearFilters = () => {
-    setFilters({
-      search: '',
-      area: undefined,
-      ativo: undefined,
-    });
+    setFilters(DEFAULT_FILTERS);
   };
 
   // Load alocações for detail view
@@ -307,189 +272,17 @@ export default function CoordenadoresPage() {
     }
   };
 
-  // Get area color
-  const getAreaColor = (area) => {
-    return AREA_COLORS[area] || 'default';
-  };
+  // Issue #303: Helper functions extracted to ./Coordenadores/helpers.js
+  // Group coordenadores by area using extracted helper
+  const coordenadoresByArea = groupByArea(coordenadores);
 
-  // Get initials for avatar
-  const getInitials = (nome) => {
-    if (!nome) return '?';
-    const parts = nome.split(' ');
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-  };
-
-  // Group coordenadores by area
-  const coordenadoresByArea = coordenadores.reduce((acc, coord) => {
-    const area = coord.area || 'Sem área';
-    if (!acc[area]) acc[area] = [];
-    acc[area].push(coord);
-    return acc;
-  }, {});
-
-  // Table columns
-  const columns = [
-    {
-      title: '',
-      dataIndex: 'foto_url',
-      key: 'foto',
-      width: 60,
-      fixed: 'left',
-      render: (foto, record) => (
-        <Avatar
-          src={foto}
-          size={40}
-          style={{ backgroundColor: getAreaColor(record.area) }}
-        >
-          {getInitials(record.nome)}
-        </Avatar>
-      ),
-    },
-    {
-      title: 'Nome',
-      dataIndex: 'nome',
-      key: 'nome',
-      width: 180,
-      fixed: 'left',
-      sorter: true,
-      render: (nome, record) => (
-        <div>
-          <Text strong>{nome}</Text>
-          {record.cargo && (
-            <div>
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {record.cargo}
-              </Text>
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: 'Área',
-      dataIndex: 'area',
-      key: 'area',
-      width: 120,
-      sorter: true,
-      render: (area) => <Tag color={getAreaColor(area)}>{area || '-'}</Tag>,
-    },
-    {
-      title: 'Email',
-      dataIndex: 'email',
-      key: 'email',
-      width: 200,
-      ellipsis: true,
-      render: (email) => (
-        email ? (
-          <a href={`mailto:${email}`}>
-            <MailOutlined style={{ marginRight: 4 }} />
-            {email}
-          </a>
-        ) : (
-          <Text type="secondary">-</Text>
-        )
-      ),
-    },
-    {
-      title: 'Telefone',
-      dataIndex: 'telefone',
-      key: 'telefone',
-      width: 140,
-      render: (telefone) => (
-        telefone ? (
-          <span>
-            <PhoneOutlined style={{ marginRight: 4 }} />
-            {telefone}
-          </span>
-        ) : (
-          <Text type="secondary">-</Text>
-        )
-      ),
-    },
-    {
-      title: 'Municípios',
-      dataIndex: 'total_municipios',
-      key: 'municipios',
-      width: 100,
-      align: 'center',
-      sorter: true,
-      render: (total) => (
-        <Badge count={total || 0} showZero style={{ backgroundColor: total > 0 ? '#1890ff' : '#d9d9d9' }}>
-          <EnvironmentOutlined className="text-gray-400 text-lg" />
-        </Badge>
-      ),
-    },
-    {
-      title: 'Projetos',
-      dataIndex: 'total_projetos',
-      key: 'projetos',
-      width: 100,
-      align: 'center',
-      sorter: true,
-      render: (total) => (
-        <Badge count={total || 0} showZero style={{ backgroundColor: total > 0 ? '#52c41a' : '#d9d9d9' }}>
-          <ProjectOutlined className="text-gray-400 text-lg" />
-        </Badge>
-      ),
-    },
-    {
-      title: 'Status',
-      dataIndex: 'ativo',
-      key: 'ativo',
-      width: 90,
-      align: 'center',
-      render: (ativo, record) => (
-        <Tooltip title={ativo !== false ? 'Clique para desativar' : 'Clique para ativar'}>
-          <Switch
-            checked={ativo !== false}
-            size="small"
-            onChange={() => handleToggleAtivo(record)}
-            checkedChildren={<CheckCircleOutlined />}
-            unCheckedChildren={<CloseCircleOutlined />}
-          />
-        </Tooltip>
-      ),
-    },
-    {
-      title: 'Ações',
-      key: 'acoes',
-      width: 120,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Ver detalhes">
-            <Button
-              type="text"
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={() => handleView(record)}
-              aria-label="Ver detalhes do coordenador"
-            />
-          </Tooltip>
-          <Tooltip title="Editar">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-              aria-label="Editar coordenador"
-            />
-          </Tooltip>
-          <Tooltip title="Excluir">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record)}
-              aria-label="Excluir coordenador"
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ];
+  // Issue #303: Column definitions extracted to ./Coordenadores/columns.jsx
+  const columns = getColumns({
+    onView: handleView,
+    onEdit: handleEdit,
+    onDelete: handleDelete,
+    onToggleAtivo: handleToggleAtivo,
+  });
 
   // Card view renderer
   const renderCardView = () => (

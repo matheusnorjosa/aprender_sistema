@@ -246,19 +246,22 @@ class DATRegistroViewSet(viewsets.ModelViewSet):
         """
         qs = self.filter_queryset(self.get_queryset())
 
-        total = qs.count()
-        completos_formar = qs.filter(
-            chaves_inscricao_status="concluido",
-            instrucoes_status="concluido",
-            envio_codigos_status="concluido",
-        ).count()
-        usa_avaliar = qs.filter(usa_avaliar=True).count()
-        completos_avaliar = qs.filter(
-            usa_avaliar=True,
-            alunos_recebidos_status="concluido",
-            alunos_validados_status="concluido",
-            alunos_importados_status="concluido",
-        ).count()
+        # Agregação em uma única query (Issue #308: fix N+1)
+        stats = qs.aggregate(
+            total=Count('id'),
+            completos_formar=Count('id', filter=Q(
+                chaves_inscricao_status="concluido",
+                instrucoes_status="concluido",
+                envio_codigos_status="concluido",
+            )),
+            usa_avaliar_count=Count('id', filter=Q(usa_avaliar=True)),
+            completos_avaliar=Count('id', filter=Q(
+                usa_avaliar=True,
+                alunos_recebidos_status="concluido",
+                alunos_validados_status="concluido",
+                alunos_importados_status="concluido",
+            )),
+        )
 
         por_uf = (
             qs.values("municipio__uf")
@@ -267,10 +270,10 @@ class DATRegistroViewSet(viewsets.ModelViewSet):
         )
 
         return Response({
-            "total": total,
-            "completos_formar": completos_formar,
-            "completos_avaliar": completos_avaliar,
-            "usa_avaliar": usa_avaliar,
+            "total": stats['total'],
+            "completos_formar": stats['completos_formar'],
+            "completos_avaliar": stats['completos_avaliar'],
+            "usa_avaliar": stats['usa_avaliar_count'],
             "por_uf": list(por_uf),
         })
 

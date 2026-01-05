@@ -201,6 +201,68 @@ class TestAcompanhamentoModel:
         assert acomp1.numero == 1
         assert acomp2.numero == 2
 
+    def test_acompanhamento_str(self, plano):
+        """Test __str__ method with and without date."""
+        acomp_with_date = Acompanhamento.objects.create(
+            plano=plano,
+            tipo="primeiro",
+            data_acompanhamento=date(2025, 6, 15),
+        )
+        assert "1o Acomp. - 15/06/2025" in str(acomp_with_date)
+
+        acomp_without_date = Acompanhamento.objects.create(
+            plano=plano,
+            tipo="segundo",
+        )
+        assert "2o Acomp. - -" in str(acomp_without_date)
+
+    def test_unique_constraint(self, plano):
+        """Test unique constraint on plano + tipo."""
+        Acompanhamento.objects.create(plano=plano, tipo="primeiro")
+        with pytest.raises(Exception):
+            Acompanhamento.objects.create(plano=plano, tipo="primeiro")
+
+    def test_tipo_choices(self, plano):
+        """Test tipo must be valid choice."""
+        # Valid choices work
+        acomp = Acompanhamento.objects.create(plano=plano, tipo="primeiro")
+        assert acomp.tipo == Acompanhamento.TipoAcompanhamento.PRIMEIRO
+
+        # Verify TipoAcompanhamento choices
+        assert Acompanhamento.TipoAcompanhamento.PRIMEIRO == "primeiro"
+        assert Acompanhamento.TipoAcompanhamento.SEGUNDO == "segundo"
+
+    def test_observacoes_max_length(self, plano):
+        """Test observacoes field max length."""
+        obs_500 = "x" * 500
+        acomp = Acompanhamento.objects.create(
+            plano=plano,
+            tipo="primeiro",
+            observacoes=obs_500,
+        )
+        assert len(acomp.observacoes) == 500
+
+    def test_realizado_default(self, plano):
+        """Test realizado defaults to False."""
+        acomp = Acompanhamento.objects.create(plano=plano, tipo="primeiro")
+        assert acomp.realizado is False
+
+    def test_timestamps(self, plano):
+        """Test created_at and updated_at are set."""
+        acomp = Acompanhamento.objects.create(plano=plano, tipo="primeiro")
+        assert acomp.created_at is not None
+        assert acomp.updated_at is not None
+
+    def test_cascade_delete(self, plano):
+        """Test acompanhamentos are deleted when plano is deleted."""
+        Acompanhamento.objects.create(plano=plano, tipo="primeiro")
+        Acompanhamento.objects.create(plano=plano, tipo="segundo")
+        assert Acompanhamento.objects.filter(plano=plano).count() == 2
+
+        plano_id = plano.id
+        plano.delete()
+        assert Acompanhamento.objects.filter(plano_id=plano_id).count() == 0
+
 
 class TestProvaModel:
     """Tests for Prova model."""
@@ -223,6 +285,76 @@ class TestProvaModel:
             data_prova=date(2025, 9, 15),
         )
         assert "P2 - 15/09/2025" in str(prova)
+
+    def test_prova_str_without_date(self, plano):
+        """Test __str__ method without date."""
+        prova = Prova.objects.create(
+            plano=plano,
+            numero_prova=1,
+        )
+        assert "P1 - -" in str(prova)
+
+    def test_unique_constraint(self, plano):
+        """Test unique constraint on plano + numero_prova."""
+        Prova.objects.create(plano=plano, numero_prova=1)
+        with pytest.raises(Exception):
+            Prova.objects.create(plano=plano, numero_prova=1)
+
+    def test_numero_prova_validators(self, plano):
+        """Test numero_prova validators (1-3 range)."""
+        # Valid: 1, 2, 3
+        p1 = Prova.objects.create(plano=plano, numero_prova=1)
+        p2 = Prova.objects.create(plano=plano, numero_prova=2)
+        p3 = Prova.objects.create(plano=plano, numero_prova=3)
+        assert p1.numero_prova == 1
+        assert p2.numero_prova == 2
+        assert p3.numero_prova == 3
+
+    def test_numero_prova_check_constraint(self, plano):
+        """Test CheckConstraint prevents invalid numero_prova at DB level."""
+        from django.db import IntegrityError
+
+        # Try to bypass validators and insert invalid value
+        # This should fail due to CheckConstraint
+        with pytest.raises(IntegrityError):
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO core_prova (plano_id, numero_prova, realizada, observacoes, created_at, updated_at) "
+                    "VALUES (%s, %s, %s, %s, NOW(), NOW())",
+                    [plano.id, 0, False, ""]  # numero_prova=0 is invalid
+                )
+
+    def test_observacoes_max_length(self, plano):
+        """Test observacoes field max length."""
+        obs_500 = "x" * 500
+        prova = Prova.objects.create(
+            plano=plano,
+            numero_prova=1,
+            observacoes=obs_500,
+        )
+        assert len(prova.observacoes) == 500
+
+    def test_realizada_default(self, plano):
+        """Test realizada defaults to False."""
+        prova = Prova.objects.create(plano=plano, numero_prova=1)
+        assert prova.realizada is False
+
+    def test_timestamps(self, plano):
+        """Test created_at and updated_at are set."""
+        prova = Prova.objects.create(plano=plano, numero_prova=1)
+        assert prova.created_at is not None
+        assert prova.updated_at is not None
+
+    def test_cascade_delete(self, plano):
+        """Test provas are deleted when plano is deleted."""
+        Prova.objects.create(plano=plano, numero_prova=1)
+        Prova.objects.create(plano=plano, numero_prova=2)
+        assert Prova.objects.filter(plano=plano).count() == 2
+
+        plano_id = plano.id
+        plano.delete()
+        assert Prova.objects.filter(plano_id=plano_id).count() == 0
 
 
 # ============================================================

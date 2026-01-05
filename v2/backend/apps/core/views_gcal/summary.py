@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from django.db.models import Count
+from django.db.models import Count, Q
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -239,21 +239,23 @@ class AlertsSummaryView(APIView):
         # Reutilizar helper TZ-aware
         qs = _filter_events_queryset(request, Solicitacao.objects.all())
 
-        # Contar por gcal_status
-        errors = qs.filter(gcal_status=Solicitacao.GCalStatus.ERROR).count()
-        pending = qs.filter(gcal_status=Solicitacao.GCalStatus.PENDING).count()
-        published = qs.filter(gcal_status=Solicitacao.GCalStatus.PUBLISHED).count()
-        none = qs.filter(gcal_status=Solicitacao.GCalStatus.NONE).count()
+        # Contar por gcal_status em uma única query (Issue #308: fix N+1)
+        counts = qs.aggregate(
+            errors=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.ERROR)),
+            pending=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.PENDING)),
+            published=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.PUBLISHED)),
+            none=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.NONE)),
+        )
 
         # Extrair janela de query params (retornar como strings ou null)
         start_param = request.query_params.get('start')
         end_param = request.query_params.get('end')
 
         return Response({
-            'errors': errors,
-            'pending': pending,
-            'published': published,
-            'none': none,
+            'errors': counts['errors'],
+            'pending': counts['pending'],
+            'published': counts['published'],
+            'none': counts['none'],
             'window': {
                 'start': start_param if start_param else None,
                 'end': end_param if end_param else None

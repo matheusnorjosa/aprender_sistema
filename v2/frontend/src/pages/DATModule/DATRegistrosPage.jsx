@@ -1,9 +1,10 @@
 /**
  * DAT Module - Registros de Turmas
  *
+ * Issue #303: Refactored - extracted constants, columns, and helpers to ./DATRegistros/
+ *
  * Interface de gestão de registros DAT com filtros avançados,
  * tabela com cabeçalhos agrupados e legenda de status.
- * Ref: v2/docs/SPEC_DAT_REGISTROS.md
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -12,7 +13,6 @@ import {
   Button,
   Input,
   Space,
-  Tag,
   Typography,
   Card,
   message,
@@ -22,16 +22,13 @@ import {
   InputNumber,
   DatePicker,
   Checkbox,
-  Tooltip,
   Divider,
   Row,
   Col,
 } from 'antd';
 import {
   ReloadOutlined,
-  EditOutlined,
   PlusOutlined,
-  DeleteOutlined,
   DownloadOutlined,
   FilterOutlined,
   ClearOutlined,
@@ -39,9 +36,6 @@ import {
   ClockCircleFilled,
   ExclamationCircleFilled,
   MinusCircleFilled,
-  DatabaseOutlined,
-  BookOutlined,
-  BarChartOutlined,
 } from '@ant-design/icons';
 import {
   listDATRegistros,
@@ -54,55 +48,24 @@ import {
   getProjetosOptions,
 } from '../../api/datModule';
 import dayjs from 'dayjs';
+import {
+  STATUS_OPTIONS,
+  UF_OPTIONS,
+  REGIAO_UFS,
+  REGIAO_OPTIONS,
+  DEFAULT_FILTERS,
+} from './DATRegistros/constants';
+import { getColumns } from './DATRegistros/columns';
 
 const { Title, Text } = Typography;
-
-// Status options
-const STATUS_OPTIONS = [
-  { label: 'Pendente', value: 'pendente' },
-  { label: 'Em Andamento', value: 'em_andamento' },
-  { label: 'Concluído', value: 'concluido' },
-];
-
-// UF options (Brazilian states)
-const UF_OPTIONS = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
-  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
-  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
-].map((uf) => ({ label: uf, value: uf }));
-
-// Região mapping
-const REGIAO_UFS = {
-  Norte: ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'],
-  Nordeste: ['AL', 'BA', 'CE', 'MA', 'PB', 'PE', 'PI', 'RN', 'SE'],
-  'Centro-Oeste': ['DF', 'GO', 'MT', 'MS'],
-  Sudeste: ['ES', 'MG', 'RJ', 'SP'],
-  Sul: ['PR', 'RS', 'SC'],
-};
-
-const REGIAO_OPTIONS = [
-  { label: 'Todas', value: '' },
-  { label: 'Norte', value: 'Norte' },
-  { label: 'Nordeste', value: 'Nordeste' },
-  { label: 'Centro-Oeste', value: 'Centro-Oeste' },
-  { label: 'Sudeste', value: 'Sudeste' },
-  { label: 'Sul', value: 'Sul' },
-];
 
 export default function DATRegistrosPage() {
   const [registros, setRegistros] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
 
-  // Filter states
-  const [filters, setFilters] = useState({
-    regiao: '',
-    uf: undefined,
-    municipio: undefined,
-    projeto_geral: undefined,
-    usa_avaliar: undefined,
-    status_formar: undefined,
-  });
+  // Filter states - using DEFAULT_FILTERS from constants
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
   // Options for dropdowns
   const [projetosGerais, setProjetosGerais] = useState([]);
@@ -182,14 +145,7 @@ export default function DATRegistrosPage() {
 
   // Clear all filters
   const handleClearFilters = () => {
-    setFilters({
-      regiao: '',
-      uf: undefined,
-      municipio: undefined,
-      projeto_geral: undefined,
-      usa_avaliar: undefined,
-      status_formar: undefined,
-    });
+    setFilters(DEFAULT_FILTERS);
     setFilteredUFs(UF_OPTIONS);
   };
 
@@ -271,221 +227,11 @@ export default function DATRegistrosPage() {
     });
   };
 
-  // Status icon renderer
-  const renderStatusIcon = (status) => {
-    switch (status) {
-      case 'concluido':
-        return <CheckCircleFilled className="text-green-500 text-lg" />;
-      case 'em_andamento':
-        return <ClockCircleFilled className="text-yellow-500 text-lg" />;
-      case 'pendente':
-        return <ExclamationCircleFilled className="text-red-500 text-lg" />;
-      default:
-        return <MinusCircleFilled className="text-gray-400 text-lg" />;
-    }
-  };
-
-  // Table columns with grouped headers
-  const columns = [
-    // Dados Básicos
-    {
-      title: 'Município - UF',
-      key: 'municipio_uf',
-      width: 180,
-      fixed: 'left',
-      render: (_, record) => (
-        <Text strong>
-          {record.municipio_nome} - {record.municipio_uf}
-        </Text>
-      ),
-    },
-    {
-      title: 'Projeto Geral',
-      dataIndex: 'projeto_geral_nome',
-      key: 'projeto_geral',
-      width: 150,
-    },
-    {
-      title: 'Projeto',
-      dataIndex: 'projeto_nome',
-      key: 'projeto',
-      width: 150,
-    },
-    {
-      title: 'Alunos',
-      dataIndex: 'aluno_qtde',
-      key: 'aluno_qtde',
-      width: 80,
-      align: 'right',
-      render: (val) => val?.toLocaleString('pt-BR') || '-',
-    },
-    {
-      title: 'Profs.',
-      dataIndex: 'professor_qtde',
-      key: 'professor_qtde',
-      width: 80,
-      align: 'right',
-      render: (val) => val?.toLocaleString('pt-BR') || '-',
-    },
-    // Detalhes FORMAR
-    {
-      title: 'Reunião DAT',
-      dataIndex: 'reuniao_dat',
-      key: 'reuniao_dat',
-      width: 110,
-      render: (val) => (val ? dayjs(val).format('DD/MM/YYYY') : '-'),
-    },
-    {
-      title: 'ID Turma',
-      dataIndex: 'turma_formar_id',
-      key: 'turma_formar_id',
-      width: 100,
-      render: (val) =>
-        val ? (
-          <Text code style={{ color: '#1890ff' }}>
-            {val}
-          </Text>
-        ) : (
-          '-'
-        ),
-    },
-    {
-      title: 'Códs',
-      dataIndex: 'nr_codigos',
-      key: 'nr_codigos',
-      width: 70,
-      align: 'center',
-      render: (val) =>
-        val ? (
-          <Tag>{val}</Tag>
-        ) : (
-          '-'
-        ),
-    },
-    {
-      title: 'Chaves',
-      dataIndex: 'chaves_inscricao_status',
-      key: 'chaves',
-      width: 100,
-      render: (status) => {
-        const colors = {
-          concluido: 'green',
-          em_andamento: 'gold',
-          pendente: 'default',
-        };
-        const labels = {
-          concluido: 'Geradas',
-          em_andamento: 'Pend.',
-          pendente: 'Pend.',
-        };
-        return <Tag color={colors[status]}>{labels[status] || status}</Tag>;
-      },
-    },
-    {
-      title: 'Envio',
-      dataIndex: 'envio_codigos_status',
-      key: 'envio',
-      width: 70,
-      align: 'center',
-      render: (status) => (
-        <Tooltip title={STATUS_OPTIONS.find((s) => s.value === status)?.label || status}>
-          {renderStatusIcon(status)}
-        </Tooltip>
-      ),
-    },
-    {
-      title: 'Obs. FORMAR',
-      dataIndex: 'obs_formar',
-      key: 'obs_formar',
-      width: 150,
-      ellipsis: { showTitle: false },
-      render: (val) => (
-        <Tooltip title={val}>
-          <Text type="secondary">{val || '-'}</Text>
-        </Tooltip>
-      ),
-    },
-    // Detalhes AVALIAR
-    {
-      title: 'Usa AVALIAR',
-      dataIndex: 'usa_avaliar',
-      key: 'usa_avaliar',
-      width: 100,
-      align: 'center',
-      render: (val) =>
-        val ? (
-          <Tag color="green">SIM</Tag>
-        ) : (
-          <Tag color="default">NÃO</Tag>
-        ),
-    },
-    {
-      title: 'Recebidos',
-      dataIndex: 'alunos_recebidos_status',
-      key: 'recebidos',
-      width: 90,
-      align: 'center',
-      render: (status) => renderStatusIcon(status),
-    },
-    {
-      title: 'Validados',
-      dataIndex: 'alunos_validados_status',
-      key: 'validados',
-      width: 90,
-      align: 'center',
-      render: (status) => renderStatusIcon(status),
-    },
-    {
-      title: 'Importados',
-      dataIndex: 'alunos_importados_status',
-      key: 'importados',
-      width: 90,
-      align: 'center',
-      render: (status) => renderStatusIcon(status),
-    },
-    {
-      title: 'Obs. AVALIAR',
-      dataIndex: 'obs_avaliar',
-      key: 'obs_avaliar',
-      width: 150,
-      ellipsis: { showTitle: false },
-      render: (val) => (
-        <Tooltip title={val}>
-          <Text type="secondary">{val || '-'}</Text>
-        </Tooltip>
-      ),
-    },
-    // Ações
-    {
-      title: 'Ações',
-      key: 'acoes',
-      width: 100,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Editar">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-              aria-label="Editar registro"
-            />
-          </Tooltip>
-          <Tooltip title="Excluir">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record)}
-              aria-label="Excluir registro"
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ];
+  // Issue #303: Column definitions extracted to ./DATRegistros/columns.jsx
+  const columns = getColumns({
+    onEdit: handleEdit,
+    onDelete: handleDelete,
+  });
 
   return (
     <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>

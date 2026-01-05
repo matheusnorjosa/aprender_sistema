@@ -1,12 +1,10 @@
 /**
  * DAT Module - Gestão de Cadastros em Plataformas
  *
- * Interface de gestão de cadastros e workflows nas plataformas FORMAR e AVALIAR.
+ * Issue #303: Refactored - extracted constants, columns, and helpers to ./Cadastros/
+ *
  * Workflow FORMAR: Criação Curso → Chaves → Instruções → Envio
  * Workflow AVALIAR: Recebidos → Validados → Importados
- *
- * Baseado na análise da planilha de controle - aba CADASTROS
- * 1.515 registros
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -15,7 +13,6 @@ import {
   Button,
   Input,
   Space,
-  Tag,
   Typography,
   Card,
   message,
@@ -24,18 +21,15 @@ import {
   Form,
   InputNumber,
   DatePicker,
-  Tooltip,
   Divider,
   Row,
   Col,
   Statistic,
   Tabs,
-  Steps,
   Badge,
 } from 'antd';
 import {
   ReloadOutlined,
-  EditOutlined,
   PlusOutlined,
   DeleteOutlined,
   DownloadOutlined,
@@ -48,7 +42,6 @@ import {
   CloudServerOutlined,
   BookOutlined,
   BarChartOutlined,
-  LinkOutlined,
 } from '@ant-design/icons';
 import {
   listCadastros,
@@ -60,80 +53,32 @@ import {
   getMunicipiosOptions,
   getProjetosGeraisOptions,
 } from '../../api/datModule';
+import {
+  STATUS_OPTIONS,
+  PLATAFORMAS,
+  UF_OPTIONS,
+  DEFAULT_FILTERS,
+} from './Cadastros/constants';
+import { getColumnsFormar, getColumnsAvaliar } from './Cadastros/columns';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
 
-// Status options
-const STATUS_OPTIONS = [
-  { label: 'Pendente', value: 'pendente' },
-  { label: 'Em Andamento', value: 'em_andamento' },
-  { label: 'Concluído', value: 'concluido' },
-  { label: 'N/A', value: 'na' },
-];
-
-// Plataformas
-const PLATAFORMAS = {
-  FORMAR: {
-    key: 'FORMAR',
-    label: 'FORMAR',
-    color: '#1890ff',
-    icon: <BookOutlined />,
-    url: 'https://www.aprenderformar.com.br/plataforma/',
-    etapas: [
-      { key: 'criacao_curso', label: 'Criação Curso' },
-      { key: 'chaves', label: 'Chaves' },
-      { key: 'instrucoes', label: 'Instruções' },
-      { key: 'envio', label: 'Envio' },
-    ],
-  },
-  AVALIAR: {
-    key: 'AVALIAR',
-    label: 'AVALIAR',
-    color: '#52c41a',
-    icon: <BarChartOutlined />,
-    url: 'https://avaliar.aprenderformar.com.br/',
-    etapas: [
-      { key: 'recebidos', label: 'Recebidos' },
-      { key: 'validados', label: 'Validados' },
-      { key: 'importados', label: 'Importados' },
-    ],
-  },
-};
-
-// Projetos que usam AVALIAR
-const PROJETOS_AVALIAR = [
-  'ACERTA',
-  'NOVO LENDO',
-  'TEMA',
-  'VIDA E...',
-  'PROJETO AMMA',
-  'SUPERATIVAR',
-  'GESTÃO ESCOLAR',
-];
-
-// UF options
-const UF_OPTIONS = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
-  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
-  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
-].map((uf) => ({ label: uf, value: uf }));
-
 export default function CadastrosPage() {
+  // Issue #303: State management - this page has complex logic (stats, tabs, filters)
+  // that doesn't fit useCrudOperations hook. Constants extracted to ./Cadastros/constants.js
   const [cadastros, setCadastros] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 15,
+    total: 0,
+  });
   const [stats, setStats] = useState(null);
   const [activeTab, setActiveTab] = useState('FORMAR');
 
-  // Filter states
-  const [filters, setFilters] = useState({
-    search: '',
-    uf: undefined,
-    municipio: undefined,
-    projeto_geral: undefined,
-    status_etapa: undefined,
-  });
+  // Filter states - using DEFAULT_FILTERS from constants
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
   // Options for dropdowns
   const [municipios, setMunicipios] = useState([]);
@@ -205,13 +150,7 @@ export default function CadastrosPage() {
 
   // Clear all filters
   const handleClearFilters = () => {
-    setFilters({
-      search: '',
-      uf: undefined,
-      municipio: undefined,
-      projeto_geral: undefined,
-      status_etapa: undefined,
-    });
+    setFilters(DEFAULT_FILTERS);
   };
 
   // CRUD handlers
@@ -295,389 +234,17 @@ export default function CadastrosPage() {
     }
   };
 
-  // Status icon renderer
-  const renderStatusIcon = (status) => {
-    switch (status) {
-      case 'concluido':
-        return <CheckCircleFilled className="text-green-500 text-lg" />;
-      case 'em_andamento':
-        return <ClockCircleFilled className="text-yellow-500 text-lg" />;
-      case 'pendente':
-        return <ExclamationCircleFilled className="text-red-500 text-lg" />;
-      case 'na':
-        return <MinusCircleFilled className="text-gray-400 text-lg" />;
-      default:
-        return <MinusCircleFilled className="text-gray-400 text-lg" />;
-    }
+  // Issue #303: Column definitions extracted to ./Cadastros/columns.jsx
+  const columnHandlers = {
+    onQuickStatusUpdate: handleQuickStatusUpdate,
+    onEdit: handleEdit,
+    onDelete: handleDelete,
   };
 
-  // Calculate progress for Steps component
-  const getStepStatus = (status) => {
-    switch (status) {
-      case 'concluido':
-        return 'finish';
-      case 'em_andamento':
-        return 'process';
-      case 'pendente':
-        return 'wait';
-      default:
-        return 'wait';
-    }
-  };
-
-  // Calculate current step
-  const getCurrentStep = (record, etapas) => {
-    for (let i = 0; i < etapas.length; i++) {
-      const status = record[`status_${etapas[i].key}`];
-      if (status !== 'concluido') {
-        return i;
-      }
-    }
-    return etapas.length;
-  };
-
-  // Columns for FORMAR
-  const columnsFormar = [
-    {
-      title: 'Projeto',
-      dataIndex: 'projeto_geral_nome',
-      key: 'projeto',
-      width: 120,
-      fixed: 'left',
-      render: (nome) => <Tag color="blue">{nome}</Tag>,
-    },
-    {
-      title: 'Município - UF',
-      key: 'municipio_uf',
-      width: 180,
-      fixed: 'left',
-      render: (_, record) => (
-        <Text strong>
-          {record.municipio_nome} - {record.uf}
-        </Text>
-      ),
-    },
-    {
-      title: 'Alunos',
-      dataIndex: 'quantidade_alunos',
-      key: 'alunos',
-      width: 80,
-      align: 'right',
-      render: (val) => val?.toLocaleString('pt-BR') || '-',
-    },
-    {
-      title: 'Profs.',
-      dataIndex: 'quantidade_professores',
-      key: 'professores',
-      width: 80,
-      align: 'right',
-      render: (val) => val?.toLocaleString('pt-BR') || '-',
-    },
-    {
-      title: 'Códs',
-      dataIndex: 'quantidade_codigos',
-      key: 'codigos',
-      width: 70,
-      align: 'center',
-      render: (val) => val ? <Tag>{val}</Tag> : '-',
-    },
-    {
-      title: 'Criação Curso',
-      key: 'criacao_curso',
-      width: 110,
-      align: 'center',
-      render: (_, record) => (
-        <Tooltip title="Clique para alterar status">
-          <div
-            style={{ cursor: 'pointer' }}
-            onClick={() => {
-              const newStatus = record.status_criacao_curso === 'concluido' ? 'pendente' : 'concluido';
-              handleQuickStatusUpdate(record, 'criacao_curso', newStatus);
-            }}
-          >
-            {renderStatusIcon(record.status_criacao_curso)}
-            <div style={{ fontSize: 10, color: '#999' }}>
-              {record.data_criacao_curso ? dayjs(record.data_criacao_curso).format('DD/MM') : '-'}
-            </div>
-          </div>
-        </Tooltip>
-      ),
-    },
-    {
-      title: 'Chaves',
-      key: 'chaves',
-      width: 100,
-      align: 'center',
-      render: (_, record) => (
-        <Tooltip title="Clique para alterar status">
-          <div
-            style={{ cursor: 'pointer' }}
-            onClick={() => {
-              const newStatus = record.status_chaves === 'concluido' ? 'pendente' : 'concluido';
-              handleQuickStatusUpdate(record, 'chaves', newStatus);
-            }}
-          >
-            {renderStatusIcon(record.status_chaves)}
-            <div style={{ fontSize: 10, color: '#999' }}>
-              {record.data_chaves ? dayjs(record.data_chaves).format('DD/MM') : '-'}
-            </div>
-          </div>
-        </Tooltip>
-      ),
-    },
-    {
-      title: 'Instruções',
-      key: 'instrucoes',
-      width: 100,
-      align: 'center',
-      render: (_, record) => (
-        <Tooltip title="Clique para alterar status">
-          <div
-            style={{ cursor: 'pointer' }}
-            onClick={() => {
-              const newStatus = record.status_instrucoes === 'concluido' ? 'pendente' : 'concluido';
-              handleQuickStatusUpdate(record, 'instrucoes', newStatus);
-            }}
-          >
-            {renderStatusIcon(record.status_instrucoes)}
-            <div style={{ fontSize: 10, color: '#999' }}>
-              {record.data_instrucoes ? dayjs(record.data_instrucoes).format('DD/MM') : '-'}
-            </div>
-          </div>
-        </Tooltip>
-      ),
-    },
-    {
-      title: 'Envio',
-      key: 'envio',
-      width: 100,
-      align: 'center',
-      render: (_, record) => (
-        <Tooltip title="Clique para alterar status">
-          <div
-            style={{ cursor: 'pointer' }}
-            onClick={() => {
-              const newStatus = record.status_envio === 'concluido' ? 'pendente' : 'concluido';
-              handleQuickStatusUpdate(record, 'envio', newStatus);
-            }}
-          >
-            {renderStatusIcon(record.status_envio)}
-            <div style={{ fontSize: 10, color: '#999' }}>
-              {record.data_envio ? dayjs(record.data_envio).format('DD/MM') : '-'}
-            </div>
-          </div>
-        </Tooltip>
-      ),
-    },
-    {
-      title: 'Link',
-      key: 'link',
-      width: 60,
-      align: 'center',
-      render: (_, record) =>
-        record.link_planilha ? (
-          <Tooltip title="Abrir planilha">
-            <Button
-              type="link"
-              size="small"
-              icon={<LinkOutlined />}
-              href={record.link_planilha}
-              target="_blank"
-              aria-label="Abrir planilha externa"
-            />
-          </Tooltip>
-        ) : (
-          '-'
-        ),
-    },
-    {
-      title: 'Ações',
-      key: 'acoes',
-      width: 100,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Editar">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-              aria-label="Editar cadastro"
-            />
-          </Tooltip>
-          <Tooltip title="Excluir">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record)}
-              aria-label="Excluir cadastro"
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ];
-
-  // Columns for AVALIAR
-  const columnsAvaliar = [
-    {
-      title: 'Projeto',
-      dataIndex: 'projeto_geral_nome',
-      key: 'projeto',
-      width: 120,
-      fixed: 'left',
-      render: (nome) => <Tag color="green">{nome}</Tag>,
-    },
-    {
-      title: 'Município - UF',
-      key: 'municipio_uf',
-      width: 180,
-      fixed: 'left',
-      render: (_, record) => (
-        <Text strong>
-          {record.municipio_nome} - {record.uf}
-        </Text>
-      ),
-    },
-    {
-      title: 'Recebidos',
-      key: 'recebidos',
-      width: 120,
-      render: (_, record) => (
-        <Space direction="vertical" size={0} align="center">
-          <Tooltip title="Clique para alterar status">
-            <div
-              style={{ cursor: 'pointer' }}
-              onClick={() => {
-                const newStatus = record.status_recebidos === 'concluido' ? 'pendente' : 'concluido';
-                handleQuickStatusUpdate(record, 'recebidos', newStatus);
-              }}
-            >
-              {renderStatusIcon(record.status_recebidos)}
-            </div>
-          </Tooltip>
-          <Text type="secondary">{record.quantidade_recebidos || 0}</Text>
-        </Space>
-      ),
-    },
-    {
-      title: 'Validados',
-      key: 'validados',
-      width: 120,
-      render: (_, record) => (
-        <Space direction="vertical" size={0} align="center">
-          <Tooltip title="Clique para alterar status">
-            <div
-              style={{ cursor: 'pointer' }}
-              onClick={() => {
-                const newStatus = record.status_validados === 'concluido' ? 'pendente' : 'concluido';
-                handleQuickStatusUpdate(record, 'validados', newStatus);
-              }}
-            >
-              {renderStatusIcon(record.status_validados)}
-            </div>
-          </Tooltip>
-          <Text type="secondary">{record.quantidade_validados || 0}</Text>
-        </Space>
-      ),
-    },
-    {
-      title: 'Importados',
-      key: 'importados',
-      width: 120,
-      render: (_, record) => (
-        <Space direction="vertical" size={0} align="center">
-          <Tooltip title="Clique para alterar status">
-            <div
-              style={{ cursor: 'pointer' }}
-              onClick={() => {
-                const newStatus = record.status_importados === 'concluido' ? 'pendente' : 'concluido';
-                handleQuickStatusUpdate(record, 'importados', newStatus);
-              }}
-            >
-              {renderStatusIcon(record.status_importados)}
-            </div>
-          </Tooltip>
-          <Text type="secondary">{record.quantidade_importados || 0}</Text>
-        </Space>
-      ),
-    },
-    {
-      title: 'Progresso',
-      key: 'progresso',
-      width: 300,
-      render: (_, record) => {
-        const etapas = PLATAFORMAS.AVALIAR.etapas;
-        const current = getCurrentStep(record, etapas);
-
-        return (
-          <Steps
-            size="small"
-            current={current}
-            items={etapas.map((etapa) => ({
-              title: etapa.label,
-              status: getStepStatus(record[`status_${etapa.key}`]),
-            }))}
-          />
-        );
-      },
-    },
-    {
-      title: 'Link',
-      key: 'link',
-      width: 60,
-      align: 'center',
-      render: (_, record) =>
-        record.link_plataforma ? (
-          <Tooltip title="Abrir plataforma">
-            <Button
-              type="link"
-              size="small"
-              icon={<LinkOutlined />}
-              href={record.link_plataforma}
-              target="_blank"
-              aria-label="Abrir plataforma externa"
-            />
-          </Tooltip>
-        ) : (
-          '-'
-        ),
-    },
-    {
-      title: 'Ações',
-      key: 'acoes',
-      width: 100,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Editar">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-              aria-label="Editar avaliação"
-            />
-          </Tooltip>
-          <Tooltip title="Excluir">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record)}
-              aria-label="Excluir avaliação"
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ];
-
-  const currentColumns = activeTab === 'FORMAR' ? columnsFormar : columnsAvaliar;
+  const currentColumns =
+    activeTab === 'FORMAR'
+      ? getColumnsFormar(columnHandlers)
+      : getColumnsAvaliar(columnHandlers);
   const currentPlataforma = PLATAFORMAS[activeTab];
 
   return (

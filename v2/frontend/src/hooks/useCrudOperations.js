@@ -28,6 +28,7 @@
 
 import { useState, useCallback } from 'react';
 import { message, Modal } from 'antd';
+import logger from '../utils/logger';
 
 /**
  * Hook for standardized CRUD operations
@@ -99,7 +100,7 @@ export function useCrudOperations({
    */
   const handleCreate = useCallback(async (values) => {
     if (!createFn) {
-      console.warn('createFn not provided to useCrudOperations');
+      logger.warn('createFn not provided to useCrudOperations');
       return { success: false };
     }
 
@@ -121,7 +122,7 @@ export function useCrudOperations({
    */
   const handleUpdate = useCallback(async (id, values) => {
     if (!updateFn) {
-      console.warn('updateFn not provided to useCrudOperations');
+      logger.warn('updateFn not provided to useCrudOperations');
       return { success: false };
     }
 
@@ -155,7 +156,7 @@ export function useCrudOperations({
    */
   const handleDelete = useCallback(async (id) => {
     if (!deleteFn) {
-      console.warn('deleteFn not provided to useCrudOperations');
+      logger.warn('deleteFn not provided to useCrudOperations');
       return { success: false };
     }
 

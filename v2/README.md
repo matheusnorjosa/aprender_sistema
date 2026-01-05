@@ -1,326 +1,169 @@
-# 🚀 Aprender Sistema v2 — Skeleton
+# Aprender Sistema v2
 
-**Status**: 🚧 Em Construção
-**Versão**: 2.0.0-alpha
-**Data**: 2025-10-10
-
----
-
-## 📋 Visão Geral
-
-Este diretório contém o **esqueleto (skeleton)** do AS v2, uma reescrita completa do sistema de gestão de eventos e disponibilidade de formadores.
-
-**Principais mudanças vs. v1**:
-- ❌ Elimina 82.389 fórmulas Excel/Google Sheets
-- ✅ Single Source of Truth em PostgreSQL 15
-- ✅ Backend Django 5.2 + DRF
-- ✅ Arquitetura de microsserviços (web + worker + beat)
-- ✅ Testes automatizados (TDD)
-- ✅ CI/CD com GitHub Actions
+**Status**: Produção
+**Versão**: 2.0
+**Atualizado**: Janeiro 2026
 
 ---
 
-## 📁 Estrutura de Diretórios
+## Visão Geral
 
-```
-v2/
-├── backend/              # Código Django
-│   ├── apps/
-│   │   ├── core/         # App principal (models, services, views)
-│   │   └── dat_ingest/   # App de ingestão (ETL)
-│   ├── config/           # Settings Django
-│   ├── services/         # Serviços compartilhados
-│   └── requirements.txt  # Dependências Python
-│
-├── frontend/             # (Futuro) React/Vue ou Templates Django
-│   └── src/
-│
-├── infra/                # Infraestrutura Docker
-│   ├── Dockerfile        # Multi-stage build
-│   ├── docker-compose.yml
-│   ├── entrypoint.sh
-│   └── Makefile          # Comandos unificados
-│
-└── docs/                 # Documentação técnica
-    ├── BLUEPRINT.md              # Arquitetura de alto nível
-    ├── SINGLE_SOURCE_OF_TRUTH.md # Regras de integridade de dados
-    ├── MIGRATION_PLAN.md         # Plano de migração v1→v2
-    └── TESTS_PLAN.md             # Estratégia de testes
-```
+Sistema de gestão de eventos e disponibilidade de formadores, substituindo planilhas Google/Excel por plataforma web automatizada.
+
+**Stack**:
+- Backend: Python 3.12 + Django 5.2 + DRF + Celery
+- Frontend: React 18 + Vite + Ant Design + Tailwind
+- Database: PostgreSQL 15 + Redis 7
+- Infra: Docker + Docker Compose
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Pré-requisitos
 
 - Docker 24+ & Docker Compose 2+
 - Git
-- (Opcional) Make
 
-### 2. Clonar e Configurar
+### 2. Iniciar Serviços
 
 ```bash
-cd v2/
-
-# Copiar .env de exemplo
-cp .env.example .env
-
-# Editar variáveis de ambiente
-nano .env
+cd v2/infra
+docker compose up -d
 ```
 
-### 3. Build e Start
+### 3. Acessar
 
-```bash
-# Via Makefile (recomendado)
-cd infra/
-make build
-make up
+| Serviço | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| API | http://localhost:8002/api/ |
+| Admin | http://localhost:8002/admin/ |
+| Health | http://localhost:8002/api/health/ |
 
-# Ou via docker-compose direto
-docker compose up -d --build
+---
+
+## Estrutura
+
+```
+v2/
+├── backend/              # Django + DRF
+│   ├── apps/
+│   │   ├── core/         # Domínio principal (28 models)
+│   │   └── dat_ingest/   # ETL (21 comandos)
+│   └── config/           # Settings, URLs, Celery
+│
+├── frontend/             # React + Vite
+│   ├── src/
+│   │   ├── pages/        # 45+ páginas
+│   │   ├── components/   # Componentes reutilizáveis
+│   │   └── api/          # Clients API
+│   └── e2e/              # Testes Playwright (46 testes)
+│
+├── infra/                # Docker
+│   ├── docker-compose.yml
+│   └── Dockerfile
+│
+└── docs/                 # Documentação (99 arquivos)
 ```
 
-### 4. Executar Migrations
+---
+
+## Testes
 
 ```bash
-make migrate
+# Backend (pytest)
+docker compose exec web pytest apps/core -v
 
-# Ou via docker-compose
+# Frontend (Vitest)
+cd frontend && npm test
+
+# E2E (Playwright) - parar frontend Docker primeiro
+docker compose stop frontend
+cd frontend && npx playwright test
+```
+
+**Cobertura**:
+- Backend: 100+ testes
+- E2E: 46 testes passando
+
+---
+
+## ETL
+
+```bash
+# Dry-run (simulação)
+docker compose exec web python manage.py import_usuarios --dry-run
+
+# Executar
+docker compose exec web python manage.py import_usuarios --apply
+```
+
+**Comandos disponíveis**: 21 (import_usuarios, import_municipios, import_dat_acoes, etc.)
+
+---
+
+## Portas
+
+| Serviço | Porta Host | Porta Container |
+|---------|------------|-----------------|
+| Frontend | 5173 | 5173 |
+| Backend | 8002 | 8000 |
+| PostgreSQL | 5434 | 5432 |
+| Redis | 6380 | 6379 |
+
+---
+
+## Documentação
+
+| Documento | Descrição |
+|-----------|-----------|
+| [PROJETO_ORIGEM.md](docs/PROJETO_ORIGEM.md) | Origem, modelos, regras |
+| [GUIDE_GCAL.md](docs/GUIDE_GCAL.md) | Integração Google Calendar |
+| [RBAC_COMPLETO.md](docs/RBAC_COMPLETO.md) | Sistema de permissões |
+| [OBSERVABILITY.md](docs/OBSERVABILITY.md) | Prometheus/Grafana/Logs |
+| [TESTING_POLICY.md](docs/TESTING_POLICY.md) | Políticas de teste |
+
+---
+
+## Variáveis de Ambiente
+
+```bash
+# Obrigatórias
+SECRET_KEY=sua-chave-secreta
+DB_PASSWORD=senha-banco
+
+# Google Calendar (opcional)
+GCAL_CLIENT=fake|google
+GCAL_CALENDAR_ID=seu-calendar-id
+GOOGLE_SERVICE_ACCOUNT_FILE=/secrets/key.json
+```
+
+---
+
+## Comandos Úteis
+
+```bash
+# Logs
+docker compose logs -f web
+
+# Shell Django
+docker compose exec web python manage.py shell
+
+# Migrations
 docker compose exec web python manage.py migrate
-```
 
-### 5. Criar Superuser
-
-```bash
-make superuser
-
-# Ou via docker-compose
+# Criar superuser
 docker compose exec web python manage.py createsuperuser
 ```
 
-### 6. Acessar a Aplicação
-
-- **Web**: http://localhost:8000
-- **Admin**: http://localhost:8000/admin
-- **API Docs**: http://localhost:8000/api/docs/
-- **Health Check**: http://localhost:8000/api/health/
-
 ---
 
-## 🧪 Testes
+## Contribuindo
 
-```bash
-# Todos os testes
-make test
+1. Branch: `git checkout -b feat/minha-feature`
+2. Commit: `git commit -m "feat: descrição"`
+3. Push: `git push origin feat/minha-feature`
+4. Pull Request
 
-# Apenas unit tests
-make test-unit
-
-# Apenas integration tests
-make test-integration
-
-# E2E tests (Playwright)
-make test-e2e
-
-# Relatório de cobertura
-make coverage
-```
-
-**Meta de cobertura**: 90%+ (crítico: 100%)
-
-### ⚠️ Pytest Best Practices
-
-**IMPORTANTE**: Execute pytest apenas **UMA vez por sessão** para evitar race conditions no banco de teste.
-
-```bash
-# ✅ Correto - Execução única
-make test
-# ou
-docker compose exec web pytest apps/core
-
-# ❌ Errado - Múltiplas execuções simultâneas
-pytest apps/core & pytest apps/dat_ingest  # Pode causar erro de DB
-
-# ✅ Alternativa - Use --reuse-db para execuções repetidas
-docker compose exec web pytest apps/core --reuse-db
-```
-
-**Por quê?** Múltiplos processos pytest tentam criar o mesmo banco de teste (`test_aprender_db`) simultaneamente, causando erro:
-```
-django.db.utils.IntegrityError: duplicate key value violates unique constraint "pg_database_datname_index"
-```
-
-📖 **Detalhes**: [docs/TESTING_RACE_CONDITION.md](docs/TESTING_RACE_CONDITION.md)
-
----
-
-## 🔄 ETL (Migração de Dados)
-
-### Executar ETL Completo
-
-```bash
-# Modo dry-run (simulação)
-make etl-dry-run
-
-# Execução real
-make etl-all
-```
-
-### ETL Parcial
-
-```bash
-# Apenas usuários
-make etl-usuarios
-
-# Apenas eventos da agenda
-make etl-agenda
-```
-
-### Verificar Integridade
-
-```bash
-make check-integrity
-```
-
-**Resultado esperado**:
-- ✅ 139 usuários
-- ✅ 88 formadores
-- ✅ 2.242 solicitações aprovadas
-- ✅ 0 dados órfãos (FKs válidas)
-
----
-
-## 📊 Monitoramento
-
-### Health Check
-
-```bash
-make health
-```
-
-**Resposta esperada**:
-```json
-{
-  "status": "healthy",
-  "database": "ok",
-  "redis": "ok",
-  "celery": "ok"
-}
-```
-
-### Logs
-
-```bash
-# Web
-make logs
-
-# Worker
-docker compose logs -f worker
-
-# Todos
-docker compose logs -f
-```
-
-### Estatísticas
-
-```bash
-make stats
-```
-
----
-
-## 🛠️ Comandos Úteis
-
-| Comando | Descrição |
-|---------|-----------|
-| `make help` | Listar todos os comandos disponíveis |
-| `make up` | Iniciar serviços |
-| `make down` | Parar serviços |
-| `make restart` | Reiniciar serviços |
-| `make shell` | Abrir Django shell |
-| `make db-shell` | Abrir PostgreSQL shell |
-| `make db-backup` | Fazer backup do banco |
-| `make clean` | Remover containers e volumes (⚠️ CUIDADO!) |
-
----
-
-## 📚 Documentação
-
-- **Arquitetura**: [BLUEPRINT.md](docs/BLUEPRINT.md)
-- **Single Source of Truth**: [SINGLE_SOURCE_OF_TRUTH.md](docs/SINGLE_SOURCE_OF_TRUTH.md)
-- **Plano de Migração**: [MIGRATION_PLAN.md](docs/MIGRATION_PLAN.md)
-- **Testes**: [TESTS_PLAN.md](docs/TESTS_PLAN.md)
-- **Learning Report**: [AS_LEARNING_REPORT_20251010.md](../docs/AS_LEARNING_REPORT_20251010.md)
-
----
-
-## 🔐 Segurança
-
-### Variáveis de Ambiente Sensíveis
-
-⚠️ **NUNCA** commitar estas variáveis:
-- `SECRET_KEY`
-- `DB_PASSWORD`
-- `GOOGLE_SERVICE_ACCOUNT_PATH`
-- `SENTRY_DSN`
-
-### Checklist de Segurança
-
-- [ ] SECRET_KEY forte em produção (50+ chars aleatórios)
-- [ ] DEBUG=0 em produção
-- [ ] ALLOWED_HOSTS configurado
-- [ ] CSRF_TRUSTED_ORIGINS configurado
-- [ ] SECURE_SSL_REDIRECT=True em produção
-- [ ] HTTPS configurado (Let's Encrypt)
-- [ ] Sentry configurado para monitoramento
-
----
-
-## 🤝 Contribuindo
-
-### Workflow de Desenvolvimento
-
-1. Criar branch: `git checkout -b feat/minha-feature`
-2. Implementar com TDD (Red→Green→Refactor)
-3. Executar testes: `make test`
-4. Executar linters: `make lint`
-5. Commit: `git commit -m "feat: descrição"`
-6. Push: `git push origin feat/minha-feature`
-7. Abrir Pull Request
-
-### Padrões de Commit
-
-- `feat:` Nova funcionalidade
-- `fix:` Correção de bug
-- `refactor:` Refatoração de código
-- `test:` Adicionar/melhorar testes
-- `docs:` Documentação
-- `chore:` Tarefas de manutenção
-
----
-
-## 🚧 Status de Implementação
-
-| Fase | Status | Descrição |
-|------|--------|-----------|
-| **Preparação** | ✅ Completo | Backup, infra, análise |
-| **ETL** | 🚧 Em Progresso | Migração de dados |
-| **Backend Services** | ⏳ Pendente | ConflictChecker, DisponibilidadeService |
-| **Frontend** | ⏳ Pendente | Templates, forms |
-| **Testes** | ⏳ Pendente | Unit, integration, E2E |
-| **Deploy** | ⏳ Pendente | Staging, produção |
-
----
-
-## 📞 Suporte
-
-- **Email**: dev@aprender.com.br
-- **Issue Tracker**: [GitHub Issues](https://github.com/seu-usuario/aprender_sistema/issues)
-- **Documentação**: [Wiki](https://github.com/seu-usuario/aprender_sistema/wiki)
-
----
-
-**Última atualização**: 2025-10-10
-**Próximos Passos**: Implementar Fase 2 (ETL) conforme [MIGRATION_PLAN.md](docs/MIGRATION_PLAN.md)
+**Padrões**: feat, fix, refactor, test, docs, chore

@@ -3,7 +3,7 @@ Testes de rate limiting no login (Issue #133 - SEC-P1)
 
 Valida que LoginThrottle está configurado corretamente.
 
-Nota: Behavior testing (429 após 5 requests) requer Redis funcional
+Nota: Behavior testing (429 após 10 requests) requer Redis funcional
 e isolamento perfeito de cache entre testes. O throttling funciona
 corretamente em produção (validado manualmente).
 """
@@ -12,15 +12,16 @@ import pytest
 from apps.core.views_auth import LoginThrottle
 
 
-def test_login_throttle_rate_is_5_per_minute():
+def test_login_throttle_rate_is_10_per_minute():
     """
-    SEC-P1: LoginThrottle deve ter rate = '5/minute'.
+    SEC-P1: LoginThrottle deve ter rate = '10/minute'.
 
     Previne brute force attacks limitando tentativas de login.
+    Configurado para 10/min (Security Audit 2025).
     """
     throttle = LoginThrottle()
-    assert throttle.rate == '5/minute', \
-        f"LoginThrottle rate = '{throttle.rate}', esperado '5/minute'"
+    assert throttle.rate == '10/minute', \
+        f"LoginThrottle rate = '{throttle.rate}', esperado '10/minute'"
 
 
 def test_login_throttle_extends_anon_rate_throttle():

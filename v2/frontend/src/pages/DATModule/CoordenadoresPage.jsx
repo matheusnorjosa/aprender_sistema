@@ -30,6 +30,7 @@ import {
   DatePicker,
   Collapse,
   List,
+  Switch,
 } from 'antd';
 import {
   ReloadOutlined,
@@ -47,6 +48,9 @@ import {
   ProjectOutlined,
   BarsOutlined,
   EyeOutlined,
+  CheckCircleOutlined,
+  PhoneOutlined,
+  MailOutlined,
 } from '@ant-design/icons';
 import {
   listCoordenadoresDAT,

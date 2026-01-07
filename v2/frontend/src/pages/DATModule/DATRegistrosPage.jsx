@@ -25,6 +25,7 @@ import {
   Divider,
   Row,
   Col,
+  Tag,
 } from 'antd';
 import {
   ReloadOutlined,
@@ -36,6 +37,10 @@ import {
   ClockCircleFilled,
   ExclamationCircleFilled,
   MinusCircleFilled,
+  DatabaseOutlined,
+  BookOutlined,
+  BarChartOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import {
   listDATRegistros,

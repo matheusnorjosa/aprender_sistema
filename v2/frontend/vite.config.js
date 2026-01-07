@@ -2,9 +2,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Backend URL - usa variável de ambiente ou fallback para localhost
+// Backend URL para proxy (servidor-side apenas)
+// PROXY_TARGET é usado apenas pelo servidor Vite, não pelo browser
 // eslint-disable-next-line no-undef
-const API_URL = process.env.VITE_API_URL || 'http://localhost:8002'
+const API_URL = process.env.PROXY_TARGET || 'http://localhost:8002'
 
 // https://vite.dev/config/
 export default defineConfig({

@@ -120,6 +120,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "apps.core.middleware_security.SecurityHeadersMiddleware",  # Security Audit 2025-01: CSP + Permissions-Policy
     "django_prometheus.middleware.PrometheusAfterMiddleware",  # MP1: Metrics end
 ]
 
@@ -534,13 +535,42 @@ ALLOWED_USER_GROUPS: set[str] = {
 # ================================================================
 # SECURITY (Production)
 # ================================================================
+# Security Audit 2025-01: Implementação de headers de segurança
+# Refs: OWASP, API Security Checklist, vibe-security
+
 if not DEBUG:
+    # --- SSL/TLS ---
     SECURE_SSL_REDIRECT = ENVIRONMENT != "testing"  # Disable in tests to avoid 301 redirects
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = "DENY"
+
+    # --- HSTS (HTTP Strict Transport Security) ---
+    # Força navegadores a usar HTTPS por 1 ano
+    # Previne ataques SSL stripping e downgrade
+    SECURE_HSTS_SECONDS = 31536000  # 1 ano
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True  # Permite inclusão na lista de preload dos browsers
+
+    # --- Content Security Headers ---
+    SECURE_BROWSER_XSS_FILTER = True  # X-XSS-Protection (legacy, mas ainda útil)
+    SECURE_CONTENT_TYPE_NOSNIFF = True  # X-Content-Type-Options: nosniff
+    X_FRAME_OPTIONS = "DENY"  # Previne clickjacking
+
+    # --- Referrer Policy ---
+    # Controla quanta informação é enviada no header Referer
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+    # --- Cross-Origin Headers ---
+    # Previne ataques de opener e embedder
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+
+# ================================================================
+# ACCOUNT LOCKOUT (Brute Force Protection)
+# ================================================================
+# Bloqueia conta após N tentativas falhas de login
+# Refs: OWASP Authentication Cheat Sheet
+ACCOUNT_LOCKOUT_THRESHOLD = int(os.getenv("ACCOUNT_LOCKOUT_THRESHOLD", "5"))  # Tentativas
+ACCOUNT_LOCKOUT_DURATION = int(os.getenv("ACCOUNT_LOCKOUT_DURATION", "900"))  # 15 min (segundos)
 
 # ================================================================
 # SENTRY APM (MP3: Distributed Tracing & Error Tracking)

@@ -247,7 +247,7 @@ class IsOwnerOrPrivileged(permissions.BasePermission):  # type: ignore[misc]
         """Verifica permissão básica de autenticação."""
         return bool(request.user and request.user.is_authenticated)
 
-    def has_object_permission(self, request: Request, view: APIView, obj) -> bool:  # type: ignore[no-untyped-def]
+    def has_object_permission(self, request: Request, view: APIView, obj: object) -> bool:
         """
         Verifica permissão no objeto (Solicitacao).
 
@@ -269,4 +269,5 @@ class IsOwnerOrPrivileged(permissions.BasePermission):  # type: ignore[misc]
             return True
 
         # Owner pode editar sua própria solicitação
-        return getattr(obj, 'usuario', None) == request.user
+        obj_usuario = getattr(obj, 'usuario', None)
+        return obj_usuario == request.user

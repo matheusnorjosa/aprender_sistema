@@ -152,10 +152,41 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """
-        Permite PATCH parcial: se apenas um dos campos vier no payload,
-        usa o valor atual da instância para validar o intervalo.
+        Validações para criação e edição de solicitações.
+
+        Regras:
+        1. Permite PATCH parcial: se apenas um dos campos vier no payload,
+           usa o valor atual da instância para validar o intervalo.
+        2. Bloqueia edição de solicitações já publicadas no Google Calendar
+           (gcal_status == 'PUBLISHED') para evitar drift.
+        3. Bloqueia edição de solicitações reprovadas.
         """
         instance = getattr(self, "instance", None)
+
+        # Regra 2: Bloquear edição após publicação no GCal
+        if instance is not None:
+            if getattr(instance, "gcal_status", None) == "PUBLISHED":
+                raise serializers.ValidationError(
+                    {
+                        "non_field_errors": [
+                            "Não é possível editar uma solicitação já publicada no Google Calendar. "
+                            "Cancele o evento primeiro se precisar fazer alterações."
+                        ]
+                    }
+                )
+
+            # Regra 3: Bloquear edição de solicitações reprovadas
+            if getattr(instance, "status", None) == "reprovado":
+                raise serializers.ValidationError(
+                    {
+                        "non_field_errors": [
+                            "Não é possível editar uma solicitação reprovada. "
+                            "Crie uma nova solicitação se necessário."
+                        ]
+                    }
+                )
+
+        # Regra 1: Validação de intervalo (fim > inicio)
         inicio = attrs.get("inicio", getattr(instance, "inicio", None))
         fim = attrs.get("fim", getattr(instance, "fim", None))
 

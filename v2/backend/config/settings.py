@@ -569,7 +569,7 @@ if not DEBUG:
 # ================================================================
 # Bloqueia conta após N tentativas falhas de login
 # Refs: OWASP Authentication Cheat Sheet
-ACCOUNT_LOCKOUT_THRESHOLD = int(os.getenv("ACCOUNT_LOCKOUT_THRESHOLD", "5"))  # Tentativas
+ACCOUNT_LOCKOUT_THRESHOLD = int(os.getenv("ACCOUNT_LOCKOUT_THRESHOLD", "10"))  # Tentativas
 ACCOUNT_LOCKOUT_DURATION = int(os.getenv("ACCOUNT_LOCKOUT_DURATION", "900"))  # 15 min (segundos)
 
 # ================================================================

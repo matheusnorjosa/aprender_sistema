@@ -6,6 +6,10 @@ Endpoints:
 - POST /api/auth/login/ - Login com username/password
 - POST /api/auth/logout/ - Logout
 - POST /api/auth/ping/ - Renovar sessão (CP5 - Issue #164)
+
+Security Audit 2025-01:
+- Account Lockout após N tentativas falhas
+- Tracking de tentativas via Redis cache
 """
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
@@ -15,7 +19,9 @@ from django.db.models import QuerySet
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from django.conf import settings
 from django.contrib.auth import authenticate, login as django_login, logout as django_logout
+from django.core.cache import cache
 from django.middleware.csrf import get_token
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
@@ -25,6 +31,67 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
 from .models import AuditLog
+
+
+# ================================================================
+# Account Lockout (Security Audit 2025-01)
+# ================================================================
+def _get_lockout_key(username: str) -> str:
+    """Gera chave Redis para tracking de tentativas de login."""
+    return f"login_attempts:{username.lower()}"
+
+
+def _get_failed_attempts(username: str) -> int:
+    """Retorna número de tentativas falhas de login."""
+    key = _get_lockout_key(username)
+    attempts = cache.get(key)
+    return int(attempts) if attempts else 0
+
+
+def _increment_failed_attempts(username: str) -> int:
+    """
+    Incrementa contador de tentativas falhas.
+    Retorna o novo total de tentativas.
+    """
+    key = _get_lockout_key(username)
+    lockout_duration = getattr(settings, "ACCOUNT_LOCKOUT_DURATION", 900)
+
+    # Usa Redis INCR com TTL
+    try:
+        # Se a chave não existe, cria com valor 1
+        current = cache.get(key)
+        if current is None:
+            cache.set(key, 1, timeout=lockout_duration)
+            return 1
+        else:
+            new_value = int(current) + 1
+            cache.set(key, new_value, timeout=lockout_duration)
+            return new_value
+    except Exception:
+        # Fallback: apenas retorna 1 se cache falhar
+        return 1
+
+
+def _clear_failed_attempts(username: str) -> None:
+    """Limpa contador de tentativas após login bem-sucedido."""
+    key = _get_lockout_key(username)
+    cache.delete(key)
+
+
+def _is_account_locked(username: str) -> bool:
+    """Verifica se a conta está bloqueada por excesso de tentativas."""
+    threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 5)
+    attempts = _get_failed_attempts(username)
+    return attempts >= threshold
+
+
+def _get_lockout_remaining_time(username: str) -> int | None:
+    """Retorna tempo restante de bloqueio em segundos, ou None se não bloqueado."""
+    key = _get_lockout_key(username)
+    ttl = cache.ttl(key) if hasattr(cache, 'ttl') else None
+    if ttl and ttl > 0:
+        return ttl
+    return None
 
 
 # Issue #135: CSRF token endpoint (SEC-P2)
@@ -75,11 +142,14 @@ def login(request: Request) -> Response:
         "password": "string"
     }
 
-    Rate Limiting: 5 tentativas por minuto por IP (previne brute force)
+    Security:
+    - Rate Limiting: 5 tentativas por minuto por IP (previne brute force)
+    - Account Lockout: Bloqueia após 5 tentativas falhas por 15 minutos
 
     Returns:
         200: Login bem-sucedido com dados do usuário
         400: Credenciais inválidas
+        403: Conta bloqueada por excesso de tentativas
         429: Too Many Requests (rate limit excedido)
     """
     username = request.data.get('username')
@@ -91,11 +161,73 @@ def login(request: Request) -> Response:
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    # Security Audit 2025-01: Account Lockout
+    # Verifica se a conta está bloqueada ANTES de tentar autenticar
+    if _is_account_locked(username):
+        lockout_duration = getattr(settings, "ACCOUNT_LOCKOUT_DURATION", 900)
+        minutes = lockout_duration // 60
+
+        # Log tentativa de login em conta bloqueada
+        AuditLog.objects.create(
+            usuario=None,
+            action='LOGIN_BLOCKED',
+            model_name='Usuario',
+            details={
+                'username': username,
+                'ip_address': request.META.get('REMOTE_ADDR', ''),
+                'user_agent': request.META.get('HTTP_USER_AGENT', '')[:200],
+                'reason': 'account_locked',
+            }
+        )
+
+        return Response(
+            {
+                'error': f'Conta bloqueada por excesso de tentativas. Tente novamente em {minutes} minutos.',
+                'locked': True,
+                'lockout_minutes': minutes,
+            },
+            status=status.HTTP_403_FORBIDDEN
+        )
+
     user = authenticate(request, username=username, password=password)
 
     if user is None:
+        # Incrementa contador de tentativas falhas
+        attempts = _increment_failed_attempts(username)
+        threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 5)
+        remaining = threshold - attempts
+
+        # Log tentativa falha
+        AuditLog.objects.create(
+            usuario=None,
+            action='LOGIN_FAILED',
+            model_name='Usuario',
+            details={
+                'username': username,
+                'ip_address': request.META.get('REMOTE_ADDR', ''),
+                'user_agent': request.META.get('HTTP_USER_AGENT', '')[:200],
+                'attempts': attempts,
+                'threshold': threshold,
+            }
+        )
+
+        if remaining <= 0:
+            lockout_duration = getattr(settings, "ACCOUNT_LOCKOUT_DURATION", 900)
+            minutes = lockout_duration // 60
+            return Response(
+                {
+                    'error': f'Conta bloqueada por excesso de tentativas. Tente novamente em {minutes} minutos.',
+                    'locked': True,
+                    'lockout_minutes': minutes,
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         return Response(
-            {'error': 'Credenciais inválidas.'},
+            {
+                'error': 'Credenciais inválidas.',
+                'remaining_attempts': remaining if remaining > 0 else 0,
+            },
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -104,6 +236,9 @@ def login(request: Request) -> Response:
             {'error': 'Usuário inativo.'},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    # Login bem-sucedido: limpa contador de tentativas
+    _clear_failed_attempts(username)
 
     # Realiza login
     django_login(request, user)

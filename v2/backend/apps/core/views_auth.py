@@ -80,7 +80,7 @@ def _clear_failed_attempts(username: str) -> None:
 
 def _is_account_locked(username: str) -> bool:
     """Verifica se a conta está bloqueada por excesso de tentativas."""
-    threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 5)
+    threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10)
     attempts = _get_failed_attempts(username)
     return attempts >= threshold
 
@@ -143,8 +143,8 @@ def login(request: Request) -> Response:
     }
 
     Security:
-    - Rate Limiting: 5 tentativas por minuto por IP (previne brute force)
-    - Account Lockout: Bloqueia após 5 tentativas falhas por 15 minutos
+    - Rate Limiting: 10 tentativas por minuto por IP (previne brute force)
+    - Account Lockout: Bloqueia após 10 tentativas falhas por 15 minutos
 
     Returns:
         200: Login bem-sucedido com dados do usuário
@@ -194,7 +194,7 @@ def login(request: Request) -> Response:
     if user is None:
         # Incrementa contador de tentativas falhas
         attempts = _increment_failed_attempts(username)
-        threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 5)
+        threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10)
         remaining = threshold - attempts
 
         # Log tentativa falha

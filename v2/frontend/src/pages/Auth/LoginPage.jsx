@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { Form, Input, Button, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '../../api/auth';
-import logoAprender from '../../assets/logo-aprender.png';
+import logoLogin from '../../assets/logo-login.png';
 import logger from '../../utils/logger';
 
 export default function LoginPage({ onLoginSuccess }) {
@@ -41,12 +41,11 @@ export default function LoginPage({ onLoginSuccess }) {
       {/* Logo */}
       <div style={{ marginBottom: '40px' }}>
         <img
-          src={logoAprender}
+          src={logoLogin}
           alt="Aprender"
           style={{
-            width: '200px',
+            width: '140px',
             height: 'auto',
-            filter: 'brightness(0) invert(1)',
           }}
         />
       </div>

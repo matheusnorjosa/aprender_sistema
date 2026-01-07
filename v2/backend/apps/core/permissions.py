@@ -227,3 +227,46 @@ class IsGerencia(permissions.BasePermission):  # type: ignore[misc]
                 or request.user.groups.filter(name="Gerência").exists()  # type: ignore[attr-defined]
             )
         )
+
+
+class IsOwnerOrPrivileged(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Permissão para edição de solicitações.
+
+    Permite acesso se:
+    - Usuário é superuser, OU
+    - Usuário pertence a grupo privilegiado (Superintendência, DAT), OU
+    - Usuário é o criador (owner) da solicitação
+
+    Usado para controlar quem pode editar uma solicitação existente.
+    """
+
+    message = "Você só pode editar suas próprias solicitações ou ser membro da Superintendência/DAT."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        """Verifica permissão básica de autenticação."""
+        return bool(request.user and request.user.is_authenticated)
+
+    def has_object_permission(self, request: Request, view: APIView, obj) -> bool:  # type: ignore[no-untyped-def]
+        """
+        Verifica permissão no objeto (Solicitacao).
+
+        Permite se:
+        - Superuser
+        - Grupo privilegiado (Superintendência, DAT)
+        - Owner (usuario da solicitação)
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        # Superuser sempre pode
+        if getattr(request.user, 'is_superuser', False):
+            return True
+
+        # Grupos privilegiados podem editar qualquer solicitação
+        privileged_groups = ["Superintendência", "DAT"]
+        if request.user.groups.filter(name__in=privileged_groups).exists():  # type: ignore[attr-defined]
+            return True
+
+        # Owner pode editar sua própria solicitação
+        return getattr(obj, 'usuario', None) == request.user

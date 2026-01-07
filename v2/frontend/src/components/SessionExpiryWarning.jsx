@@ -29,7 +29,7 @@
  *
  * Refs:
  * - CP5 (Issue #164): Monitor de sessão
- * - CP2: SESSION_COOKIE_AGE=1800 (30 min)
+ * - CP2: SESSION_COOKIE_AGE=7200 (2 horas)
  * - PA-06: Controle explícito (ISO 9241-110)
  */
 

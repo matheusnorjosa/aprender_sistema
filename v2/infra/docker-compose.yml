@@ -38,6 +38,8 @@ services:
     command: gunicorn config.wsgi:application --config /app/infra/gunicorn.conf.py
     env_file: .env
     environment:
+      # Session timeout: 2 hours (7200 seconds)
+      SESSION_COOKIE_AGE: 7200
       # Gunicorn Configuration (CP1 - Performance Optimization)
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
       GUNICORN_THREADS: ${GUNICORN_THREADS:-2}

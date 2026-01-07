@@ -42,6 +42,7 @@ import {
   CloudServerOutlined,
   BookOutlined,
   BarChartOutlined,
+  LinkOutlined,
 } from '@ant-design/icons';
 import {
   listCadastros,

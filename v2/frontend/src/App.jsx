@@ -43,6 +43,7 @@ const ControlePage = lazy(() => import('./pages/Controle/ControlePage'));
 const EtlReportsPage = lazy(() => import('./pages/Controle/EtlReportsPage'));
 const DATPage = lazy(() => import('./pages/DAT/DATPage'));
 const NewSolicitacaoWizard = lazy(() => import('./pages/Solicitacoes/NewSolicitacaoWizard'));
+const EditSolicitacaoPage = lazy(() => import('./pages/Solicitacoes/EditSolicitacaoPage'));
 const MySolicitacoesPage = lazy(() => import('./pages/Solicitacoes/MySolicitacoesPage'));
 const ApprovalsPage = lazy(() => import('./pages/Aprovacoes/ApprovalsPage'));
 const PreAgendaPage = lazy(() => import('./pages/PreAgenda/PreAgendaPage'));
@@ -520,6 +521,10 @@ function AppContent() {
                   <Route
                     path="/solicitacoes/nova"
                     element={canCoordenador ? <NewSolicitacaoWizard /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/solicitacoes/:id/editar"
+                    element={user ? <EditSolicitacaoPage /> : <Forbidden />}
                   />
 
                   {/* PR15: Rota de aprovações (Gerente + Superintendência) */}

@@ -98,6 +98,29 @@ export async function getSolicitacao(id) {
 }
 
 /**
+ * Atualiza uma solicitação existente (PATCH parcial).
+ *
+ * Regras:
+ * - Apenas o criador ou usuários privilegiados (Superintendência/DAT) podem editar
+ * - Não é possível editar solicitações já publicadas no Google Calendar
+ * - Não é possível editar solicitações reprovadas
+ *
+ * @param {number} id - ID da solicitação
+ * @param {object} data - Campos a atualizar (parcial)
+ * @returns {Promise<object>} Solicitação atualizada
+ */
+export async function updateSolicitacao(id, data) {
+  logger.debug('=== updateSolicitacao ===');
+  logger.debug('ID:', id);
+  logger.debug('Data:', data);
+
+  return await fetchAPI(`/solicitacoes/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
  * Preview do payload GCal de uma solicitação.
  *
  * @param {number} id - ID da solicitação

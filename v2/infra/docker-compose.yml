@@ -38,9 +38,44 @@ services:
     command: gunicorn config.wsgi:application --config /app/infra/gunicorn.conf.py
     env_file: .env
     environment:
-      # Session timeout: 2 hours (7200 seconds)
+      # ================================================================
+      # Environment & Security (CP-01)
+      # ================================================================
+      ENVIRONMENT: ${ENVIRONMENT:-staging}
+      DEBUG: ${DEBUG:-False}
+      REQUIRE_DOCKER: 1
+      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+      SERVICE_NAME: web
+
+      # ================================================================
+      # Session Configuration (2 hours timeout)
+      # ================================================================
       SESSION_COOKIE_AGE: 7200
+      SESSION_COOKIE_NAME: asv2sid
+      SESSION_SAVE_EVERY_REQUEST: "True"
+      SESSION_EXPIRE_AT_BROWSER_CLOSE: "True"
+
+      # ================================================================
+      # Security: Account Lockout (Security Audit 2025)
+      # ================================================================
+      ACCOUNT_LOCKOUT_THRESHOLD: 10
+      ACCOUNT_LOCKOUT_DURATION: 900
+
+      # ================================================================
+      # Business Rules (RD-04, RD-05)
+      # ================================================================
+      AVAILABILITY_DAILY_LIMIT_HOURS: ${AVAILABILITY_DAILY_LIMIT_HOURS:-8}
+      TRAVEL_BUFFER_MINUTES: ${TRAVEL_BUFFER_MINUTES:-60}
+
+      # ================================================================
+      # Feature Flags
+      # ================================================================
+      FEATURE_AUTO_APPLY_ENABLED: ${FEATURE_AUTO_APPLY_ENABLED:-False}
+      GCAL_CLIENT: ${GCAL_CLIENT:-fake}
+
+      # ================================================================
       # Gunicorn Configuration (CP1 - Performance Optimization)
+      # ================================================================
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
       GUNICORN_THREADS: ${GUNICORN_THREADS:-2}
       GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
@@ -70,7 +105,15 @@ services:
     command: celery -A config worker -l info
     env_file: .env
     environment:
-      SERVICE_NAME: worker  # MP2: Structured logging service identification
+      # Environment
+      ENVIRONMENT: ${ENVIRONMENT:-staging}
+      DEBUG: ${DEBUG:-False}
+      REQUIRE_DOCKER: 1
+      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+      SERVICE_NAME: worker
+      # Feature Flags
+      FEATURE_AUTO_APPLY_ENABLED: ${FEATURE_AUTO_APPLY_ENABLED:-False}
+      GCAL_CLIENT: ${GCAL_CLIENT:-fake}
     depends_on:
       - db
       - redis
@@ -91,7 +134,14 @@ services:
     command: celery -A config beat -l info
     env_file: .env
     environment:
-      SERVICE_NAME: beat  # MP2: Structured logging service identification
+      # Environment
+      ENVIRONMENT: ${ENVIRONMENT:-staging}
+      DEBUG: ${DEBUG:-False}
+      REQUIRE_DOCKER: 1
+      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+      SERVICE_NAME: beat
+      # Feature Flags
+      FEATURE_AUTO_APPLY_ENABLED: ${FEATURE_AUTO_APPLY_ENABLED:-False}
     depends_on:
       - db
       - redis

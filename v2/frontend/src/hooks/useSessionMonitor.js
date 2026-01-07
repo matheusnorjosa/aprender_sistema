@@ -18,7 +18,7 @@
  *
  * Refs:
  * - CP5 (Issue #164): Monitor de sessão
- * - CP2: SESSION_COOKIE_AGE=1800 (30 min)
+ * - CP2: SESSION_COOKIE_AGE=7200 (2 horas)
  * - PA-06: Controle explícito (ISO 9241-110)
  */
 
@@ -29,7 +29,7 @@ const WARNING_THRESHOLD = 300; // 5 minutos em segundos
 const CHECK_INTERVAL = 60000; // Verificar a cada 60 segundos
 
 const useSessionMonitor = () => {
-  const [sessionAge, setSessionAge] = useState(1800); // Default: 30 min
+  const [sessionAge, setSessionAge] = useState(7200); // Default: 2 horas
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [showWarning, setShowWarning] = useState(false);
 

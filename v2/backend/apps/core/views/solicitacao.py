@@ -23,7 +23,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.core.models import AuditLog, Solicitacao
-from apps.core.permissions import IsCoordenadorOrDAT, IsSuperintendencia
+from apps.core.permissions import IsCoordenadorOrDAT, IsOwnerOrPrivileged, IsSuperintendencia
 from apps.core.serializers import SolicitacaoSerializer
 from apps.core.views.utils import _get_client_ip
 
@@ -64,11 +64,16 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         """
-        PR 8/N: Apenas Coordenador ou DAT podem criar solicitações.
-        Outras ações: IsAuthenticated.
+        Permissões por ação:
+        - create: Coordenador ou DAT (PR 8/N)
+        - update/partial_update: Owner ou privilegiado (Superintendência/DAT)
+        - approve/reject: Superintendência (PA-02)
+        - outras: IsAuthenticated
         """
         if self.action == "create":
             return [IsCoordenadorOrDAT()]
+        if self.action in ["update", "partial_update"]:
+            return [IsOwnerOrPrivileged()]
         return [IsAuthenticated()]
 
     def get_queryset(self) -> QuerySet:
@@ -97,6 +102,92 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         PA-01: Status sempre começa pendente (garantido pelo modelo).
         """
         serializer.save(usuario=self.request.user)
+
+    def perform_update(self, serializer):
+        """
+        Registra edição de solicitação no AuditLog.
+
+        Rastreia:
+        - Campos alterados (antes/depois)
+        - Usuário que editou
+        - IP e User-Agent
+        """
+        instance = serializer.instance
+        old_data = {
+            "municipio_id": instance.municipio_id,
+            "projeto_id": instance.projeto_id,
+            "tipo_evento_id": instance.tipo_evento_id,
+            "inicio": instance.inicio.isoformat() if instance.inicio else None,
+            "fim": instance.fim.isoformat() if instance.fim else None,
+            "local": instance.local,
+            "observacoes": instance.observacoes,
+            "is_online": instance.is_online,
+            "coordenador_acompanha": instance.coordenador_acompanha,
+            "coordenador_id": instance.coordenador_id,
+            "tipo": instance.tipo,
+            "encontro": instance.encontro,
+            "segmento": instance.segmento,
+        }
+
+        # Salva as alterações
+        serializer.save()
+
+        # Coleta dados novos após save
+        instance.refresh_from_db()
+        new_data = {
+            "municipio_id": instance.municipio_id,
+            "projeto_id": instance.projeto_id,
+            "tipo_evento_id": instance.tipo_evento_id,
+            "inicio": instance.inicio.isoformat() if instance.inicio else None,
+            "fim": instance.fim.isoformat() if instance.fim else None,
+            "local": instance.local,
+            "observacoes": instance.observacoes,
+            "is_online": instance.is_online,
+            "coordenador_acompanha": instance.coordenador_acompanha,
+            "coordenador_id": instance.coordenador_id,
+            "tipo": instance.tipo,
+            "encontro": instance.encontro,
+            "segmento": instance.segmento,
+        }
+
+        # Identifica campos alterados
+        changed_fields = {
+            k: {"old": old_data[k], "new": new_data[k]}
+            for k in old_data
+            if old_data[k] != new_data[k]
+        }
+
+        # Se houver alterações, registra no AuditLog
+        if changed_fields:
+            client_ip = _get_client_ip(self.request)
+
+            # Logger estruturado
+            logger.info(
+                "solicitacao_updated",
+                extra={
+                    "event": "solicitacao_updated",
+                    "user_id": self.request.user.id,
+                    "username": self.request.user.username,
+                    "solicitation_id": instance.id,
+                    "action": "update",
+                    "changed_fields": list(changed_fields.keys()),
+                    "ip_address": client_ip,
+                    "timestamp": timezone.now().isoformat(),
+                },
+            )
+
+            # AuditLog persistente
+            AuditLog.objects.create(
+                usuario=self.request.user,
+                action="UPDATE",
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_id": instance.id,
+                    "changed_fields": changed_fields,
+                    "ip_address": client_ip,
+                    "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
+                },
+            )
 
     @action(
         detail=True,

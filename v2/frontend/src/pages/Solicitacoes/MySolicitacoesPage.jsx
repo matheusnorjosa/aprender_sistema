@@ -9,9 +9,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { Table, Card, Select, Input, Button, Space, Tag, Typography, message } from 'antd';
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { Link, useNavigate } from 'react-router-dom';
+import { Table, Card, Select, Input, Button, Space, Tag, Typography, message, Tooltip } from 'antd';
+import { PlusOutlined, SearchOutlined, EditOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
 import { listSolicitacoes } from '../../api/solicitacoes';
@@ -32,6 +32,7 @@ const STATUS_LABELS = {
 };
 
 export default function MySolicitacoesPage() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -101,6 +102,37 @@ export default function MySolicitacoesPage() {
       key: 'meet_link',
       render: (meet_link) => <MeetLink href={meet_link} />,
       width: 150,
+    },
+    {
+      title: 'Ações',
+      key: 'actions',
+      width: 100,
+      render: (_, record) => {
+        // Pode editar se não estiver publicado no GCal e não estiver reprovado
+        const canEdit = record.gcal_status !== 'PUBLISHED' && record.status !== 'reprovado';
+
+        if (!canEdit) {
+          return (
+            <Tooltip title={
+              record.status === 'reprovado'
+                ? 'Solicitações reprovadas não podem ser editadas'
+                : 'Solicitações publicadas no Google Calendar não podem ser editadas'
+            }>
+              <Button type="text" icon={<EditOutlined />} disabled />
+            </Tooltip>
+          );
+        }
+
+        return (
+          <Tooltip title="Editar solicitação">
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => navigate(`/solicitacoes/${record.id}/editar`)}
+            />
+          </Tooltip>
+        );
+      },
     },
   ];
 

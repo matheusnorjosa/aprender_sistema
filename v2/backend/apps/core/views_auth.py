@@ -122,16 +122,16 @@ def csrf_token(request: Request) -> Response:
 # Issue #133: Rate limiting para prevenir brute force (SEC-P1)
 class LoginThrottle(AnonRateThrottle):
     """
-    Rate limiting para endpoint de login: 5 tentativas por minuto por IP.
+    Rate limiting para endpoint de login: 10 tentativas por minuto por IP.
 
     Previne brute force attacks mantendo taxa aceitável para uso legítimo.
     """
-    rate = '5/minute'
+    rate = '10/minute'
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@throttle_classes([LoginThrottle])  # Issue #133: Rate limiting (5 req/min)
+@throttle_classes([LoginThrottle])  # Issue #133: Rate limiting (10 req/min)
 def login(request: Request) -> Response:
     """
     Endpoint de login com username/password.

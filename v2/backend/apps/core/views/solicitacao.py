@@ -22,7 +22,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from apps.core.models import AuditLog, Solicitacao
+from apps.core.models import AuditLog, Participation, Solicitacao, Usuario
 from apps.core.permissions import IsCoordenadorOrDAT, IsOwnerOrPrivileged, IsSuperintendencia
 from apps.core.serializers import SolicitacaoSerializer
 from apps.core.views.utils import _get_client_ip
@@ -109,10 +109,20 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Rastreia:
         - Campos alterados (antes/depois)
+        - Formadores alterados (adicionados/removidos)
         - Usuário que editou
         - IP e User-Agent
         """
         instance = serializer.instance
+
+        # Captura formadores atuais antes do update
+        old_formador_ids = set(
+            Participation.objects.filter(
+                solicitacao=instance,
+                role='FORMADOR'
+            ).values_list('usuario_id', flat=True)
+        )
+
         old_data = {
             "municipio_id": instance.municipio_id,
             "projeto_id": instance.projeto_id,
@@ -127,13 +137,28 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "tipo": instance.tipo,
             "encontro": instance.encontro,
             "segmento": instance.segmento,
+            "formador_ids": list(old_formador_ids),
         }
 
         # Salva as alterações
         serializer.save()
 
+        # Processa extra_participants se presente
+        extra_participants = self.request.data.get('extra_participants', {})
+        if extra_participants and 'formador_ids' in extra_participants:
+            self._update_formadores(instance, extra_participants)
+
         # Coleta dados novos após save
         instance.refresh_from_db()
+
+        # Captura formadores novos
+        new_formador_ids = set(
+            Participation.objects.filter(
+                solicitacao=instance,
+                role='FORMADOR'
+            ).values_list('usuario_id', flat=True)
+        )
+
         new_data = {
             "municipio_id": instance.municipio_id,
             "projeto_id": instance.projeto_id,
@@ -148,6 +173,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "tipo": instance.tipo,
             "encontro": instance.encontro,
             "segmento": instance.segmento,
+            "formador_ids": list(new_formador_ids),
         }
 
         # Identifica campos alterados
@@ -188,6 +214,56 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                     "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
                 },
             )
+
+    def _update_formadores(self, solicitacao, extra):
+        """
+        Atualiza formadores de uma solicitação.
+
+        Estratégia: substituição completa
+        - Remove formadores não presentes na nova lista
+        - Adiciona novos formadores
+
+        Retorna True se houve alteração.
+        """
+        new_formador_ids = set(extra.get('formador_ids', []))
+
+        # Formadores atuais
+        current_participations = Participation.objects.filter(
+            solicitacao=solicitacao,
+            role='FORMADOR'
+        )
+        current_ids = set(p.usuario_id for p in current_participations if p.usuario_id)
+
+        # Calcular diferenças
+        to_remove = current_ids - new_formador_ids
+        to_add = new_formador_ids - current_ids
+
+        changed = False
+
+        # Remover formadores
+        if to_remove:
+            Participation.objects.filter(
+                solicitacao=solicitacao,
+                role='FORMADOR',
+                usuario_id__in=to_remove
+            ).delete()
+            changed = True
+
+        # Adicionar formadores
+        for formador_id in to_add:
+            if formador_id:
+                try:
+                    usuario = Usuario.objects.get(id=formador_id)
+                    Participation.objects.get_or_create(
+                        solicitacao=solicitacao,
+                        usuario=usuario,
+                        defaults={'role': 'FORMADOR'}
+                    )
+                    changed = True
+                except Usuario.DoesNotExist:
+                    pass
+
+        return changed
 
     @action(
         detail=True,

@@ -24,8 +24,8 @@ from django.utils import timezone
 
 from apps.core.models import Compra, Municipio, Projeto
 from apps.core.types import ExternalHash
-from apps.dat_ingest.services.acompanhamento_normalize import norm_text
-from apps.dat_ingest.services.resolvers import resolve_municipio, resolve_projeto
+from apps.core.services.normalize import norm_text
+from apps.core.services.resolvers import resolve_municipio, resolve_projeto
 
 OUT_DIR: Path = Path(settings.BASE_DIR) / "out_etl"
 OUT_DIR.mkdir(parents=True, exist_ok=True)

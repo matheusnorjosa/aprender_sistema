@@ -78,7 +78,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             return super().get_permissions()
         if self.action == "create":
             return [IsCoordenadorOrDAT()]
-        if self.action in ["update", "partial_update"]:
+        if self.action in ["update", "partial_update", "destroy"]:
             return [IsOwnerOrPrivileged()]
         return [IsAuthenticated()]
 
@@ -422,6 +422,53 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                     pass
 
         return changed
+
+    def perform_destroy(self, instance):
+        """
+        Exclui solicitação com validações e AuditLog.
+
+        Regras:
+        - Não pode excluir solicitações publicadas no GCal (gcal_status=PUBLISHED)
+        - Registra exclusão no AuditLog antes de deletar
+        """
+        from rest_framework.exceptions import ValidationError
+
+        # Bloquear exclusão de solicitações publicadas
+        if instance.gcal_status == "PUBLISHED":
+            raise ValidationError({
+                "detail": "Não é possível excluir uma solicitação já publicada no Google Calendar. "
+                          "Cancele o evento primeiro se precisar excluir."
+            })
+
+        # Capturar dados antes da exclusão para o AuditLog
+        solicitacao_data = {
+            "id": instance.id,
+            "municipio_id": instance.municipio_id,
+            "municipio_nome": instance.municipio.nome if instance.municipio else None,
+            "projeto_id": instance.projeto_id,
+            "projeto_nome": instance.projeto.nome if instance.projeto else None,
+            "tipo_evento_id": instance.tipo_evento_id,
+            "inicio": instance.inicio.isoformat() if instance.inicio else None,
+            "fim": instance.fim.isoformat() if instance.fim else None,
+            "status": instance.status,
+        }
+
+        client_ip = _get_client_ip(self.request)
+
+        # Registrar exclusão no AuditLog ANTES de deletar
+        AuditLog.objects.create(
+            usuario=self.request.user,
+            action="DELETE",
+            model_name="Solicitacao",
+            details={
+                "solicitacao_data": solicitacao_data,
+                "ip_address": client_ip,
+                "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
+            },
+        )
+
+        # Executar exclusão
+        instance.delete()
 
     @action(
         detail=True,

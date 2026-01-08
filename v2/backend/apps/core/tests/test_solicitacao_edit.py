@@ -1,13 +1,21 @@
 """
-Testes para edição de solicitações (PATCH /api/solicitacoes/{id}/).
+Testes para edição e exclusão de solicitações.
 
-Cenários testados:
+Edição (PATCH /api/solicitacoes/{id}/):
 1. Owner pode editar sua própria solicitação
 2. Usuário privilegiado (Superintendência/DAT) pode editar qualquer solicitação
 3. Usuário comum NÃO pode editar solicitação de outro usuário
 4. NÃO pode editar solicitação publicada no GCal (gcal_status=PUBLISHED)
 5. NÃO pode editar solicitação reprovada (status=reprovado)
 6. Edição gera AuditLog com campos alterados
+
+Exclusão (DELETE /api/solicitacoes/{id}/):
+1. Owner pode excluir sua própria solicitação
+2. Usuário privilegiado (Superintendência/DAT) pode excluir qualquer solicitação
+3. Usuário comum NÃO pode excluir solicitação de outro usuário
+4. NÃO pode excluir solicitação publicada no GCal (gcal_status=PUBLISHED)
+5. PODE excluir solicitação reprovada (diferente de editar)
+6. Exclusão gera AuditLog antes de deletar
 """
 
 import pytest
@@ -827,3 +835,120 @@ class TestSolicitacaoEditFormadores:
             solicitacao=solicitacao_com_formador,
             role="FORMADOR"
         ).exists()
+
+
+# ============================================================================
+# TESTES DE EXCLUSÃO DE SOLICITAÇÕES
+# ============================================================================
+
+
+class TestSolicitacaoDelete:
+    """Testes de exclusão de solicitações (DELETE /api/solicitacoes/{id}/)."""
+
+    def test_owner_can_delete_own_solicitacao(
+        self, api_client, usuario_owner, solicitacao_editavel
+    ):
+        """Owner pode excluir sua própria solicitação."""
+        api_client.force_authenticate(user=usuario_owner)
+        sol_id = solicitacao_editavel.id
+
+        response = api_client.delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not Solicitacao.objects.filter(id=sol_id).exists()
+
+    def test_superintendencia_can_delete_any_solicitacao(
+        self, api_client, usuario_superintendencia, solicitacao_editavel
+    ):
+        """Superintendência pode excluir qualquer solicitação."""
+        api_client.force_authenticate(user=usuario_superintendencia)
+        sol_id = solicitacao_editavel.id
+
+        response = api_client.delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not Solicitacao.objects.filter(id=sol_id).exists()
+
+    def test_dat_can_delete_any_solicitacao(
+        self, api_client, usuario_dat, solicitacao_editavel
+    ):
+        """DAT pode excluir qualquer solicitação."""
+        api_client.force_authenticate(user=usuario_dat)
+        sol_id = solicitacao_editavel.id
+
+        response = api_client.delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not Solicitacao.objects.filter(id=sol_id).exists()
+
+    def test_other_user_cannot_delete_solicitacao(
+        self, api_client, usuario_outro, solicitacao_editavel
+    ):
+        """Usuário comum NÃO pode excluir solicitação de outro usuário."""
+        api_client.force_authenticate(user=usuario_outro)
+        sol_id = solicitacao_editavel.id
+
+        response = api_client.delete(f"/api/solicitacoes/{sol_id}/")
+
+        # 404 porque get_queryset filtra por usuário (não privilegiado não vê)
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        # Solicitação ainda existe
+        assert Solicitacao.objects.filter(id=sol_id).exists()
+
+    def test_cannot_delete_published_solicitacao(
+        self, api_client, usuario_owner, solicitacao_publicada
+    ):
+        """NÃO pode excluir solicitação já publicada no GCal."""
+        api_client.force_authenticate(user=usuario_owner)
+        sol_id = solicitacao_publicada.id
+
+        response = api_client.delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Google Calendar" in str(response.data)
+        # Solicitação ainda existe
+        assert Solicitacao.objects.filter(id=sol_id).exists()
+
+    def test_can_delete_rejected_solicitacao(
+        self, api_client, usuario_superintendencia, solicitacao_reprovada
+    ):
+        """Pode excluir solicitação reprovada (diferente de editar)."""
+        api_client.force_authenticate(user=usuario_superintendencia)
+        sol_id = solicitacao_reprovada.id
+
+        response = api_client.delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not Solicitacao.objects.filter(id=sol_id).exists()
+
+    def test_delete_creates_audit_log(
+        self, api_client, usuario_owner, solicitacao_editavel
+    ):
+        """Exclusão cria registro no AuditLog com dados da solicitação."""
+        api_client.force_authenticate(user=usuario_owner)
+        sol_id = solicitacao_editavel.id
+
+        # Limpar logs anteriores
+        AuditLog.objects.filter(model_name="Solicitacao", action="DELETE").delete()
+
+        response = api_client.delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+        # Verificar AuditLog
+        logs = AuditLog.objects.filter(
+            action="DELETE",
+            model_name="Solicitacao",
+        )
+        assert logs.count() == 1
+
+        log = logs.first()
+        assert log.usuario == usuario_owner
+        assert log.details["solicitacao_data"]["id"] == sol_id
+
+    def test_unauthenticated_cannot_delete(self, api_client, solicitacao_editavel):
+        """Usuário não autenticado não pode excluir."""
+        response = api_client.delete(f"/api/solicitacoes/{solicitacao_editavel.id}/")
+
+        # DRF retorna 403 para não autenticados (configuração padrão)
+        assert response.status_code == status.HTTP_403_FORBIDDEN

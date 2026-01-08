@@ -10,11 +10,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Table, Card, Select, Input, Button, Space, Tag, Typography, message, Tooltip } from 'antd';
-import { PlusOutlined, SearchOutlined, EditOutlined } from '@ant-design/icons';
+import { Table, Card, Select, Input, Button, Space, Tag, Typography, message, Tooltip, Popconfirm } from 'antd';
+import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
-import { listSolicitacoes } from '../../api/solicitacoes';
+import { listSolicitacoes, deleteSolicitacao } from '../../api/solicitacoes';
 import { MeetLink } from '../../components/MeetLink';
 
 const { Title } = Typography;
@@ -60,6 +60,20 @@ export default function MySolicitacoesPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteSolicitacao(id);
+      message.success('Solicitação excluída com sucesso!');
+      loadData(); // Recarrega a lista
+    } catch (error) {
+      if (error.response?.data?.detail) {
+        message.error(error.response.data.detail);
+      } else {
+        message.error('Erro ao excluir solicitação: ' + error.message);
+      }
+    }
+  };
 
   const columns = [
     {
@@ -119,31 +133,60 @@ export default function MySolicitacoesPage() {
     {
       title: 'Ações',
       key: 'actions',
-      width: 100,
+      width: 120,
       render: (_, record) => {
         // Pode editar se não estiver publicado no GCal e não estiver reprovado
         const canEdit = record.gcal_status !== 'PUBLISHED' && record.status !== 'reprovado';
-
-        if (!canEdit) {
-          return (
-            <Tooltip title={
-              record.status === 'reprovado'
-                ? 'Solicitações reprovadas não podem ser editadas'
-                : 'Solicitações publicadas no Google Calendar não podem ser editadas'
-            }>
-              <Button type="text" icon={<EditOutlined />} disabled />
-            </Tooltip>
-          );
-        }
+        // Pode excluir conforme regras por fluxo:
+        // - SUPER: só se pendente E não publicado no GCal
+        // - NAO_SUPER: se não publicado no GCal (independente do status)
+        const isPublished = record.gcal_status === 'PUBLISHED';
+        const isSuper = record.fluxo === 'SUPER';
+        const canDelete = !isPublished && (!isSuper || record.status === 'pendente');
 
         return (
-          <Tooltip title="Editar solicitação">
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              onClick={() => navigate(`/solicitacoes/${record.id}/editar`)}
-            />
-          </Tooltip>
+          <Space size="small">
+            {canEdit ? (
+              <Tooltip title="Editar solicitação">
+                <Button
+                  type="text"
+                  icon={<EditOutlined />}
+                  onClick={() => navigate(`/solicitacoes/${record.id}/editar`)}
+                />
+              </Tooltip>
+            ) : (
+              <Tooltip title={
+                record.status === 'reprovado'
+                  ? 'Solicitações reprovadas não podem ser editadas'
+                  : 'Solicitações publicadas no Google Calendar não podem ser editadas'
+              }>
+                <Button type="text" icon={<EditOutlined />} disabled />
+              </Tooltip>
+            )}
+
+            {canDelete ? (
+              <Popconfirm
+                title="Excluir solicitação"
+                description="Tem certeza que deseja excluir esta solicitação? Esta ação não pode ser desfeita."
+                onConfirm={() => handleDelete(record.id)}
+                okText="Sim, excluir"
+                cancelText="Cancelar"
+                okButtonProps={{ danger: true }}
+              >
+                <Tooltip title="Excluir solicitação">
+                  <Button type="text" icon={<DeleteOutlined />} danger />
+                </Tooltip>
+              </Popconfirm>
+            ) : (
+              <Tooltip title={
+                isPublished
+                  ? 'Solicitações publicadas no Google Calendar não podem ser excluídas'
+                  : 'Solicitações do fluxo SUPER só podem ser excluídas enquanto pendentes'
+              }>
+                <Button type="text" icon={<DeleteOutlined />} disabled />
+              </Tooltip>
+            )}
+          </Space>
         );
       },
     },

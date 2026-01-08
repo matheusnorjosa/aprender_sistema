@@ -233,7 +233,7 @@ export default function EditSolicitacaoPage() {
 
       await updateSolicitacao(id, payload);
       message.success('Solicitação atualizada com sucesso!');
-      navigate('/solicitacoes');
+      navigate('/solicitacoes/minhas');
     } catch (err) {
       logger.error('Erro ao atualizar solicitação:', err);
 
@@ -267,7 +267,7 @@ export default function EditSolicitacaoPage() {
           title="Erro ao carregar"
           subTitle={error}
           extra={[
-            <Button key="back" onClick={() => navigate('/solicitacoes')}>
+            <Button key="back" onClick={() => navigate('/solicitacoes/minhas')}>
               Voltar para Solicitações
             </Button>,
           ]}
@@ -287,7 +287,7 @@ export default function EditSolicitacaoPage() {
         <Card>
           <Button
             icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/solicitacoes')}
+            onClick={() => navigate('/solicitacoes/minhas')}
             className="mb-4"
           >
             Voltar
@@ -313,7 +313,7 @@ export default function EditSolicitacaoPage() {
       <Card>
         <Button
           icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/solicitacoes')}
+          onClick={() => navigate('/solicitacoes/minhas')}
           className="mb-4"
         >
           Voltar
@@ -472,7 +472,7 @@ export default function EditSolicitacaoPage() {
           />
 
           <div className="flex gap-2 justify-end">
-            <Button onClick={() => navigate('/solicitacoes')}>
+            <Button onClick={() => navigate('/solicitacoes/minhas')}>
               Cancelar
             </Button>
             <Button

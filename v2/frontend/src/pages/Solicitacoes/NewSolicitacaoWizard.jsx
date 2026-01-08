@@ -201,7 +201,7 @@ export default function NewSolicitacaoWizard() {
 
       await createSolicitacao(payload);
       message.success('Solicitação criada com sucesso!');
-      navigate('/solicitacoes');
+      navigate('/solicitacoes/minhas');
     } catch (error) {
       logger.error('Erro ao criar solicitação:', error);
       message.error('Erro ao criar solicitação. Verifique os dados e tente novamente.');
@@ -499,7 +499,7 @@ export default function NewSolicitacaoWizard() {
       <Card>
         <Button
           icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/solicitacoes')}
+          onClick={() => navigate('/solicitacoes/minhas')}
           className="mb-4"
         >
           Voltar

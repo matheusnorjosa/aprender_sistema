@@ -22,6 +22,7 @@ from rest_framework.test import APIClient
 from apps.core.models import (
     AuditLog,
     Municipio,
+    Participation,
     Projeto,
     Solicitacao,
     TipoEvento,
@@ -540,3 +541,289 @@ class TestSolicitacaoEditFields:
         assert solicitacao_editavel.external_event_id is None
         assert solicitacao_editavel.meet_link is None
         assert solicitacao_editavel.gcal_status == "NONE"
+
+
+# ============================================================================
+# TESTES DE EDIÇÃO DE FORMADORES
+# ============================================================================
+
+
+@pytest.fixture
+def grupo_formador():
+    """Grupo Formador para testes."""
+    group, _ = Group.objects.get_or_create(name="Formador")
+    return group
+
+
+@pytest.fixture
+def formador_1(grupo_formador):
+    """Formador 1 para testes."""
+    cpf = str(uuid4().int % 10**11).zfill(11)
+    user = Usuario.objects.create_user(
+        username=f"formador1_{uuid4().hex[:8]}",
+        email=f"formador1_{uuid4().hex[:8]}@test.com",
+        password="testpass123",
+        cpf=cpf,
+        first_name="Formador",
+        last_name="Um",
+        is_active=True,
+    )
+    user.groups.add(grupo_formador)
+    return user
+
+
+@pytest.fixture
+def formador_2(grupo_formador):
+    """Formador 2 para testes."""
+    cpf = str(uuid4().int % 10**11).zfill(11)
+    user = Usuario.objects.create_user(
+        username=f"formador2_{uuid4().hex[:8]}",
+        email=f"formador2_{uuid4().hex[:8]}@test.com",
+        password="testpass123",
+        cpf=cpf,
+        first_name="Formador",
+        last_name="Dois",
+        is_active=True,
+    )
+    user.groups.add(grupo_formador)
+    return user
+
+
+@pytest.fixture
+def formador_3(grupo_formador):
+    """Formador 3 para testes."""
+    cpf = str(uuid4().int % 10**11).zfill(11)
+    user = Usuario.objects.create_user(
+        username=f"formador3_{uuid4().hex[:8]}",
+        email=f"formador3_{uuid4().hex[:8]}@test.com",
+        password="testpass123",
+        cpf=cpf,
+        first_name="Formador",
+        last_name="Tres",
+        is_active=True,
+    )
+    user.groups.add(grupo_formador)
+    return user
+
+
+@pytest.fixture
+def solicitacao_com_formador(
+    usuario_owner, municipio, projeto, tipo_evento, formador_1
+):
+    """Solicitação com um formador já associado."""
+    sol = Solicitacao.objects.create(
+        usuario=usuario_owner,
+        municipio=municipio,
+        projeto=projeto,
+        tipo_evento=tipo_evento,
+        inicio=timezone.now() + timedelta(days=7),
+        fim=timezone.now() + timedelta(days=7, hours=2),
+        status="pendente",
+        gcal_status="NONE",
+    )
+    # Adicionar formador_1 como participante
+    Participation.objects.create(
+        solicitacao=sol,
+        usuario=formador_1,
+        role="FORMADOR",
+    )
+    return sol
+
+
+class TestSolicitacaoEditFormadores:
+    """Testes de edição de formadores em solicitações."""
+
+    def test_add_formador_to_solicitacao(
+        self, api_client, usuario_owner, solicitacao_editavel, formador_1
+    ):
+        """Pode adicionar formador a uma solicitação."""
+        api_client.force_authenticate(user=usuario_owner)
+
+        response = api_client.patch(
+            f"/api/solicitacoes/{solicitacao_editavel.id}/",
+            {
+                "extra_participants": {
+                    "formador_ids": [formador_1.id],
+                }
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verificar que o formador foi adicionado
+        participations = Participation.objects.filter(
+            solicitacao=solicitacao_editavel,
+            role="FORMADOR"
+        )
+        assert participations.count() == 1
+        assert participations.first().usuario == formador_1
+
+    def test_replace_formador_in_solicitacao(
+        self, api_client, usuario_owner, solicitacao_com_formador,
+        formador_1, formador_2
+    ):
+        """Pode substituir formador existente por outro."""
+        api_client.force_authenticate(user=usuario_owner)
+
+        # Verificar estado inicial
+        assert Participation.objects.filter(
+            solicitacao=solicitacao_com_formador,
+            usuario=formador_1,
+            role="FORMADOR"
+        ).exists()
+
+        response = api_client.patch(
+            f"/api/solicitacoes/{solicitacao_com_formador.id}/",
+            {
+                "extra_participants": {
+                    "formador_ids": [formador_2.id],  # Substitui formador_1 por formador_2
+                }
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verificar que formador_1 foi removido
+        assert not Participation.objects.filter(
+            solicitacao=solicitacao_com_formador,
+            usuario=formador_1,
+            role="FORMADOR"
+        ).exists()
+
+        # Verificar que formador_2 foi adicionado
+        assert Participation.objects.filter(
+            solicitacao=solicitacao_com_formador,
+            usuario=formador_2,
+            role="FORMADOR"
+        ).exists()
+
+    def test_add_multiple_formadores(
+        self, api_client, usuario_owner, solicitacao_editavel,
+        formador_1, formador_2, formador_3
+    ):
+        """Pode adicionar múltiplos formadores."""
+        api_client.force_authenticate(user=usuario_owner)
+
+        response = api_client.patch(
+            f"/api/solicitacoes/{solicitacao_editavel.id}/",
+            {
+                "extra_participants": {
+                    "formador_ids": [formador_1.id, formador_2.id, formador_3.id],
+                }
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+
+        participations = Participation.objects.filter(
+            solicitacao=solicitacao_editavel,
+            role="FORMADOR"
+        )
+        assert participations.count() == 3
+
+    def test_remove_formador_by_not_including(
+        self, api_client, usuario_owner, solicitacao_com_formador,
+        formador_1, formador_2
+    ):
+        """Remove formador ao não incluí-lo na nova lista."""
+        api_client.force_authenticate(user=usuario_owner)
+
+        # Adicionar formador_2 também
+        Participation.objects.create(
+            solicitacao=solicitacao_com_formador,
+            usuario=formador_2,
+            role="FORMADOR",
+        )
+
+        # Enviar apenas formador_2 (remove formador_1)
+        response = api_client.patch(
+            f"/api/solicitacoes/{solicitacao_com_formador.id}/",
+            {
+                "extra_participants": {
+                    "formador_ids": [formador_2.id],
+                }
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+
+        # formador_1 removido
+        assert not Participation.objects.filter(
+            solicitacao=solicitacao_com_formador,
+            usuario=formador_1,
+            role="FORMADOR"
+        ).exists()
+
+        # formador_2 mantido
+        assert Participation.objects.filter(
+            solicitacao=solicitacao_com_formador,
+            usuario=formador_2,
+            role="FORMADOR"
+        ).exists()
+
+    def test_formadores_change_logged_in_audit(
+        self, api_client, usuario_owner, solicitacao_com_formador,
+        formador_1, formador_2
+    ):
+        """Alteração de formadores é registrada no AuditLog."""
+        api_client.force_authenticate(user=usuario_owner)
+
+        # Contar logs antes
+        logs_before = AuditLog.objects.filter(
+            model_name="Solicitacao",
+            action="UPDATE"
+        ).count()
+
+        response = api_client.patch(
+            f"/api/solicitacoes/{solicitacao_com_formador.id}/",
+            {
+                "extra_participants": {
+                    "formador_ids": [formador_2.id],
+                }
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verificar que um novo log foi criado
+        logs_after = AuditLog.objects.filter(
+            model_name="Solicitacao",
+            action="UPDATE"
+        ).count()
+        assert logs_after == logs_before + 1
+
+        # Verificar conteúdo do log
+        latest_log = AuditLog.objects.filter(
+            model_name="Solicitacao",
+            action="UPDATE"
+        ).latest("created_at")
+        assert "formador_ids" in latest_log.details.get("changed_fields", {})
+
+    def test_empty_formador_list_removes_all(
+        self, api_client, usuario_owner, solicitacao_com_formador, formador_1
+    ):
+        """Lista vazia de formadores remove todos."""
+        api_client.force_authenticate(user=usuario_owner)
+
+        response = api_client.patch(
+            f"/api/solicitacoes/{solicitacao_com_formador.id}/",
+            {
+                "extra_participants": {
+                    "formador_ids": [],
+                }
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+
+        # Todos os formadores removidos
+        assert not Participation.objects.filter(
+            solicitacao=solicitacao_com_formador,
+            role="FORMADOR"
+        ).exists()

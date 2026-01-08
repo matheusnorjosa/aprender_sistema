@@ -41,6 +41,7 @@ import {
 } from '../../api/lookup';
 import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
+import FormadoresPicker from '../../components/FormadoresPicker';
 import logger from '../../utils/logger';
 
 dayjs.extend(utc);
@@ -75,6 +76,7 @@ export default function EditSolicitacaoPage() {
     observacoes: '',
     local: '',
     is_online: false,
+    formadores: [],
   });
 
   // Carregar dados da solicitação
@@ -84,6 +86,17 @@ export default function EditSolicitacaoPage() {
         setLoading(true);
         const data = await getSolicitacao(id);
         setSolicitacao(data);
+
+        // Extrair formadores das participations
+        const formadores = (data.participations || [])
+          .filter(p => p.role === 'FORMADOR' && p.usuario)
+          .map(p => ({
+            id: p.usuario.id,
+            label: p.usuario.first_name && p.usuario.last_name
+              ? `${p.usuario.first_name} ${p.usuario.last_name}`.trim()
+              : p.usuario.username,
+            email: p.usuario.email,
+          }));
 
         // Preencher o formData com os dados existentes
         setFormData({
@@ -98,6 +111,7 @@ export default function EditSolicitacaoPage() {
           observacoes: data.observacoes || '',
           local: data.local || '',
           is_online: data.is_online || false,
+          formadores,
         });
 
         // Preencher o form do Ant Design
@@ -191,6 +205,15 @@ export default function EditSolicitacaoPage() {
         return;
       }
 
+      // Garantir que formadores é um array
+      const formadores = Array.isArray(formData.formadores) ? formData.formadores : [];
+
+      if (formadores.length === 0) {
+        message.error('Por favor, selecione pelo menos um formador');
+        setSaving(false);
+        return;
+      }
+
       const payload = {
         municipio: formData.municipio.id,
         projeto: formData.projeto.id,
@@ -203,6 +226,9 @@ export default function EditSolicitacaoPage() {
         observacoes: formData.observacoes || null,
         local: formData.local || '',
         is_online: !!formData.is_online,
+        extra_participants: {
+          formador_ids: formadores.map(f => f.id),
+        },
       };
 
       await updateSolicitacao(id, payload);
@@ -343,6 +369,16 @@ export default function EditSolicitacaoPage() {
               onChange={(value) => setFormData({ ...formData, municipio: value })}
               value={formData.municipio}
               placeholder="Busque ou selecione um município"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Formadores"
+            rules={[{ required: true, message: 'Por favor selecione pelo menos um formador' }]}
+          >
+            <FormadoresPicker
+              value={formData.formadores}
+              onChange={(value) => setFormData({ ...formData, formadores: value })}
             />
           </Form.Item>
 

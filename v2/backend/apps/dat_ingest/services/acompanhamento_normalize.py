@@ -7,6 +7,7 @@ Use: from apps.core.services.normalize import norm_text, ...
 Este arquivo mantido apenas para compatibilidade com imports existentes.
 Será removido em versão futura.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false
 
 # Re-export all from core.services.normalize for backward compatibility
 from apps.core.services.normalize import (

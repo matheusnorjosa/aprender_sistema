@@ -7,6 +7,7 @@ Use: from apps.core.services.resolvers import resolve_municipio, ...
 Este arquivo mantido apenas para compatibilidade com imports existentes.
 Será removido em versão futura.
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false
 
 # Re-export all from core.services.resolvers for backward compatibility
 from apps.core.services.resolvers import (

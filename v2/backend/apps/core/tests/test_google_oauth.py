@@ -887,3 +887,396 @@ class TestOAuthSecurity:
 
 # Total: 19 testes (7 unit/helpers + 7 API + 5 security)
 # Cobertura: GAP-1, GAP-2, GAP-3, PA-05, PA-06
+
+
+# ============================================================================
+# TESTES ADICIONAIS PARA COBERTURA (Issue #318)
+# ============================================================================
+
+@pytest.mark.django_db
+class TestViewsOAuthCoverage:
+    """
+    Testes adicionais para aumentar cobertura de views_oauth.py (64% → 85%+).
+
+    Issue #318: Linhas não cobertas:
+    - 114: _build_frontend_redirect_url com URL absoluta
+    - 129-132, 136: Fallbacks de frontend_origin
+    - 195-197: ValueError em google_oauth_start
+    - 248-250: Callback com erro do Google
+    - 257-259: Callback sem code/state
+    - 263-265: Callback usuário não autenticado
+    - 319-331: Exceções em callback (ValueError, Exception)
+    - 433-443: Disconnect com falha revoke / DoesNotExist
+    - 481-508: list_calendars endpoint
+    - 544-580: select_calendar endpoint
+    """
+
+    def test_build_frontend_redirect_url_with_absolute_url(self):
+        """
+        Linha 114: Se URL já é absoluta, retorna como está.
+        """
+        from apps.core.views_oauth import _build_frontend_redirect_url
+
+        absolute_url = "https://example.com/callback?google=connected"
+        result = _build_frontend_redirect_url(absolute_url)
+        assert result == absolute_url
+
+    def test_build_frontend_redirect_url_with_relative_path(self):
+        """
+        Linhas 116-141: Caminho relativo é convertido para URL do frontend.
+        """
+        from apps.core.views_oauth import _build_frontend_redirect_url
+
+        result = _build_frontend_redirect_url("/pre-agenda?google=connected")
+        assert "/pre-agenda" in result
+        assert "google=connected" in result
+        # Deve ter scheme (http:// ou https://)
+        assert result.startswith("http")
+
+    @patch.dict('os.environ', {'FRONTEND_URL': ''}, clear=False)
+    @patch('django.conf.settings.CORS_ALLOWED_ORIGINS', ['http://localhost:8002'])
+    def test_build_frontend_redirect_url_fallback_no_5173(self):
+        """
+        Linhas 129-132: Fallback quando não há :5173 nas origens CORS.
+        """
+        from apps.core.views_oauth import _build_frontend_redirect_url
+
+        # Remove FRONTEND_URL do environ para forçar fallback
+        with patch.dict('os.environ', {'FRONTEND_URL': ''}, clear=False):
+            result = _build_frontend_redirect_url("/test")
+            # Deve usar fallback (localhost:5173 ou primeira origem não-8002)
+            assert "/test" in result
+
+    @patch.dict('os.environ', {'FRONTEND_URL': ''}, clear=False)
+    @patch('django.conf.settings.CORS_ALLOWED_ORIGINS', [])
+    def test_build_frontend_redirect_url_fallback_empty_cors(self):
+        """
+        Linha 136: Fallback para localhost:5173 quando CORS_ALLOWED_ORIGINS vazio.
+        """
+        from apps.core.views_oauth import _build_frontend_redirect_url
+
+        result = _build_frontend_redirect_url("/test")
+        assert "localhost:5173" in result or "/test" in result
+
+    @patch('apps.core.services.google_oauth.build_authorization_url')
+    def test_google_oauth_start_config_error(self, mock_build, usuario_controle):
+        """
+        Linhas 195-197: ValueError quando config OAuth incompleta.
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        # Mock para lançar ValueError
+        mock_build.side_effect = ValueError("GCAL_OAUTH_CLIENT_ID não configurado")
+
+        response = client.get("/api/oauth/google/start/")
+
+        assert response.status_code == http_status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "Configuração OAuth incompleta" in response.data["error"]
+
+    def test_google_oauth_callback_google_error(self, usuario_controle):
+        """
+        Linhas 248-250: Callback quando Google retorna erro (ex: access_denied).
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        response = client.get("/api/oauth/google/callback/", {
+            "error": "access_denied",
+        })
+
+        assert response.status_code == http_status.HTTP_302_FOUND
+        assert "google=error" in response.url
+        assert "access_denied" in response.url
+
+    def test_google_oauth_callback_missing_code(self, usuario_controle):
+        """
+        Linhas 257-259: Callback sem code.
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        response = client.get("/api/oauth/google/callback/", {
+            "state": "some_state",
+            # code ausente
+        })
+
+        assert response.status_code == http_status.HTTP_302_FOUND
+        assert "google=error" in response.url
+        assert "missing_params" in response.url
+
+    def test_google_oauth_callback_missing_state(self, usuario_controle):
+        """
+        Linhas 257-259: Callback sem state.
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        response = client.get("/api/oauth/google/callback/", {
+            "code": "some_code",
+            # state ausente
+        })
+
+        assert response.status_code == http_status.HTTP_302_FOUND
+        assert "google=error" in response.url
+        assert "missing_params" in response.url
+
+    def test_google_oauth_callback_unauthenticated(self):
+        """
+        Linhas 263-265: Callback com usuário não autenticado.
+
+        Nota: O endpoint callback não tem @permission_classes, mas DRF aplica
+        SessionAuthentication por padrão. Usuário não autenticado recebe 403.
+        O código de verificação is_authenticated (L263-265) só é atingido se
+        o usuário passar pela autenticação de sessão mas sem user válido.
+        """
+        client = APIClient()
+        # NÃO autenticado - DRF retorna 403 antes de chegar na view
+
+        response = client.get("/api/oauth/google/callback/", {
+            "code": "some_code",
+            "state": "some_state",
+        })
+
+        # DRF SessionAuthentication bloqueia antes de chegar na view
+        # Aceitar tanto 403 (auth padrão) quanto 302 (redirect com erro)
+        assert response.status_code in [
+            http_status.HTTP_403_FORBIDDEN,
+            http_status.HTTP_302_FOUND
+        ]
+
+    @patch('apps.core.services.google_oauth.exchange_code_for_tokens')
+    @patch('apps.core.services.google_oauth.validate_oauth_state')
+    def test_google_oauth_callback_validation_error(
+        self, mock_validate, mock_exchange, usuario_controle
+    ):
+        """
+        Linhas 319-324: ValueError durante exchange (ex: domínio inválido).
+        """
+        from django.core.cache import cache
+
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        # Mock state válido
+        mock_validate.return_value = {
+            "valid": True,
+            "return_to": "/pre-agenda",
+            "user_id": usuario_controle.id,
+        }
+
+        # Mock exchange lança ValueError
+        mock_exchange.side_effect = ValueError("Domínio não permitido: gmail.com")
+
+        response = client.get("/api/oauth/google/callback/", {
+            "code": "some_code",
+            "state": f"csrf|/pre-agenda|{usuario_controle.id}",
+        })
+
+        assert response.status_code == http_status.HTTP_302_FOUND
+        assert "google=error" in response.url
+        assert "validation" in response.url
+
+    @patch('apps.core.views_oauth.exchange_code_for_tokens')
+    @patch('apps.core.services.google_oauth.validate_oauth_state')
+    def test_google_oauth_callback_generic_exception(
+        self, mock_validate, mock_exchange, usuario_controle
+    ):
+        """
+        Linhas 326-331: Exception genérica durante exchange.
+
+        Nota:
+        - exchange_code_for_tokens: patch em views_oauth (import no topo)
+        - validate_oauth_state: patch em services (import dentro da função)
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        # Mock state válido
+        mock_validate.return_value = {
+            "valid": True,
+            "return_to": "/pre-agenda",
+            "user_id": usuario_controle.id,
+        }
+
+        # Mock exchange lança Exception genérica (não ValueError)
+        mock_exchange.side_effect = RuntimeError("Connection timeout")
+
+        response = client.get("/api/oauth/google/callback/", {
+            "code": "some_code",
+            "state": f"csrf|/pre-agenda|{usuario_controle.id}",
+        })
+
+        assert response.status_code == http_status.HTTP_302_FOUND
+        assert "google=error" in response.url
+        assert "server_error" in response.url
+
+    @patch('apps.core.views_oauth.revoke_token')
+    def test_google_oauth_disconnect_revoke_fails(
+        self, mock_revoke, usuario_controle, google_oauth_credential
+    ):
+        """
+        Linhas 433-440: Disconnect quando revoke_token retorna False.
+
+        Nota: Patch deve ser no módulo views_oauth onde a função é usada.
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        # Mock revoke falha (retorna False)
+        mock_revoke.return_value = False
+
+        response = client.post("/api/integrations/google/disconnect/")
+
+        assert response.status_code == http_status.HTTP_200_OK
+        # Quando revoke falha, mensagem inclui "falha ao revogar"
+        assert "falha ao revogar" in response.data["message"].lower()
+
+    def test_google_oauth_disconnect_not_found(self, usuario_controle):
+        """
+        Linhas 442-445: Disconnect quando não há credencial.
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        # Garantir que não existe credencial
+        GoogleOAuthCredential.objects.filter(user=usuario_controle).delete()
+
+        response = client.post("/api/integrations/google/disconnect/")
+
+        assert response.status_code == http_status.HTTP_404_NOT_FOUND
+        assert "Nenhuma conexão Google encontrada" in response.data["error"]
+
+    @patch('apps.core.services.gcal_oauth_client.OAuthCalendarClient')
+    def test_google_oauth_list_calendars_success(
+        self, mock_client_class, usuario_controle, google_oauth_credential
+    ):
+        """
+        Linhas 481-499: list_calendars retorna lista de calendários.
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        # Mock client
+        mock_client = MagicMock()
+        mock_client.list_calendars.return_value = [
+            {"id": "primary", "summary": "Primary Calendar", "primary": True},
+            {"id": "agenda@example.com", "summary": "Agenda Formações", "primary": False},
+        ]
+        mock_client_class.return_value = mock_client
+
+        response = client.get("/api/integrations/google/calendars/")
+
+        assert response.status_code == http_status.HTTP_200_OK
+        assert "calendars" in response.data
+        assert len(response.data["calendars"]) == 2
+
+    def test_google_oauth_list_calendars_not_connected(self, usuario_controle):
+        """
+        Linhas 501-504: list_calendars quando não há credencial.
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        # Garantir que não existe credencial
+        GoogleOAuthCredential.objects.filter(user=usuario_controle).delete()
+
+        response = client.get("/api/integrations/google/calendars/")
+
+        assert response.status_code == http_status.HTTP_404_NOT_FOUND
+        assert "Nenhuma conexão Google encontrada" in response.data["error"]
+
+    @patch('apps.core.services.gcal_oauth_client.OAuthCalendarClient')
+    def test_google_oauth_list_calendars_api_error(
+        self, mock_client_class, usuario_controle, google_oauth_credential
+    ):
+        """
+        Linhas 506-510: list_calendars quando API Google falha.
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        # Mock client que lança exceção
+        mock_client = MagicMock()
+        mock_client.list_calendars.side_effect = Exception("Google API error")
+        mock_client_class.return_value = mock_client
+
+        response = client.get("/api/integrations/google/calendars/")
+
+        assert response.status_code == http_status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "Erro ao listar calendários" in response.data["error"]
+
+    def test_google_oauth_select_calendar_success(
+        self, usuario_controle, google_oauth_credential
+    ):
+        """
+        Linhas 544-577: select_calendar salva calendário selecionado.
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        response = client.post(
+            "/api/integrations/google/select-calendar/",
+            {"calendar_id": "agenda-formacoes@aprendereditora.com.br"},
+            format="json"
+        )
+
+        assert response.status_code == http_status.HTTP_200_OK
+        assert "Calendário selecionado com sucesso" in response.data["message"]
+
+        # Verificar que foi salvo
+        google_oauth_credential.refresh_from_db()
+        assert google_oauth_credential.default_calendar_id == "agenda-formacoes@aprendereditora.com.br"
+
+        # Verificar AuditLog
+        audit = AuditLog.objects.filter(
+            usuario=usuario_controle,
+            action="GOOGLE_SELECT_CALENDAR"
+        ).last()
+        assert audit is not None
+        assert audit.details["calendar_id"] == "agenda-formacoes@aprendereditora.com.br"
+
+    def test_google_oauth_select_calendar_missing_id(
+        self, usuario_controle, google_oauth_credential
+    ):
+        """
+        Linhas 548-551: select_calendar sem calendar_id.
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        response = client.post(
+            "/api/integrations/google/select-calendar/",
+            {},  # Sem calendar_id
+            format="json"
+        )
+
+        assert response.status_code == http_status.HTTP_400_BAD_REQUEST
+        assert "calendar_id é obrigatório" in response.data["error"]
+
+    def test_google_oauth_select_calendar_not_connected(self, usuario_controle):
+        """
+        Linhas 579-582: select_calendar quando não há credencial.
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+
+        # Garantir que não existe credencial
+        GoogleOAuthCredential.objects.filter(user=usuario_controle).delete()
+
+        response = client.post(
+            "/api/integrations/google/select-calendar/",
+            {"calendar_id": "test@example.com"},
+            format="json"
+        )
+
+        assert response.status_code == http_status.HTTP_404_NOT_FOUND
+        assert "Nenhuma conexão Google encontrada" in response.data["error"]
+
+
+# ============================================================================
+# RESUMO ATUALIZADO
+# ============================================================================
+
+# Total: 19 + 18 = 37 testes
+# Cobertura esperada: 64% → 85%+

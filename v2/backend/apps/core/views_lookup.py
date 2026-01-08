@@ -23,7 +23,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 
 from .models import Municipio, Projeto, TipoEvento, Usuario
-from apps.dat_ingest.services.acompanhamento_normalize import norm_text
+from apps.core.services.normalize import norm_text
 
 
 def dedup_by_id(items):

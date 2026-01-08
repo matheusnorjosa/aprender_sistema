@@ -53,7 +53,7 @@ from django.utils import timezone
 import pytz
 
 from .models import Municipio, Projeto, TipoEvento
-from apps.dat_ingest.services.resolvers import (
+from apps.core.services.resolvers import (
     resolve_municipio,
     resolve_projeto,
     resolve_tipo_evento,

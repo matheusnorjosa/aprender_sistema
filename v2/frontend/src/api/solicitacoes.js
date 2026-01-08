@@ -121,6 +121,25 @@ export async function updateSolicitacao(id, data) {
 }
 
 /**
+ * Exclui uma solicitação existente (DELETE).
+ *
+ * Regras:
+ * - Apenas o criador ou usuários privilegiados (Superintendência/DAT) podem excluir
+ * - Não é possível excluir solicitações já publicadas no Google Calendar
+ *
+ * @param {number} id - ID da solicitação
+ * @returns {Promise<void>}
+ */
+export async function deleteSolicitacao(id) {
+  logger.debug('=== deleteSolicitacao ===');
+  logger.debug('ID:', id);
+
+  return await fetchAPI(`/solicitacoes/${id}/`, {
+    method: 'DELETE',
+  });
+}
+
+/**
  * Preview do payload GCal de uma solicitação.
  *
  * @param {number} id - ID da solicitação

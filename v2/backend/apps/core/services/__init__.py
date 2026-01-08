@@ -5,6 +5,54 @@ Serviços de lógica de negócio que substituem as 82K fórmulas Excel:
 - ConflictChecker: Verificação de conflitos (RD-01 a RD-07)
 - DisponibilidadeService: Mapa mensal (códigos D/P/T/E/M/X)
 - ApprovalWorkflow: Fluxo de aprovações
+- normalize: Funções de normalização de texto/datas/horas
+- resolvers: Funções para resolver FKs por nome/email
 """
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false
 
 from __future__ import annotations
+
+# Normalize functions (moved from dat_ingest for decoupling)
+from .normalize import (
+    norm_text,
+    normalize_sector,
+    normalize_project_alias,
+    split_municipios_super,
+    parse_date_iso,
+    parse_time_iso,
+    normalize_email,
+    normalize_date_field,
+    normalize_time_field,
+    hash_event_v2,
+)
+
+# Resolver functions (moved from dat_ingest for decoupling)
+from .resolvers import (
+    resolve_user_by_email,
+    resolve_user_by_name,
+    resolve_municipio,
+    resolve_projeto,
+    resolve_tipo_evento,
+    normalize_projeto_name,
+)
+
+__all__ = [
+    # Normalize
+    "norm_text",
+    "normalize_sector",
+    "normalize_project_alias",
+    "split_municipios_super",
+    "parse_date_iso",
+    "parse_time_iso",
+    "normalize_email",
+    "normalize_date_field",
+    "normalize_time_field",
+    "hash_event_v2",
+    # Resolvers
+    "resolve_user_by_email",
+    "resolve_user_by_name",
+    "resolve_municipio",
+    "resolve_projeto",
+    "resolve_tipo_evento",
+    "normalize_projeto_name",
+]

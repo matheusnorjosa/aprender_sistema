@@ -88,6 +88,19 @@ export default function MySolicitacoesPage() {
       render: (tipo) => tipo?.nome || '-',
     },
     {
+      title: 'Formadores',
+      dataIndex: 'participations',
+      key: 'formadores',
+      render: (participations) => {
+        if (!participations || !Array.isArray(participations)) return '-';
+        const formadores = participations
+          .filter(p => p.role === 'FORMADOR' && p.usuario)
+          .map(p => p.usuario.first_name || p.usuario.username);
+        return formadores.length > 0 ? formadores.join(', ') : '-';
+      },
+      ellipsis: true,
+    },
+    {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',

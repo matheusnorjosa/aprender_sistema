@@ -427,17 +427,27 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         Exclui solicitação com validações e AuditLog.
 
-        Regras:
-        - Não pode excluir solicitações publicadas no GCal (gcal_status=PUBLISHED)
-        - Registra exclusão no AuditLog antes de deletar
+        Regras por fluxo do projeto:
+        - SUPER: Pode excluir apenas se status=pendente E não publicado no GCal
+        - NAO_SUPER: Pode excluir se não publicado no GCal (auto-aprovado)
+
+        Registra exclusão no AuditLog antes de deletar.
         """
         from rest_framework.exceptions import ValidationError
 
-        # Bloquear exclusão de solicitações publicadas
+        # Bloquear exclusão de solicitações publicadas (ambos os fluxos)
         if instance.gcal_status == "PUBLISHED":
             raise ValidationError({
                 "detail": "Não é possível excluir uma solicitação já publicada no Google Calendar. "
                           "Cancele o evento primeiro se precisar excluir."
+            })
+
+        # Validação adicional para fluxo SUPER
+        projeto_fluxo = instance.projeto.fluxo if instance.projeto else None
+        if projeto_fluxo == "SUPER" and instance.status != "pendente":
+            raise ValidationError({
+                "detail": "Solicitações do fluxo SUPER só podem ser excluídas enquanto estiverem pendentes. "
+                          "Esta solicitação já foi aprovada ou reprovada."
             })
 
         # Capturar dados antes da exclusão para o AuditLog

@@ -137,8 +137,12 @@ export default function MySolicitacoesPage() {
       render: (_, record) => {
         // Pode editar se não estiver publicado no GCal e não estiver reprovado
         const canEdit = record.gcal_status !== 'PUBLISHED' && record.status !== 'reprovado';
-        // Pode excluir se não estiver publicado no GCal
-        const canDelete = record.gcal_status !== 'PUBLISHED';
+        // Pode excluir conforme regras por fluxo:
+        // - SUPER: só se pendente E não publicado no GCal
+        // - NAO_SUPER: se não publicado no GCal (independente do status)
+        const isPublished = record.gcal_status === 'PUBLISHED';
+        const isSuper = record.fluxo === 'SUPER';
+        const canDelete = !isPublished && (!isSuper || record.status === 'pendente');
 
         return (
           <Space size="small">
@@ -174,7 +178,11 @@ export default function MySolicitacoesPage() {
                 </Tooltip>
               </Popconfirm>
             ) : (
-              <Tooltip title="Solicitações publicadas no Google Calendar não podem ser excluídas">
+              <Tooltip title={
+                isPublished
+                  ? 'Solicitações publicadas no Google Calendar não podem ser excluídas'
+                  : 'Solicitações do fluxo SUPER só podem ser excluídas enquanto pendentes'
+              }>
                 <Button type="text" icon={<DeleteOutlined />} disabled />
               </Tooltip>
             )}

@@ -89,7 +89,7 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
         - "Novo  Lendo" → "novo lendo"
         - "Brincando & Aprendendo" → "brincando aprendendo"
         """
-        from apps.core.management.commands.seed_projetos_fluxo_from_sheets import (
+        from apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets import (
             Command,
         )
 
@@ -113,7 +113,7 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
             "educacao fisica"
         )
 
-    @patch('apps.core.management.commands.seed_projetos_fluxo_from_sheets.load_workbook')
+    @patch('apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets.load_workbook')
     def test_dry_run_mode(self, mock_load_workbook):
         """
         Testa modo dry-run (simulação sem commit).
@@ -169,7 +169,7 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
             if os.path.exists(xls_path):
                 os.unlink(xls_path)
 
-    @patch('apps.core.management.commands.seed_projetos_fluxo_from_sheets.load_workbook')
+    @patch('apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets.load_workbook')
     def test_effective_mode_updates_database(self, mock_load_workbook):
         """
         Testa modo efetivo (modifica banco de dados).
@@ -233,7 +233,7 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
         - Segunda execução: detecta que já estão atualizados, não duplica
         """
         # Criar mock simples
-        with patch('apps.core.management.commands.seed_projetos_fluxo_from_sheets.load_workbook') as mock_load:
+        with patch('apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets.load_workbook') as mock_load:
             mock_wb = MagicMock()
             mock_ws = MagicMock()
             mock_ws.title = "Projetos"
@@ -334,7 +334,7 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
         - Comando NÃO atualiza banco, apenas reporta
         """
         # Mock de fontes conflitantes
-        with patch('apps.core.management.commands.seed_projetos_fluxo_from_sheets.load_workbook') as mock_load:
+        with patch('apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets.load_workbook') as mock_load:
             mock_wb_controle = MagicMock()
             mock_ws_controle = MagicMock()
             mock_ws_controle.title = "Projetos"

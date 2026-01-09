@@ -1,0 +1,45 @@
+# ================================================================
+# Backend .dockerignore — AS v2
+# ================================================================
+# Files excluded from Docker build context (not copied to image)
+# ================================================================
+
+# Development scripts (not needed in production)
+scripts/
+
+# Python cache
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env.local
+.env.development
+*.local
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Documentation (not needed in runtime)
+docs/
+
+# Git
+.git/
+.gitignore

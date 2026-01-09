@@ -76,6 +76,11 @@ if ENVIRONMENT == "production":
 # Para excluir do deploy: INCLUDE_ETL=false
 INCLUDE_ETL = os.getenv("INCLUDE_ETL", "true").lower() == "true"
 
+# Dev Tools Module (dev_tools) - Seeds, backfills, fixtures
+# Default: True (inclui para manter compatibilidade)
+# Para excluir do deploy: INCLUDE_DEV_TOOLS=false
+INCLUDE_DEV_TOOLS = os.getenv("INCLUDE_DEV_TOOLS", "true").lower() == "true"
+
 INSTALLED_APPS = [
     # Django core
     "django.contrib.admin.apps.SimpleAdminConfig",  # Disables autodiscover (custom admin site)
@@ -97,6 +102,10 @@ INSTALLED_APPS = [
 # Incluir ETL apenas se INCLUDE_ETL=true
 if INCLUDE_ETL:
     INSTALLED_APPS.append("apps.dat_ingest")
+
+# Incluir Dev Tools apenas se INCLUDE_DEV_TOOLS=true
+if INCLUDE_DEV_TOOLS:
+    INSTALLED_APPS.append("apps.dev_tools")
 
 # ================================================================
 # AUTH USER MODEL

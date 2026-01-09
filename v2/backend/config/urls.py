@@ -35,8 +35,13 @@ urlpatterns = [
     path("", include("django_prometheus.urls")),
     # API
     path("api/", include("apps.core.urls")),
-    path("api/", include("apps.dat_ingest.urls")),  # Fase 5: ETL Observability
 ]
+
+# Incluir URLs do ETL apenas se o app estiver instalado (INCLUDE_ETL=true)
+if "apps.dat_ingest" in settings.INSTALLED_APPS:
+    urlpatterns.append(
+        path("api/", include("apps.dat_ingest.urls")),  # Fase 5: ETL Observability
+    )
 
 # Static/Media files (development only)
 if settings.DEBUG:

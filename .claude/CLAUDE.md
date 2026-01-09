@@ -108,6 +108,24 @@ v1 está congelado. Qualquer mudança exige branch `fix/v1-*`, PR para `main-v1`
 
 Fluxo: branch → commits → push → PR → CI verde → merge via GitHub
 
+### 🛠️ CP-08: INCLUDE_DEV_TOOLS (Ferramentas de Desenvolvimento)
+
+| Ambiente | INCLUDE_DEV_TOOLS | Resultado |
+|----------|-------------------|-----------|
+| Dev | `true` (default) | Seeds disponíveis |
+| Staging | `true` | Seeds disponíveis |
+| Prod | `false` | Seeds indisponíveis |
+
+**Commands em `apps/dev_tools`**:
+- `seed_*` — Dados iniciais (usuarios, projetos, RBAC)
+- `backfill_*` — Migracoes de dados
+- `fix_*` — Correcoes unicas
+- `cleanup_e2e_data` — Limpeza E2E
+
+**Commands em `apps/core`** (sempre disponíveis):
+- `preagenda_to_gcal` — Sync Google Calendar
+- `rotate_gcal_encryption_key` — Rotacao de chave
+
 ---
 
 ## 🏗️ Arquitetura Atual

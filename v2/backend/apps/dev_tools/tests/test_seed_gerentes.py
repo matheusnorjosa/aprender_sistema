@@ -263,7 +263,7 @@ class TestSeedGerentesCommand:
 
     def test_generate_username_function(self):
         """Test username generation from names."""
-        from apps.core.management.commands.seed_gerentes import generate_username
+        from apps.dev_tools.management.commands.seed_gerentes import generate_username
 
         # Test simple name
         assert generate_username("Fernanda", "Ramos Lopes") == "fernanda.lopes"

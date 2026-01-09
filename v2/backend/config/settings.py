@@ -71,6 +71,11 @@ if ENVIRONMENT == "production":
 # ================================================================
 # INSTALLED APPS
 # ================================================================
+# ETL Module (dat_ingest) - Opcional em produção
+# Default: True (inclui ETL para manter compatibilidade)
+# Para excluir do deploy: INCLUDE_ETL=false
+INCLUDE_ETL = os.getenv("INCLUDE_ETL", "true").lower() == "true"
+
 INSTALLED_APPS = [
     # Django core
     "django.contrib.admin.apps.SimpleAdminConfig",  # Disables autodiscover (custom admin site)
@@ -87,8 +92,11 @@ INSTALLED_APPS = [
     "django_celery_results",
     # AS v2 apps
     "apps.core",
-    "apps.dat_ingest",
 ]
+
+# Incluir ETL apenas se INCLUDE_ETL=true
+if INCLUDE_ETL:
+    INSTALLED_APPS.append("apps.dat_ingest")
 
 # ================================================================
 # AUTH USER MODEL

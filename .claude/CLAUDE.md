@@ -131,14 +131,26 @@ Fluxo: branch → commits → push → PR → CI verde → merge via GitHub
 ## 🏗️ Arquitetura Atual
 
 - **Backend Modular**: `models/`, `serializers/`, `views/`, `services/gcal/` (PRs #213-#217)
-- **Type Hints 100%**: 42 arquivos, ~18k linhas tipadas (PRs #108-#116)
+- **Type Hints**: Pyright strict mode - [Plano 100% Coverage](../v2/docs/PLAN_type_hints_100.md) (Epic #342)
 - **RBAC**: Setor + Função ([PLANO_RBAC_SETOR_FUNCAO.md](.claude/PLANO_RBAC_SETOR_FUNCAO.md))
-- **Observabilidade**: Prometheus + Grafana (MP1), Structured Logging (MP2)
+- **Observabilidade**: Structured Logging (MP2), Monitoramento via plataforma do provedor
+- **Maturidade**: [Plano Gaps de Maturidade](../v2/docs/PLAN_maturity_gaps.md) (Epic #360)
+- **Infraestrutura**: [Plano de Produção 3 VMs](../v2/docs/PLAN_infrastructure_scaling.md) (Epic #371)
+- **Multi-Setor**: [Plano Disponibilidade Multi-Setor](../v2/docs/PLAN_multi_sector_availability.md) (Epic #379)
 
 📖 **Documentação Detalhada**:
 - Origem: [v2/docs/PROJETO_ORIGEM.md](../v2/docs/PROJETO_ORIGEM.md)
 - Type Hints: Pyright 1.1.382, `cd v2/backend && pyright apps/core`
 - Google Calendar: [v2/docs/GUIDE_GCAL.md](../v2/docs/GUIDE_GCAL.md)
+- Deploy: [v2/docs/DEPLOY_CHECKLIST.md](../v2/docs/DEPLOY_CHECKLIST.md)
+
+### 🖥️ Infraestrutura de Produção
+
+| VM | Specs | Função |
+|----|-------|--------|
+| VM01_App | 4vCPU/16GB/60GB | Nginx + Gunicorn + Celery |
+| VM02_Banco | 4vCPU/16GB/300GB | PostgreSQL |
+| VM03_Redis | 2vCPU/4GB/20GB | Cache + Sessions + Broker |
 
 ---
 

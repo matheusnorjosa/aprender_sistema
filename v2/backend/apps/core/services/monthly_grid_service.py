@@ -40,6 +40,7 @@ def build_monthly_grid(
     year: int,
     month: int,
     role: str,
+    gerencia_id: int | None = None,
     sector: str | None = None,
     q: str | None = None,
     allowed_user_ids: list[UserId] | None = None,
@@ -51,6 +52,9 @@ def build_monthly_grid(
         year: Ano (YYYY)
         month: Mês (1..12)
         role: "FORMADOR" ou "COORDENADOR"
+        gerencia_id: ID da gerência para filtrar. Quando especificado, filtra
+            participações e eventos apenas dessa gerência. Quando None, mantém
+            comportamento legado (apenas fluxo SUPER).
         sector: Filtro opcional por setor (projeto.nome)
         q: Filtro opcional por nome/email (icontains)
         allowed_user_ids: Lista de IDs de usuários permitidos (None = todos)
@@ -95,11 +99,19 @@ def build_monthly_grid(
         datetime.combine(year_end, datetime.max.time()), tz
     )
 
-    # 1. Pessoas (via Participation em projetos SUPER apenas)
-    participations_qs = Participation.objects.filter(
-        role=role,
-        solicitacao__projeto__fluxo='SUPER'  # Apenas projetos SUPER (Superintendência)
-    )
+    # 1. Pessoas (via Participation) - filtrar por gerência quando especificado
+    participations_qs = Participation.objects.filter(role=role)
+
+    if gerencia_id is not None:
+        # Filtrar por gerência específica
+        participations_qs = participations_qs.filter(
+            solicitacao__projeto__gerencia_id=gerencia_id
+        )
+    else:
+        # Fallback para comportamento anterior (apenas SUPER)
+        participations_qs = participations_qs.filter(
+            solicitacao__projeto__fluxo='SUPER'
+        )
 
     if q and q.strip():
         q_lower = q.strip().lower()
@@ -139,6 +151,10 @@ def build_monthly_grid(
 
     if sector and sector.strip():
         events_q = events_q.filter(projeto__nome__iexact=sector.strip())
+
+    # Filtrar eventos por gerência quando especificado
+    if gerencia_id is not None:
+        events_q = events_q.filter(projeto__gerencia_id=gerencia_id)
 
     # Prefetch participations do role específico
     events_q = events_q.prefetch_related(

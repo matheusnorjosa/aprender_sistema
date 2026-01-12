@@ -271,3 +271,64 @@ class IsOwnerOrPrivileged(permissions.BasePermission):  # type: ignore[misc]
         # Owner pode editar sua própria solicitação
         obj_usuario = getattr(obj, 'usuario', None)
         return obj_usuario == request.user
+
+
+class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Permissão para acesso à grade mensal de disponibilidade por setor.
+
+    Regras:
+    - Superusers: acesso a todos os setores
+    - Grupo "Controle": BLOQUEADO (não tem acesso à grade mensal)
+    - Outros: acesso apenas à própria gerência (via EquipeGerencia)
+
+    A view deve passar gerencia_id via kwargs. Esta permissão verifica se o
+    usuário tem vínculo com a gerência solicitada.
+
+    Usado em: MonthlyAvailabilityView, AvailabilityBlockViewSet
+    """
+
+    message = "Você não tem acesso a esta gerência."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        # Superusers sempre podem acessar tudo
+        if getattr(request.user, 'is_superuser', False):
+            return True
+
+        # Grupo "Controle" não tem acesso à grade mensal
+        if request.user.groups.filter(name="Controle").exists():  # type: ignore[attr-defined]
+            self.message = "O grupo Controle não tem acesso à grade mensal de disponibilidade."
+            return False
+
+        # Import local para evitar circular
+        from apps.core.models import EquipeGerencia
+
+        # Obter gerencia_id da URL (via kwargs)
+        gerencia_id = view.kwargs.get('gerencia_id')  # type: ignore[attr-defined]
+        if gerencia_id is None:
+            # Se não há gerencia_id na URL, verificar query params
+            gerencia_id = request.query_params.get('gerencia_id')
+
+        if gerencia_id is None:
+            # Sem gerencia_id especificado - permitir se usuário tem pelo menos uma gerência
+            # (a view vai usar a gerência default do usuário)
+            user_has_gerencia = EquipeGerencia.objects.filter(
+                usuario=request.user
+            ).exists()
+            if not user_has_gerencia:
+                self.message = "Usuário não está vinculado a nenhuma gerência."
+            return user_has_gerencia
+
+        # Verificar se o usuário tem vínculo com a gerência via EquipeGerencia
+        has_access = EquipeGerencia.objects.filter(
+            usuario=request.user,
+            gerencia_id=gerencia_id,
+        ).exists()
+
+        if not has_access:
+            self.message = "Você não tem acesso a esta gerência."
+
+        return has_access

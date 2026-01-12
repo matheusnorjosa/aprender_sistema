@@ -1,0 +1,23 @@
+# Aprender Sistema - Backup Cron Jobs
+# Copy to /etc/cron.d/aprender-backup on VM02_Banco
+#
+# Requires:
+# - /opt/scripts/backup_db.sh (copy from v2/infra/scripts/)
+# - /var/backups/aprender directory
+# - /var/lib/postgresql/wal_archive directory
+
+# Environment
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# Daily full backup at 3:00 AM
+0 3 * * * postgres /opt/scripts/backup_db.sh >> /var/log/aprender/backup.log 2>&1
+
+# Cleanup old backups (keep 7 days) at 4:00 AM
+0 4 * * * postgres find /var/backups/aprender -name "*.sql.gz" -mtime +7 -delete
+
+# Cleanup old WAL archives (keep 7 days) at 4:30 AM
+30 4 * * * postgres find /var/lib/postgresql/wal_archive -name "*.gz" -mtime +7 -delete
+
+# Weekly backup verification (Sunday 5:00 AM)
+0 5 * * 0 postgres /opt/scripts/verify_backup.sh >> /var/log/aprender/backup.log 2>&1

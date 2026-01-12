@@ -5,6 +5,11 @@ Core API URLs (v2-only, views ativas isoladas)
 
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularSwaggerView,
+    SpectacularRedocView,
+)
 
 # Imports de módulos isolados (GAP-001 fix)
 from .views_basic import CurrentUserView, api_root
@@ -269,5 +274,9 @@ urlpatterns = [
     path("config/", config_view, name="config"),
     # Issue #311: Dashboard Overview
     path("dashboard/overview/", dashboard_overview, name="dashboard-overview"),
+    # API Documentation (drf-spectacular)
+    path("schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("docs/", SpectacularSwaggerView.as_view(url_name="core:schema"), name="swagger-ui"),
+    path("redoc/", SpectacularRedocView.as_view(url_name="core:schema"), name="redoc"),
     path("", include(router.urls)),
 ]

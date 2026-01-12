@@ -68,6 +68,12 @@ if ENVIRONMENT == "production":
         print("⚠️  WARNING: SECRET_KEY muito curta (recomendado: 50+ caracteres)", file=sys.stderr)
         print("   Gere uma chave mais segura para produção", file=sys.stderr)
 
+    # WARNING: GCAL_CLIENT=fake em produção
+    if os.getenv("GCAL_CLIENT", "fake") == "fake":
+        print("⚠️  WARNING: GCAL_CLIENT=fake em produção", file=sys.stderr)
+        print("   Eventos não serão sincronizados com Google Calendar", file=sys.stderr)
+        print("   Configure GCAL_CLIENT=google para integração real", file=sys.stderr)
+
 # ================================================================
 # INSTALLED APPS
 # ================================================================

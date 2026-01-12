@@ -492,3 +492,103 @@ def preview_then_apply_gcal() -> dict[str, Any]:
         details=result,
     )
     return result
+
+
+@shared_task(
+    bind=True,
+    name="apps.core.tasks.queue_gcal_sync_retry",
+    max_retries=10,
+    default_retry_delay=300,  # 5 minutes
+)
+def queue_gcal_sync_retry(
+    self: Any,
+    solicitation_id: int,
+    *,
+    dry_run: bool = False,
+    apply_blocked: bool = False,
+) -> dict[str, Any]:
+    """
+    Retry GCal sync when circuit breaker closes (Gap 6 - PLAN_maturity_gaps.md).
+
+    This task is queued when the circuit breaker is open. It waits for the
+    circuit to close before attempting to sync.
+
+    Args:
+        solicitation_id: ID of the Solicitacao to sync
+        dry_run: If True, don't persist changes
+        apply_blocked: If True, apply even without GCAL_CLIENT configured
+
+    Returns:
+        dict: Result with action, status, and any errors
+    """
+    from apps.core.models import Solicitacao, AuditLog
+    from apps.core.services.gcal.circuit_breaker import gcal_breaker
+
+    # Check circuit breaker state
+    if str(gcal_breaker.current_state) == "open":
+        # Circuit still open, retry later
+        logger.info(
+            f"Circuit breaker still open for Solicitacao #{solicitation_id}, "
+            f"retrying in 60s (attempt {self.request.retries + 1}/{self.max_retries})"
+        )
+        raise self.retry(countdown=60)
+
+    # Circuit is closed or half-open, attempt sync
+    try:
+        s = Solicitacao.objects.get(id=solicitation_id)
+
+        from apps.core.services.gcal_sync_service import apply_one_solicitacao
+
+        outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked)
+
+        # Log successful retry
+        if not dry_run:
+            AuditLog.objects.create(
+                usuario=None,
+                action="GCAL_RETRY_SUCCESS",
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_id": s.id,
+                    "action": outcome.action,
+                    "external_event_id": outcome.external_event_id,
+                    "retry_attempt": self.request.retries + 1,
+                },
+            )
+
+        return {
+            "action": outcome.action,
+            "solicitation_id": outcome.solicitation_id,
+            "external_event_id": outcome.external_event_id,
+            "summary": outcome.summary,
+            "retry_attempt": self.request.retries + 1,
+            "error": None,
+        }
+
+    except Solicitacao.DoesNotExist:
+        return {
+            "action": "ERROR",
+            "solicitation_id": solicitation_id,
+            "external_event_id": None,
+            "summary": f"Solicitação #{solicitation_id} não encontrada",
+            "error": "DoesNotExist",
+        }
+    except Exception as e:
+        # Check if it's a circuit breaker error
+        from apps.core.services.gcal.circuit_breaker import CircuitBreakerError
+
+        if isinstance(e, CircuitBreakerError):
+            logger.warning(
+                f"Circuit breaker triggered during retry for #{solicitation_id}, "
+                f"requeing (attempt {self.request.retries + 1}/{self.max_retries})"
+            )
+            raise self.retry(countdown=60, exc=e)
+
+        # Other errors - log and propagate
+        logger.exception(f"Error during GCal retry for #{solicitation_id}")
+        return {
+            "action": "ERROR",
+            "solicitation_id": solicitation_id,
+            "external_event_id": None,
+            "summary": f"Erro ao sincronizar: {str(e)}",
+            "error": str(e)[:500],
+        }

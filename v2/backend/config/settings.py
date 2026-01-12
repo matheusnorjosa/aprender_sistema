@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third-party
     "rest_framework",
+    "drf_spectacular",  # API documentation (Swagger/ReDoc)
     "corsheaders",
     "django_prometheus",  # MP1: Metrics collection
     "django_celery_beat",
@@ -332,6 +333,35 @@ REST_FRAMEWORK = {
         "user": "1000/hour",
         "availability_check": "60/min",  # 60 requests por minuto para availability check
     },
+    # API Schema (drf-spectacular)
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# ================================================================
+# DRF SPECTACULAR (API Documentation)
+# ================================================================
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Aprender Sistema API",
+    "DESCRIPTION": "API para gestão de eventos de formação e solicitações do Aprender Sistema.",
+    "VERSION": "2.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": "/api/",
+    # Contact info
+    "CONTACT": {
+        "name": "Equipe AS v2",
+    },
+    # Tags for endpoint grouping
+    "TAGS": [
+        {"name": "auth", "description": "Autenticação e sessões"},
+        {"name": "solicitacoes", "description": "Gestão de solicitações de eventos"},
+        {"name": "availability", "description": "Disponibilidade e bloqueios"},
+        {"name": "gcal", "description": "Integração Google Calendar"},
+        {"name": "dat", "description": "Módulo DAT (cadastros, ações, compras)"},
+        {"name": "metrics", "description": "Métricas e relatórios"},
+        {"name": "options", "description": "Opções para formulários"},
+        {"name": "admin", "description": "Administração de entidades"},
+    ],
 }
 
 # Relax throttling in development
@@ -646,3 +676,46 @@ if SENTRY_DSN:
     # Optional: Set user context in views/middleware
     # from sentry_sdk import set_user
     # set_user({"id": user.id, "email": user.email, "username": user.username})
+
+# ================================================================
+# QUERY PROFILING (Development & Staging)
+# ================================================================
+# Gap 5: Query Profiling tools for N+1 detection and performance analysis
+
+# Django Debug Toolbar (DEBUG mode only)
+if DEBUG:
+    INSTALLED_APPS += ["debug_toolbar"]
+    MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
+    INTERNAL_IPS = ["127.0.0.1", "localhost", "0.0.0.0"]
+    DEBUG_TOOLBAR_CONFIG = {
+        "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG,
+        "DISABLE_PANELS": {
+            "debug_toolbar.panels.redirects.RedirectsPanel",
+            "debug_toolbar.panels.profiling.ProfilingPanel",
+        },
+        "SHOW_TEMPLATE_CONTEXT": True,
+    }
+
+# Django Silk (Staging profiler)
+if ENVIRONMENT == "staging":
+    INSTALLED_APPS += ["silk"]
+    MIDDLEWARE += ["silk.middleware.SilkyMiddleware"]
+    SILKY_PYTHON_PROFILER = True
+    SILKY_PYTHON_PROFILER_BINARY = True
+    SILKY_META = True
+    SILKY_MAX_REQUEST_BODY_SIZE = -1  # Unlimited
+    SILKY_MAX_RESPONSE_BODY_SIZE = 1024  # 1KB
+    SILKY_INTERCEPT_PERCENT = 100  # Profile all requests
+
+# NPlusOne (N+1 query detection in dev/test)
+TESTING = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
+if DEBUG or TESTING:
+    INSTALLED_APPS += ["nplusone.ext.django"]
+    MIDDLEWARE += ["nplusone.ext.django.NPlusOneMiddleware"]
+    # Raise exception on N+1 in tests, warn in dev
+    NPLUSONE_RAISE = TESTING
+    NPLUSONE_LOG = not TESTING
+    NPLUSONE_WHITELIST = [
+        # Whitelist known N+1 patterns that are acceptable
+        {"model": "auth.Group"},  # Groups are always fetched with user
+    ]

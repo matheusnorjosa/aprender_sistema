@@ -1,7 +1,7 @@
 """
 AS v2 — GCal Sync Utilities
 
-Utility functions for retry, hashing, etc.
+Utility functions for retry, hashing, circuit breaker integration.
 """
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 
@@ -162,3 +162,54 @@ def _payload_hash(payload: JsonDict) -> PayloadHash:
     """
     serialized: str = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha1(serialized.encode("utf-8")).hexdigest()
+
+
+def _retry_with_circuit_breaker(
+    func: Callable[[], T],
+    *,
+    operation_name: str = "operation",
+    max_retries: int = 3,
+    initial_delay: float = 1.0,
+) -> T:
+    """
+    Execute function with retry, backoff, AND circuit breaker protection.
+
+    Combines _retry_with_backoff with circuit breaker pattern.
+    If circuit is open, raises CircuitBreakerError immediately.
+    Failed operations count toward circuit breaker failure threshold.
+
+    Args:
+        func: Function to execute (no arguments, use lambda if needed)
+        operation_name: Operation name for logs
+        max_retries: Maximum retry attempts (default: 3)
+        initial_delay: Initial delay in seconds (default: 1.0)
+
+    Returns:
+        Result of the function
+
+    Raises:
+        CircuitBreakerError: If circuit is open
+        Exception: Last exception after exhausting retries
+    """
+    from .circuit_breaker import CircuitBreakerError, gcal_breaker
+
+    # Check circuit state first
+    if str(gcal_breaker.current_state) == "open":
+        logger.warning(f"{operation_name}: Circuit breaker is OPEN, failing fast")
+        raise CircuitBreakerError(gcal_breaker)
+
+    try:
+        # Use circuit breaker to track success/failure
+        result = gcal_breaker.call(
+            _retry_with_backoff,
+            func,
+            operation_name=operation_name,
+            max_retries=max_retries,
+            initial_delay=initial_delay,
+        )
+        return result
+    except CircuitBreakerError:
+        logger.warning(
+            f"{operation_name}: Circuit breaker opened due to repeated failures"
+        )
+        raise

@@ -27,7 +27,16 @@ export default defineConfig({
         'src/setupTests.js',
         '**/*.config.js',
         '**/dist/**',
+        '**/*.test.{js,jsx,ts,tsx}',
+        '**/test/**',
+        '**/e2e/**',
       ],
+      thresholds: {
+        statements: 70,
+        branches: 70,
+        functions: 70,
+        lines: 70,
+      },
     },
   },
   resolve: {

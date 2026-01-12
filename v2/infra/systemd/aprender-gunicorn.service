@@ -1,0 +1,36 @@
+# Aprender Sistema - Gunicorn Service
+# Copy to /etc/systemd/system/aprender-gunicorn.service
+#
+# Enable: sudo systemctl enable aprender-gunicorn
+# Start:  sudo systemctl start aprender-gunicorn
+# Status: sudo systemctl status aprender-gunicorn
+# Logs:   sudo journalctl -u aprender-gunicorn -f
+
+[Unit]
+Description=Aprender Sistema Gunicorn
+After=network.target
+
+[Service]
+Type=notify
+User=aprender
+Group=aprender
+RuntimeDirectory=aprender
+WorkingDirectory=/var/www/aprender/backend
+Environment="PATH=/var/www/aprender/venv/bin"
+Environment="DJANGO_SETTINGS_MODULE=config.settings"
+ExecStart=/var/www/aprender/venv/bin/gunicorn config.wsgi:application -c /etc/aprender/gunicorn.conf.py
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=30
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/www/aprender/media /var/log/aprender /run/aprender
+
+[Install]
+WantedBy=multi-user.target

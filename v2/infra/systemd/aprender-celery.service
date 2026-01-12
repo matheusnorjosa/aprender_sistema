@@ -1,0 +1,48 @@
+# Aprender Sistema - Celery Worker Service
+# Copy to /etc/systemd/system/aprender-celery.service
+#
+# Enable: sudo systemctl enable aprender-celery
+# Start:  sudo systemctl start aprender-celery
+# Status: sudo systemctl status aprender-celery
+# Logs:   sudo journalctl -u aprender-celery -f
+
+[Unit]
+Description=Aprender Sistema Celery Worker
+After=network.target redis.service
+
+[Service]
+Type=forking
+User=aprender
+Group=aprender
+WorkingDirectory=/var/www/aprender/backend
+Environment="PATH=/var/www/aprender/venv/bin"
+Environment="DJANGO_SETTINGS_MODULE=config.settings"
+
+# Start 4 workers with different queue assignments
+# worker1,2: high + default (time-critical tasks)
+# worker3: default + low
+# worker4: low (ETL/batch tasks)
+ExecStart=/var/www/aprender/venv/bin/celery -A config multi start worker1 worker2 worker3 worker4 \
+    --pidfile=/run/aprender/celery-%%n.pid \
+    --logfile=/var/log/aprender/celery-%%n.log \
+    --loglevel=INFO \
+    -Q:worker1 high,default \
+    -Q:worker2 high,default \
+    -Q:worker3 default,low \
+    -Q:worker4 low
+
+ExecStop=/var/www/aprender/venv/bin/celery -A config multi stopwait worker1 worker2 worker3 worker4 \
+    --pidfile=/run/aprender/celery-%%n.pid
+
+ExecReload=/var/www/aprender/venv/bin/celery -A config multi restart worker1 worker2 worker3 worker4 \
+    --pidfile=/run/aprender/celery-%%n.pid
+
+Restart=on-failure
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

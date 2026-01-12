@@ -687,8 +687,8 @@ if DEBUG:
     INSTALLED_APPS += ["debug_toolbar"]
     MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
     INTERNAL_IPS = ["127.0.0.1", "localhost", "0.0.0.0"]
-    DEBUG_TOOLBAR_CONFIG = {
-        "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG,
+    DEBUG_TOOLBAR_CONFIG: dict[str, object] = {
+        "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG,  # type: ignore[misc]
         "DISABLE_PANELS": {
             "debug_toolbar.panels.redirects.RedirectsPanel",
             "debug_toolbar.panels.profiling.ProfilingPanel",

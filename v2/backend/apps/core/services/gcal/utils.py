@@ -12,7 +12,7 @@ import json
 import logging
 import time
 from collections.abc import Callable
-from typing import TypeVar
+from typing import TypeVar, cast
 
 from apps.core.types import JsonDict, PayloadHash
 
@@ -207,7 +207,7 @@ def _retry_with_circuit_breaker(
             max_retries=max_retries,
             initial_delay=initial_delay,
         )
-        return result
+        return cast(T, result)
     except CircuitBreakerError:
         logger.warning(
             f"{operation_name}: Circuit breaker opened due to repeated failures"

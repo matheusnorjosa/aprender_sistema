@@ -271,3 +271,54 @@ class IsOwnerOrPrivileged(permissions.BasePermission):  # type: ignore[misc]
         # Owner pode editar sua própria solicitação
         obj_usuario = getattr(obj, 'usuario', None)
         return obj_usuario == request.user
+
+
+class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Permissão para acesso à grade mensal de disponibilidade por setor.
+
+    Regras (conforme PLAN_multi_sector_availability.md):
+    - Superusers: acesso a todos os setores
+    - Grupo "Controle": BLOQUEADO (não tem acesso à grade mensal)
+    - Sem gerencia_id: permite (assume SUPER - comportamento atual)
+    - Com gerencia_id: verifica se usuário pertence à gerência via EquipeGerencia
+
+    Usado em: MonthlyAvailabilityView
+    """
+
+    message = "Você não tem acesso a este setor."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        # Superusers sempre podem acessar tudo
+        if getattr(request.user, 'is_superuser', False):
+            return True
+
+        # Grupo "Controle" não tem acesso à grade mensal
+        if request.user.groups.filter(name="Controle").exists():  # type: ignore[attr-defined]
+            self.message = "O grupo Controle não tem acesso à grade mensal de disponibilidade."
+            return False
+
+        # Obter gerencia_id da URL (via kwargs) ou query params
+        gerencia_id = view.kwargs.get('gerencia_id')  # type: ignore[attr-defined]
+        if gerencia_id is None:
+            gerencia_id = request.query_params.get('gerencia_id')
+
+        # Sem gerencia_id = comportamento SUPER (permitido para todos autenticados)
+        if gerencia_id is None:
+            return True
+
+        # Com gerencia_id = verificar se usuário pertence à gerência
+        from apps.core.models import EquipeGerencia
+
+        has_access = EquipeGerencia.objects.filter(
+            usuario=request.user,
+            gerencia_id=gerencia_id,
+        ).exists()
+
+        if not has_access:
+            self.message = "Você não tem acesso a este setor."
+
+        return has_access

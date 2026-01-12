@@ -1,0 +1,35 @@
+# Aprender Sistema - Celery Beat Service
+# Copy to /etc/systemd/system/aprender-celerybeat.service
+#
+# Enable: sudo systemctl enable aprender-celerybeat
+# Start:  sudo systemctl start aprender-celerybeat
+# Status: sudo systemctl status aprender-celerybeat
+# Logs:   sudo journalctl -u aprender-celerybeat -f
+
+[Unit]
+Description=Aprender Sistema Celery Beat
+After=network.target redis.service
+
+[Service]
+Type=simple
+User=aprender
+Group=aprender
+WorkingDirectory=/var/www/aprender/backend
+Environment="PATH=/var/www/aprender/venv/bin"
+Environment="DJANGO_SETTINGS_MODULE=config.settings"
+
+ExecStart=/var/www/aprender/venv/bin/celery -A config beat \
+    --pidfile=/run/aprender/celerybeat.pid \
+    --logfile=/var/log/aprender/celerybeat.log \
+    --loglevel=INFO \
+    --scheduler=django_celery_beat.schedulers:DatabaseScheduler
+
+Restart=on-failure
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

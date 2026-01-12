@@ -567,6 +567,11 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
+    # --- Reverse Proxy Support ---
+    # Required when running behind Nginx with SSL termination
+    # Nginx sets X-Forwarded-Proto header to indicate original protocol
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
     # --- HSTS (HTTP Strict Transport Security) ---
     # Força navegadores a usar HTTPS por 1 ano
     # Previne ataques SSL stripping e downgrade

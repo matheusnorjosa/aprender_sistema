@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from .models import AvailabilityBlock, Municipio, Usuario
+from .models import AvailabilityBlock, EquipeGerencia, Municipio, Usuario
 from .permissions import IsControleOrSuper
 from .serializers import AvailabilityBlockSerializer
 from .services.availability_service import check_conflicts
@@ -34,6 +34,13 @@ def is_privileged_user(user):
     )
 
 
+def get_user_gerencias_ids(user) -> list[int]:
+    """Retorna IDs de todas as gerências do usuário (via EquipeGerencia)."""
+    return list(
+        EquipeGerencia.objects.filter(usuario=user).values_list("gerencia_id", flat=True)
+    )
+
+
 class AvailabilityBlockViewSet(viewsets.ModelViewSet):
     """
     ViewSet para Bloqueios de Disponibilidade.
@@ -41,6 +48,10 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
     Formadores podem criar bloqueios para si mesmos.
     Usuario é preenchido automaticamente com request.user.
     Status é auto-aprovado (bloqueios são informações factuais).
+
+    Permissões (conforme PLAN_multi_sector_availability.md):
+        - Privilegiados (superuser, Superintendência, Controle): veem todos
+        - Outros: bloqueios de usuários da mesma gerência
     """
 
     queryset = AvailabilityBlock.objects.all()
@@ -48,12 +59,24 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self) -> QuerySet:
-        if (
-            self.request.user.is_superuser
-            or self.request.user.groups.filter(name="Superintendência").exists()
-        ):
+        user = self.request.user
+
+        # Privilegiados (superuser, Superintendência, Controle) veem todos
+        if is_privileged_user(user):
             return AvailabilityBlock.objects.all()
-        return AvailabilityBlock.objects.filter(usuario=self.request.user)
+
+        # Outros: bloqueios de usuários das suas gerências
+        gerencias_ids = get_user_gerencias_ids(user)
+        if not gerencias_ids:
+            # Sem gerência, vê apenas os próprios
+            return AvailabilityBlock.objects.filter(usuario=user)
+
+        # Usuários na mesma gerência
+        usuarios_na_gerencia = EquipeGerencia.objects.filter(
+            gerencia_id__in=gerencias_ids
+        ).values_list("usuario_id", flat=True)
+
+        return AvailabilityBlock.objects.filter(usuario_id__in=usuarios_na_gerencia)
 
     def perform_create(self, serializer):
         """

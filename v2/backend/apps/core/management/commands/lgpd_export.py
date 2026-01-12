@@ -60,10 +60,8 @@ class Command(BaseCommand):
         """Execute LGPD data export."""
         from apps.core.models import (
             AuditLog,
-            Aprovacao,
             AvailabilityBlock,
-            Formador,
-            GCalUserCredential,
+            GoogleOAuthCredential,
             Solicitacao,
             Usuario,
         )
@@ -136,53 +134,42 @@ class Command(BaseCommand):
             )
         )
 
-        # Solicitations where user is a formador
-        formador_obj = Formador.objects.filter(usuario=user).first()
-        if formador_obj:
-            data["formador_info"] = {
-                "id": formador_obj.id,
-                "nome": formador_obj.nome,
-                "ativo": formador_obj.ativo,
-            }
-
-            # Events where user is assigned as formador
-            formador_events = Solicitacao.objects.filter(formadores=formador_obj)
-            data["events_as_formador"] = list(
-                formador_events.values(
-                    "id",
-                    "titulo",
-                    "status",
-                    "data_inicio",
-                    "data_fim",
-                    "municipio__nome",
-                )
-            )
-
-            # Availability blocks
-            blocks = AvailabilityBlock.objects.filter(formador=formador_obj)
-            data["availability_blocks"] = list(
-                blocks.values(
-                    "id",
-                    "tipo",
-                    "data_inicio",
-                    "data_fim",
-                    "motivo",
-                    "created_at",
-                )
-            )
-        else:
-            data["formador_info"] = None
-            data["events_as_formador"] = []
-            data["availability_blocks"] = []
-
-        # Approvals made by user
-        approvals = Aprovacao.objects.filter(aprovador=user)
-        data["approvals_made"] = list(
-            approvals.values(
+        # Solicitations where user is a formador (formadores is M2M to Usuario)
+        formador_events = Solicitacao.objects.filter(formadores=user)
+        data["events_as_formador"] = list(
+            formador_events.values(
                 "id",
-                "solicitacao_id",
+                "titulo",
                 "status",
-                "comentario",
+                "data_inicio",
+                "data_fim",
+                "municipio__nome",
+            )
+        )
+
+        # Availability blocks for user
+        blocks = AvailabilityBlock.objects.filter(formador=user)
+        data["availability_blocks"] = list(
+            blocks.values(
+                "id",
+                "tipo",
+                "data_inicio",
+                "data_fim",
+                "motivo",
+                "created_at",
+            )
+        )
+
+        # Approvals made by user (from AuditLog)
+        approval_logs = AuditLog.objects.filter(
+            usuario=user,
+            action__in=["APROVAR", "APPROVE", "REPROVAR", "REJECT"],
+        ).order_by("-created_at")[:50]
+        data["approvals_made"] = list(
+            approval_logs.values(
+                "id",
+                "action",
+                "details",
                 "created_at",
             )
         )
@@ -204,13 +191,16 @@ class Command(BaseCommand):
 
         # GCal credentials (if requested)
         if include_gcal:
-            gcal_cred = GCalUserCredential.objects.filter(user=user).first()
+            gcal_cred = GoogleOAuthCredential.objects.filter(user=user).first()
             if gcal_cred:
                 data["gcal_credentials"] = {
                     "has_credential": True,
                     "google_email": gcal_cred.google_email,
                     "created_at": gcal_cred.created_at.isoformat(),
-                    "last_used_at": gcal_cred.last_used_at.isoformat() if gcal_cred.last_used_at else None,
+                    "last_used_at": (
+                        gcal_cred.last_used_at.isoformat()
+                        if gcal_cred.last_used_at else None
+                    ),
                     # Note: We don't export actual tokens for security
                     "tokens": "(excluded for security)",
                 }

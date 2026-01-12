@@ -3,17 +3,18 @@ API View para grade mensal de disponibilidade.
 
 Endpoint: GET /api/availability/monthly
 Query params:
-    - year: int (YYYY)
-    - month: int (1..12)
-    - role: str ("FORMADOR" | "COORDENADOR")
-    - gerencia_id: int (opcional para superusers, obrigatório para outros)
-    - sector: str (opcional, filtro por projeto.nome dentro da gerência)
-    - q: str (opcional, filtro por nome/email)
+    - year: int (YYYY) - obrigatório
+    - month: int (1..12) - obrigatório
+    - role: str ("FORMADOR" | "COORDENADOR") - obrigatório
+    - gerencia_id: int (opcional) - Se omitido, assume SUPERINTENDENCIA (SUPER)
+    - sector: str (opcional) - Filtro por nome do projeto
+    - q: str (opcional) - Filtro por nome/email
 
-Permissões:
+Permissões (conforme PLAN_multi_sector_availability.md):
     - Superusers: acesso a todas as gerências
     - Controle: BLOQUEADO (sem acesso à grade mensal)
-    - Outros: apenas à própria gerência (via EquipeGerencia)
+    - Com gerencia_id: verifica se usuário pertence à gerência
+    - Sem gerencia_id: assume SUPER (comportamento atual)
 
 Cache Redis 5 minutos por (year, month, role, gerencia_id, sector, q).
 """
@@ -31,30 +32,21 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from django.core.cache import cache
 
-from apps.core.models import EquipeGerencia
 from apps.core.permissions import HasSectorAccess
 from apps.core.services.monthly_grid_service import build_monthly_grid
-
-
-def get_user_gerencia_id(user) -> int | None:
-    """
-    Retorna o ID da primeira gerência do usuário (via EquipeGerencia).
-    Usado para default quando não especificado e usuário não é superuser.
-    """
-    equipe = EquipeGerencia.objects.filter(usuario=user).first()
-    return equipe.gerencia_id if equipe else None
 
 
 class MonthlyAvailabilityView(APIView):
     """
     API para consultar grade mensal de disponibilidade.
 
-    GET /api/availability/monthly?year=2025&month=10&role=FORMADOR&gerencia_id=2[&sector=...][&q=...]
+    GET /api/availability/monthly?year=2025&month=10&role=FORMADOR[&gerencia_id=2][&sector=...][&q=...]
 
-    Permissões:
-        - Superusers: acesso a todas as gerências (gerencia_id opcional)
+    Permissões (conforme PLAN_multi_sector_availability.md):
+        - Superusers: acesso a todas as gerências
         - Controle: BLOQUEADO
-        - Outros: apenas à própria gerência (gerencia_id obrigatório ou default)
+        - Com gerencia_id: verifica se usuário pertence à gerência
+        - Sem gerencia_id: assume SUPER (comportamento atual)
 
     Returns:
         {
@@ -66,16 +58,7 @@ class MonthlyAvailabilityView(APIView):
         }
     """
 
-    def get_permissions(self):
-        """
-        Retorna permissões dinâmicas.
-        Superusers usam apenas IsAuthenticated.
-        Outros usam HasSectorAccess.
-        """
-        # Verificar se é superuser (antes de check_permissions)
-        if hasattr(self, 'request') and self.request.user.is_superuser:
-            return [IsAuthenticated()]
-        return [IsAuthenticated(), HasSectorAccess()]
+    permission_classes = [IsAuthenticated, HasSectorAccess]
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Validação de parâmetros básicos
@@ -110,7 +93,7 @@ class MonthlyAvailabilityView(APIView):
         sector = request.GET.get("sector", None)
         q = request.GET.get("q", None)
 
-        # Obter gerencia_id
+        # Obter gerencia_id (opcional - se omitido, assume SUPER)
         gerencia_id_str = request.GET.get("gerencia_id", None)
         gerencia_id: int | None = None
 
@@ -122,14 +105,7 @@ class MonthlyAvailabilityView(APIView):
                     {"error": "Parâmetro 'gerencia_id' deve ser um inteiro válido."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        elif not request.user.is_superuser:
-            # Para não-superusers sem gerencia_id, usar a gerência do usuário
-            gerencia_id = get_user_gerencia_id(request.user)
-            if gerencia_id is None:
-                return Response(
-                    {"error": "Usuário não está vinculado a nenhuma gerência."},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        # Se não fornecido, gerencia_id permanece None (assume SUPER no service)
 
         # Cache key (incluindo gerencia_id)
         cache_key = (

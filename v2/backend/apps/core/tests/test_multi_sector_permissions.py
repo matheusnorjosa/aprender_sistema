@@ -1,7 +1,7 @@
 """
 Testes para permissões e filtros multi-setor (Epic #379).
 
-Testa:
+Conforme PLAN_multi_sector_availability.md:
 - HasSectorAccess permission (Issue #381)
 - MonthlyAvailabilityView com gerencia_id (Issue #382)
 - AvailabilityBlockViewSet filtro por gerência (Issue #383)
@@ -30,7 +30,7 @@ class MockView:
 
 @pytest.mark.django_db
 class TestHasSectorAccessPermission(TestCase):
-    """Testes para HasSectorAccess permission."""
+    """Testes para HasSectorAccess permission (conforme plano Seção 3.3)."""
 
     def setUp(self):
         """Cria fixtures de teste."""
@@ -105,8 +105,8 @@ class TestHasSectorAccessPermission(TestCase):
         view = MockView()
         self.assertTrue(self.permission.has_permission(request, view))
 
-    def test_controle_user_is_blocked(self):
-        """Usuário do grupo Controle deve ser bloqueado."""
+    def test_controle_user_is_blocked_from_monthly_grid(self):
+        """Grupo Controle não tem acesso à grade mensal (conforme plano)."""
         request = self.factory.get("/")
         request.user = self.user_controle
         request.query_params = {"gerencia_id": str(self.gerencia_vidas.id)}
@@ -115,7 +115,7 @@ class TestHasSectorAccessPermission(TestCase):
         self.assertFalse(self.permission.has_permission(request, view))
 
     def test_user_can_access_own_gerencia(self):
-        """Usuário pode acessar sua própria gerência."""
+        """Usuário pode acessar sua própria gerência com gerencia_id."""
         request = self.factory.get("/")
         request.user = self.user_vidas
         request.query_params = {"gerencia_id": str(self.gerencia_vidas.id)}
@@ -132,29 +132,30 @@ class TestHasSectorAccessPermission(TestCase):
         view = MockView()
         self.assertFalse(self.permission.has_permission(request, view))
 
-    def test_user_without_gerencia_id_but_with_gerencia_is_allowed(self):
-        """Requisição sem gerencia_id mas com gerência vinculada é permitida."""
+    def test_user_without_gerencia_id_is_allowed_super_behavior(self):
+        """Sem gerencia_id = assume SUPER (permitido para autenticados)."""
         request = self.factory.get("/")
         request.user = self.user_vidas
         request.query_params = {}
 
         view = MockView()
-        # Deve permitir pois user_vidas tem gerência vinculada
+        # Conforme plano: sem gerencia_id assume SUPER (comportamento atual)
         self.assertTrue(self.permission.has_permission(request, view))
 
-    def test_user_without_gerencia_and_without_gerencia_id_is_denied(self):
-        """Requisição sem gerencia_id e sem gerência vinculada é negada."""
+    def test_user_without_gerencia_without_gerencia_id_is_allowed(self):
+        """Usuário sem gerência vinculada mas sem gerencia_id = permitido (SUPER)."""
         request = self.factory.get("/")
         request.user = self.user_sem_gerencia
         request.query_params = {}
 
         view = MockView()
-        self.assertFalse(self.permission.has_permission(request, view))
+        # Conforme plano: sem gerencia_id assume SUPER (comportamento atual)
+        self.assertTrue(self.permission.has_permission(request, view))
 
 
 @pytest.mark.django_db
 class TestMonthlyAvailabilityViewMultiSector(TestCase):
-    """Testes para MonthlyAvailabilityView com gerencia_id."""
+    """Testes para MonthlyAvailabilityView com gerencia_id (conforme plano Seção 3.4)."""
 
     def setUp(self):
         """Cria fixtures de teste."""
@@ -224,17 +225,18 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_user_defaults_to_own_gerencia(self):
-        """Usuário sem gerencia_id usa sua própria gerência como default."""
+    def test_user_without_gerencia_id_gets_super_data(self):
+        """Sem gerencia_id assume SUPER (conforme plano Seção 5)."""
         self.client.force_authenticate(user=self.user_vidas)
         response = self.client.get(
             "/api/availability/monthly/",
             {"year": 2025, "month": 1, "role": "FORMADOR"},
         )
+        # Conforme plano: sem gerencia_id = comportamento SUPER (permitido)
         self.assertEqual(response.status_code, 200)
 
     def test_controle_user_is_blocked(self):
-        """Usuário do grupo Controle deve ser bloqueado."""
+        """Grupo Controle não tem acesso à grade mensal."""
         self.client.force_authenticate(user=self.user_controle)
         response = self.client.get(
             "/api/availability/monthly/",
@@ -245,7 +247,7 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
 
 @pytest.mark.django_db
 class TestAvailabilityBlockViewSetMultiSector(TestCase):
-    """Testes para AvailabilityBlockViewSet filtro por gerência."""
+    """Testes para AvailabilityBlockViewSet filtro por gerência (conforme plano Seção 3.4)."""
 
     def setUp(self):
         """Cria fixtures de teste."""
@@ -253,6 +255,7 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
 
         # Criar grupos (get_or_create para evitar duplicatas)
         self.controle_group, _ = Group.objects.get_or_create(name="Controle")
+        self.superintendencia_group, _ = Group.objects.get_or_create(name="Superintendência")
 
         # Criar gerências com nomes únicos para este teste
         self.gerencia_vidas, _ = Gerencia.objects.get_or_create(
@@ -322,7 +325,7 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
         )
 
     def test_superuser_sees_all_blocks(self):
-        """Superuser deve ver todos os bloqueios (incluindo os criados no teste)."""
+        """Superuser deve ver todos os bloqueios."""
         self.client.force_authenticate(user=self.superuser)
         response = self.client.get("/api/availability-blocks/")
         self.assertEqual(response.status_code, 200)
@@ -333,7 +336,7 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
         self.assertIn(self.block_fluir.id, block_ids)
 
     def test_user_sees_only_same_gerencia_blocks(self):
-        """Usuário deve ver apenas bloqueios da sua gerência."""
+        """Usuário não-privilegiado vê apenas bloqueios da sua gerência."""
         self.client.force_authenticate(user=self.user_vidas)
         response = self.client.get("/api/availability-blocks/")
         self.assertEqual(response.status_code, 200)
@@ -344,15 +347,17 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
         # Verificar que NÃO vê o bloqueio de outra gerência
         self.assertNotIn(self.block_fluir.id, block_ids)
 
-    def test_controle_user_sees_no_blocks(self):
-        """Usuário do grupo Controle não deve ver bloqueios."""
+    def test_controle_user_sees_all_blocks(self):
+        """Controle é privilegiado e vê todos os bloqueios (conforme plano)."""
         self.client.force_authenticate(user=self.user_controle)
         response = self.client.get("/api/availability-blocks/")
         self.assertEqual(response.status_code, 200)
-        # Resposta é paginada, acessar results ou count
+        # Resposta é paginada, acessar results
         results = response.data.get("results", response.data)
-        count = response.data.get("count", len(results))
-        self.assertEqual(count, 0)
+        block_ids = [b["id"] for b in results]
+        # Controle é privilegiado conforme is_privileged_user()
+        self.assertIn(self.block_vidas.id, block_ids)
+        self.assertIn(self.block_fluir.id, block_ids)
 
     def test_user_can_create_own_block(self):
         """Usuário pode criar bloqueio para si mesmo."""

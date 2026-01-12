@@ -1,15 +1,30 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 // Backend URL para proxy (servidor-side apenas)
 // PROXY_TARGET é usado apenas pelo servidor Vite, não pelo browser
 // eslint-disable-next-line no-undef
 const API_URL = process.env.PROXY_TARGET || 'http://localhost:8002'
 
+// Gap 8 - PLAN_maturity_gaps.md: Bundle analysis
+// eslint-disable-next-line no-undef
+const ANALYZE = process.env.ANALYZE === 'true'
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Bundle visualizer - generates stats.html when ANALYZE=true
+    ANALYZE && visualizer({
+      filename: 'dist/stats.html',
+      open: true,
+      gzipSize: true,
+      brotliSize: true,
+      template: 'treemap', // 'sunburst', 'treemap', 'network'
+    }),
+  ].filter(Boolean),
   test: {
     globals: true,
     environment: 'jsdom',

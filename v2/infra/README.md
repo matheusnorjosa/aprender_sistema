@@ -14,14 +14,23 @@ infra/
 │   └── gunicorn.conf.py        # Gunicorn worker config
 ├── celery/
 │   └── celery.conf.py          # Celery config reference (actual config in Django)
+├── postgresql/
+│   ├── postgresql.conf         # PostgreSQL tuning (16GB RAM)
+│   └── pg_hba.conf             # Access control
+├── redis/
+│   └── redis.conf              # Redis config (3GB, AOF)
 ├── systemd/
 │   ├── aprender-gunicorn.service
 │   ├── aprender-celery.service
 │   └── aprender-celerybeat.service
+├── cron/
+│   └── aprender-backup         # Backup cron jobs
 └── scripts/
     ├── setup_vm01.sh           # Initial VM setup
     ├── deploy.sh               # Deploy script
-    └── backup_db.sh            # Database backup
+    ├── backup_db.sh            # Database backup
+    ├── verify_backup.sh        # Backup verification
+    └── restore_db.sh           # Database restore
 ```
 
 ## Quick Start
@@ -92,3 +101,4 @@ REDIS_PASSWORD=your-redis-password
 
 - [PLAN_infrastructure_scaling.md](../docs/PLAN_infrastructure_scaling.md)
 - [DEPLOY_CHECKLIST.md](../docs/DEPLOY_CHECKLIST.md)
+- [GUIDE_DR.md](../docs/GUIDE_DR.md) - Disaster Recovery & Backup

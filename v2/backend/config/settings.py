@@ -190,9 +190,12 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "aprender_password"),
         "HOST": os.getenv("DB_HOST", "db"),
         "PORT": os.getenv("DB_PORT", "5432"),
-        "CONN_MAX_AGE": 600,
+        "CONN_MAX_AGE": 60,  # Reutiliza conexões por 60s
+        "CONN_HEALTH_CHECKS": True,  # Valida conexões antes de reutilizar
         "OPTIONS": {
             "connect_timeout": 10,
+            # 30s query timeout em produção (evita queries lentas)
+            "options": "-c statement_timeout=30000" if ENVIRONMENT == "production" else "",
         },
     }
 }
@@ -204,12 +207,15 @@ CACHES = {
     "default": {
         # MP1: Use Prometheus-wrapped Redis cache for cache hit/miss metrics
         "BACKEND": "django_prometheus.cache.backends.redis.RedisCache",
-        "LOCATION": f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}/0",
+        "LOCATION": f"redis://:{os.getenv('REDIS_PASSWORD', '')}@{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}/0",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "SOCKET_CONNECT_TIMEOUT": 5,
             "SOCKET_TIMEOUT": 5,
+            "CONNECTION_POOL_KWARGS": {"max_connections": 50},  # Pool de conexões
         },
+        "KEY_PREFIX": "as2",  # Namespace para evitar colisões
+        "TIMEOUT": 300,  # 5 minutos default TTL
     }
 }
 

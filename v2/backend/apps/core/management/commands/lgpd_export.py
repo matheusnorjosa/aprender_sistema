@@ -86,7 +86,8 @@ class Command(BaseCommand):
             user = Usuario.objects.filter(email__iexact=email).first()
 
         if not user:
-            raise CommandError(f"User not found with {'CPF ' + cpf if cpf else 'email ' + email}")
+            identifier = f"CPF {cpf}" if cpf else f"email {email}"
+            raise CommandError(f"User not found with {identifier}")
 
         self.stdout.write(f"Exporting data for user: {user.username} (ID: {user.id})")
 

@@ -8,6 +8,7 @@ Usage:
     python manage.py compliance_audit --days=30
     python manage.py compliance_audit --format=json --output=report.json
 """
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
 

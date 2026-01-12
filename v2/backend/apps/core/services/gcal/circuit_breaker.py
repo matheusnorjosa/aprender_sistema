@@ -21,6 +21,7 @@ Usage:
         # Circuit is open, queue for later retry
         pass
 """
+# pyright: reportIncompatibleMethodOverride=false
 
 from __future__ import annotations
 

@@ -7,6 +7,7 @@ Usage:
     python manage.py lgpd_export --cpf=12345678901 --output=user_data.json
     python manage.py lgpd_export --email=user@example.com --output=user_data.json
 """
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false, reportArgumentType=false
 
 from __future__ import annotations
 

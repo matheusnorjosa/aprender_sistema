@@ -21,6 +21,8 @@ Estrutura esperada (aba "Acompanhamento"):
 
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportCallIssue=false, reportGeneralTypeIssues=false, reportArgumentType=false, reportOptionalMemberAccess=false
 
+
+from __future__ import annotations
 import hashlib
 import logging
 from datetime import datetime, time as dtime, timedelta

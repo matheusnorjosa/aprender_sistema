@@ -5,6 +5,8 @@ Fase 5 - Desligamento gradual de planilhas
 """
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
+
+from __future__ import annotations
 from django.urls import path
 from .views import EtlReportsLatestView
 

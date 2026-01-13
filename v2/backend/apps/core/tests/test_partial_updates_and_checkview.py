@@ -8,6 +8,9 @@ Cobertura:
 - AvailabilityCheckView com municipio_id inválido (400 em vez de crash)
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
+
+from __future__ import annotations
 import pytest
 from django.urls import reverse
 from django.utils import timezone

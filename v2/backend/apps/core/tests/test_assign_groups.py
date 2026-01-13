@@ -4,6 +4,9 @@ Testes para endpoint assign_groups (GAP-003).
 Fase 1 Iteração 3 - Plano DAT/GCal 2025-10-29
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
+
+from __future__ import annotations
 import pytest
 from django.contrib.auth.models import Group
 from rest_framework.test import APIClient

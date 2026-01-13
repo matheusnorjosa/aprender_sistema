@@ -28,25 +28,49 @@ Seu código deve: funcionar com workflow humano, parecer intuitivo, resolver o p
 
 ---
 
-## 🔧 Ferramentas (.claude/)
+## 🔧 Ferramentas (.claude/) — USO OBRIGATÓRIO
 
-### Slash Commands Principais
+> **REGRA**: Antes de qualquer tarefa, verificar se existe ferramenta adequada abaixo.
 
-| Categoria | Comandos |
-|-----------|----------|
-| **Dev/Quality** | `/new-feat`, `/create-feature`, `/migrate`, `/test-coverage`, `/review`, `/review-staged`, `/trim` |
-| **Fluxos Negócio** | `/approve-flow` (PA-01 a PA-07), `/check-conflicts` (RD-01 a RD-08) |
-| **ETL** | `/etl-dry`, `/etl-apply` |
-| **Deploy** | `/deploy-staging` |
-| **Project Agents** | `/project_git-pr`, `/project_tdd`, `/project_plan`, `/project_e2e-smoke` |
+### 📚 Skills (Conhecimento Especializado)
 
-### Skills Especializadas
+| Skill | Quando Usar | Invocação |
+|-------|-------------|-----------|
+| `aprender-domain` | Implementar features, validar requisitos RF/RD/PA/CP | Automático ou `/skill aprender-domain` |
+| `django-patterns` | Implementar código Django (models, views, services) | Automático ou `/skill django-patterns` |
+| `etl-guidelines` | Criar comandos de importação ETL | Automático ou `/skill etl-guidelines` |
+| `writing-standards` | Documentação, docstrings, commits | Automático |
+| `test-driven-development` | **ANTES** de implementar features/bugfixes | `/skill test-driven-development` |
+| `create_plan` | Planejar features complexas | `/skill create_plan` |
+| `implement_plan` | Executar planos de `thoughts/shared/plans/` | `/skill implement_plan` |
+| `continuity_ledger` | Salvar estado antes de /clear ou sessão longa | `/skill continuity_ledger` |
+| `create_handoff` | Transferir trabalho para outra sessão | `/skill create_handoff` |
+| `resume_handoff` | Continuar de handoff anterior | `/skill resume_handoff` |
 
-- **aprender-domain** — Domínio completo (planilhas, fluxos SUPER/NAO_SUPER, RFs, códigos E/M/D/P/T/X)
-- **django-patterns** — Padrões Django/DRF (models, views, services, testes)
-- **etl-guidelines** — Guidelines ETL (dry-run, idempotência, relatórios)
+### ⚡ Slash Commands
 
-### MCP Servers
+| Categoria | Comandos | Quando Usar |
+|-----------|----------|-------------|
+| **Planejamento** | `/project_plan`, `/investigate-batch` | Antes de implementar algo complexo |
+| **Implementação** | `/new-feat`, `/create-feature`, `/migrate` | Criar features/migrations |
+| **Qualidade** | `/test-coverage`, `/review`, `/review-staged`, `/review-enhanced` | Após implementar |
+| **Negócio** | `/approve-flow`, `/check-conflicts` | Validar PA-01~07, RD-01~08 |
+| **ETL** | `/etl-dry`, `/etl-apply` | Importação de dados |
+| **Deploy** | `/deploy-staging` | Antes de deploy |
+| **Git** | `/project_git-pr`, `/trim` | Commits e PRs |
+| **TDD** | `/project_tdd` | Ciclo de testes |
+| **E2E** | `/project_e2e-smoke` | Testes Playwright |
+
+### 🤖 Agents (Task Tool)
+
+| Agent | Quando Usar |
+|-------|-------------|
+| `Explore` | Buscar arquivos, entender codebase (usar antes de editar) |
+| `Plan` | Arquitetar solução antes de implementar |
+| `Bash` | Comandos shell, git, npm, docker |
+| `general-purpose` | Tarefas multi-step complexas |
+
+### 🔌 MCP Servers
 
 | MCP | Uso |
 |-----|-----|
@@ -54,6 +78,16 @@ Seu código deve: funcionar com workflow humano, parecer intuitivo, resolver o p
 | **github** | Issues, PRs, CI status |
 | **playwright** | Testes E2E, screenshots |
 | **fetch** | URLs sem restrições |
+
+### 📁 Estrutura de Continuidade
+
+```
+thoughts/
+├── ledgers/           # Estado salvo (continuity_ledger)
+├── shared/
+│   ├── handoffs/      # Documentos de transferência
+│   └── plans/         # Planos de implementação
+```
 
 📖 **Guia Completo**: [.claude/GUIA_USO.md](.claude/GUIA_USO.md)
 

@@ -11,6 +11,9 @@ Valida:
 - Rate limiting aplicado (LoginThrottle)
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
+
+from __future__ import annotations
 import pytest
 from uuid import uuid4
 from django.contrib.auth.models import Group

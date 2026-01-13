@@ -1,4 +1,3 @@
-/* eslint-env node */
 /**
  * Lighthouse CI Configuration
  *

@@ -14,6 +14,8 @@ For new code, prefer importing directly from:
 """
 # pyright: reportUnusedImport=false
 
+from __future__ import annotations
+
 from apps.core.services.gcal import (
     # Types
     Action,

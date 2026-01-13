@@ -1,4 +1,6 @@
-# Projeto: Aprender Sistema (AS) — Guia do Claude Code
+# Projeto: Aprender Sistema (AS) v2 — Guia Completo
+
+**Última Atualização**: 2026-01-13
 
 ## 🎯 Filosofia — Ultrathink
 
@@ -6,69 +8,78 @@
 
 **Princípios**: Think Different → Obsess Over Details → Plan Like Da Vinci → Craft, Don't Code → Iterate Relentlessly → Simplify Ruthlessly
 
-Seu código deve: funcionar com workflow humano, parecer intuitivo, resolver o problema *real*, deixar o codebase melhor.
-
 ---
 
-## ⚠️ IMPORTANTE: Ao Retomar Sessão Resumida
+## 📊 Status do Projeto
 
-1. ✅ **LEIA**: [.claude/CHECKLIST_FERRAMENTAS.md](.claude/CHECKLIST_FERRAMENTAS.md) — Lista de slash commands, skills, hooks
-2. ✅ **EVITE**: Tarefas manuais quando existe ferramenta (use `/review-enhanced`, skill `aprender-domain`)
-3. ✅ **PERGUNTE**: "Existe slash command, skill ou agent para isso?"
+| Métrica | Valor | Status |
+|---------|-------|--------|
+| **Models** | 33 (28 core + 5 dat_ingest) | ✅ Modular |
+| **API Endpoints** | 87+ | ✅ Documentados |
+| **Testes** | 1.707 (130 arquivos) | ✅ 85%+ coverage |
+| **Type Hints** | 100% | ✅ Pyright strict |
+| **Management Commands** | 44 | ✅ ETL + Seeds |
+| **Frontend Pages** | 45+ | ✅ Lazy loading |
+
+### ✅ Iniciativas Concluídas
+
+| Iniciativa | PR/Commit | Data |
+|------------|-----------|------|
+| Type Hints 100% (Phases 1-9) | #392, #394 | ✅ Completo |
+| Maturity Gaps (10 gaps) | #390 | ✅ Completo |
+| Infraestrutura 3-VM | #391 | ✅ Completo |
+| Multi-Sector Availability | #389 | ✅ Completo |
+| Backup Automation + WAL | #388 | ✅ Completo |
 
 ---
 
 ## Contexto do Projeto
 
-- **Objetivo**: Substituir planilhas por plataforma web (solicitação → aprovação → Google Calendar)
+- **Objetivo**: Substituir 82.389 fórmulas Excel por plataforma web (solicitação → aprovação → Google Calendar)
 - **Stack**: Python 3.12 + Django 5.2 + DRF + PostgreSQL 15 + Redis 7 (Docker)
-- **Frontend**: React (Vite) + Tailwind + Ant Design
-- **Timezone**: `America/Fortaleza`
+- **Frontend**: React 18 + Vite 7 + Ant Design 5 + Tailwind CSS
+- **Timezone**: `America/Fortaleza` (UTC storage)
 - **Type Checking**: Pyright strict mode (PEP 695)
 
 ---
 
 ## 🔧 Ferramentas (.claude/) — USO OBRIGATÓRIO
 
-> **REGRA**: Antes de qualquer tarefa, verificar se existe ferramenta adequada abaixo.
+> **REGRA**: Antes de qualquer tarefa, verificar se existe ferramenta adequada.
 
 ### 📚 Skills (Conhecimento Especializado)
 
-| Skill | Quando Usar | Invocação |
-|-------|-------------|-----------|
-| `aprender-domain` | Implementar features, validar requisitos RF/RD/PA/CP | Automático ou `/skill aprender-domain` |
-| `django-patterns` | Implementar código Django (models, views, services) | Automático ou `/skill django-patterns` |
-| `etl-guidelines` | Criar comandos de importação ETL | Automático ou `/skill etl-guidelines` |
-| `writing-standards` | Documentação, docstrings, commits | Automático |
-| `test-driven-development` | **ANTES** de implementar features/bugfixes | `/skill test-driven-development` |
-| `create_plan` | Planejar features complexas | `/skill create_plan` |
-| `implement_plan` | Executar planos de `thoughts/shared/plans/` | `/skill implement_plan` |
-| `continuity_ledger` | Salvar estado antes de /clear ou sessão longa | `/skill continuity_ledger` |
-| `create_handoff` | Transferir trabalho para outra sessão | `/skill create_handoff` |
-| `resume_handoff` | Continuar de handoff anterior | `/skill resume_handoff` |
+| Skill | Quando Usar |
+|-------|-------------|
+| `aprender-domain` | Implementar features, validar RF/RD/PA/CP |
+| `django-patterns` | Implementar código Django (models, views, services) |
+| `etl-guidelines` | Criar comandos de importação ETL |
+| `writing-standards` | Documentação, docstrings, commits |
+| `test-driven-development` | **ANTES** de implementar features/bugfixes |
+| `create_plan` | Planejar features complexas |
+| `implement_plan` | Executar planos de `thoughts/shared/plans/` |
+| `continuity_ledger` | Salvar estado antes de /clear |
+| `create_handoff` / `resume_handoff` | Transferir trabalho entre sessões |
 
 ### ⚡ Slash Commands
 
-| Categoria | Comandos | Quando Usar |
-|-----------|----------|-------------|
-| **Planejamento** | `/project_plan`, `/investigate-batch` | Antes de implementar algo complexo |
-| **Implementação** | `/new-feat`, `/create-feature`, `/migrate` | Criar features/migrations |
-| **Qualidade** | `/test-coverage`, `/review`, `/review-staged`, `/review-enhanced` | Após implementar |
-| **Negócio** | `/approve-flow`, `/check-conflicts` | Validar PA-01~07, RD-01~08 |
-| **ETL** | `/etl-dry`, `/etl-apply` | Importação de dados |
-| **Deploy** | `/deploy-staging` | Antes de deploy |
-| **Git** | `/project_git-pr`, `/trim` | Commits e PRs |
-| **TDD** | `/project_tdd` | Ciclo de testes |
-| **E2E** | `/project_e2e-smoke` | Testes Playwright |
+| Categoria | Comandos |
+|-----------|----------|
+| **Planejamento** | `/project_plan`, `/investigate-batch` |
+| **Implementação** | `/new-feat`, `/create-feature`, `/migrate` |
+| **Qualidade** | `/test-coverage`, `/review`, `/review-staged`, `/review-enhanced` |
+| **Negócio** | `/approve-flow`, `/check-conflicts` |
+| **ETL** | `/etl-dry`, `/etl-apply` |
+| **Deploy** | `/deploy-staging` |
+| **Git** | `/project_git-pr`, `/trim` |
 
 ### 🤖 Agents (Task Tool)
 
 | Agent | Quando Usar |
 |-------|-------------|
-| `Explore` | Buscar arquivos, entender codebase (usar antes de editar) |
+| `Explore` | Buscar arquivos, entender codebase |
 | `Plan` | Arquitetar solução antes de implementar |
 | `Bash` | Comandos shell, git, npm, docker |
-| `general-purpose` | Tarefas multi-step complexas |
 
 ### 🔌 MCP Servers
 
@@ -79,39 +90,26 @@ Seu código deve: funcionar com workflow humano, parecer intuitivo, resolver o p
 | **playwright** | Testes E2E, screenshots |
 | **fetch** | URLs sem restrições |
 
-### 📁 Estrutura de Continuidade
-
-```
-thoughts/
-├── ledgers/           # Estado salvo (continuity_ledger)
-├── shared/
-│   ├── handoffs/      # Documentos de transferência
-│   └── plans/         # Planos de implementação
-```
-
-📖 **Guia Completo**: [.claude/GUIA_USO.md](.claude/GUIA_USO.md)
-
 ---
 
 ## ⚖️ CLÁUSULAS PÉTREAS — IMUTÁVEIS
 
-### 🐳 CP-01: REQUIRE_DOCKER=1 (v2 ONLY)
+### CP-01: REQUIRE_DOCKER=1 (v2 ONLY)
+v2 DEVE rodar APENAS em Docker: `cd v2 && make up`
 
-v2 DEVE rodar APENAS em Docker. Comando: `cd v2 && make up`
-
-### 🔒 CP-02: Política de Aprovação (PA-01 a PA-07)
+### CP-02: Política de Aprovação (PA-01 a PA-07)
 
 | Regra | Descrição |
 |-------|-----------|
-| PA-01 | Sem auto-aprovação para **SUPER**. NAO_SUPER é auto-aprovado |
-| PA-02 | **Superintendência**, **DAT** ou **superuser** podem aprovar |
+| PA-01 | Sem auto-aprovação para SUPER. NAO_SUPER é auto-aprovado |
+| PA-02 | Superintendência, DAT ou superuser podem aprovar |
 | PA-03 | Integrações externas só após aprovação |
 | PA-04 | Estado inicial: `pendente` (SUPER) ou `aprovado` (NAO_SUPER) |
-| PA-05 | Registrar em `Aprovacao` e `LogAuditoria` |
+| PA-05 | Registrar em `AuditLog` |
 | PA-06 | Esconder botões para perfis sem permissão |
-| PA-07 | Testes obrigatórios (5 testes específicos) |
+| PA-07 | 6 testes obrigatórios em `test_approval_policy_PA.py` |
 
-### 📅 CP-03: Regras de Disponibilidade (RD-01 a RD-08)
+### CP-03: Regras de Disponibilidade (RD-01 a RD-08)
 
 | Regra | Descrição |
 |-------|-----------|
@@ -122,126 +120,194 @@ v2 DEVE rodar APENAS em Docker. Comando: `cd v2 && make up`
 | RD-05 | Capacidade diária (M) por formador |
 | RD-06 | Timezone America/Fortaleza, storage UTC |
 | RD-07 | Prioridade: Bloqueios → Conflitos → Buffer → Limite |
-| RD-08 | Mensagens: formador, data, intervalo, tipo |
+| RD-08 | Mensagens estruturadas: formador, data, intervalo, tipo |
 
-### 🔄 CP-04: Workflow de Sub-Agents
+### CP-04 a CP-08
 
-1. Entender → 2. Planejar → 3. Implementar → 4. Testar → 5. Infra → 6. ETL → 7. UI/UX
-
-### 🚫 CP-05: Nunca Tocar v1 Sem Aprovação
-
-v1 está congelado. Qualquer mudança exige branch `fix/v1-*`, PR para `main-v1`, CI verde.
-
-### 📝 CP-06: Padrões de Commit/Branch/PR
-
-- **Commits**: `<type>(<scope>): <message>` (feat, fix, chore, docs, test, refactor)
-- **Branches**: `<type>/<nome>` (feat/v2-*, fix/v2-*)
-- **PRs**: Squash and merge, CI verde obrigatório
-
-### 🚫 CP-07: Nunca Push Direto na Main
-
-Fluxo: branch → commits → push → PR → CI verde → merge via GitHub
-
-### 🛠️ CP-08: INCLUDE_DEV_TOOLS (Ferramentas de Desenvolvimento)
-
-| Ambiente | INCLUDE_DEV_TOOLS | Resultado |
-|----------|-------------------|-----------|
-| Dev | `true` (default) | Seeds disponíveis |
-| Staging | `true` | Seeds disponíveis |
-| Prod | `false` | Seeds indisponíveis |
-
-**Commands em `apps/dev_tools`**:
-- `seed_*` — Dados iniciais (usuarios, projetos, RBAC)
-- `backfill_*` — Migracoes de dados
-- `fix_*` — Correcoes unicas
-- `cleanup_e2e_data` — Limpeza E2E
-
-**Commands em `apps/core`** (sempre disponíveis):
-- `preagenda_to_gcal` — Sync Google Calendar
-- `rotate_gcal_encryption_key` — Rotacao de chave
+- **CP-04**: Workflow Sub-Agents (Entender → Planejar → Implementar → Testar → Infra → ETL → UI/UX)
+- **CP-05**: v1 congelado (branch `fix/v1-*` + PR para `main-v1`)
+- **CP-06**: Conventional commits (`<type>(<scope>): <message>`)
+- **CP-07**: Nunca push direto na main (PR obrigatório)
+- **CP-08**: `INCLUDE_DEV_TOOLS=false` em produção
 
 ---
 
 ## 🏗️ Arquitetura Atual
 
-- **Backend Modular**: `models/`, `serializers/`, `views/`, `services/gcal/` (PRs #213-#217)
-- **Type Hints**: Pyright strict mode - [Plano 100% Coverage](../v2/docs/PLAN_type_hints_100.md) (Epic #342)
-- **RBAC**: Setor + Função ([PLANO_RBAC_SETOR_FUNCAO.md](.claude/PLANO_RBAC_SETOR_FUNCAO.md))
-- **Observabilidade**: Structured Logging (MP2), Monitoramento via plataforma do provedor
-- **Maturidade**: [Plano Gaps de Maturidade](../v2/docs/PLAN_maturity_gaps.md) (Epic #360)
-- **Infraestrutura**: [Plano de Produção 3 VMs](../v2/docs/PLAN_infrastructure_scaling.md) (Epic #371)
-- **Multi-Setor**: [Plano Disponibilidade Multi-Setor](../v2/docs/PLAN_multi_sector_availability.md) (Epic #379)
+### Backend (33 Models)
 
-📖 **Documentação Detalhada**:
-- Origem: [v2/docs/PROJETO_ORIGEM.md](../v2/docs/PROJETO_ORIGEM.md)
-- Type Hints: Pyright 1.1.382, `cd v2/backend && pyright apps/core`
-- Google Calendar: [v2/docs/GUIDE_GCAL.md](../v2/docs/GUIDE_GCAL.md)
-- Deploy: [v2/docs/DEPLOY_CHECKLIST.md](../v2/docs/DEPLOY_CHECKLIST.md)
+```
+apps/
+├── core/                    # App principal (28 models)
+│   ├── models/             # Usuario, Solicitacao, AvailabilityBlock, etc
+│   ├── serializers/        # 11 arquivos modulares
+│   ├── views/              # ViewSets organizados
+│   ├── services/           # Lógica de negócio
+│   │   ├── availability_service.py  # RD-01~RD-08
+│   │   ├── gcal/           # Google Calendar (6 arquivos)
+│   │   └── ...
+│   └── tests/              # 106 arquivos, 1.326 testes
+├── dat_ingest/             # ETL (5 models, 21 commands)
+└── dev_tools/              # Seeds (15 commands, prod disabled)
+```
 
-### 🖥️ Infraestrutura de Produção
+### Frontend (45+ Pages)
+
+```
+src/
+├── pages/                  # 45+ páginas lazy-loaded
+│   ├── Solicitacoes/       # Wizard 4-step, lista, edição
+│   ├── Aprovacoes/         # Fluxo PA-01~07
+│   ├── Disponibilidade/    # Grade mensal + bloqueios
+│   ├── DATModule/          # 7 páginas DAT
+│   ├── AdminDAT/           # 6 páginas admin
+│   └── Dashboards/         # KPIs, GCal, Equipe
+├── components/             # 19 componentes reutilizáveis
+├── hooks/                  # 5 custom hooks
+└── api/                    # 11 clientes axios
+```
+
+### Infraestrutura de Produção (3 VMs)
 
 | VM | Specs | Função |
 |----|-------|--------|
 | VM01_App | 4vCPU/16GB/60GB | Nginx + Gunicorn + Celery |
-| VM02_Banco | 4vCPU/16GB/300GB | PostgreSQL |
+| VM02_Banco | 4vCPU/16GB/300GB | PostgreSQL 15 |
 | VM03_Redis | 2vCPU/4GB/20GB | Cache + Sessions + Broker |
 
 ---
 
-## 🔐 RBAC Resumido
+## 🔐 RBAC (Setor + Função)
 
-- **SETOR** (9): Superintendência, Vidas, Fluir, ACerta, Brincando, Sou da Paz, DAT, Controle, Gerência
-- **FUNÇÃO** (4): Formador, Coordenador, Apoio de Coordenação, Gerente
-- **Aprovação SUPER**: `is_superuser OR ("Gerente" IN funcoes AND "Superintendência" IN setores)`
+### Setores (9)
+Superintendência, Vidas, Fluir, ACerta, Brincando, Sou da Paz, DAT, Controle, Gerência
 
----
+### Funções (4)
+Formador, Coordenador, Apoio de Coordenação, Gerente
 
-## Boas Práticas
-
-### Python/Django
-- PEP8, PEP20, type hints, docstrings, DRY
-- Models = fonte de verdade, views curtas, lógica em services
-- select_related/prefetch, URLs nomeadas, testes obrigatórios
-
-### Gerais
-- KISS, YAGNI, clareza > esperteza
-- Commits pequenos, atômicos
-- Logs e auditoria obrigatórios
+### Aprovação SUPER
+```python
+can_approve_super = is_superuser OR ("Gerente" IN funcoes AND "Superintendência" IN setores)
+```
 
 ---
 
-## Fluxos Principais
+## 📦 Management Commands (44 total)
 
-| RF | Descrição | Status |
-|----|-----------|--------|
-| RF02 | Solicitar evento | ✅ |
-| RF03 | Verificar conflitos | ✅ |
-| RF04 | Aprovar/Reprovar | ✅ |
-| RF05 | Google Calendar | ✅ |
-| RF06 | Google Meet links | ✅ |
+### Core (4 commands)
+- `preagenda_to_gcal` — Sync Google Calendar
+- `rotate_gcal_encryption_key` — Rotação de chave OAuth
+- `compliance_audit` — Auditoria PA/RD
+- `lgpd_export` — Export LGPD
+
+### ETL/dat_ingest (21 commands)
+- `etl_all` — Pipeline completo
+- `etl_upsert_acompanhamento` — Solicitações + Participations
+- `etl_import_acoes_controle` — AcaoControle
+- `etl_import_dat_cadastros` — AcaoDAT
+- ... (17 mais)
+
+### Seeds/dev_tools (15 commands)
+- `seed_rbac` — Grupos e permissões
+- `seed_tipos_evento` — TipoEvento default
+- `seed_e2e_users` — Usuários E2E
+- ... (12 mais)
 
 ---
 
-## Ações Prioritárias do Claude
+## 📋 API Endpoints (87+)
 
-1. Usar ferramentas `.claude/` proativamente
-2. Ler código e entender contexto
-3. Planejar passo a passo (`/project_plan`)
-4. Commits pequenos, atômicos, testados
-5. Conventional commits
-6. Validar com UX/IHC e regras de disponibilidade
+### Principais Rotas
+
+| Categoria | Endpoints | Permissão |
+|-----------|-----------|-----------|
+| **Auth** | `/auth/login/`, `/auth/logout/`, `/csrf/` | AllowAny |
+| **Solicitações** | `/solicitacoes/` (CRUD + approve/reject) | IsAuthenticated |
+| **Availability** | `/availability/check/`, `/availability/monthly/` | IsControleOrSuper |
+| **GCal** | `/gcal/publish-batch/`, `/gcal/dashboard/*` | IsControleOrSuper |
+| **DAT Module** | `/dat/registros/`, `/dat/acoes-ciclo/`, etc | IsDATOrSuper |
+| **Admin** | `/municipios/`, `/projetos/`, `/usuarios-admin/` | IsDAT |
+
+---
+
+## 🧪 Testes (1.707 total)
+
+| App | Arquivos | Testes |
+|-----|----------|--------|
+| **core** | 106 | 1.326 |
+| **dat_ingest** | 21 | 348 |
+| **dev_tools** | 3 | 33 |
+
+### Testes Críticos (CI Required)
+- `test_approval_policy_PA.py` — PA-01~07 (6 testes)
+- `test_availability_service.py` — RD-01~08 (17 testes)
+- `test_models_constraints.py` — Integridade DB
+- `test_google_oauth.py` — OAuth flow (42 testes)
+
+---
+
+## 📖 Documentação Principal
+
+| Documento | Propósito |
+|-----------|-----------|
+| [PROJETO_ORIGEM.md](../v2/docs/PROJETO_ORIGEM.md) | Origem, RFs, stack |
+| [GUIDE_GCAL.md](../v2/docs/GUIDE_GCAL.md) | Integração Google Calendar |
+| [GUIDE_AVAILABILITY.md](../v2/docs/GUIDE_AVAILABILITY.md) | Regras RD-01~08 |
+| [DEPLOY_CHECKLIST.md](../v2/docs/DEPLOY_CHECKLIST.md) | Checklist produção |
+| [SLO_DEFINITIONS.md](../v2/docs/SLO_DEFINITIONS.md) | Métricas de performance |
+| [DISASTER_RECOVERY.md](../v2/docs/DISASTER_RECOVERY.md) | DR procedures |
+| [PLAN_api_best_practices.md](../v2/docs/PLAN_api_best_practices.md) | **API 10/10** (Epic #405) |
+
+### 🚧 Planos em Andamento
+
+| Plano | Epic | Status |
+|-------|------|--------|
+| [API Best Practices 10/10](../v2/docs/PLAN_api_best_practices.md) | #405 | 🔄 Em progresso |
+
+**Issues relacionadas**: #406, #407, #408, #409, #410, #411, #412
+
+| Issue | Categoria | Score |
+|-------|-----------|-------|
+| #406 | Query Optimization | 7→10 |
+| #407 | Error Handling | 4→10 |
+| #408 | Pagination | 7→10 |
+| #409 | Rate Limiting | 6→10 |
+| #410 | API Versioning | 2→10 |
+| #411 | Response Consistency | 5→10 |
+| #412 | OpenAPI Documentation | 3→10 |
 
 ---
 
 ## Quick Reference
 
 ```bash
-# Testes
-python manage.py test
-
-# Type check
-cd v2/backend && pyright apps/core
-
 # Docker
 cd v2 && make up
+
+# Testes
+docker exec aprender_v2-web-1 pytest apps/core/tests/ -v
+
+# Type check
+cd v2/backend && pyright apps/core apps/dat_ingest
+
+# ETL dry-run
+make etl-acomp-dry
+
+# E2E tests
+make test-e2e
 ```
+
+---
+
+## Fluxos Principais (RF)
+
+| RF | Descrição | Status |
+|----|-----------|--------|
+| RF01 | Importação de dados (ETL) | ✅ 21 comandos |
+| RF02 | Solicitar evento | ✅ Wizard 4-step |
+| RF03 | Verificar conflitos | ✅ RD-01~08 |
+| RF04 | Aprovar/Reprovar | ✅ PA-01~07 |
+| RF05 | Google Calendar | ✅ Service Account + OAuth |
+| RF06 | Google Meet links | ✅ Automático |
+| RF07 | Auditoria | ✅ AuditLog completo |
+| RF08 | Grade mensal | ✅ Virtualização + cache |

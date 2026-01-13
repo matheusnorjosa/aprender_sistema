@@ -1,8 +1,8 @@
 # Plano: Separação Dev/Prod — Componentes de Desenvolvimento
 
 **Data**: 2026-01-09
-**Status**: Aguardando aprovação
-**PR Estimado**: #340
+**Status**: ✅ CONCLUÍDO (PR #339)
+**Nota**: Implementado como CP-08 (INCLUDE_DEV_TOOLS)
 
 ---
 

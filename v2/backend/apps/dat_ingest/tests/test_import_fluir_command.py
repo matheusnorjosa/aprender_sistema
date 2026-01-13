@@ -8,6 +8,8 @@ Valida:
 - Quality gates (min eventos, formadores, projeto)
 """
 
+
+from __future__ import annotations
 import pytest
 from io import StringIO
 from unittest.mock import patch, MagicMock

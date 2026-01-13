@@ -20,6 +20,8 @@ O parser ETL (parse_acompanhamento.py) já usava o mapeamento correto (row[7] pa
 portanto este teste valida que o parsing continua funcionando corretamente.
 """
 
+
+from __future__ import annotations
 from datetime import datetime, time
 from unittest.mock import MagicMock, patch
 

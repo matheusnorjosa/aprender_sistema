@@ -3,6 +3,8 @@ Tests: Processors
 Valida processadores de planilhas (AgendaProcessor, DisponibilidadeProcessor, ControleProcessor).
 """
 
+
+from __future__ import annotations
 import tempfile
 from datetime import date, datetime, time
 from pathlib import Path

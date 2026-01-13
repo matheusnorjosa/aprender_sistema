@@ -7,6 +7,8 @@ Verifies that:
 - Commands are available when enabled
 """
 
+
+from __future__ import annotations
 import pytest
 from django.conf import settings
 from django.core.management import get_commands

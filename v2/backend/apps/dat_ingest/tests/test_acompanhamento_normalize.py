@@ -2,6 +2,8 @@
 Testes para funções de normalização do ETL de Acompanhamento.
 """
 
+
+from __future__ import annotations
 import pytest
 from datetime import date, time
 

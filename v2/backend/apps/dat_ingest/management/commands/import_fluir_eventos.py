@@ -22,6 +22,8 @@ Output:
 
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportGeneralTypeIssues=false, reportArgumentType=false, reportOperatorIssue=false, reportUnusedVariable=false, reportOptionalMemberAccess=false
 
+
+from __future__ import annotations
 from typing import Any
 from pathlib import Path
 from datetime import datetime

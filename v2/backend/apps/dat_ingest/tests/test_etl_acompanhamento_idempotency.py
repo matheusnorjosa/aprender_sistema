@@ -4,6 +4,8 @@ Testes de idempotência do ETL de Acompanhamento.
 Valida que rodar 2x o mesmo CSV não duplica Solicitações/Participations.
 """
 
+
+from __future__ import annotations
 import csv
 import pytest
 from django.core.management import call_command

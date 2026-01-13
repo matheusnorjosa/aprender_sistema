@@ -4,6 +4,8 @@ Abas: ACerta, Outros, Super, Brincando, Vidas
 """
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
+
+from __future__ import annotations
 from datetime import datetime, time
 from pathlib import Path
 from typing import Any

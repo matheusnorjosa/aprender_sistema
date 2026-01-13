@@ -7,6 +7,8 @@ Garante que:
 3. Collision file gerado apenas se houver colisões
 """
 
+
+from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path

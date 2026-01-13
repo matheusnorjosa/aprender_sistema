@@ -3,6 +3,8 @@ Tests: ETL Idempotency
 Garante que executar o ETL 2x com os mesmos dados produz 0 inserts/updates na 2ª execução.
 """
 
+
+from __future__ import annotations
 import tempfile
 from pathlib import Path
 

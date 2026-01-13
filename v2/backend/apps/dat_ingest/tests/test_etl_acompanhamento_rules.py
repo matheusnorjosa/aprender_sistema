@@ -6,6 +6,8 @@ Valida:
 - Outros sem formadores → Coordenador também é FORMADOR
 """
 
+
+from __future__ import annotations
 import csv
 import pytest
 from django.core.management import call_command

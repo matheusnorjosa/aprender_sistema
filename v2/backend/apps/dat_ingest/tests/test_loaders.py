@@ -3,6 +3,8 @@ Tests: Loaders
 Valida funções de parse de planilhas (services/loaders.py).
 """
 
+
+from __future__ import annotations
 import tempfile
 from pathlib import Path
 

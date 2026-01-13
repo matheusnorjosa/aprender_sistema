@@ -14,6 +14,8 @@ Test patterns:
 - Input validation
 """
 
+
+from __future__ import annotations
 import csv
 from io import StringIO
 from pathlib import Path

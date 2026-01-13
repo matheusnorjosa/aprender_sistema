@@ -10,6 +10,8 @@ Garante que:
 6. Caso feliz: tudo dentro dos limites → apply ok
 """
 
+
+from __future__ import annotations
 import json
 from pathlib import Path
 from unittest.mock import patch

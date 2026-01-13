@@ -12,6 +12,8 @@ Valida:
 - Idempotência (rodar 2x → 0 duplicatas)
 """
 
+
+from __future__ import annotations
 import os
 import tempfile
 from pathlib import Path

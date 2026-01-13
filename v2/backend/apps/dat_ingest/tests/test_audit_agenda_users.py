@@ -7,6 +7,8 @@ Valida:
 - Inclui emails "Convidados" no matching por email
 """
 
+
+from __future__ import annotations
 import json
 import csv
 import pytest

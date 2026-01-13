@@ -276,6 +276,22 @@ can_approve_super = is_superuser OR ("Gerente" IN funcoes AND "Superintendência
 | #411 | Response Consistency | 5→10 |
 | #412 | OpenAPI Documentation | 3→10 |
 
+**Ordem de Execução** (após merge PR #413):
+
+| Ordem | Issue | Tempo | Justificativa |
+|-------|-------|-------|---------------|
+| 1 | #406 Query Optimization | 2h | Mais fácil, ganho imediato |
+| 2 | #407 Error Handling | 4h | Base para outras melhorias |
+| 3 | #409 Rate Limiting | 2h | Depende de Error Handling |
+| 4 | #408 Pagination | 2h | Independente |
+| 5 | #411 Response Consistency | 3h | Usa Error Handling |
+| 6 | #410 API Versioning | 3h | Independente |
+| 7 | #412 OpenAPI Documentation | 6h | Por último, documenta tudo |
+
+**Total**: ~22h de implementação
+
+📋 **Plano detalhado**: [PLAN_api_best_practices.md](../v2/docs/PLAN_api_best_practices.md) contém código específico para cada issue.
+
 ---
 
 ## Quick Reference

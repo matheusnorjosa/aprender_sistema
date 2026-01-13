@@ -1,8 +1,7 @@
 # Plano: App dev_tools — Isolamento de Commands de Desenvolvimento
 
 **Data**: 2026-01-09
-**Status**: Aguardando aprovação
-**PR**: #340
+**Status**: ✅ CONCLUÍDO (PR #340)
 **Padrão**: Mesmo de `INCLUDE_ETL` (PR #339)
 
 ---

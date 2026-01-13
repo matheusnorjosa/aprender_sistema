@@ -3,7 +3,7 @@
 [![CI](https://github.com/matheusnorjosa/aprender_sistema/actions/workflows/ci.yaml/badge.svg)](https://github.com/matheusnorjosa/aprender_sistema/actions/workflows/ci.yaml)
 [![codecov](https://codecov.io/gh/matheusnorjosa/aprender_sistema/branch/main/graph/badge.svg)](https://codecov.io/gh/matheusnorjosa/aprender_sistema)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![Django 5.1](https://img.shields.io/badge/django-5.1-green.svg)](https://www.djangoproject.com/)
+[![Django 5.2](https://img.shields.io/badge/django-5.2-green.svg)](https://www.djangoproject.com/)
 [![Type Hints: 100%](https://img.shields.io/badge/type%20hints-100%25-brightgreen.svg)](https://github.com/microsoft/pyright)
 [![Coverage 85%+](https://img.shields.io/badge/coverage-85%25+-success.svg)](https://codecov.io/gh/matheusnorjosa/aprender_sistema)
 [![Tests: 900+](https://img.shields.io/badge/tests-900%2B-blue.svg)](v2/docs/TESTING_POLICY.md)
@@ -37,7 +37,7 @@ Sistema de gestao de eventos, agendamento e formacoes com integracao Google Cale
 
 ### Backend
 - **Python 3.12.12** com Type Hints 100% ([Pyright strict mode](https://github.com/microsoft/pyright))
-- **Django 5.1.x** + **Django REST Framework 3.14.x**
+- **Django 5.2.x** + **Django REST Framework 3.14.x**
 - **Celery** (worker + beat) para tarefas assincronas
 - **PostgreSQL 15** como banco de dados principal
 - **Redis 7** para cache, sessoes e broker Celery
@@ -47,6 +47,8 @@ Sistema de gestao de eventos, agendamento e formacoes com integracao Google Cale
 - **Ant Design** + **Tailwind CSS**
 - **Axios** para comunicacao com API
 - **Playwright** para testes E2E
+- **Lighthouse CI** para metricas de performance
+- **axe-core** para testes de acessibilidade (WCAG 2.1)
 
 ### Infraestrutura
 - **Docker** + **Docker Compose** (6 servicos: web, worker, beat, db, redis, frontend)
@@ -76,14 +78,17 @@ Sistema de gestao de eventos, agendamento e formacoes com integracao Google Cale
 │   │   │   │   ├── views/        # ViewSets organizados por feature
 │   │   │   │   ├── services/     # Logica de negocio (gcal/, availability)
 │   │   │   │   └── tests/        # 103 arquivos de teste
-│   │   │   └── dat_ingest/       # Pipeline ETL (21 comandos)
+│   │   │   ├── dat_ingest/       # Pipeline ETL (21 comandos)
+│   │   │   └── dev_tools/        # Seeds e ferramentas de desenvolvimento
 │   │   └── config/               # Settings Django + Celery
 │   ├── frontend/                 # React + Vite
 │   │   ├── src/
 │   │   │   ├── pages/            # 35+ paginas organizadas por modulo
 │   │   │   ├── components/       # Componentes reutilizaveis
 │   │   │   └── api/              # Cliente API (Axios)
-│   │   └── e2e/                  # Testes Playwright (5 suites)
+│   │   └── e2e/                  # Testes Playwright
+│   │       ├── checklist/        # Testes de qualidade (a11y, performance, SEO)
+│   │       └── *.spec.ts         # 5 suites funcionais
 │   ├── infra/                    # Docker + Scripts
 │   │   ├── docker-compose.yml    # Stack principal (6 servicos)
 │   │   └── docker-compose.observability.yml
@@ -311,16 +316,30 @@ npx playwright install chromium
 # Rodar todos os testes
 npx playwright test
 
+# Testes de qualidade (checklist)
+npm run test:checklist
+
+# Lighthouse CI
+npm run lighthouse
+
 # Modo interativo
 npx playwright test --ui
 ```
 
-Suites E2E:
+**Suites Funcionais:**
 - `z-auth.spec.ts` - Autenticacao
 - `navigation.spec.ts` - Navegacao
 - `solicitacoes.spec.ts` - Fluxo de solicitacoes
 - `dashboards.spec.ts` - Dashboards
 - `dat-module.spec.ts` - Modulo DAT
+
+**Suites de Qualidade (checklist/):**
+- `meta-tags.spec.ts` - Charset, viewport, title, favicon
+- `console-errors.spec.ts` - Zero erros JS
+- `security-headers.spec.ts` - X-Frame-Options, CSP, HSTS
+- `broken-links.spec.ts` - Links e recursos 404
+- `accessibility.spec.ts` - WCAG 2.1 (axe-core)
+- `performance.spec.ts` - Core Web Vitals (LCP, CLS, FCP)
 
 ---
 
@@ -349,15 +368,15 @@ Suites E2E:
 | Workflow | Descricao |
 |----------|-----------|
 | **CI** | Testes + Pyright + Coverage (85%+ enforced) |
+| **frontend-ci** | Build + Lint + Checklist Tests + Lighthouse CI |
 | **Codecov** | Upload automatico de coverage |
-| **Pre-commit** | Linting e formatacao |
 
 ### Metricas Atuais
-- **103 arquivos de teste**
+- **134 arquivos de teste** (backend + frontend)
 - **900+ testes** passando
 - **Coverage 85%+** (enforced)
-- **Pyright 0 erros**
-- **5 suites E2E** (46 testes)
+- **Pyright 0 erros** (strict mode)
+- **11 suites E2E** (5 funcionais + 6 qualidade)
 
 ---
 
@@ -459,5 +478,5 @@ Proprietario - Todos os direitos reservados.
 
 <p align="center">
   <strong>Aprender Sistema v2</strong><br>
-  Python 3.12 | Django 5.1 | React 18 | PostgreSQL 15 | Redis 7
+  Python 3.12 | Django 5.2 | React 18 | PostgreSQL 15 | Redis 7
 </p>

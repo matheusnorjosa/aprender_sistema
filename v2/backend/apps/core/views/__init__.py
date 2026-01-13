@@ -5,6 +5,8 @@ Re-exports all views for backwards compatibility.
 """
 # pyright: reportUnusedImport=false
 
+from __future__ import annotations
+
 from apps.core.views.utils import _get_client_ip, api_root
 from apps.core.views.solicitacao import SolicitacaoViewSet
 from apps.core.views.availability import (

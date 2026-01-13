@@ -10,6 +10,8 @@ Será removido em versão futura.
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false
 
 # Re-export all from core.services.resolvers for backward compatibility
+
+from __future__ import annotations
 from apps.core.services.resolvers import (
     resolve_user_by_email,
     resolve_user_by_name,

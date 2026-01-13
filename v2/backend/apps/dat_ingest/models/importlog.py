@@ -3,6 +3,8 @@ ImportLog - Rastreamento de imports para idempotência
 """
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportIncompatibleMethodOverride=false
 
+
+from __future__ import annotations
 from django.db import models
 from django.utils import timezone
 

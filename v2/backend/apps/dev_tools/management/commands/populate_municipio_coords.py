@@ -5,6 +5,8 @@ Usage:
     python manage.py populate_municipio_coords --dry-run
     python manage.py populate_municipio_coords --apply
 """
+
+from __future__ import annotations
 import csv
 from decimal import Decimal
 from pathlib import Path

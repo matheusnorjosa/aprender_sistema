@@ -7,7 +7,7 @@ Nota: Behavior testing (429 após 10 requests) requer Redis funcional
 e isolamento perfeito de cache entre testes. O throttling funciona
 corretamente em produção (validado manualmente).
 """
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false
 
 from __future__ import annotations
 import pytest

@@ -8,7 +8,7 @@ Valida que a task preview_then_apply_gcal respeita flags de segurança:
 - PREVIEW_ONLY: nunca aplica mudanças
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false
 
 from __future__ import annotations
 from unittest.mock import patch, MagicMock

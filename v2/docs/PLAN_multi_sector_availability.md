@@ -1,7 +1,7 @@
 # Plano: Disponibilidade Multi-Setor (Cenário A)
 
 **Data**: 2026-01-09
-**Status**: Planejado
+**Status**: ✅ CONCLUÍDO (PR #389)
 **Meta**: Permitir visualização de grade mensal e bloqueios por setor (NAO_SUPER)
 
 ---

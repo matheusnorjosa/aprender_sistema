@@ -7,13 +7,13 @@ usadas tanto pelo ETL quanto por validações em runtime.
 Movido de dat_ingest/services/acompanhamento_normalize.py para desacoplar
 ETL do sistema principal (Issue: decouple-etl).
 """
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
+
+from __future__ import annotations
 
 import hashlib
 import re
 import unicodedata
 from datetime import date, time
-from typing import Dict, List, Optional
 
 
 def norm_text(s: str) -> str:
@@ -115,7 +115,7 @@ def normalize_project_alias(projeto: str) -> str:
     return projeto.strip() if projeto else ""
 
 
-def split_municipios_super(value: str) -> List[str]:
+def split_municipios_super(value: str) -> list[str]:
     """
     Split múltiplos municípios separados por ; , / |
 
@@ -137,7 +137,7 @@ def split_municipios_super(value: str) -> List[str]:
     return municipios
 
 
-def parse_date_iso(s: str) -> Optional[date]:
+def parse_date_iso(s: str) -> date | None:
     """
     Parse data no formato YYYY-MM-DD.
 
@@ -161,7 +161,7 @@ def parse_date_iso(s: str) -> Optional[date]:
         return None
 
 
-def parse_time_iso(s: str) -> Optional[time]:
+def parse_time_iso(s: str) -> time | None:
     """
     Parse hora no formato HH:MM ou HH:MM:SS.
 
@@ -257,7 +257,7 @@ def normalize_time_field(s: str) -> str:
     return ""
 
 
-def hash_event_v2(row: Dict[str, str]) -> str:
+def hash_event_v2(row: dict[str, str]) -> str:
     """
     Gera external_hash v2 (SHA1) a partir de 17 campos normalizados.
 
@@ -366,7 +366,7 @@ def hash_event_v2(row: Dict[str, str]) -> str:
         coordenador_norm = norm_text(coordenador)
 
     # 12-16. formadores (emails ou nomes)
-    formadores_norm = []
+    formadores_norm: list[str] = []
     for i in range(1, 6):
         formador = row.get(f"formador{i}", "")
         if "@" in formador:

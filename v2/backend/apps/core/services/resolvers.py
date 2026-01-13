@@ -7,11 +7,13 @@ usadas tanto pelo ETL quanto por validações em runtime.
 Movido de dat_ingest/services/resolvers.py para desacoplar
 ETL do sistema principal (Issue: decouple-etl).
 """
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false, reportIncompatibleMethodOverride=false, reportInvalidTypeForm=false, reportMissingImports=false
+# pyright: reportMissingImports=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
+
+from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -19,11 +21,13 @@ from django.db.models import Q
 from apps.core.models import Municipio, Projeto, TipoEvento
 from .normalize import norm_text
 
+if TYPE_CHECKING:
+    from apps.core.models import Usuario
 
 User = get_user_model()
 
 
-def resolve_user_by_email(email: str) -> Optional[User]:  # type: ignore[type-arg]
+def resolve_user_by_email(email: str) -> Usuario | None:
     """
     Resolve usuário por email (case-insensitive).
 
@@ -47,7 +51,7 @@ def resolve_user_by_email(email: str) -> Optional[User]:  # type: ignore[type-ar
         return User.objects.filter(email__iexact=email_norm).first()
 
 
-def resolve_user_by_name(name: str) -> Optional[User]:  # type: ignore[type-arg]
+def resolve_user_by_name(name: str) -> Usuario | None:
     """
     Resolve usuário por nome completo (match simples).
 
@@ -113,7 +117,7 @@ def _nfkd(value: str | None) -> str:
     return v.casefold()
 
 
-def _split_city_uf(raw: str | None) -> Tuple[str, Optional[str]]:
+def _split_city_uf(raw: str | None) -> tuple[str, str | None]:
     """
     Separa município e UF de formatos variados:
     - "Cidade - UF"
@@ -145,7 +149,7 @@ def _split_city_uf(raw: str | None) -> Tuple[str, Optional[str]]:
     return (txt, None)
 
 
-def resolve_municipio(nome: str) -> Optional[Municipio]:
+def resolve_municipio(nome: str) -> Municipio | None:
     """
     Resolve município por nome, aceitando formatos variados:
     - "Cidade" (apenas nome)
@@ -225,7 +229,7 @@ def normalize_projeto_name(nome: str) -> str:
     return nome
 
 
-def resolve_projeto(nome: str) -> Optional[Projeto]:
+def resolve_projeto(nome: str) -> Projeto | None:
     """
     Resolve projeto por nome (setor canonizado).
 
@@ -257,7 +261,7 @@ def resolve_projeto(nome: str) -> Optional[Projeto]:
         return Projeto.objects.filter(nome__iexact=nome_mapped).first()
 
 
-def resolve_tipo_evento(nome: str) -> Optional[TipoEvento]:
+def resolve_tipo_evento(nome: str) -> TipoEvento | None:
     """
     Resolve tipo de evento por nome.
 

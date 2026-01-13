@@ -9,6 +9,8 @@ Uso:
     admin_site.register(Model, ModelAdmin)
 """
 
+from __future__ import annotations
+
 from django.contrib.admin import AdminSite as BaseAdminSite
 from django.http import HttpRequest
 

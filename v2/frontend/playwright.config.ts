@@ -32,7 +32,16 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testIgnore: /.*\.setup\.ts/,
+      testIgnore: [/.*\.setup\.ts/, /checklist\/.*/],
+    },
+    // Testes do checklist (não requerem autenticação)
+    {
+      name: 'checklist',
+      testDir: './e2e/checklist',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      // Sem dependência de setup - não precisa de auth
     },
   ],
   webServer: {

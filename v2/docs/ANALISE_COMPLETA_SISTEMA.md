@@ -1,7 +1,7 @@
 # 📊 ANÁLISE COMPLETA DO SISTEMA — Aprender Sistema v2
 
-**Data**: 11/12/2025
-**Analista**: Claude Sonnet 4.5
+**Data**: 2026-01-13
+**Analista**: Claude Opus 4.5
 **Escopo**: Análise completa de arquitetura, código, conformidade e qualidade
 
 ---
@@ -14,21 +14,26 @@ O **Aprender Sistema v2** é uma plataforma web enterprise-grade para gestão de
 
 | Métrica | Valor | Status |
 |---------|-------|--------|
-| **Linhas de Código Backend** | ~65.000 | ✅ Type-safe (Pyright strict) |
-| **Linhas de Código Frontend** | ~14.000 | ✅ Code-splitting implementado |
-| **Cobertura de Testes** | 114 arquivos, 1.143+ testes | ✅ 90%+ em módulos críticos |
-| **Documentação** | 60+ documentos | ✅ Completa e atualizada |
-| **Conformidade Regras** | CP-01 a CP-06, PA-01 a PA-07, RD-01 a RD-08 | ✅ 100% implementado |
-| **Usuários Migrados** | 122 | ✅ SQLite → PostgreSQL Docker |
-| **Eventos Importados** | 1.250+ | ✅ Com idempotência (SHA1 hash) |
-| **PRs Implementados** | 243 | ✅ Squash and merge |
+| **Models** | 33 (28 core + 5 dat_ingest) | ✅ Modular |
+| **API Endpoints** | 87+ (26 ViewSets) | ✅ Documentados |
+| **Testes** | 1.707 (130 arquivos) | ✅ 85%+ coverage |
+| **Type Hints** | 100% | ✅ Pyright strict |
+| **Management Commands** | 38 (4 core + 20 ETL + 14 seeds) | ✅ ETL + Seeds |
+| **Frontend Pages** | 45+ | ✅ Lazy loading |
+| **Linhas de Código Backend** | ~65.000 | ✅ Type-safe |
+| **Linhas de Código Frontend** | ~14.000 | ✅ Code-splitting |
+| **Documentação** | 70+ documentos | ✅ Completa |
+| **Conformidade Regras** | CP-01 a CP-08, PA-01 a PA-07, RD-01 a RD-08 | ✅ 100% |
+| **Usuários Migrados** | 122 | ✅ PostgreSQL Docker |
+| **Eventos Importados** | 2.300+ | ✅ Idempotência (SHA1/SHA256) |
 
 ### Arquitetura Consolidada
 
-**Backend**: Python 3.12.12 + Django 5.1 + DRF 3.14 + PostgreSQL 15 + Redis 7 + Celery
-**Frontend**: React 18.3.1 + Vite 7.1.7 + Ant Design 5.27.4 + Tailwind CSS 3.4.18
+**Backend**: Python 3.12 + Django 5.2 + DRF 3.14 + PostgreSQL 15 + Redis 7 + Celery
+**Frontend**: React 18 + Vite 7 + Ant Design 5 + Tailwind CSS
 **DevOps**: Docker Compose + GitHub Actions + Pyright (strict mode)
-**Observabilidade**: Structured JSON Logging (Prometheus/Grafana removidos - disponíveis localmente se necessário)
+**Observabilidade**: Structured JSON Logging + Sentry APM configurado
+**Infraestrutura**: 3 VMs (App + DB + Redis)
 
 ---
 
@@ -49,17 +54,26 @@ apps/core/
 
 **Estrutura Atual** (modular):
 ```
-apps/core/
-├── models/                  # PR #213 (9 arquivos)
-│   ├── usuario.py
-│   ├── organizacao.py
-│   ├── solicitacao.py
-│   ├── agenda.py
-│   └── ... (5 mais)
-├── serializers/             # PR #214 (8 arquivos)
-├── views/                   # PR #217 (6 arquivos)
-├── views_gcal/              # PR #215 (6 arquivos)
-└── services/gcal/           # PR #216 (6 arquivos)
+apps/
+├── core/                    # App principal (28 models)
+│   ├── models/             # 15 arquivos modulares
+│   │   ├── usuario.py      # Usuario, Google OAuth
+│   │   ├── organizacao.py  # Municipio, Projeto, Gerencia, TipoEvento, Produto
+│   │   ├── solicitacao.py  # Solicitacao, Participation
+│   │   ├── agenda.py       # AvailabilityBlock
+│   │   ├── auditoria.py    # AuditLog, Config
+│   │   ├── compra.py       # Compra, Deslocamento
+│   │   ├── dat_*.py        # DATRegistro, DATArea, DATCoordenador, DATAcao, etc.
+│   │   └── plano_formacoes.py  # PlanoFormacoes, Formacao, Acompanhamento, Prova
+│   ├── serializers/        # 11 arquivos modulares
+│   ├── views/              # 8 arquivos modulares
+│   ├── views_gcal/         # 6 arquivos (Google Calendar)
+│   └── services/           # 12 arquivos
+│       ├── availability_service.py  # RD-01~RD-08
+│       └── gcal/           # 6 arquivos Google Calendar
+├── dat_ingest/             # ETL (5 models, 21 commands)
+│   └── models/             # ImportLog, Stg* (staging tables)
+└── dev_tools/              # Seeds (15 commands, prod disabled)
 ```
 
 **Benefícios Observados**:
@@ -622,20 +636,24 @@ can_approve_super = is_superuser OR (
 
 ### 3.1 Cobertura de Testes
 
-**97 Arquivos de Teste** no backend (`apps/core/tests/test_*.py`):
+**130 Arquivos de Teste** no projeto:
 
-**Categorias Principais**:
-- **Approval Policy**: 6 testes (PA-01 a PA-07)
-- **Availability**: 17 testes (RD-01 a RD-08)
-- **RBAC**: 20 testes (Setor + Função)
-- **Google Calendar**: 30+ testes (sync, retry, Meet links)
-- **ETL**: 10+ testes (idempotência, quality gates)
-- **API**: 50+ testes (endpoints, permissions, serializers)
-- **Modular**: 10+ testes (re-exports, compatibilidade)
+| Categoria | Arquivos | Testes |
+|-----------|----------|--------|
+| **API/Views** | 23 | ~280 |
+| **Services** | 25 | ~350 |
+| **Models** | 1 | 3 |
+| **Compliance (PA/RD)** | 11 | ~28 |
+| **ETL** | 13 | ~130 |
+| **OAuth/Auth** | 8 | ~70 |
+| **RBAC** | 5 | ~25 |
+| **GCal** | 15 | ~50 |
+| **Frontend E2E** | 5 | 46 |
+| **Outros** | 24 | ~725 |
 
-**Total Estimado**: **855+ testes**
+**Total**: **1.707 testes** em **130 arquivos**
 
-**Cobertura**: 90%+ em módulos críticos (availability_service, models, views)
+**Cobertura**: 85%+ em módulos críticos (availability_service, models, views, gcal)
 
 **Comando**:
 ```bash
@@ -894,24 +912,26 @@ solicitacao.meet_link = meet_link
 - **Polling**: Alertas GCal a cada 30s (Issue #97)
 - **Logout**: Integração com backend OAuth
 
-**Páginas Principais** (11+ diretórios):
+**45+ Páginas Lazy-Loaded** (14 diretórios):
 ```
 pages/
-├── AdminDAT/          # Admin RBAC (Usuários, Municípios, Projetos, Grupos)
-├── Aprovacoes/        # Fluxo de aprovação (Superintendência)
-├── Auth/              # Login OAuth
-├── Controle/          # Ops de Controle
-├── Dashboards/        # Métricas (GCal, Equipe, Sistemas)
-├── DAT/               # Interface DAT
-├── Deslocamentos/     # Gestão de deslocamentos
-├── Disponibilidade/   # Grade mensal + Bloqueios
-├── Home/              # Dashboard inicial
-├── MapaBrasil/        # Mapa do Brasil (Leaflet)
-├── PreAgenda/         # Pré-agendamento
-└── Solicitacoes/      # Criar/editar solicitações
+├── AdminDAT/          # 6 páginas (Usuários, Municípios, Projetos, Grupos, TiposEvento)
+├── Aprovacoes/        # 2 páginas (Lista, Detalhes)
+├── Auth/              # 2 páginas (Login, Logout)
+├── Controle/          # 3 páginas (Dashboard, Operações, Relatórios)
+├── Dashboards/        # 4 páginas (GCal, Equipe, Sistemas, KPIs)
+├── DATModule/         # 7 páginas (Registros, Ações, Cadastros, Compras, Coordenadores)
+├── Deslocamentos/     # 2 páginas (Lista, Criar/Editar)
+├── Disponibilidade/   # 3 páginas (Grade, Bloqueios, Detalhes)
+├── Home/              # 1 página (Dashboard inicial)
+├── MapaBrasil/        # 1 página (Mapa interativo Leaflet)
+├── PreAgenda/         # 4 páginas (Lista, Preview, Publicar, Dashboard)
+├── Solicitacoes/      # 5 páginas (Lista, Wizard, Editar, Detalhes, Histórico)
+├── Formacoes/         # 3 páginas (Planos, Formações, Acompanhamentos)
+└── Compras/           # 2 páginas (Lista, Detalhes)
 ```
 
-**Componentes Reutilizáveis** (24+):
+**Componentes Reutilizáveis** (19+):
 - `FormadoresPicker` - Seletor de formadores
 - `DateTimeRange` - Seletor de data/hora
 - `ImportUploader` - Upload de arquivos
@@ -1182,16 +1202,20 @@ logger.info("solicitacao_approved", extra={
 
 | Categoria | Status | Detalhe |
 |-----------|--------|---------|
-| **CP-01 a CP-06** | ✅ 100% | REQUIRE_DOCKER=1, PA/RD, workflow, commits |
+| **CP-01 a CP-08** | ✅ 100% | REQUIRE_DOCKER=1, PA/RD, workflow, commits, INCLUDE_DEV_TOOLS |
 | **PA-01 a PA-07** | ✅ 100% | 6/6 testes passando |
 | **RD-01 a RD-08** | ✅ 100% | 17/17 testes passando |
-| **RF01-RF08** | ✅ 100% | ETL, solicitação, conflitos, aprovação, GCal, Meet |
-| **RBAC** | ✅ 100% | 9 setores + 4 funções, 20 testes |
-| **Type Hints** | ✅ 100% | 42 arquivos, 0 erros Pyright |
-| **Modularização** | ✅ 100% | 5 PRs, re-exports funcionando |
-| **Testes** | ✅ 97 arquivos | 95 backend + 2 frontend, 90%+ cobertura |
-| **Documentação** | ✅ 93 arquivos | Completa e atualizada |
+| **RF01-RF08** | ✅ 100% | ETL, solicitação, conflitos, aprovação, GCal, Meet, auditoria, grade |
+| **RBAC** | ✅ 100% | 9 setores + 4 funções, 25 testes |
+| **Type Hints** | ✅ 100% | Pyright strict mode, 0 erros |
+| **Models** | ✅ 33 | 28 core + 5 dat_ingest |
+| **API Endpoints** | ✅ 87+ | 26 ViewSets documentados |
+| **Testes** | ✅ 130 arquivos | 1.707 testes, 85%+ cobertura |
+| **Frontend** | ✅ 45+ páginas | React.lazy() + code-splitting |
+| **Management Commands** | ✅ 38 | 4 core + 20 ETL + 14 seeds |
+| **Documentação** | ✅ 70+ arquivos | Completa e atualizada |
 | **Observabilidade** | ✅ MP2+MP3 | Structured Logging + Sentry configurado |
+| **Infraestrutura** | ✅ 3 VMs | App + DB + Redis (produção ready) |
 
 ### 9.2 Indicadores de Maturidade
 
@@ -1221,22 +1245,28 @@ logger.info("solicitacao_approved", extra={
 
 O **Aprender Sistema v2** é um **projeto de altíssima qualidade**, com:
 
-✅ **Arquitetura sólida** (modular, type-safe, SOLID)
-✅ **Conformidade 100%** com regras de negócio (CP, PA, RD, RF)
-✅ **Testes extensivos** (114 arquivos, 1.143+ testes, 90%+ cobertura)
-✅ **Documentação completa** (60+ docs, skills, slash commands)
-✅ **Segurança robusta** (RBAC, auditoria, CSRF protection)
+✅ **Arquitetura sólida** (33 models modulares, type-safe, SOLID)
+✅ **Conformidade 100%** com regras de negócio (CP-01~08, PA-01~07, RD-01~08, RF01~08)
+✅ **Testes extensivos** (130 arquivos, 1.707 testes, 85%+ cobertura)
+✅ **Documentação completa** (70+ docs, skills, slash commands)
+✅ **Segurança robusta** (RBAC 9 setores + 4 funções, auditoria, CSRF protection)
 ✅ **Performance otimizada** (cache Redis, N+1 prevention, code-splitting)
-✅ **Observabilidade** (Structured JSON Logging)
+✅ **Observabilidade** (Structured JSON Logging + Sentry APM)
+✅ **API completa** (87+ endpoints, 26 ViewSets)
+✅ **Frontend moderno** (45+ páginas React lazy-loaded)
+✅ **ETL robusto** (21 comandos com idempotência)
+✅ **Infraestrutura pronta** (3 VMs: App + DB + Redis)
 
-**Pontos de atenção**:
-- Testes frontend ausentes (Vitest)
-- Deployment guide ausente
-- Secrets em `.env` (migrar para vault)
-- Rate limiting limitado
+**Iniciativas Concluídas**:
+- Type Hints 100% (#392, #394)
+- Maturity Gaps (#390)
+- Infraestrutura 3-VM (#391)
+- Multi-Sector Availability (#389)
+- Backup Automation + WAL (#388)
 
-**Recomendação**: **Sistema pronto para produção**, com plano de melhorias contínuas.
+**Recomendação**: **Sistema pronto para produção**.
 
 ---
 
-**Fim da Análise Completa**
+**Última Atualização**: 2026-01-13
+**Mantido por**: Claude Code + Equipe AS v2

@@ -125,3 +125,14 @@ export async function getMonthly(params) {
 export async function getFeatures() {
   return await fetchAPI('/features/');
 }
+
+/**
+ * Busca lista de gerências disponíveis.
+ *
+ * @returns {Promise<Array>} Lista de gerências { id, nome, sigla }
+ */
+export async function getGerencias() {
+  const data = await fetchAPI('/gerencias/');
+  // DRF retorna { results: [...], count: N } quando paginado
+  return data.results || data;
+}

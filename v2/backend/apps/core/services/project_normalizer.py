@@ -7,11 +7,11 @@ consistência em importações ETL e queries.
 Issue: #150
 """
 
-from typing import Dict, List
+from __future__ import annotations
 
 
 # Mapeamento de nomes canônicos e suas variantes conhecidas
-CANONICAL_PROJECT_NAMES: Dict[str, List[str]] = {
+CANONICAL_PROJECT_NAMES: dict[str, list[str]] = {
     # Nome canônico: [lista de variantes]
     "LEIO, ESCREVO E CALCULO": [
         "LEIO ESCREVO E CALCULO",
@@ -35,7 +35,7 @@ CANONICAL_PROJECT_NAMES: Dict[str, List[str]] = {
 
 
 # Criar um dicionário reverso para lookup rápido: variante -> canônico
-_VARIANT_TO_CANONICAL: Dict[str, str] = {}
+_VARIANT_TO_CANONICAL: dict[str, str] = {}
 for canonical, variants in CANONICAL_PROJECT_NAMES.items():
     for variant in variants:
         _VARIANT_TO_CANONICAL[variant.upper().strip()] = canonical
@@ -125,7 +125,7 @@ def get_canonical_name(name: str) -> str | None:
     return None
 
 
-def list_all_variants() -> Dict[str, List[str]]:
+def list_all_variants() -> dict[str, list[str]]:
     """
     Lista todos os nomes canônicos e suas variantes conhecidas.
 

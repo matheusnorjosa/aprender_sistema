@@ -4,6 +4,8 @@ Custom authentication backends for Aprender Sistema v2.
 Implements CPF-based authentication alongside username authentication.
 """
 
+from __future__ import annotations
+
 import re
 from typing import Any, cast
 

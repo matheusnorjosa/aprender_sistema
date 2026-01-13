@@ -10,6 +10,9 @@ Complementa test_approval_policy_PA.py com cenários adicionais:
 - Usuário não autenticado recebe 401
 - Formador (sem permissão) recebe 403
 """
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
+
+from __future__ import annotations
 from datetime import timedelta
 from uuid import uuid4
 

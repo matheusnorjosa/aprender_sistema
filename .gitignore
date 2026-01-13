@@ -529,3 +529,4 @@ v2/docs/OBSERVABILITY.md
 
 # Continuous Claude cache (local only)
 .claude/cache/
+tmpclaude-*

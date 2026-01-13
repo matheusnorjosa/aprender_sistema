@@ -6,6 +6,8 @@ Usage:
     python manage.py link_projetos_gerencias --apply    # Apply
 """
 
+
+from __future__ import annotations
 from typing import Any
 
 from django.core.management.base import BaseCommand

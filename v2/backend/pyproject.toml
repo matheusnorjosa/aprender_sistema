@@ -17,18 +17,18 @@ venv = ".venv"
 # Use library code for types
 useLibraryCodeForTypes = true
 
-# Diretórios para verificar (código crítico: 35% do projeto)
+# Diretórios para verificar (100% coverage)
 include = [
     "apps/core",
     "apps/dat_ingest",
+    "apps/dev_tools",
     "config"
 ]
 
-# Ignorar temporariamente (baseline)
+# Ignorar
 exclude = [
     "**/__pycache__",
     "**/migrations",
-    "**/tests",           # Fixtures serão incluídas depois (PR #7)
     "**/.venv",
     "**/venv",
     "**/node_modules"

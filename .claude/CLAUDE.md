@@ -18,7 +18,7 @@
 | **API Endpoints** | 87+ | ✅ Documentados |
 | **Testes** | 1.707 (130 arquivos) | ✅ 85%+ coverage |
 | **Type Hints** | 100% | ✅ Pyright strict |
-| **Management Commands** | 44 | ✅ ETL + Seeds |
+| **Management Commands** | 38 | ✅ ETL + Seeds |
 | **Frontend Pages** | 45+ | ✅ Lazy loading |
 
 ### ✅ Iniciativas Concluídas
@@ -147,8 +147,8 @@ apps/
 │   │   ├── gcal/           # Google Calendar (6 arquivos)
 │   │   └── ...
 │   └── tests/              # 106 arquivos, 1.326 testes
-├── dat_ingest/             # ETL (5 models, 21 commands)
-└── dev_tools/              # Seeds (15 commands, prod disabled)
+├── dat_ingest/             # ETL (5 models, 20 commands)
+└── dev_tools/              # Seeds (14 commands, prod disabled)
 ```
 
 ### Frontend (45+ Pages)
@@ -192,7 +192,7 @@ can_approve_super = is_superuser OR ("Gerente" IN funcoes AND "Superintendência
 
 ---
 
-## 📦 Management Commands (44 total)
+## 📦 Management Commands (38 total)
 
 ### Core (4 commands)
 - `preagenda_to_gcal` — Sync Google Calendar
@@ -200,18 +200,18 @@ can_approve_super = is_superuser OR ("Gerente" IN funcoes AND "Superintendência
 - `compliance_audit` — Auditoria PA/RD
 - `lgpd_export` — Export LGPD
 
-### ETL/dat_ingest (21 commands)
+### ETL/dat_ingest (20 commands)
 - `etl_all` — Pipeline completo
 - `etl_upsert_acompanhamento` — Solicitações + Participations
 - `etl_import_acoes_controle` — AcaoControle
 - `etl_import_dat_cadastros` — AcaoDAT
-- ... (17 mais)
+- ... (16 mais)
 
-### Seeds/dev_tools (15 commands)
+### Seeds/dev_tools (14 commands)
 - `seed_rbac` — Grupos e permissões
 - `seed_tipos_evento` — TipoEvento default
 - `seed_e2e_users` — Usuários E2E
-- ... (12 mais)
+- ... (11 mais)
 
 ---
 
@@ -319,7 +319,7 @@ make test-e2e
 
 | RF | Descrição | Status |
 |----|-----------|--------|
-| RF01 | Importação de dados (ETL) | ✅ 21 comandos |
+| RF01 | Importação de dados (ETL) | ✅ 20 comandos |
 | RF02 | Solicitar evento | ✅ Wizard 4-step |
 | RF03 | Verificar conflitos | ✅ RD-01~08 |
 | RF04 | Aprovar/Reprovar | ✅ PA-01~07 |

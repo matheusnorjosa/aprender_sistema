@@ -8,6 +8,9 @@ Valida:
 - Tratamento de erros
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from pathlib import Path
 from datetime import datetime

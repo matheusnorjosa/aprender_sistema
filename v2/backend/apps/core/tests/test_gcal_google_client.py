@@ -7,6 +7,9 @@ Valida:
 - Factory retorna cliente correto baseado em settings
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from unittest.mock import MagicMock, Mock, patch
 from django.test import TestCase, override_settings

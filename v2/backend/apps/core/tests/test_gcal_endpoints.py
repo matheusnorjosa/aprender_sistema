@@ -8,6 +8,9 @@ Endpoints testados:
 Testes com override_settings para fake vs google client.
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from django.test import override_settings
 from rest_framework import status

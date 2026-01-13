@@ -11,6 +11,9 @@ Endpoint testado:
 - GET /readyz
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from django.urls import reverse
 from rest_framework.test import APIClient

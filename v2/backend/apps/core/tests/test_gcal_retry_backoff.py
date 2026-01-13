@@ -10,6 +10,9 @@ Valida:
 - Respeito ao header Retry-After
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from unittest.mock import Mock, patch, call
 from apps.core.services.gcal_sync_service import _retry_with_backoff

@@ -8,6 +8,9 @@ Valida:
 - Preview pode manter 'none' ou usar configuração (documenta escolha)
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from django.test import override_settings

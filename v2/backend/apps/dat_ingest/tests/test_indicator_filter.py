@@ -5,6 +5,9 @@ CONTEXTO (PR20 Task 2):
 Filtrar tokens como "3º ANO LING" para não criar Participation com usuario_id NULL.
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 from django.test import TestCase
 
 from apps.dat_ingest.services.indicator_filter import (

@@ -10,6 +10,9 @@ Cenários testados:
 - ID de usuário inválido (handled gracefully)
 - Usuário não-privilegiado não pode checar outros (403)
 """
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 from datetime import timedelta
 from uuid import uuid4
 

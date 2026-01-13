@@ -7,6 +7,9 @@ Valida:
 - Inclui emails "Convidados" no matching por email
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import json
 import csv
 import pytest

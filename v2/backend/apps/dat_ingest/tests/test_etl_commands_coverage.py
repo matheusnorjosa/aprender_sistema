@@ -15,6 +15,9 @@ Test patterns:
 - Input validation
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import csv
 import tempfile
 from io import StringIO

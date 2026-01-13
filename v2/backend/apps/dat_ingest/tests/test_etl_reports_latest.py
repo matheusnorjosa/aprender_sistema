@@ -4,6 +4,9 @@ Tests for ETL Observability - list_latest_reports and API endpoint
 Fase 5 - Desligamento gradual de planilhas
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 import tempfile
 import time

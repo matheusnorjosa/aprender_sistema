@@ -10,6 +10,9 @@ Valida:
 Issue: #150
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 
 from apps.core.services.project_normalizer import (

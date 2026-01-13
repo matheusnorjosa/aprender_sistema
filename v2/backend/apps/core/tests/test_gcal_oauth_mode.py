@@ -16,6 +16,9 @@ Refs:
 - fechar_plano_gcal.md
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from datetime import timedelta
 from unittest.mock import patch

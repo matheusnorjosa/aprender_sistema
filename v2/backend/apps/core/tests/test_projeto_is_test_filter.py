@@ -10,6 +10,9 @@ Tests:
 - test_projeto_option_viewset_explicit_false
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from django.contrib.auth.models import Group
 from rest_framework.test import APIClient

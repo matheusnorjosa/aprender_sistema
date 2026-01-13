@@ -9,6 +9,9 @@ Valida:
 - Duplicidades/ambiguidades → conflicts
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import json
 import pytest
 from pathlib import Path

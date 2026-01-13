@@ -12,6 +12,9 @@ Endpoints tested:
 - GET /api/metrics/formadores/
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 from datetime import timedelta
 from uuid import uuid4
 

@@ -4,6 +4,9 @@ Tests: Model Constraints
 Valida constraints de modelos (fim > inicio, status default = pendente).
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError

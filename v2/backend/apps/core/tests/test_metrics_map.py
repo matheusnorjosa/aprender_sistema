@@ -12,6 +12,9 @@ Endpoint testado:
 - GET /api/metrics/map/
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 from datetime import timedelta
 
 from django.contrib.auth.models import Group

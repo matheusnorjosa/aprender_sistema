@@ -10,6 +10,9 @@ Valida:
 - Credenciais vazias rejeitadas
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from uuid import uuid4
 from django.test import RequestFactory

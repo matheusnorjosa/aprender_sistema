@@ -6,6 +6,9 @@ Tests for:
 - /api/availability-blocks/ endpoint (create with auto-filled usuario)
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 from datetime import timedelta
 
 from django.utils import timezone

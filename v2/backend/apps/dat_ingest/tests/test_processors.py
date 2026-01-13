@@ -3,6 +3,9 @@ Tests: Processors
 Valida processadores de planilhas (AgendaProcessor, DisponibilidadeProcessor, ControleProcessor).
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import tempfile
 from datetime import date, datetime, time
 from pathlib import Path

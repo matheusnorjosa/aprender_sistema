@@ -5,6 +5,9 @@ Valida que o campo apply_blocked é calculado corretamente
 com base no valor de GCAL_CLIENT.
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import os
 import pytest
 from unittest.mock import patch

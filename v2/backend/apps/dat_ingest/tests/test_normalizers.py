@@ -3,6 +3,9 @@ Tests: Normalizers
 Valida funções de normalização de dados (services/normalizers.py).
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import datetime
 
 import pytest

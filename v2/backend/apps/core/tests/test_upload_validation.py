@@ -6,6 +6,9 @@ Valida que:
 - MIME types inválidos são rejeitados com 400
 - CSV/XLS/XLSX válidos são aceitos
 """
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import io
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile

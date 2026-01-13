@@ -6,6 +6,9 @@ Valida que constantes ETL estão definidas e têm valores esperados.
 Issue #54: Extrair magic numbers para constantes.
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from decimal import Decimal
 

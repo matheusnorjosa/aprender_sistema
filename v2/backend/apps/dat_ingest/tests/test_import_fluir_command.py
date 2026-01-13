@@ -8,6 +8,9 @@ Valida:
 - Quality gates (min eventos, formadores, projeto)
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from io import StringIO
 from unittest.mock import patch, MagicMock

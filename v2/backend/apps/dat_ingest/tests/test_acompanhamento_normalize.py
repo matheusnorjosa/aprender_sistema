@@ -2,6 +2,9 @@
 Testes para funções de normalização do ETL de Acompanhamento.
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from datetime import date, time
 

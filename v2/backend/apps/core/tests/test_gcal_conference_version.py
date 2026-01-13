@@ -7,6 +7,9 @@ Valida:
 - Funciona mesmo quando payload não tem conferenceData (campo opcional)
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 

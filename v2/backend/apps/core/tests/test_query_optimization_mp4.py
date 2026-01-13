@@ -7,6 +7,7 @@ algoritmos de busca em endpoints críticos de dashboard e export.
 Refs: Issue #168, PR #[TBD]
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
 from __future__ import annotations
 
 from datetime import timedelta

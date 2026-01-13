@@ -7,6 +7,9 @@ Valida:
 - Payload JSON estruturado conforme esperado
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone

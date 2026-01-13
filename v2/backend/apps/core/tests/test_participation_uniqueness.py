@@ -6,6 +6,9 @@ Valida:
 - Integridade referencial
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError

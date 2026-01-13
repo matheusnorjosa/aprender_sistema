@@ -8,6 +8,9 @@ Session keep-alive functionality:
 - Works with SESSION_SAVE_EVERY_REQUEST=True
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from django.conf import settings
 from django.contrib.auth import get_user_model

@@ -10,6 +10,9 @@ Tests:
 - test_migration_handles_missing_projects
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import importlib
 
 import pytest

@@ -7,6 +7,9 @@ Garante que:
 3. Mudança mínima → hash diferente
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 
 from apps.dat_ingest.services.acompanhamento_normalize import hash_event_v2

@@ -8,6 +8,9 @@ Cobertura:
 100% fake/mocked, sem rede real.
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from datetime import date, timedelta
 from django.contrib.auth.models import Group

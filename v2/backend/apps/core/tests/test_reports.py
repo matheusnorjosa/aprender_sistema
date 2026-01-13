@@ -15,6 +15,9 @@ Endpoints testados:
 - GET /api/reports/solicitacoes/by-uf
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from datetime import datetime, timedelta
 from uuid import uuid4

@@ -7,6 +7,9 @@ Conforme PLAN_multi_sector_availability.md:
 - AvailabilityBlockViewSet filtro por gerência (Issue #383)
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from django.contrib.auth.models import Group
 from django.test import TestCase

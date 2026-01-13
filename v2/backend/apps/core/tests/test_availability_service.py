@@ -4,6 +4,9 @@ Tests: Availability Service (RD-01 a RD-08)
 Cobertura completa das regras de disponibilidade + endpoint de checagem.
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from django.utils import timezone
 from django.conf import settings

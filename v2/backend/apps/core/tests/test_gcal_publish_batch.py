@@ -8,6 +8,9 @@ Cenários:
 - RBAC: 403 para usuário sem Controle/Super
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import os
 from unittest.mock import patch, MagicMock
 

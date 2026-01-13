@@ -11,6 +11,9 @@ Valida:
 - Pré-agenda filtra por fluxo corretamente
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from django.contrib.auth.models import Group
 from django.utils import timezone

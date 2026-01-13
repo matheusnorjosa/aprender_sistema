@@ -11,4 +11,6 @@ Commands disponiveis:
 - cleanup_* : Limpeza de dados E2E
 """
 
+
+from __future__ import annotations
 default_app_config = "apps.dev_tools.apps.DevToolsConfig"

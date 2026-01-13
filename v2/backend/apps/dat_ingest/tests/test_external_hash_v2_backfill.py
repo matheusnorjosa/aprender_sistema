@@ -7,6 +7,9 @@ Garante que:
 3. Collision file gerado apenas se houver colisões
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path

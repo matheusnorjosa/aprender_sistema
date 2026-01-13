@@ -3,6 +3,9 @@ Tests for DAT Registros module.
 
 Ref: v2/docs/SPEC_DAT_REGISTROS.md
 """
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import json
 from decimal import Decimal
 

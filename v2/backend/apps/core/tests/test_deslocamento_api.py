@@ -13,6 +13,9 @@ Permissions:
 - IsControleOrDAT (Controle, DAT, Superintendência)
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 from datetime import date, timedelta
 
 import pytest

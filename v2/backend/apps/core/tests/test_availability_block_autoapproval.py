@@ -9,6 +9,9 @@ Comportamento documentado:
 - Diferente de Solicitacao SUPER que nunca auto-aprova (PA-01)
 - Bloqueios são informações factuais do formador, não requerem aprovação gerencial
 """
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 from datetime import timedelta
 
 from django.test import TestCase

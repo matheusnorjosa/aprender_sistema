@@ -6,6 +6,9 @@ Ensures all functions and classes are importable from both:
 - apps.core.services.gcal_sync_service (legacy facade)
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 
 

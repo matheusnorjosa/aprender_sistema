@@ -12,6 +12,9 @@ Valida:
 - Idempotência (rodar 2x → 0 duplicatas)
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import os
 import tempfile
 from pathlib import Path

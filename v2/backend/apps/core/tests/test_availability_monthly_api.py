@@ -9,6 +9,9 @@ Valida:
 - Details_index para E/2/X
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from datetime import datetime
 from django.utils import timezone

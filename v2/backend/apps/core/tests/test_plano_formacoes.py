@@ -7,8 +7,10 @@ Tests:
 - Stats and calendar endpoints
 - Inline update actions
 """
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
 
+
+from __future__ import annotations
 import pytest
 from datetime import date
 from decimal import Decimal

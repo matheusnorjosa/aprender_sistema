@@ -9,6 +9,9 @@ Testes:
 Cobertura: 100% dos fluxos principais de config_service.py
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 from datetime import timedelta
 
 from django.core.cache import cache

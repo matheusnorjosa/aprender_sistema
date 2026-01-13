@@ -5,6 +5,9 @@ Valida que os métodos approve e reject persistem
 entries no AuditLog com os campos corretos.
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from datetime import timedelta
 from django.utils import timezone

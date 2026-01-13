@@ -10,6 +10,9 @@ Endpoint testado:
 - GET /api/features/
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from django.test import override_settings
 from django.urls import reverse

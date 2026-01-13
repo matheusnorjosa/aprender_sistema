@@ -9,6 +9,9 @@ Valida que settings.py bloqueia configurações inseguras em produção:
 - SECRET_KEY curta → warning
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import os
 import sys
 import subprocess

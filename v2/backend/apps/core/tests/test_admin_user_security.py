@@ -8,6 +8,9 @@ Valida hardening do serializer de admin de usuários:
 - Campos com whitelist explícito (sem setattr indiscriminado)
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 from django.test import TestCase
 from django.contrib.auth.models import Group
 from rest_framework.test import APIRequestFactory

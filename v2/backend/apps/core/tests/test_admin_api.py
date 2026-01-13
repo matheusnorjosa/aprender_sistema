@@ -8,6 +8,9 @@ Testa:
 - Edge cases: validações, permissões, dados inválidos
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from datetime import date
 from django.contrib.auth.models import Group

@@ -11,6 +11,9 @@ RBAC: Apenas grupos Controle/Superintendência podem acessar.
 Filtros: date_from, date_to, sector, q, status (gcal_status).
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from datetime import timedelta
 from django.contrib.auth.models import Group

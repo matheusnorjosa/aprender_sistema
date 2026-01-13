@@ -9,6 +9,9 @@ Valida:
 - Apply_blocked (409) online: não persiste meet_link mesmo se online
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import pytest
 from unittest.mock import patch, MagicMock
 from django.contrib.auth.models import Group

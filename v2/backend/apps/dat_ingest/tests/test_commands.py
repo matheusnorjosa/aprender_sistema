@@ -3,6 +3,9 @@ Tests: Management Commands
 Valida comandos Django de importação (load_full_pipeline, load_tipos_evento).
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false
+
+from __future__ import annotations
 import tempfile
 from pathlib import Path
 

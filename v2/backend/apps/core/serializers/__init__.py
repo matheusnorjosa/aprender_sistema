@@ -6,6 +6,9 @@ Import pattern: `from apps.core.serializers import SolicitacaoSerializer`
 
 Type-checked with Pyright (strict mode).
 """
+
+from __future__ import annotations
+
 from apps.core.serializers.agenda import AvailabilityBlockSerializer
 from apps.core.serializers.auditoria import AuditLogSerializer
 from apps.core.serializers.compra import CompraSerializer

@@ -12,6 +12,8 @@ Modular package containing all Google Calendar sync functionality:
 Backwards-compatible re-exports for existing imports.
 """
 
+from __future__ import annotations
+
 # Types
 from apps.core.services.gcal.types import (
     Action,

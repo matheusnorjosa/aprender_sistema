@@ -32,6 +32,9 @@ Estrutura:
 
 Type-checked with Pyright (strict mode).
 """
+
+from __future__ import annotations
+
 from apps.core.models.agenda import AvailabilityBlock
 from apps.core.models.auditoria import AuditLog
 from apps.core.models.compra import Compra

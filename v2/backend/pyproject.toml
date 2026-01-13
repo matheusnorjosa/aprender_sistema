@@ -29,6 +29,7 @@ include = [
 exclude = [
     "**/__pycache__",
     "**/migrations",
+    "**/tests",
     "**/.venv",
     "**/venv",
     "**/node_modules"

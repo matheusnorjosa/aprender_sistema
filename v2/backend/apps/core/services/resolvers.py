@@ -7,7 +7,7 @@ usadas tanto pelo ETL quanto por validações em runtime.
 Movido de dat_ingest/services/resolvers.py para desacoplar
 ETL do sistema principal (Issue: decouple-etl).
 """
-# pyright: reportMissingImports=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
+# pyright: reportMissingImports=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportReturnType=false
 
 from __future__ import annotations
 

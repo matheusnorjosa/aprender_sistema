@@ -9,4 +9,6 @@ Contém os modelos de domínio principais:
 - LogAuditoria
 """
 
+from __future__ import annotations
+
 default_app_config = "core.apps.CoreConfig"

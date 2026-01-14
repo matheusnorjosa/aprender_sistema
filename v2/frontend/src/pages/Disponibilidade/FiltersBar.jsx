@@ -3,29 +3,94 @@
  *
  * Filtros: ano, mês, gerência, setor, busca (q).
  * Sem "role" (controlado pela página principal).
+ *
+ * RBAC: Filtra gerências baseado nos setores do usuário.
+ * - Superintendência vê todas as gerências
+ * - Demais usuários veem apenas sua(s) gerência(s)
  */
 
-import { useState, useEffect } from 'react';
-import { getGerencias } from '../../api/availability';
+import { useState, useEffect, useMemo } from 'react';
+import { getGerencias, getMe } from '../../api/availability';
+
+/**
+ * Mapeamento de grupo RBAC → nome_setor da gerência.
+ * Necessário porque alguns grupos têm nomes diferentes.
+ * Ex: Grupo "Superintendência" → nome_setor "Super"
+ */
+const GROUP_TO_NOME_SETOR = {
+  'Superintendência': 'Super',
+  // Os demais têm nomes idênticos (Vidas, Fluir, ACerta, etc.)
+};
 
 export default function FiltersBar({ year, month, gerenciaId, sector, q, onChange }) {
-  const [gerencias, setGerencias] = useState([]);
-  const [loadingGerencias, setLoadingGerencias] = useState(true);
+  const [allGerencias, setAllGerencias] = useState([]);
+  const [userInfo, setUserInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Carrega lista de gerências ao montar
+  // Carrega lista de gerências e info do usuário ao montar
   useEffect(() => {
-    async function fetchGerencias() {
+    async function fetchData() {
       try {
-        const data = await getGerencias();
-        setGerencias(data);
+        const [gerenciasData, meData] = await Promise.all([
+          getGerencias(),
+          getMe(),
+        ]);
+        setAllGerencias(gerenciasData);
+        setUserInfo(meData);
+
+        // Auto-seleciona gerência se usuário não é Superintendência
+        // e ainda não tem gerência selecionada
+        if (!meData.is_superintendencia && meData.setores?.length > 0) {
+          const userSetores = meData.setores;
+          // Converte grupos RBAC para nome_setor
+          const userNomeSetores = userSetores.map(
+            (setor) => GROUP_TO_NOME_SETOR[setor] || setor
+          );
+          // Encontra a primeira gerência que corresponde aos setores do usuário
+          const matchingGerencia = gerenciasData.find((g) =>
+            userNomeSetores.includes(g.nome_setor)
+          );
+          if (matchingGerencia && !gerenciaId) {
+            onChange({ gerenciaId: matchingGerencia.id });
+          }
+        }
       } catch (err) {
-        console.error('Erro ao carregar gerências:', err);
+        console.error('Erro ao carregar dados:', err);
       } finally {
-        setLoadingGerencias(false);
+        setLoading(false);
       }
     }
-    fetchGerencias();
-  }, []);
+    fetchData();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * Filtra gerências baseado nos setores do usuário.
+   * Superintendência vê todas. Demais veem apenas suas.
+   */
+  const gerencias = useMemo(() => {
+    if (!userInfo || !allGerencias.length) return [];
+
+    // Superintendência ou superuser vê todas as gerências
+    if (userInfo.is_superintendencia || userInfo.is_superuser) {
+      return allGerencias;
+    }
+
+    // Converte grupos RBAC para nome_setor
+    const userSetores = userInfo.setores || [];
+    const userNomeSetores = userSetores.map(
+      (setor) => GROUP_TO_NOME_SETOR[setor] || setor
+    );
+
+    // Filtra gerências que correspondem aos setores do usuário
+    return allGerencias.filter((g) =>
+      userNomeSetores.includes(g.nome_setor)
+    );
+  }, [allGerencias, userInfo]);
+
+  /**
+   * Verifica se pode ver todas as gerências (opção "Todas").
+   */
+  const canSeeAll = userInfo?.is_superintendencia || userInfo?.is_superuser;
 
   /**
    * Incrementa/decrementa mês.
@@ -69,13 +134,14 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
         <select
           value={gerenciaId || ''}
           onChange={(e) => onChange({ gerenciaId: e.target.value ? Number(e.target.value) : null })}
-          disabled={loadingGerencias}
+          disabled={loading}
           className="w-52 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         >
-          <option value="">Todas (Superintendência)</option>
+          {/* Opção "Todas" apenas para Superintendência */}
+          {canSeeAll && <option value="">Todas (Superintendência)</option>}
           {gerencias.map((g) => (
             <option key={g.id} value={g.id}>
-              {g.nome}
+              {g.nome} ({g.nome_setor})
             </option>
           ))}
         </select>

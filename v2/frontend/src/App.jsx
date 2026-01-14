@@ -284,6 +284,8 @@ function AppContent() {
   const canDAT = user?.is_superuser || inDAT;
   // canDashboards = acesso aos dashboards (Diretoria, DAT, superuser)
   const canDashboards = user?.is_superuser || inDiretoria || inDAT;
+  // canDisponibilidade = acesso à grade mensal (todos exceto Controle)
+  const canDisponibilidade = user?.is_superuser || !inControle;
 
   return (
     <ConfigProvider locale={ptBR} theme={antThemeConfig}>
@@ -424,10 +426,12 @@ function AppContent() {
                 </SubMenu>
               )}
 
-              {/* 7. Grade Mensal */}
-              <Menu.Item key="grade-mensal" icon={<TableOutlined />}>
-                <Link to="/disponibilidade">Grade Mensal</Link>
-              </Menu.Item>
+              {/* 7. Grade Mensal (todos exceto Controle) */}
+              {canDisponibilidade && (
+                <Menu.Item key="grade-mensal" icon={<TableOutlined />}>
+                  <Link to="/disponibilidade">Grade Mensal</Link>
+                </Menu.Item>
+              )}
 
               {/* 8. Solicitações */}
               {canCoordenador && (
@@ -510,7 +514,10 @@ function AppContent() {
                     element={canDashboards ? <MapaBrasilPage /> : <Forbidden />}
                   />
 
-                  <Route path="/disponibilidade" element={<MonthlyPage />} />
+                  <Route
+                    path="/disponibilidade"
+                    element={canDisponibilidade ? <MonthlyPage /> : <Forbidden />}
+                  />
                   <Route path="/bloqueios" element={<DisponibilidadeBlocks />} />
 
                   {/* PR15: Novas rotas de solicitações */}

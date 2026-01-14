@@ -138,10 +138,10 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
           className="w-52 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         >
           {/* Opção "Todas" apenas para Superintendência */}
-          {canSeeAll && <option value="">Todas (Superintendência)</option>}
+          {canSeeAll && <option value="">Todas</option>}
           {gerencias.map((g) => (
             <option key={g.id} value={g.id}>
-              {g.nome} ({g.nome_setor})
+              {g.nome_setor}
             </option>
           ))}
         </select>

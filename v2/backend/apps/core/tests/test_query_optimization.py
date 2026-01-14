@@ -4,6 +4,8 @@ AS v2 — Query Optimization Tests
 Tests for N+1 query prevention (#406).
 Validates that ViewSets use select_related/prefetch_related correctly.
 """
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false, reportAttributeAccessIssue=false, reportUnusedVariable=false
+
 from __future__ import annotations
 
 import uuid

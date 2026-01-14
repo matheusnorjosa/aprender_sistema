@@ -32,7 +32,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
     Usuario é preenchido automaticamente com request.user.
     """
 
-    queryset = AvailabilityBlock.objects.all()
+    queryset = AvailabilityBlock.objects.select_related("usuario").all()
     serializer_class = AvailabilityBlockSerializer
     permission_classes = [IsAuthenticated]
 
@@ -40,12 +40,13 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         """
         Filtrar bloqueios por usuário (exceto Superintendência/superuser que vê todos).
         """
+        base_qs = AvailabilityBlock.objects.select_related("usuario")
         if (
             self.request.user.is_superuser
             or self.request.user.groups.filter(name="Superintendência").exists()
         ):
-            return AvailabilityBlock.objects.all()
-        return AvailabilityBlock.objects.filter(usuario=self.request.user)
+            return base_qs.all()
+        return base_qs.filter(usuario=self.request.user)
 
     def perform_create(self, serializer):
         """
@@ -244,14 +245,16 @@ class AvailabilityCheckManyView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
+        # Batch fetch de usuários (evita N+1)
+        usuarios_map = {u.id: u for u in Usuario.objects.filter(pk__in=usuarios_ids)}
+
         # Executar checagem para cada usuário
         results = []
         all_ok = True
 
         for usuario_id in usuarios_ids:
-            try:
-                usuario = Usuario.objects.get(pk=usuario_id)
-            except Usuario.DoesNotExist:
+            usuario = usuarios_map.get(usuario_id)
+            if not usuario:
                 results.append(
                     {
                         "usuario_id": usuario_id,

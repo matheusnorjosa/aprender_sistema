@@ -23,6 +23,7 @@ export default function MonthlyPage() {
   const [filters, setFilters] = useState({
     year: now.getFullYear(),
     month: now.getMonth() + 1,
+    gerenciaId: null, // null = Superintendência (default)
     sector: '',
     q: '',
   });
@@ -114,6 +115,7 @@ export default function MonthlyPage() {
         <FiltersBar
           year={filters.year}
           month={filters.month}
+          gerenciaId={filters.gerenciaId}
           sector={filters.sector}
           q={filters.q}
           onChange={handleFiltersChange}

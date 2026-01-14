@@ -16,6 +16,7 @@ import { getMonthly } from '../../api/availability';
  * @param {string} params.role - Role ("FORMADOR" | "COORDENADOR")
  * @param {string} params.sector - Filtro por setor (opcional)
  * @param {string} params.q - Filtro por nome/email (opcional)
+ * @param {number} params.gerenciaId - ID da gerência (opcional)
  * @returns {object} { data, loading, error, refetch }
  */
 export default function useMonthlyQuery(params) {
@@ -24,14 +25,19 @@ export default function useMonthlyQuery(params) {
   const [error, setError] = useState(null);
 
   // Desestruturar params para evitar loop infinito
-  const { year, month, role, sector, q } = params;
+  const { year, month, role, sector, q, gerenciaId } = params;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const result = await getMonthly({ year, month, role, sector, q });
+      const queryParams = { year, month, role, sector, q };
+      // Adiciona gerencia_id apenas se definido
+      if (gerenciaId) {
+        queryParams.gerencia_id = gerenciaId;
+      }
+      const result = await getMonthly(queryParams);
       setData(result);
     } catch (err) {
       setError(err.message || 'Erro ao carregar grade mensal');
@@ -39,7 +45,7 @@ export default function useMonthlyQuery(params) {
     } finally {
       setLoading(false);
     }
-  }, [year, month, role, sector, q]);
+  }, [year, month, role, sector, q, gerenciaId]);
 
   useEffect(() => {
     fetchData();

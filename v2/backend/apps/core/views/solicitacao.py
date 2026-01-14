@@ -249,19 +249,30 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             ).delete()
             changed = True
 
-        # Adicionar formadores
-        for formador_id in to_add:
-            if formador_id:
-                try:
-                    usuario = Usuario.objects.get(id=formador_id)
-                    Participation.objects.get_or_create(
-                        solicitacao=solicitacao,
-                        usuario=usuario,
-                        defaults={'role': 'FORMADOR'}
-                    )
-                    changed = True
-                except Usuario.DoesNotExist:
-                    pass
+        # Adicionar formadores (batch fetch para evitar N+1)
+        if to_add:
+            # Batch fetch de usuários
+            usuarios_map = {
+                u.id: u for u in Usuario.objects.filter(id__in=to_add)
+            }
+
+            # Criar participations em batch
+            participations_to_create = [
+                Participation(
+                    solicitacao=solicitacao,
+                    usuario=usuarios_map[fid],
+                    role='FORMADOR'
+                )
+                for fid in to_add
+                if fid and fid in usuarios_map
+            ]
+
+            if participations_to_create:
+                Participation.objects.bulk_create(
+                    participations_to_create,
+                    ignore_conflicts=True
+                )
+                changed = True
 
         return changed
 

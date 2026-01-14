@@ -1,11 +1,32 @@
 /**
  * Barra de filtros compartilhados.
  *
- * Filtros: ano, mês, setor, busca (q).
+ * Filtros: ano, mês, gerência, setor, busca (q).
  * Sem "role" (controlado pela página principal).
  */
 
-export default function FiltersBar({ year, month, sector, q, onChange }) {
+import { useState, useEffect } from 'react';
+import { getGerencias } from '../../api/availability';
+
+export default function FiltersBar({ year, month, gerenciaId, sector, q, onChange }) {
+  const [gerencias, setGerencias] = useState([]);
+  const [loadingGerencias, setLoadingGerencias] = useState(true);
+
+  // Carrega lista de gerências ao montar
+  useEffect(() => {
+    async function fetchGerencias() {
+      try {
+        const data = await getGerencias();
+        setGerencias(data);
+      } catch (err) {
+        console.error('Erro ao carregar gerências:', err);
+      } finally {
+        setLoadingGerencias(false);
+      }
+    }
+    fetchGerencias();
+  }, []);
+
   /**
    * Incrementa/decrementa mês.
    *
@@ -40,7 +61,27 @@ export default function FiltersBar({ year, month, sector, q, onChange }) {
         </button>
       </div>
 
-      {/* Filtro de setor */}
+      {/* Filtro de gerência */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">
+          Gerência
+        </label>
+        <select
+          value={gerenciaId || ''}
+          onChange={(e) => onChange({ gerenciaId: e.target.value ? Number(e.target.value) : null })}
+          disabled={loadingGerencias}
+          className="w-52 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+        >
+          <option value="">Todas (Superintendência)</option>
+          {gerencias.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.nome}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Filtro de setor (texto) */}
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">
           Setor
@@ -50,7 +91,7 @@ export default function FiltersBar({ year, month, sector, q, onChange }) {
           value={sector}
           onChange={(e) => onChange({ sector: e.target.value })}
           placeholder="Filtrar por setor"
-          className="w-52 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-40 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
@@ -64,7 +105,7 @@ export default function FiltersBar({ year, month, sector, q, onChange }) {
           value={q}
           onChange={(e) => onChange({ q: e.target.value })}
           placeholder="Buscar nome/email"
-          className="w-56 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-48 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
     </div>

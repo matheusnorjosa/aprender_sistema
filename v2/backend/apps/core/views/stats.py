@@ -6,13 +6,13 @@ GET /api/stats/home/ retorna métricas personalizadas por perfil:
 - upcoming_events: Formador=seus eventos, Coord=setor
 - my_requests: Só para quem pode criar solicitações, filtrado por setor
 """
-# pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportUnknownVariableType=false
+# pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
 
 from django.db.models import Q
 from django.utils import timezone
-from rest_framework import status
+from rest_framework import status as http_status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -112,5 +112,5 @@ class HomeStatsView(APIView):
                 "upcoming_events": upcoming_events,
                 "my_requests": my_requests,
             },
-            status=status.HTTP_200_OK,
+            status=http_status.HTTP_200_OK,
         )

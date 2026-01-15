@@ -421,6 +421,11 @@ class TestUsuarioAdminAPI:
         """Validar CPF inválido (não 11 dígitos numéricos)"""
         api_client.force_authenticate(user=usuario_dat)
 
+        # Helper to extract errors from standardized response format
+        def get_errors(response):
+            """Get field errors from standardized error response."""
+            return response.data.get("errors", response.data)
+
         # Test 1: CPF com letras
         payload = {
             "username": "test_cpf_invalid1",
@@ -430,8 +435,9 @@ class TestUsuarioAdminAPI:
         }
         response = api_client.post("/api/usuarios-admin/", payload, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "cpf" in response.data
-        assert "11 dígitos numéricos" in str(response.data["cpf"])
+        errors = get_errors(response)
+        assert "cpf" in errors
+        assert "11 dígitos numéricos" in str(errors["cpf"])
 
         # Test 2: CPF com menos de 11 dígitos
         payload["username"] = "test_cpf_invalid2"
@@ -439,7 +445,8 @@ class TestUsuarioAdminAPI:
         payload["cpf"] = "123456789"
         response = api_client.post("/api/usuarios-admin/", payload, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "cpf" in response.data
+        errors = get_errors(response)
+        assert "cpf" in errors
 
         # Test 3: CPF com mais de 11 dígitos
         payload["username"] = "test_cpf_invalid3"
@@ -447,7 +454,8 @@ class TestUsuarioAdminAPI:
         payload["cpf"] = "123456789012"
         response = api_client.post("/api/usuarios-admin/", payload, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "cpf" in response.data
+        errors = get_errors(response)
+        assert "cpf" in errors
 
 
 # ==========================

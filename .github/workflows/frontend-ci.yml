@@ -14,7 +14,7 @@ on:
 jobs:
   build-lint-frontend:
     name: build/lint do frontend
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
 
     defaults:
       run:
@@ -56,7 +56,7 @@ jobs:
 
   checklist-tests:
     name: checklist tests (meta, a11y, security)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
     needs: build-lint-frontend
 
     defaults:
@@ -93,7 +93,7 @@ jobs:
 
   lighthouse-ci:
     name: lighthouse CI
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
     needs: build-lint-frontend
     if: github.event_name == 'pull_request'
 

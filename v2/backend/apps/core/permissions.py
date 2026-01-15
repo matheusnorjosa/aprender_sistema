@@ -85,12 +85,15 @@ class IsSuperintendenciaOnly(permissions.BasePermission):  # type: ignore[misc]
 
 class IsCoordenadorOrDAT(permissions.BasePermission):  # type: ignore[misc]
     """
-    Permissão: apenas Coordenadores ou DAT podem criar solicitações.
+    Permissão: Coordenadores, Apoio de Coordenação ou DAT podem criar solicitações.
+
+    Apoio de Coordenação tem as mesmas permissões de Coordenador para auxiliar
+    nas operações quando necessário.
 
     Nota: Superusers sempre têm acesso completo.
     """
 
-    message = "Apenas Coordenadores ou DAT podem criar solicitações."
+    message = "Apenas Coordenadores, Apoio de Coordenação ou DAT podem criar solicitações."
 
     def has_permission(self, request: Request, view: APIView) -> bool:
         return (
@@ -98,7 +101,7 @@ class IsCoordenadorOrDAT(permissions.BasePermission):  # type: ignore[misc]
             and request.user.is_authenticated
             and (
                 getattr(request.user, 'is_superuser', False)
-                or request.user.groups.filter(name__in=["Coordenador", "DAT"]).exists()  # type: ignore[attr-defined]
+                or request.user.groups.filter(name__in=["Coordenador", "Apoio de Coordenação", "DAT"]).exists()  # type: ignore[attr-defined]
             )
         )
 

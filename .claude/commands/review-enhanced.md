@@ -1,5 +1,5 @@
 ---
-description: Comprehensive code review for AS v2 - 10 categories (clarity, security, a11y, performance, compliance). Adapted from premium Claude Code package with focus on Python/Django.
+description: Comprehensive code review for AS v2 - 11 categories (clarity, security, a11y, performance, React perf, compliance). Adapted from premium Claude Code package + Vercel React Best Practices.
 argument-hint: [file or directory to review]
 allowed-tools: Bash(git:*)
 ---
@@ -8,9 +8,10 @@ allowed-tools: Bash(git:*)
 
 Review code: $ARGUMENTS
 
-**Review Framework**: 10-category comprehensive analysis (adapted from premium package)
+**Review Framework**: 11-category comprehensive analysis
 - **Primary Focus**: Clarity (naming, anti-patterns, specificity)
-- **Context**: Python/Django/DRF + AS v2 business rules (CP, RD, PA)
+- **Context**: Python/Django/DRF + React 18/Vite/Ant Design + AS v2 business rules (CP, RD, PA)
+- **NEW**: React Performance (Vercel Engineering's 45 rules)
 
 ## Review Process
 
@@ -339,7 +340,308 @@ Review code: $ARGUMENTS
 
 ---
 
-### 8. **Testing Quality**
+### 8. **React Performance** (Vercel Best Practices)
+
+> 45 regras da Vercel Engineering adaptadas para React 18 + Vite + Ant Design
+
+#### 🔴 CRÍTICO — Eliminating Waterfalls
+
+**Why**: Waterfall requests are the #1 cause of slow page loads.
+
+- [ ] **Parallel async operations** with `Promise.all()`
+  ```tsx
+  // Bad - Sequential (waterfall)
+  const users = await fetchUsers();
+  const projects = await fetchProjects();
+
+  // Good - Parallel
+  const [users, projects] = await Promise.all([
+    fetchUsers(),
+    fetchProjects()
+  ]);
+  ```
+- [ ] **Defer await until needed** - Move `await` to where data is actually used
+  ```tsx
+  // Bad - Blocks even if not used
+  async function handler(needsData: boolean) {
+    const data = await fetchData();
+    if (!needsData) return null;
+    return <Component data={data} />;
+  }
+
+  // Good - Only fetches when needed
+  async function handler(needsData: boolean) {
+    if (!needsData) return null;
+    const data = await fetchData();
+    return <Component data={data} />;
+  }
+  ```
+- [ ] **Strategic Suspense boundaries** - Don't block entire UI
+  ```tsx
+  // Good - Independent loading states
+  <Suspense fallback={<HeaderSkeleton />}>
+    <Header />
+  </Suspense>
+  <Suspense fallback={<ContentSkeleton />}>
+    <Content />
+  </Suspense>
+  ```
+
+#### 🔴 CRÍTICO — Bundle Size Optimization
+
+**Why**: Large bundles directly impact TTI (Time to Interactive) and LCP.
+
+- [ ] **Dynamic imports for heavy components** (React.lazy)
+  ```tsx
+  // Bad - Loaded in main bundle
+  import MonacoEditor from '@monaco-editor/react';
+
+  // Good - Lazy loaded when needed
+  const MonacoEditor = React.lazy(() => import('@monaco-editor/react'));
+
+  // With Suspense
+  <Suspense fallback={<EditorSkeleton />}>
+    <MonacoEditor />
+  </Suspense>
+  ```
+- [ ] **Avoid barrel file imports** from large libraries
+  ```tsx
+  // Bad - Imports entire library (~200-800ms)
+  import { Button, Table, Modal, Form } from 'antd';
+
+  // Good - Direct imports (tree-shakeable)
+  import Button from 'antd/es/button';
+  import Table from 'antd/es/table';
+  // Or with proper Vite config for antd
+  ```
+- [ ] **Defer non-critical third-party** (analytics, error tracking)
+  ```tsx
+  // Bad - Blocks initial render
+  import * as Sentry from '@sentry/react';
+  Sentry.init({ dsn: '...' });
+
+  // Good - Load after hydration
+  useEffect(() => {
+    import('@sentry/react').then(Sentry => {
+      Sentry.init({ dsn: '...' });
+    });
+  }, []);
+  ```
+- [ ] **Preload on user intent** (hover, focus)
+  ```tsx
+  // Preload heavy modal on button hover
+  const preloadModal = () => import('./HeavyModal');
+
+  <button
+    onMouseEnter={preloadModal}
+    onFocus={preloadModal}
+    onClick={() => setShowModal(true)}
+  >
+    Open Modal
+  </button>
+  ```
+
+#### 🟡 MÉDIO — Re-render Optimization
+
+**Why**: Unnecessary re-renders cause UI jank and wasted CPU cycles.
+
+- [ ] **useMemo for expensive computations**
+  ```tsx
+  // Bad - Recalculates on every render
+  const sortedItems = items.sort((a, b) => a.date - b.date);
+
+  // Good - Only recalculates when items change
+  const sortedItems = useMemo(
+    () => items.sort((a, b) => a.date - b.date),
+    [items]
+  );
+  ```
+- [ ] **useCallback for callbacks passed to children**
+  ```tsx
+  // Bad - New function on every render
+  <ChildComponent onClick={() => handleClick(id)} />
+
+  // Good - Stable reference
+  const handleItemClick = useCallback(() => handleClick(id), [id]);
+  <ChildComponent onClick={handleItemClick} />
+  ```
+- [ ] **Derived state instead of state + useEffect**
+  ```tsx
+  // Bad - Extra state + effect
+  const [items, setItems] = useState([]);
+  const [filteredItems, setFilteredItems] = useState([]);
+  useEffect(() => {
+    setFilteredItems(items.filter(i => i.active));
+  }, [items]);
+
+  // Good - Derived during render
+  const [items, setItems] = useState([]);
+  const filteredItems = useMemo(
+    () => items.filter(i => i.active),
+    [items]
+  );
+  ```
+- [ ] **Lazy state initialization** for expensive defaults
+  ```tsx
+  // Bad - Runs on every render
+  const [state, setState] = useState(expensiveComputation());
+
+  // Good - Runs only once
+  const [state, setState] = useState(() => expensiveComputation());
+  ```
+- [ ] **useTransition for non-urgent updates**
+  ```tsx
+  const [isPending, startTransition] = useTransition();
+
+  const handleSearch = (query: string) => {
+    // Urgent: update input immediately
+    setQuery(query);
+
+    // Non-urgent: can be interrupted
+    startTransition(() => {
+      setFilteredResults(filterResults(query));
+    });
+  };
+  ```
+- [ ] **Extract to memoized components** for early returns
+  ```tsx
+  // Bad - Expensive work even when loading
+  function UserCard({ userId, loading }) {
+    const avatar = useMemo(() => computeAvatar(userId), [userId]);
+    if (loading) return <Skeleton />;
+    return <Card avatar={avatar} />;
+  }
+
+  // Good - Skip computation when loading
+  function UserCard({ userId, loading }) {
+    if (loading) return <Skeleton />;
+    return <UserCardContent userId={userId} />;
+  }
+
+  const UserCardContent = React.memo(({ userId }) => {
+    const avatar = computeAvatar(userId);
+    return <Card avatar={avatar} />;
+  });
+  ```
+
+#### 🟡 MÉDIO — Rendering Performance
+
+**Why**: Inefficient rendering causes layout thrashing and slow paints.
+
+- [ ] **Hoist static JSX outside components**
+  ```tsx
+  // Bad - Recreated on every render
+  function Component() {
+    const icon = <Icon name="check" />;
+    return <div>{icon}</div>;
+  }
+
+  // Good - Created once
+  const CheckIcon = <Icon name="check" />;
+  function Component() {
+    return <div>{CheckIcon}</div>;
+  }
+  ```
+- [ ] **Explicit conditional rendering** (ternary, not &&)
+  ```tsx
+  // Bad - Can render "0" or "NaN"
+  {count && <Badge count={count} />}
+
+  // Good - Explicit boolean check
+  {count > 0 ? <Badge count={count} /> : null}
+  ```
+- [ ] **CSS content-visibility for long lists**
+  ```css
+  /* Skip rendering off-screen items */
+  .list-item {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 50px;
+  }
+  ```
+- [ ] **Prevent hydration mismatch** (client-only storage)
+  ```tsx
+  // Bad - Mismatch between server and client
+  const [theme] = useState(localStorage.getItem('theme'));
+
+  // Good - Sync after mount
+  const [theme, setTheme] = useState('light');
+  useEffect(() => {
+    setTheme(localStorage.getItem('theme') ?? 'light');
+  }, []);
+  ```
+
+#### 🟢 BAIXO — JavaScript Performance
+
+**Why**: Micro-optimizations that matter in hot paths.
+
+- [ ] **Set/Map for O(1) lookups** instead of Array.find()
+  ```tsx
+  // Bad - O(n) on every check
+  const isSelected = selectedIds.find(id => id === item.id);
+
+  // Good - O(1) lookup
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const isSelected = selectedSet.has(item.id);
+  ```
+- [ ] **Combine array iterations** (.filter + .map → single loop)
+  ```tsx
+  // Bad - Two iterations
+  const result = items.filter(x => x.active).map(x => x.name);
+
+  // Good - Single iteration
+  const result = items.reduce((acc, x) => {
+    if (x.active) acc.push(x.name);
+    return acc;
+  }, []);
+  ```
+- [ ] **Cache expensive function results**
+  ```tsx
+  const cache = useMemo(() => new Map(), []);
+
+  const getProcessedItem = useCallback((id: string) => {
+    if (cache.has(id)) return cache.get(id);
+    const result = expensiveProcess(id);
+    cache.set(id, result);
+    return result;
+  }, [cache]);
+  ```
+- [ ] **Hoist RegExp creation** outside render
+  ```tsx
+  // Bad - New RegExp on every render
+  function Component({ pattern }) {
+    const regex = new RegExp(pattern);
+    // ...
+  }
+
+  // Good - Memoized
+  function Component({ pattern }) {
+    const regex = useMemo(() => new RegExp(pattern), [pattern]);
+    // ...
+  }
+  ```
+- [ ] **toSorted() for immutable sorting** (ES2023)
+  ```tsx
+  // Bad - Mutates original array
+  const sorted = items.sort((a, b) => a.name.localeCompare(b.name));
+
+  // Good - Returns new array
+  const sorted = items.toSorted((a, b) => a.name.localeCompare(b.name));
+  ```
+
+#### React Performance — Exemplos AS v2
+
+| Padrão | Onde Aplicar no AS v2 |
+|--------|----------------------|
+| Dynamic imports | `MonthlyCalendar`, `GCalDashboard`, `AdminModule` |
+| Ant Design imports | Todos os arquivos que usam `import { } from 'antd'` |
+| useMemo | `SolicitacoesList` (filtros), `DisponibilidadeGrid` |
+| Set lookups | `AvailabilityCheck` (selectedFormadores) |
+| Suspense boundaries | Wizard steps, Modal contents |
+| useTransition | Search inputs, filter changes |
+
+---
+
+### 9. **Testing Quality** (renumbered from 8)
 
 #### Test Behavior, Not Implementation
 - [ ] **Test what code does**, not how
@@ -392,7 +694,7 @@ Review code: $ARGUMENTS
 
 ---
 
-### 9. **Code Quality**
+### 10. **Code Quality**
 
 #### Comments
 - [ ] **98% should be functions/variables**, not comments
@@ -434,7 +736,7 @@ Review code: $ARGUMENTS
 
 ---
 
-### 10. **Compliance Checks (AS v2 Specific)**
+### 11. **Compliance Checks (AS v2 Specific)**
 
 #### Cláusulas Pétreas (CP-01 to CP-06)
 - [ ] **CP-01**: Docker-only (check `/.dockerenv`)

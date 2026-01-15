@@ -15,6 +15,7 @@ from rest_framework.test import APIClient
 from rest_framework import status as http_status
 
 from apps.core.models import Solicitacao, Usuario, TipoEvento, Municipio
+from apps.core.tests.conftest import get_field_errors
 
 
 @pytest.fixture
@@ -161,7 +162,8 @@ class TestAPICreateSolicitacaoPendente:
         assert response.status_code == http_status.HTTP_400_BAD_REQUEST, (
             "Criar com fim == inicio deve retornar 400"
         )
-        assert "fim" in response.data, "Deve retornar erro no campo 'fim'"
+        errors = get_field_errors(response)
+        assert "fim" in errors, "Deve retornar erro no campo 'fim'"
 
         # Caso 2: fim < inicio (inválido)
         payload2 = {

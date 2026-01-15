@@ -72,9 +72,24 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
     password = serializers.CharField(write_only=True, required=False)
 
+    # CPF mascarado para list views (LGPD compliance)
+    cpf_masked = serializers.SerializerMethodField()
+
     def get_group_ids_display(self, obj: Any) -> list[int]:
         """Return group IDs for frontend editing."""
         return [g.id for g in obj.groups.all()]
+
+    def get_cpf_masked(self, obj: Any) -> str | None:
+        """
+        Return masked CPF for LGPD compliance.
+
+        Format: ***.***XXX-XX (shows only last 6 digits)
+        """
+        cpf = getattr(obj, "cpf", None)
+        if not cpf or len(cpf) < 6:
+            return cpf
+        # Keep only last 6 characters visible
+        return f"***.***.{cpf[-6:]}"
 
     # Whitelist of allowed groups (P1.1) - configurável via settings (Issue #254)
     # Fallback para set vazio se não configurado (todos os grupos bloqueados)
@@ -89,7 +104,8 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             "password",
             "first_name",
             "last_name",
-            "cpf",
+            "cpf",               # Full CPF (write-only for create/update)
+            "cpf_masked",        # Masked CPF for display (LGPD)
             "is_active",
             "is_staff",
             "is_superuser",
@@ -100,9 +116,11 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             "last_login",
         ]
         # P1.1: is_staff and is_superuser are read-only
+        # LGPD: CPF is write-only (use cpf_masked for display)
         read_only_fields = ["id", "date_joined", "last_login", "is_staff", "is_superuser"]
         extra_kwargs = {
-            "password": {"write_only": True}
+            "password": {"write_only": True},
+            "cpf": {"write_only": True},  # LGPD: don't expose full CPF in responses
         }
 
     def validate_group_ids(self, value: list[int]) -> list[int]:

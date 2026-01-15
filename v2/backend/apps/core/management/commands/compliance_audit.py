@@ -86,8 +86,11 @@ class Command(BaseCommand):
             sol_id = details.get("solicitacao_id")
             if sol_id and log.usuario_id:
                 try:
-                    sol = Solicitacao.objects.get(id=sol_id)
-                    if sol.solicitante_id == log.usuario_id and sol.fluxo == "SUPER":
+                    sol = Solicitacao.objects.select_related("projeto").get(id=sol_id)
+                    # Verificar se o usuário aprovou sua própria solicitação em fluxo SUPER
+                    is_owner = sol.usuario_id == log.usuario_id
+                    is_super = sol.projeto and sol.projeto.fluxo == "SUPER"
+                    if is_owner and is_super:
                         self_approvals += 1
                 except Solicitacao.DoesNotExist:
                     pass
@@ -120,9 +123,9 @@ class Command(BaseCommand):
         # SUPER should start as 'pendente', NAO_SUPER as 'aprovado'
         wrong_initial_super = Solicitacao.objects.filter(
             created_at__gte=since,
-            fluxo="SUPER",
+            projeto__fluxo="SUPER",
         ).exclude(
-            status__in=["pendente", "aprovado", "cancelado"]
+            status__in=["pendente", "aprovado", "reprovado"]
         ).count()
 
         report["checks"].append({
@@ -141,14 +144,15 @@ class Command(BaseCommand):
         total_blocks = AvailabilityBlock.objects.filter(
             created_at__gte=since,
             tipo="T",  # Total block
-        )
+        ).select_related("usuario")
 
         for block in total_blocks:
+            # Verificar solicitações aprovadas do mesmo usuário no mesmo período
             conflicting = Solicitacao.objects.filter(
                 status="aprovado",
-                formadores__in=[block.formador],
-                data_inicio__lt=block.data_fim,
-                data_fim__gt=block.data_inicio,
+                usuario=block.usuario,
+                inicio__lt=block.fim,
+                fim__gt=block.inicio,
             ).exists()
 
             if conflicting:

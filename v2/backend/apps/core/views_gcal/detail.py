@@ -83,11 +83,13 @@ class DashboardEventsExportView(APIView):
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response | HttpResponse:
         # Usar helper unificado timezone-aware (Issue #96 follow-up #124)
         # MP4: select_related para evitar N+1 em CSV export (.iterator() bypassa cache)
+        # Fix N+1: added projeto__gerencia and prefetch participations
         qs = _filter_events_queryset(
             request,
             Solicitacao.objects.select_related(
-                'municipio', 'projeto', 'tipo_evento', 'usuario', 'coordenador'
-            )
+                'municipio', 'projeto', 'tipo_evento', 'usuario', 'coordenador',
+                'projeto__gerencia'
+            ).prefetch_related('participations__usuario')
         )
 
         # Determinar formato (default: csv)
@@ -134,8 +136,8 @@ class DashboardEventsExportView(APIView):
             'updated_at'
         ])
 
-        # Escrever linhas
-        for s in qs.iterator():
+        # Escrever linhas (chunk_size required when using iterator() with prefetch_related)
+        for s in qs.iterator(chunk_size=2000):
             # Determinar fluxo (SUPER ou NAO_SUPER)
             fluxo = s.projeto.fluxo if s.projeto else ''
 

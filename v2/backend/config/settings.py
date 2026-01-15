@@ -30,6 +30,8 @@ if REQUIRE_DOCKER and not os.path.exists("/.dockerenv"):
 # ================================================================
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 DEBUG = os.getenv("DEBUG", "0") == "1"
+# Detect if running under pytest (for disabling debug toolbar during tests)
+TESTING = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
 
 print("AS v2 inicializado; legado arquivado e bloqueado")
 # ================================================================
@@ -339,6 +341,8 @@ REST_FRAMEWORK = {
         "user": "1000/hour",
         "availability_check": "60/min",  # 60 requests por minuto para availability check
     },
+    # Custom exception handler for standardized error responses
+    "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
     # API Schema (drf-spectacular)
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
@@ -694,7 +698,8 @@ if DEBUG:
     MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
     INTERNAL_IPS = ["127.0.0.1", "localhost", "0.0.0.0"]
     DEBUG_TOOLBAR_CONFIG: dict[str, object] = {
-        "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG,  # type: ignore[misc]
+        # Disable toolbar during tests to avoid NoReverseMatch errors
+        "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG and not TESTING,  # type: ignore[misc]
         "DISABLE_PANELS": {
             "debug_toolbar.panels.redirects.RedirectsPanel",
             "debug_toolbar.panels.profiling.ProfilingPanel",
@@ -714,7 +719,7 @@ if ENVIRONMENT == "staging":
     SILKY_INTERCEPT_PERCENT = 100  # Profile all requests
 
 # NPlusOne (N+1 query detection in dev/test)
-TESTING = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
+# TESTING is defined earlier in file (line 34)
 if DEBUG or TESTING:
     INSTALLED_APPS += ["nplusone.ext.django"]
     MIDDLEWARE += ["nplusone.ext.django.NPlusOneMiddleware"]

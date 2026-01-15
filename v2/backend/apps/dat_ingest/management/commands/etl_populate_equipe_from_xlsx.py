@@ -20,6 +20,7 @@ Mapeamento Planilha → Banco:
     - Sou da Paz → Sou da Paz (ID=6)
     - IDEB 10 / Avançando Juntos → Individual (ID=7)
 """
+# pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportArgumentType=false, reportOperatorIssue=false
 
 from __future__ import annotations
 

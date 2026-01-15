@@ -92,7 +92,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "gcal_status",
             "gcal_last_sync_at",
             "gcal_last_error",
-            "gcal_payload_hash",
+            # gcal_payload_hash removed: internal implementation detail
             # PR19/RF06: Google Meet link
             "meet_link",
             # Modalidade online/presencial
@@ -109,7 +109,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "gcal_status",
             "gcal_last_sync_at",
             "gcal_last_error",
-            "gcal_payload_hash",
+            # gcal_payload_hash removed: internal implementation detail
             # PR19/RF06: Google Meet link (gerado automaticamente)
             "meet_link",
         ]
@@ -244,9 +244,11 @@ class EventDetailSerializer(serializers.ModelSerializer):
     - Dados do evento: id, municipio_nome, projeto_nome, tipo_evento_nome,
       inicio, fim, usuario_username, coordenador_username, fluxo
     - Dados GCal: gcal_status, external_event_id, gcal_last_sync_at,
-      gcal_last_error, meet_link, gcal_payload_hash, updated_at
+      gcal_last_error, meet_link, updated_at
     - participations: Lista de participantes (read-only)
     - timeline: Últimos 20 AuditLog relacionados (actions GCal), ordenado desc
+
+    Note: gcal_payload_hash removed (internal implementation detail)
 
     Permissions: IsControleOrSuper
     Endpoint: GET /api/gcal/dashboard/events/{id}/detail/
@@ -283,7 +285,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
             "gcal_last_sync_at",
             "gcal_last_error",
             "meet_link",
-            "gcal_payload_hash",
+            # gcal_payload_hash removed: internal implementation detail
             "updated_at",
             "participations",
             "timeline",

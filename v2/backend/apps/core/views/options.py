@@ -91,8 +91,10 @@ class CoordenadorOptionViewSet(viewsets.ReadOnlyModelViewSet):
     Retorna: [{id, username, nome_completo, email}]
 
     Permissões: IsAuthenticated (todos usuários logados)
-    Filtro: Apenas usuários do grupo "Coordenador" ou superusers
+    Filtro: Usuários dos grupos "Coordenador" ou "Apoio de Coordenação"
     Busca: Server-side por username, nome, sobrenome e email
+
+    Nota: Apoio de Coordenação tem as mesmas permissões de Coordenador.
     """
 
     serializer_class = UsuarioOptionSerializer
@@ -102,9 +104,12 @@ class CoordenadorOptionViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ["username", "first_name", "last_name", "email"]
 
     def get_queryset(self) -> QuerySet:
-        """Retorna apenas usuários coordenadores ativos"""
+        """Retorna usuários coordenadores e apoio de coordenação ativos."""
         return (
-            Usuario.objects.filter(is_active=True, groups__name="Coordenador")
+            Usuario.objects.filter(
+                is_active=True,
+                groups__name__in=["Coordenador", "Apoio de Coordenação"],
+            )
             .distinct()
             .order_by("first_name", "last_name")
         )

@@ -45,6 +45,7 @@ from apps.core.views.options import (
     ProjetoOptionViewSet,
     TipoEventoOptionViewSet,
 )
+from apps.core.views.stats import HomeStatsView
 
 __all__ = [
     # Utils
@@ -85,4 +86,6 @@ __all__ = [
     "CoordenadorOptionViewSet",
     "FormadorOptionViewSet",
     "TipoEventoOptionViewSet",
+    # Stats
+    "HomeStatsView",
 ]

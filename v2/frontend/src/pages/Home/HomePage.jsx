@@ -21,6 +21,7 @@ import {
   SafetyOutlined,
 } from '@ant-design/icons';
 import { getMe } from '../../api/availability';
+import { getHomeStats } from '../../api/stats';
 import logger from '../../utils/logger';
 
 const { Title, Text } = Typography;
@@ -74,15 +75,17 @@ export default function HomePage() {
   useEffect(() => {
     const loadUserAndStats = async () => {
       try {
-        const userData = await getMe();
-        setUser(userData);
+        // Carregar dados do usuário e estatísticas em paralelo
+        const [userData, statsData] = await Promise.all([
+          getMe(),
+          getHomeStats(),
+        ]);
 
-        // TODO: Carregar estatísticas reais da API
-        // Por enquanto, valores mockados
+        setUser(userData);
         setStats({
-          pendingApprovals: 5,
-          myRequests: 3,
-          upcomingEvents: 12,
+          pendingApprovals: statsData.pending_approvals ?? 0,
+          myRequests: statsData.my_requests ?? 0,
+          upcomingEvents: statsData.upcoming_events ?? 0,
         });
       } catch (error) {
         logger.error('Erro ao carregar dados:', error);

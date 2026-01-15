@@ -246,7 +246,7 @@ class TestGCalList:
         assert "gcal_status" in first_result
         assert "gcal_last_sync_at" in first_result
         assert "gcal_last_error" in first_result
-        assert "gcal_payload_hash" in first_result
+        # Note: gcal_payload_hash removed from serializer (internal implementation detail)
 
     def test_list_filters_by_status(
         self, api_client, usuario_controle, setup_solicitacoes

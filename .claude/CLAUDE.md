@@ -1,6 +1,6 @@
 # Projeto: Aprender Sistema (AS) v2 — Guia Completo
 
-**Última Atualização**: 2026-01-13
+**Última Atualização**: 2026-01-15
 
 ## 🎯 Filosofia — Ultrathink
 
@@ -263,8 +263,46 @@ can_approve_super = is_superuser OR ("Gerente" IN funcoes AND "Superintendência
 | Plano | Epic | Status |
 |-------|------|--------|
 | [API Best Practices 10/10](../v2/docs/PLAN_api_best_practices.md) | #405 | 🔄 Em progresso |
+| **React Performance (Vercel Best Practices)** | #423 | 🆕 Novo |
 
-**Issues relacionadas**: #406, #407, #408, #409, #410, #411, #412
+---
+
+### 🚀 Epic #423: React Performance Optimization
+
+**Objetivo**: Aplicar 45 regras de React Performance da Vercel Engineering no módulo Solicitações.
+
+**Score**: 7.25/10 → 9.5+/10
+
+**Arquivos**:
+- `v2/frontend/src/pages/Solicitacoes/MySolicitacoesPage.jsx`
+- `v2/frontend/src/pages/Solicitacoes/NewSolicitacaoWizard.jsx`
+- `v2/frontend/src/pages/Solicitacoes/EditSolicitacaoPage.jsx`
+
+| Ordem | Issue | Descrição | Prioridade |
+|-------|-------|-----------|------------|
+| 1 | #424 | antd direct imports | 🔴 CRÍTICO |
+| 2 | #425 | @ant-design/icons direct imports | 🔴 CRÍTICO |
+| 3 | #426 | memoize steps array (280 linhas) | 🟡 MÉDIO |
+| 4 | #427 | memoize columns array (115 linhas) | 🟡 MÉDIO |
+| 5 | #428 | memoize rangeValue computation | 🟡 MÉDIO |
+
+**Execução**:
+```
+Fase 1 (Paralelo):  #424 + #425 → Bundle Size (-300-600ms TTI)
+Fase 2 (Sequencial): #426 → #427 → #428 → Re-renders
+```
+
+**Verificação após cada issue**:
+```bash
+cd v2/frontend && npm run build  # Verificar bundle size
+npm run test                      # Testes unitários
+```
+
+**Review final**: `/review-enhanced v2/frontend/src/pages/Solicitacoes`
+
+---
+
+**Issues relacionadas (API)**: #406, #407, #408, #409, #410, #411, #412
 
 | Issue | Categoria | Score |
 |-------|-----------|-------|

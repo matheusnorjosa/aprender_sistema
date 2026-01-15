@@ -234,7 +234,8 @@ class TestSolicitacaoRBAC:
 
         # Assert
         assert response.status_code == status.HTTP_403_FORBIDDEN
-        assert "Coordenadores ou DAT" in str(response.data)  # Match actual message
+        # Updated message includes "Apoio de Coordenação" (audit fix)
+        assert "Coordenadores" in str(response.data) or "DAT" in str(response.data)
 
     def test_superuser_can_create_solicitacao(self):
         """PR 8/N: Superuser pode criar solicitação"""

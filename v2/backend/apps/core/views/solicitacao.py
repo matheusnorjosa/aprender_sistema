@@ -45,7 +45,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     """
 
     queryset = Solicitacao.objects.select_related(
-        "usuario", "municipio", "tipo_evento", "projeto"
+        "usuario", "municipio", "tipo_evento", "projeto", "projeto__gerencia"
+    ).prefetch_related(
+        "participations__usuario"  # Fix N+1: prefetch participations and their users
     )
     serializer_class = SolicitacaoSerializer
     permission_classes = [IsAuthenticated]

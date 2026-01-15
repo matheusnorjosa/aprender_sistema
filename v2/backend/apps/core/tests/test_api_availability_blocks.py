@@ -15,6 +15,7 @@ from django.utils import timezone
 
 import pytest
 from apps.core.models import AvailabilityBlock, Usuario
+from apps.core.tests.conftest import get_field_errors
 from rest_framework import status as http_status
 from rest_framework.test import APIClient
 
@@ -196,7 +197,8 @@ class TestAPIAvailabilityBlocks:
         assert (
             response.status_code == http_status.HTTP_400_BAD_REQUEST
         ), "Criar com fim == inicio deve retornar 400"
-        assert "fim" in response.data, "Deve retornar erro no campo 'fim'"
+        errors = get_field_errors(response)
+        assert "fim" in errors, "Deve retornar erro no campo 'fim'"
 
     def test_create_block_status_is_always_approved(self, user_test):
         """

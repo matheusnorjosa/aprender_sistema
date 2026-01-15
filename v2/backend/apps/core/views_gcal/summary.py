@@ -85,8 +85,11 @@ class GCalListView(APIView):
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas aprovadas
+        # Fix N+1: prefetch participations with their users
         qs = Solicitacao.objects.filter(status='aprovado').select_related(
-            'usuario', 'municipio', 'tipo_evento', 'projeto'
+            'usuario', 'municipio', 'tipo_evento', 'projeto', 'projeto__gerencia'
+        ).prefetch_related(
+            'participations__usuario'
         )
 
         # Aplicar filtros comuns

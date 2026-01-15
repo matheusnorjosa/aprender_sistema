@@ -15,6 +15,7 @@ Idempotence:
     - Não remove projetos com solicitações vinculadas
     - Pode ser executado múltiplas vezes sem efeitos colaterais
 """
+# pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
 

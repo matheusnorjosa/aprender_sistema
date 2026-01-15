@@ -24,6 +24,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from apps.core.models import AuditLog, Deslocamento, Usuario
+from apps.core.tests.conftest import get_field_errors
 
 
 @pytest.fixture
@@ -302,8 +303,9 @@ class TestDeslocamentoAPI:
         }
         response = client.post("/api/deslocamentos/", payload, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "end_date" in response.data
-        assert "Data fim deve ser posterior à data início" in str(response.data["end_date"])
+        errors = get_field_errors(response)
+        assert "end_date" in errors
+        assert "Data fim deve ser posterior à data início" in str(errors["end_date"])
 
         # Test 2: origem == destino
         payload = {
@@ -315,8 +317,9 @@ class TestDeslocamentoAPI:
         }
         response = client.post("/api/deslocamentos/", payload, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "destino" in response.data
-        assert "Origem e destino devem ser diferentes" in str(response.data["destino"])
+        errors = get_field_errors(response)
+        assert "destino" in errors
+        assert "Origem e destino devem ser diferentes" in str(errors["destino"])
 
     def test_deslocamento_rbac(self, user_formador, user_controle, user_dat, deslocamento_sample):
         """

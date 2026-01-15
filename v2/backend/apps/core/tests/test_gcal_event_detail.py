@@ -138,7 +138,7 @@ class TestEventDetail:
         assert data["gcal_status"] == "PUBLISHED"
         assert data["external_event_id"] == "asv2-test-123"
         assert data["meet_link"] == "https://meet.google.com/test-meet"
-        assert data["gcal_payload_hash"] == "abc123hash"
+        # Note: gcal_payload_hash removed from serializer (internal implementation detail)
         assert data["gcal_last_error"] is None  # Campo é nullable, retorna None quando vazio
 
         # Participations (vazio neste caso)

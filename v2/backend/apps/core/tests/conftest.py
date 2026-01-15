@@ -6,8 +6,29 @@ Issue #105: Fixtures para eliminar 403 RBAC failures sem alterar endpoints.
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+from typing import Any
 import pytest
 from django.conf import settings
+
+
+def get_field_errors(response) -> dict[str, Any]:
+    """
+    Extract field errors from standardized API error response.
+
+    The custom exception handler wraps errors in:
+    {"detail": "...", "code": "...", "errors": {"field": [...]}}
+
+    This helper returns the 'errors' dict if present, or response.data as-is
+    for backwards compatibility with tests that check field-level errors.
+
+    Usage in tests:
+        errors = get_field_errors(response)
+        assert "fim" in errors
+        assert "message" in str(errors["fim"])
+    """
+    if isinstance(response.data, dict) and "errors" in response.data:
+        return response.data["errors"]
+    return response.data
 
 
 @pytest.fixture(autouse=True)

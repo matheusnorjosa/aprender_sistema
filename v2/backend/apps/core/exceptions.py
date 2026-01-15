@@ -13,6 +13,7 @@ Usage: Configure in settings.py:
         'EXCEPTION_HANDLER': 'apps.core.exceptions.custom_exception_handler'
     }
 """
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false, reportArgumentType=false
 
 from __future__ import annotations
 

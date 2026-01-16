@@ -3,11 +3,10 @@ AS v2 — API Deprecation Utilities (#410)
 
 Provides decorators and utilities for marking endpoints as deprecated.
 """
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
 
-import warnings
 from functools import wraps
 from typing import Any, Callable, TypeVar
 

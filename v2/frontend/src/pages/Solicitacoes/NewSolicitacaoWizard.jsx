@@ -12,26 +12,24 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Steps,
-  Form,
-  Input,
-  Button,
-  Card,
-  Alert,
-  message,
-  Typography,
-  Descriptions,
-  Tag,
-  Checkbox,
-} from 'antd';
-import {
-  FileTextOutlined,
-  TeamOutlined,
-  EditOutlined,
-  CheckOutlined,
-  ArrowLeftOutlined,
-} from '@ant-design/icons';
+// antd - direct imports for tree-shaking (Issue #424)
+import Steps from 'antd/es/steps';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Alert from 'antd/es/alert';
+import message from 'antd/es/message';
+import Typography from 'antd/es/typography';
+import Descriptions from 'antd/es/descriptions';
+import Tag from 'antd/es/tag';
+import Checkbox from 'antd/es/checkbox';
+// icons - direct imports for tree-shaking (Issue #425)
+import FileTextOutlined from '@ant-design/icons/FileTextOutlined';
+import TeamOutlined from '@ant-design/icons/TeamOutlined';
+import EditOutlined from '@ant-design/icons/EditOutlined';
+import CheckOutlined from '@ant-design/icons/CheckOutlined';
+import ArrowLeftOutlined from '@ant-design/icons/ArrowLeftOutlined';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';

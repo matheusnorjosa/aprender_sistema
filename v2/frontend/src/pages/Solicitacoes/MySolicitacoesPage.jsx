@@ -10,8 +10,23 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Table, Card, Select, Input, Button, Space, Tag, Typography, message, Tooltip, Popconfirm } from 'antd';
-import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+// antd - direct imports for tree-shaking (Issue #424)
+import Table from 'antd/es/table';
+import Card from 'antd/es/card';
+import Select from 'antd/es/select';
+import Input from 'antd/es/input';
+import Button from 'antd/es/button';
+import Space from 'antd/es/space';
+import Tag from 'antd/es/tag';
+import Typography from 'antd/es/typography';
+import message from 'antd/es/message';
+import Tooltip from 'antd/es/tooltip';
+import Popconfirm from 'antd/es/popconfirm';
+// icons - direct imports for tree-shaking (Issue #425)
+import PlusOutlined from '@ant-design/icons/PlusOutlined';
+import SearchOutlined from '@ant-design/icons/SearchOutlined';
+import EditOutlined from '@ant-design/icons/EditOutlined';
+import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 import dayjs from 'dayjs';
 
 import { listSolicitacoes, deleteSolicitacao } from '../../api/solicitacoes';

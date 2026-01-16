@@ -74,6 +74,24 @@ const { Header, Content, Sider } = Layout;
 const { SubMenu } = Menu;
 const { Text } = Typography;
 
+// Hook para controlar abertura de submenus (apenas um aberto por vez)
+function useMenuOpenKeys() {
+  const [openKeys, setOpenKeys] = useState([]);
+
+  const onOpenChange = (keys) => {
+    // Pegar apenas a última key aberta (fecha as outras)
+    const latestOpenKey = keys.find((key) => openKeys.indexOf(key) === -1);
+    setOpenKeys(latestOpenKey ? [latestOpenKey] : []);
+  };
+
+  // Fecha todos os submenus ao clicar em item fora de submenu
+  const closeAllSubmenus = () => {
+    setOpenKeys([]);
+  };
+
+  return { openKeys, onOpenChange, closeAllSubmenus };
+}
+
 // Componente de loading para Suspense
 function PageLoader() {
   return (
@@ -90,7 +108,7 @@ function Forbidden() {
 
 // Componente principal que usa o tema
 function AppContent() {
-  const { isDark, toggleTheme, antThemeConfig } = useTheme();
+  const { isDark, antThemeConfig } = useTheme();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -101,6 +119,9 @@ function AppContent() {
 
   // Issue #255: Ref para evitar memory leak (atualizações após unmount)
   const isMountedRef = useRef(true);
+
+  // Controle de submenus (apenas um aberto por vez)
+  const { openKeys, onOpenChange, closeAllSubmenus } = useMenuOpenKeys();
 
   // Carregar dados do usuário - useCallback para poder passar como prop
   const loadUser = useCallback(async () => {
@@ -301,7 +322,7 @@ function AppContent() {
               left: 0,
               top: 0,
               bottom: 0,
-              background: isDark ? '#141414' : undefined,
+              background: isDark ? '#141414' : '#006B52',
             }}
           >
             {/* Logo/Título */}
@@ -322,23 +343,25 @@ function AppContent() {
               theme="dark"
               mode="inline"
               defaultSelectedKeys={['home']}
+              openKeys={openKeys}
+              onOpenChange={onOpenChange}
               style={{ borderRight: 0 }}
             >
               {/* 1. Página Inicial (sempre primeiro) */}
-              <Menu.Item key="home" icon={<HomeOutlined />}>
+              <Menu.Item key="home" icon={<HomeOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/home">Página Inicial</Link>
               </Menu.Item>
 
               {/* 2. Aprovações */}
               {canApproveSuper && (
-                <Menu.Item key="aprovacoes" icon={<SafetyOutlined />}>
+                <Menu.Item key="aprovacoes" icon={<SafetyOutlined />} onClick={closeAllSubmenus}>
                   <Link to="/aprovacoes">Aprovações</Link>
                 </Menu.Item>
               )}
 
               {/* 3. Bloqueios */}
               {(canControle || canCoordenador || user?.groups?.includes('Formador')) && (
-                <Menu.Item key="bloqueios" icon={<CalendarOutlined />}>
+                <Menu.Item key="bloqueios" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
                   <Link to="/bloqueios">Bloqueios</Link>
                 </Menu.Item>
               )}
@@ -428,7 +451,7 @@ function AppContent() {
 
               {/* 7. Grade Mensal (todos exceto Controle) */}
               {canDisponibilidade && (
-                <Menu.Item key="grade-mensal" icon={<TableOutlined />}>
+                <Menu.Item key="grade-mensal" icon={<TableOutlined />} onClick={closeAllSubmenus}>
                   <Link to="/disponibilidade">Grade Mensal</Link>
                 </Menu.Item>
               )}
@@ -459,7 +482,7 @@ function AppContent() {
               }}
             >
               <div className="flex items-center gap-4" style={{ whiteSpace: 'nowrap' }}>
-                {/* Toggle de tema */}
+                {/* Toggle de tema - ocultado temporariamente
                 <Tooltip title={isDark ? 'Modo claro' : 'Modo escuro'}>
                   <Button
                     type="text"
@@ -468,6 +491,7 @@ function AppContent() {
                     style={{ color: isDark ? '#fff' : undefined }}
                   />
                 </Tooltip>
+                */}
                 <div className="flex items-center gap-2">
                   <UserOutlined />
                   <Text strong>{user?.name || user?.username || 'Usuário'}</Text>

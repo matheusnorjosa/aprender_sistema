@@ -10,7 +10,7 @@
  * 4. Revisão e Confirmação
  */
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 // antd - direct imports for tree-shaking (Issue #424)
 import Steps from 'antd/es/steps';
@@ -84,21 +84,18 @@ export default function NewSolicitacaoWizard() {
     is_online: false,
   });
 
-  // Handler para DateTimeRange: converte {date, start, end} para ISO UTC
-  const handleRangeChange = (range) => {
+  // Handler para DateTimeRange: converte {date, start, end} para ISO UTC (Issue #428)
+  const handleRangeChange = useCallback((range) => {
     if (!range || !range.date || !range.start || !range.end) {
-      // Se faltar dados, limpar os campos
       setFormData(prev => ({ ...prev, inicio: null, fim: null }));
       return;
     }
 
     try {
-      // Combinar date + hora usando timezone America/Fortaleza
-      const dateStr = range.date; // formato YYYY-MM-DD
-      const startTime = range.start; // formato HH:mm
-      const endTime = range.end; // formato HH:mm
+      const dateStr = range.date;
+      const startTime = range.start;
+      const endTime = range.end;
 
-      // Criar dayjs objects em America/Fortaleza e converter para ISO UTC
       const inicioLocal = dayjs.tz(`${dateStr} ${startTime}`, RANGE_TIMEZONE);
       const fimLocal = dayjs.tz(`${dateStr} ${endTime}`, RANGE_TIMEZONE);
 
@@ -110,16 +107,19 @@ export default function NewSolicitacaoWizard() {
       logger.error('Erro ao converter data/hora:', error);
       setFormData(prev => ({ ...prev, inicio: null, fim: null }));
     }
-  };
+  }, []);
 
-  // Derivar rangeValue de formData.inicio/fim para o componente DateTimeRange
-  const rangeValue = formData.inicio && formData.fim
-    ? {
-        date: dayjs(formData.inicio).tz(RANGE_TIMEZONE).format('YYYY-MM-DD'),
-        start: dayjs(formData.inicio).tz(RANGE_TIMEZONE).format('HH:mm'),
-        end: dayjs(formData.fim).tz(RANGE_TIMEZONE).format('HH:mm'),
-      }
-    : { date: '', start: '', end: '' };
+  // Derivar rangeValue memoizado (Issue #428)
+  const rangeValue = useMemo(() => {
+    if (!formData.inicio || !formData.fim) {
+      return { date: '', start: '', end: '' };
+    }
+    return {
+      date: dayjs(formData.inicio).tz(RANGE_TIMEZONE).format('YYYY-MM-DD'),
+      start: dayjs(formData.inicio).tz(RANGE_TIMEZONE).format('HH:mm'),
+      end: dayjs(formData.fim).tz(RANGE_TIMEZONE).format('HH:mm'),
+    };
+  }, [formData.inicio, formData.fim]);
 
   // Navegação entre passos
   const next = () => {
@@ -208,8 +208,8 @@ export default function NewSolicitacaoWizard() {
     }
   };
 
-  // Passos do wizard
-  const steps = [
+  // Passos do wizard memoizados (Issue #426)
+  const steps = useMemo(() => [
     {
       title: 'Informações Básicas',
       icon: <FileTextOutlined />,
@@ -490,7 +490,7 @@ export default function NewSolicitacaoWizard() {
         </>
       ),
     },
-  ];
+  ], [formData, rangeValue, handleRangeChange]);
 
   return (
     <div className="p-6 max-w-4xl mx-auto">

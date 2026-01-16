@@ -11,24 +11,22 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import {
-  Form,
-  Input,
-  Button,
-  Card,
-  Alert,
-  message,
-  Typography,
-  Spin,
-  Checkbox,
-  Result,
-} from 'antd';
-import {
-  ArrowLeftOutlined,
-  SaveOutlined,
-  CalendarOutlined,
-  StopOutlined,
-} from '@ant-design/icons';
+// antd - direct imports for tree-shaking (Issue #424)
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Alert from 'antd/es/alert';
+import message from 'antd/es/message';
+import Typography from 'antd/es/typography';
+import Spin from 'antd/es/spin';
+import Checkbox from 'antd/es/checkbox';
+import Result from 'antd/es/result';
+// icons - direct imports for tree-shaking (Issue #425)
+import ArrowLeftOutlined from '@ant-design/icons/ArrowLeftOutlined';
+import SaveOutlined from '@ant-design/icons/SaveOutlined';
+import CalendarOutlined from '@ant-design/icons/CalendarOutlined';
+import StopOutlined from '@ant-design/icons/StopOutlined';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';

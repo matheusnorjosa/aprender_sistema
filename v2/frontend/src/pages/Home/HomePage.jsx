@@ -41,7 +41,7 @@ function AccessCard({ icon, title, description, link, badge, disabled = false })
     >
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <div className="flex justify-between items-center">
-          <div style={{ fontSize: '32px', color: '#1890ff' }}>
+          <div style={{ fontSize: '32px', color: '#004B3D' }}>
             {icon}
           </div>
           {badge !== undefined && (

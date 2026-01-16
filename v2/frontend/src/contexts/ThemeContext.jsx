@@ -28,7 +28,7 @@ const darkThemeTokens = {
 
 // Cores customizadas para o tema claro
 const lightThemeTokens = {
-  colorPrimary: '#1890ff',
+  colorPrimary: '#006B52',
   borderRadius: 6,
 };
 
@@ -73,7 +73,22 @@ export function ThemeProvider({ children }) {
         darkItemBg: '#141414',
         darkSubMenuItemBg: '#1f1f1f',
         darkItemSelectedBg: '#ea2a33',
-      } : {},
+      } : {
+        darkItemBg: '#006B52',
+        darkSubMenuItemBg: '#004B3D',
+        darkItemSelectedBg: '#C6E6C3',
+        darkItemColor: '#ffffff',
+        darkItemHoverColor: '#ffffff',
+        darkItemSelectedColor: '#000000',
+        darkPopupBg: '#006B52',
+        itemColor: '#ffffff',
+        itemHoverColor: '#ffffff',
+        itemSelectedColor: '#000000',
+        subMenuItemColor: '#ffffff',
+        groupTitleColor: '#ffffff',
+        iconSize: 16,
+        collapsedIconSize: 16,
+      },
       Table: isDark ? {
         headerBg: '#1f1f1f',
         rowHoverBg: '#262626',

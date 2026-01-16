@@ -7,26 +7,103 @@
   padding: 0;
 }
 
-/* Fix: Links dentro do Menu dark devem ter cor branca */
-.ant-menu-dark .ant-menu-item a,
-.ant-menu-dark .ant-menu-submenu-title a {
+/* Fix: Links dentro do Menu dark - tema escuro (branco) */
+html.dark .ant-menu-dark .ant-menu-item a,
+html.dark .ant-menu-dark .ant-menu-submenu-title a {
   color: rgba(255, 255, 255, 0.65) !important;
   text-decoration: none;
 }
 
-.ant-menu-dark .ant-menu-item-selected a,
-.ant-menu-dark .ant-menu-item:hover a {
+html.dark .ant-menu-dark .ant-menu-item-selected a,
+html.dark .ant-menu-dark .ant-menu-item:hover a {
   color: #fff !important;
 }
 
-/* Fix específico: Badge dentro de Link no Menu dark */
-.ant-menu-dark .ant-menu-item a .ant-badge {
+/* Fix específico: Badge dentro de Link no Menu dark - tema escuro */
+html.dark .ant-menu-dark .ant-menu-item a .ant-badge {
   color: rgba(255, 255, 255, 0.65) !important;
 }
 
-.ant-menu-dark .ant-menu-item-selected a .ant-badge,
-.ant-menu-dark .ant-menu-item:hover a .ant-badge {
+html.dark .ant-menu-dark .ant-menu-item-selected a .ant-badge,
+html.dark .ant-menu-dark .ant-menu-item:hover a .ant-badge {
   color: #fff !important;
+}
+
+/* Fix: Links dentro do Menu dark - tema claro (branco) */
+html:not(.dark) .ant-menu-dark .ant-menu-item a,
+html:not(.dark) .ant-menu-dark .ant-menu-submenu-title a,
+html:not(.dark) .ant-menu-dark .ant-menu-submenu-title {
+  color: #ffffff !important;
+  text-decoration: none;
+}
+
+html:not(.dark) .ant-menu-dark .ant-menu-item-selected a,
+html:not(.dark) .ant-menu-dark .ant-menu-item-selected:hover a {
+  color: #000000 !important;
+}
+
+html:not(.dark) .ant-menu-dark .ant-menu-item:not(.ant-menu-item-selected):hover a {
+  color: #ffffff !important;
+}
+
+/* Fix específico: Badge dentro de Link no Menu - tema claro */
+html:not(.dark) .ant-menu-dark .ant-menu-item a .ant-badge {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .ant-menu-dark .ant-menu-item-selected a .ant-badge {
+  color: #000000 !important;
+}
+
+html:not(.dark) .ant-menu-dark .ant-menu-item:hover a .ant-badge {
+  color: #ffffff !important;
+}
+
+/* Ícones do menu - tema claro (branco) */
+html:not(.dark) .ant-menu-dark .ant-menu-item .anticon,
+html:not(.dark) .ant-menu-dark .ant-menu-submenu-title .anticon {
+  color: #ffffff !important;
+}
+
+/* Ícone do item selecionado - preto (mesmo no hover) */
+html:not(.dark) .ant-menu-dark .ant-menu-item-selected .anticon,
+html:not(.dark) .ant-menu-dark .ant-menu-item-selected:hover .anticon {
+  color: #000000 !important;
+}
+
+/* Submenu expandido - título com fundo e texto preto */
+html:not(.dark) .ant-menu-dark .ant-menu-submenu-open > .ant-menu-submenu-title {
+  background-color: #C6E6C3 !important;
+  color: #000000 !important;
+}
+
+html:not(.dark) .ant-menu-dark .ant-menu-submenu-open > .ant-menu-submenu-title .anticon {
+  color: #000000 !important;
+}
+
+html:not(.dark) .ant-menu-dark .ant-menu-submenu-open > .ant-menu-submenu-title .ant-menu-submenu-arrow {
+  color: #000000 !important;
+}
+
+/* Remover transições de cor para resposta instantânea */
+.ant-menu-dark .ant-menu-item,
+.ant-menu-dark .ant-menu-item a,
+.ant-menu-dark .ant-menu-item .anticon,
+.ant-menu-dark .ant-menu-submenu-title,
+.ant-menu-dark .ant-menu-submenu-title .anticon {
+  transition: none !important;
+}
+
+/* Menu lateral - fonte maior e mais grossa */
+.ant-menu-dark .ant-menu-item,
+.ant-menu-dark .ant-menu-submenu-title {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+
+.ant-menu-dark .ant-menu-item a {
+  font-size: 15px !important;
+  font-weight: 600 !important;
 }
 
 /* ============================================

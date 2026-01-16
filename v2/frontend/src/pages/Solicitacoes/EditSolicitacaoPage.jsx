@@ -9,7 +9,7 @@
  * - Não é possível editar solicitações reprovadas
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 // antd - direct imports for tree-shaking (Issue #424)
 import Form from 'antd/es/form';
@@ -140,8 +140,8 @@ export default function EditSolicitacaoPage() {
     }
   }, [id, form]);
 
-  // Handler para DateTimeRange
-  const handleRangeChange = (range) => {
+  // Handler para DateTimeRange (Issue #428)
+  const handleRangeChange = useCallback((range) => {
     if (!range || !range.date || !range.start || !range.end) {
       setFormData(prev => ({ ...prev, inicio: null, fim: null }));
       return;
@@ -163,16 +163,19 @@ export default function EditSolicitacaoPage() {
       logger.error('Erro ao converter data/hora:', error);
       setFormData(prev => ({ ...prev, inicio: null, fim: null }));
     }
-  };
+  }, []);
 
-  // Derivar rangeValue para o componente DateTimeRange
-  const rangeValue = formData.inicio && formData.fim
-    ? {
-        date: dayjs(formData.inicio).tz(RANGE_TIMEZONE).format('YYYY-MM-DD'),
-        start: dayjs(formData.inicio).tz(RANGE_TIMEZONE).format('HH:mm'),
-        end: dayjs(formData.fim).tz(RANGE_TIMEZONE).format('HH:mm'),
-      }
-    : { date: '', start: '', end: '' };
+  // Derivar rangeValue memoizado (Issue #428)
+  const rangeValue = useMemo(() => {
+    if (!formData.inicio || !formData.fim) {
+      return { date: '', start: '', end: '' };
+    }
+    return {
+      date: dayjs(formData.inicio).tz(RANGE_TIMEZONE).format('YYYY-MM-DD'),
+      start: dayjs(formData.inicio).tz(RANGE_TIMEZONE).format('HH:mm'),
+      end: dayjs(formData.fim).tz(RANGE_TIMEZONE).format('HH:mm'),
+    };
+  }, [formData.inicio, formData.fim]);
 
   // Submit
   const handleSubmit = async () => {

@@ -108,7 +108,7 @@ function Forbidden() {
 
 // Componente principal que usa o tema
 function AppContent() {
-  const { isDark, toggleTheme, antThemeConfig } = useTheme();
+  const { isDark, antThemeConfig } = useTheme();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 

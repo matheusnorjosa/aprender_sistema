@@ -80,7 +80,6 @@ export function ThemeProvider({ children }) {
         darkItemColor: '#ffffff',
         darkItemHoverColor: '#ffffff',
         darkItemSelectedColor: '#000000',
-        darkSubMenuItemBg: '#004B3D',
         darkPopupBg: '#006B52',
         itemColor: '#ffffff',
         itemHoverColor: '#ffffff',

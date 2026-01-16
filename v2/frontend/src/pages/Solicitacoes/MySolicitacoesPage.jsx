@@ -8,7 +8,7 @@
  * - Botão para criar nova solicitação
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 // antd - direct imports for tree-shaking (Issue #424)
 import Table from 'antd/es/table';
@@ -76,11 +76,11 @@ export default function MySolicitacoesPage() {
     loadData();
   }, [loadData]);
 
-  const handleDelete = async (id) => {
+  const handleDelete = useCallback(async (id) => {
     try {
       await deleteSolicitacao(id);
       message.success('Solicitação excluída com sucesso!');
-      loadData(); // Recarrega a lista
+      loadData();
     } catch (error) {
       if (error.response?.data?.detail) {
         message.error(error.response.data.detail);
@@ -88,9 +88,10 @@ export default function MySolicitacoesPage() {
         message.error('Erro ao excluir solicitação: ' + error.message);
       }
     }
-  };
+  }, [loadData]);
 
-  const columns = [
+  // Colunas memoizadas (Issue #427)
+  const columns = useMemo(() => [
     {
       title: 'Data/Hora',
       dataIndex: 'inicio',
@@ -205,7 +206,7 @@ export default function MySolicitacoesPage() {
         );
       },
     },
-  ];
+  ], [handleDelete, navigate]);
 
   return (
     <div className="p-6">

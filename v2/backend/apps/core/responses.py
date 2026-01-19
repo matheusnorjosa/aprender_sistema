@@ -87,28 +87,3 @@ class APIResponse:
             }
         )
 
-    @staticmethod
-    def counts(
-        counts: dict[str, int],
-        total: int | None = None,
-        meta: dict[str, Any] | None = None
-    ) -> Response:
-        """
-        Standardized counts response.
-
-        Response format:
-        {
-            "data": {
-                "counts": {...},
-                "total": 10
-            },
-            "meta": {...}
-        }
-        """
-        return APIResponse.success(
-            data={
-                "counts": counts,
-                "total": total if total is not None else sum(counts.values())
-            },
-            meta=meta
-        )

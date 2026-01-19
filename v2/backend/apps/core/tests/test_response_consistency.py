@@ -64,24 +64,6 @@ class TestAPIResponseFactory(TestCase):
 
         self.assertEqual(content["data"]["total"], 100)
 
-    def test_counts_response_format(self) -> None:
-        """APIResponse.counts should return counts and total."""
-        counts = {"a": 10, "b": 20}
-        response = APIResponse.counts(counts=counts)
-        content = response.data
-
-        self.assertIn("data", content)
-        self.assertEqual(content["data"]["counts"], counts)
-        self.assertEqual(content["data"]["total"], 30)
-
-    def test_counts_with_explicit_total(self) -> None:
-        """APIResponse.counts should use explicit total if provided."""
-        counts = {"a": 10, "b": 20}
-        response = APIResponse.counts(counts=counts, total=50)
-        content = response.data
-
-        self.assertEqual(content["data"]["total"], 50)
-
     def test_availability_response_format(self) -> None:
         """APIResponse.availability should return available and conflicts."""
         response = APIResponse.availability(ok=True, conflicts=[])

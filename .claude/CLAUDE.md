@@ -373,13 +373,13 @@ make test-e2e
 | §2 | Memoização CoordenadoresPage | ✅ DONE | useMemo/useCallback aplicado |
 | §3 | Memoização AcoesPage | ✅ DONE | useMemo/useCallback aplicado |
 | §4 | Hook useGoogleGuard | ✅ DONE | -150 linhas duplicadas |
-| §5 | Modularizar ETL acompanhamento | 🔄 TODO | 798 linhas |
-| §6 | Separar ViewSets dat_module | 🔄 TODO | 747 linhas |
+| §5 | Modularizar ETL acompanhamento | ⏭️ SKIP | Bem estruturado internamente |
+| §6 | Separar ViewSets dat_module | ⏭️ SKIP | Bem estruturado (748 linhas, 6 ViewSets) |
 | §7 | Separar google_oauth.py | 🔄 TODO | 671 linhas |
 | §8 | Mover lógica tasks.py | 🔄 TODO | 594 linhas |
 | §9 | Fatiar views_metrics.py | 🔄 TODO | 592 linhas |
 | §10 | Dividir serializers/dat_module | 🔄 TODO | MEDIUM |
-| §11 | Mixin/factory permissões | 🔄 TODO | MEDIUM |
+| §11 | Mixin/factory permissões | ⏭️ SKIP | Padrão claro, lógica complexa variada |
 | §12 | Padronizar error handling | 🔄 TODO | MEDIUM |
 | §13 | N+1 availability_service | 🔄 TODO | MEDIUM |
 | §14 | constants/styles.js | ✅ DONE | Estilos centralizados |

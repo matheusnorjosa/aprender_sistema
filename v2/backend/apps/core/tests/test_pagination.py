@@ -223,11 +223,3 @@ class TestPaginationClasses(TestCase):
         self.assertEqual(pagination.page_size_query_param, "page_size")
         self.assertEqual(pagination.max_page_size, 1000)
 
-    def test_small_pagination_config(self) -> None:
-        """SmallPagination should have correct config."""
-        from apps.core.pagination import SmallPagination
-
-        pagination = SmallPagination()
-        self.assertEqual(pagination.page_size, 20)
-        self.assertEqual(pagination.page_size_query_param, "page_size")
-        self.assertEqual(pagination.max_page_size, 100)

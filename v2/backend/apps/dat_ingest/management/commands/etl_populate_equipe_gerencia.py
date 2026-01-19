@@ -54,10 +54,10 @@ class Command(BaseCommand):
             help="Mostra detalhes de cada operação",
         )
 
-    def handle(self, *args: str, **options: dict[str, Any]) -> None:
-        dry_run = options.get("dry_run", False)
-        apply = options.get("apply", False)
-        verbose = options.get("verbose", False)
+    def handle(self, *args: str, **options: Any) -> None:
+        dry_run: bool = options.get("dry_run", False)
+        apply: bool = options.get("apply", False)
+        verbose: bool = options.get("verbose", False)
 
         if not dry_run and not apply:
             self.stderr.write(

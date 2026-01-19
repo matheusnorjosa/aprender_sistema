@@ -9,7 +9,6 @@ Type-checked with Pyright (strict mode).
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -17,6 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from apps.core.exceptions import ServiceUnavailableError
 from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,10 @@ def gcal_health(request: Request) -> Response:
     Permissões: Qualquer usuário autenticado
 
     Returns:
-        200: Health check bem-sucedido
+        200: Service healthy
+        503: Service unavailable (unhealthy or error)
+
+    Response format:
         {
             "status": "healthy"|"unhealthy",
             "client_type": "fake"|"google",
@@ -77,16 +80,20 @@ def gcal_health(request: Request) -> Response:
         client, _ = get_gcal_client_and_calendar_id()
         health_status = client.health_check()
 
-        # Retornar 200 sempre (health status está no body)
+        # Return 503 if unhealthy, 200 if healthy
+        if health_status.get("status") == "unhealthy":
+            raise ServiceUnavailableError(
+                service="Google Calendar",
+                details=health_status.get("details", "Service unhealthy"),
+            )
+
         return Response(health_status, status=status.HTTP_200_OK)
 
+    except ServiceUnavailableError:
+        raise  # Re-raise for custom exception handler
     except Exception as e:
         logger.error(f"Error checking GCal health: {e}", exc_info=True)
-        return Response(
-            {
-                "status": "unhealthy",
-                "client_type": "unknown",
-                "details": f"Error: {str(e)}",
-            },
-            status=status.HTTP_200_OK,  # 200 mesmo com erro (status no body)
+        raise ServiceUnavailableError(
+            service="Google Calendar",
+            details=str(e),
         )

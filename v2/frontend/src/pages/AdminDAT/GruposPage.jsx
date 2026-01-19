@@ -10,6 +10,7 @@ import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, For
 import { TeamOutlined, ReloadOutlined, EditOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { listGroups, createGroup, updateGroup, listUsers, assignGroups } from '../../api/adminDAT';
+import { PAGE_SIZES } from '../../constants';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -45,7 +46,7 @@ export default function GruposPage() {
 
   const fetchUsuarios = async () => {
     try {
-      const data = await listUsers({ ordering: 'username', page_size: 1000 });
+      const data = await listUsers({ ordering: 'username', page_size: PAGE_SIZES.ALL });
       setUsuarios(data.results || data);
     } catch (error) {
       message.error(`Erro ao carregar usuários: ${error.message}`);

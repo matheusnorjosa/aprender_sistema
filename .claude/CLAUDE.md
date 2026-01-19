@@ -360,9 +360,8 @@ make test-e2e
 
 **Data**: 2026-01-19 | **Última Atualização**: 2026-01-19
 **Branch**: `refactor/epic-459-code-quality`
-**Commits**: `71143a1`, `848d2b6`
 
-**Score Atual**: Frontend 7.5/10 | Backend 7.0/10
+**Score Atual**: Frontend 8.0/10 | Backend 8.0/10
 **Score Meta**: Frontend 9.0/10 | Backend 9.0/10
 
 ### 📊 Progresso por Item
@@ -375,9 +374,9 @@ make test-e2e
 | §4 | Hook useGoogleGuard | ✅ DONE | -150 linhas duplicadas |
 | §5 | Modularizar ETL acompanhamento | ⏭️ SKIP | Bem estruturado internamente |
 | §6 | Separar ViewSets dat_module | ⏭️ SKIP | Bem estruturado (748 linhas, 6 ViewSets) |
-| §7 | Separar google_oauth.py | 🔄 TODO | 671 linhas |
-| §8 | Mover lógica tasks.py | 🔄 TODO | 594 linhas |
-| §9 | Fatiar views_metrics.py | 🔄 TODO | 592 linhas |
+| §7 | Separar google_oauth.py | ✅ DONE | 672→54 linhas (+oauth/) |
+| §8 | Mover lógica tasks.py | ⏭️ SKIP | Já delega para services |
+| §9 | Fatiar views_metrics.py | ✅ DONE | 592→30 linhas (+views/metrics/) |
 | §10 | Dividir serializers/dat_module | 🔄 TODO | MEDIUM |
 | §11 | Mixin/factory permissões | ⏭️ SKIP | Padrão claro, lógica complexa variada |
 | §12 | Padronizar error handling | 🔄 TODO | MEDIUM |

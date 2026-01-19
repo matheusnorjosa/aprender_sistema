@@ -19,6 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.models import Solicitacao
+from apps.core.pagination import LargePagination
 from apps.core.permissions import IsControleOrSuper
 from apps.core.serializers import SolicitacaoSerializer
 from apps.core.views_gcal.helpers import _apply_common_filters, _filter_events_queryset
@@ -74,14 +75,18 @@ class GCalListView(APIView):
 
     Lista solicitações aprovadas com campos GCal expostos.
     Suporta filtros: date_from, date_to, sector, q, status.
+    Suporta paginação: page, page_size (max 1000).
 
-    Response:
+    Response (paginada):
     {
-        "results": [...],  # SolicitacaoSerializer com campos gcal
-        "count": 150
+        "count": 1500,
+        "next": "http://.../api/gcal/list/?page=2",
+        "previous": null,
+        "results": [...]
     }
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
+    pagination_class = LargePagination
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas aprovadas
@@ -98,12 +103,16 @@ class GCalListView(APIView):
         # Ordenação: mais recentes primeiro
         qs = qs.order_by('-inicio', '-id')
 
-        # Limitar a 500 resultados (performance)
-        qs = qs[:500]
+        # Paginação (#408)
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(qs, request)
 
-        # Serializar
-        serializer = SolicitacaoSerializer(qs, many=True)
+        if page is not None:
+            serializer = SolicitacaoSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
 
+        # Fallback (não deve acontecer com PageNumberPagination)
+        serializer = SolicitacaoSerializer(qs[:500], many=True)
         return Response({
             'results': serializer.data,
             'count': len(serializer.data)

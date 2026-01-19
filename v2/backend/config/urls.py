@@ -87,12 +87,19 @@ urlpatterns = [
     path("healthz/detailed/", healthz_detailed, name="healthz_detailed"),
     # Prometheus metrics (MP1) - django_prometheus.urls defines 'metrics' internally
     path("", include("django_prometheus.urls")),
-    # API
+    # API v1 (primary versioned path) - #410
+    path("api/v1/", include("apps.core.urls", namespace="core-v1")),
+    # API (backward compatible alias - same as v1) - #410
     path("api/", include("apps.core.urls")),
 ]
 
 # Incluir URLs do ETL apenas se o app estiver instalado (INCLUDE_ETL=true)
 if "apps.dat_ingest" in settings.INSTALLED_APPS:
+    # API v1 (primary) - #410
+    urlpatterns.append(
+        path("api/v1/", include("apps.dat_ingest.urls", namespace="dat-v1")),
+    )
+    # Backward compatible alias - #410
     urlpatterns.append(
         path("api/", include("apps.dat_ingest.urls")),  # Fase 5: ETL Observability
     )

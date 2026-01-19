@@ -20,10 +20,8 @@ Endpoints testados:
 from __future__ import annotations
 import pytest
 from datetime import datetime, timedelta
-from uuid import uuid4
 from django.contrib.auth.models import Group
 from django.core.cache import cache
-from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -311,17 +309,19 @@ def test_status_counts_default_range(user_super, solicitacoes_variedade, clear_c
     assert res.status_code == 200
     data = res.json()
 
-    # Verificar estrutura
-    assert 'range' in data
-    assert 'counts' in data
-    assert 'total' in data
+    # Verificar estrutura padrão (#411 Response Consistency)
+    assert 'data' in data
+    assert 'meta' in data
+    assert 'range' in data['meta']
+    assert 'counts' in data['data']
+    assert 'total' in data['data']
 
     # Verificar contagens (últimos 30 dias = 3 aprovadas + 2 pendentes + 1 reprovada = 6)
-    assert data['counts']['aprovado'] == 3
-    assert data['counts']['pendente'] == 2
-    assert data['counts']['reprovado'] == 1
-    assert data['counts']['publicado'] == 0  # Sempre 0 por enquanto
-    assert data['total'] == 6
+    assert data['data']['counts']['aprovado'] == 3
+    assert data['data']['counts']['pendente'] == 2
+    assert data['data']['counts']['reprovado'] == 1
+    assert data['data']['counts']['publicado'] == 0  # Sempre 0 por enquanto
+    assert data['data']['total'] == 6
 
 
 def test_status_counts_custom_range(user_super, solicitacoes_variedade, clear_cache):
@@ -339,11 +339,11 @@ def test_status_counts_custom_range(user_super, solicitacoes_variedade, clear_ca
     assert res.status_code == 200
     data = res.json()
 
-    # Últimos 10 dias = apenas as 3 aprovadas
-    assert data['counts']['aprovado'] == 3
-    assert data['counts']['pendente'] == 0
-    assert data['counts']['reprovado'] == 0
-    assert data['total'] == 3
+    # Últimos 10 dias = apenas as 3 aprovadas (#411 format)
+    assert data['data']['counts']['aprovado'] == 3
+    assert data['data']['counts']['pendente'] == 0
+    assert data['data']['counts']['reprovado'] == 0
+    assert data['data']['total'] == 3
 
 
 def test_status_counts_invalid_date_format(user_super, clear_cache):
@@ -370,67 +370,31 @@ def test_status_counts_end_before_start(user_super, clear_cache):
     assert 'detail' in res.json()
 
 
-@override_settings(
-    CACHES={
-        'default': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'test-status-counts',
-            'KEY_PREFIX': f'test_status_counts_{uuid4().hex}',
-        }
-    }
-)
-def test_status_counts_cache_works(user_super, solicitacoes_variedade, clear_cache):
+def test_status_counts_response_consistency(user_super, solicitacoes_variedade, clear_cache):
     """
-    status-counts utiliza cache corretamente.
+    status-counts retorna respostas consistentes.
 
-    Issue #130: Isolado com LocMemCache + KEY_PREFIX único para evitar
-    flakiness no CI. Cache é limpo antes e depois do teste.
+    Note: Cache foi removido em #411 (Response Consistency).
+    Verifica que múltiplas chamadas retornam dados idênticos.
     """
-    # Limpar cache no início do teste
-    cache.clear()
-
     client = APIClient()
     client.force_authenticate(user=user_super)
 
     url = reverse('core:reports-status-counts')
 
-    # Primeira chamada (sem cache)
+    # Primeira chamada
     res1 = client.get(url)
     assert res1.status_code == 200
     data1 = res1.json()
 
-    # Criar nova solicitação (não deve aparecer por causa do cache)
-    formador = Usuario.objects.filter(groups__name='Formador').first()
-    mun = Municipio.objects.first()
-    proj = Projeto.objects.first()
-    tipo = TipoEvento.objects.first()
-
-    # Criar um usuário para a solicitação
-    coord_cache = Usuario.objects.create_user(
-        username='coord_cache', email='coord_cache@x.com', password='x', cpf='11122233344'
-    )
-
-    sol = Solicitacao.objects.create(
-        usuario=coord_cache,
-        status='pendente',
-        inicio=timezone.now(),
-        fim=timezone.now() + timedelta(hours=2),
-        municipio=mun,
-        projeto=proj,
-        tipo_evento=tipo,
-    )
-    sol.formadores.add(formador)
-
-    # Segunda chamada (deve vir do cache)
+    # Segunda chamada
     res2 = client.get(url)
     assert res2.status_code == 200
     data2 = res2.json()
 
-    # Dados devem ser idênticos (cache)
-    assert data1 == data2
-
-    # Limpar cache no final do teste
-    cache.clear()
+    # #411: Data portion should be identical (timestamp may differ)
+    assert data1['data'] == data2['data']
+    assert data1['meta']['range'] == data2['meta']['range']
 
 
 # ============================================================================
@@ -448,9 +412,12 @@ def test_top_projects_default_limit(user_super, solicitacoes_variedade, clear_ca
     assert res.status_code == 200
     data = res.json()
 
-    assert 'range' in data
-    assert 'items' in data
-    assert isinstance(data['items'], list)
+    # #411 Response Consistency format
+    assert 'data' in data
+    assert 'meta' in data
+    assert 'range' in data['meta']
+    assert 'items' in data['data']
+    assert isinstance(data['data']['items'], list)
 
 
 def test_top_projects_correct_ranking(user_super, solicitacoes_variedade, clear_cache):
@@ -464,7 +431,8 @@ def test_top_projects_correct_ranking(user_super, solicitacoes_variedade, clear_
     assert res.status_code == 200
     data = res.json()
 
-    items = data['items']
+    # #411 Response Consistency format
+    items = data['data']['items']
     assert len(items) == 3  # Temos 3 projetos
 
     # Primeiro projeto deve ser Alfabetização (3 solicitações)
@@ -518,10 +486,13 @@ def test_weekly_approved_default_weeks(user_super, solicitacoes_variedade, clear
     assert res.status_code == 200
     data = res.json()
 
-    assert 'weeks' in data
-    assert 'series' in data
-    assert data['weeks'] == 12
-    assert isinstance(data['series'], list)
+    # #411 Response Consistency format
+    assert 'data' in data
+    assert 'meta' in data
+    assert 'weeks' in data['meta']
+    assert 'items' in data['data']
+    assert data['meta']['weeks'] == 12
+    assert isinstance(data['data']['items'], list)
 
 
 def test_weekly_approved_only_approved_status(user_super, solicitacoes_variedade, clear_cache):
@@ -535,8 +506,8 @@ def test_weekly_approved_only_approved_status(user_super, solicitacoes_variedade
     assert res.status_code == 200
     data = res.json()
 
-    # Somar todas as contagens
-    total_aprovadas = sum(item['count'] for item in data['series'])
+    # Somar todas as contagens (#411 format: items instead of series)
+    total_aprovadas = sum(item['count'] for item in data['data']['items'])
 
     # Devemos ter 4 aprovadas no total (3 recentes + 1 antiga)
     assert total_aprovadas == 4
@@ -580,12 +551,15 @@ def test_by_uf_groups_by_state(user_super, solicitacoes_variedade, clear_cache):
     assert res.status_code == 200
     data = res.json()
 
-    assert 'range' in data
-    assert 'items' in data
-    assert isinstance(data['items'], list)
+    # #411 Response Consistency format
+    assert 'data' in data
+    assert 'meta' in data
+    assert 'range' in data['meta']
+    assert 'items' in data['data']
+    assert isinstance(data['data']['items'], list)
 
     # Converter para dict para facilitar verificação
-    uf_counts = {item['uf']: item['count'] for item in data['items']}
+    uf_counts = {item['uf']: item['count'] for item in data['data']['items']}
 
     # Últimos 30 dias: 3 em CE, 2 em PE, 1 em BA
     assert uf_counts.get('CE', 0) == 3
@@ -604,7 +578,8 @@ def test_by_uf_orders_by_count_desc(user_super, solicitacoes_variedade, clear_ca
     assert res.status_code == 200
     data = res.json()
 
-    items = data['items']
+    # #411 Response Consistency format
+    items = data['data']['items']
 
     # Primeira UF deve ser CE (maior contagem)
     assert items[0]['uf'] == 'CE'
@@ -647,8 +622,8 @@ def test_by_uf_ignores_null_municipio(user_super, dados_basicos, clear_cache):
     assert res.status_code == 200
     data = res.json()
 
-    # "N/A" não deve aparecer na lista
-    ufs = [item['uf'] for item in data['items']]
+    # "N/A" não deve aparecer na lista (#411 format)
+    ufs = [item['uf'] for item in data['data']['items']]
     assert 'N/A' not in ufs
 
 
@@ -667,11 +642,12 @@ def test_status_counts_empty_database(user_super, clear_cache):
     assert res.status_code == 200
     data = res.json()
 
-    assert data['counts']['pendente'] == 0
-    assert data['counts']['aprovado'] == 0
-    assert data['counts']['reprovado'] == 0
-    assert data['counts']['publicado'] == 0
-    assert data['total'] == 0
+    # #411 Response Consistency format
+    assert data['data']['counts']['pendente'] == 0
+    assert data['data']['counts']['aprovado'] == 0
+    assert data['data']['counts']['reprovado'] == 0
+    assert data['data']['counts']['publicado'] == 0
+    assert data['data']['total'] == 0
 
 
 def test_top_projects_empty_database(user_super, clear_cache):
@@ -685,7 +661,8 @@ def test_top_projects_empty_database(user_super, clear_cache):
     assert res.status_code == 200
     data = res.json()
 
-    assert data['items'] == []
+    # #411 Response Consistency format
+    assert data['data']['items'] == []
 
 
 def test_weekly_approved_empty_database(user_super, clear_cache):
@@ -699,7 +676,8 @@ def test_weekly_approved_empty_database(user_super, clear_cache):
     assert res.status_code == 200
     data = res.json()
 
-    assert data['series'] == []
+    # #411 Response Consistency format (items instead of series)
+    assert data['data']['items'] == []
 
 
 def test_by_uf_empty_database(user_super, clear_cache):
@@ -713,4 +691,5 @@ def test_by_uf_empty_database(user_super, clear_cache):
     assert res.status_code == 200
     data = res.json()
 
-    assert data['items'] == []
+    # #411 Response Consistency format
+    assert data['data']['items'] == []

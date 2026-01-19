@@ -339,12 +339,23 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/hour",
         "user": "1000/hour",
+        # Scopes para endpoints específicos (#409)
         "availability_check": "60/min",  # 60 requests por minuto para availability check
+        "metrics": "30/min",             # Geo queries + aggregations
+        "reports": "30/min",             # Heavy aggregations
+        "gcal_read": "60/min",           # Google Calendar reads
+        "gcal_write": "10/min",          # Google Calendar writes (publish)
+        "export": "10/min",              # CSV/JSON exports
     },
     # Custom exception handler for standardized error responses
     "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
     # API Schema (drf-spectacular)
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # API Versioning (#410)
+    "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.URLPathVersioning",
+    "DEFAULT_VERSION": "v1",
+    "ALLOWED_VERSIONS": ["v1"],
+    "VERSION_PARAM": "version",
 }
 
 # ================================================================
@@ -379,7 +390,13 @@ if ENVIRONMENT == "development":
     REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
         "anon": "10000/hour",
         "user": "100000/hour",
-        "availability_check": "600/min",  # 10x mais permissivo em dev
+        # 10x mais permissivo em dev
+        "availability_check": "600/min",
+        "metrics": "300/min",
+        "reports": "300/min",
+        "gcal_read": "600/min",
+        "gcal_write": "100/min",
+        "export": "100/min",
     }
 
 # ================================================================

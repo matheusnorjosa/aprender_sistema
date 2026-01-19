@@ -13,18 +13,20 @@ from rest_framework.response import Response
 
 from datetime import datetime, timedelta
 
-from django.core.cache import cache
 from django.db.models import Count
 from django.utils import timezone
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
 from .models import Solicitacao
 from .permissions import IsControleOrDAT
+from .responses import APIResponse
 
 
 @api_view(["GET"])
 @permission_classes([IsControleOrDAT])
+@throttle_classes([ScopedRateThrottle])
 def reports_status_counts(request: Request) -> Response:
     """
     GET /api/reports/status-counts/
@@ -77,12 +79,6 @@ def reports_status_counts(request: Request) -> Response:
             status=400
         )
 
-    # Generate cache key
-    cache_key = f"reports:status_counts:{start_date}:{end_date}"
-    cached_result = cache.get(cache_key)
-    if cached_result:
-        return Response(cached_result)
-
     # Query - filtrar por data do evento (inicio), não por created_at
     queryset = Solicitacao.objects.filter(
         inicio__date__gte=start_date,
@@ -92,28 +88,31 @@ def reports_status_counts(request: Request) -> Response:
     counts = queryset.values("status").annotate(count=Count("id"))
     counts_dict = {item["status"]: item["count"] for item in counts}
 
-    result = {
-        "range": {
-            "start": str(start_date),
-            "end": str(end_date)
-        },
-        "counts": {
+    # Response consistency (#411)
+    return APIResponse.counts(
+        counts={
             "pendente": counts_dict.get("pendente", 0),
             "aprovado": counts_dict.get("aprovado", 0),
             "reprovado": counts_dict.get("reprovado", 0),
             "publicado": counts_dict.get("publicado", 0),
         },
-        "total": queryset.count(),
-    }
+        total=queryset.count(),
+        meta={
+            "range": {
+                "start": str(start_date),
+                "end": str(end_date)
+            }
+        }
+    )
 
-    # Cache for 5 minutes
-    cache.set(cache_key, result, 300)
 
-    return Response(result)
+# Throttle scope for reports_status_counts (#409)
+reports_status_counts.throttle_scope = "reports"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
 @permission_classes([IsControleOrDAT])
+@throttle_classes([ScopedRateThrottle])
 def reports_top_projects(request: Request) -> Response:
     """
     GET /api/reports/top-projects/
@@ -176,14 +175,20 @@ def reports_top_projects(request: Request) -> Response:
         for idx, item in enumerate(top_projects)
     ]
 
-    return Response({
-        "range": {"limit": limit},
-        "items": items_list
-    })
+    # Response consistency (#411)
+    return APIResponse.list(
+        items=items_list,
+        meta={"range": {"limit": limit}}
+    )
+
+
+# Throttle scope for reports_top_projects (#409)
+reports_top_projects.throttle_scope = "reports"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
 @permission_classes([IsControleOrDAT])
+@throttle_classes([ScopedRateThrottle])
 def reports_weekly_approved(request: Request) -> Response:
     """
     GET /api/reports/weekly-approved/
@@ -236,10 +241,11 @@ def reports_weekly_approved(request: Request) -> Response:
 
     # Se não há nenhuma solicitação aprovada, retornar array vazio
     if queryset.count() == 0:
-        return Response({
-            "weeks": weeks,
-            "series": [],
-        })
+        return APIResponse.list(
+            items=[],
+            total=0,
+            meta={"weeks": weeks}
+        )
 
     # Group by week (simplified - use created_at week)
     weeks_data = []
@@ -263,14 +269,20 @@ def reports_weekly_approved(request: Request) -> Response:
 
         current_date = week_end + timedelta(days=1)
 
-    return Response({
-        "weeks": weeks,
-        "series": weeks_data[-weeks:],  # Last N weeks
-    })
+    # Response consistency (#411)
+    return APIResponse.list(
+        items=weeks_data[-weeks:],  # Last N weeks
+        meta={"weeks": weeks}
+    )
+
+
+# Throttle scope for reports_weekly_approved (#409)
+reports_weekly_approved.throttle_scope = "reports"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
 @permission_classes([IsControleOrDAT])
+@throttle_classes([ScopedRateThrottle])
 def reports_by_uf(request: Request) -> Response:
     """
     GET /api/reports/by-uf/
@@ -308,7 +320,15 @@ def reports_by_uf(request: Request) -> Response:
         for item in by_uf
     ]
 
-    return Response({
-        "range": {},
-        "items": items_list,
-    })
+    # Response consistency (#411)
+    return APIResponse.list(
+        items=items_list,
+        meta={"range": {
+            "start": str(start_date),
+            "end": str(end_date)
+        }}
+    )
+
+
+# Throttle scope for reports_by_uf (#409)
+reports_by_uf.throttle_scope = "reports"  # type: ignore[attr-defined]

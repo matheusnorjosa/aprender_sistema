@@ -12,9 +12,10 @@ from datetime import timedelta
 from django.db.models import Avg, Case, Count, F, Sum, When
 from django.utils import timezone
 from rest_framework import status as http_status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
 from .models import AuditLog, Participation, Solicitacao, Usuario
 from .permissions import IsControle, IsControleOrDAT, IsGerencia
@@ -22,6 +23,7 @@ from .permissions import IsControle, IsControleOrDAT, IsGerencia
 
 @api_view(["GET"])
 @permission_classes([IsControleOrDAT])
+@throttle_classes([ScopedRateThrottle])
 def metrics_map(request: Request) -> Response:
     """
     GET /api/metrics/map/
@@ -50,6 +52,12 @@ def metrics_map(request: Request) -> Response:
     Permissions: IsControleOrDAT (Controle, DAT ou Superintendência)
     """
     queryset = Solicitacao.objects.all()
+
+    # Parâmetro limit com default e máximo (#408)
+    try:
+        limit = min(int(request.query_params.get('limit', 50)), 100)
+    except (ValueError, TypeError):
+        limit = 50
 
     # Filtros opcionais
     filters_applied = {}
@@ -94,7 +102,7 @@ def metrics_map(request: Request) -> Response:
             projetos=Count("projeto_id", distinct=True),
             eventos=Count("id"),
         )
-        .order_by("-eventos")[:50]  # Top 50 municípios
+        .order_by("-eventos")[:limit]  # Respects limit param (#408)
     )
 
     # Contagem de coordenadores por município
@@ -150,6 +158,8 @@ def metrics_map(request: Request) -> Response:
         "meta": {
             "generated_at": timezone.now().isoformat(),
             "filters": filters_applied,
+            "limit": limit,
+            "max_limit": 100,
         },
         "totals": {
             "all": queryset.count(),
@@ -160,8 +170,13 @@ def metrics_map(request: Request) -> Response:
     })
 
 
+# Throttle scope for metrics_map (#409)
+metrics_map.throttle_scope = "metrics"  # type: ignore[attr-defined]
+
+
 @api_view(["GET"])
 @permission_classes([IsControleOrDAT])
+@throttle_classes([ScopedRateThrottle])
 def metrics_map_coordinators(request: Request) -> Response:
     """
     GET /api/metrics/map/coordinators/
@@ -264,8 +279,13 @@ def metrics_map_coordinators(request: Request) -> Response:
     })
 
 
+# Throttle scope for metrics_map_coordinators (#409)
+metrics_map_coordinators.throttle_scope = "metrics"  # type: ignore[attr-defined]
+
+
 @api_view(["GET"])
 @permission_classes([IsControle | IsGerencia])
+@throttle_classes([ScopedRateThrottle])
 def productivity_metrics(request: Request) -> Response:
     """
     Productivity metrics for the last N days (Issue #189).
@@ -351,8 +371,13 @@ def productivity_metrics(request: Request) -> Response:
     )
 
 
+# Throttle scope for productivity_metrics (#409)
+productivity_metrics.throttle_scope = "metrics"  # type: ignore[attr-defined]
+
+
 @api_view(["GET"])
 @permission_classes([IsControle | IsGerencia])
+@throttle_classes([ScopedRateThrottle])
 def formadores_metrics(request: Request) -> Response:
     """
     Formadores ranking by performance (top 10) (Issue #189).
@@ -442,8 +467,13 @@ def formadores_metrics(request: Request) -> Response:
     )
 
 
+# Throttle scope for formadores_metrics (#409)
+formadores_metrics.throttle_scope = "metrics"  # type: ignore[attr-defined]
+
+
 @api_view(["GET"])
 @permission_classes([IsControle | IsGerencia])
+@throttle_classes([ScopedRateThrottle])
 def quality_metrics(request: Request) -> Response:
     """
     Quality metrics for the last N days (Issue #189).
@@ -556,3 +586,7 @@ def quality_metrics(request: Request) -> Response:
         },
         status=http_status.HTTP_200_OK,
     )
+
+
+# Throttle scope for quality_metrics (#409)
+quality_metrics.throttle_scope = "metrics"  # type: ignore[attr-defined]

@@ -13,6 +13,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -321,7 +322,8 @@ class DATRegistro(models.Model):
     def turma_formar_url(self) -> str | None:
         """Gera URL da turma na plataforma FORMAR."""
         if self.turma_formar_id:
-            return f"https://www.aprenderformar.com.br/plataforma/course/view.php?id={self.turma_formar_id}"
+            base_url = getattr(settings, 'FORMAR_PLATFORM_BASE_URL', 'https://www.aprenderformar.com.br/plataforma')
+            return f"{base_url}/course/view.php?id={self.turma_formar_id}"
         return None
 
     @property

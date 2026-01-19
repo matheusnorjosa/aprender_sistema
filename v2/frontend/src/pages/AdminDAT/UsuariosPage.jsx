@@ -14,6 +14,7 @@ import { UserAddOutlined, ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutl
 import { Link } from 'react-router-dom';
 import { listUsers, createUser, updateUser, deleteUser, listGroups } from '../../api/adminDAT';
 import logger from '../../utils/logger';
+import { PAGE_SIZES } from '../../constants';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -31,7 +32,7 @@ export default function UsuariosPage() {
   const [searchText, setSearchText] = useState('');
   const [pagination, setPagination] = useState({
     current: 1,
-    pageSize: 10,
+    pageSize: PAGE_SIZES.SMALL,
     total: 0,
   });
   const [modalVisible, setModalVisible] = useState(false);

@@ -8,6 +8,7 @@
 import { Select, Spin } from 'antd';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import logger from '../utils/logger';
+import { TIMING } from '../constants';
 
 const { Option } = Select;
 
@@ -31,7 +32,7 @@ export default function RemoteSelect({
   mode,
   value,
   onChange,
-  debounceMs = 400,
+  debounceMs = TIMING.DEBOUNCE_SEARCH_MS,
   extraParams = {},
   ...restProps
 }) {

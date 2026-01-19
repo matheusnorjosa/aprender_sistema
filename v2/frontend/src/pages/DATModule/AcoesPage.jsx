@@ -58,6 +58,7 @@ import {
   getCoordenadoresOptions,
 } from '../../api/datModule';
 import dayjs from 'dayjs';
+import { UF_OPTIONS } from '../../constants';
 
 const { Title, Text } = Typography;
 
@@ -76,13 +77,6 @@ const STATUS_COLORS = {
   concluido: 'green',
   na: 'default',
 };
-
-// UF options (Brazilian states)
-const UF_OPTIONS = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
-  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
-  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
-].map((uf) => ({ label: uf, value: uf }));
 
 export default function AcoesPage() {
   const [acoes, setAcoes] = useState([]);

@@ -89,14 +89,16 @@ def reports_status_counts(request: Request) -> Response:
     counts_dict = {item["status"]: item["count"] for item in counts}
 
     # Response consistency (#411)
-    return APIResponse.counts(
-        counts={
-            "pendente": counts_dict.get("pendente", 0),
-            "aprovado": counts_dict.get("aprovado", 0),
-            "reprovado": counts_dict.get("reprovado", 0),
-            "publicado": counts_dict.get("publicado", 0),
+    return APIResponse.success(
+        data={
+            "counts": {
+                "pendente": counts_dict.get("pendente", 0),
+                "aprovado": counts_dict.get("aprovado", 0),
+                "reprovado": counts_dict.get("reprovado", 0),
+                "publicado": counts_dict.get("publicado", 0),
+            },
+            "total": queryset.count(),
         },
-        total=queryset.count(),
         meta={
             "range": {
                 "start": str(start_date),

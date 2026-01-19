@@ -57,7 +57,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         - Outros: bloqueios de usuários da mesma gerência
     """
 
-    queryset = AvailabilityBlock.objects.all()
+    queryset = AvailabilityBlock.objects.select_related("usuario").all()
     serializer_class = AvailabilityBlockSerializer
     permission_classes = [IsAuthenticated]
 
@@ -66,20 +66,20 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
 
         # Privilegiados (superuser, Superintendência, Controle) veem todos
         if is_privileged_user(user):
-            return AvailabilityBlock.objects.all()
+            return AvailabilityBlock.objects.select_related("usuario").all()
 
         # Outros: bloqueios de usuários das suas gerências
         gerencias_ids = get_user_gerencias_ids(user)
         if not gerencias_ids:
             # Sem gerência, vê apenas os próprios
-            return AvailabilityBlock.objects.filter(usuario=user)
+            return AvailabilityBlock.objects.select_related("usuario").filter(usuario=user)
 
         # Usuários na mesma gerência
         usuarios_na_gerencia = EquipeGerencia.objects.filter(
             gerencia_id__in=gerencias_ids
         ).values_list("usuario_id", flat=True)
 
-        return AvailabilityBlock.objects.filter(usuario_id__in=usuarios_na_gerencia)
+        return AvailabilityBlock.objects.select_related("usuario").filter(usuario_id__in=usuarios_na_gerencia)
 
     def perform_create(self, serializer):
         """

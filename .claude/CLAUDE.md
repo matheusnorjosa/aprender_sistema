@@ -1,6 +1,6 @@
 # Projeto: Aprender Sistema (AS) v2 — Guia Completo
 
-**Última Atualização**: 2026-01-15
+**Última Atualização**: 2026-01-19
 
 ## 🎯 Filosofia — Ultrathink
 
@@ -25,6 +25,8 @@
 
 | Iniciativa | PR/Commit | Data |
 |------------|-----------|------|
+| Epic #405: API Best Practices 10/10 | #433, #434, #435 | ✅ 2026-01-19 |
+| Epic #423: React Performance | #430, #431 | ✅ 2026-01-19 |
 | Type Hints 100% (Phases 1-9) | #392, #394 | ✅ Completo |
 | Maturity Gaps (10 gaps) | #390 | ✅ Completo |
 | Infraestrutura 3-VM | #391 | ✅ Completo |
@@ -262,12 +264,54 @@ can_approve_super = is_superuser OR ("Gerente" IN funcoes AND "Superintendência
 
 | Plano | Epic | Status |
 |-------|------|--------|
-| [API Best Practices 10/10](../v2/docs/PLAN_api_best_practices.md) | #405 | 🔄 Em progresso |
-| **React Performance (Vercel Best Practices)** | #423 | 🆕 Novo |
+| [Refatoração Valores Hardcoded](../v2/docs/PLAN_hardcoded_values_refactor.md) | #437 | 🆕 Novo |
 
 ---
 
-### 🚀 Epic #423: React Performance Optimization
+### 🚀 Epic #437: Refatoração de Valores Hardcoded
+
+**Objetivo**: Eliminar valores hardcoded no frontend e backend, centralizando em constantes e configurações.
+
+**Plano Detalhado**: [PLAN_hardcoded_values_refactor.md](../v2/docs/PLAN_hardcoded_values_refactor.md)
+
+**Estimativa Total**: ~9 horas
+
+#### Issues Críticas (Fase 1)
+
+| Issue | Título | Prioridade |
+|-------|--------|------------|
+| #438 | Criar estrutura de constantes frontend | 🔴 CRÍTICO |
+| #439 | Consolidar cores no ThemeContext | 🔴 CRÍTICO |
+| #440 | Corrigir anos hardcoded (dinâmico) | 🔴 CRÍTICO |
+| #441 | Corrigir lista de UFs incompleta | 🔴 CRÍTICO |
+| #442 | Mover portas OAuth para env vars | 🔴 CRÍTICO |
+
+#### Issues Médias (Fase 2)
+
+| Issue | Título | Prioridade |
+|-------|--------|------------|
+| #443 | Centralizar timeouts no backend | 🟡 MÉDIO |
+| #444 | Centralizar page sizes | 🟡 MÉDIO |
+| #445 | Consolidar listas de UF duplicadas | 🟡 MÉDIO |
+| #446 | Mover URLs externas para config | 🟡 MÉDIO |
+
+**Ordem de Execução**:
+```
+Fase 1 (Paralelo):   #438 + #440 + #441 + #442
+Fase 2 (Sequencial): #439 (depende de #438)
+Fase 3 (Paralelo):   #443 + #444 + #445 + #446
+```
+
+**Verificação**:
+```bash
+cd v2/frontend && npm run build  # Frontend
+cd v2/backend && pyright apps/   # Backend
+docker exec aprender_v2-web-1 pytest  # Testes
+```
+
+---
+
+### ✅ Epic #423: React Performance Optimization (CONCLUÍDO)
 
 **Objetivo**: Aplicar 45 regras de React Performance da Vercel Engineering no módulo Solicitações.
 

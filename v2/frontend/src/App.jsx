@@ -109,7 +109,7 @@ function Forbidden() {
 
 // Componente principal que usa o tema
 function AppContent() {
-  const { isDark, antThemeConfig } = useTheme();
+  const { antThemeConfig } = useTheme();
   const colors = useBrandColors();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);

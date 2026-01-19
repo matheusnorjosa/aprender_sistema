@@ -10,3 +10,4 @@ export * from './pagination';
 export * from './validation';
 export * from './brazil';
 export * from './urls';
+export * from './styles';

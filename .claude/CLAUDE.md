@@ -25,6 +25,7 @@
 
 | Iniciativa | PR/Commit | Data |
 |------------|-----------|------|
+| Epic #437: Refatoração Hardcoded | #448 | ✅ 2026-01-19 |
 | Epic #405: API Best Practices 10/10 | #433, #434, #435 | ✅ 2026-01-19 |
 | Epic #423: React Performance | #430, #431 | ✅ 2026-01-19 |
 | Type Hints 100% (Phases 1-9) | #392, #394 | ✅ Completo |
@@ -264,115 +265,56 @@ can_approve_super = is_superuser OR ("Gerente" IN funcoes AND "Superintendência
 
 | Plano | Epic | Status |
 |-------|------|--------|
-| [Refatoração Valores Hardcoded](../v2/docs/PLAN_hardcoded_values_refactor.md) | #437 | 🆕 Novo |
+| [Backend Code Formatting](../v2/docs/PLAN_backend_code_formatting.md) | #450 | 🆕 Novo |
 
 ---
 
-### 🚀 Epic #437: Refatoração de Valores Hardcoded
+### 🚀 Epic #450: Backend Code Formatting (Black + isort + Flake8)
 
-**Objetivo**: Eliminar valores hardcoded no frontend e backend, centralizando em constantes e configurações.
+**Objetivo**: Formatar todo o backend Python com Black e isort, corrigir erros de Flake8, e tornar o lint obrigatório no CI.
 
-**Plano Detalhado**: [PLAN_hardcoded_values_refactor.md](../v2/docs/PLAN_hardcoded_values_refactor.md)
+**Plano Detalhado**: [PLAN_backend_code_formatting.md](../v2/docs/PLAN_backend_code_formatting.md)
 
-**Estimativa Total**: ~9 horas
+#### Métricas
 
-#### Issues Críticas (Fase 1)
+| Métrica | Valor |
+|---------|-------|
+| Total de arquivos Python | 396 |
+| Arquivos precisando Black | 330 (83%) |
+| Arquivos precisando isort | 251 |
+| Erros Flake8 total | 713 |
 
-| Issue | Título | Prioridade |
-|-------|--------|------------|
-| #438 | Criar estrutura de constantes frontend | 🔴 CRÍTICO |
-| #439 | Consolidar cores no ThemeContext | 🔴 CRÍTICO |
-| #440 | Corrigir anos hardcoded (dinâmico) | 🔴 CRÍTICO |
-| #441 | Corrigir lista de UFs incompleta | 🔴 CRÍTICO |
-| #442 | Mover portas OAuth para env vars | 🔴 CRÍTICO |
+#### Issues
 
-#### Issues Médias (Fase 2)
-
-| Issue | Título | Prioridade |
-|-------|--------|------------|
-| #443 | Centralizar timeouts no backend | 🟡 MÉDIO |
-| #444 | Centralizar page sizes | 🟡 MÉDIO |
-| #445 | Consolidar listas de UF duplicadas | 🟡 MÉDIO |
-| #446 | Mover URLs externas para config | 🟡 MÉDIO |
+| Fase | Issue | Descrição | Prioridade |
+|------|-------|-----------|------------|
+| 1 | #451 | Configuração de Ferramentas | 🔴 CRÍTICO |
+| 2 | #452 | Formatação com Black | 🔴 CRÍTICO |
+| 3 | #453 | Ordenação de Imports (isort) | 🔴 CRÍTICO |
+| 4 | #454 | Remoção de Imports Não Usados | 🟡 MÉDIO |
+| 5 | #455 | Correção de Variáveis Não Usadas | 🟡 MÉDIO |
+| 6 | #456 | Correções Manuais (F541, F811, E722) | 🟡 MÉDIO |
+| 7 | #457 | Tornar Lint Obrigatório no CI | 🔴 CRÍTICO |
+| 8 | #458 | Pre-commit Hooks (Opcional) | 🟢 BAIXO |
 
 **Ordem de Execução**:
 ```
-Fase 1 (Paralelo):   #438 + #440 + #441 + #442
-Fase 2 (Sequencial): #439 (depende de #438)
-Fase 3 (Paralelo):   #443 + #444 + #445 + #446
+Fase 1 (Config)     → Base para todas as outras
+Fase 2-3 (Paralelo): Black + isort → Formatação automática
+Fase 4-6 (Sequencial): autoflake → F841 → Manual → Correções
+Fase 7 (CI)         → Só após tudo formatado
+Fase 8 (Opcional)   → Pre-commit para devs
 ```
 
 **Verificação**:
 ```bash
-cd v2/frontend && npm run build  # Frontend
-cd v2/backend && pyright apps/   # Backend
-docker exec aprender_v2-web-1 pytest  # Testes
+cd v2/backend
+black --check .
+isort --check .
+flake8 .
+pyright apps/core apps/dat_ingest config
+pytest apps/ -q
 ```
-
----
-
-### ✅ Epic #423: React Performance Optimization (CONCLUÍDO)
-
-**Objetivo**: Aplicar 45 regras de React Performance da Vercel Engineering no módulo Solicitações.
-
-**Score**: 7.25/10 → 9.5+/10
-
-**Arquivos**:
-- `v2/frontend/src/pages/Solicitacoes/MySolicitacoesPage.jsx`
-- `v2/frontend/src/pages/Solicitacoes/NewSolicitacaoWizard.jsx`
-- `v2/frontend/src/pages/Solicitacoes/EditSolicitacaoPage.jsx`
-
-| Ordem | Issue | Descrição | Prioridade |
-|-------|-------|-----------|------------|
-| 1 | #424 | antd direct imports | 🔴 CRÍTICO |
-| 2 | #425 | @ant-design/icons direct imports | 🔴 CRÍTICO |
-| 3 | #426 | memoize steps array (280 linhas) | 🟡 MÉDIO |
-| 4 | #427 | memoize columns array (115 linhas) | 🟡 MÉDIO |
-| 5 | #428 | memoize rangeValue computation | 🟡 MÉDIO |
-
-**Execução**:
-```
-Fase 1 (Paralelo):  #424 + #425 → Bundle Size (-300-600ms TTI)
-Fase 2 (Sequencial): #426 → #427 → #428 → Re-renders
-```
-
-**Verificação após cada issue**:
-```bash
-cd v2/frontend && npm run build  # Verificar bundle size
-npm run test                      # Testes unitários
-```
-
-**Review final**: `/review-enhanced v2/frontend/src/pages/Solicitacoes`
-
----
-
-**Issues relacionadas (API)**: #406, #407, #408, #409, #410, #411, #412
-
-| Issue | Categoria | Score |
-|-------|-----------|-------|
-| #406 | Query Optimization | 7→10 |
-| #407 | Error Handling | 4→10 |
-| #408 | Pagination | 7→10 |
-| #409 | Rate Limiting | 6→10 |
-| #410 | API Versioning | 2→10 |
-| #411 | Response Consistency | 5→10 |
-| #412 | OpenAPI Documentation | 3→10 |
-
-**Ordem de Execução** (após merge PR #413):
-
-| Ordem | Issue | Tempo | Justificativa |
-|-------|-------|-------|---------------|
-| 1 | #406 Query Optimization | 2h | Mais fácil, ganho imediato |
-| 2 | #407 Error Handling | 4h | Base para outras melhorias |
-| 3 | #409 Rate Limiting | 2h | Depende de Error Handling |
-| 4 | #408 Pagination | 2h | Independente |
-| 5 | #411 Response Consistency | 3h | Usa Error Handling |
-| 6 | #410 API Versioning | 3h | Independente |
-| 7 | #412 OpenAPI Documentation | 6h | Por último, documenta tudo |
-
-**Total**: ~22h de implementação
-
-📋 **Plano detalhado**: [PLAN_api_best_practices.md](../v2/docs/PLAN_api_best_practices.md) contém código específico para cada issue.
 
 ---
 
@@ -409,3 +351,393 @@ make test-e2e
 | RF06 | Google Meet links | ✅ Automático |
 | RF07 | Auditoria | ✅ AuditLog completo |
 | RF08 | Grade mensal | ✅ Virtualização + cache |
+
+---
+
+## 🚀 Epic #460: Refatoração de Código - Plano Mestre
+
+**Objetivo**: Refatorar arquivos longos e de difícil manutenção, aplicando boas práticas de programação sem alterar comportamento, rotas ou contratos públicos.
+
+**Data**: 2026-01-19
+
+**Score Atual**: Frontend 7.5/10 | Backend 7.0/10
+**Score Meta**: Frontend 9.0/10 | Backend 9.0/10
+
+### Regras Gerais
+
+- ❌ Não mudar comportamento, rotas, payloads ou status codes
+- ❌ Não adicionar dependências novas
+- ❌ Não alterar contratos públicos
+- ✅ Manter lint/estilo do projeto
+- ✅ Manter i18n/labels e strings
+- ✅ Evitar regressões de autorização
+- ✅ Comentários só para blocos realmente complexos
+
+---
+
+### 🔴 ALTA PRIORIDADE (1-9)
+
+#### §1. Backend: Extrair Services de views_solicitacao.py
+
+**Arquivo**: `v2/backend/apps/core/views_solicitacao.py` (~1234 linhas, 15+ métodos)
+
+**Problema**: God class com approve/reject/publish/perform_create misturados. Lógica de negócio em views.
+
+**Solução**:
+- Criar `apps/core/services/solicitacao_approval.py` (approve, reject, batch_approve, batch_reject)
+- Criar `apps/core/services/solicitacao_publish.py` (publish, preview, resync, cancel)
+- View delega para services
+- Usar `ValidationAPIError` em vez de `Response()` direto para erros
+
+**Arquivos Criados**:
+- `v2/backend/apps/core/services/solicitacao_approval.py`
+- `v2/backend/apps/core/services/solicitacao_publish.py`
+
+**Arquivos Modificados**:
+- `v2/backend/apps/core/views_solicitacao.py`
+
+---
+
+#### §2. Frontend: Refatorar CoordenadoresPage.jsx
+
+**Arquivo**: `v2/frontend/src/pages/DATModule/CoordenadoresPage.jsx` (~945 linhas)
+
+**Problema**: 3 views (Cards/Table/Area) + CRUD + stats misturados em um arquivo.
+
+**Solução**:
+- Extrair `components/CoordenadoresTable.jsx`
+- Extrair `components/CoordenadoresCards.jsx`
+- Extrair `components/CoordenadoresAreaView.jsx`
+- Extrair `components/CoordenadoresFilters.jsx`
+- Extrair `components/CoordenadoresStats.jsx`
+- Criar `hooks/useCoordenadoresPage.js` para lógica de estado
+- Aplicar `useMemo` em columns e groupByArea
+- Aplicar `useCallback` em handlers
+
+**Arquivos Criados**:
+- `v2/frontend/src/pages/DATModule/Coordenadores/components/CoordenadoresTable.jsx`
+- `v2/frontend/src/pages/DATModule/Coordenadores/components/CoordenadoresCards.jsx`
+- `v2/frontend/src/pages/DATModule/Coordenadores/components/CoordenadoresAreaView.jsx`
+- `v2/frontend/src/pages/DATModule/Coordenadores/components/CoordenadoresFilters.jsx`
+- `v2/frontend/src/pages/DATModule/Coordenadores/components/CoordenadoresStats.jsx`
+- `v2/frontend/src/pages/DATModule/Coordenadores/hooks/useCoordenadoresPage.js`
+
+**Arquivos Modificados**:
+- `v2/frontend/src/pages/DATModule/CoordenadoresPage.jsx` (delega para componentes)
+
+---
+
+#### §3. Frontend: Otimizar AcoesPage.jsx
+
+**Arquivo**: `v2/frontend/src/pages/DATModule/AcoesPage.jsx` (~933 linhas)
+
+**Problema**: Columns/render sem memoização, múltiplos view modes.
+
+**Solução**:
+- Aplicar `useMemo` em columns array
+- Aplicar `useCallback` em handlers pesados
+- Extrair view modes para componentes se simples (opcional)
+
+**Arquivos Modificados**:
+- `v2/frontend/src/pages/DATModule/AcoesPage.jsx`
+
+---
+
+#### §4. Frontend: Deduplicar Modal.confirm em PreAgendaPage.jsx
+
+**Arquivo**: `v2/frontend/src/pages/PreAgenda/PreAgendaPage.jsx` (~939 linhas)
+
+**Problema**: Modal.confirm + guardas Google OAuth duplicados (~150 linhas duplicadas).
+
+**Solução**:
+- Criar hook `useGoogleGuard` para verificação OAuth
+- Criar helper `confirmWithGoogleCheck` para modais com verificação
+- Manter useMemo existente nas colunas
+
+**Arquivos Criados**:
+- `v2/frontend/src/hooks/useGoogleGuard.js`
+
+**Arquivos Modificados**:
+- `v2/frontend/src/pages/PreAgenda/PreAgendaPage.jsx`
+
+---
+
+#### §5. Backend: Modularizar etl_upsert_acompanhamento.py
+
+**Arquivo**: `v2/backend/apps/dat_ingest/management/commands/etl_upsert_acompanhamento.py` (~798 linhas)
+
+**Problema**: ETL monolítico sem separação de responsabilidades.
+
+**Solução**:
+- Criar `dat_ingest/etl/parsers/acompanhamento_parser.py`
+- Criar `dat_ingest/etl/normalizers/acompanhamento_normalizer.py`
+- Criar `dat_ingest/etl/importers/acompanhamento_importer.py`
+- Command apenas orquestra
+
+**Arquivos Criados**:
+- `v2/backend/apps/dat_ingest/etl/__init__.py`
+- `v2/backend/apps/dat_ingest/etl/parsers/__init__.py`
+- `v2/backend/apps/dat_ingest/etl/parsers/acompanhamento_parser.py`
+- `v2/backend/apps/dat_ingest/etl/normalizers/__init__.py`
+- `v2/backend/apps/dat_ingest/etl/normalizers/acompanhamento_normalizer.py`
+- `v2/backend/apps/dat_ingest/etl/importers/__init__.py`
+- `v2/backend/apps/dat_ingest/etl/importers/acompanhamento_importer.py`
+
+**Arquivos Modificados**:
+- `v2/backend/apps/dat_ingest/management/commands/etl_upsert_acompanhamento.py`
+
+---
+
+#### §6. Backend: Separar ViewSets em dat_module.py
+
+**Arquivo**: `v2/backend/apps/core/views/dat_module.py` (~747 linhas)
+
+**Problema**: Múltiplos ViewSets misturados (DATRegistro, DATAcao, DATCompra, etc.).
+
+**Solução**:
+- Criar `views/dat_module/` diretório
+- Separar: `dat_registros.py`, `dat_acoes.py`, `dat_compras.py`, `dat_plano_formacoes.py`
+- `views/dat_module/__init__.py` re-exporta para manter imports
+
+**Arquivos Criados**:
+- `v2/backend/apps/core/views/dat_module/__init__.py`
+- `v2/backend/apps/core/views/dat_module/dat_registros.py`
+- `v2/backend/apps/core/views/dat_module/dat_acoes.py`
+- `v2/backend/apps/core/views/dat_module/dat_compras.py`
+- `v2/backend/apps/core/views/dat_module/dat_plano_formacoes.py`
+
+**Arquivos Removidos**:
+- `v2/backend/apps/core/views/dat_module.py` (substituído pelo diretório)
+
+---
+
+#### §7. Backend: Separar Responsabilidades em google_oauth.py
+
+**Arquivo**: `v2/backend/apps/core/services/google_oauth.py` (~671 linhas)
+
+**Problema**: OAuth + encryption/token management misturados.
+
+**Solução**:
+- Criar `services/oauth/` diretório
+- Separar: `token_manager.py` (criptografia, refresh, storage)
+- Separar: `oauth_flow.py` (authorization URL, callback handling)
+- `google_oauth.py` importa e re-exporta para compatibilidade
+
+**Arquivos Criados**:
+- `v2/backend/apps/core/services/oauth/__init__.py`
+- `v2/backend/apps/core/services/oauth/token_manager.py`
+- `v2/backend/apps/core/services/oauth/oauth_flow.py`
+
+**Arquivos Modificados**:
+- `v2/backend/apps/core/services/google_oauth.py` (delega para módulos)
+
+---
+
+#### §8. Backend: Mover Lógica de Negócio de tasks.py
+
+**Arquivo**: `v2/backend/apps/core/tasks.py` (~594 linhas)
+
+**Problema**: Celery tasks com lógica de negócio inline.
+
+**Solução**:
+- Mover lógica para services existentes ou novos
+- Tasks apenas orquestram (chamam service, tratam retry)
+- Usar services de §1 e §7 onde aplicável
+
+**Arquivos Modificados**:
+- `v2/backend/apps/core/tasks.py`
+
+---
+
+#### §9. Backend: Fatiar views_metrics.py
+
+**Arquivo**: `v2/backend/apps/core/views_metrics.py` (~592 linhas)
+
+**Problema**: Múltiplos endpoints e aggregations inline.
+
+**Solução**:
+- Criar `views/metrics/` diretório
+- Separar por domínio: `solicitacao_metrics.py`, `formador_metrics.py`, `dashboard_metrics.py`
+- Mover lógica de aggregation para services se complexa
+
+**Arquivos Criados**:
+- `v2/backend/apps/core/views/metrics/__init__.py`
+- `v2/backend/apps/core/views/metrics/solicitacao_metrics.py`
+- `v2/backend/apps/core/views/metrics/formador_metrics.py`
+- `v2/backend/apps/core/views/metrics/dashboard_metrics.py`
+
+**Arquivos Removidos**:
+- `v2/backend/apps/core/views_metrics.py` (substituído pelo diretório)
+
+---
+
+### 🟡 MÉDIA PRIORIDADE (10-15)
+
+#### §10. Backend: Dividir serializers/dat_module.py
+
+**Arquivo**: `v2/backend/apps/core/serializers/dat_module.py` (~557 linhas)
+
+**Problema**: 16+ serializers em um arquivo.
+
+**Solução**:
+- Criar `serializers/dat_module/` diretório
+- Separar: `dat_registro.py`, `dat_acao.py`, `dat_compra.py`, `plano_formacoes.py`
+- `__init__.py` re-exporta para manter imports
+
+**Arquivos Criados**:
+- `v2/backend/apps/core/serializers/dat_module/__init__.py`
+- `v2/backend/apps/core/serializers/dat_module/dat_registro.py`
+- `v2/backend/apps/core/serializers/dat_module/dat_acao.py`
+- `v2/backend/apps/core/serializers/dat_module/dat_compra.py`
+- `v2/backend/apps/core/serializers/dat_module/plano_formacoes.py`
+
+**Arquivos Removidos**:
+- `v2/backend/apps/core/serializers/dat_module.py`
+
+---
+
+#### §11. Backend: Criar Mixin/Factory para Permissões
+
+**Problema**: IsControleOrSuper e similares repetidos 73x com padrão idêntico.
+
+**Solução**:
+- Criar `permissions/base.py` com `GroupPermissionMixin`
+- Criar factory `create_group_permission(groups: list[str])`
+- Aplicar onde trivial (não alterar permissões existentes, só refatorar)
+
+**Arquivos Criados**:
+- `v2/backend/apps/core/permissions/base.py`
+
+**Arquivos Modificados**:
+- `v2/backend/apps/core/permissions.py` (usa base)
+
+---
+
+#### §12. Backend: Padronizar Error Handling
+
+**Problema**: Mistura de `Response()` direto e `ValidationAPIError` para erros.
+
+**Solução**:
+- Usar `ValidationAPIError` (já existe) em vez de `Response({"detail": ...}, status=400)`
+- Não mudar respostas de sucesso
+- Foco em views_metrics.py e outros com Response direto para erros
+
+**Arquivos Modificados**:
+- `v2/backend/apps/core/views_metrics.py` (se ainda existir após §9)
+- Outros views com Response direto para erros
+
+---
+
+#### §13. Backend: Corrigir N+1 em availability_service.py
+
+**Arquivo**: `v2/backend/apps/core/services/availability_service.py`
+
+**Problema**: Loops sem `select_related`/`prefetch_related` onde acessa FKs.
+
+**Solução**:
+- Adicionar `select_related('usuario', 'municipio')` onde aplicável
+- NÃO alterar monthly_grid_service.py ou views_gcal/batch.py (já otimizados)
+- NÃO alterar loaders.py (só parseia Excel)
+
+**Arquivos Modificados**:
+- `v2/backend/apps/core/services/availability_service.py`
+
+---
+
+#### §14. Frontend: Extrair Inline Styles Repetidos
+
+**Problema**: 434 inline styles, muitos repetidos.
+
+**Solução**:
+- Criar `constants/styles.js` para estilos repetidos
+- Aplicar onde há repetição clara
+- Não mudar UI visualmente
+
+**Arquivos Criados**:
+- `v2/frontend/src/constants/styles.js`
+
+**Arquivos Modificados**:
+- Páginas com inline styles repetidos
+
+---
+
+#### §15. Frontend: Deduplicar Modal/OAuth Guard (Referência §4)
+
+**Nota**: Este item é coberto por §4 (PreAgendaPage.jsx). O hook `useGoogleGuard` criado em §4 pode ser reutilizado em outras páginas se necessário.
+
+---
+
+### 🟢 BAIXA PRIORIDADE (16-18)
+
+#### §16. Frontend: Otimização Leve em Outros Arquivos Longos
+
+**Arquivos**:
+- `Dashboards/GCalDashboardPage.jsx` (~896 linhas)
+- `DATModule/ComprasPage.jsx` (~890 linhas)
+- `DATModule/PlanoFormacoesPage.jsx` (~861 linhas)
+- `MapaBrasil/MapaBrasilPage.jsx` (~860 linhas)
+- `DATModule/FormacoesPage.jsx` (~803 linhas)
+- `App.jsx` (~663 linhas)
+
+**Solução**:
+- Aplicar `useMemo`/`useCallback` onde cabível
+- Fatiamento leve se simples
+- Sem regressão de funcionalidade
+
+---
+
+#### §17. Frontend: Manter Padrões de Memoização Existentes
+
+**Nota**: Garantir que refatorações não removam `useMemo`/`useCallback` existentes (ex: PreAgendaPage columns).
+
+---
+
+#### §18. Backend: Garantir Não-Regressão de Autorização
+
+**Nota**: Em todos os refactors de permissão, garantir que:
+- Testes de permissão existentes passem
+- Comportamento de autorização não mude
+- Rodar `pytest apps/core/tests/test_approval_policy_PA.py -v` após mudanças
+
+---
+
+### Verificação
+
+```bash
+# Backend
+cd v2/backend
+pytest apps/ -q --tb=short
+pyright apps/core apps/dat_ingest
+
+# Frontend
+cd v2/frontend
+npm run build
+npm run lint
+
+# Docker rebuild
+cd v2
+COMPOSE_PROJECT_NAME=aprender_v2 docker compose -f infra/docker-compose.yml up -d --build
+```
+
+---
+
+### Issues Derivadas
+
+| Issue | Seção | Prioridade | Descrição |
+|-------|-------|------------|-----------|
+| #459 | Epic | 📋 EPIC | Epic: Refatoração de Código - Plano Mestre |
+| #460 | §1 | 🔴 HIGH | Extrair services de views_solicitacao.py |
+| #461 | §2 | 🔴 HIGH | Refatorar CoordenadoresPage.jsx |
+| #462 | §3 | 🔴 HIGH | Otimizar AcoesPage.jsx |
+| #463 | §4 | 🔴 HIGH | Deduplicar Modal.confirm em PreAgendaPage.jsx |
+| #464 | §5 | 🔴 HIGH | Modularizar etl_upsert_acompanhamento.py |
+| #465 | §6 | 🔴 HIGH | Separar ViewSets em dat_module.py |
+| #466 | §7 | 🔴 HIGH | Separar responsabilidades em google_oauth.py |
+| #467 | §8 | 🔴 HIGH | Mover lógica de negócio de tasks.py |
+| #468 | §9 | 🔴 HIGH | Fatiar views_metrics.py |
+| #469 | §10 | 🟡 MEDIUM | Dividir serializers/dat_module.py |
+| #470 | §11 | 🟡 MEDIUM | Criar mixin/factory para permissões |
+| #471 | §12 | 🟡 MEDIUM | Padronizar error handling |
+| #472 | §13 | 🟡 MEDIUM | Corrigir N+1 em availability_service.py |
+| #473 | §14 | 🟡 MEDIUM | Extrair inline styles repetidos |
+| #474 | §16-18 | 🟢 LOW | Otimização leve e garantia de não-regressão |

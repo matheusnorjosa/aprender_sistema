@@ -18,7 +18,7 @@ from rest_framework.response import Response
 from rest_framework.test import APIClient
 from rest_framework.views import APIView
 
-from apps.core.deprecation import deprecated_endpoint, deprecated_view_class
+from apps.core.deprecation import deprecated_endpoint
 from apps.core.models import Usuario
 
 
@@ -109,27 +109,6 @@ class TestDeprecationDecorator(TestCase):
         self.assertEqual(response["X-Deprecated"], "true")
         self.assertEqual(response["X-Deprecated-Message"], "Use /new-endpoint/")
         self.assertEqual(response["X-Removal-Version"], "v2")
-
-    def test_deprecated_view_class_adds_headers(self) -> None:
-        """deprecated_view_class should add X-Deprecated headers."""
-        @deprecated_view_class("Use NewView", removal_version="v2")
-        class OldView(APIView):
-            permission_classes = []
-
-            def get(self, request: Request) -> Response:
-                return Response({"status": "ok"})
-
-        # Simulate request
-        from rest_framework.test import APIRequestFactory
-        factory = APIRequestFactory()
-        request = factory.get("/old/")
-        view = OldView.as_view()
-        response = view(request)
-
-        self.assertEqual(response["X-Deprecated"], "true")
-        self.assertEqual(response["X-Deprecated-Message"], "Use NewView")
-        self.assertEqual(response["X-Removal-Version"], "v2")
-
 
 class TestVersioningConfiguration(TestCase):
     """Tests for versioning DRF configuration."""

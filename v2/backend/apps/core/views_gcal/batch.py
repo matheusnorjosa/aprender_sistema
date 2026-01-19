@@ -16,6 +16,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.core.models import Solicitacao
@@ -58,6 +59,8 @@ class GCalPublishBatchView(APIView):
     - Inválidas: retorna em 'errors' com motivo
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "gcal_write"  # 10/min (#409)
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Parse request body
@@ -175,6 +178,8 @@ class GCalBatchReapplyView(APIView):
     Permissions: IsControleOrSuper
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "gcal_write"  # 10/min (#409)
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         from apps.core.models import GoogleOAuthCredential
@@ -324,6 +329,8 @@ class GCalBatchResyncView(APIView):
     Permissions: IsControleOrSuper
     """
     permission_classes = [IsAuthenticated, IsControleOrSuper]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "gcal_write"  # 10/min (#409)
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         from apps.core.models import GoogleOAuthCredential

@@ -13,6 +13,8 @@ from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -21,6 +23,7 @@ from .models import AvailabilityBlock, EquipeGerencia, Municipio, Usuario
 from .permissions import IsControleOrSuper
 from .serializers import AvailabilityBlockSerializer
 from .services.availability_service import check_conflicts
+from .api_schemas import COMMON_ERROR_RESPONSES, AVAILABILITY_OK_EXAMPLE, AVAILABILITY_CONFLICT_EXAMPLE
 
 
 def is_privileged_user(user):
@@ -109,6 +112,26 @@ class AvailabilityCheckView(APIView):
     permission_classes = [IsControleOrSuper]
     throttle_scope = "availability_check"
 
+    @extend_schema(
+        summary="Verificar disponibilidade",
+        description="Verifica conflitos de agenda para um formador (RD-01 a RD-08). Retorna se o período está disponível e lista de conflitos.",
+        parameters=[
+            OpenApiParameter("usuario_id", OpenApiTypes.INT, required=True, description="ID do formador"),
+            OpenApiParameter("inicio", OpenApiTypes.DATETIME, required=True, description="Data/hora início (ISO8601)"),
+            OpenApiParameter("fim", OpenApiTypes.DATETIME, required=True, description="Data/hora fim (ISO8601)"),
+            OpenApiParameter("municipio_id", OpenApiTypes.INT, required=False, description="ID do município (para verificar deslocamento)"),
+        ],
+        responses={
+            200: OpenApiExample(
+                "Resposta",
+                value={"available": True, "conflicts": []},
+            ),
+            400: COMMON_ERROR_RESPONSES[400],
+            403: COMMON_ERROR_RESPONSES[403],
+        },
+        examples=[AVAILABILITY_OK_EXAMPLE, AVAILABILITY_CONFLICT_EXAMPLE],
+        tags=["availability"],
+    )
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Validar usuario_id
         usuario_id_raw = request.query_params.get("usuario_id")

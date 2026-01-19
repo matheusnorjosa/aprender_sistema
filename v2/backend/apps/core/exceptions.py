@@ -28,6 +28,133 @@ from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
 
+# =============================================================================
+# Custom Exception Classes (#407 Error Handling)
+# =============================================================================
+
+
+class APIError(APIException):
+    """
+    Base exception for custom API errors.
+
+    Usage:
+        raise APIError(code="CUSTOM_ERROR", message="Something went wrong")
+    """
+
+    status_code = 400
+    default_code = "API_ERROR"
+    default_detail = "Ocorreu um erro na API."
+
+    def __init__(
+        self,
+        code: str | None = None,
+        message: str | None = None,
+        details: dict[str, Any] | None = None,
+        status_code: int | None = None,
+    ) -> None:
+        self.code = code or self.default_code
+        self.message = message or self.default_detail
+        self.details = details or {}
+        if status_code is not None:
+            self.status_code = status_code
+        super().__init__(detail=self.message, code=self.code)
+
+
+class ValidationAPIError(APIError):
+    """Validation error with field-level details."""
+
+    status_code = 400
+    default_code = "VALIDATION_ERROR"
+    default_detail = "Erro de validação nos dados enviados."
+
+    def __init__(
+        self,
+        message: str | None = None,
+        field: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        extra_details = {"field": field} if field else {}
+        if details:
+            extra_details.update(details)
+        super().__init__(
+            code=self.default_code,
+            message=message or self.default_detail,
+            details=extra_details,
+        )
+
+
+class NotFoundError(APIError):
+    """Resource not found error."""
+
+    status_code = 404
+    default_code = "NOT_FOUND"
+    default_detail = "Recurso não encontrado."
+
+    def __init__(
+        self,
+        resource: str | None = None,
+        identifier: str | int | None = None,
+    ) -> None:
+        message = f"{resource} não encontrado." if resource else self.default_detail
+        details: dict[str, Any] = {}
+        if resource:
+            details["resource"] = resource
+        if identifier is not None:
+            details["identifier"] = str(identifier)
+        super().__init__(code=self.default_code, message=message, details=details)
+
+
+class ServiceUnavailableError(APIError):
+    """External service unavailable error (503)."""
+
+    status_code = 503
+    default_code = "SERVICE_UNAVAILABLE"
+    default_detail = "Serviço externo indisponível."
+
+    def __init__(
+        self,
+        service: str | None = None,
+        details: str | None = None,
+    ) -> None:
+        message = f"Serviço {service} indisponível." if service else self.default_detail
+        extra_details: dict[str, Any] = {}
+        if service:
+            extra_details["service"] = service
+        if details:
+            extra_details["error"] = details
+        super().__init__(
+            code=self.default_code,
+            message=message,
+            details=extra_details,
+            status_code=503,
+        )
+
+
+class ConflictError(APIError):
+    """Conflict error (409) for business rule violations."""
+
+    status_code = 409
+    default_code = "CONFLICT"
+    default_detail = "Conflito com o estado atual do recurso."
+
+    def __init__(
+        self,
+        message: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            code=self.default_code,
+            message=message or self.default_detail,
+            details=details,
+            status_code=409,
+        )
+
+
+# =============================================================================
+# Custom Exception Handler
+# =============================================================================
+
+
 def custom_exception_handler(exc: Exception, context: dict[str, Any]) -> Response | None:
     """
     Custom exception handler that standardizes error response format.
@@ -39,7 +166,17 @@ def custom_exception_handler(exc: Exception, context: dict[str, Any]) -> Respons
         "errors": dict  # Optional field-level errors (validation only)
     }
     """
-    # First, call DRF's default handler to get the standard response
+    # Handle our custom APIError exceptions first
+    if isinstance(exc, APIError):
+        data: dict[str, Any] = {
+            "detail": exc.message,
+            "code": exc.code,
+        }
+        if exc.details:
+            data["errors"] = exc.details
+        return Response(data, status=exc.status_code)
+
+    # Call DRF's default handler to get the standard response
     response = exception_handler(exc, context)
 
     # If DRF didn't handle it, handle common Django exceptions

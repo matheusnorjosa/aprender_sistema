@@ -15,6 +15,8 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -23,6 +25,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from .models import Solicitacao, AuditLog
 from .permissions import IsCoordenadorOrDAT, IsOwnerOrPrivileged, IsSuperintendencia, IsControleOrSuper, IsGerenteSuperintendencia
 from .serializers import SolicitacaoSerializer
+from .api_schemas import COMMON_ERROR_RESPONSES
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,52 @@ def _get_client_ip(request: Request) -> Response:
     return request.META.get("REMOTE_ADDR", "unknown")
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary="Lista solicitações",
+        description="Retorna lista paginada de solicitações filtradas por status, projeto, etc.",
+        parameters=[
+            OpenApiParameter("status", OpenApiTypes.STR, description="Filtrar por status (pendente/aprovado/reprovado)"),
+            OpenApiParameter("mine", OpenApiTypes.BOOL, description="Se true, retorna apenas solicitações do usuário atual"),
+            OpenApiParameter("search", OpenApiTypes.STR, description="Busca textual em usuário, município, observações"),
+        ],
+        responses={200: SolicitacaoSerializer(many=True), **COMMON_ERROR_RESPONSES},
+        tags=["solicitacoes"],
+    ),
+    retrieve=extend_schema(
+        summary="Detalhe da solicitação",
+        description="Retorna detalhes completos de uma solicitação específica.",
+        responses={200: SolicitacaoSerializer, **COMMON_ERROR_RESPONSES},
+        tags=["solicitacoes"],
+    ),
+    create=extend_schema(
+        summary="Criar solicitação",
+        description="Cria nova solicitação de evento. Status inicial: pendente (PA-01). Requer permissão de Coordenador ou DAT.",
+        request=SolicitacaoSerializer,
+        responses={201: SolicitacaoSerializer, **COMMON_ERROR_RESPONSES},
+        tags=["solicitacoes"],
+    ),
+    update=extend_schema(
+        summary="Atualizar solicitação",
+        description="Atualiza todos os campos de uma solicitação. Requer ser o proprietário ou ter privilégio especial.",
+        request=SolicitacaoSerializer,
+        responses={200: SolicitacaoSerializer, **COMMON_ERROR_RESPONSES},
+        tags=["solicitacoes"],
+    ),
+    partial_update=extend_schema(
+        summary="Atualizar parcialmente",
+        description="Atualiza campos específicos de uma solicitação.",
+        request=SolicitacaoSerializer,
+        responses={200: SolicitacaoSerializer, **COMMON_ERROR_RESPONSES},
+        tags=["solicitacoes"],
+    ),
+    destroy=extend_schema(
+        summary="Excluir solicitação",
+        description="Remove uma solicitação. Requer ser o proprietário ou ter privilégio especial.",
+        responses={204: None, **COMMON_ERROR_RESPONSES},
+        tags=["solicitacoes"],
+    ),
+)
 class SolicitacaoViewSet(viewsets.ModelViewSet):
     """
     ViewSet para Solicitações de Evento.
@@ -480,6 +529,17 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # Executar exclusão
         instance.delete()
 
+    @extend_schema(
+        summary="Aprovar solicitação",
+        description="Aprova uma solicitação pendente. Apenas Superintendência, DAT ou superuser (PA-02).",
+        request=None,
+        responses={
+            200: SolicitacaoSerializer,
+            400: COMMON_ERROR_RESPONSES[400],
+            403: COMMON_ERROR_RESPONSES[403],
+        },
+        tags=["solicitacoes"],
+    )
     @action(
         detail=True,
         methods=["patch"],
@@ -543,6 +603,17 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(
+        summary="Reprovar solicitação",
+        description="Reprova uma solicitação pendente. Requer justificativa. Apenas Superintendência, DAT ou superuser (PA-02).",
+        request=None,
+        responses={
+            200: SolicitacaoSerializer,
+            400: COMMON_ERROR_RESPONSES[400],
+            403: COMMON_ERROR_RESPONSES[403],
+        },
+        tags=["solicitacoes"],
+    )
     @action(
         detail=True,
         methods=["patch"],

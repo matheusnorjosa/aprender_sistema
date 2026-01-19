@@ -208,6 +208,26 @@ export async function fetchAPI(url, options = {}, isRetry = false) {
 }
 
 /**
+ * Inicializa CSRF token proativamente.
+ *
+ * Chame no início do app para garantir que o token CSRF esteja disponível
+ * antes de qualquer interação do usuário. Isso evita race conditions
+ * onde o usuário tenta fazer login antes do token estar pronto.
+ */
+export async function initCsrfToken() {
+  try {
+    await ensureCsrfToken();
+    logger.debug('CSRF token inicializado com sucesso');
+  } catch (error) {
+    logger.warn('Falha ao inicializar CSRF token:', error);
+  }
+}
+
+// Inicializar CSRF token automaticamente quando o módulo carrega
+// Isso garante que o token está disponível assim que o app iniciar
+initCsrfToken();
+
+/**
  * Helper para construir URL com query params.
  *
  * @param {string} path - Caminho relativo (ex: '/solicitacoes/')

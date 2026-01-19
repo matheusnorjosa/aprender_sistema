@@ -50,35 +50,3 @@ def deprecated_endpoint(message: str, removal_version: str = "v2") -> Callable[[
     return decorator
 
 
-def deprecated_view_class(message: str, removal_version: str = "v2") -> Callable[[type], type]:
-    """
-    Class decorator to mark API view classes as deprecated.
-
-    Wraps the dispatch method to add deprecation headers to all responses.
-
-    Usage:
-        @deprecated_view_class("Use NewView instead", removal_version="v2")
-        class OldView(APIView):
-            ...
-
-    Args:
-        message: Human-readable deprecation message
-        removal_version: API version when endpoint will be removed
-
-    Returns:
-        Decorated class that adds deprecation headers to all responses
-    """
-    def decorator(cls: type) -> type:
-        original_dispatch = cls.dispatch  # type: ignore[attr-defined]
-
-        @wraps(original_dispatch)
-        def new_dispatch(self: Any, request: Request, *args: Any, **kwargs: Any) -> Response:
-            response = original_dispatch(self, request, *args, **kwargs)
-            response["X-Deprecated"] = "true"
-            response["X-Deprecated-Message"] = message
-            response["X-Removal-Version"] = removal_version
-            return response
-
-        cls.dispatch = new_dispatch  # type: ignore[attr-defined]
-        return cls
-    return decorator

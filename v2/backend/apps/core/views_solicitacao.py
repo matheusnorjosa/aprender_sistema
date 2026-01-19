@@ -426,7 +426,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Estratégia: substituição completa
         - Remove formadores não presentes na nova lista
-        - Adiciona novos formadores
+        - Adiciona novos formadores com batch fetch (#406)
 
         Retorna True se houve alteração.
         """
@@ -456,19 +456,30 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             ).delete()
             changed = True
 
-        # Adicionar formadores
-        for formador_id in to_add:
-            if formador_id:
-                try:
-                    usuario = Usuario.objects.get(id=formador_id)
-                    Participation.objects.get_or_create(
-                        solicitacao=solicitacao,
-                        usuario=usuario,
-                        defaults={'role': 'FORMADOR'}
-                    )
-                    changed = True
-                except Usuario.DoesNotExist:
-                    pass
+        # Adicionar formadores com batch fetch (#406 - Query Optimization)
+        if to_add:
+            # Batch fetch: 1 query para todos os usuários em vez de N queries
+            usuarios_map = {
+                u.id: u for u in Usuario.objects.filter(id__in=to_add)
+            }
+
+            # Bulk create participations
+            participations_to_create = [
+                Participation(
+                    solicitacao=solicitacao,
+                    usuario=usuarios_map[formador_id],
+                    role='FORMADOR'
+                )
+                for formador_id in to_add
+                if formador_id and formador_id in usuarios_map
+            ]
+
+            if participations_to_create:
+                Participation.objects.bulk_create(
+                    participations_to_create,
+                    ignore_conflicts=True
+                )
+                changed = True
 
         return changed
 

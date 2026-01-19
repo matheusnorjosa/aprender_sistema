@@ -101,18 +101,18 @@ class TestGCalHealthEndpoint(APITestCase):
         self.assertIn("details", response.data)
 
     @override_settings(GCAL_CLIENT="fake")
-    def test_health_check_returns_200_even_on_error(self):
+    def test_health_check_returns_200_when_healthy(self):
         """
-        Testa que health check retorna 200 mesmo com status unhealthy.
+        Testa que health check retorna 200 quando serviço está healthy.
 
-        Health status está no body, não no HTTP status code.
+        Issue #407: Retorna 503 quando unhealthy, 200 quando healthy.
+        Fake client sempre retorna healthy.
         """
         response = self.client.get("/api/gcal/health/")
 
-        # Sempre 200, status no body
+        # Fake client always returns healthy = 200
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("status", response.data)
-        self.assertIn(response.data["status"], ["healthy", "unhealthy"])
+        self.assertEqual(response.data["status"], "healthy")
 
     def test_health_check_requires_authentication(self):
         """

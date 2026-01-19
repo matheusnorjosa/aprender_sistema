@@ -11,12 +11,17 @@ import { fetchAPI, clearCsrfCache } from './config';
 
 /**
  * Realiza login com username e senha
+ *
+ * Nota: Django rotaciona o CSRF token após login bem-sucedido.
+ * Limpamos o cache para forçar obtenção de token fresco.
  */
 export async function login(username, password) {
   const response = await fetchAPI('/auth/login/', {
     method: 'POST',
     body: JSON.stringify({ username, password }),
   });
+  // Limpar cache de CSRF token após login (Django rotaciona o token)
+  clearCsrfCache();
   return response;
 }
 

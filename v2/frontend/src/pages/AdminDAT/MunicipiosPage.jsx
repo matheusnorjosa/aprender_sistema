@@ -10,6 +10,7 @@ import { Table, Button, Input, Space, Tag, Typography, Card, message, Select, Mo
 import { EnvironmentOutlined, ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { listMunicipios, createMunicipio, updateMunicipio, deleteMunicipio } from '../../api/adminDAT';
+import { UF_NORDESTE_OPTIONS } from '../../constants';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -161,7 +162,7 @@ export default function MunicipiosPage() {
               allowClear
               style={{ width: 100 }}
               onChange={setUfFilter}
-              options={['BA', 'CE', 'PE', 'RN', 'SE', 'AL', 'PB', 'PI', 'MA'].map((uf) => ({ label: uf, value: uf }))}
+              options={UF_NORDESTE_OPTIONS}
             />
             <Button icon={<ReloadOutlined />} onClick={fetchMunicipios} loading={loading}>
               Atualizar

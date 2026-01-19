@@ -48,6 +48,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import logger from '../../utils/logger';
+import { TIMING } from '../../constants';
 import { ensureCsrfToken } from '../../api/config';
 
 const { Title, Text } = Typography;
@@ -348,7 +349,7 @@ export default function GCalDashboardPage() {
       if (data.queued > 0) {
         message.success(`Evento reenfileirado para publicação (Reapply)`);
         // Recarregar detalhes após 2 segundos
-        setTimeout(() => loadEventDetail(selectedEventId), 2000);
+        setTimeout(() => loadEventDetail(selectedEventId), TIMING.GCAL_DETAIL_LOAD_DELAY_MS);
       } else if (data.errors && data.errors.length > 0) {
         message.error(`Erro: ${data.errors[0].detail}`);
       }
@@ -388,7 +389,7 @@ export default function GCalDashboardPage() {
       if (data.queued > 0) {
         message.success(`Evento reenfileirado para ressincronização (Resync)`);
         // Recarregar detalhes após 2 segundos
-        setTimeout(() => loadEventDetail(selectedEventId), 2000);
+        setTimeout(() => loadEventDetail(selectedEventId), TIMING.GCAL_DETAIL_LOAD_DELAY_MS);
       } else if (data.errors && data.errors.length > 0) {
         message.error(`Erro: ${data.errors[0].detail}`);
       }

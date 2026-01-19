@@ -354,14 +354,37 @@ make test-e2e
 
 ---
 
-## 🚀 Epic #460: Refatoração de Código - Plano Mestre
+## 🚀 Epic #459: Refatoração de Código - Plano Mestre
 
 **Objetivo**: Refatorar arquivos longos e de difícil manutenção, aplicando boas práticas de programação sem alterar comportamento, rotas ou contratos públicos.
 
-**Data**: 2026-01-19
+**Data**: 2026-01-19 | **Última Atualização**: 2026-01-19
+**Branch**: `refactor/epic-459-code-quality`
+**Commits**: `71143a1`, `848d2b6`
 
 **Score Atual**: Frontend 7.5/10 | Backend 7.0/10
 **Score Meta**: Frontend 9.0/10 | Backend 9.0/10
+
+### 📊 Progresso por Item
+
+| Item | Descrição | Status | Notas |
+|------|-----------|--------|-------|
+| §1 | Services views_solicitacao.py | ✅ DONE | 1234→821 linhas (-33%) |
+| §2 | Memoização CoordenadoresPage | ✅ DONE | useMemo/useCallback aplicado |
+| §3 | Memoização AcoesPage | ✅ DONE | useMemo/useCallback aplicado |
+| §4 | Hook useGoogleGuard | ✅ DONE | -150 linhas duplicadas |
+| §5 | Modularizar ETL acompanhamento | 🔄 TODO | 798 linhas |
+| §6 | Separar ViewSets dat_module | 🔄 TODO | 747 linhas |
+| §7 | Separar google_oauth.py | 🔄 TODO | 671 linhas |
+| §8 | Mover lógica tasks.py | 🔄 TODO | 594 linhas |
+| §9 | Fatiar views_metrics.py | 🔄 TODO | 592 linhas |
+| §10 | Dividir serializers/dat_module | 🔄 TODO | MEDIUM |
+| §11 | Mixin/factory permissões | 🔄 TODO | MEDIUM |
+| §12 | Padronizar error handling | 🔄 TODO | MEDIUM |
+| §13 | N+1 availability_service | 🔄 TODO | MEDIUM |
+| §14 | constants/styles.js | ✅ DONE | Estilos centralizados |
+| §15 | (coberto por §4) | ✅ DONE | - |
+| §16-18 | Otimizações leves | 🔄 TODO | LOW |
 
 ### Regras Gerais
 

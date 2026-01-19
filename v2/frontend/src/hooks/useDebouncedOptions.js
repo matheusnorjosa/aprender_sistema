@@ -26,9 +26,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'prop-types';
 import api from '../api';
+import { TIMING } from '../constants';
 
 const CACHE_TTL = 300000; // 5 minutos em ms (sincronizado com backend)
-const DEBOUNCE_DELAY = 300; // 300ms
 
 const useDebouncedOptions = (endpoint, params = {}) => {
   const [options, setOptions] = useState([]);
@@ -129,7 +129,7 @@ const useDebouncedOptions = (endpoint, params = {}) => {
     // Agendar fetch com debounce
     debounceTimerRef.current = setTimeout(() => {
       fetchOptions();
-    }, DEBOUNCE_DELAY);
+    }, TIMING.DEBOUNCE_DEFAULT_MS);
 
     // Cleanup
     return () => {

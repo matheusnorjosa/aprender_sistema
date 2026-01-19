@@ -4,6 +4,7 @@
  */
 
 import { BookOutlined, BarChartOutlined } from '@ant-design/icons';
+import { EXTERNAL_URLS } from '../../../constants';
 
 // Status options for workflow steps
 export const STATUS_OPTIONS = [
@@ -20,7 +21,7 @@ export const PLATAFORMAS = {
     label: 'FORMAR',
     color: '#1890ff',
     icon: <BookOutlined />,
-    url: 'https://www.aprenderformar.com.br/plataforma/',
+    url: EXTERNAL_URLS.FORMAR_PLATFORM,
     etapas: [
       { key: 'criacao_curso', label: 'Criação Curso' },
       { key: 'chaves', label: 'Chaves' },
@@ -33,7 +34,7 @@ export const PLATAFORMAS = {
     label: 'AVALIAR',
     color: '#52c41a',
     icon: <BarChartOutlined />,
-    url: 'https://avaliar.aprenderformar.com.br/',
+    url: EXTERNAL_URLS.AVALIAR_PLATFORM,
     etapas: [
       { key: 'recebidos', label: 'Recebidos' },
       { key: 'validados', label: 'Validados' },

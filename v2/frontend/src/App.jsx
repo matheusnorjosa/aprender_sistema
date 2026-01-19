@@ -28,10 +28,11 @@ import {
   SunOutlined,
   MoonOutlined,
 } from '@ant-design/icons';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { ThemeProvider, useTheme, useBrandColors } from './contexts/ThemeContext';
 import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
 import { logout as apiLogout } from './api/auth';
+import { LAYOUT, TIMING } from './constants';
 import './App.css';
 
 // ============================================================================
@@ -108,7 +109,8 @@ function Forbidden() {
 
 // Componente principal que usa o tema
 function AppContent() {
-  const { isDark, antThemeConfig } = useTheme();
+  const { antThemeConfig } = useTheme();
+  const colors = useBrandColors();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -162,8 +164,6 @@ function AppContent() {
       return; // Não tem permissão, não fazer polling
     }
 
-    const POLL_MS = 30000; // 30 segundos
-    const COOLDOWN_MS = 120000; // 2 minutos de cooldown para toast
     let intervalId = null;
 
     const fetchAlerts = async () => {
@@ -190,7 +190,7 @@ function AppContent() {
             `Novos erros de publicação detectados (${lastErrorsCount} → ${data.errors})`,
             5 // duração 5s
           );
-          setCooldownUntil(now + COOLDOWN_MS);
+          setCooldownUntil(now + TIMING.TOAST_COOLDOWN_MS);
         }
 
         // Atualizar lastErrorsCount e persistir em localStorage
@@ -206,7 +206,7 @@ function AppContent() {
     // Issue #259: Funções para controlar polling baseado em visibilidade
     const startPolling = () => {
       if (!intervalId) {
-        intervalId = setInterval(fetchAlerts, POLL_MS);
+        intervalId = setInterval(fetchAlerts, TIMING.ALERT_POLL_INTERVAL_MS);
       }
     };
 
@@ -311,10 +311,10 @@ function AppContent() {
   return (
     <ConfigProvider locale={ptBR} theme={antThemeConfig}>
       <Router>
-        <Layout style={{ minHeight: '100vh', background: isDark ? '#141414' : undefined }}>
+        <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
           {/* Sider lateral fixo */}
           <Sider
-            width={250}
+            width={LAYOUT.SIDEBAR_WIDTH}
             style={{
               overflow: 'auto',
               height: '100vh',
@@ -322,7 +322,7 @@ function AppContent() {
               left: 0,
               top: 0,
               bottom: 0,
-              background: isDark ? '#141414' : '#006B52',
+              background: colors.sidebarBackground,
             }}
           >
             {/* Logo/Título */}
@@ -332,7 +332,7 @@ function AppContent() {
                 height: '64px',
                 color: 'white',
                 fontSize: '22px',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                borderBottom: `1px solid ${colors.borderLight}`,
               }}
             >
               Aprender Sistema
@@ -471,14 +471,14 @@ function AppContent() {
           </Sider>
 
           {/* Layout com margem para compensar Sider fixo */}
-          <Layout style={{ marginLeft: 250, minHeight: '100vh', background: isDark ? '#141414' : undefined }}>
+          <Layout style={{ marginLeft: LAYOUT.SIDEBAR_WIDTH, minHeight: '100vh', background: colors.pageBackground }}>
             {/* Header com info do usuário */}
             <Header
               className="flex items-center justify-end w-full"
               style={{
-                background: isDark ? '#1f1f1f' : '#fff',
+                background: colors.cardBackground,
                 padding: '0 24px',
-                borderBottom: isDark ? '1px solid #303030' : '1px solid #f0f0f0',
+                borderBottom: `1px solid ${colors.borderDefault}`,
               }}
             >
               <div className="flex items-center gap-4" style={{ whiteSpace: 'nowrap' }}>
@@ -508,7 +508,7 @@ function AppContent() {
             </Header>
 
             {/* Conteúdo principal com Suspense para lazy loading */}
-            <Content style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: isDark ? '#141414' : '#f0f2f5' }}>
+            <Content style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: colors.pageBackground }}>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   <Route path="/" element={<HomePage />} />

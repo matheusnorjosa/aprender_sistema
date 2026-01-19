@@ -118,22 +118,27 @@ def _build_frontend_redirect_url(path: str) -> str:
     frontend_origin = os.getenv("FRONTEND_URL")
 
     if not frontend_origin and settings.CORS_ALLOWED_ORIGINS:
-        # Priorizar localhost:5173 (Vite dev server padrão)
+        # Issue #442: Use settings instead of hardcoded ports
+        frontend_port = getattr(settings, 'FRONTEND_DEV_PORT', '5173')
+        backend_port = getattr(settings, 'BACKEND_PORT', '8002')
+
+        # Priorizar frontend dev port (Vite dev server padrão)
         for origin in settings.CORS_ALLOWED_ORIGINS:
-            if ':5173' in origin:
+            if f':{frontend_port}' in origin:
                 frontend_origin = origin
                 break
 
-        # Se não encontrou :5173, pegar primeira origem que não seja :8002 (backend)
+        # Se não encontrou frontend port, pegar primeira origem que não seja backend port
         if not frontend_origin:
             for origin in settings.CORS_ALLOWED_ORIGINS:
-                if ':8002' not in origin:
+                if f':{backend_port}' not in origin:
                     frontend_origin = origin
                     break
 
-    # Fallback para localhost:5173 (dev)
+    # Fallback para frontend URL (dev)
     if not frontend_origin:
-        frontend_origin = "http://localhost:5173"
+        frontend_port = getattr(settings, 'FRONTEND_DEV_PORT', '5173')
+        frontend_origin = f"http://localhost:{frontend_port}"
 
     # Construir URL absoluta
     full_url = f"{frontend_origin}{path}"

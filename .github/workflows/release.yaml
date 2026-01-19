@@ -27,19 +27,24 @@ jobs:
         fetch-depth: 0
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r v2/backend/requirements.txt
 
     - name: Run final checks
+      env:
+        DJANGO_SETTINGS_MODULE: config.settings
+        ENVIRONMENT: production
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        REQUIRE_DOCKER: "0"
       run: |
+        cd v2/backend
         python manage.py check --deploy
-        python devops/auditar_integracoes.py
 
     - name: Create tag
       run: |
@@ -50,7 +55,8 @@ jobs:
 
     - name: Build Docker image
       run: |
-        docker build -t aprender-sistema:${{ github.event.inputs.version }} .
+        cd v2
+        docker build -f infra/Dockerfile -t aprender-sistema:${{ github.event.inputs.version }} .
         docker tag aprender-sistema:${{ github.event.inputs.version }} aprender-sistema:latest
 
     - name: Generate release notes

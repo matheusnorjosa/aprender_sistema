@@ -56,6 +56,7 @@ import {
 } from '../../api/datModule';
 import { useCrudOperations } from '../../hooks/useCrudOperations';
 import dayjs from 'dayjs';
+import { UF_OPTIONS } from '../../constants';
 
 const { Title, Text } = Typography;
 
@@ -67,19 +68,11 @@ const STATUS_OPTIONS = [
   { label: 'Esgotado', value: 'esgotado', color: 'red' },
 ];
 
-// Ano de uso options
-const ANO_OPTIONS = [
-  { label: '2024', value: 2024 },
-  { label: '2025', value: 2025 },
-  { label: '2026', value: 2026 },
-];
-
-// UF options (Brazilian states)
-const UF_OPTIONS = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
-  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
-  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
-].map((uf) => ({ label: uf, value: uf }));
+// Ano de uso options (dinâmico: ano atual ± 1)
+const currentYear = new Date().getFullYear();
+const ANO_OPTIONS = [currentYear - 1, currentYear, currentYear + 1].map(
+  (year) => ({ label: String(year), value: year })
+);
 
 export default function ComprasPage() {
   // Issue #302: Use useCrudOperations hook for standardized CRUD

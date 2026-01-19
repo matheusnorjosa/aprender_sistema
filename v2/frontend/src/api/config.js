@@ -7,6 +7,7 @@
  * - fetchAPI: Unified fetch wrapper with credentials and CSRF
  */
 import logger from '../utils/logger';
+import { TIMING } from '../constants';
 
 /**
  * Base API URL (can be overridden by VITE_API_URL env var)
@@ -40,7 +41,6 @@ export function getCsrfToken() {
 // Issue #258: Adiciona TTL para evitar token stale
 let cachedCsrfToken = null;
 let csrfTokenTimestamp = null;
-const CSRF_TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutos
 
 /**
  * Limpa o cache de CSRF token (usar no logout ou em erro 401/403).
@@ -59,7 +59,7 @@ function isCsrfTokenValid() {
     return false;
   }
   const elapsed = Date.now() - csrfTokenTimestamp;
-  return elapsed < CSRF_TOKEN_TTL_MS;
+  return elapsed < TIMING.CSRF_TOKEN_TTL_MS;
 }
 
 /**

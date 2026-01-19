@@ -13,6 +13,7 @@ import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '../../api/auth';
 import logoLogin from '../../assets/logo-login.png';
 import logger from '../../utils/logger';
+import { BRAND_COLORS } from '../../contexts/ThemeContext';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -36,7 +37,7 @@ export default function LoginPage({ onLoginSuccess }) {
   return (
     <div
       className="flex flex-col items-center justify-start"
-      style={{ minHeight: '100vh', paddingTop: '60px', background: '#004B3D' }}
+      style={{ minHeight: '100vh', paddingTop: '60px', background: BRAND_COLORS.primaryDark }}
     >
       {/* Logo */}
       <div style={{ marginBottom: '40px' }}>
@@ -55,14 +56,14 @@ export default function LoginPage({ onLoginSuccess }) {
         style={{
           width: '100%',
           maxWidth: '420px',
-          background: '#E5EDE5',
+          background: BRAND_COLORS.primaryLight,
           borderRadius: '24px 24px 24px 24px',
           padding: '40px 32px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
         }}
       >
         <h2 style={{
-          color: '#004B3D',
+          color: BRAND_COLORS.primaryDark,
           fontSize: '24px',
           fontWeight: '500',
           marginBottom: '32px',

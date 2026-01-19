@@ -39,17 +39,3 @@ class LargePagination(PageNumberPagination):
     max_page_size = 1000
 
 
-class SmallPagination(PageNumberPagination):
-    """
-    Pagination for endpoints with smaller datasets.
-
-    - Default page size: 20
-    - Max page size: 100
-    - Supports ?page_size= query param
-
-    Use for: User lists, simple lookups.
-    """
-
-    page_size = 20
-    page_size_query_param = "page_size"
-    max_page_size = 100

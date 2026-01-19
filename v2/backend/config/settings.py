@@ -290,6 +290,45 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ================================================================
+# OAUTH PORT CONFIGURATION
+# ================================================================
+# Issue #442: Centralize port numbers for OAuth flow
+FRONTEND_DEV_PORT = os.getenv("FRONTEND_DEV_PORT", "5173")
+BACKEND_PORT = os.getenv("BACKEND_PORT", "8002")
+
+# ================================================================
+# TIMEOUTS & CACHE (Issue #443)
+# ================================================================
+# Centralized timeout constants for consistent configuration
+
+# Cache TTL (matches frontend hook CACHE_TTL)
+CACHE_DEFAULT_TIMEOUT = int(os.getenv("CACHE_DEFAULT_TIMEOUT", 300))  # 5 minutes
+
+# Redis distributed lock
+REDIS_LOCK_TIMEOUT = int(os.getenv("REDIS_LOCK_TIMEOUT", 300))  # 5 minutes
+
+# Google API timeouts
+GOOGLE_API_TIMEOUT = int(os.getenv("GOOGLE_API_TIMEOUT", 10))  # 10 seconds
+GOOGLE_OAUTH_TIMEOUT = int(os.getenv("GOOGLE_OAUTH_TIMEOUT", 600))  # 10 minutes
+GOOGLE_API_MAX_RETRIES = int(os.getenv("GOOGLE_API_MAX_RETRIES", 3))
+
+# Circuit Breaker (GCal)
+GCAL_CIRCUIT_BREAKER_FAIL_MAX = int(os.getenv("GCAL_CB_FAIL_MAX", 5))
+GCAL_CIRCUIT_BREAKER_RESET_TIMEOUT = int(os.getenv("GCAL_CB_RESET_TIMEOUT", 60))
+
+# Celery task retry
+CELERY_DEFAULT_RETRY_DELAY = int(os.getenv("CELERY_RETRY_DELAY", 300))  # 5 minutes
+CELERY_CIRCUIT_BREAKER_COUNTDOWN = int(os.getenv("CELERY_CB_COUNTDOWN", 60))  # 1 minute
+
+# ================================================================
+# EXTERNAL PLATFORMS (Issue #446)
+# ================================================================
+FORMAR_PLATFORM_BASE_URL = os.getenv(
+    "FORMAR_PLATFORM_URL",
+    "https://www.aprenderformar.com.br/plataforma"
+)
+
+# ================================================================
 # CORS
 # ================================================================
 CORS_ALLOWED_ORIGINS = os.getenv(

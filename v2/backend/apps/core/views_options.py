@@ -24,6 +24,7 @@ from .serializers import (
 )
 from .serializers.dat_module import DATAreaOptionSerializer, DATCoordenadorOptionSerializer
 from django.core.cache import cache
+from django.conf import settings
 
 
 @api_view(["GET"])
@@ -56,7 +57,7 @@ def municipios_options(request: Request) -> Response:
     data = serializer.data
 
     # Salvar no cache
-    cache.set(cache_key, data, timeout=300)  # 5 min
+    cache.set(cache_key, data, timeout=settings.CACHE_DEFAULT_TIMEOUT)  # 5 min
 
     return Response(data)
 
@@ -103,7 +104,7 @@ def projetos_options(request: Request) -> Response:
     data = serializer.data
 
     # Salvar no cache
-    cache.set(cache_key, data, timeout=300)  # 5 min
+    cache.set(cache_key, data, timeout=settings.CACHE_DEFAULT_TIMEOUT)  # 5 min
 
     return Response(data)
 
@@ -138,7 +139,7 @@ def tipos_evento_options(request: Request) -> Response:
     data = serializer.data
 
     # Salvar no cache
-    cache.set(cache_key, data, timeout=300)  # 5 min
+    cache.set(cache_key, data, timeout=settings.CACHE_DEFAULT_TIMEOUT)  # 5 min
 
     return Response(data)
 
@@ -172,7 +173,7 @@ def usuarios_options(request: Request) -> Response:
     data = serializer.data
 
     # Salvar no cache
-    cache.set(cache_key, data, timeout=300)  # 5 min
+    cache.set(cache_key, data, timeout=settings.CACHE_DEFAULT_TIMEOUT)  # 5 min
 
     return Response(data)
 
@@ -203,7 +204,7 @@ def produtos_options(request: Request) -> Response:
     serializer = ProdutoOptionSerializer(produtos, many=True)
     data = serializer.data
 
-    cache.set(cache_key, data, timeout=300)
+    cache.set(cache_key, data, timeout=settings.CACHE_DEFAULT_TIMEOUT)
     return Response(data)
 
 
@@ -233,7 +234,7 @@ def coordenadores_options(request: Request) -> Response:
     serializer = DATCoordenadorOptionSerializer(coordenadores, many=True)
     data = serializer.data
 
-    cache.set(cache_key, data, timeout=300)
+    cache.set(cache_key, data, timeout=settings.CACHE_DEFAULT_TIMEOUT)
     return Response(data)
 
 
@@ -263,5 +264,5 @@ def areas_options(request: Request) -> Response:
     serializer = DATAreaOptionSerializer(areas, many=True)
     data = serializer.data
 
-    cache.set(cache_key, data, timeout=300)
+    cache.set(cache_key, data, timeout=settings.CACHE_DEFAULT_TIMEOUT)
     return Response(data)

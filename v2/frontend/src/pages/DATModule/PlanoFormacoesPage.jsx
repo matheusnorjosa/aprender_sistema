@@ -553,7 +553,7 @@ export default function PlanoFormacoesPage() {
           <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
-                title="Formacoes 2025"
+                title={`Formações ${new Date().getFullYear()}`}
                 value={stats.total_formacoes}
                 prefix={<CalendarOutlined />}
               />

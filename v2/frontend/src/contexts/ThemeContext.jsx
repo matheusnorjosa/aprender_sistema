@@ -11,6 +11,36 @@ import { theme } from 'antd';
 
 const ThemeContext = createContext();
 
+// ============================================================================
+// Issue #439: Centralized Brand Colors
+// ============================================================================
+export const BRAND_COLORS = {
+  // Primary brand colors
+  primary: '#006B52',
+  primaryDark: '#004B3D',
+  primaryLight: '#E5EDE5',
+
+  // Backgrounds
+  pageBackground: '#f0f2f5',
+  cardBackground: '#ffffff',
+  sidebarBackground: '#006B52',
+
+  // Borders
+  borderLight: 'rgba(255, 255, 255, 0.1)',
+  borderDefault: '#d9d9d9',
+
+  // Status colors (Ant Design tokens)
+  success: '#52c41a',
+  warning: '#faad14',
+  error: '#ff4d4f',
+  info: '#1890ff',
+
+  // Status backgrounds
+  successBg: '#f6ffed',
+  warningBg: '#fffbe6',
+  errorBg: '#fff2f0',
+};
+
 // Cores customizadas para o tema escuro (baseado no design de referência)
 const darkThemeTokens = {
   colorPrimary: '#ea2a33',
@@ -124,6 +154,22 @@ export function useTheme() {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;
+}
+
+/**
+ * Issue #439: Hook to access brand colors with dark mode support.
+ *
+ * Returns BRAND_COLORS with overrides for dark mode backgrounds.
+ */
+export function useBrandColors() {
+  const { isDark } = useTheme();
+  return {
+    ...BRAND_COLORS,
+    // Override for dark mode
+    pageBackground: isDark ? '#141414' : BRAND_COLORS.pageBackground,
+    cardBackground: isDark ? '#1f1f1f' : BRAND_COLORS.cardBackground,
+    sidebarBackground: isDark ? '#141414' : BRAND_COLORS.sidebarBackground,
+  };
 }
 
 export default ThemeContext;

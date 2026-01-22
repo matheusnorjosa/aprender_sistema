@@ -12,6 +12,7 @@ from .oauth_flow import (
     validate_oauth_state,
 )
 from .token_manager import (
+    _get_fernet_key,
     decrypt_token,
     encrypt_token,
     refresh_access_token_safe,

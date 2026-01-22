@@ -26,6 +26,9 @@ Refs:
 from __future__ import annotations
 
 # §7 Epic #459: Re-export from modular services for backward compatibility
+# Import requests at module level for test mocking (tests mock apps.core.services.google_oauth.requests)
+import requests  # noqa: F401
+
 from apps.core.services.oauth.oauth_flow import (
     _is_safe_url,
     build_authorization_url,
@@ -35,6 +38,7 @@ from apps.core.services.oauth.oauth_flow import (
 from apps.core.services.oauth.token_manager import (
     _decrypt_token,
     _encrypt_token,
+    _get_fernet_key,
     decrypt_token,
     encrypt_token,
     refresh_access_token_safe,
@@ -53,8 +57,10 @@ __all__ = [
     "build_authorization_url",
     "exchange_code_for_tokens",
     "validate_oauth_state",
-    # Internal helpers (for backward compatibility)
+    # Internal helpers (for backward compatibility and test mocking)
     "_encrypt_token",
     "_decrypt_token",
+    "_get_fernet_key",
     "_is_safe_url",
+    "requests",  # For test mocking (tests mock apps.core.services.google_oauth.requests)
 ]

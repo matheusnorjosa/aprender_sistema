@@ -7,7 +7,7 @@
  * Agendamentos, formadores, locais e acompanhamento.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Button,
@@ -261,8 +261,11 @@ export default function FormacoesPage() {
     );
   };
 
-  // Table columns - using extracted getColumns from ./Formacoes/columns
-  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete });
+  // Table columns - using extracted getColumns from ./Formacoes/columns (memoized §16 Epic #459)
+  const columns = useMemo(
+    () => getColumns({ onEdit: handleEdit, onDelete: handleDelete }),
+    [handleEdit, handleDelete]
+  );
 
   return (
     <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>

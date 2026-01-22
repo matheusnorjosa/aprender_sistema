@@ -15,6 +15,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
+from apps.core.exceptions import ValidationAPIError
 from apps.core.models import Participation, Solicitacao
 from apps.core.permissions import IsControleOrDAT
 
@@ -64,9 +65,9 @@ def metrics_map(request: Request) -> Response:
     if status_filter:
         valid_statuses = ["pendente", "aprovado", "reprovado"]
         if status_filter not in valid_statuses:
-            return Response(
-                {"detail": f"Status inválido. Valores aceitos: {', '.join(valid_statuses)}"},
-                status=400,
+            raise ValidationAPIError(
+                message=f"Status inválido. Valores aceitos: {', '.join(valid_statuses)}",
+                field="status",
             )
         queryset = queryset.filter(status=status_filter)
         filters_applied["status"] = status_filter
@@ -74,7 +75,10 @@ def metrics_map(request: Request) -> Response:
     projeto_filter = request.query_params.get("projeto_id")
     if projeto_filter:
         if not projeto_filter.isdigit():
-            return Response({"detail": "projeto_id deve ser um ID numérico válido"}, status=400)
+            raise ValidationAPIError(
+                message="projeto_id deve ser um ID numérico válido",
+                field="projeto_id",
+            )
         projeto_id = int(projeto_filter)
         queryset = queryset.filter(projeto_id=projeto_id)
         filters_applied["projeto_id"] = projeto_id
@@ -203,7 +207,10 @@ def metrics_map_coordinators(request: Request) -> Response:
     """
     uf = request.query_params.get("uf")
     if not uf:
-        return Response({"detail": "Parâmetro 'uf' é obrigatório"}, status=400)
+        raise ValidationAPIError(
+            message="Parâmetro 'uf' é obrigatório",
+            field="uf",
+        )
 
     # Buscar participações de coordenadores para o estado especificado
     participations = Participation.objects.filter(

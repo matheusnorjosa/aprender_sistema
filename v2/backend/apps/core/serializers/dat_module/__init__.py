@@ -1,48 +1,55 @@
 """
-AS v2 — DAT Module Serializers
+DAT Module Serializers - §10 Epic #459
 
-§10 Epic #459: Refactored to delegate to modular serializers.
-
-This module re-exports all serializers from serializers/dat_module/ for backward compatibility.
-Original serializers extracted to:
-- serializers/dat_module/dat_area.py (DATAreaSerializer, DATAreaOptionSerializer)
-- serializers/dat_module/dat_coordenador.py (DATCoordenadorSerializer, etc.)
-- serializers/dat_module/dat_acao.py (DATAcaoSerializer, DATAcaoListSerializer)
-- serializers/dat_module/dat_compra.py (DATCompraSerializer, DATCompraListSerializer)
-- serializers/dat_module/dat_cadastro.py (DATCadastroSerializer, DATCadastroListSerializer)
-- serializers/dat_module/dat_formacao.py (DATFormacaoSerializer, etc.)
+Re-exports all DAT serializers for backward compatibility.
+Original monolithic file split into domain-specific modules.
 """
 
-# §10 Epic #459: Re-export from modular serializers for backward compatibility
-from apps.core.serializers.dat_module import (
+from apps.core.serializers.dat_module.dat_acao import (
     DATAcaoListSerializer,
     DATAcaoSerializer,
+)
+from apps.core.serializers.dat_module.dat_area import (
     DATAreaOptionSerializer,
     DATAreaSerializer,
+)
+from apps.core.serializers.dat_module.dat_cadastro import (
     DATCadastroListSerializer,
     DATCadastroSerializer,
+)
+from apps.core.serializers.dat_module.dat_compra import (
     DATCompraListSerializer,
     DATCompraSerializer,
+)
+from apps.core.serializers.dat_module.dat_coordenador import (
     DATCoordenadorListSerializer,
     DATCoordenadorOptionSerializer,
     DATCoordenadorSerializer,
+)
+from apps.core.serializers.dat_module.dat_formacao import (
     DATFormacaoCalendarioSerializer,
     DATFormacaoListSerializer,
     DATFormacaoSerializer,
 )
 
 __all__ = [
+    # DATArea
     "DATAreaSerializer",
     "DATAreaOptionSerializer",
+    # DATCoordenador
     "DATCoordenadorSerializer",
     "DATCoordenadorOptionSerializer",
     "DATCoordenadorListSerializer",
+    # DATAcao
     "DATAcaoSerializer",
     "DATAcaoListSerializer",
+    # DATCompra
     "DATCompraSerializer",
     "DATCompraListSerializer",
+    # DATCadastro
     "DATCadastroSerializer",
     "DATCadastroListSerializer",
+    # DATFormacao
     "DATFormacaoSerializer",
     "DATFormacaoListSerializer",
     "DATFormacaoCalendarioSerializer",

@@ -95,7 +95,7 @@ async function networkFirstWithCache(request) {
     }
 
     return response;
-  } catch (error) {
+  } catch {
     console.log('[SW] Network failed, trying cache:', request.url);
 
     // Try cache
@@ -139,7 +139,7 @@ async function cacheFirstWithNetwork(request) {
     }
 
     return response;
-  } catch (error) {
+  } catch {
     console.log('[SW] Network failed, returning offline page');
 
     // Return offline page for navigation requests

@@ -8,7 +8,7 @@
  * 1.798 registros, 502.771 itens, 307 produtos, 94 municípios
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Button,
@@ -234,8 +234,8 @@ export default function ComprasPage() {
     return <Tag color={statusConfig?.color || 'default'}>{statusConfig?.label || status}</Tag>;
   };
 
-  // Table columns
-  const columns = [
+  // Table columns (memoized §16 Epic #459)
+  const columns = useMemo(() => [
     {
       title: 'Projeto',
       dataIndex: 'projeto_nome',
@@ -399,7 +399,7 @@ export default function ComprasPage() {
         </Space>
       ),
     },
-  ];
+  ], []);
 
   return (
     <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>

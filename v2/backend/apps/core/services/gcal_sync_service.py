@@ -12,7 +12,7 @@ For new code, prefer importing directly from:
 - apps.core.services.gcal.payload (build_*, compute_payload_hash)
 - apps.core.services.gcal.sync (apply_one_solicitacao, upsert_one, etc.)
 """
-# pyright: reportUnusedImport=false
+# pyright: reportUnusedImport=false, reportPrivateUsage=false
 
 from __future__ import annotations
 

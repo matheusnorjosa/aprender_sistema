@@ -219,3 +219,107 @@ REPORTS_COUNTS_EXAMPLE = OpenApiExample(
         }
     }
 )
+
+# ============================================================================
+# SOLICITACAO EXAMPLES (Issue #415)
+# ============================================================================
+
+SOLICITACAO_CREATE_PRESENCIAL_EXAMPLE = OpenApiExample(
+    "Evento Presencial",
+    summary="Criar evento presencial em Fortaleza",
+    value={
+        "titulo": "Formacao Fundamental I",
+        "inicio": "2026-01-20T09:00:00-03:00",
+        "fim": "2026-01-20T12:00:00-03:00",
+        "municipio": 1,
+        "projeto": 1,
+        "tipo_evento": 1,
+        "is_online": False,
+        "observacoes": "Sala 101"
+    },
+    request_only=True,
+)
+
+SOLICITACAO_CREATE_ONLINE_EXAMPLE = OpenApiExample(
+    "Evento Online",
+    summary="Criar evento online com Google Meet",
+    value={
+        "titulo": "Formacao Online - Fluir",
+        "inicio": "2026-01-20T14:00:00-03:00",
+        "fim": "2026-01-20T16:00:00-03:00",
+        "projeto": 2,
+        "tipo_evento": 1,
+        "is_online": True,
+        "observacoes": "Link Google Meet sera gerado automaticamente"
+    },
+    request_only=True,
+)
+
+SOLICITACAO_CREATED_EXAMPLE = OpenApiExample(
+    "Solicitacao Criada",
+    summary="Resposta de solicitacao criada (PA-01: status pendente)",
+    value={
+        "id": 123,
+        "titulo": "Formacao Fundamental I",
+        "status": "pendente",
+        "gcal_status": "NONE",
+        "inicio": "2026-01-20T09:00:00-03:00",
+        "fim": "2026-01-20T12:00:00-03:00",
+        "is_online": False,
+        "usuario": {"id": 1, "nome": "Maria Silva"},
+        "municipio": {"id": 1, "nome": "Fortaleza"},
+        "projeto": {"id": 1, "nome": "Vidas"},
+        "tipo_evento": {"id": 1, "nome": "Formacao"},
+        "created_at": "2026-01-13T10:00:00-03:00"
+    },
+    response_only=True,
+    status_codes=["201"],
+)
+
+SOLICITACAO_APPROVED_EXAMPLE = OpenApiExample(
+    "Solicitacao Aprovada",
+    summary="Resposta de aprovacao (PA-02)",
+    value={
+        "detail": "Solicitacao aprovada com sucesso",
+        "status": "aprovado"
+    },
+    response_only=True,
+    status_codes=["200"],
+)
+
+SOLICITACAO_REJECTED_EXAMPLE = OpenApiExample(
+    "Solicitacao Reprovada",
+    summary="Resposta de reprovacao com motivo",
+    value={
+        "detail": "Solicitacao reprovada",
+        "status": "reprovado",
+        "motivo_reprovacao": "Data indisponivel para o formador"
+    },
+    response_only=True,
+    status_codes=["200"],
+)
+
+SOLICITACAO_BATCH_APPROVE_REQUEST = OpenApiExample(
+    "Aprovar em Lote",
+    summary="Aprovar multiplas solicitacoes",
+    value={
+        "ids": [1, 2, 3, 4, 5]
+    },
+    request_only=True,
+)
+
+SOLICITACAO_BATCH_APPROVE_RESPONSE = OpenApiExample(
+    "Resultado do Lote",
+    summary="Resposta de aprovacao em lote",
+    value={
+        "detail": "3 solicitacoes aprovadas",
+        "approved": 3,
+        "failed": 2,
+        "errors": [
+            {"id": 4, "error": "Solicitacao ja aprovada"},
+            {"id": 5, "error": "Conflito de disponibilidade"}
+        ]
+    },
+    response_only=True,
+    status_codes=["200"],
+)

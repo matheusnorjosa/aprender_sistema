@@ -33,6 +33,7 @@ import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
 import { logout as apiLogout } from './api/auth';
 import { LAYOUT, TIMING } from './constants';
+import { preloadSearchData } from './services/preloadSearchData';
 import './App.css';
 
 // ============================================================================
@@ -131,6 +132,8 @@ function AppContent() {
       const userData = await getMe();
       if (isMountedRef.current) {
         setUser(userData);
+        // Issue #418: Preload search data after successful login
+        preloadSearchData().catch((err) => logger.warn('Search preload failed:', err));
       }
     } catch (error) {
       if (isMountedRef.current) {

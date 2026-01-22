@@ -422,6 +422,14 @@ SPECTACULAR_SETTINGS = {
         {"name": "options", "description": "Opções para formulários"},
         {"name": "admin", "description": "Administração de entidades"},
     ],
+    # Swagger UI settings (Issue #415)
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+        "displayOperationId": True,
+        "filter": True,
+        "tryItOutEnabled": True,
+    },
 }
 
 # Relax throttling in development

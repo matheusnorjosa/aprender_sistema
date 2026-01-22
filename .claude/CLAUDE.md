@@ -597,24 +597,27 @@ make test-e2e
 
 #### §10. Backend: Dividir serializers/dat_module.py
 
-**Arquivo**: `v2/backend/apps/core/serializers/dat_module.py` (~557 linhas)
+**Arquivo**: `v2/backend/apps/core/serializers/dat_module.py` (~558 linhas)
 
 **Problema**: 16+ serializers em um arquivo.
 
-**Solução**:
+**Solução** (implementada):
 - Criar `serializers/dat_module/` diretório
-- Separar: `dat_registro.py`, `dat_acao.py`, `dat_compra.py`, `plano_formacoes.py`
+- Separar por modelo: `dat_area.py`, `dat_coordenador.py`, `dat_acao.py`, `dat_compra.py`, `dat_cadastro.py`, `dat_formacao.py`
 - `__init__.py` re-exporta para manter imports
+- `dat_module.py` mantido como thin wrapper para backward compatibility
 
 **Arquivos Criados**:
 - `v2/backend/apps/core/serializers/dat_module/__init__.py`
-- `v2/backend/apps/core/serializers/dat_module/dat_registro.py`
+- `v2/backend/apps/core/serializers/dat_module/dat_area.py`
+- `v2/backend/apps/core/serializers/dat_module/dat_coordenador.py`
 - `v2/backend/apps/core/serializers/dat_module/dat_acao.py`
 - `v2/backend/apps/core/serializers/dat_module/dat_compra.py`
-- `v2/backend/apps/core/serializers/dat_module/plano_formacoes.py`
+- `v2/backend/apps/core/serializers/dat_module/dat_cadastro.py`
+- `v2/backend/apps/core/serializers/dat_module/dat_formacao.py`
 
-**Arquivos Removidos**:
-- `v2/backend/apps/core/serializers/dat_module.py`
+**Arquivos Modificados**:
+- `v2/backend/apps/core/serializers/dat_module.py` (thin re-export wrapper)
 
 ---
 

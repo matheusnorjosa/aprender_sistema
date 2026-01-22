@@ -82,7 +82,7 @@ def parse_deslocamentos(filepath: Path) -> list[dict[str, Any]]:
             if data_aware.tzinfo is None:
                 data_aware = tz.localize(data_aware)
 
-        except Exception as e:
+        except Exception:
             continue
 
         # Extrair pessoas (colunas 5-10)

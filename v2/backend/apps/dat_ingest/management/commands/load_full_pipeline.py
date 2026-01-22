@@ -16,8 +16,6 @@ from apps.core.models import Municipio, Projeto, TipoEvento, Usuario
 from apps.dat_ingest.models import StgMunicipio, StgProjeto, StgTipoEvento, StgUsuario
 from apps.dat_ingest.services.loaders import (
     extract_tipos_evento_from_agenda,
-    parse_municipios,
-    parse_projetos,
     parse_usuarios,
 )
 
@@ -226,7 +224,7 @@ class Command(BaseCommand):
                 continue
 
             # Extract unique valores
-            for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            for _, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
                 if not row or len(row) <= mun_col_idx:
                     continue
 
@@ -279,7 +277,7 @@ class Command(BaseCommand):
             nome = stg.nome.strip()
             uf = (stg.uf or "").strip().upper()
 
-            obj, created = Municipio.objects.update_or_create(
+            _, created = Municipio.objects.update_or_create(
                 nome__iexact=nome,
                 uf__iexact=uf,
                 defaults={

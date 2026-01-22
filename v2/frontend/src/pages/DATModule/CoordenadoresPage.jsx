@@ -7,7 +7,7 @@
  * Alocação por área, projetos e municípios, visualização de carga de trabalho.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Button,
@@ -201,20 +201,21 @@ export default function CoordenadoresPage() {
     setModalVisible(true);
   };
 
-  const handleEdit = (record) => {
+  // Memoized handlers (§2 Epic #459)
+  const handleEdit = useCallback((record) => {
     setEditingCoordenador(record);
     form.setFieldsValue({
       ...record,
       data_admissao: record.data_admissao ? dayjs(record.data_admissao) : null,
     });
     setModalVisible(true);
-  };
+  }, [form]);
 
-  const handleView = async (record) => {
+  const handleView = useCallback(async (record) => {
     setViewingCoordenador(record);
     setDetailModalVisible(true);
     await loadAlocacoes(record.id);
-  };
+  }, []);
 
   const handleSave = async (values) => {
     try {
@@ -238,7 +239,7 @@ export default function CoordenadoresPage() {
     }
   };
 
-  const handleDelete = (record) => {
+  const handleDelete = useCallback((record) => {
     Modal.confirm({
       title: 'Confirmar exclusão',
       content: (
@@ -264,9 +265,9 @@ export default function CoordenadoresPage() {
         }
       },
     });
-  };
+  }, [fetchData, pagination.current]);
 
-  const handleToggleAtivo = async (record) => {
+  const handleToggleAtivo = useCallback(async (record) => {
     try {
       await updateCoordenadorDAT(record.id, { ativo: !record.ativo });
       message.success(`Coordenador ${record.ativo ? 'desativado' : 'ativado'}`);
@@ -274,19 +275,26 @@ export default function CoordenadoresPage() {
     } catch (error) {
       message.error(`Erro: ${error.message}`);
     }
-  };
+  }, [fetchData, pagination.current]);
 
   // Issue #303: Helper functions extracted to ./Coordenadores/helpers.js
-  // Group coordenadores by area using extracted helper
-  const coordenadoresByArea = groupByArea(coordenadores);
+  // Group coordenadores by area using extracted helper - memoized (§2 Epic #459)
+  const coordenadoresByArea = useMemo(
+    () => groupByArea(coordenadores),
+    [coordenadores]
+  );
 
   // Issue #303: Column definitions extracted to ./Coordenadores/columns.jsx
-  const columns = getColumns({
-    onView: handleView,
-    onEdit: handleEdit,
-    onDelete: handleDelete,
-    onToggleAtivo: handleToggleAtivo,
-  });
+  // Memoized to prevent re-renders (§2 Epic #459)
+  const columns = useMemo(
+    () => getColumns({
+      onView: handleView,
+      onEdit: handleEdit,
+      onDelete: handleDelete,
+      onToggleAtivo: handleToggleAtivo,
+    }),
+    [handleView, handleEdit, handleDelete, handleToggleAtivo]
+  );
 
   // Card view renderer
   const renderCardView = () => (

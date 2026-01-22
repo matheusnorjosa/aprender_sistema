@@ -401,13 +401,11 @@ def extract_tipos_evento_from_agenda(filepath: Path) -> list[dict[str, Any]]:
         ws = wb[sheet_name]
 
         # Procura header "Tipo de Evento" ou "Tipo"
-        header_row = None
         tipo_col_idx = None
 
         for row in ws.iter_rows(min_row=1, max_row=5, values_only=True):
             for idx, cell in enumerate(row):
                 if cell and "tipo" in str(cell).lower():
-                    header_row = row
                     tipo_col_idx = idx
                     break
             if tipo_col_idx is not None:

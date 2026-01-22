@@ -72,12 +72,16 @@ class ValidationAPIError(APIError):
         message: str | None = None,
         field: str | None = None,
         details: dict[str, Any] | None = None,
+        code: str | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> None:
         extra_details = {"field": field} if field else {}
         if details:
             extra_details.update(details)
+        if extra:
+            extra_details.update(extra)
         super().__init__(
-            code=self.default_code,
+            code=code or self.default_code,
             message=message or self.default_detail,
             details=extra_details,
         )

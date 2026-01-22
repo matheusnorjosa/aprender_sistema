@@ -61,6 +61,7 @@ import { getStatusSummary } from '../../api/gcal';
 import { MeetLink } from '../../components/MeetLink';
 import { getMe } from '../../api/availability';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
+import useGoogleGuard from '../../hooks/useGoogleGuard';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
 import logger from '../../utils/logger';
 import { ensureCsrfToken } from '../../api/config';
@@ -96,6 +97,12 @@ export default function PreAgendaPage() {
   // OAuth Phase 5: Estado do usuário e integração Google
   const [user, setUser] = useState(null);
   const { status: googleStatus, loading: _googleLoading, fetchStatus: _fetchStatus, disconnect: googleDisconnect } = useGoogleIntegration();
+
+  // §4 Epic #459: Consolidated Google OAuth guard
+  const { requireGoogleConnection, handleGoogleError } = useGoogleGuard({
+    googleStatus,
+    returnTo: '/pre-agenda',
+  });
 
   // Carregar dados do usuário
   useEffect(() => {
@@ -156,24 +163,8 @@ export default function PreAgendaPage() {
   }, []);
 
   const handlePublish = useCallback((id) => {
-    // OAuth Phase 5: Guarda - verificar conexão Google
-    if (googleStatus && !googleStatus.connected) {
-      Modal.confirm({
-        title: 'Conectar conta Google',
-        content: (
-          <div>
-            <p>Para publicar eventos no Google Calendar, você precisa conectar sua conta corporativa do Google.</p>
-          </div>
-        ),
-        okText: 'Conectar agora',
-        okType: 'primary',
-        cancelText: 'Cancelar',
-        onOk: () => {
-          window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
-        },
-      });
-      return;
-    }
+    // §4 Epic #459: Use consolidated Google guard
+    if (!requireGoogleConnection('publicar eventos')) return;
 
     Modal.confirm({
       title: 'Confirmar Publicação',
@@ -187,49 +178,17 @@ export default function PreAgendaPage() {
           message.success('Evento publicado com sucesso!');
           loadData();
         } catch (error) {
-          // OAuth Phase 5: Tratar erro 403 com code='google_not_connected'
-          if (error.response?.data?.code === 'google_not_connected') {
-            Modal.confirm({
-              title: 'Conectar conta Google',
-              content: (
-                <div>
-                  <p>{error.response?.data?.detail || 'Conecte sua conta Google para publicar eventos.'}</p>
-                </div>
-              ),
-              okText: 'Conectar agora',
-              okType: 'primary',
-              cancelText: 'Cancelar',
-              onOk: () => {
-                window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
-              },
-            });
-          } else {
-            message.error('Erro ao publicar: ' + error.message);
-          }
+          // §4 Epic #459: Use consolidated error handler
+          if (handleGoogleError(error)) return;
+          message.error('Erro ao publicar: ' + error.message);
         }
       },
     });
-  }, [googleStatus, loadData]);
+  }, [requireGoogleConnection, handleGoogleError, loadData]);
 
   const handleResync = useCallback((id) => {
-    // OAuth Phase 5: Guarda - verificar conexão Google
-    if (googleStatus && !googleStatus.connected) {
-      Modal.confirm({
-        title: 'Conectar conta Google',
-        content: (
-          <div>
-            <p>Para reenviar eventos no Google Calendar, você precisa conectar sua conta corporativa do Google.</p>
-          </div>
-        ),
-        okText: 'Conectar agora',
-        okType: 'primary',
-        cancelText: 'Cancelar',
-        onOk: () => {
-          window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
-        },
-      });
-      return;
-    }
+    // §4 Epic #459: Use consolidated Google guard
+    if (!requireGoogleConnection('reenviar eventos')) return;
 
     Modal.confirm({
       title: 'Confirmar Reenvio',
@@ -251,29 +210,13 @@ export default function PreAgendaPage() {
           message.success('Reenvio solicitado! O evento será atualizado em instantes.');
           loadData();
         } catch (error) {
-          // OAuth Phase 5: Tratar erro 403 com code='google_not_connected'
-          if (error.response?.data?.code === 'google_not_connected') {
-            Modal.confirm({
-              title: 'Conectar conta Google',
-              content: (
-                <div>
-                  <p>{error.response?.data?.detail || 'Conecte sua conta Google para reenviar eventos.'}</p>
-                </div>
-              ),
-              okText: 'Conectar agora',
-              okType: 'primary',
-              cancelText: 'Cancelar',
-              onOk: () => {
-                window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
-              },
-            });
-          } else {
-            message.error('Erro ao reenviar: ' + error.message);
-          }
+          // §4 Epic #459: Use consolidated error handler
+          if (handleGoogleError(error)) return;
+          message.error('Erro ao reenviar: ' + error.message);
         }
       },
     });
-  }, [googleStatus, loadData]);
+  }, [requireGoogleConnection, handleGoogleError, loadData]);
 
   const handleCancel = useCallback((id) => {
     Modal.confirm({
@@ -304,24 +247,8 @@ export default function PreAgendaPage() {
 
   // Issue #95: Batch Reapply
   const handleBatchReapply = () => {
-    // OAuth Phase 5: Guarda - verificar conexão Google
-    if (googleStatus && !googleStatus.connected) {
-      Modal.confirm({
-        title: 'Conectar conta Google',
-        content: (
-          <div>
-            <p>Para realizar ações em massa no Google Calendar, você precisa conectar sua conta corporativa do Google.</p>
-          </div>
-        ),
-        okText: 'Conectar agora',
-        okType: 'primary',
-        cancelText: 'Cancelar',
-        onOk: () => {
-          window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
-        },
-      });
-      return;
-    }
+    // §4 Epic #459: Use consolidated Google guard
+    if (!requireGoogleConnection('realizar ações em massa')) return;
 
     if (selectedRowKeys.length === 0) {
       message.warning('Selecione ao menos um evento para reaplica');
@@ -362,21 +289,9 @@ export default function PreAgendaPage() {
 
           const data = await response.json();
 
+          // §4 Epic #459: Handle Google not connected error
           if (response.status === 403 && data.code === 'google_not_connected') {
-            Modal.confirm({
-              title: 'Conectar conta Google',
-              content: (
-                <div>
-                  <p>{data.detail || 'Conecte sua conta Google para realizar ações em massa.'}</p>
-                </div>
-              ),
-              okText: 'Conectar agora',
-              okType: 'primary',
-              cancelText: 'Cancelar',
-              onOk: () => {
-                window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
-              },
-            });
+            handleGoogleError({ response: { status: 403, data } });
             return;
           }
 
@@ -401,24 +316,8 @@ export default function PreAgendaPage() {
 
   // Issue #95: Batch Resync
   const handleBatchResync = () => {
-    // OAuth Phase 5: Guarda - verificar conexão Google
-    if (googleStatus && !googleStatus.connected) {
-      Modal.confirm({
-        title: 'Conectar conta Google',
-        content: (
-          <div>
-            <p>Para realizar ações em massa no Google Calendar, você precisa conectar sua conta corporativa do Google.</p>
-          </div>
-        ),
-        okText: 'Conectar agora',
-        okType: 'primary',
-        cancelText: 'Cancelar',
-        onOk: () => {
-          window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
-        },
-      });
-      return;
-    }
+    // §4 Epic #459: Use consolidated Google guard
+    if (!requireGoogleConnection('realizar ações em massa')) return;
 
     if (selectedRowKeys.length === 0) {
       message.warning('Selecione ao menos um evento para resync');
@@ -459,21 +358,9 @@ export default function PreAgendaPage() {
 
           const data = await response.json();
 
+          // §4 Epic #459: Handle Google not connected error
           if (response.status === 403 && data.code === 'google_not_connected') {
-            Modal.confirm({
-              title: 'Conectar conta Google',
-              content: (
-                <div>
-                  <p>{data.detail || 'Conecte sua conta Google para realizar ações em massa.'}</p>
-                </div>
-              ),
-              okText: 'Conectar agora',
-              okType: 'primary',
-              cancelText: 'Cancelar',
-              onOk: () => {
-                window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
-              },
-            });
+            handleGoogleError({ response: { status: 403, data } });
             return;
           }
 

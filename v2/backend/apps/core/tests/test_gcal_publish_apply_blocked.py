@@ -142,8 +142,9 @@ class TestPublishApplyBlocked:
             f"Publicação real deve ser bloqueada. Got {response.status_code}: {response.data}"
 
         assert "bloqueada" in response.data.get("detail", "").lower()
-        assert response.data.get("features_apply_blocked") is True
-        assert response.data.get("dry_run_allowed") is True
+        # §1 Epic #459: standardized error format puts details in 'errors' key
+        assert response.data.get("errors", {}).get("features_apply_blocked") is True
+        assert response.data.get("errors", {}).get("dry_run_allowed") is True
 
         # Task NÃO deve ter sido disparada
         assert not mock_task.called, "Task não deve ser chamada quando bloqueado"

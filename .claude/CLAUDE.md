@@ -377,13 +377,13 @@ make test-e2e
 | §7 | Separar google_oauth.py | ✅ DONE | 672→54 linhas (+oauth/) |
 | §8 | Mover lógica tasks.py | ⏭️ SKIP | Já delega para services |
 | §9 | Fatiar views_metrics.py | ✅ DONE | 592→30 linhas (+views/metrics/) |
-| §10 | Dividir serializers/dat_module | 🔄 TODO | MEDIUM |
+| §10 | Dividir serializers/dat_module | ✅ DONE | 558→6 módulos (+dat_module/) |
 | §11 | Mixin/factory permissões | ⏭️ SKIP | Padrão claro, lógica complexa variada |
-| §12 | Padronizar error handling | 🔄 TODO | MEDIUM |
-| §13 | N+1 availability_service | 🔄 TODO | MEDIUM |
+| §12 | Padronizar error handling | ✅ DONE | Response→ValidationAPIError |
+| §13 | N+1 availability_service | ⏭️ SKIP | Sem N+1 (só campos diretos) |
 | §14 | constants/styles.js | ✅ DONE | Estilos centralizados |
 | §15 | (coberto por §4) | ✅ DONE | - |
-| §16-18 | Otimizações leves | 🔄 TODO | LOW |
+| §16-18 | Otimizações leves | ✅ DONE | useMemo em 4 páginas |
 
 ### Regras Gerais
 

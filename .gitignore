@@ -465,6 +465,8 @@ creds/
 *api-key*
 *secret*
 *token*
+# Exception for code files
+!**/token_manager.py
 
 # Data directories
 data/private/

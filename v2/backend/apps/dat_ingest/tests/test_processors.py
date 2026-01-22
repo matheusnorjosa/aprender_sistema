@@ -6,9 +6,7 @@ Valida processadores de planilhas (AgendaProcessor, DisponibilidadeProcessor, Co
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import tempfile
 from datetime import date, datetime, time
-from pathlib import Path
 
 import pandas as pd
 import pytest

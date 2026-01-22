@@ -19,8 +19,6 @@ Test patterns:
 from __future__ import annotations
 import csv
 from io import StringIO
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import Group

@@ -8,8 +8,6 @@ Valida funções de normalização de dados (services/normalizers.py).
 from __future__ import annotations
 import datetime
 
-import pytest
-
 from apps.dat_ingest.services.normalizers import (
     generate_cpf_from_email,
     make_iso_datetime,

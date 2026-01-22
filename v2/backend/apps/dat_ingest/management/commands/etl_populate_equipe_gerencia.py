@@ -17,11 +17,9 @@ Idempotence:
 
 from __future__ import annotations
 
-from collections import defaultdict
 from typing import Any
 
 from django.core.management.base import BaseCommand
-from django.db import transaction
 from django.db.models import Count
 
 from apps.core.models import (
@@ -279,7 +277,7 @@ class Command(BaseCommand):
 
         # APPLY mode
         try:
-            obj, created = EquipeGerencia.objects.get_or_create(
+            _, created = EquipeGerencia.objects.get_or_create(
                 gerencia=gerencia,
                 usuario=usuario,
                 papel=papel,

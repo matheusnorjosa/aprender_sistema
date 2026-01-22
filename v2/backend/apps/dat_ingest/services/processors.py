@@ -13,9 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from openpyxl import load_workbook
 
-from .loaders import parse_usuarios, parse_municipios, parse_projetos
 from .parse_acompanhamento import parse_todas_abas_acompanhamento
 from .parse_bloqueios import parse_bloqueios
 from .parse_deslocamentos import parse_deslocamentos
@@ -156,9 +154,8 @@ class AgendaProcessor:
                 return match.iloc[0]["email"]
 
         # Tentativa 2: Match fuzzy por nome (case-insensitive, partial)
-        for idx, row in self.users_df.iterrows():
+        for _, row in self.users_df.iterrows():
             nome = str(row.get("nome", "")).lower()
-            email = str(row.get("email", "")).lower()
 
             # Match partial name
             if nome and raw_lower in nome:

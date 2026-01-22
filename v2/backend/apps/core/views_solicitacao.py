@@ -13,7 +13,12 @@ from typing import Any
 from django.db.models import QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiParameter,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
@@ -21,7 +26,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .api_schemas import COMMON_ERROR_RESPONSES
+from .api_schemas import (
+    COMMON_ERROR_RESPONSES,
+    SOLICITACAO_BATCH_APPROVE_REQUEST,
+    SOLICITACAO_BATCH_APPROVE_RESPONSE,
+    SOLICITACAO_CREATE_ONLINE_EXAMPLE,
+    SOLICITACAO_CREATE_PRESENCIAL_EXAMPLE,
+    SOLICITACAO_CREATED_EXAMPLE,
+)
 from .models import AuditLog, Solicitacao
 from .permissions import (
     IsControleOrSuper,
@@ -78,9 +90,28 @@ def _get_client_ip(request: Request) -> str:
     ),
     create=extend_schema(
         summary="Criar solicitação",
-        description="Cria nova solicitação de evento. Status inicial: pendente (PA-01). Requer permissão de Coordenador ou DAT.",
+        description="""Cria nova solicitação de evento.
+
+## Fluxo
+1. Frontend envia dados do wizard (4 steps)
+2. Backend valida disponibilidade (RD-01~08)
+3. Status inicial: `pendente` (SUPER) ou `aprovado` (NAO_SUPER) conforme PA-01
+
+## Exemplo curl
+```bash
+curl -X POST /api/v1/solicitacoes/ \\
+  -H "Content-Type: application/json" \\
+  -H "X-CSRFToken: $CSRF" \\
+  -d '{"titulo": "Formacao", "inicio": "2026-01-20T09:00:00-03:00", ...}'
+```
+""",
         request=SolicitacaoSerializer,
         responses={201: SolicitacaoSerializer, **COMMON_ERROR_RESPONSES},
+        examples=[
+            SOLICITACAO_CREATE_PRESENCIAL_EXAMPLE,
+            SOLICITACAO_CREATE_ONLINE_EXAMPLE,
+            SOLICITACAO_CREATED_EXAMPLE,
+        ],
         tags=["solicitacoes"],
     ),
     update=extend_schema(
@@ -748,6 +779,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             status=status.HTTP_202_ACCEPTED,
         )
 
+    @extend_schema(
+        summary="Aprovar em lote",
+        description="Aprova múltiplas solicitações em lote (PA-05). Máx 100 por requisição.",
+        request={"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}}}},
+        responses={200: {"type": "object", "properties": {"approved": {"type": "integer"}, "errors": {"type": "array"}}}},
+        examples=[SOLICITACAO_BATCH_APPROVE_REQUEST, SOLICITACAO_BATCH_APPROVE_RESPONSE],
+        tags=["solicitacoes"],
+    )
     @action(
         detail=False,
         methods=["post"],

@@ -1,39 +1,54 @@
 """
 Solicitacao ViewSet (views ativas)
+
+§1 Epic #459: Refactored to use service layer for approval/publish operations.
 """
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportFunctionMemberAccess=false
 
 from __future__ import annotations
+
+import logging
 from typing import Any
+
 from django.db.models import QuerySet
+from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-import logging
-
-from rest_framework import status, viewsets
-from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
-from drf_spectacular.types import OpenApiTypes
-
-from django.utils import timezone
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import OrderingFilter, SearchFilter
-
-from .models import Solicitacao, AuditLog
-from .permissions import IsCoordenadorOrDAT, IsOwnerOrPrivileged, IsSuperintendencia, IsControleOrSuper, IsGerenteSuperintendencia
-from .serializers import SolicitacaoSerializer
 from .api_schemas import COMMON_ERROR_RESPONSES
+from .models import AuditLog, Solicitacao
+from .permissions import (
+    IsControleOrSuper,
+    IsCoordenadorOrDAT,
+    IsGerenteSuperintendencia,
+    IsOwnerOrPrivileged,
+    IsSuperintendencia,
+)
+from .serializers import SolicitacaoSerializer
+from .services.solicitacao_approval import (
+    approve_solicitacao,
+    batch_approve_solicitacoes,
+    batch_reject_solicitacoes,
+    reject_solicitacao,
+)
+from .services.solicitacao_publish import (
+    cancel_from_gcal,
+    preview_gcal as preview_gcal_service,
+    publish_to_gcal,
+    resync_to_gcal,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def _get_client_ip(request: Request) -> Response:
-    """
-    Extrai o IP real do cliente, considerando proxies reversos.
-    """
+def _get_client_ip(request: Request) -> str:
+    """Extract real client IP considering reverse proxies."""
     x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if x_forwarded_for:
         return x_forwarded_for.split(",")[0].strip()
@@ -560,56 +575,20 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     def approve(self, request, pk=None):
         """Aprovar solicitação (PA-02 Adaptada: Superintendência, DAT e Superusuários)."""
         solicitacao = self.get_object()
-
-        if solicitacao.status == "aprovado":
-            return Response(
-                {"detail": "Solicitação já está aprovada."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # PR15: Accept 'reason' as alias for 'justificativa'
         justificativa = request.data.get("reason") or request.data.get("justificativa", "")
 
-        # Capturar status anterior
-        prev_status = solicitacao.status
-
-        solicitacao.status = "aprovado"
-        solicitacao.save()
-
-        client_ip = _get_client_ip(request)
-
-        # Persistir AuditLog
-        AuditLog.objects.create(
-            usuario=request.user,
-            action="APPROVE",
-            model_name="Solicitacao",
-            details={
-                "solicitacao_id": solicitacao.id,
-                "prev_status": prev_status,
-                "new_status": solicitacao.status,
-                "ip_address": client_ip,
-            },
-        )
-
-        logger.info(
-            "solicitacao_approved",
-            extra={
-                "event": "solicitacao_approved",
-                "user_id": request.user.id,
-                "username": request.user.username,
-                "solicitation_id": solicitacao.id,
-                "action": "approve",
-                "ip_address": client_ip,
-                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-                "justificativa": justificativa,
-                "timestamp": timezone.now().isoformat(),
-            },
+        # §1 Epic #459: Delegate to service layer
+        result = approve_solicitacao(
+            solicitacao=solicitacao,
+            user=request.user,
+            request=request,
+            justificativa=justificativa,
         )
 
         return Response(
             {
-                "detail": "Solicitação aprovada com sucesso.",
-                "solicitacao": SolicitacaoSerializer(solicitacao).data,
+                "detail": result.message,
+                "solicitacao": SolicitacaoSerializer(result.solicitacao).data,
             },
             status=status.HTTP_200_OK,
         )
@@ -634,57 +613,20 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     def reject(self, request, pk=None):
         """Reprovar solicitação (PA-02 Adaptada: Superintendência, DAT e Superusuários)."""
         solicitacao = self.get_object()
-
-        # PR15: Accept 'reason' as alias for 'justificativa'
         justificativa = request.data.get("reason") or request.data.get("justificativa", "")
 
-        if solicitacao.status == "reprovado":
-            return Response(
-                {"detail": "Solicitação já está reprovada."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Capturar status anterior
-        prev_status = solicitacao.status
-
-        solicitacao.status = "reprovado"
-        solicitacao.save()
-
-        client_ip = _get_client_ip(request)
-
-        # Persistir AuditLog
-        AuditLog.objects.create(
-            usuario=request.user,
-            action="REJECT",
-            model_name="Solicitacao",
-            details={
-                "solicitacao_id": solicitacao.id,
-                "prev_status": prev_status,
-                "new_status": solicitacao.status,
-                "justificativa": justificativa,
-                "ip_address": client_ip,
-            },
-        )
-
-        logger.info(
-            "solicitacao_rejected",
-            extra={
-                "event": "solicitacao_rejected",
-                "user_id": request.user.id,
-                "username": request.user.username,
-                "solicitation_id": solicitacao.id,
-                "action": "reject",
-                "ip_address": client_ip,
-                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-                "justificativa": justificativa,
-                "timestamp": timezone.now().isoformat(),
-            },
+        # §1 Epic #459: Delegate to service layer
+        result = reject_solicitacao(
+            solicitacao=solicitacao,
+            user=request.user,
+            request=request,
+            justificativa=justificativa,
         )
 
         return Response(
             {
-                "detail": "Solicitação reprovada.",
-                "solicitacao": SolicitacaoSerializer(solicitacao).data,
+                "detail": result.message,
+                "solicitacao": SolicitacaoSerializer(result.solicitacao).data,
             },
             status=status.HTTP_200_OK,
         )
@@ -697,46 +639,19 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     )
     def preview_gcal(self, request, pk=None):
         """Preview do payload GCal sem publicar (Controle ou Superintendência)."""
-        from apps.core.services.gcal_sync_service import build_preview_for_solicitacao
-        from apps.core.models import AuditLog
-
         solicitacao = self.get_object()
 
-        # Gerar preview
-        preview = build_preview_for_solicitacao(solicitacao)
-
-        # AuditLog (PR14: incluir payload_hash)
-        client_ip = _get_client_ip(request)
-        AuditLog.objects.create(
-            usuario=request.user,
-            action="PREVIEW_GCAL",
-            model_name="Solicitacao",
-            details={
-                "solicitacao_id": solicitacao.id,
-                "event_id": preview["event_id"],
-                "summary": preview["payload"].get("summary", ""),
-                "payload_hash": preview.get("payload_hash", ""),
-                "ip_address": client_ip,
-            },
-        )
-
-        logger.info(
-            "preview_gcal",
-            extra={
-                "event": "preview_gcal",
-                "user_id": request.user.id,
-                "username": request.user.username,
-                "solicitacao_id": solicitacao.id,
-                "event_id": preview["event_id"],
-                "ip_address": client_ip,
-                "timestamp": timezone.now().isoformat(),
-            },
+        # §1 Epic #459: Delegate to service layer
+        result = preview_gcal_service(
+            solicitacao=solicitacao,
+            user=request.user,
+            request=request,
         )
 
         return Response(
             {
-                "detail": "Preview gerado com sucesso.",
-                "preview": preview,
+                "detail": result.message,
+                "preview": result.preview,
             },
             status=status.HTTP_200_OK,
         )
@@ -749,117 +664,24 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     )
     def publish(self, request, pk=None):
         """Publica solicitação no Google Calendar via Celery (Controle ou Superintendência)."""
-        from django.conf import settings
-        from apps.core.tasks import task_publish_solicitacao_to_gcal
-        from apps.core.models import AuditLog, GoogleOAuthCredential
-
-        # OAuth Phase 4: Verificar credencial Google em modo OAuth
-        auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
-        operator_user_id = None
-
-        if auth_mode == "oauth":
-            try:
-                GoogleOAuthCredential.objects.get(user=request.user)
-                operator_user_id = request.user.id
-            except GoogleOAuthCredential.DoesNotExist:
-                return Response(
-                    {
-                        "detail": "Conecte sua conta Google",
-                        "code": "google_not_connected"
-                    },
-                    status=status.HTTP_403_FORBIDDEN
-                )
-
         solicitacao = self.get_object()
-
-        # Verificar se já está aprovada
-        if solicitacao.status != "aprovado":
-            return Response(
-                {"detail": "Apenas solicitações aprovadas podem ser publicadas no Google Calendar."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Parâmetros opcionais
         dry_run = request.data.get("dry_run", False)
         apply_blocked = request.data.get("apply_blocked", False)
 
-        # Verificar se apply está bloqueado (GCAL_CLIENT != "google")
-        gcal_client = getattr(settings, "GCAL_CLIENT", None)
-        features_apply_blocked = gcal_client != "google"
-
-        # RF05/PA-03: Bloquear apenas chamadas reais (dry_run=False) quando apply_blocked
-        # dry_run deve sempre funcionar, independente de GCAL_CLIENT
-        if features_apply_blocked and not apply_blocked and not dry_run:
-            return Response(
-                {
-                    "detail": "Publicação bloqueada: GCAL_CLIENT não está configurado como 'google'.",
-                    "hint": "Para forçar publicação em modo de teste, envie apply_blocked=true no corpo da requisição.",
-                    "features_apply_blocked": True,
-                    "dry_run_allowed": True,
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
-
-        # PR14: Marcar como PENDING antes de enfileirar (se não for dry-run)
-        if not dry_run:
-            solicitacao.mark_gcal(
-                status=Solicitacao.GCalStatus.PENDING,
-                payload_hash=None,
-                error=""
-            )
-
-        # Disparar task Celery (assíncrona)
-        # OAuth Phase 3: Passar operator_user_id APENAS em modo OAuth
-        if auth_mode == "oauth":
-            task = task_publish_solicitacao_to_gcal.delay(
-                solicitacao.id,
-                dry_run=dry_run,
-                apply_blocked=apply_blocked,
-                operator_user_id=operator_user_id
-            )
-        else:
-            # Service account mode: não passar operator_user_id (mantém assinatura antiga)
-            task = task_publish_solicitacao_to_gcal.delay(
-                solicitacao.id,
-                dry_run=dry_run,
-                apply_blocked=apply_blocked
-            )
-
-        # AuditLog
-        client_ip = _get_client_ip(request)
-        AuditLog.objects.create(
-            usuario=request.user,
-            action="PUBLISH_GCAL_REQUESTED",
-            model_name="Solicitacao",
-            details={
-                "solicitacao_id": solicitacao.id,
-                "task_id": task.id,
-                "dry_run": dry_run,
-                "apply_blocked": apply_blocked,
-                "ip_address": client_ip,
-            },
-        )
-
-        logger.info(
-            "publish_gcal_requested",
-            extra={
-                "event": "publish_gcal_requested",
-                "user_id": request.user.id,
-                "username": request.user.username,
-                "solicitacao_id": solicitacao.id,
-                "task_id": task.id,
-                "dry_run": dry_run,
-                "apply_blocked": apply_blocked,
-                "ip_address": client_ip,
-                "timestamp": timezone.now().isoformat(),
-            },
+        # §1 Epic #459: Delegate to service layer
+        result = publish_to_gcal(
+            solicitacao=solicitacao,
+            user=request.user,
+            request=request,
+            dry_run=dry_run,
+            apply_blocked=apply_blocked,
         )
 
         return Response(
             {
-                "detail": "Publicação solicitada com sucesso (processando em background).",
-                "task_id": task.id,
-                "solicitacao_id": solicitacao.id,
+                "detail": result.message,
+                "task_id": result.task_id,
+                "solicitacao_id": result.solicitacao_id,
             },
             status=status.HTTP_202_ACCEPTED,
         )
@@ -874,97 +696,23 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         Republicar solicitação no Google Calendar (força UPDATE) - Fase 4.
 
-        Reseta gcal_payload_hash para forçar UPDATE mesmo se já publicado.
-        Enfileira task_publish_solicitacao_to_gcal para republicação.
-
         Permissão: Controle ou Superintendência
         Returns: 202 Accepted (processamento assíncrono)
         """
-        from django.conf import settings
-        from apps.core.tasks import task_publish_solicitacao_to_gcal
-        from apps.core.models import AuditLog, GoogleOAuthCredential
-
-        # OAuth Phase 4: Verificar credencial Google em modo OAuth
-        auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
-        operator_user_id = None
-
-        if auth_mode == "oauth":
-            try:
-                GoogleOAuthCredential.objects.get(user=request.user)
-                operator_user_id = request.user.id
-            except GoogleOAuthCredential.DoesNotExist:
-                return Response(
-                    {
-                        "detail": "Conecte sua conta Google",
-                        "code": "google_not_connected"
-                    },
-                    status=status.HTTP_403_FORBIDDEN
-                )
-
         solicitacao = self.get_object()
 
-        # Validar status aprovado
-        if solicitacao.status != "aprovado":
-            return Response(
-                {"detail": "Apenas solicitações aprovadas podem ser resincronizadas."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Marcar como PENDING (será republicado)
-        solicitacao.mark_gcal(
-            status=Solicitacao.GCalStatus.PENDING,
-            payload_hash=None,  # Resetar hash para forçar UPDATE
-            error=""
-        )
-
-        # Enfileirar task de publicação (reutiliza lógica existente)
-        # OAuth Phase 3: Passar operator_user_id APENAS em modo OAuth
-        if auth_mode == "oauth":
-            task = task_publish_solicitacao_to_gcal.delay(
-                solicitacao.id,
-                dry_run=False,
-                apply_blocked=False,
-                operator_user_id=operator_user_id
-            )
-        else:
-            # Service account mode: não passar operator_user_id (mantém assinatura antiga)
-            task = task_publish_solicitacao_to_gcal.delay(
-                solicitacao.id,
-                dry_run=False,
-                apply_blocked=False
-            )
-
-        # AuditLog
-        client_ip = _get_client_ip(request)
-        AuditLog.objects.create(
-            usuario=request.user,
-            action="RESYNC_GCAL_REQUESTED",
-            model_name="Solicitacao",
-            details={
-                "solicitacao_id": solicitacao.id,
-                "task_id": task.id,
-                "ip_address": client_ip,
-            },
-        )
-
-        logger.info(
-            "resync_gcal_requested",
-            extra={
-                "event": "resync_gcal_requested",
-                "user_id": request.user.id,
-                "username": request.user.username,
-                "solicitacao_id": solicitacao.id,
-                "task_id": task.id,
-                "ip_address": client_ip,
-                "timestamp": timezone.now().isoformat(),
-            },
+        # §1 Epic #459: Delegate to service layer
+        result = resync_to_gcal(
+            solicitacao=solicitacao,
+            user=request.user,
+            request=request,
         )
 
         return Response(
             {
-                "detail": "Resincronização solicitada com sucesso (processando em background).",
-                "task_id": task.id,
-                "solicitacao_id": solicitacao.id,
+                "detail": result.message,
+                "task_id": result.task_id,
+                "solicitacao_id": result.solicitacao_id,
             },
             status=status.HTTP_202_ACCEPTED,
         )
@@ -979,70 +727,23 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         Cancelar evento no Google Calendar e limpar campos - Fase 4.
 
-        Deleta evento do Calendar (trata 404 como sucesso - idempotência) e limpa
-        todos os campos relacionados: external_event_id, meet_link, gcal_payload_hash.
-
         Permissão: Controle ou Superintendência
-        Returns: 202 Accepted (processamento assíncrono) ou 409 Conflict
+        Returns: 202 Accepted (processamento assíncrono)
         """
-        from apps.core.tasks import task_cancel_solicitacao_from_gcal
-        from apps.core.models import AuditLog
-
         solicitacao = self.get_object()
 
-        # Validar que evento foi publicado
-        if not solicitacao.external_event_id and solicitacao.gcal_status != Solicitacao.GCalStatus.PUBLISHED:
-            return Response(
-                {
-                    "detail": "Solicitação não possui evento publicado no Google Calendar.",
-                    "hint": "Apenas eventos publicados podem ser cancelados.",
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
-
-        # Marcar como PENDING temporariamente (task mudará para NONE após deletar)
-        solicitacao.mark_gcal(
-            status=Solicitacao.GCalStatus.PENDING,
-            payload_hash=solicitacao.gcal_payload_hash,  # Manter hash durante cancelamento
-            error=""
-        )
-
-        # Enfileirar task de cancelamento
-        task = task_cancel_solicitacao_from_gcal.delay(solicitacao.id)
-
-        # AuditLog
-        client_ip = _get_client_ip(request)
-        AuditLog.objects.create(
-            usuario=request.user,
-            action="CANCEL_GCAL_REQUESTED",
-            model_name="Solicitacao",
-            details={
-                "solicitacao_id": solicitacao.id,
-                "task_id": task.id,
-                "external_event_id": solicitacao.external_event_id,
-                "ip_address": client_ip,
-            },
-        )
-
-        logger.info(
-            "cancel_gcal_requested",
-            extra={
-                "event": "cancel_gcal_requested",
-                "user_id": request.user.id,
-                "username": request.user.username,
-                "solicitacao_id": solicitacao.id,
-                "task_id": task.id,
-                "external_event_id": solicitacao.external_event_id,
-                "ip_address": client_ip,
-                "timestamp": timezone.now().isoformat(),
-            },
+        # §1 Epic #459: Delegate to service layer
+        result = cancel_from_gcal(
+            solicitacao=solicitacao,
+            user=request.user,
+            request=request,
         )
 
         return Response(
             {
-                "detail": "Cancelamento solicitado com sucesso (processando em background).",
-                "task_id": task.id,
-                "solicitacao_id": solicitacao.id,
+                "detail": result.message,
+                "task_id": result.task_id,
+                "solicitacao_id": result.solicitacao_id,
             },
             status=status.HTTP_202_ACCEPTED,
         )
@@ -1068,74 +769,17 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         ids = request.data.get("ids", [])
 
-        if not ids:
-            return Response(
-                {"detail": "O campo 'ids' é obrigatório."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if len(ids) > 100:
-            return Response(
-                {"detail": "Máximo 100 solicitações por vez."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        approved = 0
-        errors = []
-        client_ip = _get_client_ip(request)
-
-        # Buscar solicitações pendentes
-        solicitacoes = Solicitacao.objects.filter(id__in=ids, status="pendente")
-        found_ids = set(solicitacoes.values_list("id", flat=True))
-
-        # Registrar erros para IDs não encontrados ou já processados
-        for sol_id in ids:
-            if sol_id not in found_ids:
-                sol = Solicitacao.objects.filter(id=sol_id).first()
-                if sol:
-                    errors.append({"id": sol_id, "detail": f"Status já é '{sol.status}'"})
-                else:
-                    errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
-
-        # Aprovar em lote
-        for sol in solicitacoes:
-            prev_status = sol.status
-            sol.status = "aprovado"
-            sol.save()
-
-            # PA-05: AuditLog individual com batch=true
-            AuditLog.objects.create(
-                usuario=request.user,
-                action="APPROVE",
-                model_name="Solicitacao",
-                details={
-                    "solicitacao_id": sol.id,
-                    "prev_status": prev_status,
-                    "new_status": "aprovado",
-                    "batch": True,
-                    "ip_address": client_ip,
-                },
-            )
-
-            logger.info(
-                "solicitacao_batch_approved",
-                extra={
-                    "event": "solicitacao_batch_approved",
-                    "user_id": request.user.id,
-                    "username": request.user.username,
-                    "solicitacao_id": sol.id,
-                    "batch": True,
-                    "ip_address": client_ip,
-                    "timestamp": timezone.now().isoformat(),
-                },
-            )
-
-            approved += 1
+        # §1 Epic #459: Delegate to service layer
+        result = batch_approve_solicitacoes(
+            ids=ids,
+            user=request.user,
+            request=request,
+        )
 
         return Response(
             {
-                "approved": approved,
-                "errors": errors,
+                "approved": result.approved_count,
+                "errors": result.errors,
             },
             status=status.HTTP_200_OK,
         )
@@ -1161,74 +805,17 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         ids = request.data.get("ids", [])
 
-        if not ids:
-            return Response(
-                {"detail": "O campo 'ids' é obrigatório."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if len(ids) > 100:
-            return Response(
-                {"detail": "Máximo 100 solicitações por vez."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        rejected = 0
-        errors = []
-        client_ip = _get_client_ip(request)
-
-        # Buscar solicitações pendentes
-        solicitacoes = Solicitacao.objects.filter(id__in=ids, status="pendente")
-        found_ids = set(solicitacoes.values_list("id", flat=True))
-
-        # Registrar erros para IDs não encontrados ou já processados
-        for sol_id in ids:
-            if sol_id not in found_ids:
-                sol = Solicitacao.objects.filter(id=sol_id).first()
-                if sol:
-                    errors.append({"id": sol_id, "detail": f"Status já é '{sol.status}'"})
-                else:
-                    errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
-
-        # Reprovar em lote
-        for sol in solicitacoes:
-            prev_status = sol.status
-            sol.status = "reprovado"
-            sol.save()
-
-            # PA-05: AuditLog individual com batch=true
-            AuditLog.objects.create(
-                usuario=request.user,
-                action="REJECT",
-                model_name="Solicitacao",
-                details={
-                    "solicitacao_id": sol.id,
-                    "prev_status": prev_status,
-                    "new_status": "reprovado",
-                    "batch": True,
-                    "ip_address": client_ip,
-                },
-            )
-
-            logger.info(
-                "solicitacao_batch_rejected",
-                extra={
-                    "event": "solicitacao_batch_rejected",
-                    "user_id": request.user.id,
-                    "username": request.user.username,
-                    "solicitacao_id": sol.id,
-                    "batch": True,
-                    "ip_address": client_ip,
-                    "timestamp": timezone.now().isoformat(),
-                },
-            )
-
-            rejected += 1
+        # §1 Epic #459: Delegate to service layer
+        result = batch_reject_solicitacoes(
+            ids=ids,
+            user=request.user,
+            request=request,
+        )
 
         return Response(
             {
-                "rejected": rejected,
-                "errors": errors,
+                "rejected": result.rejected_count,
+                "errors": result.errors,
             },
             status=status.HTTP_200_OK,
         )

@@ -182,7 +182,8 @@ class TestPublishEndpoint:
         # Deve retornar 409 quando GCAL_CLIENT != "google" e apply_blocked=false
         assert response.status_code == status.HTTP_409_CONFLICT
         assert "bloqueada" in response.data["detail"].lower() or "blocked" in response.data["detail"].lower()
-        assert response.data.get("features_apply_blocked") is True
+        # §1 Epic #459: standardized error format puts details in 'errors' key
+        assert response.data.get("errors", {}).get("features_apply_blocked") is True
 
     @patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
     @patch('django.conf.settings.GCAL_CLIENT', 'fake')

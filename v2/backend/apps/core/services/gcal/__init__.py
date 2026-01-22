@@ -11,6 +11,7 @@ Modular package containing all Google Calendar sync functionality:
 
 Backwards-compatible re-exports for existing imports.
 """
+# pyright: reportPrivateUsage=false
 
 from __future__ import annotations
 

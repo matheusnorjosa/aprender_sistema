@@ -12,7 +12,7 @@
  * Ref: prompt-pagina-formacoes.md
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Card,
@@ -368,10 +368,10 @@ export default function PlanoFormacoesPage() {
   };
 
   // ============================================================
-  // TABLE COLUMNS
+  // TABLE COLUMNS (memoized §16 Epic #459)
   // ============================================================
 
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: 'Municipio',
       dataIndex: 'municipio_nome',
@@ -494,7 +494,7 @@ export default function PlanoFormacoesPage() {
         </Space>
       ),
     },
-  ];
+  ], []);
 
   // ============================================================
   // RENDER

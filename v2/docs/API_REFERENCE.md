@@ -1,8 +1,12 @@
 # 📡 API Reference — Aprender Sistema v2
 
-**Última Atualização**: 2026-01-13
+**Última Atualização**: 2026-01-22
 **Total de Endpoints**: 87+
 **ViewSets**: 26
+
+> **Legenda de Status**: ![Stable](https://img.shields.io/badge/-stable-green) Estável | ![Beta](https://img.shields.io/badge/-beta-yellow) Beta | ![Deprecated](https://img.shields.io/badge/-deprecated-red) Deprecated | ![Internal](https://img.shields.io/badge/-internal-gray) Interno
+>
+> Ver [API_BADGES.md](./API_BADGES.md) para detalhes.
 
 ---
 
@@ -12,13 +16,13 @@ Todos os endpoints (exceto `/auth/` e `/csrf/`) requerem autenticação via sess
 
 ### Endpoints de Auth
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| POST | `/auth/login/` | Login com username/password | AllowAny |
-| POST | `/auth/logout/` | Logout e invalidação de sessão | IsAuthenticated |
-| GET | `/csrf/` | Obter CSRF token | AllowAny |
-| GET | `/api/ping/` | Health check simples | AllowAny |
-| GET | `/api/me/` | Dados do usuário logado + RBAC | IsAuthenticated |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| POST | `/auth/login/` | ![Stable](https://img.shields.io/badge/-stable-green) | Login com username/password | AllowAny |
+| POST | `/auth/logout/` | ![Stable](https://img.shields.io/badge/-stable-green) | Logout e invalidação de sessão | IsAuthenticated |
+| GET | `/csrf/` | ![Stable](https://img.shields.io/badge/-stable-green) | Obter CSRF token | AllowAny |
+| GET | `/api/ping/` | ![Stable](https://img.shields.io/badge/-stable-green) | Health check simples | AllowAny |
+| GET | `/api/me/` | ![Stable](https://img.shields.io/badge/-stable-green) | Dados do usuário logado + RBAC | IsAuthenticated |
 
 ### Headers Obrigatórios
 
@@ -34,21 +38,21 @@ Cookie: sessionid=<session_id>
 
 ### CRUD Principal
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/solicitacoes/` | Listar solicitações (paginado) | IsAuthenticated |
-| POST | `/api/solicitacoes/` | Criar nova solicitação | IsAuthenticated |
-| GET | `/api/solicitacoes/{id}/` | Detalhes de uma solicitação | IsAuthenticated |
-| PUT | `/api/solicitacoes/{id}/` | Atualizar solicitação completa | IsAuthenticated |
-| PATCH | `/api/solicitacoes/{id}/` | Atualizar parcialmente | IsAuthenticated |
-| DELETE | `/api/solicitacoes/{id}/` | Excluir solicitação | IsAuthenticated |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/solicitacoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar solicitações (paginado) | IsAuthenticated |
+| POST | `/api/solicitacoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar nova solicitação | IsAuthenticated |
+| GET | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes de uma solicitação | IsAuthenticated |
+| PUT | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar solicitação completa | IsAuthenticated |
+| PATCH | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar parcialmente | IsAuthenticated |
+| DELETE | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Excluir solicitação | IsAuthenticated |
 
 ### Ações de Aprovação (PA-01 a PA-07)
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| POST | `/api/solicitacoes/{id}/approve/` | Aprovar solicitação SUPER | IsSuperintendencia |
-| POST | `/api/solicitacoes/{id}/reject/` | Reprovar solicitação SUPER | IsSuperintendencia |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| POST | `/api/solicitacoes/{id}/approve/` | ![Stable](https://img.shields.io/badge/-stable-green) | Aprovar solicitação SUPER | IsSuperintendencia |
+| POST | `/api/solicitacoes/{id}/reject/` | ![Stable](https://img.shields.io/badge/-stable-green) | Reprovar solicitação SUPER | IsSuperintendencia |
 
 ### Filtros Disponíveis
 
@@ -68,11 +72,11 @@ Cookie: sessionid=<session_id>
 
 ### Verificação de Conflitos
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/availability/check/` | Verificar conflitos (individual) | IsAuthenticated |
-| POST | `/api/availability/check-many/` | Verificar conflitos em lote | IsAuthenticated |
-| GET | `/api/availability/monthly/` | Grade mensal de disponibilidade | IsControleOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/availability/check/` | ![Stable](https://img.shields.io/badge/-stable-green) | Verificar conflitos (individual) | IsAuthenticated |
+| POST | `/api/availability/check-many/` | ![Stable](https://img.shields.io/badge/-stable-green) | Verificar conflitos em lote | IsAuthenticated |
+| GET | `/api/availability/monthly/` | ![Stable](https://img.shields.io/badge/-stable-green) | Grade mensal de disponibilidade | IsControleOrSuper |
 
 ### Parâmetros de Check
 
@@ -112,11 +116,11 @@ Cookie: sessionid=<session_id>
 
 ### Bloqueios de Disponibilidade
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/availability/blocks/` | Listar bloqueios | IsAuthenticated |
-| POST | `/api/availability/blocks/` | Criar bloqueio | IsAuthenticated |
-| DELETE | `/api/availability/blocks/{id}/` | Remover bloqueio | IsAuthenticated |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/availability/blocks/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar bloqueios | IsAuthenticated |
+| POST | `/api/availability/blocks/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar bloqueio | IsAuthenticated |
+| DELETE | `/api/availability/blocks/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Remover bloqueio | IsAuthenticated |
 
 ---
 
@@ -124,37 +128,37 @@ Cookie: sessionid=<session_id>
 
 ### Preview e Publicação
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| POST | `/api/gcal/preview/` | Preview do payload (dry-run) | IsControleOrSuper |
-| POST | `/api/gcal/publish/` | Publicar no Google Calendar | IsControleOrSuper |
-| POST | `/api/gcal/publish-batch/` | Publicar múltiplas solicitações | IsControleOrSuper |
-| POST | `/api/gcal/resync/{id}/` | Resincronizar evento | IsControleOrSuper |
-| POST | `/api/gcal/cancel/{id}/` | Cancelar evento no GCal | IsControleOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| POST | `/api/gcal/preview/` | ![Stable](https://img.shields.io/badge/-stable-green) | Preview do payload (dry-run) | IsControleOrSuper |
+| POST | `/api/gcal/publish/` | ![Stable](https://img.shields.io/badge/-stable-green) | Publicar no Google Calendar | IsControleOrSuper |
+| POST | `/api/gcal/publish-batch/` | ![Stable](https://img.shields.io/badge/-stable-green) | Publicar múltiplas solicitações | IsControleOrSuper |
+| POST | `/api/gcal/resync/{id}/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Resincronizar evento | IsControleOrSuper |
+| POST | `/api/gcal/cancel/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Cancelar evento no GCal | IsControleOrSuper |
 
 ### Dashboards e Métricas
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/gcal/dashboard/summary/` | Resumo de publicações | IsControleOrSuper |
-| GET | `/api/gcal/dashboard/pending/` | Solicitações pendentes | IsControleOrSuper |
-| GET | `/api/gcal/dashboard/errors/` | Erros de publicação | IsControleOrSuper |
-| GET | `/api/gcal/dashboard/insights/` | Insights de uso | IsControleOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/gcal/dashboard/summary/` | ![Stable](https://img.shields.io/badge/-stable-green) | Resumo de publicações | IsControleOrSuper |
+| GET | `/api/gcal/dashboard/pending/` | ![Stable](https://img.shields.io/badge/-stable-green) | Solicitações pendentes | IsControleOrSuper |
+| GET | `/api/gcal/dashboard/errors/` | ![Stable](https://img.shields.io/badge/-stable-green) | Erros de publicação | IsControleOrSuper |
+| GET | `/api/gcal/dashboard/insights/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Insights de uso | IsControleOrSuper |
 
 ### Calendários
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/gcal/calendars/` | Listar calendários disponíveis | IsControleOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/gcal/calendars/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar calendários disponíveis | IsControleOrSuper |
 
 ### OAuth (por usuário)
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/gcal/oauth/status/` | Status da conexão OAuth | IsAuthenticated |
-| POST | `/api/gcal/oauth/authorize/` | Iniciar fluxo OAuth | IsAuthenticated |
-| POST | `/api/gcal/oauth/callback/` | Callback do OAuth | IsAuthenticated |
-| POST | `/api/gcal/oauth/revoke/` | Revogar credenciais | IsAuthenticated |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/gcal/oauth/status/` | ![Stable](https://img.shields.io/badge/-stable-green) | Status da conexão OAuth | IsAuthenticated |
+| POST | `/api/gcal/oauth/authorize/` | ![Stable](https://img.shields.io/badge/-stable-green) | Iniciar fluxo OAuth | IsAuthenticated |
+| POST | `/api/gcal/oauth/callback/` | ![Stable](https://img.shields.io/badge/-stable-green) | Callback do OAuth | IsAuthenticated |
+| POST | `/api/gcal/oauth/revoke/` | ![Stable](https://img.shields.io/badge/-stable-green) | Revogar credenciais | IsAuthenticated |
 
 ---
 
@@ -162,51 +166,51 @@ Cookie: sessionid=<session_id>
 
 ### Usuários
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/usuarios-admin/` | Listar usuários | IsDAT |
-| POST | `/api/usuarios-admin/` | Criar usuário | IsDAT |
-| GET | `/api/usuarios-admin/{id}/` | Detalhes do usuário | IsDAT |
-| PATCH | `/api/usuarios-admin/{id}/` | Atualizar usuário | IsDAT |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/usuarios-admin/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar usuários | IsDAT |
+| POST | `/api/usuarios-admin/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar usuário | IsDAT |
+| GET | `/api/usuarios-admin/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes do usuário | IsDAT |
+| PATCH | `/api/usuarios-admin/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar usuário | IsDAT |
 
 ### Municípios
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/municipios/` | Listar municípios | IsAuthenticated |
-| POST | `/api/municipios/` | Criar município | IsDAT |
-| GET | `/api/municipios/{id}/` | Detalhes do município | IsAuthenticated |
-| PATCH | `/api/municipios/{id}/` | Atualizar município | IsDAT |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/municipios/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar municípios | IsAuthenticated |
+| POST | `/api/municipios/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar município | IsDAT |
+| GET | `/api/municipios/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes do município | IsAuthenticated |
+| PATCH | `/api/municipios/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar município | IsDAT |
 
 ### Projetos
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/projetos/` | Listar projetos | IsAuthenticated |
-| POST | `/api/projetos/` | Criar projeto | IsDAT |
-| GET | `/api/projetos/{id}/` | Detalhes do projeto | IsAuthenticated |
-| PATCH | `/api/projetos/{id}/` | Atualizar projeto | IsDAT |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/projetos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar projetos | IsAuthenticated |
+| POST | `/api/projetos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar projeto | IsDAT |
+| GET | `/api/projetos/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes do projeto | IsAuthenticated |
+| PATCH | `/api/projetos/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar projeto | IsDAT |
 
 ### Grupos (RBAC)
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/grupos/` | Listar grupos Django | IsDAT |
-| GET | `/api/grupos/{id}/` | Detalhes do grupo | IsDAT |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/grupos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar grupos Django | IsDAT |
+| GET | `/api/grupos/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes do grupo | IsDAT |
 
 ### Tipos de Evento
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/tipos-evento/` | Listar tipos de evento | IsAuthenticated |
-| POST | `/api/tipos-evento/` | Criar tipo de evento | IsDAT |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/tipos-evento/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar tipos de evento | IsAuthenticated |
+| POST | `/api/tipos-evento/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar tipo de evento | IsDAT |
 
 ### Gerências
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/gerencias/` | Listar gerências | IsAuthenticated |
-| GET | `/api/gerencias/{id}/` | Detalhes da gerência | IsAuthenticated |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/gerencias/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar gerências | IsAuthenticated |
+| GET | `/api/gerencias/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes da gerência | IsAuthenticated |
 
 ---
 
@@ -214,56 +218,56 @@ Cookie: sessionid=<session_id>
 
 ### Registros
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/dat/registros/` | Listar registros DAT | IsDATOrSuper |
-| POST | `/api/dat/registros/` | Criar registro | IsDATOrSuper |
-| GET | `/api/dat/registros/{id}/` | Detalhes do registro | IsDATOrSuper |
-| PATCH | `/api/dat/registros/{id}/` | Atualizar registro | IsDATOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/dat/registros/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar registros DAT | IsDATOrSuper |
+| POST | `/api/dat/registros/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar registro | IsDATOrSuper |
+| GET | `/api/dat/registros/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes do registro | IsDATOrSuper |
+| PATCH | `/api/dat/registros/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar registro | IsDATOrSuper |
 
 ### Ações
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/dat/acoes/` | Listar ações DAT | IsDATOrSuper |
-| POST | `/api/dat/acoes/` | Criar ação | IsDATOrSuper |
-| PATCH | `/api/dat/acoes/{id}/` | Atualizar ação | IsDATOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/dat/acoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar ações DAT | IsDATOrSuper |
+| POST | `/api/dat/acoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar ação | IsDATOrSuper |
+| PATCH | `/api/dat/acoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar ação | IsDATOrSuper |
 
 ### Ciclos de Ação
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/dat/acoes-ciclo/` | Listar ciclos de ação | IsDATOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/dat/acoes-ciclo/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar ciclos de ação | IsDATOrSuper |
 
 ### Cadastros
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/dat/cadastros/` | Listar cadastros | IsDATOrSuper |
-| POST | `/api/dat/cadastros/` | Criar cadastro | IsDATOrSuper |
-| PATCH | `/api/dat/cadastros/{id}/` | Atualizar cadastro | IsDATOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/dat/cadastros/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar cadastros | IsDATOrSuper |
+| POST | `/api/dat/cadastros/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar cadastro | IsDATOrSuper |
+| PATCH | `/api/dat/cadastros/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar cadastro | IsDATOrSuper |
 
 ### Compras DAT
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/dat/compras/` | Listar compras | IsDATOrSuper |
-| POST | `/api/dat/compras/` | Registrar compra | IsDATOrSuper |
-| PATCH | `/api/dat/compras/{id}/` | Atualizar compra | IsDATOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/dat/compras/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar compras | IsDATOrSuper |
+| POST | `/api/dat/compras/` | ![Stable](https://img.shields.io/badge/-stable-green) | Registrar compra | IsDATOrSuper |
+| PATCH | `/api/dat/compras/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar compra | IsDATOrSuper |
 
 ### Coordenadores DAT
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/dat/coordenadores/` | Listar coordenadores | IsDATOrSuper |
-| POST | `/api/dat/coordenadores/` | Criar coordenador | IsDATOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/dat/coordenadores/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar coordenadores | IsDATOrSuper |
+| POST | `/api/dat/coordenadores/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar coordenador | IsDATOrSuper |
 
 ### Áreas DAT
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/dat/areas/` | Listar áreas | IsDATOrSuper |
-| POST | `/api/dat/areas/` | Criar área | IsDATOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/dat/areas/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar áreas | IsDATOrSuper |
+| POST | `/api/dat/areas/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar área | IsDATOrSuper |
 
 ---
 
@@ -271,23 +275,23 @@ Cookie: sessionid=<session_id>
 
 ### Mapa do Brasil
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/metrics/map/` | Dados para mapa | IsAuthenticated |
-| GET | `/api/metrics/map/summary/` | Resumo por estado | IsAuthenticated |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/metrics/map/` | ![Stable](https://img.shields.io/badge/-stable-green) | Dados para mapa | IsAuthenticated |
+| GET | `/api/metrics/map/summary/` | ![Stable](https://img.shields.io/badge/-stable-green) | Resumo por estado | IsAuthenticated |
 
 ### Métricas de Coordenadores
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/metrics/coordinators/` | Métricas de coordenadores | IsControleOrSuper |
-| GET | `/api/metrics/coordinators/{id}/` | Métricas de coordenador específico | IsControleOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/metrics/coordinators/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Métricas de coordenadores | IsControleOrSuper |
+| GET | `/api/metrics/coordinators/{id}/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Métricas de coordenador específico | IsControleOrSuper |
 
 ### Qualidade de Dados
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/metrics/quality/` | Indicadores de qualidade | IsControleOrSuper |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/metrics/quality/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Indicadores de qualidade | IsControleOrSuper |
 
 ---
 
@@ -295,26 +299,26 @@ Cookie: sessionid=<session_id>
 
 Endpoints para popular dropdowns e selects no frontend.
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/options/municipios/` | Lista simplificada de municípios | IsAuthenticated |
-| GET | `/api/options/projetos/` | Lista simplificada de projetos | IsAuthenticated |
-| GET | `/api/options/usuarios/` | Lista de usuários para select | IsAuthenticated |
-| GET | `/api/options/formadores/` | Lista de formadores | IsAuthenticated |
-| GET | `/api/options/coordenadores/` | Lista de coordenadores | IsAuthenticated |
-| GET | `/api/options/tipos-evento/` | Tipos de evento para select | IsAuthenticated |
-| GET | `/api/options/gerencias/` | Gerências para select | IsAuthenticated |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/options/municipios/` | ![Stable](https://img.shields.io/badge/-stable-green) | Lista simplificada de municípios | IsAuthenticated |
+| GET | `/api/options/projetos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Lista simplificada de projetos | IsAuthenticated |
+| GET | `/api/options/usuarios/` | ![Stable](https://img.shields.io/badge/-stable-green) | Lista de usuários para select | IsAuthenticated |
+| GET | `/api/options/formadores/` | ![Stable](https://img.shields.io/badge/-stable-green) | Lista de formadores | IsAuthenticated |
+| GET | `/api/options/coordenadores/` | ![Stable](https://img.shields.io/badge/-stable-green) | Lista de coordenadores | IsAuthenticated |
+| GET | `/api/options/tipos-evento/` | ![Stable](https://img.shields.io/badge/-stable-green) | Tipos de evento para select | IsAuthenticated |
+| GET | `/api/options/gerencias/` | ![Stable](https://img.shields.io/badge/-stable-green) | Gerências para select | IsAuthenticated |
 
 ---
 
 ## ❤️ Health Checks
 
-| Método | Endpoint | Descrição | Permissão |
-|--------|----------|-----------|-----------|
-| GET | `/api/healthz/` | Health check básico | AllowAny |
-| GET | `/api/readyz/` | Readiness (DB + Redis) | AllowAny |
-| GET | `/api/features/` | Feature flags ativas | AllowAny |
-| GET | `/api/config/` | Configurações públicas | IsAuthenticated |
+| Método | Endpoint | Status | Descrição | Permissão |
+|--------|----------|--------|-----------|-----------|
+| GET | `/api/healthz/` | ![Stable](https://img.shields.io/badge/-stable-green) | Health check básico | AllowAny |
+| GET | `/api/readyz/` | ![Stable](https://img.shields.io/badge/-stable-green) | Readiness (DB + Redis) | AllowAny |
+| GET | `/api/features/` | ![Stable](https://img.shields.io/badge/-stable-green) | Feature flags ativas | AllowAny |
+| GET | `/api/config/` | ![Stable](https://img.shields.io/badge/-stable-green) | Configurações públicas | IsAuthenticated |
 
 ---
 

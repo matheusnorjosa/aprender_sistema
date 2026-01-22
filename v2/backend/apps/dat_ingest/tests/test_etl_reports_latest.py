@@ -7,9 +7,9 @@ Fase 5 - Desligamento gradual de planilhas
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-import tempfile
 import time
+
+import pytest
 from pathlib import Path
 from django.test import override_settings
 from django.contrib.auth import get_user_model

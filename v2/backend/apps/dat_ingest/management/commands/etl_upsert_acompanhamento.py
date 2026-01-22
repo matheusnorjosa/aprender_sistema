@@ -559,7 +559,7 @@ class Command(BaseCommand):
                     continue
 
                 # Criar Participation
-                participation, created = Participation.objects.get_or_create(
+                _, created = Participation.objects.get_or_create(
                     solicitacao=solicitacao,
                     usuario=user,
                     role=role,

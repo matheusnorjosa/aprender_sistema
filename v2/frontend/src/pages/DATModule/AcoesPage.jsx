@@ -8,7 +8,7 @@
  * 688 registros, 103 municípios, 88 projetos, 28 coordenadores
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Button,
@@ -184,7 +184,8 @@ export default function AcoesPage() {
     setModalVisible(true);
   };
 
-  const handleEdit = (record) => {
+  // Memoized handlers (§3 Epic #459)
+  const handleEdit = useCallback((record) => {
     setEditingAcao(record);
     form.setFieldsValue({
       ...record,
@@ -194,7 +195,7 @@ export default function AcoesPage() {
       data_entrega: record.data_entrega ? dayjs(record.data_entrega) : null,
     });
     setModalVisible(true);
-  };
+  }, [form]);
 
   const handleSave = async (values) => {
     try {
@@ -221,7 +222,7 @@ export default function AcoesPage() {
     }
   };
 
-  const handleDelete = (record) => {
+  const handleDelete = useCallback((record) => {
     Modal.confirm({
       title: 'Confirmar exclusão',
       content: `Excluir ação "${record.projeto_nome}" em "${record.municipio_nome}"?`,
@@ -238,10 +239,10 @@ export default function AcoesPage() {
         }
       },
     });
-  };
+  }, [fetchData, pagination.current]);
 
-  // Status icon renderer
-  const renderStatusIcon = (status) => {
+  // Status icon renderer - memoized (§3 Epic #459)
+  const renderStatusIcon = useCallback((status) => {
     switch (status) {
       case 'concluido':
         return <CheckCircleFilled className="text-green-500 text-lg" />;
@@ -254,10 +255,10 @@ export default function AcoesPage() {
       default:
         return <MinusCircleFilled className="text-gray-400 text-lg" />;
     }
-  };
+  }, []);
 
-  // Calculate progress based on status
-  const calculateProgress = (record) => {
+  // Calculate progress based on status - memoized (§3 Epic #459)
+  const calculateProgress = useCallback((record) => {
     const etapas = [
       record.status_carta,
       record.status_contato,
@@ -266,10 +267,10 @@ export default function AcoesPage() {
     ];
     const concluidas = etapas.filter((s) => s === 'concluido').length;
     return Math.round((concluidas / 4) * 100);
-  };
+  }, []);
 
-  // Table columns
-  const columns = [
+  // Table columns - memoized to prevent re-renders (§3 Epic #459)
+  const columns = useMemo(() => [
     {
       title: 'Município - UF',
       key: 'municipio_uf',
@@ -442,7 +443,7 @@ export default function AcoesPage() {
         </Space>
       ),
     },
-  ];
+  ], [handleEdit, handleDelete, renderStatusIcon, calculateProgress]);
 
   return (
     <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>

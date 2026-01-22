@@ -10,7 +10,7 @@ Fase 5 - Desligamento gradual de planilhas
 
 
 from __future__ import annotations
-import os
+
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional

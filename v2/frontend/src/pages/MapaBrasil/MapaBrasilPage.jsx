@@ -38,7 +38,6 @@ import {
 } from '@ant-design/icons';
 import { MapContainer, GeoJSON, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import brazilGeoJSON from '../../data/brazil-states.json';
 import api from '../../api';
 import logger from '../../utils/logger';
 
@@ -63,6 +62,8 @@ export default function MapaBrasilPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedState, setSelectedState] = useState(null); // Estado selecionado (sigla)
+  const [brazilGeoJSON, setBrazilGeoJSON] = useState(null); // Lazy loaded GeoJSON
+  const [geoJsonLoading, setGeoJsonLoading] = useState(true);
 
   // Estados para dados da API
   const [municipiosData, setMunicipiosData] = useState([]);
@@ -77,6 +78,19 @@ export default function MapaBrasilPage() {
   const mapRef = useRef(null);
   const geoJsonRef = useRef(null);
   const mapContainerRef = useRef(null);
+
+  // Lazy load do GeoJSON para reduzir bundle size
+  useEffect(() => {
+    import('../../data/brazil-states.json')
+      .then((module) => {
+        setBrazilGeoJSON(module.default);
+        setGeoJsonLoading(false);
+      })
+      .catch((err) => {
+        logger.error('Erro ao carregar GeoJSON:', err);
+        setGeoJsonLoading(false);
+      });
+  }, []);
 
   // Manter refs sincronizados com state
   useEffect(() => {
@@ -487,7 +501,7 @@ export default function MapaBrasilPage() {
 
           {viewMode === 'map' ? (
             <>
-            <Card style={{ marginBottom: 16 }} loading={loading}>
+            <Card style={{ marginBottom: 16 }} loading={loading || geoJsonLoading}>
               {/* Mapa Leaflet com GeoJSON (sem tiles de fundo) */}
               <div
                 ref={mapContainerRef}
@@ -557,22 +571,24 @@ export default function MapaBrasilPage() {
                   <MapController mapRef={mapRef} />
 
                   {/* GeoJSON layer for states - cores baseadas em eventos */}
-                  <GeoJSON
-                    key={`geojson-${Object.keys(estadosData).length}`}
-                    ref={geoJsonRef}
-                    data={brazilGeoJSON}
-                    onEachFeature={onEachFeature}
-                    style={(feature) => {
-                      const sigla = feature.properties?.sigla;
-                      const hasEvents = estadosData[sigla]?.eventos > 0;
-                      return {
-                        fillColor: hasEvents ? '#2e7d32' : '#81c784',
-                        fillOpacity: 1,
-                        color: '#ffffff',
-                        weight: 1,
-                      };
-                    }}
-                  />
+                  {brazilGeoJSON && (
+                    <GeoJSON
+                      key={`geojson-${Object.keys(estadosData).length}`}
+                      ref={geoJsonRef}
+                      data={brazilGeoJSON}
+                      onEachFeature={onEachFeature}
+                      style={(feature) => {
+                        const sigla = feature.properties?.sigla;
+                        const hasEvents = estadosData[sigla]?.eventos > 0;
+                        return {
+                          fillColor: hasEvents ? '#2e7d32' : '#81c784',
+                          fillOpacity: 1,
+                          color: '#ffffff',
+                          weight: 1,
+                        };
+                      }}
+                    />
+                  )}
 
                 </MapContainer>
               </div>

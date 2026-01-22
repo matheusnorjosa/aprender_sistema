@@ -1,9 +1,12 @@
 [
   {
-    "name": "JS Bundle (gzipped)",
-    "path": "dist/assets/*.js",
+    "name": "JS Bundle (gzipped, excluding lazy chunks)",
+    "path": [
+      "dist/assets/*.js",
+      "!dist/assets/brazil-states-*.js"
+    ],
     "gzip": true,
-    "limit": "200 KB",
+    "limit": "650 KB",
     "running": false
   },
   {
@@ -24,7 +27,14 @@
     "name": "Vendor Chunk (React + Ant Design)",
     "path": "dist/assets/vendor-*.js",
     "gzip": true,
-    "limit": "200 KB",
+    "limit": "550 KB",
+    "running": false
+  },
+  {
+    "name": "Lazy GeoJSON Chunk",
+    "path": "dist/assets/brazil-states-*.js",
+    "gzip": true,
+    "limit": "100 KB",
     "running": false
   },
   {

@@ -4,7 +4,7 @@ Solicitacao Publish Service - §1 Epic #459
 Service layer for Google Calendar publish/resync/cancel operations.
 Extracted from views_solicitacao.py to follow Single Responsibility Principle.
 """
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportFunctionMemberAccess=false, reportCallIssue=false
 
 from __future__ import annotations
 

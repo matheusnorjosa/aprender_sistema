@@ -8,7 +8,7 @@
  * - Integração com /api/gcal/dashboard/metrics e /api/gcal/dashboard/events
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Card,
   Row,
@@ -191,9 +191,9 @@ export default function GCalDashboardPage() {
     }
   };
 
-  const handleTableChange = (newPagination) => {
+  const handleTableChange = useCallback((newPagination) => {
     loadEvents(newPagination.current, newPagination.pageSize);
-  };
+  }, []);
 
   // Issue #99: Carregar insights (success rate + top insights)
   const loadInsights = async () => {
@@ -399,8 +399,8 @@ export default function GCalDashboardPage() {
     }
   };
 
-  // Menu items para dropdown de Export
-  const exportMenuItems = [
+  // Menu items para dropdown de Export (memoized §16 Epic #459)
+  const exportMenuItems = useMemo(() => [
     {
       key: 'csv',
       label: 'Exportar CSV',
@@ -413,9 +413,10 @@ export default function GCalDashboardPage() {
       icon: <DownloadOutlined />,
       onClick: () => handleExport('json'),
     },
-  ];
+  ], [dateRange, statusFilter]);
 
-  const columns = [
+  // Columns memoized (§16 Epic #459)
+  const columns = useMemo(() => [
     {
       title: 'ID',
       dataIndex: 'id',
@@ -464,10 +465,10 @@ export default function GCalDashboardPage() {
           '-'
         ),
     },
-  ];
+  ], []);
 
-  // Issue #99: Colunas para Top Insights
-  const topInsightsColumns = [
+  // Issue #99: Colunas para Top Insights (memoized §16 Epic #459)
+  const topInsightsColumns = useMemo(() => [
     {
       title: 'Nome',
       dataIndex: 'name',
@@ -509,7 +510,7 @@ export default function GCalDashboardPage() {
         return <Text style={{ color, fontWeight: 'bold' }}>{percentage}%</Text>;
       },
     },
-  ];
+  ], []);
 
   return (
     <div className="p-6">

@@ -4,7 +4,7 @@
  * @see useSessionMonitor.js
  */
 
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import useSessionMonitor from '../useSessionMonitor';
 import api from '../../api';
@@ -90,18 +90,12 @@ describe('useSessionMonitor', () => {
   it('shows warning when time left is below threshold', async () => {
     const { result } = renderHook(() => useSessionMonitor());
 
-    // Advance time to near expiration (7200 - 300 = 6900 seconds)
-    act(() => {
-      vi.advanceTimersByTime(6900 * 1000);
+    // Advance time to near expiration (7200 - 300 = 6900 seconds + 60s for interval)
+    await act(async () => {
+      vi.advanceTimersByTime((6900 + 60) * 1000);
     });
 
-    // Trigger the interval check
-    act(() => {
-      vi.advanceTimersByTime(60000);
-    });
-
-    await waitFor(() => {
-      expect(result.current.showWarning).toBe(true);
-    });
+    // Assertion direta após os timers serem processados
+    expect(result.current.showWarning).toBe(true);
   });
 });

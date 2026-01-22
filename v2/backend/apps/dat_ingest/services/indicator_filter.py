@@ -43,7 +43,7 @@ def is_indicator_token(name: Optional[str]) -> bool:
         >>> is_indicator_token(None)
         False
     """
-    if not name or not isinstance(name, str):
+    if not name:
         return False
 
     # Normalizar: strip, lowercase, remover acentos

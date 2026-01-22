@@ -92,7 +92,7 @@ def parse_bloqueios(filepath: Path) -> list[dict[str, Any]]:
                     # Caso geral: adicionar 1 segundo
                     fim = fim + timedelta(seconds=1)
 
-        except Exception as e:
+        except Exception:
             # Erro ao processar datas, pular linha
             continue
 

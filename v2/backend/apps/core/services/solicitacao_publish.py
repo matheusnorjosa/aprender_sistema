@@ -15,7 +15,7 @@ from typing import Any
 from django.conf import settings
 from django.utils import timezone
 
-from apps.core.exceptions import ValidationAPIError
+from apps.core.exceptions import APIError, ConflictError, ValidationAPIError
 from apps.core.models import AuditLog, GoogleOAuthCredential, Solicitacao, Usuario
 
 logger = logging.getLogger(__name__)
@@ -81,9 +81,10 @@ def _check_google_oauth(user: Usuario) -> int | None:
         GoogleOAuthCredential.objects.get(user=user)
         return user.id
     except GoogleOAuthCredential.DoesNotExist:
-        raise ValidationAPIError(
-            message="Conecte sua conta Google",
+        raise APIError(
             code="google_not_connected",
+            message="Conecte sua conta Google",
+            status_code=403,
         )
 
 
@@ -181,10 +182,10 @@ def publish_to_gcal(
     features_apply_blocked = gcal_client != "google"
 
     if features_apply_blocked and not apply_blocked and not dry_run:
-        raise ValidationAPIError(
+        raise ConflictError(
             message="Publicação bloqueada: GCAL_CLIENT não está configurado como 'google'.",
-            code="gcal_client_not_configured",
-            extra={
+            details={
+                "code": "gcal_client_not_configured",
                 "hint": "Para forçar publicação em modo de teste, envie apply_blocked=true no corpo da requisição.",
                 "features_apply_blocked": True,
                 "dry_run_allowed": True,
@@ -364,7 +365,7 @@ def cancel_from_gcal(
         CancelResult with task details
 
     Raises:
-        ValidationAPIError: If event was not published
+        ConflictError: If event was not published
     """
     from apps.core.tasks import task_cancel_solicitacao_from_gcal
 
@@ -373,10 +374,12 @@ def cancel_from_gcal(
         not solicitacao.external_event_id
         and solicitacao.gcal_status != Solicitacao.GCalStatus.PUBLISHED
     ):
-        raise ValidationAPIError(
+        raise ConflictError(
             message="Solicitação não possui evento publicado no Google Calendar.",
-            code="not_published",
-            extra={"hint": "Apenas eventos publicados podem ser cancelados."},
+            details={
+                "code": "not_published",
+                "hint": "Apenas eventos publicados podem ser cancelados.",
+            },
         )
 
     # Mark as PENDING temporarily (task will change to NONE after delete)

@@ -34,6 +34,7 @@ import { getMe } from './api/availability';
 import { logout as apiLogout } from './api/auth';
 import { LAYOUT, TIMING } from './constants';
 import { preloadSearchData } from './services/preloadSearchData';
+import OfflineBanner from './components/OfflineBanner';
 import './App.css';
 
 // ============================================================================
@@ -314,6 +315,8 @@ function AppContent() {
   return (
     <ConfigProvider locale={ptBR} theme={antThemeConfig}>
       <Router>
+        {/* Issue #416: Offline warning banner */}
+        <OfflineBanner />
         <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
           {/* Sider lateral fixo */}
           <Sider

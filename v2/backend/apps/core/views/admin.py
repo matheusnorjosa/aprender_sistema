@@ -3,19 +3,20 @@ AS v2 — Admin ViewSets
 
 CRUD ViewSets for admin entities (DAT permissions).
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
 
 from django.contrib.auth.models import Group
 from django.db.models import Count, Q, QuerySet
-
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.core.models import (
     AuditLog,
@@ -150,9 +151,9 @@ class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
         - nome_setor (search)
     """
 
-    queryset = Gerencia.objects.annotate(
-        projetos_count=Count("projetos", filter=Q(projetos__ativo=True))
-    ).order_by("nome")
+    queryset = Gerencia.objects.annotate(projetos_count=Count("projetos", filter=Q(projetos__ativo=True))).order_by(
+        "nome"
+    )
     serializer_class = GerenciaSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]

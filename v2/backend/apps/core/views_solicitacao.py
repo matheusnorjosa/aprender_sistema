@@ -3,6 +3,7 @@ Solicitacao ViewSet (views ativas)
 
 §1 Epic #459: Refactored to use service layer for approval/publish operations.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportFunctionMemberAccess=false
 
 from __future__ import annotations
@@ -11,6 +12,13 @@ import logging
 from typing import Any
 
 from django.db.models import QuerySet
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
@@ -19,12 +27,6 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
-from rest_framework import status, viewsets
-from rest_framework.decorators import action
-from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.request import Request
-from rest_framework.response import Response
 
 from .api_schemas import (
     COMMON_ERROR_RESPONSES,
@@ -51,7 +53,9 @@ from .services.solicitacao_approval import (
 )
 from .services.solicitacao_publish import (
     cancel_from_gcal,
-    preview_gcal as preview_gcal_service,
+)
+from .services.solicitacao_publish import preview_gcal as preview_gcal_service
+from .services.solicitacao_publish import (
     publish_to_gcal,
     resync_to_gcal,
 )
@@ -75,9 +79,15 @@ def _get_client_ip(request: Request) -> str:
         summary="Lista solicitações",
         description="Retorna lista paginada de solicitações filtradas por status, projeto, etc.",
         parameters=[
-            OpenApiParameter("status", OpenApiTypes.STR, description="Filtrar por status (pendente/aprovado/reprovado)"),
-            OpenApiParameter("mine", OpenApiTypes.BOOL, description="Se true, retorna apenas solicitações do usuário atual"),
-            OpenApiParameter("search", OpenApiTypes.STR, description="Busca textual em usuário, município, observações"),
+            OpenApiParameter(
+                "status", OpenApiTypes.STR, description="Filtrar por status (pendente/aprovado/reprovado)"
+            ),
+            OpenApiParameter(
+                "mine", OpenApiTypes.BOOL, description="Se true, retorna apenas solicitações do usuário atual"
+            ),
+            OpenApiParameter(
+                "search", OpenApiTypes.STR, description="Busca textual em usuário, município, observações"
+            ),
         ],
         responses={200: SolicitacaoSerializer(many=True), **COMMON_ERROR_RESPONSES},
         tags=["solicitacoes"],
@@ -144,9 +154,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     PR 8/N: Apenas Coordenador ou DAT podem criar solicitações.
     """
 
-    queryset = Solicitacao.objects.select_related(
-        "usuario", "municipio", "tipo_evento", "projeto"
-    )
+    queryset = Solicitacao.objects.select_related("usuario", "municipio", "tipo_evento", "projeto")
     serializer_class = SolicitacaoSerializer
     permission_classes = [IsAuthenticated]
 
@@ -166,8 +174,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # Actions com permission_classes específicas definidas no decorator
         # Não sobrescrever nesses casos - usar super() para pegar do decorator
         actions_with_custom_permissions = [
-            "approve", "reject", "preview_gcal", "publish",
-            "resync_gcal", "cancel_gcal", "batch_approve", "batch_reject"
+            "approve",
+            "reject",
+            "preview_gcal",
+            "publish",
+            "resync_gcal",
+            "cancel_gcal",
+            "batch_approve",
+            "batch_reject",
         ]
         if self.action in actions_with_custom_permissions:
             return super().get_permissions()
@@ -193,9 +207,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             self.request.user.is_superuser
             or self.request.user.groups.filter(name__in=["Superintendência", "Controle", "DAT"]).exists()
         ):
-            qs = Solicitacao.objects.select_related(
-                "usuario", "municipio", "tipo_evento", "projeto"
-            ).prefetch_related("participations__usuario")
+            qs = Solicitacao.objects.select_related("usuario", "municipio", "tipo_evento", "projeto").prefetch_related(
+                "participations__usuario"
+            )
         else:
             qs = (
                 Solicitacao.objects.filter(usuario=self.request.user)
@@ -212,11 +226,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         status_filter = self.request.query_params.get("status")  # PR15: alias em inglês
 
         # PR15: Mapear status alias (inglês → português)
-        STATUS_MAP = {
-            "pending": "pendente",
-            "approved": "aprovado",
-            "rejected": "reprovado"
-        }
+        STATUS_MAP = {"pending": "pendente", "approved": "aprovado", "rejected": "reprovado"}
 
         if status_filter:
             # Aceitar tanto alias em inglês quanto português
@@ -233,6 +243,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         if date_from:
             try:
                 from datetime import date
+
                 date_from_parsed = date.fromisoformat(date_from)
                 qs = qs.filter(inicio__date__gte=date_from_parsed)
             except (ValueError, TypeError):
@@ -241,6 +252,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         if date_to:
             try:
                 from datetime import date
+
                 date_to_parsed = date.fromisoformat(date_to)
                 qs = qs.filter(inicio__date__lte=date_to_parsed)
             except (ValueError, TypeError):
@@ -248,6 +260,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         if q:
             from django.db.models import Q
+
             qs = qs.filter(
                 Q(municipio__nome__icontains=q)
                 | Q(projeto__nome__icontains=q)
@@ -274,7 +287,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         instance = serializer.save(usuario=self.request.user)
 
         # PR15: Processar extra_participants
-        extra_participants = self.request.data.get('extra_participants', {})
+        extra_participants = self.request.data.get("extra_participants", {})
         if extra_participants:
             self._create_participants(instance, extra_participants)
 
@@ -299,72 +312,58 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         # Sempre criar participação do coordenador (request.user)
         Participation.objects.get_or_create(
-            solicitacao=solicitacao,
-            usuario=self.request.user,
-            defaults={'role': 'COORDENADOR'}
+            solicitacao=solicitacao, usuario=self.request.user, defaults={"role": "COORDENADOR"}
         )
 
         # Formadores por ID
-        for formador_id in extra.get('formador_ids', []):
+        for formador_id in extra.get("formador_ids", []):
             if formador_id:
                 try:
                     usuario = Usuario.objects.get(id=formador_id)
                     Participation.objects.get_or_create(
-                        solicitacao=solicitacao,
-                        usuario=usuario,
-                        defaults={'role': 'FORMADOR'}
+                        solicitacao=solicitacao, usuario=usuario, defaults={"role": "FORMADOR"}
                     )
                 except Usuario.DoesNotExist:
                     pass
 
         # Formadores por email (guest)
-        for email in extra.get('formador_emails', []):
+        for email in extra.get("formador_emails", []):
             if email and email.strip():
                 # Tentar resolver email → Usuario
                 try:
                     usuario = Usuario.objects.get(email__iexact=email.strip())
                     Participation.objects.get_or_create(
-                        solicitacao=solicitacao,
-                        usuario=usuario,
-                        defaults={'role': 'FORMADOR'}
+                        solicitacao=solicitacao, usuario=usuario, defaults={"role": "FORMADOR"}
                     )
                 except Usuario.DoesNotExist:
                     # Criar como guest_email mantendo role=FORMADOR para GCal
                     Participation.objects.get_or_create(
-                        solicitacao=solicitacao,
-                        guest_email=email.strip().lower(),
-                        defaults={'role': 'FORMADOR'}
+                        solicitacao=solicitacao, guest_email=email.strip().lower(), defaults={"role": "FORMADOR"}
                     )
 
         # Coordenadores acompanhantes por ID
-        for coord_id in extra.get('coord_acompanha_ids', []):
+        for coord_id in extra.get("coord_acompanha_ids", []):
             if coord_id:
                 try:
                     usuario = Usuario.objects.get(id=coord_id)
                     Participation.objects.get_or_create(
-                        solicitacao=solicitacao,
-                        usuario=usuario,
-                        defaults={'role': 'COORD_ACOMPANHA'}
+                        solicitacao=solicitacao, usuario=usuario, defaults={"role": "COORD_ACOMPANHA"}
                     )
                 except Usuario.DoesNotExist:
                     pass
 
         # Coordenadores acompanhantes por email (guest)
-        for email in extra.get('coord_acompanha_emails', []):
+        for email in extra.get("coord_acompanha_emails", []):
             if email and email.strip():
                 try:
                     usuario = Usuario.objects.get(email__iexact=email.strip())
                     Participation.objects.get_or_create(
-                        solicitacao=solicitacao,
-                        usuario=usuario,
-                        defaults={'role': 'COORD_ACOMPANHA'}
+                        solicitacao=solicitacao, usuario=usuario, defaults={"role": "COORD_ACOMPANHA"}
                     )
                 except Usuario.DoesNotExist:
                     # Criar como guest_email mantendo role=COORD_ACOMPANHA para GCal
                     Participation.objects.get_or_create(
-                        solicitacao=solicitacao,
-                        guest_email=email.strip().lower(),
-                        defaults={'role': 'COORD_ACOMPANHA'}
+                        solicitacao=solicitacao, guest_email=email.strip().lower(), defaults={"role": "COORD_ACOMPANHA"}
                     )
 
     def perform_update(self, serializer):
@@ -383,10 +382,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         # Captura formadores atuais antes do update
         old_formador_ids = set(
-            Participation.objects.filter(
-                solicitacao=instance,
-                role='FORMADOR'
-            ).values_list('usuario_id', flat=True)
+            Participation.objects.filter(solicitacao=instance, role="FORMADOR").values_list("usuario_id", flat=True)
         )
 
         old_data = {
@@ -410,8 +406,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         serializer.save()
 
         # Processa extra_participants se presente
-        extra_participants = self.request.data.get('extra_participants', {})
-        if extra_participants and 'formador_ids' in extra_participants:
+        extra_participants = self.request.data.get("extra_participants", {})
+        if extra_participants and "formador_ids" in extra_participants:
             self._update_formadores(instance, extra_participants)
 
         # Coleta dados novos após save
@@ -419,10 +415,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         # Captura formadores novos
         new_formador_ids = set(
-            Participation.objects.filter(
-                solicitacao=instance,
-                role='FORMADOR'
-            ).values_list('usuario_id', flat=True)
+            Participation.objects.filter(solicitacao=instance, role="FORMADOR").values_list("usuario_id", flat=True)
         )
 
         new_data = {
@@ -443,11 +436,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         }
 
         # Identifica campos alterados
-        changed_fields = {
-            k: {"old": old_data[k], "new": new_data[k]}
-            for k in old_data
-            if old_data[k] != new_data[k]
-        }
+        changed_fields = {k: {"old": old_data[k], "new": new_data[k]} for k in old_data if old_data[k] != new_data[k]}
 
         # Se houver alterações, registra no AuditLog
         if changed_fields:
@@ -478,13 +467,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         from .models import Participation, Usuario
 
-        new_formador_ids = set(extra.get('formador_ids', []))
+        new_formador_ids = set(extra.get("formador_ids", []))
 
         # Formadores atuais
-        current_participations = Participation.objects.filter(
-            solicitacao=solicitacao,
-            role='FORMADOR'
-        )
+        current_participations = Participation.objects.filter(solicitacao=solicitacao, role="FORMADOR")
         current_ids = set(p.usuario_id for p in current_participations if p.usuario_id)
 
         # Calcular diferenças
@@ -495,36 +481,23 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         # Remover formadores
         if to_remove:
-            Participation.objects.filter(
-                solicitacao=solicitacao,
-                role='FORMADOR',
-                usuario_id__in=to_remove
-            ).delete()
+            Participation.objects.filter(solicitacao=solicitacao, role="FORMADOR", usuario_id__in=to_remove).delete()
             changed = True
 
         # Adicionar formadores com batch fetch (#406 - Query Optimization)
         if to_add:
             # Batch fetch: 1 query para todos os usuários em vez de N queries
-            usuarios_map = {
-                u.id: u for u in Usuario.objects.filter(id__in=to_add)
-            }
+            usuarios_map = {u.id: u for u in Usuario.objects.filter(id__in=to_add)}
 
             # Bulk create participations
             participations_to_create = [
-                Participation(
-                    solicitacao=solicitacao,
-                    usuario=usuarios_map[formador_id],
-                    role='FORMADOR'
-                )
+                Participation(solicitacao=solicitacao, usuario=usuarios_map[formador_id], role="FORMADOR")
                 for formador_id in to_add
                 if formador_id and formador_id in usuarios_map
             ]
 
             if participations_to_create:
-                Participation.objects.bulk_create(
-                    participations_to_create,
-                    ignore_conflicts=True
-                )
+                Participation.objects.bulk_create(participations_to_create, ignore_conflicts=True)
                 changed = True
 
         return changed
@@ -543,18 +516,22 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         # Bloquear exclusão de solicitações publicadas (ambos os fluxos)
         if instance.gcal_status == "PUBLISHED":
-            raise ValidationError({
-                "detail": "Não é possível excluir uma solicitação já publicada no Google Calendar. "
-                          "Cancele o evento primeiro se precisar excluir."
-            })
+            raise ValidationError(
+                {
+                    "detail": "Não é possível excluir uma solicitação já publicada no Google Calendar. "
+                    "Cancele o evento primeiro se precisar excluir."
+                }
+            )
 
         # Validação adicional para fluxo SUPER
         projeto_fluxo = instance.projeto.fluxo if instance.projeto else None
         if projeto_fluxo == "SUPER" and instance.status != "pendente":
-            raise ValidationError({
-                "detail": "Solicitações do fluxo SUPER só podem ser excluídas enquanto estiverem pendentes. "
-                          "Esta solicitação já foi aprovada ou reprovada."
-            })
+            raise ValidationError(
+                {
+                    "detail": "Solicitações do fluxo SUPER só podem ser excluídas enquanto estiverem pendentes. "
+                    "Esta solicitação já foi aprovada ou reprovada."
+                }
+            )
 
         # Capturar dados antes da exclusão para o AuditLog
         solicitacao_data = {
@@ -783,7 +760,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         summary="Aprovar em lote",
         description="Aprova múltiplas solicitações em lote (PA-05). Máx 100 por requisição.",
         request={"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}}}},
-        responses={200: {"type": "object", "properties": {"approved": {"type": "integer"}, "errors": {"type": "array"}}}},
+        responses={
+            200: {"type": "object", "properties": {"approved": {"type": "integer"}, "errors": {"type": "array"}}}
+        },
         examples=[SOLICITACAO_BATCH_APPROVE_REQUEST, SOLICITACAO_BATCH_APPROVE_RESPONSE],
         tags=["solicitacoes"],
     )

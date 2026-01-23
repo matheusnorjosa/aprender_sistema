@@ -1,29 +1,30 @@
 """
 Availability ViewSets (views ativas)
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
+
 from typing import Any
+
 from django.db.models import QuerySet
-from rest_framework.request import Request
-from rest_framework.response import Response
-
-from rest_framework import status, viewsets
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
-from drf_spectacular.types import OpenApiTypes
-
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from rest_framework import status, viewsets
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
+
+from .api_schemas import AVAILABILITY_CONFLICT_EXAMPLE, AVAILABILITY_OK_EXAMPLE, COMMON_ERROR_RESPONSES
 from .models import AvailabilityBlock, EquipeGerencia, Municipio, Usuario
 from .permissions import IsControleOrSuper
 from .serializers import AvailabilityBlockSerializer
 from .services.availability_service import check_conflicts
-from .api_schemas import COMMON_ERROR_RESPONSES, AVAILABILITY_OK_EXAMPLE, AVAILABILITY_CONFLICT_EXAMPLE
 
 
 def is_privileged_user(user):
@@ -31,17 +32,12 @@ def is_privileged_user(user):
     Verifica se o usuário tem permissão para acessar dados de outros usuários.
     Privilegiados: superuser, Superintendência, Controle
     """
-    return (
-        user.is_superuser
-        or user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
-    )
+    return user.is_superuser or user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
 
 
 def get_user_gerencias_ids(user) -> list[int]:
     """Retorna IDs de todas as gerências do usuário (via EquipeGerencia)."""
-    return list(
-        EquipeGerencia.objects.filter(usuario=user).values_list("gerencia_id", flat=True)
-    )
+    return list(EquipeGerencia.objects.filter(usuario=user).values_list("gerencia_id", flat=True))
 
 
 class AvailabilityBlockViewSet(viewsets.ModelViewSet):
@@ -75,9 +71,9 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
             return AvailabilityBlock.objects.select_related("usuario").filter(usuario=user)
 
         # Usuários na mesma gerência
-        usuarios_na_gerencia = EquipeGerencia.objects.filter(
-            gerencia_id__in=gerencias_ids
-        ).values_list("usuario_id", flat=True)
+        usuarios_na_gerencia = EquipeGerencia.objects.filter(gerencia_id__in=gerencias_ids).values_list(
+            "usuario_id", flat=True
+        )
 
         return AvailabilityBlock.objects.select_related("usuario").filter(usuario_id__in=usuarios_na_gerencia)
 
@@ -90,7 +86,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         automaticamente para que o bloqueio seja considerado imediatamente nas
         verificações de conflito (RD-02, RD-03).
         """
-        serializer.save(usuario=self.request.user, status='aprovado')
+        serializer.save(usuario=self.request.user, status="aprovado")
 
 
 class AvailabilityCheckView(APIView):
@@ -119,7 +115,12 @@ class AvailabilityCheckView(APIView):
             OpenApiParameter("usuario_id", OpenApiTypes.INT, required=True, description="ID do formador"),
             OpenApiParameter("inicio", OpenApiTypes.DATETIME, required=True, description="Data/hora início (ISO8601)"),
             OpenApiParameter("fim", OpenApiTypes.DATETIME, required=True, description="Data/hora fim (ISO8601)"),
-            OpenApiParameter("municipio_id", OpenApiTypes.INT, required=False, description="ID do município (para verificar deslocamento)"),
+            OpenApiParameter(
+                "municipio_id",
+                OpenApiTypes.INT,
+                required=False,
+                description="ID do município (para verificar deslocamento)",
+            ),
         ],
         responses={
             200: OpenApiExample(
@@ -206,9 +207,7 @@ class AvailabilityCheckView(APIView):
             fim = timezone.make_aware(fim, timezone.utc)
 
         # Executar checagem
-        result = check_conflicts(
-            usuario=usuario, inicio=inicio, fim=fim, municipio=municipio
-        )
+        result = check_conflicts(usuario=usuario, inicio=inicio, fim=fim, municipio=municipio)
 
         return Response(
             {
@@ -314,9 +313,7 @@ class AvailabilityCheckManyView(APIView):
                 all_ok = False
                 continue
 
-            result = check_conflicts(
-                usuario=usuario, inicio=inicio, fim=fim, municipio=municipio
-            )
+            result = check_conflicts(usuario=usuario, inicio=inicio, fim=fim, municipio=municipio)
 
             results.append(
                 {

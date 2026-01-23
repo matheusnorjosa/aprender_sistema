@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import json
 
-import pytest
 from django.core.management import call_command
+
+import pytest
 
 pytestmark = pytest.mark.django_db
 

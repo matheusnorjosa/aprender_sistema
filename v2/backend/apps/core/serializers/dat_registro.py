@@ -6,6 +6,7 @@ Type-checked with Pyright (strict mode).
 
 Ref: v2/docs/SPEC_DAT_REGISTROS.md
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
@@ -141,16 +142,18 @@ class DATRegistroCreateSerializer(serializers.ModelSerializer["DATRegistro"]):
         # Check projeto belongs to projeto_geral (if projeto has projeto_geral set)
         if projeto and projeto.projeto_geral and projeto_geral:
             if projeto.projeto_geral_id != projeto_geral.id:
-                raise serializers.ValidationError({
-                    "projeto": f"Projeto '{projeto.nome}' não pertence ao Projeto Geral '{projeto_geral.nome}'."
-                })
+                raise serializers.ValidationError(
+                    {"projeto": f"Projeto '{projeto.nome}' não pertence ao Projeto Geral '{projeto_geral.nome}'."}
+                )
 
         # Check professor_qtde for por_professor calculation
         if projeto_geral and projeto_geral.tipo_calculo_codigos == "por_professor":
             if not attrs.get("professor_qtde"):
-                raise serializers.ValidationError({
-                    "professor_qtde": "Quantidade de professores é obrigatória para projetos com cálculo por professor."
-                })
+                raise serializers.ValidationError(
+                    {
+                        "professor_qtde": "Quantidade de professores é obrigatória para projetos com cálculo por professor."
+                    }
+                )
 
         return attrs
 
@@ -203,9 +206,11 @@ class DATRegistroUpdateSerializer(serializers.ModelSerializer["DATRegistro"]):
             if instance.projeto_geral.tipo_calculo_codigos == "por_professor":
                 professor_qtde = attrs.get("professor_qtde", instance.professor_qtde)
                 if not professor_qtde:
-                    raise serializers.ValidationError({
-                        "professor_qtde": "Quantidade de professores é obrigatória para projetos com cálculo por professor."
-                    })
+                    raise serializers.ValidationError(
+                        {
+                            "professor_qtde": "Quantidade de professores é obrigatória para projetos com cálculo por professor."
+                        }
+                    )
         return attrs
 
     def update(self, instance: DATRegistro, validated_data: dict[str, Any]) -> DATRegistro:
@@ -223,9 +228,7 @@ class DATRegistroDetailSerializer(DATRegistroListSerializer):
     Includes all fields from list plus additional nested data.
     """
 
-    updated_by_nome = serializers.CharField(
-        source="updated_by.get_full_name", read_only=True, allow_null=True
-    )
+    updated_by_nome = serializers.CharField(source="updated_by.get_full_name", read_only=True, allow_null=True)
 
     class Meta(DATRegistroListSerializer.Meta):
         fields = DATRegistroListSerializer.Meta.fields + [

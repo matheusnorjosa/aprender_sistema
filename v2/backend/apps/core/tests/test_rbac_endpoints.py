@@ -10,20 +10,22 @@ Complementa test_approval_policy_PA.py com cenários adicionais:
 - Usuário não autenticado recebe 401
 - Formador (sem permissão) recebe 403
 """
+
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from datetime import timedelta
 from uuid import uuid4
 
-import pytest
 from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+import pytest
 
+from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 pytestmark = pytest.mark.django_db
 
@@ -94,9 +96,7 @@ def user_formador(grupo_formador):
 @pytest.fixture
 def solicitacao_pendente(user_formador):
     """Solicitação pendente para testes RBAC."""
-    municipio, _ = Municipio.objects.get_or_create(
-        nome="Fortaleza RBAC", defaults={"uf": "CE", "ativo": True}
-    )
+    municipio, _ = Municipio.objects.get_or_create(nome="Fortaleza RBAC", defaults={"uf": "CE", "ativo": True})
     projeto, _ = Projeto.objects.get_or_create(
         nome="Projeto RBAC SUPER",
         defaults={"ativo": True, "fluxo": "SUPER"},
@@ -127,9 +127,7 @@ class TestRBACApprovalEndpoints:
         client = APIClient()
         # Não autenticar - cliente sem credenciais
 
-        response = client.patch(
-            f"/api/solicitacoes/{solicitacao_pendente.id}/approve/"
-        )
+        response = client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/approve/")
 
         assert response.status_code in (
             status.HTTP_401_UNAUTHORIZED,
@@ -158,13 +156,9 @@ class TestRBACApprovalEndpoints:
         client = APIClient()
         client.force_authenticate(user=user_formador)
 
-        response = client.patch(
-            f"/api/solicitacoes/{solicitacao_pendente.id}/approve/"
-        )
+        response = client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/approve/")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN, (
-            f"Esperado 403, recebido {response.status_code}"
-        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN, f"Esperado 403, recebido {response.status_code}"
 
     def test_formador_cannot_reject(self, solicitacao_pendente, user_formador):
         """Formador recebe 403 ao tentar reprovar."""
@@ -176,9 +170,7 @@ class TestRBACApprovalEndpoints:
             {"justificativa": "Teste"},
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN, (
-            f"Esperado 403, recebido {response.status_code}"
-        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN, f"Esperado 403, recebido {response.status_code}"
 
     def test_dat_can_approve(self, solicitacao_pendente, user_dat):
         """DAT pode aprovar (PA-02 Adaptada).
@@ -189,9 +181,7 @@ class TestRBACApprovalEndpoints:
         client = APIClient()
         client.force_authenticate(user=user_dat)
 
-        response = client.patch(
-            f"/api/solicitacoes/{solicitacao_pendente.id}/approve/"
-        )
+        response = client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/approve/")
 
         assert response.status_code in (
             status.HTTP_200_OK,
@@ -205,9 +195,7 @@ class TestRBACApprovalEndpoints:
     def test_dat_can_reject(self, user_dat, user_formador):
         """DAT pode reprovar (PA-02 Adaptada)."""
         # Criar nova solicitação para este teste
-        municipio, _ = Municipio.objects.get_or_create(
-            nome="Fortaleza RBAC", defaults={"uf": "CE", "ativo": True}
-        )
+        municipio, _ = Municipio.objects.get_or_create(nome="Fortaleza RBAC", defaults={"uf": "CE", "ativo": True})
         projeto, _ = Projeto.objects.get_or_create(
             nome="Projeto RBAC SUPER",
             defaults={"ativo": True, "fluxo": "SUPER"},
@@ -242,16 +230,12 @@ class TestRBACApprovalEndpoints:
         solicitacao.refresh_from_db()
         assert solicitacao.status == "reprovado"
 
-    def test_superintendencia_can_approve(
-        self, solicitacao_pendente, user_superintendencia
-    ):
+    def test_superintendencia_can_approve(self, solicitacao_pendente, user_superintendencia):
         """Superintendência pode aprovar (PA-02)."""
         client = APIClient()
         client.force_authenticate(user=user_superintendencia)
 
-        response = client.patch(
-            f"/api/solicitacoes/{solicitacao_pendente.id}/approve/"
-        )
+        response = client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/approve/")
 
         assert response.status_code in (
             status.HTTP_200_OK,
@@ -261,9 +245,7 @@ class TestRBACApprovalEndpoints:
     def test_superintendencia_can_reject(self, user_superintendencia, user_formador):
         """Superintendência pode reprovar (PA-02)."""
         # Criar nova solicitação para este teste
-        municipio, _ = Municipio.objects.get_or_create(
-            nome="Fortaleza RBAC", defaults={"uf": "CE", "ativo": True}
-        )
+        municipio, _ = Municipio.objects.get_or_create(nome="Fortaleza RBAC", defaults={"uf": "CE", "ativo": True})
         projeto, _ = Projeto.objects.get_or_create(
             nome="Projeto RBAC SUPER",
             defaults={"ativo": True, "fluxo": "SUPER"},

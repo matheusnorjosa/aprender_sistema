@@ -5,6 +5,7 @@ Models de solicitacao de eventos: Solicitacao, Participation.
 Clausulas Petreas: PA-01 a PA-07, RD-06.
 Type-checked with Pyright (strict mode).
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -36,6 +37,7 @@ class Solicitacao(models.Model):
 
     class GCalStatus(models.TextChoices):
         """Status de sincronizacao com Google Calendar."""
+
         NONE = "NONE", "Nao publicado"
         PENDING = "PENDING", "Aguardando publicacao"
         PUBLISHED = "PUBLISHED", "Publicado"
@@ -74,9 +76,7 @@ class Solicitacao(models.Model):
         help_text="PA-01: Sempre comeca pendente",
     )
 
-    observacoes = models.TextField(
-        blank=True, help_text="Observacoes adicionais sobre o evento"
-    )
+    observacoes = models.TextField(blank=True, help_text="Observacoes adicionais sobre o evento")
 
     local = models.CharField(
         max_length=300,
@@ -233,13 +233,13 @@ class Solicitacao(models.Model):
             ),
             # Issue #136: Check constraint for status choices
             models.CheckConstraint(
-                check=models.Q(status__in=['pendente', 'aprovado', 'reprovado']),
-                name='solicitacao_status_valid',
+                check=models.Q(status__in=["pendente", "aprovado", "reprovado"]),
+                name="solicitacao_status_valid",
             ),
             # Issue #136: Check constraint for gcal_status choices
             models.CheckConstraint(
-                check=models.Q(gcal_status__in=['NONE', 'PENDING', 'PUBLISHED', 'ERROR']),
-                name='solicitacao_gcal_status_valid',
+                check=models.Q(gcal_status__in=["NONE", "PENDING", "PUBLISHED", "ERROR"]),
+                name="solicitacao_gcal_status_valid",
             ),
         ]
 
@@ -311,8 +311,8 @@ class Solicitacao(models.Model):
         - PR18: RESTAURA auto-aprovacao para NAO_SUPER conforme especificacao correta
         """
         # Auto-aprovar apenas projetos NAO_SUPER na criacao
-        if self.pk is None and self.projeto and self.projeto.fluxo == 'NAO_SUPER':
-            self.status = 'aprovado'
+        if self.pk is None and self.projeto and self.projeto.fluxo == "NAO_SUPER":
+            self.status = "aprovado"
 
         super().save(*args, **kwargs)
 
@@ -358,9 +358,7 @@ class Participation(models.Model):
         choices=Role.choices,
         verbose_name="Papel",
     )
-    ch_horas = models.DecimalField(
-        max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="CH (horas)"
-    )
+    ch_horas = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="CH (horas)")
     observacao = models.TextField(null=True, blank=True, verbose_name="Observacao")
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")

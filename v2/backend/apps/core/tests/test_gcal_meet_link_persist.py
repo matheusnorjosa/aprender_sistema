@@ -10,19 +10,22 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from unittest.mock import patch, MagicMock
-from django.contrib.auth.models import Group
-from rest_framework.test import APIClient
-from django.utils import timezone
+
 from datetime import timedelta
+from unittest.mock import MagicMock, patch
+
+from django.contrib.auth.models import Group
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import (
-    Usuario,
     Municipio,
     Projeto,
-    TipoEvento,
     Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 
 
@@ -65,15 +68,10 @@ def solicitacao_aprovada(usuario_controle):
 class TestMeetLinkPersistence:
     """Testes para persistência de meet_link"""
 
-    @patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
-    @patch('apps.core.services.gcal_google_client.GoogleCalendarClient')
+    @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+    @patch("apps.core.services.gcal_google_client.GoogleCalendarClient")
     def test_apply_persists_meet_link_when_hangoutlink_returned(
-        self,
-        MockGoogleClient,
-        mock_task,
-        usuario_controle,
-        solicitacao_aprovada,
-        settings
+        self, MockGoogleClient, mock_task, usuario_controle, solicitacao_aprovada, settings
     ):
         """
         RF06: APPLY real deve persistir meet_link quando API retorna hangoutLink.
@@ -95,7 +93,7 @@ class TestMeetLinkPersistence:
         mock_client_instance = MockGoogleClient.return_value
         mock_client_instance.insert.return_value = {
             "id": "gcal-event-123",
-            "hangoutLink": "https://meet.google.com/xyz-abcd-efg"
+            "hangoutLink": "https://meet.google.com/xyz-abcd-efg",
         }
 
         # Garantir que a task retorna imediatamente (mock)
@@ -111,7 +109,7 @@ class TestMeetLinkPersistence:
         response = client.post(
             f"/api/solicitacoes/{solicitacao_aprovada.id}/publish/",
             {"dry_run": False, "apply_blocked": False},
-            format="json"
+            format="json",
         )
 
         # Verificar que publicação foi aceita
@@ -122,13 +120,8 @@ class TestMeetLinkPersistence:
         # O teste de persistência real está em test_gcal_sync_service.py
         mock_task.assert_called_once()
 
-    @patch('apps.core.services.gcal_sync_service.build_preview_for_solicitacao')
-    def test_preview_does_not_persist_meet_link(
-        self,
-        mock_build_preview,
-        usuario_controle,
-        solicitacao_aprovada
-    ):
+    @patch("apps.core.services.gcal_sync_service.build_preview_for_solicitacao")
+    def test_preview_does_not_persist_meet_link(self, mock_build_preview, usuario_controle, solicitacao_aprovada):
         """
         RF06: PREVIEW não deve persistir meet_link no DB.
 
@@ -150,7 +143,7 @@ class TestMeetLinkPersistence:
                 "end": {},
             },
             "meet_link": "https://meet.google.com/preview-fake-link",
-            "payload_hash": "abc123"
+            "payload_hash": "abc123",
         }
 
         client = APIClient()
@@ -160,10 +153,7 @@ class TestMeetLinkPersistence:
         assert solicitacao_aprovada.meet_link is None
 
         # POST preview
-        response = client.post(
-            f"/api/solicitacoes/{solicitacao_aprovada.id}/preview-gcal/",
-            format="json"
-        )
+        response = client.post(f"/api/solicitacoes/{solicitacao_aprovada.id}/preview-gcal/", format="json")
 
         # Verificar resposta
         assert response.status_code == 200
@@ -175,15 +165,9 @@ class TestMeetLinkPersistence:
         solicitacao_aprovada.refresh_from_db()
 
         # Verificar que meet_link NÃO foi persistido
-        assert solicitacao_aprovada.meet_link is None, \
-            "PREVIEW nunca deve persistir meet_link no DB"
+        assert solicitacao_aprovada.meet_link is None, "PREVIEW nunca deve persistir meet_link no DB"
 
-    def test_apply_blocked_does_not_persist_meet_link(
-        self,
-        usuario_controle,
-        solicitacao_aprovada,
-        settings
-    ):
+    def test_apply_blocked_does_not_persist_meet_link(self, usuario_controle, solicitacao_aprovada, settings):
         """
         RF06: apply_blocked (409) não deve persistir meet_link.
 
@@ -209,7 +193,7 @@ class TestMeetLinkPersistence:
         response = client.post(
             f"/api/solicitacoes/{solicitacao_aprovada.id}/publish/",
             {"dry_run": False, "apply_blocked": False},
-            format="json"
+            format="json",
         )
 
         # Verificar que publicação foi bloqueada
@@ -219,15 +203,9 @@ class TestMeetLinkPersistence:
         solicitacao_aprovada.refresh_from_db()
 
         # Verificar que meet_link NÃO foi persistido
-        assert solicitacao_aprovada.meet_link is None, \
-            "apply_blocked (409) nunca deve persistir meet_link"
+        assert solicitacao_aprovada.meet_link is None, "apply_blocked (409) nunca deve persistir meet_link"
 
-    def test_dry_run_does_not_persist_meet_link(
-        self,
-        usuario_controle,
-        solicitacao_aprovada,
-        settings
-    ):
+    def test_dry_run_does_not_persist_meet_link(self, usuario_controle, solicitacao_aprovada, settings):
         """
         RF06: dry_run não deve persistir meet_link.
 
@@ -251,7 +229,7 @@ class TestMeetLinkPersistence:
         response = client.post(
             f"/api/solicitacoes/{solicitacao_aprovada.id}/publish/",
             {"dry_run": True, "apply_blocked": False},
-            format="json"
+            format="json",
         )
 
         # Verificar que publicação foi aceita (dry_run permitido)
@@ -261,5 +239,4 @@ class TestMeetLinkPersistence:
         solicitacao_aprovada.refresh_from_db()
 
         # Verificar que meet_link NÃO foi persistido
-        assert solicitacao_aprovada.meet_link is None, \
-            "dry_run nunca deve persistir meet_link"
+        assert solicitacao_aprovada.meet_link is None, "dry_run nunca deve persistir meet_link"

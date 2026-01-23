@@ -6,6 +6,7 @@ Cada plano pode ter ate 2 acompanhamentos (1o e 2o).
 
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
@@ -38,31 +39,16 @@ class Acompanhamento(models.Model):
         "core.PlanoFormacoes",
         on_delete=models.CASCADE,
         related_name="acompanhamentos",
-        verbose_name="Plano de Formacoes"
+        verbose_name="Plano de Formacoes",
     )
 
     # Tipo do acompanhamento
-    tipo = models.CharField(
-        max_length=20,
-        choices=TipoAcompanhamento.choices,
-        verbose_name="Tipo de Acompanhamento"
-    )
+    tipo = models.CharField(max_length=20, choices=TipoAcompanhamento.choices, verbose_name="Tipo de Acompanhamento")
 
     # Dados
-    data_acompanhamento = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data do Acompanhamento"
-    )
-    realizado = models.BooleanField(
-        default=False,
-        verbose_name="Realizado"
-    )
-    observacoes = models.TextField(
-        blank=True,
-        max_length=500,
-        verbose_name="Observacoes"
-    )
+    data_acompanhamento = models.DateField(null=True, blank=True, verbose_name="Data do Acompanhamento")
+    realizado = models.BooleanField(default=False, verbose_name="Realizado")
+    observacoes = models.TextField(blank=True, max_length=500, verbose_name="Observacoes")
 
     # Timestamps
     created_at = models.DateTimeField(default=timezone.now)
@@ -78,12 +64,7 @@ class Acompanhamento(models.Model):
             models.Index(fields=["data_acompanhamento"]),
             models.Index(fields=["realizado"]),
         ]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["plano", "tipo"],
-                name="unique_acompanhamento_plano_tipo"
-            )
-        ]
+        constraints = [models.UniqueConstraint(fields=["plano", "tipo"], name="unique_acompanhamento_plano_tipo")]
 
     def __str__(self) -> str:
         tipo_display = "1o" if self.tipo == self.TipoAcompanhamento.PRIMEIRO else "2o"

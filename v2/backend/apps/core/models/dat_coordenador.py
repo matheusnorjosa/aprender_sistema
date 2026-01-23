@@ -5,6 +5,7 @@ Models para gestao de coordenadores do DAT e suas areas de atuacao.
 
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
@@ -24,22 +25,12 @@ class DATArea(models.Model):
     Ex: DAT, Tecnologia, Pedagogico, Administrativo, etc.
     """
 
-    nome = models.CharField(
-        max_length=100,
-        unique=True,
-        verbose_name="Nome da Area"
-    )
+    nome = models.CharField(max_length=100, unique=True, verbose_name="Nome da Area")
     cor = models.CharField(
-        max_length=20,
-        blank=True,
-        verbose_name="Cor",
-        help_text="Cor para exibicao na UI (ex: blue, green, red)"
+        max_length=20, blank=True, verbose_name="Cor", help_text="Cor para exibicao na UI (ex: blue, green, red)"
     )
     ativo = models.BooleanField(default=True)
-    ordem = models.PositiveSmallIntegerField(
-        default=0,
-        verbose_name="Ordem de Exibicao"
-    )
+    ordem = models.PositiveSmallIntegerField(default=0, verbose_name="Ordem de Exibicao")
 
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -65,69 +56,29 @@ class DATCoordenador(models.Model):
     """
 
     # Dados pessoais
-    nome = models.CharField(
-        max_length=200,
-        verbose_name="Nome Completo"
-    )
-    email = models.EmailField(
-        blank=True,
-        verbose_name="Email Principal"
-    )
-    email_alternativo = models.EmailField(
-        blank=True,
-        verbose_name="Email Alternativo"
-    )
-    telefone = models.CharField(
-        max_length=20,
-        blank=True,
-        verbose_name="Telefone Principal"
-    )
-    telefone_alternativo = models.CharField(
-        max_length=20,
-        blank=True,
-        verbose_name="Telefone Alternativo"
-    )
+    nome = models.CharField(max_length=200, verbose_name="Nome Completo")
+    email = models.EmailField(blank=True, verbose_name="Email Principal")
+    email_alternativo = models.EmailField(blank=True, verbose_name="Email Alternativo")
+    telefone = models.CharField(max_length=20, blank=True, verbose_name="Telefone Principal")
+    telefone_alternativo = models.CharField(max_length=20, blank=True, verbose_name="Telefone Alternativo")
 
     # Area e cargo
-    area = models.CharField(
-        max_length=100,
-        verbose_name="Area de Atuacao",
-        help_text="Ex: DAT, Tecnologia, Pedagogico"
-    )
-    cargo = models.CharField(
-        max_length=100,
-        blank=True,
-        verbose_name="Cargo"
-    )
+    area = models.CharField(max_length=100, verbose_name="Area de Atuacao", help_text="Ex: DAT, Tecnologia, Pedagogico")
+    cargo = models.CharField(max_length=100, blank=True, verbose_name="Cargo")
 
     # Status
     ativo = models.BooleanField(default=True)
-    data_admissao = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data de Admissao"
-    )
+    data_admissao = models.DateField(null=True, blank=True, verbose_name="Data de Admissao")
 
     # Foto
-    foto_url = models.URLField(
-        max_length=500,
-        blank=True,
-        verbose_name="URL da Foto"
-    )
+    foto_url = models.URLField(max_length=500, blank=True, verbose_name="URL da Foto")
 
     # Observacoes
-    observacoes = models.TextField(
-        blank=True,
-        max_length=2000,
-        verbose_name="Observacoes"
-    )
+    observacoes = models.TextField(blank=True, max_length=2000, verbose_name="Observacoes")
 
     # Auditoria
     created_by: models.ForeignKey[Usuario] = models.ForeignKey(  # type: ignore[assignment]
-        "core.Usuario",
-        on_delete=models.PROTECT,
-        related_name="dat_coordenadores_criados",
-        verbose_name="Criado por"
+        "core.Usuario", on_delete=models.PROTECT, related_name="dat_coordenadores_criados", verbose_name="Criado por"
     )
     updated_by: models.ForeignKey[Usuario | None] = models.ForeignKey(  # type: ignore[assignment]
         "core.Usuario",
@@ -135,7 +86,7 @@ class DATCoordenador(models.Model):
         null=True,
         blank=True,
         related_name="dat_coordenadores_atualizados",
-        verbose_name="Atualizado por"
+        verbose_name="Atualizado por",
     )
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)

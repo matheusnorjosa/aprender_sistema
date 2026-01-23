@@ -11,16 +11,18 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from io import StringIO
-from unittest.mock import patch, MagicMock
+
 from datetime import datetime
+from io import StringIO
+from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
-from django.core.management import call_command
 from django.contrib.auth.models import Group
+from django.core.management import call_command
 
-from apps.core.models import Solicitacao, Projeto, Municipio, Usuario, Participation, TipoEvento
+import pytest
+
+from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
 
 
 @pytest.mark.django_db
@@ -88,9 +90,9 @@ class TestImportFluirCommand:
     def _normalize_username(self, nome_completo: str) -> str:
         """Normaliza nome completo para username."""
         import unicodedata
+
         nome_sem_acento = "".join(
-            c for c in unicodedata.normalize("NFD", nome_completo)
-            if unicodedata.category(c) != "Mn"
+            c for c in unicodedata.normalize("NFD", nome_completo) if unicodedata.category(c) != "Mn"
         )
         username = nome_sem_acento.lower().replace(" ", "_")
         return username

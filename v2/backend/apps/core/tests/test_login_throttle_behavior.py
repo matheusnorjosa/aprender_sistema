@@ -27,16 +27,18 @@ Ver seção "Testing" em SECURITY.md para script curl.
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 import time
 from uuid import uuid4
+
 from django.core.cache import cache
 from django.test import override_settings
-from rest_framework.test import APIClient
 from rest_framework import status
+from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import Usuario
-
 
 pytestmark = pytest.mark.django_db
 
@@ -88,8 +90,10 @@ def test_throttle_allows_10_requests_in_1_minute(api_client_with_cache, usuario_
             REMOTE_ADDR=f"192.168.1.{i}",  # IPs diferentes para evitar throttle compartilhado
         )
         # Deve retornar 200 (sucesso) ou 400 (credencial inválida), nunca 429
-        assert response.status_code in [status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST], \
-            f"Request {i+1}/10 retornou {response.status_code} (esperado 200/400)"
+        assert response.status_code in [
+            status.HTTP_200_OK,
+            status.HTTP_400_BAD_REQUEST,
+        ], f"Request {i+1}/10 retornou {response.status_code} (esperado 200/400)"
 
 
 @pytest.mark.skip(reason="Requer cache persistente entre requests. Validar MANUALMENTE em staging (ver SECURITY.md)")
@@ -116,8 +120,10 @@ def test_throttle_blocks_11th_request_in_1_minute(api_client_with_cache, usuario
             format="json",
             REMOTE_ADDR=test_ip,
         )
-        assert response.status_code in [status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST], \
-            f"Request {i+1}/10 retornou {response.status_code} (esperado 200/400, não 429)"
+        assert response.status_code in [
+            status.HTTP_200_OK,
+            status.HTTP_400_BAD_REQUEST,
+        ], f"Request {i+1}/10 retornou {response.status_code} (esperado 200/400, não 429)"
 
     # 11ª requisição deve ser bloqueada
     response = api_client_with_cache.post(
@@ -127,8 +133,9 @@ def test_throttle_blocks_11th_request_in_1_minute(api_client_with_cache, usuario
         REMOTE_ADDR=test_ip,
     )
 
-    assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS, \
-        f"11ª requisição retornou {response.status_code} (esperado 429)"
+    assert (
+        response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    ), f"11ª requisição retornou {response.status_code} (esperado 429)"
 
     # Validar mensagem de erro
     assert "detail" in response.data, "Response deve conter campo 'detail' com mensagem de erro"
@@ -179,11 +186,15 @@ def test_throttle_resets_after_time_window(api_client_with_cache, usuario_valido
         format="json",
         REMOTE_ADDR=test_ip,
     )
-    assert response.status_code in [status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST], \
-        f"Após 61s, requisição retornou {response.status_code} (esperado 200/400, não 429)"
+    assert response.status_code in [
+        status.HTTP_200_OK,
+        status.HTTP_400_BAD_REQUEST,
+    ], f"Após 61s, requisição retornou {response.status_code} (esperado 200/400, não 429)"
 
 
-@pytest.mark.skip(reason="Requer cache persistente sem interferências. Em CI paralelo (pytest-xdist), cache.clear() de outros testes reseta contador de throttle, causando flake (11ª request retorna 400 em vez de 429). Validar MANUALMENTE em staging (ver SECURITY.md)")
+@pytest.mark.skip(
+    reason="Requer cache persistente sem interferências. Em CI paralelo (pytest-xdist), cache.clear() de outros testes reseta contador de throttle, causando flake (11ª request retorna 400 em vez de 429). Validar MANUALMENTE em staging (ver SECURITY.md)"
+)
 def test_throttle_does_not_leak_credential_info(api_client_with_cache):
     """
     SEC-P1: Throttling não deve vazar informação sobre credenciais válidas/inválidas.
@@ -206,8 +217,9 @@ def test_throttle_does_not_leak_credential_info(api_client_with_cache):
             format="json",
             REMOTE_ADDR=test_ip,
         )
-        assert response.status_code == status.HTTP_400_BAD_REQUEST, \
-            f"Request {i+1}/10 com credenciais inválidas retornou {response.status_code} (esperado 400)"
+        assert (
+            response.status_code == status.HTTP_400_BAD_REQUEST
+        ), f"Request {i+1}/10 com credenciais inválidas retornou {response.status_code} (esperado 400)"
 
     # 11ª requisição deve ser bloqueada pelo throttle (429), não pela validação (400)
     response = api_client_with_cache.post(
@@ -217,8 +229,9 @@ def test_throttle_does_not_leak_credential_info(api_client_with_cache):
         REMOTE_ADDR=test_ip,
     )
 
-    assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS, \
-        f"11ª requisição retornou {response.status_code} (esperado 429, não 400)"
+    assert (
+        response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    ), f"11ª requisição retornou {response.status_code} (esperado 429, não 400)"
 
 
 @pytest.mark.skip(reason="Requer cache persistente entre requests. Validar MANUALMENTE em staging (ver SECURITY.md)")
@@ -252,8 +265,9 @@ def test_throttle_independent_per_ip(api_client_with_cache, usuario_valido):
         format="json",
         REMOTE_ADDR=ip1,
     )
-    assert response_ip1_11th.status_code == status.HTTP_429_TOO_MANY_REQUESTS, \
-        "IP1 deve ser bloqueado na 11ª requisição"
+    assert (
+        response_ip1_11th.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    ), "IP1 deve ser bloqueado na 11ª requisição"
 
     # IP2 ainda deve conseguir fazer requisições (não afetado pelo IP1)
     response_ip2 = api_client_with_cache.post(
@@ -262,8 +276,10 @@ def test_throttle_independent_per_ip(api_client_with_cache, usuario_valido):
         format="json",
         REMOTE_ADDR=ip2,
     )
-    assert response_ip2.status_code in [status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST], \
-        f"IP2 retornou {response_ip2.status_code} (esperado 200/400, não 429)"
+    assert response_ip2.status_code in [
+        status.HTTP_200_OK,
+        status.HTTP_400_BAD_REQUEST,
+    ], f"IP2 retornou {response_ip2.status_code} (esperado 200/400, não 429)"
 
 
 # ===================================================================
@@ -271,7 +287,9 @@ def test_throttle_independent_per_ip(api_client_with_cache, usuario_valido):
 # ===================================================================
 
 
-@pytest.mark.skip(reason="Requer cache persistente entre requests. Em CI paralelo (pytest-xdist), cache.clear() de outros testes interfere. Validar MANUALMENTE em staging (ver SECURITY.md)")
+@pytest.mark.skip(
+    reason="Requer cache persistente entre requests. Em CI paralelo (pytest-xdist), cache.clear() de outros testes interfere. Validar MANUALMENTE em staging (ver SECURITY.md)"
+)
 def test_throttle_with_empty_credentials(api_client_with_cache):
     """
     SEC-P1: Credenciais vazias também contam para rate limit.
@@ -300,5 +318,4 @@ def test_throttle_with_empty_credentials(api_client_with_cache):
         format="json",
         REMOTE_ADDR=test_ip,
     )
-    assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS, \
-        "Credenciais vazias devem contar para rate limit"
+    assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS, "Credenciais vazias devem contar para rate limit"

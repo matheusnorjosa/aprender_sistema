@@ -4,6 +4,7 @@ OAuth Service Package - §7 Epic #459
 Modularized OAuth services for Google Calendar integration.
 Re-exports from token_manager and oauth_flow for convenience.
 """
+
 # pyright: reportUnknownVariableType=false, reportMissingImports=false
 
 from .oauth_flow import (

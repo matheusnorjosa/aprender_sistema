@@ -12,12 +12,12 @@ Output:
     - Relatório de formadores criados/atualizados/skipped
 """
 
-
 from __future__ import annotations
+
 from typing import Any
 
-from django.core.management.base import BaseCommand
 from django.contrib.auth.models import Group
+from django.core.management.base import BaseCommand
 
 from apps.core.models import Usuario
 from apps.dat_ingest.services.parse_fluir import get_formadores_fluir
@@ -59,9 +59,7 @@ class Command(BaseCommand):
 
             if created:
                 stats["created"] += 1
-                self.stdout.write(
-                    self.style.SUCCESS(f"  ✅ Criado: {nome_completo} ({username})")
-                )
+                self.stdout.write(self.style.SUCCESS(f"  ✅ Criado: {nome_completo} ({username})"))
             else:
                 # Atualizar campos se necessário
                 updated = False
@@ -71,21 +69,15 @@ class Command(BaseCommand):
                 if updated:
                     usuario.save()
                     stats["updated"] += 1
-                    self.stdout.write(
-                        self.style.WARNING(f"  🔄 Atualizado: {nome_completo} ({username})")
-                    )
+                    self.stdout.write(self.style.WARNING(f"  🔄 Atualizado: {nome_completo} ({username})"))
                 else:
                     stats["skipped"] += 1
-                    self.stdout.write(
-                        self.style.NOTICE(f"  ⏭️  Já existe: {nome_completo} ({username})")
-                    )
+                    self.stdout.write(self.style.NOTICE(f"  ⏭️  Já existe: {nome_completo} ({username})"))
 
             # Adicionar ao grupo Formador se não estiver
             if not usuario.groups.filter(name="Formador").exists():
                 usuario.groups.add(grupo_formador)
-                self.stdout.write(
-                    self.style.NOTICE(f"      ➕ Adicionado ao grupo Formador")
-                )
+                self.stdout.write(self.style.NOTICE("      ➕ Adicionado ao grupo Formador"))
 
         # Resumo
         self.stdout.write("\n" + "=" * 60)
@@ -109,9 +101,7 @@ class Command(BaseCommand):
 
         # Remover acentos
         nome_sem_acento = "".join(
-            c
-            for c in unicodedata.normalize("NFD", nome_completo)
-            if unicodedata.category(c) != "Mn"
+            c for c in unicodedata.normalize("NFD", nome_completo) if unicodedata.category(c) != "Mn"
         )
 
         # Lowercase + substituir espaços por underscore

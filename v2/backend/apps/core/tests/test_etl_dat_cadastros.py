@@ -13,18 +13,20 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import csv
 import json
 import tempfile
-import pytest
 from datetime import date
 from pathlib import Path
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
+import pytest
+
 from apps.core.models import AcaoDAT, Municipio, Projeto
 from apps.core.services.dat_cadastros_import import import_dat_cadastros
-
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
@@ -55,18 +57,17 @@ def test_import_creates_acao_dat():
     projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Tipo de Ação": "Cadastro INEP",
-            "Responsável": "resp@example.com",
-            "Data Registro": "2025-01-15",
-            "Observação": "Cadastro realizado",
-        }],
-        fieldnames=[
-            "Município", "Projeto", "Tipo de Ação",
-            "Responsável", "Data Registro", "Observação"
-        ]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": "Cadastro INEP",
+                "Responsável": "resp@example.com",
+                "Data Registro": "2025-01-15",
+                "Observação": "Cadastro realizado",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Responsável", "Data Registro", "Observação"],
     )
 
     report = import_dat_cadastros(csv_file, dry_run=False)
@@ -91,13 +92,15 @@ def test_idempotency_no_duplicates():
     projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Tipo de Ação": "Cadastro INEP",
-            "Data Registro": "2025-01-15",
-        }],
-        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": "Cadastro INEP",
+                "Data Registro": "2025-01-15",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"],
     )
 
     # Primeira rodada
@@ -119,13 +122,15 @@ def test_dry_run_does_not_commit():
     projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Tipo de Ação": "Cadastro INEP",
-            "Data Registro": "2025-01-15",
-        }],
-        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": "Cadastro INEP",
+                "Data Registro": "2025-01-15",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"],
     )
 
     report = import_dat_cadastros(csv_file, dry_run=True)
@@ -143,12 +148,14 @@ def test_skip_missing_tipo_acao():
     projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Data Registro": "2025-01-01",
-        }],
-        fieldnames=["Município", "Projeto", "Data Registro"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Data Registro": "2025-01-01",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Data Registro"],
     )
 
     report = import_dat_cadastros(csv_file, dry_run=False)
@@ -166,12 +173,14 @@ def test_report_saved_to_out_etl():
     projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Tipo de Ação": "Cadastro INEP",
-        }],
-        fieldnames=["Município", "Projeto", "Tipo de Ação"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": "Cadastro INEP",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação"],
     )
 
     import_dat_cadastros(csv_file, dry_run=False)
@@ -195,13 +204,15 @@ def test_responsavel_optional():
     projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Tipo de Ação": "Cadastro SIGPEC",
-            "Data Registro": "2025-01-01",
-        }],
-        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": "Cadastro SIGPEC",
+                "Data Registro": "2025-01-01",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"],
     )
 
     report = import_dat_cadastros(csv_file, dry_run=False)
@@ -220,14 +231,16 @@ def test_update_existing_record():
 
     # Criar inicial
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Tipo de Ação": "Cadastro Teste",
-            "Data Registro": "2025-01-01",
-            "Observação": "Versão 1",
-        }],
-        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro", "Observação"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": "Cadastro Teste",
+                "Data Registro": "2025-01-01",
+                "Observação": "Versão 1",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro", "Observação"],
     )
 
     report1 = import_dat_cadastros(csv_file, dry_run=False)
@@ -235,14 +248,16 @@ def test_update_existing_record():
 
     # Atualizar observação
     csv_file2 = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Tipo de Ação": "Cadastro Teste",
-            "Data Registro": "2025-01-01",
-            "Observação": "Versão 2 - atualizada",
-        }],
-        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro", "Observação"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": "Cadastro Teste",
+                "Data Registro": "2025-01-01",
+                "Observação": "Versão 2 - atualizada",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro", "Observação"],
     )
 
     report2 = import_dat_cadastros(csv_file2, dry_run=False)
@@ -274,7 +289,7 @@ def test_external_hash_includes_tipo_acao():
                 "Data Registro": "2025-01-01",
             },
         ],
-        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"],
     )
 
     report = import_dat_cadastros(csv_file, dry_run=False)
@@ -308,7 +323,7 @@ def test_date_parsing_formats():
                 "Data Registro": "20/01/2025",
             },
         ],
-        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"]
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"],
     )
 
     report = import_dat_cadastros(csv_file, dry_run=False)

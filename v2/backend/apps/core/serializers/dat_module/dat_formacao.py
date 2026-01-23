@@ -4,6 +4,7 @@ DATFormacao Serializers - §10 Epic #459
 Training/formation event serializers.
 Extracted from serializers/dat_module.py.
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations
@@ -17,15 +18,9 @@ class DATFormacaoSerializer(serializers.ModelSerializer["DATFormacao"]):
     """Full serializer for DATFormacao (CRUD)."""
 
     # FK names
-    municipio_nome = serializers.CharField(
-        source="municipio.nome", read_only=True
-    )
-    projeto_nome = serializers.CharField(
-        source="projeto.nome", read_only=True
-    )
-    coordenador_nome = serializers.CharField(
-        source="coordenador.nome", read_only=True, allow_null=True
-    )
+    municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
+    projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    coordenador_nome = serializers.CharField(source="coordenador.nome", read_only=True, allow_null=True)
 
     # Computed
     duracao_horas = serializers.FloatField(read_only=True)
@@ -33,9 +28,7 @@ class DATFormacaoSerializer(serializers.ModelSerializer["DATFormacao"]):
     documentacao_completa = serializers.BooleanField(read_only=True)
 
     # Audit
-    created_by_nome = serializers.CharField(
-        source="created_by.get_full_name", read_only=True
-    )
+    created_by_nome = serializers.CharField(source="created_by.get_full_name", read_only=True)
 
     class Meta:
         model = DATFormacao
@@ -95,9 +88,7 @@ class DATFormacaoListSerializer(serializers.ModelSerializer["DATFormacao"]):
 
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
-    coordenador_nome = serializers.CharField(
-        source="coordenador.nome", read_only=True, allow_null=True
-    )
+    coordenador_nome = serializers.CharField(source="coordenador.nome", read_only=True, allow_null=True)
     duracao_horas = serializers.FloatField(read_only=True)
     taxa_presenca = serializers.FloatField(read_only=True)
     documentacao_completa = serializers.BooleanField(read_only=True)

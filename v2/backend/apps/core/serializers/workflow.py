@@ -4,6 +4,7 @@ AS v2 — Workflow Serializers
 Serializers para AcaoControle, AcaoDAT, Deslocamento.
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations
@@ -159,15 +160,11 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
         # Validação 1: start_date < end_date
         if start_date is not None and end_date is not None:
             if end_date <= start_date:
-                raise serializers.ValidationError(
-                    {"end_date": "Data fim deve ser posterior à data início"}
-                )
+                raise serializers.ValidationError({"end_date": "Data fim deve ser posterior à data início"})
 
         # Validação 2: origem != destino
         if origem is not None and destino is not None:
             if origem.strip().lower() == destino.strip().lower():
-                raise serializers.ValidationError(
-                    {"destino": "Origem e destino devem ser diferentes"}
-                )
+                raise serializers.ValidationError({"destino": "Origem e destino devem ser diferentes"})
 
         return super().validate(attrs)

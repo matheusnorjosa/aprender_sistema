@@ -17,17 +17,20 @@ Cobertura:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
+from datetime import datetime, timedelta
+
+from django.contrib.auth.models import Group
 from django.test import TestCase, override_settings
 from django.utils import timezone
-from datetime import datetime, timedelta
+from rest_framework import status as http_status
+from rest_framework.test import APIClient
+
+import pytest
 import pytz
 
-from apps.core.models import Usuario, Solicitacao, Municipio, Projeto, TipoEvento
-from apps.core.services.gcal_sync_service import build_preview_for_solicitacao, build_event_payload
-from rest_framework.test import APIClient
-from rest_framework import status as http_status
-from django.contrib.auth.models import Group
+from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.services.gcal_sync_service import build_event_payload, build_preview_for_solicitacao
 
 
 class GCalTemplateFase3Tests(TestCase):

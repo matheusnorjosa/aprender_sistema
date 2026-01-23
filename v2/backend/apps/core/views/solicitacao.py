@@ -5,6 +5,7 @@ PA-01: Nenhuma solicitação é auto-aprovada.
 PA-02: Apenas Superintendência pode aprovar/reprovar.
 PA-05: Registrar usuário, data/hora e justificativa em AuditLog.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -13,14 +14,14 @@ import logging
 
 from django.db.models import QuerySet
 from django.utils import timezone
-
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+
+from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.core.models import AuditLog, Participation, Solicitacao, Usuario
 from apps.core.permissions import IsCoordenadorOrDAT, IsOwnerOrPrivileged, IsSuperintendencia
@@ -119,10 +120,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         # Captura formadores atuais antes do update
         old_formador_ids = set(
-            Participation.objects.filter(
-                solicitacao=instance,
-                role='FORMADOR'
-            ).values_list('usuario_id', flat=True)
+            Participation.objects.filter(solicitacao=instance, role="FORMADOR").values_list("usuario_id", flat=True)
         )
 
         old_data = {
@@ -146,8 +144,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         serializer.save()
 
         # Processa extra_participants se presente
-        extra_participants = self.request.data.get('extra_participants', {})
-        if extra_participants and 'formador_ids' in extra_participants:
+        extra_participants = self.request.data.get("extra_participants", {})
+        if extra_participants and "formador_ids" in extra_participants:
             self._update_formadores(instance, extra_participants)
 
         # Coleta dados novos após save
@@ -155,10 +153,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         # Captura formadores novos
         new_formador_ids = set(
-            Participation.objects.filter(
-                solicitacao=instance,
-                role='FORMADOR'
-            ).values_list('usuario_id', flat=True)
+            Participation.objects.filter(solicitacao=instance, role="FORMADOR").values_list("usuario_id", flat=True)
         )
 
         new_data = {
@@ -179,11 +174,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         }
 
         # Identifica campos alterados
-        changed_fields = {
-            k: {"old": old_data[k], "new": new_data[k]}
-            for k in old_data
-            if old_data[k] != new_data[k]
-        }
+        changed_fields = {k: {"old": old_data[k], "new": new_data[k]} for k in old_data if old_data[k] != new_data[k]}
 
         # Se houver alterações, registra no AuditLog
         if changed_fields:
@@ -227,13 +218,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Retorna True se houve alteração.
         """
-        new_formador_ids = set(extra.get('formador_ids', []))
+        new_formador_ids = set(extra.get("formador_ids", []))
 
         # Formadores atuais
-        current_participations = Participation.objects.filter(
-            solicitacao=solicitacao,
-            role='FORMADOR'
-        )
+        current_participations = Participation.objects.filter(solicitacao=solicitacao, role="FORMADOR")
         current_ids = set(p.usuario_id for p in current_participations if p.usuario_id)
 
         # Calcular diferenças
@@ -244,36 +232,23 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         # Remover formadores
         if to_remove:
-            Participation.objects.filter(
-                solicitacao=solicitacao,
-                role='FORMADOR',
-                usuario_id__in=to_remove
-            ).delete()
+            Participation.objects.filter(solicitacao=solicitacao, role="FORMADOR", usuario_id__in=to_remove).delete()
             changed = True
 
         # Adicionar formadores (batch fetch para evitar N+1)
         if to_add:
             # Batch fetch de usuários
-            usuarios_map = {
-                u.id: u for u in Usuario.objects.filter(id__in=to_add)
-            }
+            usuarios_map = {u.id: u for u in Usuario.objects.filter(id__in=to_add)}
 
             # Criar participations em batch
             participations_to_create = [
-                Participation(
-                    solicitacao=solicitacao,
-                    usuario=usuarios_map[fid],
-                    role='FORMADOR'
-                )
+                Participation(solicitacao=solicitacao, usuario=usuarios_map[fid], role="FORMADOR")
                 for fid in to_add
                 if fid and fid in usuarios_map
             ]
 
             if participations_to_create:
-                Participation.objects.bulk_create(
-                    participations_to_create,
-                    ignore_conflicts=True
-                )
+                Participation.objects.bulk_create(participations_to_create, ignore_conflicts=True)
                 changed = True
 
         return changed

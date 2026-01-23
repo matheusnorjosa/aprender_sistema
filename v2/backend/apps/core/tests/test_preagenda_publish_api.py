@@ -14,28 +14,30 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from datetime import datetime
-from django.utils import timezone
+from unittest.mock import MagicMock, patch
+
 from django.conf import settings
+from django.utils import timezone
 from rest_framework.test import APIClient
-from unittest.mock import patch, MagicMock
+
+import pytest
 
 from apps.core.models import (
-    Usuario,
-    Municipio,
-    Projeto,
-    TipoEvento,
-    Solicitacao,
-    Participation,
     AuditLog,
+    Municipio,
+    Participation,
+    Projeto,
+    Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 from apps.core.services.gcal_sync_service import (
+    apply_one_solicitacao,
     build_attendees_for_solicitacao,
     build_preview_for_solicitacao,
-    apply_one_solicitacao,
 )
-
 
 pytestmark = pytest.mark.django_db
 
@@ -130,15 +132,9 @@ def setup_solicitacao():
     )
 
     # Participações
-    Participation.objects.create(
-        solicitacao=sol, usuario=coord, role="COORDENADOR"
-    )
-    Participation.objects.create(
-        solicitacao=sol, usuario=formador, role="FORMADOR"
-    )
-    Participation.objects.create(
-        solicitacao=sol, usuario=acompanha, role="COORD_ACOMPANHA"
-    )
+    Participation.objects.create(solicitacao=sol, usuario=coord, role="COORDENADOR")
+    Participation.objects.create(solicitacao=sol, usuario=formador, role="FORMADOR")
+    Participation.objects.create(solicitacao=sol, usuario=acompanha, role="COORD_ACOMPANHA")
     Participation.objects.create(
         solicitacao=sol,
         usuario=None,
@@ -291,9 +287,7 @@ def test_preview_gcal_api_success(api_client, user_super, setup_solicitacao):
     assert len(preview["payload_hash"]) == 40  # SHA1 hex = 40 chars
 
     # Validar AuditLog
-    audit_log = AuditLog.objects.filter(
-        action="PREVIEW_GCAL", model_name="Solicitacao"
-    ).first()
+    audit_log = AuditLog.objects.filter(action="PREVIEW_GCAL", model_name="Solicitacao").first()
     assert audit_log is not None
     assert audit_log.usuario == user_super
     assert audit_log.details["solicitacao_id"] == sol.id
@@ -322,9 +316,7 @@ def test_preview_gcal_api_permission_denied(api_client, user_coord, setup_solici
     sol.save()
 
     # Criar participação para o user_coord
-    Participation.objects.create(
-        solicitacao=sol, usuario=user_coord, role="COORDENADOR"
-    )
+    Participation.objects.create(solicitacao=sol, usuario=user_coord, role="COORDENADOR")
 
     api_client.force_authenticate(user=user_coord)
 
@@ -364,18 +356,14 @@ def test_publish_gcal_api_success(mock_task_delay, api_client, user_super, setup
     assert data["solicitacao_id"] == sol.id
 
     # Verificar que task foi disparada
-    mock_task_delay.assert_called_once_with(
-        sol.id, dry_run=False, apply_blocked=True
-    )
+    mock_task_delay.assert_called_once_with(sol.id, dry_run=False, apply_blocked=True)
 
     # PR14: Validar que gcal_status foi marcado como PENDING
     sol.refresh_from_db()
     assert sol.gcal_status == "PENDING"
 
     # Validar AuditLog
-    audit_log = AuditLog.objects.filter(
-        action="PUBLISH_GCAL_REQUESTED", model_name="Solicitacao"
-    ).first()
+    audit_log = AuditLog.objects.filter(action="PUBLISH_GCAL_REQUESTED", model_name="Solicitacao").first()
     assert audit_log is not None
     assert audit_log.usuario == user_super
     assert audit_log.details["solicitacao_id"] == sol.id

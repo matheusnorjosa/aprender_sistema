@@ -9,21 +9,22 @@ Endpoints:
 
 Retorna: [{id, label, kind, alias?}]
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
+
 from typing import Any
-from django.db.models import QuerySet
+
+from django.db.models import Q, QuerySet
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
-
 from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.db.models import Q
+
+from apps.core.services.normalize import norm_text
 
 from .models import Municipio, Projeto, TipoEvento, Usuario
-from apps.core.services.normalize import norm_text
 
 
 def dedup_by_id(items):
@@ -31,8 +32,8 @@ def dedup_by_id(items):
     seen = set()
     result = []
     for item in items:
-        if item['id'] not in seen:
-            seen.add(item['id'])
+        if item["id"] not in seen:
+            seen.add(item["id"])
             result.append(item)
     return result
 
@@ -42,31 +43,31 @@ class MunicipioLookup(APIView):
     GET /api/lookup/municipios/?q=fortaleza
     Retorna: [{id, label, kind: "municipio"}]
     """
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        q = request.GET.get('q', '').strip()
+        q = request.GET.get("q", "").strip()
 
         if not q:
             # Retornar todos os municípios (max 100)
-            qs = Municipio.objects.filter(ativo=True).order_by('nome')[:100]
+            qs = Municipio.objects.filter(ativo=True).order_by("nome")[:100]
         else:
             # Normalizar query
-            q_norm = norm_text(q)
+            _q_norm = norm_text(q)  # noqa: F841 - reserved for future normalized search
 
             # Buscar por nome ou UF
-            qs = Municipio.objects.filter(
-                Q(nome__icontains=q) | Q(uf__icontains=q),
-                ativo=True
-            )[:50]
+            qs = Municipio.objects.filter(Q(nome__icontains=q) | Q(uf__icontains=q), ativo=True)[:50]
 
         results = []
         for mun in qs:
-            results.append({
-                'id': mun.id,
-                'label': f"{mun.nome}-{mun.uf}",
-                'kind': 'municipio',
-            })
+            results.append(
+                {
+                    "id": mun.id,
+                    "label": f"{mun.nome}-{mun.uf}",
+                    "kind": "municipio",
+                }
+            )
 
         return Response(dedup_by_id(results))
 
@@ -76,19 +77,17 @@ class ProjetoLookup(APIView):
     GET /api/lookup/projetos/?q=acerta
     Retorna: [{id, label, kind: "projeto"}]
     """
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        q = request.GET.get('q', '').strip()
+        q = request.GET.get("q", "").strip()
 
         if not q:
-            qs = Projeto.objects.filter(ativo=True).order_by('nome')[:50]
+            qs = Projeto.objects.filter(ativo=True).order_by("nome")[:50]
         else:
-            q_norm = norm_text(q)
-            qs = Projeto.objects.filter(
-                Q(nome__icontains=q) | Q(codigo__icontains=q),
-                ativo=True
-            )[:50]
+            _q_norm = norm_text(q)  # noqa: F841 - reserved for future normalized search
+            qs = Projeto.objects.filter(Q(nome__icontains=q) | Q(codigo__icontains=q), ativo=True)[:50]
 
         results = []
         for proj in qs:
@@ -96,12 +95,14 @@ class ProjetoLookup(APIView):
             if proj.codigo:
                 label = f"{proj.codigo} - {proj.nome}"
 
-            results.append({
-                'id': proj.id,
-                'label': label,
-                'kind': 'projeto',
-                'fluxo': proj.fluxo,
-            })
+            results.append(
+                {
+                    "id": proj.id,
+                    "label": label,
+                    "kind": "projeto",
+                    "fluxo": proj.fluxo,
+                }
+            )
 
         return Response(dedup_by_id(results))
 
@@ -111,25 +112,26 @@ class TipoEventoLookup(APIView):
     GET /api/lookup/tipos-evento/?q=formacao
     Retorna: [{id, label, kind: "tipo_evento"}]
     """
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        q = request.GET.get('q', '').strip()
+        q = request.GET.get("q", "").strip()
 
         if not q:
-            qs = TipoEvento.objects.all().order_by('nome')[:50]
+            qs = TipoEvento.objects.all().order_by("nome")[:50]
         else:
-            qs = TipoEvento.objects.filter(
-                nome__icontains=q
-            )[:50]
+            qs = TipoEvento.objects.filter(nome__icontains=q)[:50]
 
         results = []
         for tipo in qs:
-            results.append({
-                'id': tipo.id,
-                'label': tipo.nome,
-                'kind': 'tipo_evento',
-            })
+            results.append(
+                {
+                    "id": tipo.id,
+                    "label": tipo.nome,
+                    "kind": "tipo_evento",
+                }
+            )
 
         return Response(dedup_by_id(results))
 
@@ -139,11 +141,12 @@ class UsuarioLookup(APIView):
     GET /api/lookup/usuarios/?q=maria&role=formador
     Retorna: [{id, label, kind: "usuario", email}]
     """
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        q = request.GET.get('q', '').strip()
-        role = request.GET.get('role', '').strip()
+        q = request.GET.get("q", "").strip()
+        role = request.GET.get("role", "").strip()
 
         # Começar com queryset base
         qs = Usuario.objects.filter(is_active=True)
@@ -151,10 +154,10 @@ class UsuarioLookup(APIView):
         # Aplicar filtro de busca
         if q:
             qs = qs.filter(
-                Q(first_name__icontains=q) |
-                Q(last_name__icontains=q) |
-                Q(email__icontains=q) |
-                Q(username__icontains=q)
+                Q(first_name__icontains=q)
+                | Q(last_name__icontains=q)
+                | Q(email__icontains=q)
+                | Q(username__icontains=q)
             )
 
         # Filtrar por role/group ANTES do slice
@@ -162,7 +165,7 @@ class UsuarioLookup(APIView):
             qs = qs.filter(groups__name__iexact=role)
 
         # Aplicar ordenação e limite
-        qs = qs.order_by('-id')[:50 if q else 20]
+        qs = qs.order_by("-id")[: 50 if q else 20]
 
         results = []
         for user in qs:
@@ -170,11 +173,13 @@ class UsuarioLookup(APIView):
             if user.email:
                 label = f"{label} <{user.email}>"
 
-            results.append({
-                'id': user.id,
-                'label': label,
-                'kind': 'usuario',
-                'email': user.email or '',
-            })
+            results.append(
+                {
+                    "id": user.id,
+                    "label": label,
+                    "kind": "usuario",
+                    "email": user.email or "",
+                }
+            )
 
         return Response(dedup_by_id(results))

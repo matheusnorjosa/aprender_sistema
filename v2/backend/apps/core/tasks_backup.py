@@ -9,6 +9,7 @@ Implements MP5: Automated Backup System with:
 
 Refs: Issue #169
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
@@ -20,8 +21,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from celery import shared_task
 from django.conf import settings
+
+from celery import shared_task
 
 if TYPE_CHECKING:
     from typing import Literal
@@ -54,9 +56,7 @@ def perform_database_backup(
     start_time = datetime.now()
     script_path = Path("/app/infra/scripts/backup_db.sh")
 
-    logger.info(
-        f"Starting {backup_type} database backup (task_id={self.request.id})"
-    )
+    logger.info(f"Starting {backup_type} database backup (task_id={self.request.id})")
 
     # Validate script exists
     if not script_path.exists():
@@ -66,19 +66,19 @@ def perform_database_backup(
 
     # Prepare environment variables
     env = os.environ.copy()
-    env.update({
-        "DB_HOST": settings.DATABASES["default"]["HOST"],
-        "DB_PORT": str(settings.DATABASES["default"]["PORT"]),
-        "DB_USER": settings.DATABASES["default"]["USER"],
-        "DB_PASSWORD": settings.DATABASES["default"]["PASSWORD"],
-        "DB_NAME": settings.DATABASES["default"]["NAME"],
-        "BACKUP_DIR": getattr(settings, "BACKUP_DIR", "/backups"),
-        "BACKUP_RETENTION_DAYS": str(
-            getattr(settings, "BACKUP_RETENTION_DAYS", 7)
-        ),
-        "S3_BUCKET": getattr(settings, "BACKUP_S3_BUCKET", ""),
-        "SENTRY_DSN": getattr(settings, "SENTRY_DSN", ""),
-    })
+    env.update(
+        {
+            "DB_HOST": settings.DATABASES["default"]["HOST"],
+            "DB_PORT": str(settings.DATABASES["default"]["PORT"]),
+            "DB_USER": settings.DATABASES["default"]["USER"],
+            "DB_PASSWORD": settings.DATABASES["default"]["PASSWORD"],
+            "DB_NAME": settings.DATABASES["default"]["NAME"],
+            "BACKUP_DIR": getattr(settings, "BACKUP_DIR", "/backups"),
+            "BACKUP_RETENTION_DAYS": str(getattr(settings, "BACKUP_RETENTION_DAYS", 7)),
+            "S3_BUCKET": getattr(settings, "BACKUP_S3_BUCKET", ""),
+            "SENTRY_DSN": getattr(settings, "SENTRY_DSN", ""),
+        }
+    )
 
     try:
         # Execute backup script
@@ -126,9 +126,7 @@ def perform_database_backup(
 
     except subprocess.CalledProcessError as exc:
         duration = (datetime.now() - start_time).total_seconds()
-        error_msg = (
-            f"{backup_type} backup failed (exit code {exc.returncode})"
-        )
+        error_msg = f"{backup_type} backup failed (exit code {exc.returncode})"
 
         logger.error(
             error_msg,
@@ -145,12 +143,13 @@ def perform_database_backup(
         if hasattr(settings, "SENTRY_DSN") and settings.SENTRY_DSN:
             try:
                 import sentry_sdk
+
                 sentry_sdk.capture_exception(exc)
             except ImportError:
                 pass
 
         # Retry with exponential backoff
-        raise self.retry(exc=exc, countdown=self.default_retry_delay * (2 ** self.request.retries))
+        raise self.retry(exc=exc, countdown=self.default_retry_delay * (2**self.request.retries))
 
     except Exception as exc:
         logger.exception(f"Unexpected error during {backup_type} backup")
@@ -159,6 +158,7 @@ def perform_database_backup(
         if hasattr(settings, "SENTRY_DSN") and settings.SENTRY_DSN:
             try:
                 import sentry_sdk
+
                 sentry_sdk.capture_exception(exc)
             except ImportError:
                 pass
@@ -198,14 +198,10 @@ def verify_backup_health() -> dict[str, str | int | list[str]]:
     recent_backups = list(backup_dir.glob("backup_full_*.sql.gz"))
     if recent_backups:
         latest_backup = max(recent_backups, key=lambda p: p.stat().st_mtime)
-        age_hours = (
-            datetime.now().timestamp() - latest_backup.stat().st_mtime
-        ) / 3600
+        age_hours = (datetime.now().timestamp() - latest_backup.stat().st_mtime) / 3600
 
         if age_hours > 25:
-            warnings.append(
-                f"Latest backup is {age_hours:.1f}h old (expected < 25h)"
-            )
+            warnings.append(f"Latest backup is {age_hours:.1f}h old (expected < 25h)")
         else:
             checks_passed += 1
             logger.info(f"Latest backup: {latest_backup.name} ({age_hours:.1f}h old)")
@@ -216,7 +212,7 @@ def verify_backup_health() -> dict[str, str | int | list[str]]:
     s3_bucket = getattr(settings, "BACKUP_S3_BUCKET", "")
     if s3_bucket:
         try:
-            result = subprocess.run(
+            _result = subprocess.run(  # noqa: F841 - used for side effects only
                 ["aws", "s3", "ls", f"s3://{s3_bucket}/backups/"],
                 capture_output=True,
                 timeout=30,
@@ -234,6 +230,7 @@ def verify_backup_health() -> dict[str, str | int | list[str]]:
     if len(warnings) > 0 and hasattr(settings, "SENTRY_DSN") and settings.SENTRY_DSN:
         try:
             import sentry_sdk
+
             sentry_sdk.capture_message(
                 f"Backup health check warnings: {'; '.join(warnings)}",
                 level="warning",

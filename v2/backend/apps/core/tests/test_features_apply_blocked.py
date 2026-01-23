@@ -8,11 +8,13 @@ com base no valor de GCAL_CLIENT.
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import os
-import pytest
 from unittest.mock import patch
+
 from rest_framework.test import APIClient
 
+import pytest
 
 pytestmark = pytest.mark.django_db
 

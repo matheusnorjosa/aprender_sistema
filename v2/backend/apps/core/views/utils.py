@@ -3,6 +3,7 @@ AS v2 — Core Views Utilities
 
 Helper functions and API root endpoint.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false
 
 from __future__ import annotations

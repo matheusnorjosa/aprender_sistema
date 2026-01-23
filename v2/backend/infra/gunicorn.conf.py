@@ -7,6 +7,7 @@ References:
 - https://docs.gunicorn.org/en/stable/settings.html
 - PLANO_MELHORIAS_DETALHADO.md (CP1)
 """
+
 import multiprocessing
 import os
 
@@ -35,7 +36,7 @@ worker_tmp_dir = "/dev/shm" if os.path.exists("/dev/shm") else None
 # LOGGING
 # ================================================================
 accesslog = "-"  # stdout
-errorlog = "-"   # stderr
+errorlog = "-"  # stderr
 loglevel = os.getenv("GUNICORN_LOG_LEVEL", "info")
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s'
 
@@ -48,6 +49,7 @@ bind = os.getenv("GUNICORN_BIND", "0.0.0.0:8000")
 # PRELOAD (production only)
 # ================================================================
 preload_app = os.getenv("ENVIRONMENT", "development") == "production"
+
 
 # ================================================================
 # HOOKS

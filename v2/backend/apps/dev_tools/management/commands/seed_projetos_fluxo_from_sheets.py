@@ -20,6 +20,7 @@ Matching:
 Idempotente: Só atualiza se fluxo mudou.
 Gera CSV com fonte/detalhe rastreável.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 from __future__ import annotations
 
@@ -45,27 +46,19 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
-            '--xls-controle',
+            "--xls-controle",
             type=str,
-            default='data/csv-import/Planilha de Controle - 2025.xlsx',
-            help='Caminho da Planilha de Controle'
+            default="data/csv-import/Planilha de Controle - 2025.xlsx",
+            help="Caminho da Planilha de Controle",
         )
         parser.add_argument(
-            '--xls-agenda',
+            "--xls-agenda",
             type=str,
-            default='data/csv-import/Acompanhamento de Agenda _ 2025.xlsx',
-            help='Caminho da planilha Acompanhamento de Agenda'
+            default="data/csv-import/Acompanhamento de Agenda _ 2025.xlsx",
+            help="Caminho da planilha Acompanhamento de Agenda",
         )
-        parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Simula execução sem persistir mudanças'
-        )
-        parser.add_argument(
-            '--verbose',
-            action='store_true',
-            help='Log detalhado de cada operação'
-        )
+        parser.add_argument("--dry-run", action="store_true", help="Simula execução sem persistir mudanças")
+        parser.add_argument("--verbose", action="store_true", help="Log detalhado de cada operação")
 
     def _normalize_string(self, s: str | None) -> str:
         """
@@ -79,16 +72,16 @@ class Command(BaseCommand):
         - Colapsa espaços múltiplos
         """
         if not s:
-            return ''
+            return ""
         # NFKD + remove acentos
-        s = unicodedata.normalize('NFKD', s)
-        s = s.encode('ascii', 'ignore').decode('ascii')
+        s = unicodedata.normalize("NFKD", s)
+        s = s.encode("ascii", "ignore").decode("ascii")
         # casefold
         s = s.casefold()
         # Remove pontuação, mantém espaços
-        s = re.sub(r'[^\w\s]', '', s)
+        s = re.sub(r"[^\w\s]", "", s)
         # Colapsa espaços
-        s = re.sub(r'\s+', ' ', s).strip()
+        s = re.sub(r"\s+", " ", s).strip()
         return s
 
     def _find_projeto(self, codigo_raw: str | None, nome_raw: str | None) -> Projeto | None:
@@ -101,9 +94,7 @@ class Command(BaseCommand):
         """
         # Prioridade 1: código
         if codigo_raw:
-            projeto = Projeto.objects.filter(
-                Q(codigo__iexact=codigo_raw.strip())
-            ).first()
+            projeto = Projeto.objects.filter(Q(codigo__iexact=codigo_raw.strip())).first()
             if projeto:
                 return projeto
 
@@ -134,9 +125,7 @@ class Command(BaseCommand):
         # Procurar aba "Projetos"
         if "Projetos" not in wb.sheetnames:
             if verbose:
-                self.stdout.write(
-                    self.style.WARNING(f"  ⚠️ Aba 'Projetos' não encontrada em {xls_path}")
-                )
+                self.stdout.write(self.style.WARNING(f"  ⚠️ Aba 'Projetos' não encontrada em {xls_path}"))
             return projetos_map
 
         ws = wb["Projetos"]
@@ -153,9 +142,7 @@ class Command(BaseCommand):
             idx_setor = header.index("Setor")
         except ValueError:
             if verbose:
-                self.stdout.write(
-                    self.style.WARNING("  ⚠️ Colunas esperadas não encontradas (Codigo, Nome, Setor)")
-                )
+                self.stdout.write(self.style.WARNING("  ⚠️ Colunas esperadas não encontradas (Codigo, Nome, Setor)"))
             return projetos_map
 
         # Processar linhas
@@ -163,24 +150,24 @@ class Command(BaseCommand):
             if len(row) <= max(idx_codigo, idx_nome, idx_setor):
                 continue
 
-            codigo = str(row[idx_codigo] or '').strip()
-            nome = str(row[idx_nome] or '').strip()
-            setor = str(row[idx_setor] or '').strip()
+            codigo = str(row[idx_codigo] or "").strip()
+            nome = str(row[idx_nome] or "").strip()
+            setor = str(row[idx_setor] or "").strip()
 
             if not nome:
                 continue
 
             # Determinar fluxo
-            fluxo = 'SUPER' if 'superintend' in setor.lower() else 'NAO_SUPER'
+            fluxo = "SUPER" if "superintend" in setor.lower() else "NAO_SUPER"
 
             # Key para matching
             key = self._normalize_string(codigo if codigo else nome)
             projetos_map[key] = {
-                'codigo': codigo,
-                'nome': nome,
-                'fluxo': fluxo,
-                'fonte': f'Planilha de Controle, aba \'Projetos\', linha {i}',
-                'detalhe': f'Coluna Setor = \'{setor}\''
+                "codigo": codigo,
+                "nome": nome,
+                "fluxo": fluxo,
+                "fonte": f"Planilha de Controle, aba 'Projetos', linha {i}",
+                "detalhe": f"Coluna Setor = '{setor}'",
             }
 
         return projetos_map
@@ -207,13 +194,13 @@ class Command(BaseCommand):
                 continue
 
             # Determinar fluxo pela aba
-            fluxo = 'SUPER' if sheet_name.lower() == 'super' else 'NAO_SUPER'
+            fluxo = "SUPER" if sheet_name.lower() == "super" else "NAO_SUPER"
 
             # Primeira linha = header (assumir coluna "Projeto" ou similar)
             header = rows[0]
             idx_projeto = None
             for idx, col in enumerate(header):
-                if col and 'projeto' in str(col).lower():
+                if col and "projeto" in str(col).lower():
                     idx_projeto = idx
                     break
 
@@ -225,31 +212,29 @@ class Command(BaseCommand):
                 if len(row) <= idx_projeto:
                     continue
 
-                nome = str(row[idx_projeto] or '').strip()
+                nome = str(row[idx_projeto] or "").strip()
                 if not nome:
                     continue
 
                 key = self._normalize_string(nome)
                 projetos_map[key] = {
-                    'codigo': '',
-                    'nome': nome,
-                    'fluxo': fluxo,
-                    'fonte': f'Acompanhamento de Agenda, aba \'{sheet_name}\', linha {i}',
-                    'detalhe': f'Aba determina fluxo (Super → SUPER, outros → NAO_SUPER)'
+                    "codigo": "",
+                    "nome": nome,
+                    "fluxo": fluxo,
+                    "fonte": f"Acompanhamento de Agenda, aba '{sheet_name}', linha {i}",
+                    "detalhe": "Aba determina fluxo (Super → SUPER, outros → NAO_SUPER)",
                 }
 
         return projetos_map
 
     def handle(self, *args: Any, **options: Any) -> None:
-        xls_controle = Path(options['xls_controle'])
-        xls_agenda = Path(options['xls_agenda'])
-        dry_run = options['dry_run']
-        verbose = options['verbose']
+        xls_controle = Path(options["xls_controle"])
+        xls_agenda = Path(options["xls_agenda"])
+        dry_run = options["dry_run"]
+        verbose = options["verbose"]
 
         if load_workbook is None:
-            self.stdout.write(
-                self.style.ERROR("❌ openpyxl não instalado. Instale com: pip install openpyxl")
-            )
+            self.stdout.write(self.style.ERROR("❌ openpyxl não instalado. Instale com: pip install openpyxl"))
             return
 
         if dry_run:
@@ -287,11 +272,11 @@ class Command(BaseCommand):
         csv_rows = []
 
         for key, data in projetos_map.items():
-            codigo = data['codigo']
-            nome = data['nome']
-            fluxo_target = data['fluxo']
-            fonte = data['fonte']
-            detalhe = data['detalhe']
+            codigo = data["codigo"]
+            nome = data["nome"]
+            fluxo_target = data["fluxo"]
+            fonte = data["fonte"]
+            detalhe = data["detalhe"]
 
             projeto = self._find_projeto(codigo, nome)
 
@@ -306,9 +291,7 @@ class Command(BaseCommand):
             # Idempotência
             if projeto.fluxo == fluxo_target:
                 if verbose:
-                    self.stdout.write(
-                        self.style.WARNING(f"  ⊙ Já atualizado: {projeto.nome} ({fluxo_target})")
-                    )
+                    self.stdout.write(self.style.WARNING(f"  ⊙ Já atualizado: {projeto.nome} ({fluxo_target})"))
                 ignored_count += 1
             else:
                 prev_fluxo = projeto.fluxo
@@ -326,31 +309,29 @@ class Command(BaseCommand):
                 updated_count += 1
 
             # Registrar para CSV
-            csv_rows.append({
-                'codigo': projeto.codigo or '',
-                'nome': projeto.nome,
-                'fluxo': fluxo_target,
-                'fonte': fonte,
-                'detalhe': detalhe
-            })
+            csv_rows.append(
+                {
+                    "codigo": projeto.codigo or "",
+                    "nome": projeto.nome,
+                    "fluxo": fluxo_target,
+                    "fonte": fonte,
+                    "detalhe": detalhe,
+                }
+            )
 
         # Gerar CSV rastreável
         if not dry_run and csv_rows:
-            csv_path = Path('apps/core/data/projetos_fluxo_resolved.csv')
+            csv_path = Path("apps/core/data/projetos_fluxo_resolved.csv")
             csv_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=['codigo', 'nome', 'fluxo', 'fonte', 'detalhe'])
+            with open(csv_path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=["codigo", "nome", "fluxo", "fonte", "detalhe"])
                 writer.writeheader()
                 writer.writerows(csv_rows)
             self.stdout.write(self.style.SUCCESS(f"📄 CSV gerado: {csv_path}"))
 
         # Sumário final
         self.stdout.write("")
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"✅ {'[DRY-RUN] ' if dry_run else ''}Seed concluído:"
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"✅ {'[DRY-RUN] ' if dry_run else ''}Seed concluído:"))
         self.stdout.write(f"   • Atualizados: {updated_count}")
         self.stdout.write(f"   • Ignorados (já OK): {ignored_count}")
         self.stdout.write(f"   • Não encontrados: {not_found_count}")

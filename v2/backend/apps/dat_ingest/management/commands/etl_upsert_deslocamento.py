@@ -9,6 +9,7 @@ Regras de negócio:
 - Idempotência: SHA1(usuario_id|origem|destino|start|end)
 - Relatório em out_etl/etl_deslocamento_report.json
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ import hashlib
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandParser
@@ -81,11 +82,13 @@ class Command(BaseCommand):
                 except Exception as e:
                     self.stdout.write(f"   ❌ Erro linha {idx}: {e}")
                     self.stats["skipped"]["other"] += 1
-                    self.pendencias["outros"].append({
-                        "linha": idx,
-                        "erro": str(e),
-                        "row": row,
-                    })
+                    self.pendencias["outros"].append(
+                        {
+                            "linha": idx,
+                            "erro": str(e),
+                            "row": row,
+                        }
+                    )
 
             if self.dry_run:
                 self.stdout.write("   [DRY-RUN] Rollback transaction")
@@ -110,9 +113,9 @@ class Command(BaseCommand):
         """
         file_path = Path(self.file_path)
 
-        if file_path.suffix.lower() == '.csv':
+        if file_path.suffix.lower() == ".csv":
             return self._load_csv(file_path)
-        elif file_path.suffix.lower() in ['.xlsx', '.xls']:
+        elif file_path.suffix.lower() in [".xlsx", ".xls"]:
             return self._load_xlsx(file_path)
         else:
             raise ValueError(f"Formato não suportado: {file_path.suffix}")
@@ -324,11 +327,13 @@ class Command(BaseCommand):
         if not usuario:
             self.stdout.write(f"   ⚠️  Linha {linha_num}: Usuário não resolvido (email={email}, name={name})")
             self.stats["skipped"]["usuario"] += 1
-            self.pendencias["usuarios"].append({
-                "linha": linha_num,
-                "email": email,
-                "name": name,
-            })
+            self.pendencias["usuarios"].append(
+                {
+                    "linha": linha_num,
+                    "email": email,
+                    "name": name,
+                }
+            )
             return
 
         # Parse datas
@@ -336,24 +341,30 @@ class Command(BaseCommand):
         end_date = self.parse_date_flexible(row.get("end"))
 
         if not start_date or not end_date:
-            self.stdout.write(f"   ⚠️  Linha {linha_num}: Datas inválidas (start={row.get('start')}, end={row.get('end')})")
+            self.stdout.write(
+                f"   ⚠️  Linha {linha_num}: Datas inválidas (start={row.get('start')}, end={row.get('end')})"
+            )
             self.stats["skipped"]["dates"] += 1
-            self.pendencias["dates"].append({
-                "linha": linha_num,
-                "start": str(row.get("start")),
-                "end": str(row.get("end")),
-            })
+            self.pendencias["dates"].append(
+                {
+                    "linha": linha_num,
+                    "start": str(row.get("start")),
+                    "end": str(row.get("end")),
+                }
+            )
             return
 
         if end_date < start_date:
             self.stdout.write(f"   ⚠️  Linha {linha_num}: end_date < start_date")
             self.stats["skipped"]["dates"] += 1
-            self.pendencias["dates"].append({
-                "linha": linha_num,
-                "motivo": "end_date < start_date",
-                "start": str(start_date),
-                "end": str(end_date),
-            })
+            self.pendencias["dates"].append(
+                {
+                    "linha": linha_num,
+                    "motivo": "end_date < start_date",
+                    "start": str(start_date),
+                    "end": str(end_date),
+                }
+            )
             return
 
         # Origem/Destino
@@ -363,21 +374,21 @@ class Command(BaseCommand):
         if not origem or not destino:
             self.stdout.write(f"   ⚠️  Linha {linha_num}: Origem/Destino ausentes")
             self.stats["skipped"]["other"] += 1
-            self.pendencias["outros"].append({
-                "linha": linha_num,
-                "motivo": "origem_destino_ausentes",
-                "origem": origem,
-                "destino": destino,
-            })
+            self.pendencias["outros"].append(
+                {
+                    "linha": linha_num,
+                    "motivo": "origem_destino_ausentes",
+                    "origem": origem,
+                    "destino": destino,
+                }
+            )
             return
 
         # Observação
         observacao = row.get("obs", "").strip()
 
         # Gerar external_hash
-        external_hash = self.compute_external_hash(
-            usuario.id, origem, destino, start_date, end_date
-        )
+        external_hash = self.compute_external_hash(usuario.id, origem, destino, start_date, end_date)
 
         # Upsert Deslocamento
         if not self.dry_run:
@@ -414,11 +425,11 @@ class Command(BaseCommand):
         else:
             # Dry-run: apenas contadores
             self.stats["created"] += 1
-            self.stdout.write(f"   [DRY-RUN] Linha {linha_num}: {external_hash[:8]}... ({usuario.username}: {origem}→{destino})")
+            self.stdout.write(
+                f"   [DRY-RUN] Linha {linha_num}: {external_hash[:8]}... ({usuario.username}: {origem}→{destino})"
+            )
 
-    def compute_external_hash(
-        self, usuario_id: int, origem: str, destino: str, start: date, end: date
-    ) -> str:
+    def compute_external_hash(self, usuario_id: int, origem: str, destino: str, start: date, end: date) -> str:
         """
         Gera external_hash SHA1 a partir de campos-chave.
 
@@ -450,7 +461,7 @@ class Command(BaseCommand):
             json.dump(report, f, indent=2, ensure_ascii=False)
 
         self.stdout.write(f"\n📄 Relatório salvo em: {report_path}")
-        self.stdout.write(f"\n📊 Stats:")
+        self.stdout.write("\n📊 Stats:")
         self.stdout.write(f"   Created: {self.stats['created']}")
         self.stdout.write(f"   Updated: {self.stats['updated']}")
         self.stdout.write(f"   Unchanged: {self.stats['unchanged']}")

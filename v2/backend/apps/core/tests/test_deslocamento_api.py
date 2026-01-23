@@ -16,12 +16,14 @@ Permissions:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from datetime import date, timedelta
 
-import pytest
 from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import AuditLog, Deslocamento, Usuario
 from apps.core.tests.conftest import get_field_errors
@@ -46,10 +48,7 @@ def grupos(db):
 def user_controle(db, grupos):
     """User with Controle permission."""
     user = Usuario.objects.create_user(
-        username="controle1",
-        email="controle1@example.com",
-        password="testpass123",
-        cpf="12345678901"
+        username="controle1", email="controle1@example.com", password="testpass123", cpf="12345678901"
     )
     user.groups.add(grupos["controle"])
     return user
@@ -59,10 +58,7 @@ def user_controle(db, grupos):
 def user_dat(db, grupos):
     """User with DAT permission."""
     user = Usuario.objects.create_user(
-        username="dat1",
-        email="dat1@example.com",
-        password="testpass123",
-        cpf="98765432109"
+        username="dat1", email="dat1@example.com", password="testpass123", cpf="98765432109"
     )
     user.groups.add(grupos["dat"])
     return user
@@ -77,7 +73,7 @@ def user_formador(db, grupos):
         password="testpass123",
         first_name="João",
         last_name="Silva",
-        cpf="11122233344"
+        cpf="11122233344",
     )
     user.groups.add(grupos["formador"])
     return user
@@ -92,7 +88,7 @@ def deslocamento_sample(db, user_formador):
         destino="Sobral",
         start_date=date.today(),
         end_date=date.today() + timedelta(days=1),
-        observacao="Viagem de formação"
+        observacao="Viagem de formação",
     )
 
 
@@ -200,7 +196,7 @@ class TestDeslocamentoAPI:
             "destino": "Sobral",
             "start_date": "2025-02-10",
             "end_date": "2025-02-12",
-            "observacao": "Viagem de formação"
+            "observacao": "Viagem de formação",
         }
         response = client.post("/api/deslocamentos/", payload, format="json")
         assert response.status_code == status.HTTP_201_CREATED
@@ -211,8 +207,7 @@ class TestDeslocamentoAPI:
         # Test 2: AuditLog created
         deslocamento_id = response.data["id"]
         audit_log = AuditLog.objects.filter(
-            action="CREATE_DESLOCAMENTO",
-            details__deslocamento_id=deslocamento_id
+            action="CREATE_DESLOCAMENTO", details__deslocamento_id=deslocamento_id
         ).first()
         assert audit_log is not None
         assert audit_log.usuario == user_controle
@@ -230,21 +225,14 @@ class TestDeslocamentoAPI:
         client.force_authenticate(user=user_controle)
 
         # Update destino
-        payload = {
-            "destino": "Juazeiro do Norte"
-        }
-        response = client.patch(
-            f"/api/deslocamentos/{deslocamento_sample.id}/",
-            payload,
-            format="json"
-        )
+        payload = {"destino": "Juazeiro do Norte"}
+        response = client.patch(f"/api/deslocamentos/{deslocamento_sample.id}/", payload, format="json")
         assert response.status_code == status.HTTP_200_OK
         assert response.data["destino"] == "Juazeiro do Norte"
 
         # Check AuditLog
         audit_log = AuditLog.objects.filter(
-            action="UPDATE_DESLOCAMENTO",
-            details__deslocamento_id=deslocamento_sample.id
+            action="UPDATE_DESLOCAMENTO", details__deslocamento_id=deslocamento_sample.id
         ).first()
         assert audit_log is not None
         assert audit_log.usuario == user_controle
@@ -274,8 +262,7 @@ class TestDeslocamentoAPI:
 
         # Check AuditLog
         audit_log = AuditLog.objects.filter(
-            action="DELETE_DESLOCAMENTO",
-            details__deslocamento_id=deslocamento_id
+            action="DELETE_DESLOCAMENTO", details__deslocamento_id=deslocamento_id
         ).first()
         assert audit_log is not None
         assert audit_log.usuario == user_controle

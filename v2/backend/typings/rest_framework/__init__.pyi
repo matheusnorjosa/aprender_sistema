@@ -1,7 +1,8 @@
 # Django REST Framework Type Stubs
 # Custom type hints for DRF-specific patterns in Aprender Sistema v2
 
-from typing import TypeVar, Generic, Any
+from typing import Any, Generic, TypeVar
+
 from django.db import models
 
 _T = TypeVar("_T", bound=models.Model)

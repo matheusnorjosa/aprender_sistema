@@ -11,14 +11,17 @@ Cobertura:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from datetime import date, timedelta
+
 from django.contrib.auth.models import Group
 from django.utils import timezone
-from rest_framework.test import APIClient
 from rest_framework import status as http_status
+from rest_framework.test import APIClient
 
-from apps.core.models import Usuario, Solicitacao, Municipio, Projeto, TipoEvento
+import pytest
+
+from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 
 @pytest.fixture
@@ -74,7 +77,7 @@ def create_solicitacao(usuario, municipio, projeto, tipo_evento, gcal_status, da
     # Setar erro se fornecido
     if gcal_last_error:
         sol.gcal_last_error = gcal_last_error
-        sol.save(update_fields=['gcal_last_error'])
+        sol.save(update_fields=["gcal_last_error"])
 
     return sol
 
@@ -94,7 +97,9 @@ class TestDashboardMetrics:
         create_solicitacao(usuario_controle, municipio, projeto, tipo_evento, Solicitacao.GCalStatus.PUBLISHED, 4)
         create_solicitacao(usuario_controle, municipio, projeto, tipo_evento, Solicitacao.GCalStatus.PUBLISHED, 5)
         create_solicitacao(usuario_controle, municipio, projeto, tipo_evento, Solicitacao.GCalStatus.PUBLISHED, 6)
-        create_solicitacao(usuario_controle, municipio, projeto, tipo_evento, Solicitacao.GCalStatus.ERROR, 7, "Erro teste")
+        create_solicitacao(
+            usuario_controle, municipio, projeto, tipo_evento, Solicitacao.GCalStatus.ERROR, 7, "Erro teste"
+        )
 
         client = APIClient()
         client.force_authenticate(user=usuario_controle)
@@ -105,16 +110,16 @@ class TestDashboardMetrics:
         data = response.data
 
         # Validar estrutura
-        assert 'counts' in data
-        assert 'recent_errors' in data
-        assert 'window' in data
+        assert "counts" in data
+        assert "recent_errors" in data
+        assert "window" in data
 
         # Validar counts
-        counts = data['counts']
-        assert counts['NONE'] == 2
-        assert counts['PENDING'] == 1
-        assert counts['PUBLISHED'] == 3
-        assert counts['ERROR'] == 1
+        counts = data["counts"]
+        assert counts["NONE"] == 2
+        assert counts["PENDING"] == 1
+        assert counts["PUBLISHED"] == 3
+        assert counts["ERROR"] == 1
 
     def test_metrics_recent_errors_top_5(self, usuario_controle, municipio, projeto, tipo_evento):
         """
@@ -123,8 +128,7 @@ class TestDashboardMetrics:
         # Criar 7 solicitações com erro (deve retornar apenas 5 mais recentes)
         for i in range(7):
             create_solicitacao(
-                usuario_controle, municipio, projeto, tipo_evento,
-                Solicitacao.GCalStatus.ERROR, i, f"Erro {i}"
+                usuario_controle, municipio, projeto, tipo_evento, Solicitacao.GCalStatus.ERROR, i, f"Erro {i}"
             )
 
         client = APIClient()
@@ -133,17 +137,17 @@ class TestDashboardMetrics:
         response = client.get("/api/gcal/dashboard/metrics/")
 
         assert response.status_code == http_status.HTTP_200_OK
-        recent_errors = response.data['recent_errors']
+        recent_errors = response.data["recent_errors"]
 
         # Deve retornar apenas 5
         assert len(recent_errors) == 5
 
         # Validar estrutura de cada erro
         for error in recent_errors:
-            assert 'id' in error
-            assert 'summary' in error
-            assert 'gcal_last_error' in error
-            assert 'updated_at' in error
+            assert "id" in error
+            assert "summary" in error
+            assert "gcal_last_error" in error
+            assert "updated_at" in error
 
     def test_metrics_window_filter_start_end(self, usuario_controle, municipio, projeto, tipo_evento):
         """
@@ -173,12 +177,12 @@ class TestDashboardMetrics:
         data = response.data
 
         # Apenas 2 eventos dentro da janela
-        total = sum(data['counts'].values())
+        total = sum(data["counts"].values())
         assert total == 2
 
         # Validar window retornado
-        assert data['window']['start'] == start
-        assert data['window']['end'] == end
+        assert data["window"]["start"] == start
+        assert data["window"]["end"] == end
 
     def test_metrics_requires_authentication(self, usuario_controle, municipio, projeto, tipo_evento):
         """
@@ -237,16 +241,16 @@ class TestDashboardEvents:
         data = response.data
 
         # Estrutura paginada
-        assert 'count' in data
-        assert 'next' in data
-        assert 'previous' in data
-        assert 'results' in data
+        assert "count" in data
+        assert "next" in data
+        assert "previous" in data
+        assert "results" in data
 
         # Deve retornar 20 itens (página 1)
-        assert len(data['results']) == 20
-        assert data['count'] == 25
-        assert data['next'] is not None
-        assert data['previous'] is None
+        assert len(data["results"]) == 20
+        assert data["count"] == 25
+        assert data["next"] is not None
+        assert data["previous"] is None
 
     def test_events_pagination_custom_page_size(self, usuario_controle, municipio, projeto, tipo_evento):
         """
@@ -265,9 +269,9 @@ class TestDashboardEvents:
         data = response.data
 
         # Deve retornar 5 itens
-        assert len(data['results']) == 5
-        assert data['count'] == 15
-        assert data['next'] is not None
+        assert len(data["results"]) == 5
+        assert data["count"] == 15
+        assert data["next"] is not None
 
     def test_events_filter_by_status(self, usuario_controle, municipio, projeto, tipo_evento):
         """
@@ -285,13 +289,13 @@ class TestDashboardEvents:
         response = client.get("/api/gcal/dashboard/events/?status=NONE")
 
         assert response.status_code == http_status.HTTP_200_OK
-        assert len(response.data['results']) == 2
+        assert len(response.data["results"]) == 2
 
         # Filtrar apenas ERROR
         response = client.get("/api/gcal/dashboard/events/?status=ERROR")
 
         assert response.status_code == http_status.HTTP_200_OK
-        assert len(response.data['results']) == 1
+        assert len(response.data["results"]) == 1
 
     def test_events_filter_by_date_window(self, usuario_controle, municipio, projeto, tipo_evento):
         """
@@ -317,16 +321,22 @@ class TestDashboardEvents:
 
         assert response.status_code == http_status.HTTP_200_OK
         # Apenas 2 eventos dentro da janela
-        assert len(response.data['results']) == 2
+        assert len(response.data["results"]) == 2
 
     def test_events_ordered_by_updated_at_desc(self, usuario_controle, municipio, projeto, tipo_evento):
         """
         Caso 5: Ordenação por updated_at desc (mais recentes primeiro)
         """
         # Criar solicitações em ordem
-        sol1 = create_solicitacao(usuario_controle, municipio, projeto, tipo_evento, Solicitacao.GCalStatus.PUBLISHED, 1)
-        sol2 = create_solicitacao(usuario_controle, municipio, projeto, tipo_evento, Solicitacao.GCalStatus.PUBLISHED, 2)
-        sol3 = create_solicitacao(usuario_controle, municipio, projeto, tipo_evento, Solicitacao.GCalStatus.PUBLISHED, 3)
+        sol1 = create_solicitacao(
+            usuario_controle, municipio, projeto, tipo_evento, Solicitacao.GCalStatus.PUBLISHED, 1
+        )
+        sol2 = create_solicitacao(
+            usuario_controle, municipio, projeto, tipo_evento, Solicitacao.GCalStatus.PUBLISHED, 2
+        )
+        sol3 = create_solicitacao(
+            usuario_controle, municipio, projeto, tipo_evento, Solicitacao.GCalStatus.PUBLISHED, 3
+        )
 
         client = APIClient()
         client.force_authenticate(user=usuario_controle)
@@ -334,12 +344,12 @@ class TestDashboardEvents:
         response = client.get("/api/gcal/dashboard/events/")
 
         assert response.status_code == http_status.HTTP_200_OK
-        results = response.data['results']
+        results = response.data["results"]
 
         # Mais recente primeiro
-        assert results[0]['id'] == sol3.id
-        assert results[1]['id'] == sol2.id
-        assert results[2]['id'] == sol1.id
+        assert results[0]["id"] == sol3.id
+        assert results[1]["id"] == sol2.id
+        assert results[2]["id"] == sol1.id
 
     def test_events_requires_authentication(self):
         """

@@ -12,33 +12,33 @@ Refs:
 - GAP-3: Rate limiting com UserRateThrottle
 - PA-05: Auditoria obrigatória (AuditLog)
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
-from typing import Any
-from django.db.models import QuerySet
-from rest_framework.request import Request
-from rest_framework.response import Response
 
 import logging
 from datetime import timedelta
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from typing import Any
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from django.conf import settings
+from django.db.models import QuerySet
 from django.shortcuts import redirect
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 
+from apps.core.models import AuditLog, GoogleOAuthCredential
 from apps.core.permissions import IsControleOrSuper
-from apps.core.models import GoogleOAuthCredential, AuditLog
 from apps.core.services.google_oauth import (
+    _encrypt_token,
     build_authorization_url,
     exchange_code_for_tokens,
     revoke_token,
-    _encrypt_token,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
 
 def _merge_query_params(url: str, **params) -> str:
     """
@@ -77,14 +78,7 @@ def _merge_query_params(url: str, **params) -> str:
     new_query = urlencode(query_dict, doseq=True)
 
     # Rebuild URL
-    return urlunparse((
-        parsed.scheme,
-        parsed.netloc,
-        parsed.path,
-        parsed.params,
-        new_query,
-        parsed.fragment
-    ))
+    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment))
 
 
 def _build_frontend_redirect_url(path: str) -> str:
@@ -119,25 +113,25 @@ def _build_frontend_redirect_url(path: str) -> str:
 
     if not frontend_origin and settings.CORS_ALLOWED_ORIGINS:
         # Issue #442: Use settings instead of hardcoded ports
-        frontend_port = getattr(settings, 'FRONTEND_DEV_PORT', '5173')
-        backend_port = getattr(settings, 'BACKEND_PORT', '8002')
+        frontend_port = getattr(settings, "FRONTEND_DEV_PORT", "5173")
+        backend_port = getattr(settings, "BACKEND_PORT", "8002")
 
         # Priorizar frontend dev port (Vite dev server padrão)
         for origin in settings.CORS_ALLOWED_ORIGINS:
-            if f':{frontend_port}' in origin:
+            if f":{frontend_port}" in origin:
                 frontend_origin = origin
                 break
 
         # Se não encontrou frontend port, pegar primeira origem que não seja backend port
         if not frontend_origin:
             for origin in settings.CORS_ALLOWED_ORIGINS:
-                if f':{backend_port}' not in origin:
+                if f":{backend_port}" not in origin:
                     frontend_origin = origin
                     break
 
     # Fallback para frontend URL (dev)
     if not frontend_origin:
-        frontend_port = getattr(settings, 'FRONTEND_DEV_PORT', '5173')
+        frontend_port = getattr(settings, "FRONTEND_DEV_PORT", "5173")
         frontend_origin = f"http://localhost:{frontend_port}"
 
     # Construir URL absoluta
@@ -150,21 +144,24 @@ def _build_frontend_redirect_url(path: str) -> str:
 # RATE LIMITING (GAP-3)
 # ============================================================================
 
+
 class OAuthThrottle(UserRateThrottle):
     """
     Rate limiting específico para endpoints OAuth.
 
     GAP-3: Prevenir abuso com 10 requests/hora por usuário.
     """
-    rate = '10/hour'
-    scope = 'oauth'
+
+    rate = "10/hour"
+    scope = "oauth"
 
 
 # ============================================================================
 # OAUTH 2.0 ENDPOINTS
 # ============================================================================
 
-@api_view(['GET'])
+
+@api_view(["GET"])
 @permission_classes([IsControleOrSuper])
 @throttle_classes([OAuthThrottle])
 def google_oauth_start(request: Request) -> Response:
@@ -185,30 +182,25 @@ def google_oauth_start(request: Request) -> Response:
 
         → Redirects to: https://accounts.google.com/o/oauth2/v2/auth?...
     """
-    return_to = request.GET.get('return_to', '/pre-agenda')
+    return_to = request.GET.get("return_to", "/pre-agenda")
 
     try:
         # Gerar URL de autorização
         auth_url = build_authorization_url(request.user, return_to=return_to)
 
-        logger.info(
-            f"🔐 OAuth start: {request.user.username} → Google consent screen"
-        )
+        logger.info(f"🔐 OAuth start: {request.user.username} → Google consent screen")
 
         return redirect(auth_url)
 
     except ValueError as e:
         logger.error(f"❌ OAuth start falhou: {e}")
         return Response(
-            {
-                "error": "Configuração OAuth incompleta. Contate o administrador.",
-                "detail": str(e)
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"error": "Configuração OAuth incompleta. Contate o administrador.", "detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 def google_oauth_callback(request: Request) -> Response:
     """
     Callback OAuth 2.0 após autorização do usuário no Google.
@@ -242,21 +234,18 @@ def google_oauth_callback(request: Request) -> Response:
     # Validação HTTPS em produção
     if settings.ENVIRONMENT == "production" and not request.is_secure():
         logger.error("❌ OAuth callback rejeitado: HTTPS obrigatório em produção")
-        return Response(
-            {"error": "HTTPS obrigatório em produção"},
-            status=status.HTTP_403_FORBIDDEN
-        )
+        return Response({"error": "HTTPS obrigatório em produção"}, status=status.HTTP_403_FORBIDDEN)
 
     # Verificar erro do Google (ex: usuário negou permissão)
-    error = request.GET.get('error')
+    error = request.GET.get("error")
     if error:
         logger.warning(f"⚠️ OAuth callback erro: {error}")
         redirect_url = _build_frontend_redirect_url(f"/pre-agenda?google=error&reason={error}")
         return redirect(redirect_url)
 
     # Obter parâmetros
-    code = request.GET.get('code')
-    state = request.GET.get('state')
+    code = request.GET.get("code")
+    state = request.GET.get("state")
 
     if not code or not state:
         logger.error("❌ OAuth callback: code ou state ausente")
@@ -271,6 +260,7 @@ def google_oauth_callback(request: Request) -> Response:
 
     # Validar state token (CSRF + user_id + return_to)
     from apps.core.services.google_oauth import validate_oauth_state
+
     validation = validate_oauth_state(state, request.user.id)
 
     if not validation["valid"]:
@@ -294,14 +284,11 @@ def google_oauth_callback(request: Request) -> Response:
                 "refresh_token_encrypted": _encrypt_token(tokens["refresh_token"]),
                 "token_expiry": timezone.now() + timedelta(seconds=tokens["expires_in"]),
                 "scope": tokens["scope"],
-            }
+            },
         )
 
         action = "created" if created else "updated"
-        logger.info(
-            f"✅ OAuth callback: credencial {action} para "
-            f"{request.user.username} ({tokens['email']})"
-        )
+        logger.info(f"✅ OAuth callback: credencial {action} para " f"{request.user.username} ({tokens['email']})")
 
         # Auditoria (PA-05)
         AuditLog.objects.create(
@@ -311,9 +298,9 @@ def google_oauth_callback(request: Request) -> Response:
             details={
                 "google_email": tokens["email"],
                 "action": action,
-                "ip_address": request.META.get('REMOTE_ADDR', ''),
-                "user_agent": request.META.get('HTTP_USER_AGENT', '')[:200],
-            }
+                "ip_address": request.META.get("REMOTE_ADDR", ""),
+                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+            },
         )
 
         # Redirecionar para return_to (merge query params)
@@ -336,7 +323,7 @@ def google_oauth_callback(request: Request) -> Response:
         return redirect(redirect_url)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsControleOrSuper])
 def google_oauth_status(request: Request) -> Response:
     """
@@ -377,27 +364,31 @@ def google_oauth_status(request: Request) -> Response:
     try:
         credential = GoogleOAuthCredential.objects.get(user=request.user)
 
-        return Response({
-            "connected": True,
-            "google_email": credential.google_email,
-            "token_expiry": credential.token_expiry.isoformat(),
-            "expires_in_days": credential.days_until_expiry(),
-            "is_expired": credential.is_expired(),
-            "default_calendar_id": credential.default_calendar_id or None,
-        })
+        return Response(
+            {
+                "connected": True,
+                "google_email": credential.google_email,
+                "token_expiry": credential.token_expiry.isoformat(),
+                "expires_in_days": credential.days_until_expiry(),
+                "is_expired": credential.is_expired(),
+                "default_calendar_id": credential.default_calendar_id or None,
+            }
+        )
 
     except GoogleOAuthCredential.DoesNotExist:
-        return Response({
-            "connected": False,
-            "google_email": None,
-            "token_expiry": None,
-            "expires_in_days": None,
-            "is_expired": False,
-            "default_calendar_id": None,
-        })
+        return Response(
+            {
+                "connected": False,
+                "google_email": None,
+                "token_expiry": None,
+                "expires_in_days": None,
+                "is_expired": False,
+                "default_calendar_id": None,
+            }
+        )
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsControleOrSuper])
 def google_oauth_disconnect(request: Request) -> Response:
     """
@@ -426,32 +417,25 @@ def google_oauth_disconnect(request: Request) -> Response:
         success = revoke_token(credential)
 
         if success:
-            logger.info(
-                f"✅ OAuth disconnect: {request.user.username} ({google_email})"
-            )
+            logger.info(f"✅ OAuth disconnect: {request.user.username} ({google_email})")
 
-            return Response({
-                "message": "Conta Google desconectada com sucesso",
-                "google_email": google_email
-            })
+            return Response({"message": "Conta Google desconectada com sucesso", "google_email": google_email})
         else:
-            logger.warning(
-                f"⚠️ OAuth disconnect: falha ao revogar token ({google_email})"
-            )
+            logger.warning(f"⚠️ OAuth disconnect: falha ao revogar token ({google_email})")
 
-            return Response({
-                "message": "Credencial removida localmente, mas falha ao revogar no Google",
-                "google_email": google_email
-            }, status=status.HTTP_200_OK)
+            return Response(
+                {
+                    "message": "Credencial removida localmente, mas falha ao revogar no Google",
+                    "google_email": google_email,
+                },
+                status=status.HTTP_200_OK,
+            )
 
     except GoogleOAuthCredential.DoesNotExist:
-        return Response(
-            {"error": "Nenhuma conexão Google encontrada"},
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return Response({"error": "Nenhuma conexão Google encontrada"}, status=status.HTTP_404_NOT_FOUND)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsControleOrSuper])
 def google_oauth_list_calendars(request: Request) -> Response:
     """
@@ -492,9 +476,7 @@ def google_oauth_list_calendars(request: Request) -> Response:
         client = OAuthCalendarClient(credential)
         calendars = client.list_calendars()
 
-        logger.info(
-            f"📅 Listed {len(calendars)} calendars for {request.user.username}"
-        )
+        logger.info(f"📅 Listed {len(calendars)} calendars for {request.user.username}")
         for cal in calendars:
             logger.info(
                 f"  📅 {cal['summary']}: id={cal['id']}, "
@@ -504,19 +486,15 @@ def google_oauth_list_calendars(request: Request) -> Response:
         return Response({"calendars": calendars})
 
     except GoogleOAuthCredential.DoesNotExist:
-        return Response(
-            {"error": "Nenhuma conexão Google encontrada"},
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return Response({"error": "Nenhuma conexão Google encontrada"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         logger.error(f"❌ Erro ao listar calendários: {e}")
         return Response(
-            {"error": "Erro ao listar calendários", "detail": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"error": "Erro ao listar calendários", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsControleOrSuper])
 def google_oauth_select_calendar(request: Request) -> Response:
     """
@@ -551,18 +529,13 @@ def google_oauth_select_calendar(request: Request) -> Response:
 
         calendar_id = request.data.get("calendar_id")
         if not calendar_id:
-            return Response(
-                {"error": "calendar_id é obrigatório"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "calendar_id é obrigatório"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Atualizar calendário padrão
         credential.default_calendar_id = calendar_id
         credential.save(update_fields=["default_calendar_id", "updated_at"])
 
-        logger.info(
-            f"📅 Calendar selected: {request.user.username} → {calendar_id}"
-        )
+        logger.info(f"📅 Calendar selected: {request.user.username} → {calendar_id}")
 
         # Auditoria (PA-05)
         AuditLog.objects.create(
@@ -571,18 +544,12 @@ def google_oauth_select_calendar(request: Request) -> Response:
             model_name="GoogleOAuthCredential",
             details={
                 "calendar_id": calendar_id,
-                "ip_address": request.META.get('REMOTE_ADDR', ''),
-                "user_agent": request.META.get('HTTP_USER_AGENT', '')[:200],
-            }
+                "ip_address": request.META.get("REMOTE_ADDR", ""),
+                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+            },
         )
 
-        return Response({
-            "message": "Calendário selecionado com sucesso",
-            "calendar_id": calendar_id
-        })
+        return Response({"message": "Calendário selecionado com sucesso", "calendar_id": calendar_id})
 
     except GoogleOAuthCredential.DoesNotExist:
-        return Response(
-            {"error": "Nenhuma conexão Google encontrada"},
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return Response({"error": "Nenhuma conexão Google encontrada"}, status=status.HTTP_404_NOT_FOUND)

@@ -3,6 +3,7 @@ AS v2 — Availability Views
 
 ViewSets and APIViews for availability blocks and conflict checking.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -12,7 +13,6 @@ from typing import Any
 from django.db.models import QuerySet
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -41,10 +41,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         Filtrar bloqueios por usuário (exceto Superintendência/superuser que vê todos).
         """
         base_qs = AvailabilityBlock.objects.select_related("usuario")
-        if (
-            self.request.user.is_superuser
-            or self.request.user.groups.filter(name="Superintendência").exists()
-        ):
+        if self.request.user.is_superuser or self.request.user.groups.filter(name="Superintendência").exists():
             return base_qs.all()
         return base_qs.filter(usuario=self.request.user)
 
@@ -149,9 +146,7 @@ class AvailabilityCheckView(APIView):
             fim = timezone.make_aware(fim, timezone.utc)
 
         # Executar checagem
-        result = check_conflicts(
-            usuario=usuario, inicio=inicio, fim=fim, municipio=municipio
-        )
+        result = check_conflicts(usuario=usuario, inicio=inicio, fim=fim, municipio=municipio)
 
         # Retornar resultado
         return Response(
@@ -273,9 +268,7 @@ class AvailabilityCheckManyView(APIView):
                 continue
 
             # Executar checagem
-            result = check_conflicts(
-                usuario=usuario, inicio=inicio, fim=fim, municipio=municipio
-            )
+            result = check_conflicts(usuario=usuario, inicio=inicio, fim=fim, municipio=municipio)
 
             results.append(
                 {

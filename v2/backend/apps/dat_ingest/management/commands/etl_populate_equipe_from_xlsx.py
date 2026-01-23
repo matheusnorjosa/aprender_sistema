@@ -20,6 +20,7 @@ Mapeamento Planilha → Banco:
     - Sou da Paz → Sou da Paz (ID=6)
     - IDEB 10 / Avançando Juntos → Individual (ID=7)
 """
+
 # pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportArgumentType=false, reportOperatorIssue=false
 
 from __future__ import annotations
@@ -28,11 +29,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
 from django.core.management.base import BaseCommand
 
-from apps.core.models import EquipeGerencia, Gerencia, Usuario
+import pandas as pd
 
+from apps.core.models import EquipeGerencia, Gerencia, Usuario
 
 # Mapeamento de gerência da planilha para nome_setor do banco
 GERENCIA_MAP: dict[str, str] = {
@@ -113,9 +114,7 @@ class Command(BaseCommand):
         xlsx_path = options.get("xlsx_path", "/app/data/csv-import/todososusuarios.xlsx")
 
         if not dry_run and not apply:
-            self.stderr.write(
-                self.style.ERROR("Especifique --dry-run ou --apply")
-            )
+            self.stderr.write(self.style.ERROR("Especifique --dry-run ou --apply"))
             return
 
         self.stdout.write("=" * 70)
@@ -127,9 +126,7 @@ class Command(BaseCommand):
 
         # Verificar se arquivo existe
         if not Path(xlsx_path).exists():
-            self.stderr.write(
-                self.style.ERROR(f"Arquivo não encontrado: {xlsx_path}")
-            )
+            self.stderr.write(self.style.ERROR(f"Arquivo não encontrado: {xlsx_path}"))
             return
 
         # Carregar planilha
@@ -184,9 +181,7 @@ class Command(BaseCommand):
             cpf = normalize_cpf(cpf_raw)
             if not cpf:
                 if verbose:
-                    self.stdout.write(
-                        self.style.WARNING(f"  [SKIP] Linha {idx+1}: CPF inválido ({cpf_raw})")
-                    )
+                    self.stdout.write(self.style.WARNING(f"  [SKIP] Linha {idx+1}: CPF inválido ({cpf_raw})"))
                 stats["cpf_invalido"] += 1
                 continue
 
@@ -218,9 +213,7 @@ class Command(BaseCommand):
             if not papel:
                 if verbose:
                     self.stdout.write(
-                        self.style.WARNING(
-                            f"  [SKIP] Linha {idx+1} ({nome}): Cargo não mapeado ({cargo})"
-                        )
+                        self.style.WARNING(f"  [SKIP] Linha {idx+1} ({nome}): Cargo não mapeado ({cargo})")
                     )
                 stats["cargo_nao_mapeado"] += 1
                 continue
@@ -268,16 +261,12 @@ class Command(BaseCommand):
                     if not usuario:
                         if verbose:
                             self.stdout.write(
-                                self.style.WARNING(
-                                    f"  [SKIP] {nome}: Usuário não encontrado (CPF: {cpf})"
-                                )
+                                self.style.WARNING(f"  [SKIP] {nome}: Usuário não encontrado (CPF: {cpf})")
                             )
                         stats["usuario_nao_encontrado"] += 1
                         continue
 
-                    result = self._criar_equipe(
-                        gerencia_fluir, usuario, "FORMADOR", dry_run, verbose, nome
-                    )
+                    result = self._criar_equipe(gerencia_fluir, usuario, "FORMADOR", dry_run, verbose, nome)
                     self._update_stats(stats, result, "formadores_criados")
 
         # Resumo
@@ -297,19 +286,13 @@ class Command(BaseCommand):
         self.stdout.write(f"Usuário não encontrado: {stats['usuario_nao_encontrado']}")
         self.stdout.write(f"Erros: {stats['erros']}")
 
-        total_criados = (
-            stats["gerentes_criados"]
-            + stats["coordenadores_criados"]
-            + stats["formadores_criados"]
-        )
+        total_criados = stats["gerentes_criados"] + stats["coordenadores_criados"] + stats["formadores_criados"]
         self.stdout.write("")
         self.stdout.write(f"TOTAL CRIADOS: {total_criados}")
 
         if dry_run:
             self.stdout.write("")
-            self.stdout.write(
-                self.style.WARNING("DRY-RUN: Nenhuma alteração foi feita no banco.")
-            )
+            self.stdout.write(self.style.WARNING("DRY-RUN: Nenhuma alteração foi feita no banco."))
             self.stdout.write("Execute com --apply para aplicar as alterações.")
 
     def _criar_equipe(
@@ -341,11 +324,7 @@ class Command(BaseCommand):
                     self.stdout.write(f"    [SKIP] {nome} já é {papel} em {gerencia.nome_setor}")
                 return "exists"
             else:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"    [+] {nome} → {papel} em {gerencia.nome_setor}"
-                    )
-                )
+                self.stdout.write(self.style.SUCCESS(f"    [+] {nome} → {papel} em {gerencia.nome_setor}"))
                 return "created"
 
         # APPLY mode
@@ -358,11 +337,7 @@ class Command(BaseCommand):
             )
 
             if created:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"    [+] {nome} → {papel} em {gerencia.nome_setor}"
-                    )
-                )
+                self.stdout.write(self.style.SUCCESS(f"    [+] {nome} → {papel} em {gerencia.nome_setor}"))
                 return "created"
             else:
                 if verbose:
@@ -370,9 +345,7 @@ class Command(BaseCommand):
                 return "exists"
 
         except Exception as e:
-            self.stderr.write(
-                self.style.ERROR(f"    [ERRO] {nome}: {e}")
-            )
+            self.stderr.write(self.style.ERROR(f"    [ERRO] {nome}: {e}"))
             return "error"
 
     def _update_stats(

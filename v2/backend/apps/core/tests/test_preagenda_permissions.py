@@ -11,13 +11,16 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from django.contrib.auth.models import Group
-from rest_framework.test import APIClient
-from django.utils import timezone
-from datetime import timedelta
-from apps.core.models import Usuario, Solicitacao, TipoEvento, Municipio, Projeto
 
+from datetime import timedelta
+
+from django.contrib.auth.models import Group
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+import pytest
+
+from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 pytestmark = pytest.mark.django_db
 

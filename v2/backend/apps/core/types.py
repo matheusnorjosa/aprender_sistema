@@ -142,9 +142,9 @@ ErrorHandler: TypeAlias = Callable[[Exception], None]
 """Callback para tratamento de erros."""
 
 # Generic callbacks (Python 3.11+ compatible)
-from typing import TypeVar
+from typing import TypeVar  # noqa: E402
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 SuccessCallback: TypeAlias = Callable[[Any], None]
 """Callback genérico para sucesso."""
@@ -168,14 +168,7 @@ IMPORTANTE: Sempre usar timezone-aware datetimes.
 # 8. RBAC (Grupos e Permissões)
 # ==============================================================================
 
-GroupName: TypeAlias = Literal[
-    "Superintendência",
-    "Controle",
-    "Coordenador",
-    "Formador",
-    "DAT",
-    "Gerência"
-]
+GroupName: TypeAlias = Literal["Superintendência", "Controle", "Coordenador", "Formador", "DAT", "Gerência"]
 """Grupos de permissão Django (Usuario.groups)."""
 
 ActionType: TypeAlias = Literal[
@@ -186,7 +179,7 @@ ActionType: TypeAlias = Literal[
     "PUBLISH_GCAL",
     "RESYNC_GCAL_REQUESTED",
     "CANCEL_GCAL_REQUESTED",
-    "CANCEL_GCAL"
+    "CANCEL_GCAL",
 ]
 """Tipos de ação para auditoria (AuditLog.action)."""
 

@@ -10,19 +10,22 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from unittest.mock import patch
-from django.contrib.auth.models import Group
-from rest_framework.test import APIClient
-from django.utils import timezone
+
 from datetime import timedelta
+from unittest.mock import patch
+
+from django.contrib.auth.models import Group
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import (
-    Usuario,
     Municipio,
     Projeto,
-    TipoEvento,
     Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 
 
@@ -70,8 +73,8 @@ def solicitacao_com_meet_link(usuario_controle):
 class TestSolicitacaoSerializerMeetLink:
     """Testes para campo meet_link no SolicitacaoSerializer"""
 
-    @patch('rest_framework.throttling.AnonRateThrottle.allow_request', return_value=True)
-    @patch('rest_framework.throttling.UserRateThrottle.allow_request', return_value=True)
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_detail_returns_meet_link_when_set(
         self, mock_throttle1, mock_throttle2, usuario_controle, solicitacao_com_meet_link
     ):
@@ -87,10 +90,7 @@ class TestSolicitacaoSerializerMeetLink:
         client = APIClient()
         client.force_authenticate(user=usuario_controle)
 
-        response = client.get(
-            f"/api/solicitacoes/{solicitacao_com_meet_link.id}/",
-            format="json"
-        )
+        response = client.get(f"/api/solicitacoes/{solicitacao_com_meet_link.id}/", format="json")
 
         assert response.status_code == 200
         assert "meet_link" in response.data
@@ -147,11 +147,7 @@ class TestSolicitacaoSerializerMeetLink:
         assert len(response.data["results"]) > 0
 
         # Encontrar nossa solicitação na listagem
-        item = next(
-            (item for item in response.data["results"]
-             if item["id"] == solicitacao_com_meet_link.id),
-            None
-        )
+        item = next((item for item in response.data["results"] if item["id"] == solicitacao_com_meet_link.id), None)
 
         assert item is not None
         assert "meet_link" in item
@@ -185,9 +181,9 @@ class TestSolicitacaoSerializerMeetLink:
                 "fim": (now + timedelta(days=3, hours=2)).isoformat(),
                 "observacoes": "Teste",
                 # Tentar setar meet_link (deve ser ignorado)
-                "meet_link": "https://meet.google.com/fake-link"
+                "meet_link": "https://meet.google.com/fake-link",
             },
-            format="json"
+            format="json",
         )
 
         # POST pode retornar 201 ou 400 dependendo das validações
@@ -195,12 +191,9 @@ class TestSolicitacaoSerializerMeetLink:
         if response.status_code == 201:
             sol_id = response.data["id"]
             sol = Solicitacao.objects.get(id=sol_id)
-            assert sol.meet_link is None, \
-                "meet_link deve ser read_only e não aceitar valor via POST"
+            assert sol.meet_link is None, "meet_link deve ser read_only e não aceitar valor via POST"
 
-    def test_meet_link_is_read_only_on_patch(
-        self, usuario_controle, solicitacao_com_meet_link
-    ):
+    def test_meet_link_is_read_only_on_patch(self, usuario_controle, solicitacao_com_meet_link):
         """
         RF06: meet_link deve ser read_only (não aceita PATCH).
 
@@ -220,14 +213,15 @@ class TestSolicitacaoSerializerMeetLink:
             {
                 "observacoes": "Atualizado",
                 # Tentar alterar meet_link (deve ser ignorado)
-                "meet_link": "https://meet.google.com/new-fake-link"
+                "meet_link": "https://meet.google.com/new-fake-link",
             },
-            format="json"
+            format="json",
         )
 
         # Refresh do banco
         solicitacao_com_meet_link.refresh_from_db()
 
         # meet_link deve manter o valor original
-        assert solicitacao_com_meet_link.meet_link == original_link, \
-            "meet_link deve ser read_only e não aceitar alteração via PATCH"
+        assert (
+            solicitacao_com_meet_link.meet_link == original_link
+        ), "meet_link deve ser read_only e não aceitar alteração via PATCH"

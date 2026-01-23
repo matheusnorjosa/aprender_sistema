@@ -10,9 +10,12 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from unittest.mock import MagicMock, Mock, patch
+
 from django.test import TestCase, override_settings
+
+import pytest
 from googleapiclient.errors import HttpError
 
 
@@ -38,6 +41,7 @@ class TestGoogleCalendarClient(TestCase):
             if key == "GOOGLE_SERVICE_ACCOUNT_JSON":
                 return '{"type": "service_account", "project_id": "test"}'
             return default
+
         mock_getenv.side_effect = getenv_side_effect
 
         # Mock credentials (from_service_account_info already patched)
@@ -53,9 +57,7 @@ class TestGoogleCalendarClient(TestCase):
 
         # Mock get() to return a request object that raises 404 on execute()
         mock_get_request = MagicMock()
-        mock_get_request.execute.side_effect = HttpError(
-            resp=Mock(status=404), content=b"Not Found"
-        )
+        mock_get_request.execute.side_effect = HttpError(resp=Mock(status=404), content=b"Not Found")
         mock_events_api.get.return_value = mock_get_request
 
         # Mock insert() to return a request object that returns data on execute()
@@ -104,6 +106,7 @@ class TestGoogleCalendarClient(TestCase):
             if key == "GOOGLE_SERVICE_ACCOUNT_JSON":
                 return '{"type": "service_account", "project_id": "test"}'
             return default
+
         mock_getenv.side_effect = getenv_side_effect
 
         # Mock credentials (from_service_account_info already patched)
@@ -173,6 +176,7 @@ class TestGoogleCalendarClient(TestCase):
             if key == "GOOGLE_SERVICE_ACCOUNT_JSON":
                 return '{"type": "service_account", "project_id": "test"}'
             return default
+
         mock_getenv.side_effect = getenv_side_effect
 
         # Mock credentials (from_service_account_info already patched)
@@ -188,9 +192,7 @@ class TestGoogleCalendarClient(TestCase):
 
         # Mock delete() to return a request object that raises 404 on execute()
         mock_delete_request = MagicMock()
-        mock_delete_request.execute.side_effect = HttpError(
-            resp=Mock(status=404), content=b"Not Found"
-        )
+        mock_delete_request.execute.side_effect = HttpError(resp=Mock(status=404), content=b"Not Found")
         mock_events_api.delete.return_value = mock_delete_request
 
         # Criar client com credentials mockadas
@@ -200,9 +202,7 @@ class TestGoogleCalendarClient(TestCase):
         client.delete("primary", "test-event-1")  # Idempotente
 
         # Validar que delete foi chamado
-        mock_events_api.delete.assert_called_once_with(
-            calendarId="primary", eventId="test-event-1", sendUpdates="none"
-        )
+        mock_events_api.delete.assert_called_once_with(calendarId="primary", eventId="test-event-1", sendUpdates="none")
 
     @patch("os.getenv")
     @patch("google.oauth2.service_account.Credentials.from_service_account_info")
@@ -240,9 +240,7 @@ class TestGoogleCalendarClient(TestCase):
 
         # Mock get() to return a request object that raises 404 on execute()
         mock_get_request = MagicMock()
-        mock_get_request.execute.side_effect = HttpError(
-            resp=Mock(status=404), content=b"Not Found"
-        )
+        mock_get_request.execute.side_effect = HttpError(resp=Mock(status=404), content=b"Not Found")
         mock_events_api.get.return_value = mock_get_request
 
         # Criar client com credentials mockadas
@@ -253,9 +251,7 @@ class TestGoogleCalendarClient(TestCase):
         assert result is None
 
         # Validar que get foi chamado com parâmetros corretos
-        mock_events_api.get.assert_called_once_with(
-            calendarId="primary", eventId="nonexistent-event-id"
-        )
+        mock_events_api.get.assert_called_once_with(calendarId="primary", eventId="nonexistent-event-id")
 
 
 @pytest.mark.django_db
@@ -284,6 +280,7 @@ class TestGcalClientFactory(TestCase):
             if key == "GOOGLE_SERVICE_ACCOUNT_JSON":
                 return '{"type": "service_account", "project_id": "test"}'
             return default
+
         mock_getenv.side_effect = getenv_side_effect
 
         # Mock credentials e build (from_service_account_info already patched)
@@ -291,9 +288,7 @@ class TestGcalClientFactory(TestCase):
         mock_build.return_value = MagicMock()
 
         # Obter client e calendar_id
-        with override_settings(
-            GOOGLE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": "test"}'
-        ):
+        with override_settings(GOOGLE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": "test"}'):
             client, calendar_id = get_gcal_client_and_calendar_id()
 
         # Validar tipo e calendar_id
@@ -321,7 +316,7 @@ class TestGcalClientFactory(TestCase):
         assert client.__class__.__name__ == "FakeCalendarClient"
         assert calendar_id == "primary"
 
-    @override_settings(GCAL_CLIENT='fake')
+    @override_settings(GCAL_CLIENT="fake")
     def test_factory_defaults_to_fake(self):
         """
         Factory usa fake como padrão quando GCAL_CLIENT não definido.
@@ -373,9 +368,7 @@ class TestGcalClientFactory(TestCase):
         mock_build.return_value = MagicMock()
 
         # Obter client (GCAL_CLIENT='Google' via override_settings)
-        with override_settings(
-            GOOGLE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": "test"}'
-        ):
+        with override_settings(GOOGLE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": "test"}'):
             client, calendar_id = get_gcal_client_and_calendar_id()
 
         # Validar que retorna GoogleCalendarClient mesmo com case diferente

@@ -5,6 +5,7 @@ Serializers para AuditLog.
 Clausula Petrea: PA-05 (registro de aprovacoes/reprovacoes).
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations

@@ -12,11 +12,13 @@ Valida que settings.py bloqueia configurações inseguras em produção:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
 from unittest import TestCase
+
 from django.conf import settings
 
 
@@ -154,8 +156,7 @@ class ProductionGuardRailsTests(TestCase):
             print("STDERR:", result.stderr)
 
         # Aceitar exit code 0 (sucesso) ou != 1 (warnings OK, mas não critical errors)
-        self.assertNotEqual(result.returncode, 1,
-            f"Django check falhou inesperadamente. Stderr: {result.stderr}")
+        self.assertNotEqual(result.returncode, 1, f"Django check falhou inesperadamente. Stderr: {result.stderr}")
 
     def test_startup_warns_with_short_secret_key(self):
         """

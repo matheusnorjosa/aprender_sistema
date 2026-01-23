@@ -14,15 +14,17 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from uuid import uuid4
+
 from django.contrib.auth.models import Group
 from django.core.cache import cache
-from rest_framework.test import APIClient
 from rest_framework import status
+from rest_framework.test import APIClient
 
-from apps.core.models import Usuario, AuditLog
+import pytest
 
+from apps.core.models import AuditLog, Usuario
 
 pytestmark = pytest.mark.django_db
 
@@ -100,9 +102,7 @@ def test_login_success_returns_user_data(api_client, usuario_ativo):
     - Campos: id, username, email, name, groups, is_superintendencia
     """
     response = api_client.post(
-        "/api/auth/login/",
-        {"username": usuario_ativo.username, "password": "testpass123"},
-        format="json"
+        "/api/auth/login/", {"username": usuario_ativo.username, "password": "testpass123"}, format="json"
     )
 
     assert response.status_code == status.HTTP_200_OK
@@ -129,7 +129,7 @@ def test_login_creates_audit_log(api_client, usuario_ativo):
         "/api/auth/login/",
         {"username": usuario_ativo.username, "password": "testpass123"},
         format="json",
-        HTTP_USER_AGENT="pytest-agent"
+        HTTP_USER_AGENT="pytest-agent",
     )
 
     assert response.status_code == status.HTTP_200_OK
@@ -153,9 +153,7 @@ def test_login_inactive_user_blocked(api_client, usuario_inativo):
     - Mensagem de erro: 'Credenciais inválidas.' (auth backend retorna None para inativos)
     """
     response = api_client.post(
-        "/api/auth/login/",
-        {"username": usuario_inativo.username, "password": "testpass123"},
-        format="json"
+        "/api/auth/login/", {"username": usuario_inativo.username, "password": "testpass123"}, format="json"
     )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -172,29 +170,17 @@ def test_login_empty_credentials_rejected(api_client):
     - Ambos vazios → 400
     """
     # Username vazio
-    response = api_client.post(
-        "/api/auth/login/",
-        {"username": "", "password": "testpass123"},
-        format="json"
-    )
+    response = api_client.post("/api/auth/login/", {"username": "", "password": "testpass123"}, format="json")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "obrigatórios" in response.data["error"]
 
     # Password vazio
-    response = api_client.post(
-        "/api/auth/login/",
-        {"username": "user", "password": ""},
-        format="json"
-    )
+    response = api_client.post("/api/auth/login/", {"username": "user", "password": ""}, format="json")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "obrigatórios" in response.data["error"]
 
     # Ambos vazios
-    response = api_client.post(
-        "/api/auth/login/",
-        {"username": "", "password": ""},
-        format="json"
-    )
+    response = api_client.post("/api/auth/login/", {"username": "", "password": ""}, format="json")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "obrigatórios" in response.data["error"]
 
@@ -209,18 +195,14 @@ def test_login_invalid_credentials_rejected(api_client, usuario_ativo):
     """
     # Senha errada
     response = api_client.post(
-        "/api/auth/login/",
-        {"username": usuario_ativo.username, "password": "wrongpass"},
-        format="json"
+        "/api/auth/login/", {"username": usuario_ativo.username, "password": "wrongpass"}, format="json"
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["error"] == "Credenciais inválidas."
 
     # Usuário inexistente
     response = api_client.post(
-        "/api/auth/login/",
-        {"username": "nonexistent", "password": "testpass123"},
-        format="json"
+        "/api/auth/login/", {"username": "nonexistent", "password": "testpass123"}, format="json"
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["error"] == "Credenciais inválidas."
@@ -236,9 +218,7 @@ def test_login_returns_groups(api_client, usuario_superintendencia):
     - is_superintendencia=True
     """
     response = api_client.post(
-        "/api/auth/login/",
-        {"username": usuario_superintendencia.username, "password": "testpass123"},
-        format="json"
+        "/api/auth/login/", {"username": usuario_superintendencia.username, "password": "testpass123"}, format="json"
     )
 
     assert response.status_code == status.HTTP_200_OK
@@ -260,10 +240,7 @@ def test_logout_requires_authentication(api_client):
     - Usuário não autenticado → 401 ou 403
     """
     response = api_client.post("/api/auth/logout/")
-    assert response.status_code in [
-        status.HTTP_401_UNAUTHORIZED,
-        status.HTTP_403_FORBIDDEN
-    ]
+    assert response.status_code in [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN]
 
 
 def test_logout_creates_audit_log(api_client, usuario_ativo):
@@ -282,10 +259,7 @@ def test_logout_creates_audit_log(api_client, usuario_ativo):
     initial_count = AuditLog.objects.count()
 
     # Fazer logout
-    response = api_client.post(
-        "/api/auth/logout/",
-        HTTP_USER_AGENT="pytest-agent"
-    )
+    response = api_client.post("/api/auth/logout/", HTTP_USER_AGENT="pytest-agent")
 
     assert response.status_code == status.HTTP_200_OK
     assert AuditLog.objects.count() == initial_count + 1
@@ -336,7 +310,4 @@ def test_logout_clears_session(api_client, usuario_ativo):
 
     # Tentar logout novamente sem auth (deve falhar)
     response = api_client.post("/api/auth/logout/")
-    assert response.status_code in [
-        status.HTTP_401_UNAUTHORIZED,
-        status.HTTP_403_FORBIDDEN
-    ]
+    assert response.status_code in [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN]

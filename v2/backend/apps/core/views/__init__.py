@@ -3,18 +3,11 @@ AS v2 — Core Views Package
 
 Re-exports all views for backwards compatibility.
 """
+
 # pyright: reportUnusedImport=false
 
 from __future__ import annotations
 
-from apps.core.views.utils import _get_client_ip, api_root
-from apps.core.views.solicitacao import SolicitacaoViewSet
-from apps.core.views.availability import (
-    AvailabilityBlockViewSet,
-    AvailabilityCheckManyView,
-    AvailabilityCheckView,
-)
-from apps.core.views_basic import CurrentUserView
 from apps.core.views.admin import (
     AuditLogViewSet,
     CompraViewSet,
@@ -24,6 +17,11 @@ from apps.core.views.admin import (
     ProdutoViewSet,
     ProjetoViewSet,
     UsuarioAdminViewSet,
+)
+from apps.core.views.availability import (
+    AvailabilityBlockViewSet,
+    AvailabilityCheckManyView,
+    AvailabilityCheckView,
 )
 from apps.core.views.dat import (
     DATRegistroViewSet,
@@ -37,7 +35,6 @@ from apps.core.views.dat_module import (
     DATCoordenadorViewSet,
     DATFormacaoViewSet,
 )
-from apps.core.views.plano_formacoes import PlanoFormacoesViewSet
 from apps.core.views.options import (
     CoordenadorOptionViewSet,
     FormadorOptionViewSet,
@@ -45,7 +42,11 @@ from apps.core.views.options import (
     ProjetoOptionViewSet,
     TipoEventoOptionViewSet,
 )
+from apps.core.views.plano_formacoes import PlanoFormacoesViewSet
+from apps.core.views.solicitacao import SolicitacaoViewSet
 from apps.core.views.stats import HomeStatsView
+from apps.core.views.utils import _get_client_ip, api_root
+from apps.core.views_basic import CurrentUserView
 
 __all__ = [
     # Utils

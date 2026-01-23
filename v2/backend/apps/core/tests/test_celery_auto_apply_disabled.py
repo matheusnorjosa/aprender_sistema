@@ -10,12 +10,15 @@ Cenários:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from unittest.mock import patch, MagicMock
+
+from unittest.mock import MagicMock, patch
+
 from django.test import override_settings
 
-from apps.core.tasks import preview_then_apply_gcal
+import pytest
+
 from apps.core.models import AuditLog
+from apps.core.tasks import preview_then_apply_gcal
 
 
 @pytest.mark.django_db
@@ -35,9 +38,7 @@ class TestCeleryAutoApplyDisabled:
         assert "governança via /pre-agenda" in result["reason"]
 
         # Verificar AuditLog registrado
-        audit_log = AuditLog.objects.filter(
-            action="CELERY_GCAL_SYNC"
-        ).order_by("-created_at").first()
+        audit_log = AuditLog.objects.filter(action="CELERY_GCAL_SYNC").order_by("-created_at").first()
 
         assert audit_log is not None
         assert audit_log.details["status"] == "SKIPPED"
@@ -57,15 +58,10 @@ class TestCeleryAutoApplyDisabled:
         mock_call_command.assert_not_called()
 
     @override_settings(
-        FEATURE_AUTO_APPLY_ENABLED=True,
-        GCAL_CALENDAR_ID="test-calendar-id",
-        FEATURE_FLAGS={"GCAL_MODE": "google"}
+        FEATURE_AUTO_APPLY_ENABLED=True, GCAL_CALENDAR_ID="test-calendar-id", FEATURE_FLAGS={"GCAL_MODE": "google"}
     )
     @patch("apps.core.tasks.call_command")
-    def test_auto_apply_enabled_allows_execution(
-        self,
-        mock_call_command
-    ):
+    def test_auto_apply_enabled_allows_execution(self, mock_call_command):
         """
         Cenário: FEATURE_AUTO_APPLY_ENABLED=True + GCAL_MODE=google
         Espera: Task executa normalmente (chama call_command)
@@ -80,16 +76,12 @@ class TestCeleryAutoApplyDisabled:
                 preview_result = {
                     "status": "SUCCESS",
                     "meta": {"dry_run": True},
-                    "totals": {"total": 0, "CREATE": 0, "UPDATE": 0, "DELETE": 0, "ADOPT": 0}
+                    "totals": {"total": 0, "CREATE": 0, "UPDATE": 0, "DELETE": 0, "ADOPT": 0},
                 }
                 stdout.write(json.dumps(preview_result))
             elif stdout and not kwargs.get("dry_run"):
                 # Simula apply (não será chamado pois preview retorna total=0)
-                apply_result = {
-                    "status": "SUCCESS",
-                    "meta": {"dry_run": False},
-                    "totals": {"total": 0}
-                }
+                apply_result = {"status": "SUCCESS", "meta": {"dry_run": False}, "totals": {"total": 0}}
                 stdout.write(json.dumps(apply_result))
             return None
 
@@ -98,7 +90,9 @@ class TestCeleryAutoApplyDisabled:
         result = preview_then_apply_gcal()
 
         # Task deve executar (chamar call_command para preview)
-        assert mock_call_command.call_count >= 1, f"Expected call_command to be called, but was called {mock_call_command.call_count} times"
+        assert (
+            mock_call_command.call_count >= 1
+        ), f"Expected call_command to be called, but was called {mock_call_command.call_count} times"
 
         # Primeira chamada deve ser dry-run (preview)
         first_call_args = mock_call_command.call_args_list[0][0]  # Positional args

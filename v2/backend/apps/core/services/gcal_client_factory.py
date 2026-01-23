@@ -3,6 +3,7 @@ Factory para selecionar cliente do Google Calendar (fake vs real).
 
 Retorna instância do cliente apropriado baseado em settings.GCAL_CLIENT.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -40,14 +41,8 @@ def get_gcal_client_and_calendar_id() -> tuple["CalendarClientAdapter", Calendar
         >>> event = client.get(calendar_id, "event-id")
     """
     # Normalizar para lowercase e aceitar fallback via os.getenv
-    client_name: str = (
-        getattr(settings, "GCAL_CLIENT", None) or os.getenv("GCAL_CLIENT") or "fake"
-    ).lower()
-    calendar_id: CalendarId = (
-        getattr(settings, "GCAL_CALENDAR_ID", None)
-        or os.getenv("GCAL_CALENDAR_ID")
-        or "primary"
-    )
+    client_name: str = (getattr(settings, "GCAL_CLIENT", None) or os.getenv("GCAL_CLIENT") or "fake").lower()
+    calendar_id: CalendarId = getattr(settings, "GCAL_CALENDAR_ID", None) or os.getenv("GCAL_CALENDAR_ID") or "primary"
 
     if client_name == "google":
         # Cliente real do Google Calendar
@@ -102,11 +97,7 @@ def get_oauth_client_for_user(user: Usuario) -> tuple["CalendarClientAdapter", C
         )
 
     # Ler calendar_id (mesma lógica da função atual)
-    calendar_id: CalendarId = (
-        getattr(settings, "GCAL_CALENDAR_ID", None)
-        or os.getenv("GCAL_CALENDAR_ID")
-        or "primary"
-    )
+    calendar_id: CalendarId = getattr(settings, "GCAL_CALENDAR_ID", None) or os.getenv("GCAL_CALENDAR_ID") or "primary"
 
     # Instanciar cliente OAuth com credencial do usuário
     client: OAuthCalendarClient = OAuthCalendarClient(credential)

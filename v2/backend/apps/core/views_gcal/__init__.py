@@ -12,27 +12,6 @@ Modular package containing all GCal views, organized by domain:
 Backwards-compatible re-exports for existing imports.
 """
 
-# Core GCal views (from old views_gcal.py)
-from apps.core.views_gcal.gcal import (
-    gcal_calendars,
-    gcal_health,
-)
-
-# Helpers
-from apps.core.views_gcal.helpers import (
-    DashboardEventsPagination,
-    _apply_common_filters,
-    _filter_events_queryset,
-)
-
-# Summary views
-from apps.core.views_gcal.summary import (
-    AlertsSummaryView,
-    DashboardMetricsView,
-    GCalListView,
-    GCalStatusSummaryView,
-)
-
 # Batch views
 from apps.core.views_gcal.batch import (
     GCalBatchReapplyView,
@@ -48,10 +27,31 @@ from apps.core.views_gcal.detail import (
     GCalDriftView,
 )
 
+# Core GCal views (from old views_gcal.py)
+from apps.core.views_gcal.gcal import (
+    gcal_calendars,
+    gcal_health,
+)
+
+# Helpers
+from apps.core.views_gcal.helpers import (
+    DashboardEventsPagination,
+    _apply_common_filters,
+    _filter_events_queryset,
+)
+
 # Insights views
 from apps.core.views_gcal.insights import (
     SuccessRateView,
     TopInsightsView,
+)
+
+# Summary views
+from apps.core.views_gcal.summary import (
+    AlertsSummaryView,
+    DashboardMetricsView,
+    GCalListView,
+    GCalStatusSummaryView,
 )
 
 __all__ = [

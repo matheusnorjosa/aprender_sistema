@@ -11,9 +11,12 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+
+from unittest.mock import MagicMock, Mock, patch
+
 from django.test import override_settings
+
+import pytest
 
 from apps.core.services.gcal_google_client import GoogleCalendarClient
 
@@ -21,8 +24,8 @@ from apps.core.services.gcal_google_client import GoogleCalendarClient
 class TestSendUpdatesConfiguration:
     """Testes para parâmetro sendUpdates configurável"""
 
-    @patch('apps.core.services.gcal_google_client.build')
-    @patch('apps.core.services.gcal_google_client.service_account')
+    @patch("apps.core.services.gcal_google_client.build")
+    @patch("apps.core.services.gcal_google_client.service_account")
     def test_default_send_updates_is_none(self, mock_sa, mock_build):
         """
         RF05/RF06: Default sendUpdates deve ser 'none'.
@@ -50,25 +53,20 @@ class TestSendUpdatesConfiguration:
 
         # Criar cliente (vai usar default 'none')
         with override_settings(GCAL_SEND_UPDATES="none"):
-            client = GoogleCalendarClient(
-                credentials_json='{"type": "service_account", "project_id": "test"}'
-            )
+            client = GoogleCalendarClient(credentials_json='{"type": "service_account", "project_id": "test"}')
 
             # Chamar insert
-            result = client.insert(
-                calendar_id="primary",
-                event_id="test-event",
-                payload={"summary": "Test Event"}
-            )
+            result = client.insert(calendar_id="primary", event_id="test-event", payload={"summary": "Test Event"})
 
             # Verificar que insert foi chamado com sendUpdates='none'
             mock_events.insert.assert_called_once()
             call_kwargs = mock_events.insert.call_args[1]
-            assert call_kwargs['sendUpdates'] == 'none', \
-                f"Expected sendUpdates='none', got '{call_kwargs.get('sendUpdates')}'"
+            assert (
+                call_kwargs["sendUpdates"] == "none"
+            ), f"Expected sendUpdates='none', got '{call_kwargs.get('sendUpdates')}'"
 
-    @patch('apps.core.services.gcal_google_client.build')
-    @patch('apps.core.services.gcal_google_client.service_account')
+    @patch("apps.core.services.gcal_google_client.build")
+    @patch("apps.core.services.gcal_google_client.service_account")
     def test_send_updates_respects_override(self, mock_sa, mock_build):
         """
         RF05/RF06: override_settings deve alterar sendUpdates.
@@ -96,25 +94,20 @@ class TestSendUpdatesConfiguration:
 
         # Criar cliente com override
         with override_settings(GCAL_SEND_UPDATES="all"):
-            client = GoogleCalendarClient(
-                credentials_json='{"type": "service_account", "project_id": "test"}'
-            )
+            client = GoogleCalendarClient(credentials_json='{"type": "service_account", "project_id": "test"}')
 
             # Chamar insert
-            result = client.insert(
-                calendar_id="primary",
-                event_id="test-event",
-                payload={"summary": "Test Event"}
-            )
+            result = client.insert(calendar_id="primary", event_id="test-event", payload={"summary": "Test Event"})
 
             # Verificar que insert foi chamado com sendUpdates='all'
             mock_events.insert.assert_called_once()
             call_kwargs = mock_events.insert.call_args[1]
-            assert call_kwargs['sendUpdates'] == 'all', \
-                f"Expected sendUpdates='all', got '{call_kwargs.get('sendUpdates')}'"
+            assert (
+                call_kwargs["sendUpdates"] == "all"
+            ), f"Expected sendUpdates='all', got '{call_kwargs.get('sendUpdates')}'"
 
-    @patch('apps.core.services.gcal_google_client.build')
-    @patch('apps.core.services.gcal_google_client.service_account')
+    @patch("apps.core.services.gcal_google_client.build")
+    @patch("apps.core.services.gcal_google_client.service_account")
     def test_send_updates_external_only(self, mock_sa, mock_build):
         """
         RF05/RF06: sendUpdates='externalOnly' deve funcionar.
@@ -142,25 +135,20 @@ class TestSendUpdatesConfiguration:
 
         # Criar cliente com override
         with override_settings(GCAL_SEND_UPDATES="externalOnly"):
-            client = GoogleCalendarClient(
-                credentials_json='{"type": "service_account", "project_id": "test"}'
-            )
+            client = GoogleCalendarClient(credentials_json='{"type": "service_account", "project_id": "test"}')
 
             # Chamar update
-            result = client.update(
-                calendar_id="primary",
-                event_id="test-event",
-                payload={"summary": "Updated Event"}
-            )
+            result = client.update(calendar_id="primary", event_id="test-event", payload={"summary": "Updated Event"})
 
             # Verificar que patch foi chamado com sendUpdates='externalOnly'
             mock_events.patch.assert_called_once()
             call_kwargs = mock_events.patch.call_args[1]
-            assert call_kwargs['sendUpdates'] == 'externalOnly', \
-                f"Expected sendUpdates='externalOnly', got '{call_kwargs.get('sendUpdates')}'"
+            assert (
+                call_kwargs["sendUpdates"] == "externalOnly"
+            ), f"Expected sendUpdates='externalOnly', got '{call_kwargs.get('sendUpdates')}'"
 
-    @patch('apps.core.services.gcal_google_client.build')
-    @patch('apps.core.services.gcal_google_client.service_account')
+    @patch("apps.core.services.gcal_google_client.build")
+    @patch("apps.core.services.gcal_google_client.service_account")
     def test_delete_uses_send_updates(self, mock_sa, mock_build):
         """
         RF05/RF06: delete também deve respeitar sendUpdates.
@@ -188,21 +176,17 @@ class TestSendUpdatesConfiguration:
 
         # Criar cliente
         with override_settings(GCAL_SEND_UPDATES="none"):
-            client = GoogleCalendarClient(
-                credentials_json='{"type": "service_account", "project_id": "test"}'
-            )
+            client = GoogleCalendarClient(credentials_json='{"type": "service_account", "project_id": "test"}')
 
             # Chamar delete
-            client.delete(
-                calendar_id="primary",
-                event_id="test-event"
-            )
+            client.delete(calendar_id="primary", event_id="test-event")
 
             # Verificar que delete foi chamado com sendUpdates='none'
             mock_events.delete.assert_called_once()
             call_kwargs = mock_events.delete.call_args[1]
-            assert call_kwargs['sendUpdates'] == 'none', \
-                f"Expected sendUpdates='none', got '{call_kwargs.get('sendUpdates')}'"
+            assert (
+                call_kwargs["sendUpdates"] == "none"
+            ), f"Expected sendUpdates='none', got '{call_kwargs.get('sendUpdates')}'"
 
     def test_invalid_send_updates_rejected_at_startup(self):
         """
@@ -227,11 +211,14 @@ class TestSendUpdatesConfiguration:
         from django.conf import settings
 
         # Verificar que o valor atual é válido
-        assert settings.GCAL_SEND_UPDATES in {"none", "all", "externalOnly"}, \
-            f"GCAL_SEND_UPDATES='{settings.GCAL_SEND_UPDATES}' inválido"
+        assert settings.GCAL_SEND_UPDATES in {
+            "none",
+            "all",
+            "externalOnly",
+        }, f"GCAL_SEND_UPDATES='{settings.GCAL_SEND_UPDATES}' inválido"
 
-    @patch('apps.core.services.gcal_google_client.build')
-    @patch('apps.core.services.gcal_google_client.service_account')
+    @patch("apps.core.services.gcal_google_client.build")
+    @patch("apps.core.services.gcal_google_client.service_account")
     def test_preview_can_use_configured_value(self, mock_sa, mock_build):
         """
         RF05/RF06: Preview pode usar configuração ou forçar 'none'.
@@ -262,18 +249,13 @@ class TestSendUpdatesConfiguration:
 
         # Criar cliente
         with override_settings(GCAL_SEND_UPDATES="all"):
-            client = GoogleCalendarClient(
-                credentials_json='{"type": "service_account", "project_id": "test"}'
-            )
+            client = GoogleCalendarClient(credentials_json='{"type": "service_account", "project_id": "test"}')
 
             # Chamar insert (preview é só um insert normal no fake client)
             result = client.insert(
-                calendar_id="primary",
-                event_id="preview-event",
-                payload={"summary": "Preview Event"}
+                calendar_id="primary", event_id="preview-event", payload={"summary": "Preview Event"}
             )
 
             # Verificar que usou configuração
             call_kwargs = mock_events.insert.call_args[1]
-            assert call_kwargs['sendUpdates'] == 'all', \
-                "Preview deve usar configuração para consistência"
+            assert call_kwargs["sendUpdates"] == "all", "Preview deve usar configuração para consistência"

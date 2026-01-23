@@ -14,9 +14,10 @@ import statistics
 import time
 from typing import TYPE_CHECKING
 
-import pytest
 from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import Gerencia, Municipio, Projeto, TipoEvento, Usuario
 
@@ -160,9 +161,7 @@ class TestOptionsEndpointLatency:
 
     def test_municipios_options_p95_under_100ms(self, authenticated_client, setup_minimal_data):
         """GET /api/options/municipios/ should respond in <100ms (p95)."""
-        metrics = measure_latency(
-            authenticated_client, "/api/options/municipios/", iterations=50
-        )
+        metrics = measure_latency(authenticated_client, "/api/options/municipios/", iterations=50)
 
         assert metrics["p95"] < SLO_TARGETS["options"]["p95"], (
             f"p95 latency {metrics['p95']:.3f}s exceeds SLO target "
@@ -172,9 +171,7 @@ class TestOptionsEndpointLatency:
 
     def test_projetos_options_p95_under_100ms(self, authenticated_client, setup_minimal_data):
         """GET /api/options/projetos/ should respond in <100ms (p95)."""
-        metrics = measure_latency(
-            authenticated_client, "/api/options/projetos/", iterations=50
-        )
+        metrics = measure_latency(authenticated_client, "/api/options/projetos/", iterations=50)
 
         assert metrics["p95"] < SLO_TARGETS["options"]["p95"], (
             f"p95 latency {metrics['p95']:.3f}s exceeds SLO target "
@@ -188,9 +185,7 @@ class TestSolicitacoesLatency:
 
     def test_solicitacoes_list_p95_under_300ms(self, authenticated_client, setup_minimal_data):
         """GET /api/solicitacoes/ should respond in <300ms (p95)."""
-        metrics = measure_latency(
-            authenticated_client, "/api/solicitacoes/", iterations=30
-        )
+        metrics = measure_latency(authenticated_client, "/api/solicitacoes/", iterations=30)
 
         assert metrics["p95"] < SLO_TARGETS["solicitacoes_list"]["p95"], (
             f"p95 latency {metrics['p95']:.3f}s exceeds SLO target "
@@ -244,14 +239,16 @@ class TestLatencyReport:
             if not (p95_ok and p99_ok):
                 all_within_slo = False
 
-            report.append({
-                "endpoint": url.split("?")[0],
-                "p50": f"{metrics['p50']*1000:.1f}ms",
-                "p95": f"{metrics['p95']*1000:.1f}ms",
-                "p99": f"{metrics['p99']*1000:.1f}ms",
-                "p95_slo": f"{slo.get('p95', 0)*1000:.0f}ms" if slo else "N/A",
-                "p95_ok": "OK" if p95_ok else "FAIL",
-            })
+            report.append(
+                {
+                    "endpoint": url.split("?")[0],
+                    "p50": f"{metrics['p50']*1000:.1f}ms",
+                    "p95": f"{metrics['p95']*1000:.1f}ms",
+                    "p99": f"{metrics['p99']*1000:.1f}ms",
+                    "p95_slo": f"{slo.get('p95', 0)*1000:.0f}ms" if slo else "N/A",
+                    "p95_ok": "OK" if p95_ok else "FAIL",
+                }
+            )
 
         # Print report
         print("\n" + "=" * 80)
@@ -260,7 +257,9 @@ class TestLatencyReport:
         print(f"{'Endpoint':<45} {'p50':>10} {'p95':>10} {'p99':>10} {'SLO':>10} {'Status':>8}")
         print("-" * 80)
         for r in report:
-            print(f"{r['endpoint']:<45} {r['p50']:>10} {r['p95']:>10} {r['p99']:>10} {r['p95_slo']:>10} {r['p95_ok']:>8}")
+            print(
+                f"{r['endpoint']:<45} {r['p50']:>10} {r['p95']:>10} {r['p99']:>10} {r['p95_slo']:>10} {r['p95_ok']:>8}"
+            )
         print("=" * 80)
 
         # Test passes but logs the report

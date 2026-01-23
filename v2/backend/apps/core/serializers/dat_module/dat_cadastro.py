@@ -4,6 +4,7 @@ DATCadastro Serializers - §10 Epic #459
 Registration/onboarding workflow serializers.
 Extracted from serializers/dat_module.py.
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations
@@ -17,12 +18,8 @@ class DATCadastroSerializer(serializers.ModelSerializer["DATCadastro"]):
     """Full serializer for DATCadastro (CRUD)."""
 
     # FK names
-    municipio_nome = serializers.CharField(
-        source="municipio.nome", read_only=True
-    )
-    projeto_geral_nome = serializers.CharField(
-        source="projeto_geral.nome", read_only=True
-    )
+    municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
+    projeto_geral_nome = serializers.CharField(source="projeto_geral.nome", read_only=True)
 
     # Computed
     progresso = serializers.IntegerField(read_only=True)
@@ -30,9 +27,7 @@ class DATCadastroSerializer(serializers.ModelSerializer["DATCadastro"]):
     progresso_avaliar = serializers.IntegerField(read_only=True)
 
     # Audit
-    created_by_nome = serializers.CharField(
-        source="created_by.get_full_name", read_only=True
-    )
+    created_by_nome = serializers.CharField(source="created_by.get_full_name", read_only=True)
 
     class Meta:
         model = DATCadastro

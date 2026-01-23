@@ -7,6 +7,7 @@ Usage:
 """
 
 from __future__ import annotations
+
 import csv
 from decimal import Decimal
 from pathlib import Path
@@ -14,6 +15,7 @@ from typing import Any
 from unicodedata import normalize
 
 from django.core.management.base import BaseCommand, CommandParser
+
 from apps.core.models import Municipio
 
 
@@ -21,7 +23,7 @@ def remove_accents(text: str) -> str:
     """Remove accents from text for fuzzy matching."""
     if not text:
         return ""
-    return normalize('NFKD', text).encode('ASCII', 'ignore').decode('ASCII')
+    return normalize("NFKD", text).encode("ASCII", "ignore").decode("ASCII")
 
 
 class Command(BaseCommand):
@@ -67,13 +69,13 @@ class Command(BaseCommand):
 
         # Read CSV into dict: {(nome_normalized, uf): (lat_decimal, lng_decimal)}
         coords_map: dict[tuple[str, str], tuple[Decimal, Decimal]] = {}
-        with open(csv_file, 'r', encoding='utf-8') as f:
+        with open(csv_file, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                nome_str = row.get('nome', '').strip()
-                uf_str = row.get('uf', '').strip().upper()
-                lat_str = row.get('latitude', '').strip()
-                lng_str = row.get('longitude', '').strip()
+                nome_str = row.get("nome", "").strip()
+                uf_str = row.get("uf", "").strip().upper()
+                lat_str = row.get("latitude", "").strip()
+                lng_str = row.get("longitude", "").strip()
 
                 # Convert to Decimal immediately
                 lat_dec = Decimal(lat_str)
@@ -117,10 +119,7 @@ class Command(BaseCommand):
                 try:
                     lat_dec, lng_dec = coords_map[key]
 
-                    self.stdout.write(
-                        f"[{i}/{total}] ✓ {municipio.nome}-{municipio.uf}: "
-                        f"{lat_dec}, {lng_dec}"
-                    )
+                    self.stdout.write(f"[{i}/{total}] ✓ {municipio.nome}-{municipio.uf}: " f"{lat_dec}, {lng_dec}")
 
                     if apply_mode:
                         municipio.latitude = lat_dec
@@ -156,10 +155,6 @@ class Command(BaseCommand):
                 self.stdout.write(f"  - {error}")
 
         if dry_run:
-            self.stdout.write(
-                self.style.WARNING("\nDRY-RUN: No changes saved to database")
-            )
+            self.stdout.write(self.style.WARNING("\nDRY-RUN: No changes saved to database"))
         else:
-            self.stdout.write(
-                self.style.SUCCESS(f"\nAPPLY: {success_count} coordinates saved")
-            )
+            self.stdout.write(self.style.SUCCESS(f"\nAPPLY: {success_count} coordinates saved"))

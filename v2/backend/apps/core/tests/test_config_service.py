@@ -12,12 +12,14 @@ Cobertura: 100% dos fluxos principais de config_service.py
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from datetime import timedelta
 
 from django.core.cache import cache
 from django.utils import timezone
 
 import pytest
+
 from apps.core.models import Config
 from apps.core.services.config_service import bust_cfg, get_cfg
 
@@ -119,9 +121,7 @@ class TestConfigService:
 
         # Segunda leitura (hit, ainda retorna do cache)
         result2 = get_cfg("test_cache", {})
-        assert result2 == {
-            "VALUE": 500
-        }, "Deve retornar do cache mesmo após delete no DB"
+        assert result2 == {"VALUE": 500}, "Deve retornar do cache mesmo após delete no DB"
 
     def test_bust_cfg_manual(self):
         """
@@ -149,9 +149,7 @@ class TestConfigService:
 
         # Segunda leitura (miss, deve retornar default)
         result2 = get_cfg("test_bust", {"DEFAULT": 700})
-        assert result2 == {
-            "DEFAULT": 700
-        }, "Após bust_cfg, deve buscar do DB (que está vazio)"
+        assert result2 == {"DEFAULT": 700}, "Após bust_cfg, deve buscar do DB (que está vazio)"
 
     def test_availability_config_usage(self):
         """

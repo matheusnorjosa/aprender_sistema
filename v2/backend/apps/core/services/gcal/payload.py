@@ -3,6 +3,7 @@ AS v2 — GCal Payload Building
 
 Functions for building Google Calendar event payloads.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportPrivateUsage=false, reportUnusedVariable=false
 
 from __future__ import annotations
@@ -42,9 +43,7 @@ def build_attendees_for_solicitacao(s: Solicitacao) -> list[JsonDict]:
     attendee_roles = ["COORDENADOR", "FORMADOR", "COORD_ACOMPANHA"]
 
     # Buscar participações com prefetch do usuário
-    participations = s.participations.filter(role__in=attendee_roles).select_related(
-        "usuario"
-    )
+    participations = s.participations.filter(role__in=attendee_roles).select_related("usuario")
 
     emails = set()
     for p in participations:
@@ -84,7 +83,7 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
     municipio = getattr(s, "municipio", None)
     projeto = getattr(s, "projeto", None)
     tipo = getattr(s, "tipo_evento", None)
-    usuario = getattr(s, "usuario", None)
+    _usuario = getattr(s, "usuario", None)  # Reserved for future use
     coordenador = getattr(s, "coordenador", None)
 
     # ================================================================
@@ -171,13 +170,12 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
 
     # Seção 4: Data/Horário (formatado em America/Fortaleza)
     import pytz
+
     fortaleza_tz = pytz.timezone("America/Fortaleza")
     inicio_local = s.inicio.astimezone(fortaleza_tz)
     fim_local = s.fim.astimezone(fortaleza_tz)
     data_format = "%d/%m/%Y %H:%M"
-    description_lines.append(
-        f"📅 Data: {inicio_local.strftime(data_format)} a {fim_local.strftime(data_format)}"
-    )
+    description_lines.append(f"📅 Data: {inicio_local.strftime(data_format)} a {fim_local.strftime(data_format)}")
 
     # Seção 5: Modalidade
     description_lines.append(f"🌐 Modalidade: {modalidade}")
@@ -252,11 +250,7 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
             "private": {
                 "solicitation_id": str(s.id),
                 "ssot_version": "v2",
-                "last_updated": (
-                    s.updated_at.isoformat()
-                    if hasattr(s, "updated_at") and s.updated_at
-                    else ""
-                ),
+                "last_updated": (s.updated_at.isoformat() if hasattr(s, "updated_at") and s.updated_at else ""),
             }
         },
     }

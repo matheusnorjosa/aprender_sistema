@@ -18,19 +18,20 @@ Permissões (conforme PLAN_multi_sector_availability.md):
 
 Cache Redis 5 minutos por (year, month, role, gerencia_id, sector, q).
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
+
 from typing import Any
+
+from django.core.cache import cache
 from django.db.models import QuerySet
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
-
 from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
-from django.core.cache import cache
 
 from apps.core.permissions import HasSectorAccess
 from apps.core.services.monthly_grid_service import build_monthly_grid

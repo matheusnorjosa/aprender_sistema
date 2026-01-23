@@ -27,7 +27,7 @@ Testes:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from datetime import timedelta
 from uuid import uuid4
 
@@ -35,6 +35,8 @@ from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import (
     AuditLog,
@@ -45,7 +47,6 @@ from apps.core.models import (
     TipoEvento,
     Usuario,
 )
-
 
 pytestmark = pytest.mark.django_db
 
@@ -235,9 +236,7 @@ def api_client():
 class TestSolicitacaoEditPermissions:
     """Testes de permissão para edição de solicitações."""
 
-    def test_owner_can_edit_own_solicitacao(
-        self, api_client, usuario_owner, solicitacao_editavel
-    ):
+    def test_owner_can_edit_own_solicitacao(self, api_client, usuario_owner, solicitacao_editavel):
         """Owner pode editar sua própria solicitação."""
         api_client.force_authenticate(user=usuario_owner)
 
@@ -267,9 +266,7 @@ class TestSolicitacaoEditPermissions:
         solicitacao_editavel.refresh_from_db()
         assert solicitacao_editavel.local == "Local editado por Super"
 
-    def test_dat_can_edit_any_solicitacao(
-        self, api_client, usuario_dat, solicitacao_editavel
-    ):
+    def test_dat_can_edit_any_solicitacao(self, api_client, usuario_dat, solicitacao_editavel):
         """DAT pode editar qualquer solicitação."""
         api_client.force_authenticate(user=usuario_dat)
 
@@ -283,9 +280,7 @@ class TestSolicitacaoEditPermissions:
         solicitacao_editavel.refresh_from_db()
         assert solicitacao_editavel.local == "Local editado por DAT"
 
-    def test_other_user_cannot_edit_solicitacao(
-        self, api_client, usuario_outro, solicitacao_editavel
-    ):
+    def test_other_user_cannot_edit_solicitacao(self, api_client, usuario_outro, solicitacao_editavel):
         """Usuário comum NÃO pode editar solicitação de outro usuário.
 
         Nota: O sistema retorna 404 (Not Found) porque o get_queryset filtra
@@ -325,9 +320,7 @@ class TestSolicitacaoEditPermissions:
 class TestSolicitacaoEditBusinessRules:
     """Testes de regras de negócio para edição."""
 
-    def test_cannot_edit_published_solicitacao(
-        self, api_client, usuario_owner, solicitacao_publicada
-    ):
+    def test_cannot_edit_published_solicitacao(self, api_client, usuario_owner, solicitacao_publicada):
         """NÃO pode editar solicitação já publicada no GCal."""
         api_client.force_authenticate(user=usuario_owner)
 
@@ -342,9 +335,7 @@ class TestSolicitacaoEditBusinessRules:
         solicitacao_publicada.refresh_from_db()
         assert solicitacao_publicada.local == "Local Publicado"
 
-    def test_cannot_edit_rejected_solicitacao(
-        self, api_client, usuario_superintendencia, solicitacao_reprovada
-    ):
+    def test_cannot_edit_rejected_solicitacao(self, api_client, usuario_superintendencia, solicitacao_reprovada):
         """NÃO pode editar solicitação reprovada.
 
         Nota: Usamos usuário da Superintendência porque usuários comuns
@@ -363,9 +354,7 @@ class TestSolicitacaoEditBusinessRules:
         solicitacao_reprovada.refresh_from_db()
         assert solicitacao_reprovada.local == "Local Reprovado"
 
-    def test_can_edit_approved_not_published_solicitacao(
-        self, api_client, usuario_owner, solicitacao_editavel
-    ):
+    def test_can_edit_approved_not_published_solicitacao(self, api_client, usuario_owner, solicitacao_editavel):
         """Pode editar solicitação aprovada mas ainda não publicada."""
         # Aprovar a solicitação
         solicitacao_editavel.status = "aprovado"
@@ -393,9 +382,7 @@ class TestSolicitacaoEditAuditLog:
     """Testes de audit log para edições."""
 
     @pytest.mark.skip(reason="AuditLog para edições em investigação - funcionalidade principal de edição funciona")
-    def test_edit_creates_audit_log(
-        self, api_client, usuario_owner, solicitacao_editavel
-    ):
+    def test_edit_creates_audit_log(self, api_client, usuario_owner, solicitacao_editavel):
         """Edição cria registro no AuditLog com campos alterados.
 
         Nota: O AuditLog é criado no perform_update() do ViewSet quando
@@ -441,9 +428,7 @@ class TestSolicitacaoEditAuditLog:
         assert log.details["solicitacao_id"] == solicitacao_editavel.id
         assert "local" in log.details["changed_fields"]
 
-    def test_no_audit_log_when_no_changes(
-        self, api_client, usuario_owner, solicitacao_editavel
-    ):
+    def test_no_audit_log_when_no_changes(self, api_client, usuario_owner, solicitacao_editavel):
         """Não cria AuditLog quando não há mudanças."""
         api_client.force_authenticate(user=usuario_owner)
 
@@ -545,9 +530,7 @@ class TestSolicitacaoEditFields:
         # Local deve ter mudado
         assert solicitacao_editavel.local == "Local alterado"
 
-    def test_cannot_edit_gcal_fields(
-        self, api_client, usuario_owner, solicitacao_editavel
-    ):
+    def test_cannot_edit_gcal_fields(self, api_client, usuario_owner, solicitacao_editavel):
         """NÃO pode editar campos GCal (são read_only)."""
         api_client.force_authenticate(user=usuario_owner)
 
@@ -633,9 +616,7 @@ def formador_3(grupo_formador):
 
 
 @pytest.fixture
-def solicitacao_com_formador(
-    usuario_owner, municipio, projeto, tipo_evento, formador_1
-):
+def solicitacao_com_formador(usuario_owner, municipio, projeto, tipo_evento, formador_1):
     """Solicitação com um formador já associado."""
     sol = Solicitacao.objects.create(
         usuario=usuario_owner,
@@ -659,9 +640,7 @@ def solicitacao_com_formador(
 class TestSolicitacaoEditFormadores:
     """Testes de edição de formadores em solicitações."""
 
-    def test_add_formador_to_solicitacao(
-        self, api_client, usuario_owner, solicitacao_editavel, formador_1
-    ):
+    def test_add_formador_to_solicitacao(self, api_client, usuario_owner, solicitacao_editavel, formador_1):
         """Pode adicionar formador a uma solicitação."""
         api_client.force_authenticate(user=usuario_owner)
 
@@ -678,25 +657,19 @@ class TestSolicitacaoEditFormadores:
         assert response.status_code == status.HTTP_200_OK
 
         # Verificar que o formador foi adicionado
-        participations = Participation.objects.filter(
-            solicitacao=solicitacao_editavel,
-            role="FORMADOR"
-        )
+        participations = Participation.objects.filter(solicitacao=solicitacao_editavel, role="FORMADOR")
         assert participations.count() == 1
         assert participations.first().usuario == formador_1
 
     def test_replace_formador_in_solicitacao(
-        self, api_client, usuario_owner, solicitacao_com_formador,
-        formador_1, formador_2
+        self, api_client, usuario_owner, solicitacao_com_formador, formador_1, formador_2
     ):
         """Pode substituir formador existente por outro."""
         api_client.force_authenticate(user=usuario_owner)
 
         # Verificar estado inicial
         assert Participation.objects.filter(
-            solicitacao=solicitacao_com_formador,
-            usuario=formador_1,
-            role="FORMADOR"
+            solicitacao=solicitacao_com_formador, usuario=formador_1, role="FORMADOR"
         ).exists()
 
         response = api_client.patch(
@@ -713,21 +686,16 @@ class TestSolicitacaoEditFormadores:
 
         # Verificar que formador_1 foi removido
         assert not Participation.objects.filter(
-            solicitacao=solicitacao_com_formador,
-            usuario=formador_1,
-            role="FORMADOR"
+            solicitacao=solicitacao_com_formador, usuario=formador_1, role="FORMADOR"
         ).exists()
 
         # Verificar que formador_2 foi adicionado
         assert Participation.objects.filter(
-            solicitacao=solicitacao_com_formador,
-            usuario=formador_2,
-            role="FORMADOR"
+            solicitacao=solicitacao_com_formador, usuario=formador_2, role="FORMADOR"
         ).exists()
 
     def test_add_multiple_formadores(
-        self, api_client, usuario_owner, solicitacao_editavel,
-        formador_1, formador_2, formador_3
+        self, api_client, usuario_owner, solicitacao_editavel, formador_1, formador_2, formador_3
     ):
         """Pode adicionar múltiplos formadores."""
         api_client.force_authenticate(user=usuario_owner)
@@ -744,15 +712,11 @@ class TestSolicitacaoEditFormadores:
 
         assert response.status_code == status.HTTP_200_OK
 
-        participations = Participation.objects.filter(
-            solicitacao=solicitacao_editavel,
-            role="FORMADOR"
-        )
+        participations = Participation.objects.filter(solicitacao=solicitacao_editavel, role="FORMADOR")
         assert participations.count() == 3
 
     def test_remove_formador_by_not_including(
-        self, api_client, usuario_owner, solicitacao_com_formador,
-        formador_1, formador_2
+        self, api_client, usuario_owner, solicitacao_com_formador, formador_1, formador_2
     ):
         """Remove formador ao não incluí-lo na nova lista."""
         api_client.force_authenticate(user=usuario_owner)
@@ -779,30 +743,22 @@ class TestSolicitacaoEditFormadores:
 
         # formador_1 removido
         assert not Participation.objects.filter(
-            solicitacao=solicitacao_com_formador,
-            usuario=formador_1,
-            role="FORMADOR"
+            solicitacao=solicitacao_com_formador, usuario=formador_1, role="FORMADOR"
         ).exists()
 
         # formador_2 mantido
         assert Participation.objects.filter(
-            solicitacao=solicitacao_com_formador,
-            usuario=formador_2,
-            role="FORMADOR"
+            solicitacao=solicitacao_com_formador, usuario=formador_2, role="FORMADOR"
         ).exists()
 
     def test_formadores_change_logged_in_audit(
-        self, api_client, usuario_owner, solicitacao_com_formador,
-        formador_1, formador_2
+        self, api_client, usuario_owner, solicitacao_com_formador, formador_1, formador_2
     ):
         """Alteração de formadores é registrada no AuditLog."""
         api_client.force_authenticate(user=usuario_owner)
 
         # Contar logs antes
-        logs_before = AuditLog.objects.filter(
-            model_name="Solicitacao",
-            action="UPDATE"
-        ).count()
+        logs_before = AuditLog.objects.filter(model_name="Solicitacao", action="UPDATE").count()
 
         response = api_client.patch(
             f"/api/solicitacoes/{solicitacao_com_formador.id}/",
@@ -817,22 +773,14 @@ class TestSolicitacaoEditFormadores:
         assert response.status_code == status.HTTP_200_OK
 
         # Verificar que um novo log foi criado
-        logs_after = AuditLog.objects.filter(
-            model_name="Solicitacao",
-            action="UPDATE"
-        ).count()
+        logs_after = AuditLog.objects.filter(model_name="Solicitacao", action="UPDATE").count()
         assert logs_after == logs_before + 1
 
         # Verificar conteúdo do log
-        latest_log = AuditLog.objects.filter(
-            model_name="Solicitacao",
-            action="UPDATE"
-        ).latest("created_at")
+        latest_log = AuditLog.objects.filter(model_name="Solicitacao", action="UPDATE").latest("created_at")
         assert "formador_ids" in latest_log.details.get("changed_fields", {})
 
-    def test_empty_formador_list_removes_all(
-        self, api_client, usuario_owner, solicitacao_com_formador, formador_1
-    ):
+    def test_empty_formador_list_removes_all(self, api_client, usuario_owner, solicitacao_com_formador, formador_1):
         """Lista vazia de formadores remove todos."""
         api_client.force_authenticate(user=usuario_owner)
 
@@ -849,10 +797,7 @@ class TestSolicitacaoEditFormadores:
         assert response.status_code == status.HTTP_200_OK
 
         # Todos os formadores removidos
-        assert not Participation.objects.filter(
-            solicitacao=solicitacao_com_formador,
-            role="FORMADOR"
-        ).exists()
+        assert not Participation.objects.filter(solicitacao=solicitacao_com_formador, role="FORMADOR").exists()
 
 
 # ============================================================================
@@ -869,9 +814,7 @@ class TestSolicitacaoDelete:
     - NAO_SUPER: Pode excluir se não publicado no GCal (independente do status)
     """
 
-    def test_owner_can_delete_own_solicitacao_super_pendente(
-        self, api_client, usuario_owner, solicitacao_editavel
-    ):
+    def test_owner_can_delete_own_solicitacao_super_pendente(self, api_client, usuario_owner, solicitacao_editavel):
         """Owner pode excluir sua solicitação SUPER enquanto pendente."""
         api_client.force_authenticate(user=usuario_owner)
         sol_id = solicitacao_editavel.id
@@ -897,9 +840,7 @@ class TestSolicitacaoDelete:
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not Solicitacao.objects.filter(id=sol_id).exists()
 
-    def test_dat_can_delete_any_solicitacao(
-        self, api_client, usuario_dat, solicitacao_editavel
-    ):
+    def test_dat_can_delete_any_solicitacao(self, api_client, usuario_dat, solicitacao_editavel):
         """DAT pode excluir qualquer solicitação pendente."""
         api_client.force_authenticate(user=usuario_dat)
         sol_id = solicitacao_editavel.id
@@ -909,9 +850,7 @@ class TestSolicitacaoDelete:
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not Solicitacao.objects.filter(id=sol_id).exists()
 
-    def test_other_user_cannot_delete_solicitacao(
-        self, api_client, usuario_outro, solicitacao_editavel
-    ):
+    def test_other_user_cannot_delete_solicitacao(self, api_client, usuario_outro, solicitacao_editavel):
         """Usuário comum NÃO pode excluir solicitação de outro usuário."""
         api_client.force_authenticate(user=usuario_outro)
         sol_id = solicitacao_editavel.id
@@ -923,9 +862,7 @@ class TestSolicitacaoDelete:
         # Solicitação ainda existe
         assert Solicitacao.objects.filter(id=sol_id).exists()
 
-    def test_cannot_delete_published_solicitacao(
-        self, api_client, usuario_owner, solicitacao_publicada
-    ):
+    def test_cannot_delete_published_solicitacao(self, api_client, usuario_owner, solicitacao_publicada):
         """NÃO pode excluir solicitação já publicada no GCal (ambos os fluxos)."""
         api_client.force_authenticate(user=usuario_owner)
         sol_id = solicitacao_publicada.id
@@ -937,9 +874,7 @@ class TestSolicitacaoDelete:
         # Solicitação ainda existe
         assert Solicitacao.objects.filter(id=sol_id).exists()
 
-    def test_cannot_delete_approved_super_solicitacao(
-        self, api_client, usuario_superintendencia, solicitacao_editavel
-    ):
+    def test_cannot_delete_approved_super_solicitacao(self, api_client, usuario_superintendencia, solicitacao_editavel):
         """NÃO pode excluir solicitação SUPER após aprovação."""
         # Aprovar a solicitação SUPER
         solicitacao_editavel.status = "aprovado"
@@ -1021,9 +956,7 @@ class TestSolicitacaoDelete:
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not Solicitacao.objects.filter(id=sol.id).exists()
 
-    def test_delete_creates_audit_log(
-        self, api_client, usuario_owner, solicitacao_editavel
-    ):
+    def test_delete_creates_audit_log(self, api_client, usuario_owner, solicitacao_editavel):
         """Exclusão cria registro no AuditLog com dados da solicitação."""
         api_client.force_authenticate(user=usuario_owner)
         sol_id = solicitacao_editavel.id

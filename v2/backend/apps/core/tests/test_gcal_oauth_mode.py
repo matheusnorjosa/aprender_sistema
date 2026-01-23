@@ -19,22 +19,25 @@ Refs:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from datetime import timedelta
 from unittest.mock import patch
-from django.utils import timezone
+
 from django.contrib.auth.models import Group
 from django.test import override_settings
-from rest_framework.test import APIClient
+from django.utils import timezone
 from rest_framework import status as http_status
+from rest_framework.test import APIClient
 
-from apps.core.models import Usuario, Municipio, Projeto, TipoEvento, Solicitacao, GoogleOAuthCredential
+import pytest
+
+from apps.core.models import GoogleOAuthCredential, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 from apps.core.services.google_oauth import _encrypt_token
-
 
 # ============================================================================
 # FIXTURES
 # ============================================================================
+
 
 @pytest.fixture
 def usuario_controle(db):
@@ -89,7 +92,9 @@ def google_oauth_credential(usuario_controle):
     if not isinstance(access_encrypted, bytes):
         access_encrypted = access_encrypted.encode() if isinstance(access_encrypted, str) else bytes(access_encrypted)
     if not isinstance(refresh_encrypted, bytes):
-        refresh_encrypted = refresh_encrypted.encode() if isinstance(refresh_encrypted, str) else bytes(refresh_encrypted)
+        refresh_encrypted = (
+            refresh_encrypted.encode() if isinstance(refresh_encrypted, str) else bytes(refresh_encrypted)
+        )
 
     cred = GoogleOAuthCredential.objects.create(
         user=usuario_controle,
@@ -103,9 +108,9 @@ def google_oauth_credential(usuario_controle):
 
     # PostgreSQL BinaryField pode retornar memoryview
     cred.refresh_from_db()
-    if hasattr(cred.access_token_encrypted, 'tobytes'):
+    if hasattr(cred.access_token_encrypted, "tobytes"):
         cred.access_token_encrypted = bytes(cred.access_token_encrypted)
-    if hasattr(cred.refresh_token_encrypted, 'tobytes'):
+    if hasattr(cred.refresh_token_encrypted, "tobytes"):
         cred.refresh_token_encrypted = bytes(cred.refresh_token_encrypted)
 
     return cred
@@ -115,9 +120,10 @@ def google_oauth_credential(usuario_controle):
 # TESTES - PUBLISH SEM/COM CREDENCIAL
 # ============================================================================
 
+
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='oauth')
-@patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_publish_oauth_mode_sem_credencial_retorna_403(mock_task, solicitacao_aprovada, usuario_controle):
     """
     OAuth Phase 7: Publish sem credencial → 403 Forbidden com code='google_not_connected'
@@ -133,23 +139,23 @@ def test_publish_oauth_mode_sem_credencial_retorna_403(mock_task, solicitacao_ap
     response = client.post(
         f"/api/solicitacoes/{solicitacao_aprovada.id}/publish/",
         {"dry_run": False, "apply_blocked": True},
-        format="json"
+        format="json",
     )
 
     # Validar 403
     assert response.status_code == http_status.HTTP_403_FORBIDDEN
 
     # Validar payload
-    assert response.data['code'] == 'google_not_connected'
-    assert 'Conecte sua conta Google' in response.data['detail']
+    assert response.data["code"] == "google_not_connected"
+    assert "Conecte sua conta Google" in response.data["detail"]
 
     # Task NÃO deve ter sido chamada
     mock_task.assert_not_called()
 
 
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='oauth')
-@patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_publish_oauth_mode_com_credencial_retorna_202(
     mock_task, solicitacao_aprovada, usuario_controle, google_oauth_credential
 ):
@@ -169,7 +175,7 @@ def test_publish_oauth_mode_com_credencial_retorna_202(
     response = client.post(
         f"/api/solicitacoes/{solicitacao_aprovada.id}/publish/",
         {"dry_run": False, "apply_blocked": True},
-        format="json"
+        format="json",
     )
 
     # Validar 202
@@ -177,10 +183,7 @@ def test_publish_oauth_mode_com_credencial_retorna_202(
 
     # Validar task chamada com operator_user_id
     mock_task.assert_called_once_with(
-        solicitacao_aprovada.id,
-        dry_run=False,
-        apply_blocked=True,
-        operator_user_id=usuario_controle.id
+        solicitacao_aprovada.id, dry_run=False, apply_blocked=True, operator_user_id=usuario_controle.id
     )
 
 
@@ -188,9 +191,10 @@ def test_publish_oauth_mode_com_credencial_retorna_202(
 # TESTES - RESYNC SEM/COM CREDENCIAL
 # ============================================================================
 
+
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='oauth')
-@patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_resync_oauth_mode_sem_credencial_retorna_403(mock_task, solicitacao_aprovada, usuario_controle):
     """
     OAuth Phase 7: Resync sem credencial → 403 Forbidden com code='google_not_connected'
@@ -208,25 +212,22 @@ def test_resync_oauth_mode_sem_credencial_retorna_403(mock_task, solicitacao_apr
     client = APIClient()
     client.force_authenticate(user=usuario_controle)
 
-    response = client.post(
-        f"/api/solicitacoes/{solicitacao_aprovada.id}/resync-gcal/",
-        format="json"
-    )
+    response = client.post(f"/api/solicitacoes/{solicitacao_aprovada.id}/resync-gcal/", format="json")
 
     # Validar 403
     assert response.status_code == http_status.HTTP_403_FORBIDDEN
 
     # Validar payload
-    assert response.data['code'] == 'google_not_connected'
-    assert 'Conecte sua conta Google' in response.data['detail']
+    assert response.data["code"] == "google_not_connected"
+    assert "Conecte sua conta Google" in response.data["detail"]
 
     # Task NÃO deve ter sido chamada
     mock_task.assert_not_called()
 
 
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='oauth')
-@patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_resync_oauth_mode_com_credencial_retorna_202(
     mock_task, solicitacao_aprovada, usuario_controle, google_oauth_credential
 ):
@@ -248,18 +249,12 @@ def test_resync_oauth_mode_com_credencial_retorna_202(
     client = APIClient()
     client.force_authenticate(user=usuario_controle)
 
-    response = client.post(
-        f"/api/solicitacoes/{solicitacao_aprovada.id}/resync-gcal/",
-        format="json"
-    )
+    response = client.post(f"/api/solicitacoes/{solicitacao_aprovada.id}/resync-gcal/", format="json")
 
     # Validar 202
     assert response.status_code == http_status.HTTP_202_ACCEPTED
 
     # Validar task chamada com operator_user_id
     mock_task.assert_called_once_with(
-        solicitacao_aprovada.id,
-        dry_run=False,
-        apply_blocked=False,
-        operator_user_id=usuario_controle.id
+        solicitacao_aprovada.id, dry_run=False, apply_blocked=False, operator_user_id=usuario_controle.id
     )

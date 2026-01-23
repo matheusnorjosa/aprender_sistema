@@ -23,22 +23,25 @@ Refs:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from datetime import timedelta
 from unittest.mock import patch
-from django.utils import timezone
+
 from django.contrib.auth.models import Group
 from django.test import override_settings
-from rest_framework.test import APIClient
+from django.utils import timezone
 from rest_framework import status as http_status
+from rest_framework.test import APIClient
 
-from apps.core.models import Usuario, Municipio, Projeto, TipoEvento, Solicitacao, GoogleOAuthCredential
+import pytest
+
+from apps.core.models import GoogleOAuthCredential, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 from apps.core.services.google_oauth import _encrypt_token
-
 
 # ============================================================================
 # FIXTURES
 # ============================================================================
+
 
 @pytest.fixture
 def api_client():
@@ -91,8 +94,8 @@ def setup_solicitacoes(usuario_controle):
             projeto=projeto,
             tipo_evento=tipo_evento,
             tipo="evento",
-            inicio=now + timedelta(days=i+1),
-            fim=now + timedelta(days=i+1, hours=3),
+            inicio=now + timedelta(days=i + 1),
+            fim=now + timedelta(days=i + 1, hours=3),
             status="aprovado",
             gcal_status=Solicitacao.GCalStatus.NONE,
         )
@@ -119,7 +122,9 @@ def google_oauth_credential(usuario_controle):
     if not isinstance(access_encrypted, bytes):
         access_encrypted = access_encrypted.encode() if isinstance(access_encrypted, str) else bytes(access_encrypted)
     if not isinstance(refresh_encrypted, bytes):
-        refresh_encrypted = refresh_encrypted.encode() if isinstance(refresh_encrypted, str) else bytes(refresh_encrypted)
+        refresh_encrypted = (
+            refresh_encrypted.encode() if isinstance(refresh_encrypted, str) else bytes(refresh_encrypted)
+        )
 
     cred = GoogleOAuthCredential.objects.create(
         user=usuario_controle,
@@ -133,9 +138,9 @@ def google_oauth_credential(usuario_controle):
 
     # PostgreSQL BinaryField pode retornar memoryview
     cred.refresh_from_db()
-    if hasattr(cred.access_token_encrypted, 'tobytes'):
+    if hasattr(cred.access_token_encrypted, "tobytes"):
         cred.access_token_encrypted = bytes(cred.access_token_encrypted)
-    if hasattr(cred.refresh_token_encrypted, 'tobytes'):
+    if hasattr(cred.refresh_token_encrypted, "tobytes"):
         cred.refresh_token_encrypted = bytes(cred.refresh_token_encrypted)
 
     return cred
@@ -145,9 +150,10 @@ def google_oauth_credential(usuario_controle):
 # TESTES - BATCH REAPPLY
 # ============================================================================
 
+
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='service_account')
-@patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_batch_reapply_retorna_202_com_queued_count(mock_task, api_client, usuario_controle, setup_solicitacoes):
     """
     Issue #95: Batch reapply retorna 202 Accepted com queued count correto.
@@ -166,27 +172,25 @@ def test_batch_reapply_retorna_202_com_queued_count(mock_task, api_client, usuar
     ids = [sol.id for sol in setup_solicitacoes]
 
     response = api_client.post(
-        "/api/gcal/dashboard/batch/reapply/",
-        {"ids": ids, "dry_run": False, "apply_blocked": True},
-        format="json"
+        "/api/gcal/dashboard/batch/reapply/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"
     )
 
     # Validar 202
     assert response.status_code == http_status.HTTP_202_ACCEPTED
 
     # Validar payload
-    assert response.data['queued'] == 3
-    assert response.data['errors'] == []
-    assert response.data['dry_run'] is False
-    assert response.data['apply_blocked'] is True
+    assert response.data["queued"] == 3
+    assert response.data["errors"] == []
+    assert response.data["dry_run"] is False
+    assert response.data["apply_blocked"] is True
 
     # Task deve ter sido chamada 3 vezes (uma por ID)
     assert mock_task.call_count == 3
 
 
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='service_account')
-@patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_batch_reapply_retorna_erros_para_ids_inexistentes(mock_task, api_client, usuario_controle, setup_solicitacoes):
     """
     Issue #95: Batch reapply retorna erros para IDs inexistentes em errors[].
@@ -203,20 +207,18 @@ def test_batch_reapply_retorna_erros_para_ids_inexistentes(mock_task, api_client
     ids = ids_validos + ids_invalidos
 
     response = api_client.post(
-        "/api/gcal/dashboard/batch/reapply/",
-        {"ids": ids, "dry_run": False, "apply_blocked": True},
-        format="json"
+        "/api/gcal/dashboard/batch/reapply/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"
     )
 
     # Validar 202
     assert response.status_code == http_status.HTTP_202_ACCEPTED
 
     # Validar contadores
-    assert response.data['queued'] == 3  # Apenas IDs válidos
-    assert len(response.data['errors']) == 2  # 2 IDs inválidos
+    assert response.data["queued"] == 3  # Apenas IDs válidos
+    assert len(response.data["errors"]) == 2  # 2 IDs inválidos
 
     # Validar estrutura de errors
-    error_ids = [err['id'] for err in response.data['errors']]
+    error_ids = [err["id"] for err in response.data["errors"]]
     assert 99999 in error_ids
     assert 99998 in error_ids
 
@@ -225,9 +227,10 @@ def test_batch_reapply_retorna_erros_para_ids_inexistentes(mock_task, api_client
 # TESTES - BATCH RESYNC
 # ============================================================================
 
+
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='service_account')
-@patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_batch_resync_retorna_202_com_queued_count(mock_task, api_client, usuario_controle, setup_solicitacoes):
     """
     Issue #95: Batch resync retorna 202 Accepted com queued count correto.
@@ -252,17 +255,15 @@ def test_batch_resync_retorna_202_com_queued_count(mock_task, api_client, usuari
     ids = [sol.id for sol in setup_solicitacoes]
 
     response = api_client.post(
-        "/api/gcal/dashboard/batch/resync/",
-        {"ids": ids, "dry_run": False, "apply_blocked": True},
-        format="json"
+        "/api/gcal/dashboard/batch/resync/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"
     )
 
     # Validar 202
     assert response.status_code == http_status.HTTP_202_ACCEPTED
 
     # Validar payload
-    assert response.data['queued'] == 3
-    assert response.data['errors'] == []
+    assert response.data["queued"] == 3
+    assert response.data["errors"] == []
 
     # Validar que hash foi resetado e status marcado PENDING
     for sol in setup_solicitacoes:
@@ -272,8 +273,8 @@ def test_batch_resync_retorna_202_com_queued_count(mock_task, api_client, usuari
 
 
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='service_account')
-@patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_batch_resync_nao_altera_db_em_dry_run(mock_task, api_client, usuario_controle, setup_solicitacoes):
     """
     Issue #95: Batch resync em dry_run NÃO altera hash/status no banco.
@@ -294,14 +295,12 @@ def test_batch_resync_nao_altera_db_em_dry_run(mock_task, api_client, usuario_co
     ids = [sol.id for sol in setup_solicitacoes]
 
     response = api_client.post(
-        "/api/gcal/dashboard/batch/resync/",
-        {"ids": ids, "dry_run": True, "apply_blocked": True},
-        format="json"
+        "/api/gcal/dashboard/batch/resync/", {"ids": ids, "dry_run": True, "apply_blocked": True}, format="json"
     )
 
     # Validar 202
     assert response.status_code == http_status.HTTP_202_ACCEPTED
-    assert response.data['dry_run'] is True
+    assert response.data["dry_run"] is True
 
     # Validar que hash e status NÃO foram alterados
     for sol in setup_solicitacoes:
@@ -317,10 +316,13 @@ def test_batch_resync_nao_altera_db_em_dry_run(mock_task, api_client, usuario_co
 # TESTES - OAUTH MODE
 # ============================================================================
 
+
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='oauth')
-@patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
-def test_batch_reapply_oauth_mode_sem_credencial_retorna_403(mock_task, api_client, usuario_controle, setup_solicitacoes):
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+def test_batch_reapply_oauth_mode_sem_credencial_retorna_403(
+    mock_task, api_client, usuario_controle, setup_solicitacoes
+):
     """
     OAuth Phase 7: Batch reapply sem credencial → 403 Forbidden.
 
@@ -334,25 +336,23 @@ def test_batch_reapply_oauth_mode_sem_credencial_retorna_403(mock_task, api_clie
     ids = [sol.id for sol in setup_solicitacoes]
 
     response = api_client.post(
-        "/api/gcal/dashboard/batch/reapply/",
-        {"ids": ids, "dry_run": False, "apply_blocked": True},
-        format="json"
+        "/api/gcal/dashboard/batch/reapply/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"
     )
 
     # Validar 403
     assert response.status_code == http_status.HTTP_403_FORBIDDEN
 
     # Validar payload
-    assert response.data['code'] == 'google_not_connected'
-    assert 'Conecte sua conta Google' in response.data['detail']
+    assert response.data["code"] == "google_not_connected"
+    assert "Conecte sua conta Google" in response.data["detail"]
 
     # Task NÃO deve ter sido chamada
     mock_task.assert_not_called()
 
 
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='oauth')
-@patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_batch_reapply_oauth_mode_com_credencial_retorna_202(
     mock_task, api_client, usuario_controle, setup_solicitacoes, google_oauth_credential
 ):
@@ -372,28 +372,28 @@ def test_batch_reapply_oauth_mode_com_credencial_retorna_202(
     ids = [sol.id for sol in setup_solicitacoes]
 
     response = api_client.post(
-        "/api/gcal/dashboard/batch/reapply/",
-        {"ids": ids, "dry_run": False, "apply_blocked": True},
-        format="json"
+        "/api/gcal/dashboard/batch/reapply/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"
     )
 
     # Validar 202
     assert response.status_code == http_status.HTTP_202_ACCEPTED
 
     # Validar queued count
-    assert response.data['queued'] == 3
+    assert response.data["queued"] == 3
 
     # Validar que task foi chamada com operator_user_id
     for call_args in mock_task.call_args_list:
         kwargs = call_args[1]
-        assert 'operator_user_id' in kwargs
-        assert kwargs['operator_user_id'] == usuario_controle.id
+        assert "operator_user_id" in kwargs
+        assert kwargs["operator_user_id"] == usuario_controle.id
 
 
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='oauth')
-@patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
-def test_batch_resync_oauth_mode_sem_credencial_retorna_403(mock_task, api_client, usuario_controle, setup_solicitacoes):
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+def test_batch_resync_oauth_mode_sem_credencial_retorna_403(
+    mock_task, api_client, usuario_controle, setup_solicitacoes
+):
     """
     OAuth Phase 7: Batch resync sem credencial → 403 Forbidden.
 
@@ -412,24 +412,22 @@ def test_batch_resync_oauth_mode_sem_credencial_retorna_403(mock_task, api_clien
     ids = [sol.id for sol in setup_solicitacoes]
 
     response = api_client.post(
-        "/api/gcal/dashboard/batch/resync/",
-        {"ids": ids, "dry_run": False, "apply_blocked": True},
-        format="json"
+        "/api/gcal/dashboard/batch/resync/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"
     )
 
     # Validar 403
     assert response.status_code == http_status.HTTP_403_FORBIDDEN
 
     # Validar payload
-    assert response.data['code'] == 'google_not_connected'
+    assert response.data["code"] == "google_not_connected"
 
     # Task NÃO deve ter sido chamada
     mock_task.assert_not_called()
 
 
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='oauth')
-@patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_batch_resync_oauth_mode_com_credencial_retorna_202(
     mock_task, api_client, usuario_controle, setup_solicitacoes, google_oauth_credential
 ):
@@ -455,16 +453,14 @@ def test_batch_resync_oauth_mode_com_credencial_retorna_202(
     ids = [sol.id for sol in setup_solicitacoes]
 
     response = api_client.post(
-        "/api/gcal/dashboard/batch/resync/",
-        {"ids": ids, "dry_run": False, "apply_blocked": True},
-        format="json"
+        "/api/gcal/dashboard/batch/resync/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"
     )
 
     # Validar 202
     assert response.status_code == http_status.HTTP_202_ACCEPTED
 
     # Validar queued count
-    assert response.data['queued'] == 3
+    assert response.data["queued"] == 3
 
     # Validar hash resetado
     for sol in setup_solicitacoes:
@@ -477,8 +473,9 @@ def test_batch_resync_oauth_mode_com_credencial_retorna_202(
 # TESTES - RBAC
 # ============================================================================
 
+
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='service_account')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
 def test_batch_reapply_rbac_coordenador_retorna_403(api_client, usuario_coordenador, setup_solicitacoes):
     """
     RBAC: Batch reapply por Coordenador (sem permissão) → 403 Forbidden.
@@ -492,9 +489,7 @@ def test_batch_reapply_rbac_coordenador_retorna_403(api_client, usuario_coordena
     ids = [sol.id for sol in setup_solicitacoes]
 
     response = api_client.post(
-        "/api/gcal/dashboard/batch/reapply/",
-        {"ids": ids, "dry_run": False, "apply_blocked": True},
-        format="json"
+        "/api/gcal/dashboard/batch/reapply/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"
     )
 
     # Validar 403
@@ -502,7 +497,7 @@ def test_batch_reapply_rbac_coordenador_retorna_403(api_client, usuario_coordena
 
 
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='service_account')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
 def test_batch_resync_rbac_coordenador_retorna_403(api_client, usuario_coordenador, setup_solicitacoes):
     """
     RBAC: Batch resync por Coordenador (sem permissão) → 403 Forbidden.
@@ -516,9 +511,7 @@ def test_batch_resync_rbac_coordenador_retorna_403(api_client, usuario_coordenad
     ids = [sol.id for sol in setup_solicitacoes]
 
     response = api_client.post(
-        "/api/gcal/dashboard/batch/resync/",
-        {"ids": ids, "dry_run": False, "apply_blocked": True},
-        format="json"
+        "/api/gcal/dashboard/batch/resync/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"
     )
 
     # Validar 403
@@ -529,8 +522,9 @@ def test_batch_resync_rbac_coordenador_retorna_403(api_client, usuario_coordenad
 # TESTES - VALIDAÇÃO DE LIMITES
 # ============================================================================
 
+
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='service_account')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
 def test_batch_reapply_valida_limite_500_ids(api_client, usuario_controle):
     """
     Issue #95: Batch reapply valida limite de 500 IDs.
@@ -544,18 +538,16 @@ def test_batch_reapply_valida_limite_500_ids(api_client, usuario_controle):
     ids = list(range(1, 502))  # 501 IDs
 
     response = api_client.post(
-        "/api/gcal/dashboard/batch/reapply/",
-        {"ids": ids, "dry_run": False, "apply_blocked": True},
-        format="json"
+        "/api/gcal/dashboard/batch/reapply/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"
     )
 
     # Validar 400
     assert response.status_code == http_status.HTTP_400_BAD_REQUEST
-    assert 'Limite de 500 IDs' in response.data['detail']
+    assert "Limite de 500 IDs" in response.data["detail"]
 
 
 @pytest.mark.django_db
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='service_account')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
 def test_batch_resync_valida_limite_500_ids(api_client, usuario_controle):
     """
     Issue #95: Batch resync valida limite de 500 IDs.
@@ -569,11 +561,9 @@ def test_batch_resync_valida_limite_500_ids(api_client, usuario_controle):
     ids = list(range(1, 502))  # 501 IDs
 
     response = api_client.post(
-        "/api/gcal/dashboard/batch/resync/",
-        {"ids": ids, "dry_run": False, "apply_blocked": True},
-        format="json"
+        "/api/gcal/dashboard/batch/resync/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"
     )
 
     # Validar 400
     assert response.status_code == http_status.HTTP_400_BAD_REQUEST
-    assert 'Limite de 500 IDs' in response.data['detail']
+    assert "Limite de 500 IDs" in response.data["detail"]

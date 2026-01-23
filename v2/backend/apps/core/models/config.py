@@ -4,6 +4,7 @@ AS v2 — Config Model
 Model de configuracoes dinamicas do sistema.
 Type-checked with Pyright (strict mode).
 """
+
 from __future__ import annotations
 
 from django.db import models
@@ -39,9 +40,7 @@ class Config(models.Model):
         db_index=True,
         help_text="Chave da configuracao (ex: 'availability', 'gcal_sync')",
     )
-    value = models.JSONField(  # type: ignore[misc]
-        default=dict, help_text="Valor da configuracao (dict JSON)"
-    )
+    value = models.JSONField(default=dict, help_text="Valor da configuracao (dict JSON)")  # type: ignore[misc]
     effective_at = models.DateTimeField(
         null=True,
         blank=True,

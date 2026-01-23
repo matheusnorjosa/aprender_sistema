@@ -13,12 +13,15 @@ Coverage:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from datetime import timedelta
+
 from django.contrib.auth.models import Group
 from django.utils import timezone
-from rest_framework.test import APIClient
 from rest_framework import status as http_status
+from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import (
     AuditLog,
@@ -136,9 +139,7 @@ class TestProductivityMetrics:
     Endpoint: GET /api/metrics/team/productivity/?days=N
     """
 
-    def test_metrics_productivity(
-        self, controle_user, tipo_evento, projeto, municipio_a
-    ):
+    def test_metrics_productivity(self, controle_user, tipo_evento, projeto, municipio_a):
         """
         Test productivity metrics with mixed statuses.
 
@@ -264,9 +265,7 @@ class TestProductivityMetrics:
         assert data["gcal_published"] == 0
         assert data["gcal_error_rate"] == 0.0
 
-    def test_productivity_metrics_custom_days(
-        self, controle_user, tipo_evento, projeto, municipio_a
-    ):
+    def test_productivity_metrics_custom_days(self, controle_user, tipo_evento, projeto, municipio_a):
         """Test productivity metrics with custom days parameter"""
         client = APIClient()
         client.force_authenticate(user=controle_user)
@@ -316,9 +315,7 @@ class TestFormadoresMetrics:
     Endpoint: GET /api/metrics/team/formadores/?days=N
     """
 
-    def test_metrics_formadores(
-        self, grupos, tipo_evento, projeto, municipio_a, municipio_b
-    ):
+    def test_metrics_formadores(self, grupos, tipo_evento, projeto, municipio_a, municipio_b):
         """
         Test formadores ranking with 15 formadores.
 
@@ -356,7 +353,7 @@ class TestFormadoresMetrics:
                 email=f"formador{i}@test.com",
                 password="testpass123",
                 cpf=f"{str(i).zfill(11)}",
-                first_name=f"Formador",
+                first_name="Formador",
                 last_name=f"#{i}",
             )
             formador.groups.add(grupos["formador"])
@@ -427,9 +424,7 @@ class TestFormadoresMetrics:
         # Validate nome format
         assert "Formador #0" in formadores_list[0]["nome"]
 
-    def test_formadores_metrics_top_10_limit(
-        self, grupos, tipo_evento, projeto, municipio_a
-    ):
+    def test_formadores_metrics_top_10_limit(self, grupos, tipo_evento, projeto, municipio_a):
         """Test that formadores ranking is limited to top 10"""
         client = APIClient()
 
@@ -453,7 +448,7 @@ class TestFormadoresMetrics:
                 email=f"formador_top10_{i}@test.com",
                 password="testpass123",
                 cpf=f"{str(100 + i).zfill(11)}",
-                first_name=f"Top",
+                first_name="Top",
                 last_name=f"{i}",
             )
             formador.groups.add(grupos["formador"])
@@ -486,9 +481,7 @@ class TestFormadoresMetrics:
         # Should return exactly 10 (top 10 limit)
         assert len(data["formadores"]) == 10
 
-    def test_formadores_metrics_exclude_guest_participations(
-        self, grupos, tipo_evento, projeto, municipio_a
-    ):
+    def test_formadores_metrics_exclude_guest_participations(self, grupos, tipo_evento, projeto, municipio_a):
         """Test that guest participations (no usuario) are excluded"""
         client = APIClient()
 
@@ -543,9 +536,7 @@ class TestQualityMetrics:
     Endpoint: GET /api/metrics/team/quality/?days=N
     """
 
-    def test_metrics_quality(
-        self, controle_user, tipo_evento, projeto, municipio_a
-    ):
+    def test_metrics_quality(self, controle_user, tipo_evento, projeto, municipio_a):
         """
         Test quality metrics with conflicts and rework.
 
@@ -699,9 +690,7 @@ class TestMetricsRBAC:
 
         for endpoint in endpoints:
             response = client.get(endpoint)
-            assert response.status_code == http_status.HTTP_200_OK, (
-                f"Controle user should access {endpoint}"
-            )
+            assert response.status_code == http_status.HTTP_200_OK, f"Controle user should access {endpoint}"
 
     def test_metrics_rbac_gerencia_allowed(self, gerencia_user):
         """Test that Gerência users can access metrics"""
@@ -717,9 +706,7 @@ class TestMetricsRBAC:
 
         for endpoint in endpoints:
             response = client.get(endpoint)
-            assert response.status_code == http_status.HTTP_200_OK, (
-                f"Gerência user should access {endpoint}"
-            )
+            assert response.status_code == http_status.HTTP_200_OK, f"Gerência user should access {endpoint}"
 
     def test_metrics_rbac_formador_forbidden(self, formador_user):
         """Test that Formador users get 403 (forbidden)"""
@@ -735,9 +722,9 @@ class TestMetricsRBAC:
 
         for endpoint in endpoints:
             response = client.get(endpoint)
-            assert response.status_code == http_status.HTTP_403_FORBIDDEN, (
-                f"Formador user should be forbidden from {endpoint}"
-            )
+            assert (
+                response.status_code == http_status.HTTP_403_FORBIDDEN
+            ), f"Formador user should be forbidden from {endpoint}"
 
     def test_metrics_rbac_coordenador_forbidden(self, coordenador_user):
         """Test that Coordenador users get 403 (forbidden)"""
@@ -753,9 +740,9 @@ class TestMetricsRBAC:
 
         for endpoint in endpoints:
             response = client.get(endpoint)
-            assert response.status_code == http_status.HTTP_403_FORBIDDEN, (
-                f"Coordenador user should be forbidden from {endpoint}"
-            )
+            assert (
+                response.status_code == http_status.HTTP_403_FORBIDDEN
+            ), f"Coordenador user should be forbidden from {endpoint}"
 
     def test_metrics_rbac_anonymous_forbidden(self):
         """Test that anonymous users get 403 (forbidden)"""

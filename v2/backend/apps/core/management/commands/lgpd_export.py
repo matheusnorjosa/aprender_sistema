@@ -7,6 +7,7 @@ Usage:
     python manage.py lgpd_export --cpf=12345678901 --output=user_data.json
     python manage.py lgpd_export --email=user@example.com --output=user_data.json
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false, reportArgumentType=false
 
 from __future__ import annotations
@@ -199,10 +200,7 @@ class Command(BaseCommand):
                     "has_credential": True,
                     "google_email": gcal_cred.google_email,
                     "created_at": gcal_cred.created_at.isoformat(),
-                    "last_used_at": (
-                        gcal_cred.last_used_at.isoformat()
-                        if gcal_cred.last_used_at else None
-                    ),
+                    "last_used_at": (gcal_cred.last_used_at.isoformat() if gcal_cred.last_used_at else None),
                     # Note: We don't export actual tokens for security
                     "tokens": "(excluded for security)",
                 }
@@ -218,12 +216,10 @@ class Command(BaseCommand):
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False, default=str)
 
-        self.stdout.write(
-            self.style.SUCCESS(f"Data exported to: {output_path}")
-        )
+        self.stdout.write(self.style.SUCCESS(f"Data exported to: {output_path}"))
 
         # Summary
-        self.stdout.write(f"  - Personal data: exported")
+        self.stdout.write("  - Personal data: exported")
         self.stdout.write(f"  - Solicitations created: {len(data['solicitations_created'])}")
         self.stdout.write(f"  - Events as formador: {len(data['events_as_formador'])}")
         self.stdout.write(f"  - Availability blocks: {len(data['availability_blocks'])}")

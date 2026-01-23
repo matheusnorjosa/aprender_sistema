@@ -4,6 +4,7 @@ AS v2 — GCal Dashboard Insights Views
 Views for analytics: success rate, top insights.
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportFunctionMemberAccess=false
 
 from __future__ import annotations
@@ -44,6 +45,7 @@ class SuccessRateView(APIView):
 
     Permissions: IsControleOrSuper
     """
+
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -52,35 +54,35 @@ class SuccessRateView(APIView):
 
         # Contar por gcal_status em uma única query (Issue #308: fix N+1)
         counts = qs.aggregate(
-            published=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.PUBLISHED)),
-            error=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.ERROR)),
-            pending=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.PENDING)),
-            none=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.NONE)),
+            published=Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.PUBLISHED)),
+            error=Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.ERROR)),
+            pending=Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.PENDING)),
+            none=Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.NONE)),
         )
-        published = counts['published']
-        error = counts['error']
-        pending = counts['pending']
-        none = counts['none']
+        published = counts["published"]
+        error = counts["error"]
+        pending = counts["pending"]
+        none = counts["none"]
 
         # Calcular rate (apenas published e error contam como "tentativas")
         denom = published + error
         rate = 0.0 if denom == 0 else round(published / denom, 4)
 
         # Extrair janela
-        start_param = request.query_params.get('start')
-        end_param = request.query_params.get('end')
+        start_param = request.query_params.get("start")
+        end_param = request.query_params.get("end")
 
-        return Response({
-            'published': published,
-            'error': error,
-            'pending': pending,
-            'none': none,
-            'rate': rate,
-            'window': {
-                'start': start_param if start_param else None,
-                'end': end_param if end_param else None
-            }
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "published": published,
+                "error": error,
+                "pending": pending,
+                "none": none,
+                "rate": rate,
+                "window": {"start": start_param if start_param else None, "end": end_param if end_param else None},
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class TopInsightsView(APIView):
@@ -116,26 +118,27 @@ class TopInsightsView(APIView):
     Permissions: IsControleOrSuper
     Ordenação: -error, -count
     """
+
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Validar metric
-        metric_param = request.query_params.get('metric', '').lower()
-        if metric_param in ('municipios', 'municipio'):
-            group_field = 'municipio__nome'
-            metric = 'municipios'
-        elif metric_param in ('projetos', 'projeto'):
-            group_field = 'projeto__nome'
-            metric = 'projetos'
+        metric_param = request.query_params.get("metric", "").lower()
+        if metric_param in ("municipios", "municipio"):
+            group_field = "municipio__nome"
+            metric = "municipios"
+        elif metric_param in ("projetos", "projeto"):
+            group_field = "projeto__nome"
+            metric = "projetos"
         else:
             return Response(
-                {'detail': f'Parâmetro "metric" inválido: {metric_param}. Use "municipios" ou "projetos".'},
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": f'Parâmetro "metric" inválido: {metric_param}. Use "municipios" ou "projetos".'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Validar limit
         try:
-            limit = int(request.query_params.get('limit', 5))
+            limit = int(request.query_params.get("limit", 5))
             limit = max(1, min(20, limit))  # clamp entre 1 e 20
         except ValueError:
             limit = 5
@@ -144,38 +147,38 @@ class TopInsightsView(APIView):
         qs = _filter_events_queryset(request, Solicitacao.objects.all())
 
         # Aggregations
-        items_qs = qs.values(group_field).annotate(
-            count=Count('id'),
-            published=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.PUBLISHED)),
-            error=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.ERROR))
-        ).order_by('-error', '-count')[:limit]
+        items_qs = (
+            qs.values(group_field)
+            .annotate(
+                count=Count("id"),
+                published=Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.PUBLISHED)),
+                error=Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.ERROR)),
+            )
+            .order_by("-error", "-count")[:limit]
+        )
 
         # Formatar items com rate
         items = []
         for item in items_qs:
-            pub = item['published']
-            err = item['error']
+            pub = item["published"]
+            err = item["error"]
             denom = pub + err
             rate = 0.0 if denom == 0 else round(pub / denom, 4)
 
-            items.append({
-                'name': item[group_field] or '—',
-                'count': item['count'],
-                'published': pub,
-                'error': err,
-                'rate': rate
-            })
+            items.append(
+                {"name": item[group_field] or "—", "count": item["count"], "published": pub, "error": err, "rate": rate}
+            )
 
         # Extrair janela
-        start_param = request.query_params.get('start')
-        end_param = request.query_params.get('end')
+        start_param = request.query_params.get("start")
+        end_param = request.query_params.get("end")
 
-        return Response({
-            'items': items,
-            'window': {
-                'start': start_param if start_param else None,
-                'end': end_param if end_param else None
+        return Response(
+            {
+                "items": items,
+                "window": {"start": start_param if start_param else None, "end": end_param if end_param else None},
+                "metric": metric,
+                "limit": limit,
             },
-            'metric': metric,
-            'limit': limit
-        }, status=status.HTTP_200_OK)
+            status=status.HTTP_200_OK,
+        )

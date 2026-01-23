@@ -11,10 +11,12 @@ Cobertura:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import (
     AvailabilityBlock,
@@ -49,9 +51,7 @@ def projeto():
 def auth_client(user=None):
     """Helper para criar cliente autenticado."""
     client = APIClient()
-    user = user or Usuario.objects.create_user(
-        username="u1", email="u1@x.com", password="x"
-    )
+    user = user or Usuario.objects.create_user(username="u1", email="u1@x.com", password="x")
     client.force_authenticate(user=user)
     return client, user
 

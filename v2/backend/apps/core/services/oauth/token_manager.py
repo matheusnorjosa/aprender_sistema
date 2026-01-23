@@ -9,6 +9,7 @@ Security features:
 - Thread-safe refresh with select_for_update (GAP-1)
 - Zero-downtime key rotation (GAP-2)
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false
 
 from __future__ import annotations
@@ -19,11 +20,12 @@ import os
 from datetime import timedelta
 from typing import Any
 
-import requests
-from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+
+import requests
+from cryptography.fernet import Fernet, InvalidToken
 
 from apps.core.models import AuditLog, GoogleOAuthCredential, Usuario
 
@@ -139,15 +141,11 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
     """
     with transaction.atomic():
         # Row-level lock (GAP-1: Concorrência)
-        cred: GoogleOAuthCredential = GoogleOAuthCredential.objects.select_for_update().get(
-            id=credential.id
-        )
+        cred: GoogleOAuthCredential = GoogleOAuthCredential.objects.select_for_update().get(id=credential.id)
 
         # Double-check: outro thread já refrescou?
         if cred.token_expiry > timezone.now() + timedelta(minutes=5):
-            logger.info(
-                f"✅ Token já válido (outro thread refrescou). " f"Expira em: {cred.token_expiry}"
-            )
+            logger.info(f"✅ Token já válido (outro thread refrescou). " f"Expira em: {cred.token_expiry}")
             return cred
 
         # Refresh via Google API
@@ -200,9 +198,7 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
             if e.response.status_code == 400:
                 error_data: dict[str, Any] = e.response.json()
                 if error_data.get("error") == "invalid_grant":
-                    logger.error(
-                        f"❌ Refresh token inválido (revogado pelo usuário): {cred.google_email}"
-                    )
+                    logger.error(f"❌ Refresh token inválido (revogado pelo usuário): {cred.google_email}")
 
                     # Remover credencial (usuário precisa reconectar)
                     cred.delete()
@@ -220,8 +216,7 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
                     )
 
                     raise ValueError(
-                        "Sua conexão com o Google foi revogada. "
-                        "Reconecte sua conta em Pré-agenda > Integrações."
+                        "Sua conexão com o Google foi revogada. " "Reconecte sua conta em Pré-agenda > Integrações."
                     )
 
             logger.error(f"❌ Erro ao refresh access token: {e}")

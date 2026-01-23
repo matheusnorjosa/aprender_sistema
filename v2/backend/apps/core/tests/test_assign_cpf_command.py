@@ -12,13 +12,16 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import json
-import pytest
 from pathlib import Path
-from openpyxl import Workbook
+
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import override_settings
+
+import pytest
+from openpyxl import Workbook
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db

@@ -8,6 +8,7 @@ Usage:
     python manage.py compliance_audit --days=30
     python manage.py compliance_audit --format=json --output=report.json
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -95,13 +96,15 @@ class Command(BaseCommand):
                 except Solicitacao.DoesNotExist:
                     pass
 
-        report["checks"].append({
-            "rule": "PA-01",
-            "description": "No self-approval for SUPER solicitations",
-            "status": "PASS" if self_approvals == 0 else "FAIL",
-            "violations": self_approvals,
-            "details": f"Found {self_approvals} self-approvals in SUPER flow",
-        })
+        report["checks"].append(
+            {
+                "rule": "PA-01",
+                "description": "No self-approval for SUPER solicitations",
+                "status": "PASS" if self_approvals == 0 else "FAIL",
+                "violations": self_approvals,
+                "details": f"Found {self_approvals} self-approvals in SUPER flow",
+            }
+        )
 
         # ================================================================
         # PA-02: Approvers have correct permissions
@@ -109,32 +112,38 @@ class Command(BaseCommand):
         # This check is simplified - we trust RBAC enforces permissions
         invalid_approvers = 0  # Would require checking user permissions at approval time
 
-        report["checks"].append({
-            "rule": "PA-02",
-            "description": "Approvers have correct permissions (Gerente or superuser)",
-            "status": "PASS" if invalid_approvers == 0 else "WARN",
-            "violations": invalid_approvers,
-            "details": f"Found {invalid_approvers} approvals by non-authorized users",
-        })
+        report["checks"].append(
+            {
+                "rule": "PA-02",
+                "description": "Approvers have correct permissions (Gerente or superuser)",
+                "status": "PASS" if invalid_approvers == 0 else "WARN",
+                "violations": invalid_approvers,
+                "details": f"Found {invalid_approvers} approvals by non-authorized users",
+            }
+        )
 
         # ================================================================
         # PA-04: Initial status follows flow
         # ================================================================
         # SUPER should start as 'pendente', NAO_SUPER as 'aprovado'
-        wrong_initial_super = Solicitacao.objects.filter(
-            created_at__gte=since,
-            projeto__fluxo="SUPER",
-        ).exclude(
-            status__in=["pendente", "aprovado", "reprovado"]
-        ).count()
+        wrong_initial_super = (
+            Solicitacao.objects.filter(
+                created_at__gte=since,
+                projeto__fluxo="SUPER",
+            )
+            .exclude(status__in=["pendente", "aprovado", "reprovado"])
+            .count()
+        )
 
-        report["checks"].append({
-            "rule": "PA-04",
-            "description": "SUPER solicitations start as 'pendente'",
-            "status": "PASS" if wrong_initial_super == 0 else "WARN",
-            "violations": wrong_initial_super,
-            "details": f"Found {wrong_initial_super} SUPER solicitations with unexpected status",
-        })
+        report["checks"].append(
+            {
+                "rule": "PA-04",
+                "description": "SUPER solicitations start as 'pendente'",
+                "status": "PASS" if wrong_initial_super == 0 else "WARN",
+                "violations": wrong_initial_super,
+                "details": f"Found {wrong_initial_super} SUPER solicitations with unexpected status",
+            }
+        )
 
         # ================================================================
         # RD-02: No events during total block
@@ -158,46 +167,56 @@ class Command(BaseCommand):
             if conflicting:
                 blocks_with_events += 1
 
-        report["checks"].append({
-            "rule": "RD-02",
-            "description": "No approved events during total blocks (T)",
-            "status": "PASS" if blocks_with_events == 0 else "FAIL",
-            "violations": blocks_with_events,
-            "details": f"Found {blocks_with_events} total blocks with conflicting events",
-        })
+        report["checks"].append(
+            {
+                "rule": "RD-02",
+                "description": "No approved events during total blocks (T)",
+                "status": "PASS" if blocks_with_events == 0 else "FAIL",
+                "violations": blocks_with_events,
+                "details": f"Found {blocks_with_events} total blocks with conflicting events",
+            }
+        )
 
         # ================================================================
         # RD-06: All timestamps in America/Fortaleza
         # ================================================================
         # Check for any UTC timestamps that might indicate timezone issues
         # This is informational only
-        report["checks"].append({
-            "rule": "RD-06",
-            "description": "Timestamps use America/Fortaleza timezone",
-            "status": "INFO",
-            "violations": 0,
-            "details": "Timezone compliance verified by Django TIME_ZONE setting",
-        })
+        report["checks"].append(
+            {
+                "rule": "RD-06",
+                "description": "Timestamps use America/Fortaleza timezone",
+                "status": "INFO",
+                "violations": 0,
+                "details": "Timezone compliance verified by Django TIME_ZONE setting",
+            }
+        )
 
         # ================================================================
         # Audit Log Completeness
         # ================================================================
-        solicitations_without_audit = Solicitacao.objects.filter(
-            created_at__gte=since,
-        ).exclude(
-            id__in=AuditLog.objects.filter(
-                model_name="Solicitacao",
-                action__in=["CREATE", "CRIAR_SOLICITACAO"],
-            ).values_list("details__solicitacao_id", flat=True)
-        ).count()
+        solicitations_without_audit = (
+            Solicitacao.objects.filter(
+                created_at__gte=since,
+            )
+            .exclude(
+                id__in=AuditLog.objects.filter(
+                    model_name="Solicitacao",
+                    action__in=["CREATE", "CRIAR_SOLICITACAO"],
+                ).values_list("details__solicitacao_id", flat=True)
+            )
+            .count()
+        )
 
-        report["checks"].append({
-            "rule": "AUDIT-01",
-            "description": "All solicitations have audit logs",
-            "status": "PASS" if solicitations_without_audit == 0 else "WARN",
-            "violations": solicitations_without_audit,
-            "details": f"Found {solicitations_without_audit} solicitations without audit trail",
-        })
+        report["checks"].append(
+            {
+                "rule": "AUDIT-01",
+                "description": "All solicitations have audit logs",
+                "status": "PASS" if solicitations_without_audit == 0 else "WARN",
+                "violations": solicitations_without_audit,
+                "details": f"Found {solicitations_without_audit} solicitations without audit trail",
+            }
+        )
 
         # ================================================================
         # GCal Sync Status
@@ -213,13 +232,15 @@ class Command(BaseCommand):
             gcal_status="NONE",
         ).count()
 
-        report["checks"].append({
-            "rule": "GCAL-01",
-            "description": "GCal sync status for approved solicitations",
-            "status": "PASS" if gcal_errors == 0 else "WARN",
-            "violations": gcal_errors,
-            "details": f"Errors: {gcal_errors}, Pending: {gcal_pending}",
-        })
+        report["checks"].append(
+            {
+                "rule": "GCAL-01",
+                "description": "GCal sync status for approved solicitations",
+                "status": "PASS" if gcal_errors == 0 else "WARN",
+                "violations": gcal_errors,
+                "details": f"Errors: {gcal_errors}, Pending: {gcal_pending}",
+            }
+        )
 
         # Calculate summary
         for check in report["checks"]:
@@ -249,9 +270,7 @@ class Command(BaseCommand):
         if output_path:
             with open(output_path, "w") as f:
                 f.write(content)
-            self.stdout.write(
-                self.style.SUCCESS(f"Report saved to: {output_path}")
-            )
+            self.stdout.write(self.style.SUCCESS(f"Report saved to: {output_path}"))
         else:
             self.stdout.write(content)
 
@@ -284,16 +303,18 @@ class Command(BaseCommand):
             lines.append(f"   Details: {check['details']}")
             lines.append("")
 
-        lines.extend([
-            "-" * 60,
-            "SUMMARY",
-            "-" * 60,
-            f"Total checks: {report['summary']['total_checks']}",
-            f"Passed: {report['summary']['passed']}",
-            f"Failed: {report['summary']['failed']}",
-            f"Warnings: {report['summary']['warnings']}",
-            "=" * 60,
-        ])
+        lines.extend(
+            [
+                "-" * 60,
+                "SUMMARY",
+                "-" * 60,
+                f"Total checks: {report['summary']['total_checks']}",
+                f"Passed: {report['summary']['passed']}",
+                f"Failed: {report['summary']['failed']}",
+                f"Warnings: {report['summary']['warnings']}",
+                "=" * 60,
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -304,8 +325,7 @@ class Command(BaseCommand):
         for check in report["checks"]:
             details = check["details"].replace('"', '""')
             lines.append(
-                f'"{check["rule"]}","{check["description"]}","{check["status"]}",'
-                f'{check["violations"]},"{details}"'
+                f'"{check["rule"]}","{check["description"]}","{check["status"]}",' f'{check["violations"]},"{details}"'
             )
 
         return "\n".join(lines)

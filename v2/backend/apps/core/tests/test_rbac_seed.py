@@ -13,11 +13,13 @@ Comando testado:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.urls import reverse
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
@@ -188,9 +190,7 @@ def test_seed_rbac_assigns_permissions_to_formador(run_seed_rbac):
 
 def test_endpoint_municipios_dat_allowed(run_seed_rbac):
     """DAT tem acesso CRUD a /api/municipios/."""
-    user = Usuario.objects.create_user(
-        username="dat1", email="dat@x.com", password="x", cpf="11111111111"
-    )
+    user = Usuario.objects.create_user(username="dat1", email="dat@x.com", password="x", cpf="11111111111")
     dat = Group.objects.get(name="DAT")
     user.groups.add(dat)
 
@@ -205,9 +205,7 @@ def test_endpoint_municipios_dat_allowed(run_seed_rbac):
 
 def test_endpoint_municipios_coordenador_forbidden(run_seed_rbac):
     """Coordenador NÃO tem acesso a /api/municipios/ (endpoint protegido por IsDAT)."""
-    user = Usuario.objects.create_user(
-        username="coord1", email="coord@x.com", password="x", cpf="22222222222"
-    )
+    user = Usuario.objects.create_user(username="coord1", email="coord@x.com", password="x", cpf="22222222222")
     coord = Group.objects.get(name="Coordenador")
     user.groups.add(coord)
 
@@ -234,9 +232,7 @@ def test_endpoint_solicitacoes_list_requires_authentication(run_seed_rbac):
 
 def test_endpoint_import_compras_controle_allowed(run_seed_rbac):
     """Controle tem acesso ao endpoint de import compras."""
-    user = Usuario.objects.create_user(
-        username="controle1", email="controle@x.com", password="x", cpf="66666666666"
-    )
+    user = Usuario.objects.create_user(username="controle1", email="controle@x.com", password="x", cpf="66666666666")
     controle = Group.objects.get(name="Controle")
     user.groups.add(controle)
 
@@ -253,9 +249,7 @@ def test_endpoint_import_compras_controle_allowed(run_seed_rbac):
 
 def test_endpoint_import_compras_coordenador_forbidden(run_seed_rbac):
     """Coordenador NÃO tem acesso ao endpoint de import compras."""
-    user = Usuario.objects.create_user(
-        username="coord1", email="coord@x.com", password="x", cpf="77777777777"
-    )
+    user = Usuario.objects.create_user(username="coord1", email="coord@x.com", password="x", cpf="77777777777")
     coord = Group.objects.get(name="Coordenador")
     user.groups.add(coord)
 
@@ -272,9 +266,7 @@ def test_endpoint_import_compras_coordenador_forbidden(run_seed_rbac):
 
 def test_superuser_bypasses_all_permissions(run_seed_rbac):
     """Superuser sempre tem acesso, independente de grupos."""
-    user = Usuario.objects.create_superuser(
-        username="admin", email="admin@x.com", password="x", cpf="99999999999"
-    )
+    user = Usuario.objects.create_superuser(username="admin", email="admin@x.com", password="x", cpf="99999999999")
 
     client = APIClient()
     client.force_authenticate(user=user)

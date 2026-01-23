@@ -1,10 +1,12 @@
 """
 Staging models para ETL - Tabelas temporárias para importação
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false, reportIncompatibleMethodOverride=false, reportInvalidTypeForm=false
 
 
 from __future__ import annotations
+
 from django.db import models
 
 
@@ -15,9 +17,7 @@ class StgUsuario(models.Model):
     email = models.EmailField()
     cpf = models.CharField(max_length=11, blank=True, default="")
     telefone = models.CharField(max_length=20, blank=True, default="")
-    perfil = models.CharField(
-        max_length=50
-    )  # "Formador"/"Coordenador"/"Superintendência"
+    perfil = models.CharField(max_length=50)  # "Formador"/"Coordenador"/"Superintendência"
     ativo = models.BooleanField(default=True)
     src = models.CharField(max_length=100)  # nome do arquivo / aba
     rownum = models.IntegerField()

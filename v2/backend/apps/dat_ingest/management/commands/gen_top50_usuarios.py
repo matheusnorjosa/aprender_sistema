@@ -13,6 +13,7 @@ HEURÍSTICA:
 - papel_sugerido: se apareceu ≥1x como COORDENADOR → "Coordenador", senão "Formador"
 - Frequência: contar ocorrências únicas (pessoa + papel)
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false
 
 from __future__ import annotations
@@ -86,12 +87,14 @@ class Command(BaseCommand):
                 papeis = [p.strip() for p in papel.split(",")]
 
                 for p in papeis:
-                    pessoas.append({
-                        "pessoa": pessoa,
-                        "papel": p,
-                        "aba": aba,
-                        "sector": sector,
-                    })
+                    pessoas.append(
+                        {
+                            "pessoa": pessoa,
+                            "papel": p,
+                            "aba": aba,
+                            "sector": sector,
+                        }
+                    )
 
         self.stdout.write(f"📊 Total de ocorrências (após filtrar indicadores): {len(pessoas)}")
 
@@ -119,16 +122,18 @@ class Command(BaseCommand):
             # Setor mais frequente
             sector_freq = ", ".join(sorted(stats["sectors"]))
 
-            usuarios_ranked.append({
-                "nome_display": nome,
-                "email": "",  # Não temos email no relatório de pendências
-                "papel_sugerido": papel_sugerido,
-                "gerente_sugerido": "",  # Não conseguimos inferir facilmente
-                "origem_mais_frequente": ", ".join(sorted(stats["abas"])),
-                "frequencia": stats["count"],
-                "papeis_observados": ", ".join(sorted(stats["papeis"])),
-                "setores": sector_freq,
-            })
+            usuarios_ranked.append(
+                {
+                    "nome_display": nome,
+                    "email": "",  # Não temos email no relatório de pendências
+                    "papel_sugerido": papel_sugerido,
+                    "gerente_sugerido": "",  # Não conseguimos inferir facilmente
+                    "origem_mais_frequente": ", ".join(sorted(stats["abas"])),
+                    "frequencia": stats["count"],
+                    "papeis_observados": ", ".join(sorted(stats["papeis"])),
+                    "setores": sector_freq,
+                }
+            )
 
         # Ordenar por frequência descendente
         usuarios_ranked.sort(key=lambda x: x["frequencia"], reverse=True)
@@ -163,7 +168,5 @@ class Command(BaseCommand):
 
         self.stdout.write(f"\n✅ CSV gerado: {output_path}")
         self.stdout.write(f"   Usuários: {len(top_usuarios)}")
-        self.stdout.write(
-            f"\n⚠️  ATENÇÃO: Campo 'email' vazio - preencher manualmente antes de importar!"
-        )
+        self.stdout.write("\n⚠️  ATENÇÃO: Campo 'email' vazio - preencher manualmente antes de importar!")
         self.stdout.write("=" * 80 + "\n")

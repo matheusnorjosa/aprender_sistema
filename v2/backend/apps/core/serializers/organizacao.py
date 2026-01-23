@@ -4,6 +4,7 @@ AS v2 — Organizacao Serializers
 Serializers para Municipio, ProjetoGeral, Projeto, Gerencia, TipoEvento, Produto.
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations
@@ -76,13 +77,9 @@ class ProjetoSerializer(serializers.ModelSerializer):
     Full serializer for Projeto model (Admin CRUD).
     """
 
-    gerencia_nome = serializers.CharField(
-        source="gerencia.nome_setor", read_only=True, allow_null=True
-    )
+    gerencia_nome = serializers.CharField(source="gerencia.nome_setor", read_only=True, allow_null=True)
     setor = serializers.SerializerMethodField()
-    projeto_geral_nome = serializers.CharField(
-        source="projeto_geral.nome", read_only=True, allow_null=True
-    )
+    projeto_geral_nome = serializers.CharField(source="projeto_geral.nome", read_only=True, allow_null=True)
 
     def get_setor(self, obj: Projeto) -> str:
         """Retorna nome do setor (derivado de gerencia)."""
@@ -125,9 +122,7 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
         - projetos_count (annotated, read-only)
     """
 
-    gerente_nome = serializers.CharField(
-        source="gerente.get_full_name", read_only=True, allow_null=True
-    )
+    gerente_nome = serializers.CharField(source="gerente.get_full_name", read_only=True, allow_null=True)
     projetos_count = serializers.IntegerField(read_only=True, required=False)
 
     class Meta:  # type: ignore[misc]

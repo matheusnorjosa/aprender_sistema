@@ -12,10 +12,12 @@ Testa:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import Usuario
 from apps.core.views_basic import FUNCAO_GROUPS, SETOR_GROUPS
@@ -27,16 +29,16 @@ class TestRBACConstants(TestCase):
     def test_setor_groups_contains_expected_setores(self):
         """SETOR_GROUPS deve conter todos os setores esperados."""
         expected_setores = [
-            'Superintendência',
-            'Vidas',
-            'Fluir',
-            'ACerta',
-            'Brincando',
-            'Sou da Paz',
-            'DAT',
-            'Controle',
-            'Gerência',
-            'Diretoria',
+            "Superintendência",
+            "Vidas",
+            "Fluir",
+            "ACerta",
+            "Brincando",
+            "Sou da Paz",
+            "DAT",
+            "Controle",
+            "Gerência",
+            "Diretoria",
         ]
         for setor in expected_setores:
             self.assertIn(setor, SETOR_GROUPS, f"Setor '{setor}' não encontrado em SETOR_GROUPS")
@@ -47,7 +49,7 @@ class TestRBACConstants(TestCase):
 
     def test_funcao_groups_contains_expected_funcoes(self):
         """FUNCAO_GROUPS deve conter todas as funções esperadas."""
-        expected_funcoes = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente']
+        expected_funcoes = ["Formador", "Coordenador", "Apoio de Coordenação", "Gerente"]
         for funcao in expected_funcoes:
             self.assertIn(funcao, FUNCAO_GROUPS, f"Função '{funcao}' não encontrada em FUNCAO_GROUPS")
 
@@ -75,7 +77,9 @@ class TestCanApproveSuperLogic(TestCase):
         for funcao in FUNCAO_GROUPS:
             Group.objects.get_or_create(name=funcao)
 
-    def _create_user_with_groups(self, username: str, setores: list, funcoes: list, is_superuser: bool = False) -> Usuario:
+    def _create_user_with_groups(
+        self, username: str, setores: list, funcoes: list, is_superuser: bool = False
+    ) -> Usuario:
         """Helper para criar usuário com grupos específicos."""
         user = Usuario.objects.create_user(
             username=username,

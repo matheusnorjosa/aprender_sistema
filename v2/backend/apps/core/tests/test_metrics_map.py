@@ -15,15 +15,17 @@ Endpoint testado:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from datetime import timedelta
 
 from django.contrib.auth.models import Group
 from django.urls import reverse
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 import pytest
+
 from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
-from rest_framework.test import APIClient
 
 pytestmark = pytest.mark.django_db
 
@@ -48,9 +50,7 @@ def grupos():
 @pytest.fixture
 def user_controle(grupos):
     """Usuário do grupo Controle."""
-    user = Usuario.objects.create_user(
-        username="controle1", email="controle@x.com", password="x", cpf="11111111111"
-    )
+    user = Usuario.objects.create_user(username="controle1", email="controle@x.com", password="x", cpf="11111111111")
     user.groups.add(grupos["controle"])
     return user
 
@@ -58,9 +58,7 @@ def user_controle(grupos):
 @pytest.fixture
 def user_dat(grupos):
     """Usuário do grupo DAT."""
-    user = Usuario.objects.create_user(
-        username="dat1", email="dat@x.com", password="x", cpf="22222222222"
-    )
+    user = Usuario.objects.create_user(username="dat1", email="dat@x.com", password="x", cpf="22222222222")
     user.groups.add(grupos["dat"])
     return user
 
@@ -68,9 +66,7 @@ def user_dat(grupos):
 @pytest.fixture
 def user_coordenador(grupos):
     """Usuário do grupo Coordenador (sem permissão)."""
-    user = Usuario.objects.create_user(
-        username="coord1", email="coord@x.com", password="x", cpf="33333333333"
-    )
+    user = Usuario.objects.create_user(username="coord1", email="coord@x.com", password="x", cpf="33333333333")
     user.groups.add(grupos["coordenador"])
     return user
 
@@ -78,9 +74,7 @@ def user_coordenador(grupos):
 @pytest.fixture
 def user_formador(grupos):
     """Usuário do grupo Formador (sem permissão)."""
-    user = Usuario.objects.create_user(
-        username="form1", email="form@x.com", password="x", cpf="44444444444"
-    )
+    user = Usuario.objects.create_user(username="form1", email="form@x.com", password="x", cpf="44444444444")
     user.groups.add(grupos["formador"])
     return user
 
@@ -89,28 +83,23 @@ def user_formador(grupos):
 def dados_basicos(grupos):
     """Criar dados básicos para os testes."""
     # Formadores (usuários)
-    formador1 = Usuario.objects.create_user(
-        username="ana.silva", email="ana@x.com", password="x", cpf="55555555555"
-    )
+    formador1 = Usuario.objects.create_user(username="ana.silva", email="ana@x.com", password="x", cpf="55555555555")
     formador1.groups.add(grupos["formador"])
 
     # Municípios (3 UFs diferentes) com coordenadas para testes
     mun_ce = Municipio.objects.create(
-        nome="Fortaleza", uf="CE", ibge_code="2304400",
-        latitude=-3.717200, longitude=-38.543400
+        nome="Fortaleza", uf="CE", ibge_code="2304400", latitude=-3.717200, longitude=-38.543400
     )
     mun_sp = Municipio.objects.create(
-        nome="São Paulo", uf="SP", ibge_code="3550308",
-        latitude=-23.550520, longitude=-46.633308
+        nome="São Paulo", uf="SP", ibge_code="3550308", latitude=-23.550520, longitude=-46.633308
     )
     mun_ba = Municipio.objects.create(
-        nome="Salvador", uf="BA", ibge_code="2927408",
-        latitude=-12.971400, longitude=-38.510800
+        nome="Salvador", uf="BA", ibge_code="2927408", latitude=-12.971400, longitude=-38.510800
     )
 
     # Projetos (fluxo='SUPER' para permitir testar diferentes status)
-    proj1 = Projeto.objects.create(nome="Vida & Matemática", codigo="P001", fluxo='SUPER')
-    proj2 = Projeto.objects.create(nome="TEMA", codigo="P002", fluxo='SUPER')
+    proj1 = Projeto.objects.create(nome="Vida & Matemática", codigo="P001", fluxo="SUPER")
+    proj2 = Projeto.objects.create(nome="TEMA", codigo="P002", fluxo="SUPER")
 
     # Tipos de evento
     tipo1 = TipoEvento.objects.create(nome="Formação Inicial")
@@ -241,9 +230,7 @@ def test_map_metrics_formador_forbidden(user_formador):
 
 def test_map_metrics_superuser_allowed():
     """Superuser sempre tem acesso."""
-    user = Usuario.objects.create_superuser(
-        username="admin", email="admin@x.com", password="x", cpf="99999999999"
-    )
+    user = Usuario.objects.create_superuser(username="admin", email="admin@x.com", password="x", cpf="99999999999")
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -316,10 +303,7 @@ def test_map_metrics_by_municipio_aggregation(user_controle, solicitacoes_varied
     data = res.json()
 
     # Converter by_municipio para dict para facilitar verificação
-    by_mun_dict = {
-        f"{item['municipio']}-{item['uf']}": item["eventos"]
-        for item in data["by_municipio"]
-    }
+    by_mun_dict = {f"{item['municipio']}-{item['uf']}": item["eventos"] for item in data["by_municipio"]}
 
     # Verificar contagens (3 CE + 2 SP + 1 BA = 6 total)
     assert by_mun_dict.get("Fortaleza-CE", 0) == 3
@@ -387,9 +371,7 @@ def test_map_metrics_filter_by_status(user_controle, solicitacoes_variedade):
     assert data["by_municipio"][0]["eventos"] == 3
 
 
-def test_map_metrics_filter_by_projeto(
-    user_controle, solicitacoes_variedade, dados_basicos
-):
+def test_map_metrics_filter_by_projeto(user_controle, solicitacoes_variedade, dados_basicos):
     """Filtro por projeto_id funciona corretamente."""
     client = APIClient()
     client.force_authenticate(user=user_controle)
@@ -406,10 +388,7 @@ def test_map_metrics_filter_by_projeto(
     assert data["meta"]["filters"]["projeto_id"] == projeto_matematica_id
 
     # Deve ter Fortaleza-CE (3) e Salvador-BA (1)
-    by_mun_dict = {
-        f"{m['municipio']}-{m['uf']}": m["eventos"]
-        for m in data["by_municipio"]
-    }
+    by_mun_dict = {f"{m['municipio']}-{m['uf']}": m["eventos"] for m in data["by_municipio"]}
     assert by_mun_dict.get("Fortaleza-CE", 0) == 3
     assert by_mun_dict.get("Salvador-BA", 0) == 1
     assert "São Paulo-SP" not in by_mun_dict
@@ -418,9 +397,7 @@ def test_map_metrics_filter_by_projeto(
     assert len(data["by_municipio"]) == 2
 
 
-def test_map_metrics_filter_combined(
-    user_controle, solicitacoes_variedade, dados_basicos
-):
+def test_map_metrics_filter_combined(user_controle, solicitacoes_variedade, dados_basicos):
     """Filtros combinados (status + projeto_id) funcionam corretamente."""
     client = APIClient()
     client.force_authenticate(user=user_controle)

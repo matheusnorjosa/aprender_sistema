@@ -1,19 +1,17 @@
 from __future__ import annotations
-# pyright: reportMissingTypeArgument=false
 
 import csv
 import logging
 from pathlib import Path
 from typing import Any
 
-from django.contrib import admin
 from django.conf import settings
+from django.contrib import admin
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse
 
 # Fase 1 - Plano DAT/GCal: Admin restrito a superusers
 from .admin_site import admin_site
-
 from .models import (
     AcaoControle,
     AcaoDAT,
@@ -29,9 +27,12 @@ from .models import (
     Usuario,
 )
 
+# pyright: reportMissingTypeArgument=false
+
 
 class CPFFilter(admin.SimpleListFilter):
     """Filtro para CPF ausente/preenchido."""
+
     title = "CPF"
     parameter_name = "cpf_status"
 
@@ -70,14 +71,16 @@ class UsuarioAdmin(admin.ModelAdmin):
 
         for user in usuarios_sem_cpf:
             nome_completo = f"{user.first_name} {user.last_name}".strip()
-            writer.writerow([
-                user.username,
-                user.email,
-                nome_completo,
-                user.cpf or "",
-                user.cargo or "",
-                "Sim" if user.is_active else "Não",
-            ])
+            writer.writerow(
+                [
+                    user.username,
+                    user.email,
+                    nome_completo,
+                    user.cpf or "",
+                    user.cargo or "",
+                    "Sim" if user.is_active else "Não",
+                ]
+            )
 
         # Também salvar em out_etl para auditoria
         try:
@@ -90,14 +93,16 @@ class UsuarioAdmin(admin.ModelAdmin):
                 writer_file.writerow(["Username", "Email", "Nome Completo", "CPF", "Cargo", "Ativo"])
                 for user in usuarios_sem_cpf:
                     nome_completo = f"{user.first_name} {user.last_name}".strip()
-                    writer_file.writerow([
-                        user.username,
-                        user.email,
-                        nome_completo,
-                        user.cpf or "",
-                        user.cargo or "",
-                        "Sim" if user.is_active else "Não",
-                    ])
+                    writer_file.writerow(
+                        [
+                            user.username,
+                            user.email,
+                            nome_completo,
+                            user.cpf or "",
+                            user.cargo or "",
+                            "Sim" if user.is_active else "Não",
+                        ]
+                    )
         except Exception as e:
             # Se falhar ao salvar em out_etl, apenas retornar o CSV via HTTP
             logger = logging.getLogger(__name__)
@@ -224,6 +229,7 @@ class AuditLogAdmin(admin.ModelAdmin):
     Registro de auditoria para rastreamento de ações críticas (RF07).
     Não permite edição/exclusão via admin.
     """
+
     list_display = ("id", "usuario", "action", "model_name", "created_at")
     list_filter = ("action", "model_name", "created_at")
     search_fields = ("usuario__username", "usuario__email", "action", "model_name")

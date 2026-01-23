@@ -7,14 +7,17 @@ Cobertura completa das regras de disponibilidade + endpoint de checagem.
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from django.utils import timezone
-from django.conf import settings
-from datetime import timedelta
-from rest_framework.test import APIClient
-from rest_framework import status as http_status
 
-from apps.core.models import Solicitacao, AvailabilityBlock, Usuario, TipoEvento, Municipio
+from datetime import timedelta
+
+from django.conf import settings
+from django.utils import timezone
+from rest_framework import status as http_status
+from rest_framework.test import APIClient
+
+import pytest
+
+from apps.core.models import AvailabilityBlock, Municipio, Solicitacao, TipoEvento, Usuario
 from apps.core.services.availability_service import check_conflicts
 
 
@@ -53,9 +56,7 @@ class TestAvailabilityServiceRules:
     Testes das regras RD-01 a RD-08.
     """
 
-    def test_conflict_overlap_total(
-        self, usuario_test, tipo_evento_test, municipio_a
-    ):
+    def test_conflict_overlap_total(self, usuario_test, tipo_evento_test, municipio_a):
         """
         RD-01: Sobreposição total → conflito X.
         Evento aprovado 10:00–12:00, novo 11:00–13:00 → X.
@@ -84,9 +85,7 @@ class TestAvailabilityServiceRules:
         assert len(result.conflicts) > 0
         assert any(c.code == "X" for c in result.conflicts), "Deve ter conflito X"
 
-    def test_conflict_overlap_partial(
-        self, usuario_test, tipo_evento_test, municipio_a
-    ):
+    def test_conflict_overlap_partial(self, usuario_test, tipo_evento_test, municipio_a):
         """
         RD-01: Sobreposição parcial → conflito X.
         Evento 10:00–12:00, novo 09:30–10:30 → X.
@@ -113,9 +112,7 @@ class TestAvailabilityServiceRules:
         assert not result.ok, "Deve detectar sobreposição parcial"
         assert any(c.code == "X" for c in result.conflicts)
 
-    def test_no_conflict_adjacent_end_equals_start(
-        self, usuario_test, tipo_evento_test, municipio_a
-    ):
+    def test_no_conflict_adjacent_end_equals_start(self, usuario_test, tipo_evento_test, municipio_a):
         """
         RD-01: Adjacente (fim == início) → OK (não conflita).
         Evento 10:00–12:00, novo 12:00–13:00 → ok.
@@ -140,9 +137,7 @@ class TestAvailabilityServiceRules:
         )
 
         # Não deve ter conflito X (adjacente é OK)
-        assert not any(
-            c.code == "X" for c in result.conflicts
-        ), "Adjacente não deve gerar conflito X"
+        assert not any(c.code == "X" for c in result.conflicts), "Adjacente não deve gerar conflito X"
 
     def test_block_total_T_prevents_any_event(self, usuario_test):
         """
@@ -208,13 +203,9 @@ class TestAvailabilityServiceRules:
             municipio=None,
         )
 
-        assert not any(
-            c.code == "P" for c in result2.conflicts
-        ), "Fora do bloqueio P não deve conflitar"
+        assert not any(c.code == "P" for c in result2.conflicts), "Fora do bloqueio P não deve conflitar"
 
-    def test_travel_buffer_between_cities_required(
-        self, usuario_test, tipo_evento_test, municipio_a, municipio_b
-    ):
+    def test_travel_buffer_between_cities_required(self, usuario_test, tipo_evento_test, municipio_a, municipio_b):
         """
         RD-04: Buffer de deslocamento entre cidades distintas.
         Evento 08:00–10:00 em Mun A, novo 10:30 em Mun B com buffer=60min → D.
@@ -243,13 +234,9 @@ class TestAvailabilityServiceRules:
         buffer_min = getattr(settings, "TRAVEL_BUFFER_MINUTES", 120)
         if buffer_min > 30:  # Se buffer exigido > 30 min
             assert not result.ok, "Buffer insuficiente deve gerar conflito D"
-            assert any(
-                c.code == "D" for c in result.conflicts
-            ), "Deve ter conflito D de deslocamento"
+            assert any(c.code == "D" for c in result.conflicts), "Deve ter conflito D de deslocamento"
 
-    def test_same_city_allows_zero_buffer(
-        self, usuario_test, tipo_evento_test, municipio_a
-    ):
+    def test_same_city_allows_zero_buffer(self, usuario_test, tipo_evento_test, municipio_a):
         """
         RD-04: Mesmo município → buffer 0 (permite eventos próximos).
         Evento 08:00–10:00 em Mun A, novo 10:10 em Mun A → ok (mesmo com buffer=60).
@@ -274,13 +261,9 @@ class TestAvailabilityServiceRules:
         )
 
         # Não deve ter conflito D (mesmo município)
-        assert not any(
-            c.code == "D" for c in result.conflicts
-        ), "Mesmo município não exige buffer"
+        assert not any(c.code == "D" for c in result.conflicts), "Mesmo município não exige buffer"
 
-    def test_daily_capacity_M_exceeded(
-        self, usuario_test, tipo_evento_test, municipio_a
-    ):
+    def test_daily_capacity_M_exceeded(self, usuario_test, tipo_evento_test, municipio_a):
         """
         RD-05: Capacidade diária excedida → M.
         Já tem 7h aprovadas no dia, novo de 2h com limite 8h → M.
@@ -308,9 +291,7 @@ class TestAvailabilityServiceRules:
         daily_limit = getattr(settings, "AVAILABILITY_DAILY_LIMIT_HOURS", 8)
         if daily_limit <= 8:  # Se limite é 8h ou menos
             assert not result.ok, "Deve detectar excesso de capacidade diária"
-            assert any(
-                c.code == "M" for c in result.conflicts
-            ), "Deve ter conflito M"
+            assert any(c.code == "M" for c in result.conflicts), "Deve ter conflito M"
 
     def test_timezone_aware_fortaleza_localtime(self, usuario_test):
         """
@@ -336,9 +317,7 @@ class TestAvailabilityServiceRules:
         # Nota: Este teste assume horário padrão. Durante horário de verão pode variar.
         # Para teste robusto, apenas garantimos que formato está correto.
 
-    def test_midnight_boundary_timezone_aware(
-        self, usuario_test, tipo_evento_test, municipio_a
-    ):
+    def test_midnight_boundary_timezone_aware(self, usuario_test, tipo_evento_test, municipio_a):
         """
         Issue #249: Teste de meia-noite timezone-aware.
 
@@ -353,8 +332,9 @@ class TestAvailabilityServiceRules:
         - Usa range de datetime no timezone local
         - Evento é corretamente associado ao dia no timezone Fortaleza
         """
-        import pytz
         from datetime import datetime, time
+
+        import pytz
 
         # Timezone do projeto
         fortaleza_tz = pytz.timezone("America/Fortaleza")
@@ -364,12 +344,8 @@ class TestAvailabilityServiceRules:
 
         # Evento existente às 23:30 Fortaleza (que seria 02:30 UTC do dia seguinte)
         # Nota: America/Fortaleza é UTC-3
-        event_start_local = fortaleza_tz.localize(
-            datetime.combine(test_date, time(23, 30))
-        )
-        event_end_local = fortaleza_tz.localize(
-            datetime.combine(test_date, time(23, 59))
-        )
+        event_start_local = fortaleza_tz.localize(datetime.combine(test_date, time(23, 30)))
+        event_end_local = fortaleza_tz.localize(datetime.combine(test_date, time(23, 59)))
 
         # Criar evento aprovado às 23:30 Fortaleza
         existing = Solicitacao.objects.create(
@@ -383,12 +359,8 @@ class TestAvailabilityServiceRules:
 
         # Verificar conflito com outro evento no MESMO dia local (Fortaleza)
         # Novo evento às 22:00-23:00 Fortaleza (mesmo dia)
-        new_start_local = fortaleza_tz.localize(
-            datetime.combine(test_date, time(22, 0))
-        )
-        new_end_local = fortaleza_tz.localize(
-            datetime.combine(test_date, time(23, 0))
-        )
+        new_start_local = fortaleza_tz.localize(datetime.combine(test_date, time(22, 0)))
+        new_end_local = fortaleza_tz.localize(datetime.combine(test_date, time(23, 0)))
 
         result = check_conflicts(
             usuario=usuario_test,
@@ -419,9 +391,7 @@ class TestAvailabilityCheckEndpoint:
     Testes do endpoint GET /api/availability/check/
     """
 
-    def test_availability_check_endpoint_returns_conflicts(
-        self, usuario_test, tipo_evento_test, municipio_a
-    ):
+    def test_availability_check_endpoint_returns_conflicts(self, usuario_test, tipo_evento_test, municipio_a):
         """
         Test: Endpoint retorna conflitos corretamente.
 
@@ -550,13 +520,9 @@ class TestAvailabilityCheckEndpoint:
         )
 
         assert response.status_code == http_status.HTTP_400_BAD_REQUEST
-        assert "fim" in str(response.data).lower() or "posterior" in str(
-            response.data
-        ).lower()
+        assert "fim" in str(response.data).lower() or "posterior" in str(response.data).lower()
 
-    def test_check_many_endpoint_batch_processing(
-        self, usuario_test, tipo_evento_test, municipio_a, db
-    ):
+    def test_check_many_endpoint_batch_processing(self, usuario_test, tipo_evento_test, municipio_a, db):
         """
         Test: Endpoint check-many/ processa múltiplos usuários.
         Requer usuário privilegiado para checar outros usuários.
@@ -651,9 +617,7 @@ class TestAvailabilityServiceAdditional:
     Testes adicionais obrigatórios (RD-01, RD-08).
     """
 
-    def test_multi_formador_any_conflict_blocks(
-        self, usuario_test, tipo_evento_test, municipio_a
-    ):
+    def test_multi_formador_any_conflict_blocks(self, usuario_test, tipo_evento_test, municipio_a):
         """
         RD-01: Múltiplos formadores - qualquer conflito bloqueia.
         Se qualquer formador tiver conflito, a solicitação não deve prosseguir.
@@ -698,9 +662,7 @@ class TestAvailabilityServiceAdditional:
 
         # Implicação: Se vários formadores forem alocados, TODOS devem estar disponíveis
 
-    def test_conflict_messages_include_codes_and_intervals(
-        self, usuario_test, tipo_evento_test, municipio_a
-    ):
+    def test_conflict_messages_include_codes_and_intervals(self, usuario_test, tipo_evento_test, municipio_a):
         """
         RD-08: Mensagens de conflito incluem código e intervalo formatado.
         Verifica estrutura: { code, title, detail (com intervalo) }

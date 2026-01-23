@@ -10,18 +10,21 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from django.contrib.auth.models import Group
-from rest_framework.test import APIClient
-from django.utils import timezone
+
 from datetime import timedelta
 
+from django.contrib.auth.models import Group
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+import pytest
+
 from apps.core.models import (
-    Usuario,
     Municipio,
     Projeto,
-    TipoEvento,
     Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 
 
@@ -77,8 +80,7 @@ class TestSolicitacaoOnlineMode:
         )
 
         # Verificar default
-        assert sol.is_online is False, \
-            "is_online deve ter default False (presencial)"
+        assert sol.is_online is False, "is_online deve ter default False (presencial)"
 
     def test_create_online_solicitacao(self, usuario_coordenador, fixtures_basicas):
         """
@@ -102,12 +104,9 @@ class TestSolicitacaoOnlineMode:
 
         # Verificar persistência
         sol.refresh_from_db()
-        assert sol.is_online is True, \
-            "is_online=True deve persistir no DB"
+        assert sol.is_online is True, "is_online=True deve persistir no DB"
 
-    def test_serializer_exposes_is_online_and_meet_link(
-        self, usuario_coordenador, fixtures_basicas
-    ):
+    def test_serializer_exposes_is_online_and_meet_link(self, usuario_coordenador, fixtures_basicas):
         """
         PR19: Serializer deve expor is_online (writable) e meet_link (read_only).
 
@@ -140,9 +139,7 @@ class TestSolicitacaoOnlineMode:
         assert response.data["is_online"] is True
         assert "meet_link" in response.data  # Pode ser null ou string
 
-    def test_serializer_exposes_is_online_false_for_presencial(
-        self, usuario_coordenador, fixtures_basicas
-    ):
+    def test_serializer_exposes_is_online_false_for_presencial(self, usuario_coordenador, fixtures_basicas):
         """
         PR19: Serializer deve expor is_online=False para eventos presenciais.
 
@@ -176,9 +173,7 @@ class TestSolicitacaoOnlineMode:
         assert "meet_link" in response.data
         assert response.data["meet_link"] is None  # Presencial não tem Meet link
 
-    def test_is_online_writable_via_post(
-        self, usuario_coordenador, fixtures_basicas
-    ):
+    def test_is_online_writable_via_post(self, usuario_coordenador, fixtures_basicas):
         """
         PR19: is_online deve ser writable (aceita POST).
 
@@ -202,19 +197,16 @@ class TestSolicitacaoOnlineMode:
                 "fim": (now + timedelta(days=5, hours=2)).isoformat(),
                 "is_online": True,
             },
-            format="json"
+            format="json",
         )
 
         # POST pode retornar 201 ou 400 dependendo das validações
         if response.status_code == 201:
             sol_id = response.data["id"]
             sol = Solicitacao.objects.get(id=sol_id)
-            assert sol.is_online is True, \
-                "is_online deve aceitar valor via POST"
+            assert sol.is_online is True, "is_online deve aceitar valor via POST"
 
-    def test_is_online_writable_via_patch(
-        self, usuario_coordenador, fixtures_basicas
-    ):
+    def test_is_online_writable_via_patch(self, usuario_coordenador, fixtures_basicas):
         """
         PR19: is_online deve ser writable (aceita PATCH).
 
@@ -239,15 +231,10 @@ class TestSolicitacaoOnlineMode:
         client = APIClient()
         client.force_authenticate(user=usuario_coordenador)
 
-        response = client.patch(
-            f"/api/solicitacoes/{sol.id}/",
-            {"is_online": True},
-            format="json"
-        )
+        response = client.patch(f"/api/solicitacoes/{sol.id}/", {"is_online": True}, format="json")
 
         # Refresh do banco
         sol.refresh_from_db()
 
         # Verificar que is_online foi alterado
-        assert sol.is_online is True, \
-            "is_online deve aceitar alteração via PATCH"
+        assert sol.is_online is True, "is_online deve aceitar alteração via PATCH"

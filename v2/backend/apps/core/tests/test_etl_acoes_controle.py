@@ -12,18 +12,20 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import csv
 import json
 import tempfile
-import pytest
 from datetime import date
 from pathlib import Path
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
+import pytest
+
 from apps.core.models import AcaoControle, Municipio, Projeto
 from apps.core.services.controle_acoes_import import import_acoes_controle
-
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
@@ -56,21 +58,28 @@ def test_import_creates_acao_controle():
 
     # Criar CSV temporário
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Coordenador": "coord@example.com",
-            "Data Entrega": "2025-01-15",
-            "Data Carta": "15/01/2025",
-            "Contato Inicial": "45677",  # Excel serial for 2025-01-20
-            "Data Reunião": "2025-02-01",
-            "Observação": "Teste observação",
-        }],
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Coordenador": "coord@example.com",
+                "Data Entrega": "2025-01-15",
+                "Data Carta": "15/01/2025",
+                "Contato Inicial": "45677",  # Excel serial for 2025-01-20
+                "Data Reunião": "2025-02-01",
+                "Observação": "Teste observação",
+            }
+        ],
         fieldnames=[
-            "Município", "Projeto", "Coordenador",
-            "Data Entrega", "Data Carta", "Contato Inicial",
-            "Data Reunião", "Observação"
-        ]
+            "Município",
+            "Projeto",
+            "Coordenador",
+            "Data Entrega",
+            "Data Carta",
+            "Contato Inicial",
+            "Data Reunião",
+            "Observação",
+        ],
     )
 
     report = import_acoes_controle(csv_file, dry_run=False)
@@ -97,12 +106,14 @@ def test_idempotency_no_duplicates():
     projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Data Entrega": "2025-01-15",
-        }],
-        fieldnames=["Município", "Projeto", "Data Entrega"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Data Entrega": "2025-01-15",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Data Entrega"],
     )
 
     # Primeira rodada
@@ -124,12 +135,14 @@ def test_dry_run_does_not_commit():
     projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Data Entrega": "2025-01-15",
-        }],
-        fieldnames=["Município", "Projeto", "Data Entrega"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Data Entrega": "2025-01-15",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Data Entrega"],
     )
 
     report = import_acoes_controle(csv_file, dry_run=True)
@@ -146,12 +159,14 @@ def test_skip_missing_municipio():
     Projeto.objects.create(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Município Inexistente",
-            "Projeto": "ACerta",
-            "Data Entrega": "2025-01-01",
-        }],
-        fieldnames=["Município", "Projeto", "Data Entrega"]
+        rows=[
+            {
+                "Município": "Município Inexistente",
+                "Projeto": "ACerta",
+                "Data Entrega": "2025-01-01",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Data Entrega"],
     )
 
     report = import_acoes_controle(csv_file, dry_run=False)
@@ -170,12 +185,14 @@ def test_report_saved_to_out_etl():
     projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Data Entrega": "2025-01-15",
-        }],
-        fieldnames=["Município", "Projeto", "Data Entrega"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Data Entrega": "2025-01-15",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Data Entrega"],
     )
 
     import_acoes_controle(csv_file, dry_run=False)
@@ -199,12 +216,14 @@ def test_coordenador_optional():
     projeto = Projeto.objects.create(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Data Entrega": "2025-01-01",
-        }],
-        fieldnames=["Município", "Projeto", "Data Entrega"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Data Entrega": "2025-01-01",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Data Entrega"],
     )
 
     report = import_acoes_controle(csv_file, dry_run=False)
@@ -222,13 +241,15 @@ def test_update_existing_record():
 
     # Criar inicial
     csv_file = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Data Entrega": "2025-01-01",
-            "Observação": "Versão 1",
-        }],
-        fieldnames=["Município", "Projeto", "Data Entrega", "Observação"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Data Entrega": "2025-01-01",
+                "Observação": "Versão 1",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Data Entrega", "Observação"],
     )
 
     report1 = import_acoes_controle(csv_file, dry_run=False)
@@ -236,13 +257,15 @@ def test_update_existing_record():
 
     # Atualizar observação
     csv_file2 = _create_csv_file(
-        rows=[{
-            "Município": "Fortaleza",
-            "Projeto": "ACerta",
-            "Data Entrega": "2025-01-01",
-            "Observação": "Versão 2 - atualizada",
-        }],
-        fieldnames=["Município", "Projeto", "Data Entrega", "Observação"]
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Data Entrega": "2025-01-01",
+                "Observação": "Versão 2 - atualizada",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Data Entrega", "Observação"],
     )
 
     report2 = import_acoes_controle(csv_file2, dry_run=False)

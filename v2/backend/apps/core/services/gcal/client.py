@@ -3,6 +3,7 @@ AS v2 — GCal Client Adapter
 
 Base interface for Calendar clients.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false
 
 from __future__ import annotations

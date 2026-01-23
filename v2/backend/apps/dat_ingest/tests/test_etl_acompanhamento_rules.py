@@ -9,13 +9,15 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import csv
-import pytest
-from django.core.management import call_command
+
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 
-from apps.core.models import Municipio, Projeto, TipoEvento, Solicitacao, Participation
+import pytest
 
+from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
@@ -61,30 +63,32 @@ def test_super_multi_municipio(tmp_path, setup_dependencies):
             ],
         )
         writer.writeheader()
-        writer.writerow({
-            "event_hash": "super001",
-            "source_sheet": "Super",
-            "municipio": "Fortaleza; Caucaia",
-            "tipo": "Formação",
-            "data": "2025-01-10",
-            "hora_inicio": "08:00",
-            "hora_fim": "12:00",
-            "projeto": "Super",
-            "aprovacao": "SIM",
-        })
+        writer.writerow(
+            {
+                "event_hash": "super001",
+                "source_sheet": "Super",
+                "municipio": "Fortaleza; Caucaia",
+                "tipo": "Formação",
+                "data": "2025-01-10",
+                "hora_inicio": "08:00",
+                "hora_fim": "12:00",
+                "projeto": "Super",
+                "aprovacao": "SIM",
+            }
+        )
 
     participantes_csv = tmp_path / "participantes.csv"
     with open(participantes_csv, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["event_hash", "role", "display_name", "email"]
-        )
+        writer = csv.DictWriter(f, fieldnames=["event_hash", "role", "display_name", "email"])
         writer.writeheader()
-        writer.writerow({
-            "event_hash": "super001",
-            "role": "COORDENADOR",
-            "display_name": "",
-            "email": "coord@example.com",
-        })
+        writer.writerow(
+            {
+                "event_hash": "super001",
+                "role": "COORDENADOR",
+                "display_name": "",
+                "email": "coord@example.com",
+            }
+        )
 
     call_command(
         "etl_upsert_acompanhamento",
@@ -128,31 +132,33 @@ def test_outros_sem_formador_duplica_coordenador(tmp_path, setup_dependencies):
             ],
         )
         writer.writeheader()
-        writer.writerow({
-            "event_hash": "outros001",
-            "source_sheet": "Outros",
-            "municipio": "Fortaleza",
-            "tipo": "Formação",
-            "data": "2025-03-20",
-            "hora_inicio": "14:00",
-            "hora_fim": "17:00",
-            "projeto": "IDEB",  # → Gestão Escolar
-            "aprovacao": "",
-        })
+        writer.writerow(
+            {
+                "event_hash": "outros001",
+                "source_sheet": "Outros",
+                "municipio": "Fortaleza",
+                "tipo": "Formação",
+                "data": "2025-03-20",
+                "hora_inicio": "14:00",
+                "hora_fim": "17:00",
+                "projeto": "IDEB",  # → Gestão Escolar
+                "aprovacao": "",
+            }
+        )
 
     participantes_csv = tmp_path / "participantes.csv"
     with open(participantes_csv, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["event_hash", "role", "display_name", "email"]
-        )
+        writer = csv.DictWriter(f, fieldnames=["event_hash", "role", "display_name", "email"])
         writer.writeheader()
         # Apenas COORDENADOR (sem FORMADOR)
-        writer.writerow({
-            "event_hash": "outros001",
-            "role": "COORDENADOR",
-            "display_name": "",
-            "email": "coord@example.com",
-        })
+        writer.writerow(
+            {
+                "event_hash": "outros001",
+                "role": "COORDENADOR",
+                "display_name": "",
+                "email": "coord@example.com",
+            }
+        )
 
     call_command(
         "etl_upsert_acompanhamento",

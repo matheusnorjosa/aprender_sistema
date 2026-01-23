@@ -5,6 +5,7 @@ Serializers para Solicitacao, Participation e EventDetail.
 Clausulas Petreas: PA-01 a PA-07.
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations
@@ -44,18 +45,16 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     múltiplos participantes com seus papéis.
     """
 
-    participations = ParticipationNestedSerializer(
-        many=True, read_only=True
-    )
+    participations = ParticipationNestedSerializer(many=True, read_only=True)
     fluxo = serializers.SerializerMethodField()
 
     # Campos legíveis para exibição (além dos IDs)
     usuario_username = serializers.SerializerMethodField()
     coordenador_username = serializers.SerializerMethodField()
     coordenador_nome = serializers.SerializerMethodField()
-    municipio_nome = serializers.CharField(source='municipio.nome', read_only=True)
-    projeto_nome = serializers.CharField(source='projeto.nome', read_only=True)
-    tipo_evento_nome = serializers.CharField(source='tipo_evento.nome', read_only=True)
+    municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
+    projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True)
 
     class Meta:
         model = Solicitacao
@@ -118,7 +117,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         """Retorna fluxo do projeto (SUPER ou NAO_SUPER), fallback para NAO_SUPER."""
         if obj.projeto:
             return obj.projeto.fluxo
-        return 'NAO_SUPER'  # PR15: Fallback para solicitações sem projeto
+        return "NAO_SUPER"  # PR15: Fallback para solicitações sem projeto
 
     def get_usuario_username(self, obj: Solicitacao) -> str | None:
         """Retorna username do usuário que criou a solicitação."""
@@ -193,9 +192,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         # só valida se os dois forem conhecidos
         if inicio is not None and fim is not None:
             if fim <= inicio:
-                raise serializers.ValidationError(
-                    {"fim": "O fim do evento deve ser posterior ao início."}
-                )
+                raise serializers.ValidationError({"fim": "O fim do evento deve ser posterior ao início."})
 
         return super().validate(attrs)
 
@@ -203,6 +200,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 # ================================================================
 # Issue #98 - Event Detail with AuditLog Timeline
 # ================================================================
+
 
 class AuditLogTimelineSerializer(serializers.ModelSerializer):
     """
@@ -255,9 +253,9 @@ class EventDetailSerializer(serializers.ModelSerializer):
     """
 
     # Campos legíveis (nomes em vez de IDs)
-    municipio_nome = serializers.CharField(source='municipio.nome', read_only=True)
-    projeto_nome = serializers.CharField(source='projeto.nome', read_only=True)
-    tipo_evento_nome = serializers.CharField(source='tipo_evento.nome', read_only=True)
+    municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
+    projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True)
     usuario_username = serializers.SerializerMethodField()
     coordenador_username = serializers.SerializerMethodField()
     fluxo = serializers.SerializerMethodField()
@@ -306,7 +304,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
 
     def get_fluxo(self, obj: Solicitacao) -> str:
         """Retorna fluxo do projeto (SUPER ou NAO_SUPER)."""
-        return obj.projeto.fluxo if obj.projeto else 'NAO_SUPER'
+        return obj.projeto.fluxo if obj.projeto else "NAO_SUPER"
 
     def get_timeline(self, obj: Solicitacao) -> list[dict[str, Any]]:
         """
@@ -328,22 +326,23 @@ class EventDetailSerializer(serializers.ModelSerializer):
         """
         # Ações GCal relevantes para timeline
         gcal_actions = [
-            'PUBLISH_GCAL_REQUESTED',
-            'PUBLISH_GCAL',
-            'PUBLISH_GCAL_ERROR',
-            'CANCEL_GCAL',
-            'CANCEL_GCAL_REQUESTED',
-            'RESYNC_GCAL_REQUESTED',
-            'GOOGLE_CONNECT',
-            'GOOGLE_DISCONNECT',
-            'GOOGLE_REFRESH_TOKEN',
+            "PUBLISH_GCAL_REQUESTED",
+            "PUBLISH_GCAL",
+            "PUBLISH_GCAL_ERROR",
+            "CANCEL_GCAL",
+            "CANCEL_GCAL_REQUESTED",
+            "RESYNC_GCAL_REQUESTED",
+            "GOOGLE_CONNECT",
+            "GOOGLE_DISCONNECT",
+            "GOOGLE_REFRESH_TOKEN",
         ]
 
         # Buscar logs relacionados ao evento (via details.solicitacao_id ou model_name)
-        logs = AuditLog.objects.filter(
-            action__in=gcal_actions,
-            details__solicitacao_id=obj.id
-        ).select_related('usuario').order_by('-created_at')[:20]
+        logs = (
+            AuditLog.objects.filter(action__in=gcal_actions, details__solicitacao_id=obj.id)
+            .select_related("usuario")
+            .order_by("-created_at")[:20]
+        )
 
         # Serializar
         return AuditLogTimelineSerializer(logs, many=True).data

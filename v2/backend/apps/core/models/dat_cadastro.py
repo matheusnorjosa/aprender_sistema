@@ -6,6 +6,7 @@ Rastreia workflow de criação de cursos, chaves, instruções e envio.
 
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
@@ -46,146 +47,68 @@ class DATCadastro(models.Model):
 
     # Relacionamentos principais
     municipio: models.ForeignKey[Municipio] = models.ForeignKey(  # type: ignore[assignment]
-        "core.Municipio",
-        on_delete=models.PROTECT,
-        related_name="dat_cadastros",
-        verbose_name="Município"
+        "core.Municipio", on_delete=models.PROTECT, related_name="dat_cadastros", verbose_name="Município"
     )
     projeto_geral: models.ForeignKey[ProjetoGeral] = models.ForeignKey(  # type: ignore[assignment]
-        "core.ProjetoGeral",
-        on_delete=models.PROTECT,
-        related_name="dat_cadastros",
-        verbose_name="Projeto Geral"
+        "core.ProjetoGeral", on_delete=models.PROTECT, related_name="dat_cadastros", verbose_name="Projeto Geral"
     )
-    plataforma = models.CharField(
-        max_length=10,
-        choices=Plataforma.choices,
-        verbose_name="Plataforma"
-    )
+    plataforma = models.CharField(max_length=10, choices=Plataforma.choices, verbose_name="Plataforma")
 
     # === Workflow FORMAR ===
     # Etapa 1: Criação do Curso
     status_criacao_curso = models.CharField(
-        max_length=20,
-        choices=StatusEtapa.choices,
-        default=StatusEtapa.PENDENTE,
-        verbose_name="Criação do Curso"
+        max_length=20, choices=StatusEtapa.choices, default=StatusEtapa.PENDENTE, verbose_name="Criação do Curso"
     )
-    data_criacao_curso = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data Criação Curso"
-    )
+    data_criacao_curso = models.DateField(null=True, blank=True, verbose_name="Data Criação Curso")
 
     # Etapa 2: Chaves de Acesso
     status_chaves = models.CharField(
-        max_length=20,
-        choices=StatusEtapa.choices,
-        default=StatusEtapa.PENDENTE,
-        verbose_name="Chaves de Acesso"
+        max_length=20, choices=StatusEtapa.choices, default=StatusEtapa.PENDENTE, verbose_name="Chaves de Acesso"
     )
-    data_chaves = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data Geração Chaves"
-    )
-    quantidade_chaves = models.PositiveIntegerField(
-        default=0,
-        verbose_name="Quantidade de Chaves"
-    )
+    data_chaves = models.DateField(null=True, blank=True, verbose_name="Data Geração Chaves")
+    quantidade_chaves = models.PositiveIntegerField(default=0, verbose_name="Quantidade de Chaves")
 
     # Etapa 3: Instruções
     status_instrucoes = models.CharField(
-        max_length=20,
-        choices=StatusEtapa.choices,
-        default=StatusEtapa.PENDENTE,
-        verbose_name="Instruções"
+        max_length=20, choices=StatusEtapa.choices, default=StatusEtapa.PENDENTE, verbose_name="Instruções"
     )
-    data_instrucoes = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data Envio Instruções"
-    )
+    data_instrucoes = models.DateField(null=True, blank=True, verbose_name="Data Envio Instruções")
 
     # Etapa 4: Envio para Município
     status_envio = models.CharField(
-        max_length=20,
-        choices=StatusEtapa.choices,
-        default=StatusEtapa.PENDENTE,
-        verbose_name="Envio ao Município"
+        max_length=20, choices=StatusEtapa.choices, default=StatusEtapa.PENDENTE, verbose_name="Envio ao Município"
     )
-    data_envio = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data de Envio"
-    )
+    data_envio = models.DateField(null=True, blank=True, verbose_name="Data de Envio")
 
     # === Workflow AVALIAR ===
     # Etapa 1: Recebimento
     status_recebidos = models.CharField(
-        max_length=20,
-        choices=StatusEtapa.choices,
-        default=StatusEtapa.PENDENTE,
-        verbose_name="Dados Recebidos"
+        max_length=20, choices=StatusEtapa.choices, default=StatusEtapa.PENDENTE, verbose_name="Dados Recebidos"
     )
-    data_recebidos = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data Recebimento"
-    )
-    quantidade_recebidos = models.PositiveIntegerField(
-        default=0,
-        verbose_name="Quantidade Recebida"
-    )
+    data_recebidos = models.DateField(null=True, blank=True, verbose_name="Data Recebimento")
+    quantidade_recebidos = models.PositiveIntegerField(default=0, verbose_name="Quantidade Recebida")
 
     # Etapa 2: Validação
     status_validados = models.CharField(
-        max_length=20,
-        choices=StatusEtapa.choices,
-        default=StatusEtapa.PENDENTE,
-        verbose_name="Dados Validados"
+        max_length=20, choices=StatusEtapa.choices, default=StatusEtapa.PENDENTE, verbose_name="Dados Validados"
     )
-    data_validados = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data Validação"
-    )
-    quantidade_validados = models.PositiveIntegerField(
-        default=0,
-        verbose_name="Quantidade Validada"
-    )
+    data_validados = models.DateField(null=True, blank=True, verbose_name="Data Validação")
+    quantidade_validados = models.PositiveIntegerField(default=0, verbose_name="Quantidade Validada")
 
     # Etapa 3: Importação
     status_importados = models.CharField(
-        max_length=20,
-        choices=StatusEtapa.choices,
-        default=StatusEtapa.PENDENTE,
-        verbose_name="Dados Importados"
+        max_length=20, choices=StatusEtapa.choices, default=StatusEtapa.PENDENTE, verbose_name="Dados Importados"
     )
-    data_importados = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data Importação"
-    )
-    quantidade_importados = models.PositiveIntegerField(
-        default=0,
-        verbose_name="Quantidade Importada"
-    )
+    data_importados = models.DateField(null=True, blank=True, verbose_name="Data Importação")
+    quantidade_importados = models.PositiveIntegerField(default=0, verbose_name="Quantidade Importada")
 
     # Status geral
     ativo = models.BooleanField(default=True)
-    observacoes = models.TextField(
-        blank=True,
-        max_length=1000,
-        verbose_name="Observações"
-    )
+    observacoes = models.TextField(blank=True, max_length=1000, verbose_name="Observações")
 
     # Auditoria
     created_by: models.ForeignKey[Usuario] = models.ForeignKey(  # type: ignore[assignment]
-        "core.Usuario",
-        on_delete=models.PROTECT,
-        related_name="dat_cadastros_criados",
-        verbose_name="Criado por"
+        "core.Usuario", on_delete=models.PROTECT, related_name="dat_cadastros_criados", verbose_name="Criado por"
     )
     updated_by: models.ForeignKey[Usuario | None] = models.ForeignKey(  # type: ignore[assignment]
         "core.Usuario",
@@ -193,7 +116,7 @@ class DATCadastro(models.Model):
         null=True,
         blank=True,
         related_name="dat_cadastros_atualizados",
-        verbose_name="Atualizado por"
+        verbose_name="Atualizado por",
     )
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -205,8 +128,7 @@ class DATCadastro(models.Model):
         ordering = ["plataforma", "municipio__nome"]
         constraints = [
             models.UniqueConstraint(
-                fields=["municipio", "projeto_geral", "plataforma"],
-                name="unique_dat_cadastro_mun_proj_plat"
+                fields=["municipio", "projeto_geral", "plataforma"], name="unique_dat_cadastro_mun_proj_plat"
             ),
         ]
         indexes = [

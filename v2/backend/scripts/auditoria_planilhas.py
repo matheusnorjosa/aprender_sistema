@@ -4,19 +4,19 @@ Auditoria de Dados - Planilhas Aprender Sistema
 Gera relatórios CSV em v2/.agents/outbox/ com análise completa
 """
 
-import os
-import sys
 import hashlib
+import os
 import re
+import sys
 import unicodedata
-from pathlib import Path
-from datetime import datetime, date, time
-from typing import Dict, List, Tuple, Optional, Any
 from collections import defaultdict
+from datetime import date, datetime, time
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
-import requests
 import pytz
+import requests
 
 # Configuração
 TZ = pytz.timezone("America/Fortaleza")
@@ -236,9 +236,7 @@ def load_workbook(file_path: Path, source: str) -> Optional[Dict[str, pd.DataFra
         return None
 
 
-def process_events_sheet(
-    df: pd.DataFrame, sheet_name: str, source: str
-) -> List[Dict[str, Any]]:
+def process_events_sheet(df: pd.DataFrame, sheet_name: str, source: str) -> List[Dict[str, Any]]:
     """Processa uma aba de eventos (ACerta, Brincando, Vidas, Outros, Super)"""
     events = []
 
@@ -459,10 +457,7 @@ def main():
     sem_formador = []
     for idx, row in df_events.iterrows():
         if row["sheet"] == "Outros":
-            has_formador = any(
-                row[f"formador_{i}"] and not pd.isna(row[f"formador_{i}"])
-                for i in range(1, 6)
-            )
+            has_formador = any(row[f"formador_{i}"] and not pd.isna(row[f"formador_{i}"]) for i in range(1, 6))
             if not has_formador:
                 row_dict = row.to_dict()
                 row_dict["observacao"] = "Coordenador acumula papel de FORMADOR"
@@ -512,8 +507,10 @@ def main():
         sem_data = len(sheet_data[sheet_data["data"].isna()])
         duplicados = len(sheet_data[sheet_data.duplicated(subset=["external_hash"], keep=False)])
 
-        print(f"{sheet:15} | Total: {total:4} | Sem município: {sem_municipio:3} | "
-              f"Sem data: {sem_data:3} | Duplicados: {duplicados:3}")
+        print(
+            f"{sheet:15} | Total: {total:4} | Sem município: {sem_municipio:3} | "
+            f"Sem data: {sem_data:3} | Duplicados: {duplicados:3}"
+        )
 
     print()
     print("📊 RESUMO SUPER (Aprovação/Tempo)")
@@ -522,10 +519,7 @@ def main():
     today = datetime.now(TZ).date()
     passados = len(super_data[super_data["data"] < today])
     futuros = len(super_data[super_data["data"] >= today])
-    futuros_aprovados = len(super_data[
-        (super_data["data"] >= today) &
-        (super_data["aprovacao"].str.upper() == "SIM")
-    ])
+    futuros_aprovados = len(super_data[(super_data["data"] >= today) & (super_data["aprovacao"].str.upper() == "SIM")])
     futuros_pendentes = futuros - futuros_aprovados
 
     print(f"Total eventos Super:          {len(super_data)}")

@@ -2,6 +2,7 @@
 Management Command: load_tipos_evento
 Extrai tipos de evento de arquivo de agenda e persiste em StgTipoEvento + TipoEvento.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -60,11 +61,7 @@ class Command(BaseCommand):
 
         # Upsert to SSOT
         created, updated, unchanged = self._upsert_ssot()
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"SSOT: {created} created, {updated} updated, {unchanged} unchanged"
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"SSOT: {created} created, {updated} updated, {unchanged} unchanged"))
 
     @transaction.atomic
     def _load_staging(self, tipos_data: list[dict[str, Any]]) -> int:

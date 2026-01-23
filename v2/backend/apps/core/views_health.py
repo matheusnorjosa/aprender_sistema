@@ -1,21 +1,21 @@
 """
 Health Check and Features Views
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
-from typing import Any
-from django.db.models import QuerySet
-from rest_framework.request import Request
-from rest_framework.response import Response
 
 import os
+from typing import Any
 
 from django.core.cache import cache
 from django.db import connection
+from django.db.models import QuerySet
 from django.http import JsonResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 
@@ -68,10 +68,7 @@ def readyz(request: Request) -> Response:
     status_code = 200 if db_ok else 503
     status = "healthy" if db_ok else "unhealthy"
 
-    return JsonResponse({
-        "status": status,
-        "checks": checks
-    }, status=status_code)
+    return JsonResponse({"status": status, "checks": checks}, status=status_code)
 
 
 @api_view(["GET"])
@@ -117,11 +114,14 @@ def features(request: Request) -> Response:
     preview_only = os.getenv("PREVIEW_ONLY", "1") == "1"  # Default true (blocks writes)
     metrics_enabled = os.getenv("METRICS_ENABLED", "1") == "1"  # Default true
     show_pre_agenda = os.getenv("SHOW_PRE_AGENDA", "1") == "1"  # Default true
-    realtime_check_enabled = os.getenv("REALTIME_CHECK_ENABLED", "0") == "1"  # Default false (manual flow via Grade Mensal)
+    realtime_check_enabled = (
+        os.getenv("REALTIME_CHECK_ENABLED", "0") == "1"
+    )  # Default false (manual flow via Grade Mensal)
 
     # Check for Config overrides from database
     try:
         from apps.core.models import Config
+
         config = Config.objects.filter(key="features").first()
         if config and isinstance(config.value, dict):
             # Override with Config values
@@ -142,26 +142,30 @@ def features(request: Request) -> Response:
     # Default: False (desativado) - governança consolidada via /pre-agenda
     # Usar settings efetivo (runtime) ao invés de os.getenv direto
     from django.conf import settings as django_settings
+
     auto_apply_enabled = getattr(django_settings, "FEATURE_AUTO_APPLY_ENABLED", False)
 
     # Check for Config overrides for auto_apply_enabled
     try:
         from apps.core.models import Config
+
         config = Config.objects.filter(key="features").first()
         if config and isinstance(config.value, dict):
             auto_apply_enabled = config.value.get("auto_apply_enabled", auto_apply_enabled)
     except Exception:
         pass
 
-    return Response({
-        "USE_V2_ONLY": use_v2_only,
-        "GCAL_MODE": gcal_mode,
-        "PREVIEW_ONLY": preview_only,
-        "METRICS_ENABLED": metrics_enabled,
-        "SHOW_PRE_AGENDA": show_pre_agenda,
-        "GCAL_CLIENT": gcal_client,
-        "apply_blocked": apply_blocked,
-        "auto_apply_enabled": auto_apply_enabled,
-        "ENVIRONMENT": environment,
-        "realtime_check_enabled": realtime_check_enabled,
-    })
+    return Response(
+        {
+            "USE_V2_ONLY": use_v2_only,
+            "GCAL_MODE": gcal_mode,
+            "PREVIEW_ONLY": preview_only,
+            "METRICS_ENABLED": metrics_enabled,
+            "SHOW_PRE_AGENDA": show_pre_agenda,
+            "GCAL_CLIENT": gcal_client,
+            "apply_blocked": apply_blocked,
+            "auto_apply_enabled": auto_apply_enabled,
+            "ENVIRONMENT": environment,
+            "realtime_check_enabled": realtime_check_enabled,
+        }
+    )

@@ -15,14 +15,17 @@ Endpoints tested:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from datetime import timedelta
 from uuid import uuid4
 
 from django.contrib.auth.models import Group
 from django.urls import reverse
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 import pytest
+
 from apps.core.models import (
     Municipio,
     Participation,
@@ -31,7 +34,6 @@ from apps.core.models import (
     TipoEvento,
     Usuario,
 )
-from rest_framework.test import APIClient
 
 pytestmark = pytest.mark.django_db
 
@@ -176,9 +178,7 @@ def formador_com_nome(grupos):
 
 
 @pytest.fixture
-def solicitacoes_ce(
-    municipios, projeto, tipo_evento, coordenador_user, formador_com_nome, grupos
-):
+def solicitacoes_ce(municipios, projeto, tipo_evento, coordenador_user, formador_com_nome, grupos):
     """Create approved solicitations in CE state with coordinator and formador participations."""
     now = timezone.now()
     solicitacoes = []
@@ -281,9 +281,7 @@ def solicitacao_sp(municipios, projeto, tipo_evento, grupos):
 class TestMetricsMapUFFilter:
     """Tests for metrics_map UF filter (lines 78-79) and coordinator count (line 115)."""
 
-    def test_filter_by_uf_returns_only_matching_state(
-        self, user_controle, solicitacoes_ce, solicitacao_sp
-    ):
+    def test_filter_by_uf_returns_only_matching_state(self, user_controle, solicitacoes_ce, solicitacao_sp):
         """
         Test: ?uf=CE returns only Ceará municipalities.
 
@@ -308,9 +306,7 @@ class TestMetricsMapUFFilter:
         assert "Caucaia" in municipio_names
         assert "São Paulo" not in municipio_names
 
-    def test_filter_by_uf_shows_in_meta_filters(
-        self, user_controle, solicitacoes_ce
-    ):
+    def test_filter_by_uf_shows_in_meta_filters(self, user_controle, solicitacoes_ce):
         """
         Test: UF filter value appears in meta.filters.
 
@@ -329,9 +325,7 @@ class TestMetricsMapUFFilter:
         assert "filters" in data["meta"]
         assert data["meta"]["filters"]["uf"] == "CE"
 
-    def test_filter_by_uf_counts_events_correctly(
-        self, user_controle, solicitacoes_ce, solicitacao_sp
-    ):
+    def test_filter_by_uf_counts_events_correctly(self, user_controle, solicitacoes_ce, solicitacao_sp):
         """
         Test: Total count only includes filtered UF.
 
@@ -353,9 +347,7 @@ class TestMetricsMapUFFilter:
         assert response_ce.status_code == 200
         assert response_ce.json()["totals"]["all"] == 4
 
-    def test_coordinator_count_per_municipality(
-        self, user_controle, solicitacoes_ce, coordenador_user
-    ):
+    def test_coordinator_count_per_municipality(self, user_controle, solicitacoes_ce, coordenador_user):
         """
         Test: Coordinator count per municipality is calculated.
 
@@ -420,9 +412,7 @@ class TestMetricsMapCoordinators:
         assert response.status_code == 400
         assert "uf" in response.json()["detail"].lower()
 
-    def test_returns_coordinators_for_uf(
-        self, user_controle, solicitacoes_ce, coordenador_user
-    ):
+    def test_returns_coordinators_for_uf(self, user_controle, solicitacoes_ce, coordenador_user):
         """
         Test: Returns coordinator list for given UF.
 
@@ -441,9 +431,7 @@ class TestMetricsMapCoordinators:
         assert "coordenadores" in data
         assert len(data["coordenadores"]) >= 1
 
-    def test_coordinator_has_expected_structure(
-        self, user_controle, solicitacoes_ce, coordenador_user
-    ):
+    def test_coordinator_has_expected_structure(self, user_controle, solicitacoes_ce, coordenador_user):
         """
         Test: Each coordinator has id, nome, eventos, projetos, municipios.
 
@@ -469,9 +457,7 @@ class TestMetricsMapCoordinators:
         assert isinstance(coord["projetos"], list)
         assert isinstance(coord["municipios"], list)
 
-    def test_coordinator_nome_uses_full_name(
-        self, user_controle, solicitacoes_ce, coordenador_user
-    ):
+    def test_coordinator_nome_uses_full_name(self, user_controle, solicitacoes_ce, coordenador_user):
         """
         Test: Coordinator nome uses first_name + last_name.
 
@@ -494,9 +480,7 @@ class TestMetricsMapCoordinators:
         assert coord is not None
         assert coord["nome"] == "Maria Silva"
 
-    def test_coordinator_projetos_list(
-        self, user_controle, solicitacoes_ce, projeto, coordenador_user
-    ):
+    def test_coordinator_projetos_list(self, user_controle, solicitacoes_ce, projeto, coordenador_user):
         """
         Test: Projetos list contains project names with event counts.
 
@@ -524,9 +508,7 @@ class TestMetricsMapCoordinators:
         assert "eventos" in proj
         assert proj["eventos"] >= 1
 
-    def test_coordinator_municipios_list(
-        self, user_controle, solicitacoes_ce, municipios, coordenador_user
-    ):
+    def test_coordinator_municipios_list(self, user_controle, solicitacoes_ce, municipios, coordenador_user):
         """
         Test: Municipios list contains municipality names with event counts.
 
@@ -553,9 +535,7 @@ class TestMetricsMapCoordinators:
         assert "nome" in mun
         assert "eventos" in mun
 
-    def test_coordinators_ordered_by_eventos_desc(
-        self, user_controle, solicitacoes_ce, grupos
-    ):
+    def test_coordinators_ordered_by_eventos_desc(self, user_controle, solicitacoes_ce, grupos):
         """
         Test: Coordinators are ordered by eventos descending.
 
@@ -659,9 +639,7 @@ class TestMetricsMapCoordinators:
 class TestFormadoresMetricsUsernameFallback:
     """Tests for formadores_metrics username fallback (lines 423-427)."""
 
-    def test_formador_with_name_shows_full_name(
-        self, user_gerencia, solicitacoes_ce, formador_com_nome
-    ):
+    def test_formador_with_name_shows_full_name(self, user_gerencia, solicitacoes_ce, formador_com_nome):
         """
         Test: Formador with first/last name shows full name.
 
@@ -736,9 +714,7 @@ class TestFormadoresMetricsUsernameFallback:
         # Should use username as fallback
         assert formador["nome"] == formador_sem_nome.username
 
-    def test_formadores_metrics_returns_expected_fields(
-        self, user_gerencia, solicitacoes_ce, formador_com_nome
-    ):
+    def test_formadores_metrics_returns_expected_fields(self, user_gerencia, solicitacoes_ce, formador_com_nome):
         """
         Test: Each formador has id, nome, eventos, horas_trabalhadas, municipios_atendidos.
         """
@@ -762,9 +738,7 @@ class TestFormadoresMetricsUsernameFallback:
             assert "horas_trabalhadas" in formador
             assert "municipios_atendidos" in formador
 
-    def test_formadores_metrics_respects_days_parameter(
-        self, user_gerencia, solicitacoes_ce
-    ):
+    def test_formadores_metrics_respects_days_parameter(self, user_gerencia, solicitacoes_ce):
         """
         Test: days parameter filters by date range.
         """

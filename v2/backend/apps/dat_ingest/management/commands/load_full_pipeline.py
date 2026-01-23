@@ -2,6 +2,7 @@
 Management Command: load_full_pipeline
 Carrega todo o pipeline de dados: usuários, municípios, projetos, tipos de evento.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -85,12 +86,12 @@ class Command(BaseCommand):
         if disponibilidade_file:
             disp_path = Path(disponibilidade_file)
             if disp_path.exists():
-                self.stdout.write(f"[Disponibilidade] File provided but not yet implemented")
+                self.stdout.write("[Disponibilidade] File provided but not yet implemented")
 
         if controle_file:
             controle_path = Path(controle_file)
             if controle_path.exists():
-                self.stdout.write(f"[Controle] File provided but not yet implemented")
+                self.stdout.write("[Controle] File provided but not yet implemented")
 
         self.stdout.write(self.style.SUCCESS("\n[PIPELINE] All entities loaded successfully"))
 

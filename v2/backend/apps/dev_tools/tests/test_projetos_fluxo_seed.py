@@ -15,15 +15,17 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import os
 import tempfile
+from io import StringIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from django.core.management import call_command
 from django.test import TestCase
-from io import StringIO
+
+import pytest
 
 from apps.core.models import Projeto
 
@@ -43,28 +45,19 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
         """Cria projetos de teste no banco."""
         self.projetos = [
             Projeto.objects.create(
-                nome="ACerta",
-                codigo="ACERTA",
-                fluxo="NAO_SUPER",  # Será atualizado para SUPER
-                ativo=True
+                nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True  # Será atualizado para SUPER
             ),
             Projeto.objects.create(
-                nome="Novo Lendo",
-                codigo="NLENDO",
-                fluxo="NAO_SUPER",  # Será atualizado para SUPER
-                ativo=True
+                nome="Novo Lendo", codigo="NLENDO", fluxo="NAO_SUPER", ativo=True  # Será atualizado para SUPER
             ),
             Projeto.objects.create(
-                nome="Alfabetização Ceará",
-                codigo="ALFCE",
-                fluxo="NAO_SUPER",  # Permanece NAO_SUPER
-                ativo=True
+                nome="Alfabetização Ceará", codigo="ALFCE", fluxo="NAO_SUPER", ativo=True  # Permanece NAO_SUPER
             ),
             Projeto.objects.create(
                 nome="Projeto Sem Codigo",
-                codigo='',  # Explicitly set empty string (default)
+                codigo="",  # Explicitly set empty string (default)
                 fluxo="NAO_SUPER",
-                ativo=True
+                ativo=True,
             ),
         ]
 
@@ -72,11 +65,11 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
         """Testa se o comando existe e pode ser invocado."""
         out = StringIO()
         try:
-            call_command('seed_projetos_fluxo_from_sheets', '--help', stdout=out)
+            call_command("seed_projetos_fluxo_from_sheets", "--help", stdout=out)
             # Se chegar aqui, comando executou sem SystemExit (não esperado para --help)
             # Mas podemos verificar se há conteúdo
             if out.getvalue():
-                self.assertIn('seed', out.getvalue().lower())
+                self.assertIn("seed", out.getvalue().lower())
         except SystemExit as e:
             # --help causa SystemExit(0), o que significa que o comando existe
             self.assertEqual(e.code, 0, f"Comando deve ter código de saída 0 com --help, recebeu: {e.code}")
@@ -105,18 +98,12 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
         self.assertEqual(cmd._normalize_string("Novo  Lendo"), "novo lendo")
 
         # Teste 3: Caracteres especiais
-        self.assertEqual(
-            cmd._normalize_string("Brincando & Aprendendo"),
-            "brincando aprendendo"
-        )
+        self.assertEqual(cmd._normalize_string("Brincando & Aprendendo"), "brincando aprendendo")
 
         # Teste 4: Unicode
-        self.assertEqual(
-            cmd._normalize_string("Educação Física"),
-            "educacao fisica"
-        )
+        self.assertEqual(cmd._normalize_string("Educação Física"), "educacao fisica")
 
-    @patch('apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets.load_workbook')
+    @patch("apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets.load_workbook")
     def test_dry_run_mode(self, mock_load_workbook):
         """
         Testa modo dry-run (simulação sem commit).
@@ -145,17 +132,17 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
 
         # Executar dry-run
         out = StringIO()
-        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
             xls_path = f.name
 
         try:
             call_command(
-                'seed_projetos_fluxo_from_sheets',
-                f'--xls-controle={xls_path}',
-                f'--xls-agenda={xls_path}',
-                '--dry-run',
-                '--verbose',
-                stdout=out
+                "seed_projetos_fluxo_from_sheets",
+                f"--xls-controle={xls_path}",
+                f"--xls-agenda={xls_path}",
+                "--dry-run",
+                "--verbose",
+                stdout=out,
             )
 
             output = out.getvalue()
@@ -172,7 +159,7 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
             if os.path.exists(xls_path):
                 os.unlink(xls_path)
 
-    @patch('apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets.load_workbook')
+    @patch("apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets.load_workbook")
     def test_effective_mode_updates_database(self, mock_load_workbook):
         """
         Testa modo efetivo (modifica banco de dados).
@@ -199,16 +186,16 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
 
         # Executar modo efetivo
         out = StringIO()
-        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
             xls_path = f.name
 
         try:
             call_command(
-                'seed_projetos_fluxo_from_sheets',
-                f'--xls-controle={xls_path}',
-                f'--xls-agenda={xls_path}',
-                '--verbose',
-                stdout=out
+                "seed_projetos_fluxo_from_sheets",
+                f"--xls-controle={xls_path}",
+                f"--xls-agenda={xls_path}",
+                "--verbose",
+                stdout=out,
             )
 
             # Verificar que banco FOI modificado
@@ -218,7 +205,7 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
             # Verificar que CSV foi gerado
             csv_path = Path("apps/core/data/projetos_fluxo_resolved.csv")
             if csv_path.exists():
-                content = csv_path.read_text(encoding='utf-8')
+                content = csv_path.read_text(encoding="utf-8")
                 self.assertIn("ACerta", content)
                 self.assertIn("SUPER", content)
                 self.assertIn("Planilha de Controle", content)  # Fonte
@@ -236,7 +223,7 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
         - Segunda execução: detecta que já estão atualizados, não duplica
         """
         # Criar mock simples
-        with patch('apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets.load_workbook') as mock_load:
+        with patch("apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets.load_workbook") as mock_load:
             mock_wb = MagicMock()
             mock_ws = MagicMock()
             mock_ws.title = "Projetos"
@@ -248,25 +235,25 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
             mock_wb.__getitem__.return_value = mock_ws
             mock_load.return_value = mock_wb
 
-            with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
+            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
                 xls_path = f.name
 
             try:
                 # Primeira execução
                 call_command(
-                    'seed_projetos_fluxo_from_sheets',
-                    f'--xls-controle={xls_path}',
-                    f'--xls-agenda={xls_path}',
-                    stdout=StringIO()
+                    "seed_projetos_fluxo_from_sheets",
+                    f"--xls-controle={xls_path}",
+                    f"--xls-agenda={xls_path}",
+                    stdout=StringIO(),
                 )
                 count_after_first = Projeto.objects.filter(fluxo="SUPER").count()
 
                 # Segunda execução
                 call_command(
-                    'seed_projetos_fluxo_from_sheets',
-                    f'--xls-controle={xls_path}',
-                    f'--xls-agenda={xls_path}',
-                    stdout=StringIO()
+                    "seed_projetos_fluxo_from_sheets",
+                    f"--xls-controle={xls_path}",
+                    f"--xls-agenda={xls_path}",
+                    stdout=StringIO(),
                 )
                 count_after_second = Projeto.objects.filter(fluxo="SUPER").count()
 
@@ -307,16 +294,16 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
         # Gerar CSV mockado para teste
         csv_content = (
             "codigo,nome,fluxo,fonte,detalhe\n"
-            'ACERTA,ACerta,SUPER,"Planilha de Controle, aba \'Projetos\', linha 2","Coluna Setor = \'Superintendência\'"\n'
+            "ACERTA,ACerta,SUPER,\"Planilha de Controle, aba 'Projetos', linha 2\",\"Coluna Setor = 'Superintendência'\"\n"
         )
 
         csv_path.parent.mkdir(parents=True, exist_ok=True)
-        csv_path.write_text(csv_content, encoding='utf-8')
+        csv_path.write_text(csv_content, encoding="utf-8")
 
         try:
             # Validar CSV
             self.assertTrue(csv_path.exists())
-            content = csv_path.read_text(encoding='utf-8')
+            content = csv_path.read_text(encoding="utf-8")
 
             self.assertIn("codigo,nome,fluxo,fonte,detalhe", content)
             self.assertIn("ACerta", content)
@@ -337,7 +324,7 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
         - Comando NÃO atualiza banco, apenas reporta
         """
         # Mock de fontes conflitantes
-        with patch('apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets.load_workbook') as mock_load:
+        with patch("apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets.load_workbook") as mock_load:
             mock_wb_controle = MagicMock()
             mock_ws_controle = MagicMock()
             mock_ws_controle.title = "Projetos"
@@ -367,19 +354,19 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
 
             mock_load.side_effect = load_side_effect
 
-            with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f1:
+            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f1:
                 xls_controle = f1.name
-            with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f2:
+            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f2:
                 xls_agenda = f2.name
 
             try:
                 out = StringIO()
                 call_command(
-                    'seed_projetos_fluxo_from_sheets',
-                    f'--xls-controle={xls_controle}',
-                    f'--xls-agenda={xls_agenda}',
-                    '--verbose',
-                    stdout=out
+                    "seed_projetos_fluxo_from_sheets",
+                    f"--xls-controle={xls_controle}",
+                    f"--xls-agenda={xls_agenda}",
+                    "--verbose",
+                    stdout=out,
                 )
 
                 output = out.getvalue()
@@ -404,12 +391,12 @@ class TestProjetosFluxoIntegration:
 
     def test_projeto_default_fluxo_is_outros(self):
         """Testa que projetos novos têm fluxo padrão NAO_SUPER."""
-        projeto = Projeto.objects.create(nome="Teste Default Fluxo", codigo='')
+        projeto = Projeto.objects.create(nome="Teste Default Fluxo", codigo="")
         assert projeto.fluxo == "NAO_SUPER"
 
     def test_projeto_can_be_set_to_super(self):
         """Testa que projetos podem ser setados para SUPER."""
-        projeto = Projeto.objects.create(nome="Teste SUPER", codigo='', fluxo="SUPER")
+        projeto = Projeto.objects.create(nome="Teste SUPER", codigo="", fluxo="SUPER")
         assert projeto.fluxo == "SUPER"
 
         # Verificar que pode ser salvo novamente

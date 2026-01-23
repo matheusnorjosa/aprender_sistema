@@ -4,51 +4,72 @@
  * Consome endpoints do backend AS v2 para gerenciar solicitações de eventos.
  */
 
-import { fetchAPI, buildUrl } from './config';
+import { fetchAPI, buildUrl, type QueryParams } from './config';
 import logger from '../utils/logger';
+import type {
+  ID,
+  PaginatedResponse,
+  Solicitacao,
+  SolicitacaoPayload,
+  SolicitacaoFilters,
+  MunicipioOption,
+  ProjetoOption,
+  TipoEventoOption,
+  UsuarioOption,
+  BatchOperationResult,
+  PublishResult,
+} from '../types';
 
 // Mapeamento de aliases de status (inglês → português)
 // Mantido para compatibilidade com código legado
-const STATUS_MAP = {
+const STATUS_MAP: Record<string, string> = {
   pending: 'pendente',
   approved: 'aprovado',
   rejected: 'reprovado',
 };
 
 /**
+ * Publish options for GCal
+ */
+export interface PublishOptions {
+  dry_run?: boolean;
+  apply_blocked?: boolean;
+}
+
+/**
+ * GCal preview payload
+ */
+export interface GCalPreviewPayload {
+  summary: string;
+  description: string;
+  start: { dateTime: string; timeZone: string };
+  end: { dateTime: string; timeZone: string };
+  attendees: Array<{ email: string }>;
+}
+
+/**
  * Lista solicitações de eventos com filtros.
  *
- * @param {object} filters - Parâmetros de filtro
- * @param {string} filters.status - Filtro por status (aceita EN ou PT)
- * @param {string} filters.mine - Forçar filtro por usuário ('true' para minhas solicitações)
- * @param {string} filters.flow - Filtro por fluxo ('SUPER' ou 'NAO_SUPER')
- * @param {string} filters.q - Busca textual multi-campo
- * @param {string} filters.sector - Filtro por setor/projeto (nome parcial)
- * @param {string} filters.date_from - Data inicial (YYYY-MM-DD)
- * @param {string} filters.date_to - Data final (YYYY-MM-DD)
- * @param {number} filters.page - Número da página (default: 1)
- * @param {string} filters.search - Busca por usuário/município/tipo (alias de q)
- * @returns {Promise<object>} Resultado paginado { results: [...], count: N }
+ * @param filters - Parâmetros de filtro
  */
-export async function listSolicitacoes(filters = {}) {
+export async function listSolicitacoes(filters: SolicitacaoFilters = {}): Promise<PaginatedResponse<Solicitacao>> {
   // Mapear status aliases (inglês→português) se necessário
-  const normalizedFilters = { ...filters };
+  const normalizedFilters = { ...filters } as Record<string, unknown>;
 
   if (normalizedFilters.status) {
-    normalizedFilters.status = STATUS_MAP[normalizedFilters.status] ?? normalizedFilters.status;
+    normalizedFilters.status = STATUS_MAP[normalizedFilters.status as string] ?? normalizedFilters.status;
   }
 
-  const url = buildUrl('/solicitacoes/', normalizedFilters);
+  const url = buildUrl('/solicitacoes/', normalizedFilters as QueryParams);
   return await fetchAPI(url);
 }
 
 /**
  * Cria uma nova solicitação de evento.
  *
- * @param {object} body - Dados da solicitação
- * @returns {Promise<object>} Solicitação criada
+ * @param body - Dados da solicitação
  */
-export async function createSolicitacao(body) {
+export async function createSolicitacao(body: SolicitacaoPayload): Promise<Solicitacao> {
   logger.debug('=== createSolicitacao ===');
   logger.debug('Body enviado:', body);
   logger.debug('JSON stringificado:', JSON.stringify(body));
@@ -62,11 +83,10 @@ export async function createSolicitacao(body) {
 /**
  * Aprova uma solicitação pendente.
  *
- * @param {number} id - ID da solicitação
- * @param {string} reason - Motivo/justificativa (opcional)
- * @returns {Promise<object>} Solicitação atualizada
+ * @param id - ID da solicitação
+ * @param reason - Motivo/justificativa (opcional)
  */
-export async function approveSolicitacao(id, reason = '') {
+export async function approveSolicitacao(id: ID, reason: string = ''): Promise<Solicitacao> {
   return await fetchAPI(`/solicitacoes/${id}/approve/`, {
     method: 'PATCH',
     body: JSON.stringify(reason ? { reason } : {}),
@@ -76,11 +96,10 @@ export async function approveSolicitacao(id, reason = '') {
 /**
  * Reprova uma solicitação pendente.
  *
- * @param {number} id - ID da solicitação
- * @param {string} reason - Motivo/justificativa (opcional)
- * @returns {Promise<object>} Solicitação atualizada
+ * @param id - ID da solicitação
+ * @param reason - Motivo/justificativa (opcional)
  */
-export async function rejectSolicitacao(id, reason = '') {
+export async function rejectSolicitacao(id: ID, reason: string = ''): Promise<Solicitacao> {
   return await fetchAPI(`/solicitacoes/${id}/reject/`, {
     method: 'PATCH',
     body: JSON.stringify(reason ? { reason } : {}),
@@ -90,10 +109,9 @@ export async function rejectSolicitacao(id, reason = '') {
 /**
  * Busca detalhes de uma solicitação específica.
  *
- * @param {number} id - ID da solicitação
- * @returns {Promise<object>} Detalhes da solicitação
+ * @param id - ID da solicitação
  */
-export async function getSolicitacao(id) {
+export async function getSolicitacao(id: ID): Promise<Solicitacao> {
   return await fetchAPI(`/solicitacoes/${id}/`);
 }
 
@@ -105,11 +123,10 @@ export async function getSolicitacao(id) {
  * - Não é possível editar solicitações já publicadas no Google Calendar
  * - Não é possível editar solicitações reprovadas
  *
- * @param {number} id - ID da solicitação
- * @param {object} data - Campos a atualizar (parcial)
- * @returns {Promise<object>} Solicitação atualizada
+ * @param id - ID da solicitação
+ * @param data - Campos a atualizar (parcial)
  */
-export async function updateSolicitacao(id, data) {
+export async function updateSolicitacao(id: ID, data: Partial<SolicitacaoPayload>): Promise<Solicitacao> {
   logger.debug('=== updateSolicitacao ===');
   logger.debug('ID:', id);
   logger.debug('Data:', data);
@@ -127,10 +144,9 @@ export async function updateSolicitacao(id, data) {
  * - Apenas o criador ou usuários privilegiados (Superintendência/DAT) podem excluir
  * - Não é possível excluir solicitações já publicadas no Google Calendar
  *
- * @param {number} id - ID da solicitação
- * @returns {Promise<void>}
+ * @param id - ID da solicitação
  */
-export async function deleteSolicitacao(id) {
+export async function deleteSolicitacao(id: ID): Promise<void> {
   logger.debug('=== deleteSolicitacao ===');
   logger.debug('ID:', id);
 
@@ -142,10 +158,9 @@ export async function deleteSolicitacao(id) {
 /**
  * Preview do payload GCal de uma solicitação.
  *
- * @param {number} id - ID da solicitação
- * @returns {Promise<object>} Payload GCal
+ * @param id - ID da solicitação
  */
-export async function previewSolicitacao(id) {
+export async function previewSolicitacao(id: ID): Promise<GCalPreviewPayload> {
   return await fetchAPI(`/solicitacoes/${id}/preview-gcal/`, {
     method: 'POST',
     body: JSON.stringify({}),
@@ -155,11 +170,10 @@ export async function previewSolicitacao(id) {
 /**
  * Publica solicitação no Google Calendar.
  *
- * @param {number} id - ID da solicitação
- * @param {object} body - Opções (dry_run, apply_blocked, etc.)
- * @returns {Promise<object>} Resultado da publicação
+ * @param id - ID da solicitação
+ * @param body - Opções (dry_run, apply_blocked, etc.)
  */
-export async function publishSolicitacao(id, body = {}) {
+export async function publishSolicitacao(id: ID, body: PublishOptions = {}): Promise<PublishResult> {
   return await fetchAPI(`/solicitacoes/${id}/publish/`, {
     method: 'POST',
     body: JSON.stringify(body),
@@ -172,10 +186,9 @@ export async function publishSolicitacao(id, body = {}) {
  * Reseta gcal_payload_hash para forçar UPDATE mesmo se já publicado.
  * Enfileira task_publish_solicitacao_to_gcal para republicação.
  *
- * @param {number} id - ID da solicitação aprovada
- * @returns {Promise<object>} { detail, task_id, solicitacao_id }
+ * @param id - ID da solicitação aprovada
  */
-export async function resyncSolicitacao(id) {
+export async function resyncSolicitacao(id: ID): Promise<PublishResult> {
   return await fetchAPI(`/solicitacoes/${id}/resync-gcal/`, {
     method: 'POST',
     body: JSON.stringify({}),
@@ -188,10 +201,9 @@ export async function resyncSolicitacao(id) {
  * Deleta evento do Calendar (trata 404 como sucesso - idempotência) e limpa
  * todos os campos relacionados: external_event_id, meet_link, gcal_payload_hash.
  *
- * @param {number} id - ID da solicitação com evento publicado
- * @returns {Promise<object>} { detail, task_id, solicitacao_id }
+ * @param id - ID da solicitação com evento publicado
  */
-export async function cancelSolicitacao(id) {
+export async function cancelSolicitacao(id: ID): Promise<PublishResult> {
   return await fetchAPI(`/solicitacoes/${id}/cancel-gcal/`, {
     method: 'POST',
     body: JSON.stringify({}),
@@ -204,38 +216,31 @@ export async function cancelSolicitacao(id) {
 
 /**
  * Lista municípios para seleção.
- *
- * @returns {Promise<Array>} Lista de municípios { id, nome, uf }
  */
-export async function listMunicipiosOptions() {
+export async function listMunicipiosOptions(): Promise<MunicipioOption[]> {
   return await fetchAPI('/options/municipios/');
 }
 
 /**
  * Lista projetos para seleção.
- *
- * @returns {Promise<Array>} Lista de projetos { id, nome, codigo }
  */
-export async function listProjetosOptions() {
+export async function listProjetosOptions(): Promise<ProjetoOption[]> {
   return await fetchAPI('/options/projetos/');
 }
 
 /**
  * Lista tipos de evento para seleção.
- *
- * @returns {Promise<Array>} Lista de tipos { id, nome }
  */
-export async function listTiposEventoOptions() {
+export async function listTiposEventoOptions(): Promise<TipoEventoOption[]> {
   return await fetchAPI('/options/tipos-evento/');
 }
 
 /**
  * Lista usuários para seleção.
  *
- * @param {object} params - Parâmetros opcionais (ex: search)
- * @returns {Promise<Array>} Lista de usuários { id, first_name, last_name, email }
+ * @param params - Parâmetros opcionais (ex: search)
  */
-export async function listUsuariosOptions(params = {}) {
+export async function listUsuariosOptions(params: QueryParams = {}): Promise<UsuarioOption[]> {
   const url = buildUrl('/options/usuarios/', params);
   return await fetchAPI(url);
 }
@@ -247,10 +252,9 @@ export async function listUsuariosOptions(params = {}) {
 /**
  * Aprovar múltiplas solicitações em lote.
  *
- * @param {number[]} ids - IDs das solicitações a aprovar
- * @returns {Promise<object>} { approved: N, errors: [...] }
+ * @param ids - IDs das solicitações a aprovar
  */
-export async function approveSolicitacoesBatch(ids) {
+export async function approveSolicitacoesBatch(ids: ID[]): Promise<BatchOperationResult> {
   return await fetchAPI('/solicitacoes/batch-approve/', {
     method: 'POST',
     body: JSON.stringify({ ids }),
@@ -260,15 +264,14 @@ export async function approveSolicitacoesBatch(ids) {
 /**
  * Reprovar múltiplas solicitações em lote.
  *
- * @param {number[]} ids - IDs das solicitações a reprovar
- * @returns {Promise<object>} { rejected: N, errors: [...] }
+ * @param ids - IDs das solicitações a reprovar
  */
-export async function rejectSolicitacoesBatch(ids) {
+export async function rejectSolicitacoesBatch(ids: ID[]): Promise<BatchOperationResult> {
   return await fetchAPI('/solicitacoes/batch-reject/', {
     method: 'POST',
     body: JSON.stringify({ ids }),
   });
 }
 
-// Re-exportar checkAvailability de availability.js
-export { checkAvailability } from './availability.js';
+// Re-exportar checkAvailability de availability
+export { checkAvailability } from './availability';

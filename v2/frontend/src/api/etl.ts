@@ -10,19 +10,31 @@
 import { fetchAPI, buildUrl } from './config';
 
 /**
+ * ETL Report file info
+ */
+export interface ETLReport {
+  filename: string;
+  size_bytes: number;
+  mtime_iso: string;
+  kind: 'json' | 'csv' | 'txt' | 'other';
+  path_rel: string;
+}
+
+/**
+ * ETL Reports list response
+ */
+export interface ETLReportsResponse {
+  count: number;
+  limit: number;
+  reports: ETLReport[];
+}
+
+/**
  * Listar relatórios ETL mais recentes
  *
- * @param {number} limit - Número máximo de relatórios (1-100, default=20)
- * @returns {Promise<{count: number, limit: number, reports: Array}>}
- *
- * Cada report contém:
- * - filename: string - Nome do arquivo
- * - size_bytes: number - Tamanho em bytes
- * - mtime_iso: string - Data/hora modificação (ISO 8601)
- * - kind: string - Tipo do arquivo (json, csv, txt, other)
- * - path_rel: string - Caminho relativo (para download)
+ * @param limit - Número máximo de relatórios (1-100, default=20)
  */
-export async function listLatestReports(limit = 20) {
+export async function listLatestReports(limit: number = 20): Promise<ETLReportsResponse> {
   const url = buildUrl('/etl/reports/latest/', { limit });
   return await fetchAPI(url);
 }
@@ -30,13 +42,13 @@ export async function listLatestReports(limit = 20) {
 /**
  * Construir URL para download de relatório ETL
  *
- * @param {string} filename - Nome do arquivo (path_rel do report)
- * @returns {string} URL absoluta para download
+ * @param filename - Nome do arquivo (path_rel do report)
+ * @returns URL absoluta para download
  *
  * Nota: O download é feito via link direto (não via fetchAPI) para permitir
  * navegação direta ao arquivo. O backend serve arquivos estáticos de out_etl/.
  */
-export function getReportDownloadUrl(filename) {
+export function getReportDownloadUrl(filename: string): string {
   // Backend deve servir arquivos estáticos em /out_etl/
   // ou implementar endpoint /api/etl/reports/download/{filename}
   return `/out_etl/${encodeURIComponent(filename)}`;

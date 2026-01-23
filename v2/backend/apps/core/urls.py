@@ -9,11 +9,7 @@ from __future__ import annotations
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from drf_spectacular.views import (
-    SpectacularAPIView,
-    SpectacularRedocView,
-    SpectacularSwaggerView,
-)
+from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
 from .views import DATRegistroViewSet  # DAT Registros module
 from .views import GerenciaViewSet  # Issue #145
@@ -36,11 +32,7 @@ from .views import (  # DAT Module ViewSets; Plano Formacoes (novo modelo estrut
 )
 from .views.stats import HomeStatsView
 from .views_auth import csrf_token, login, logout, ping
-from .views_availability import (
-    AvailabilityBlockViewSet,
-    AvailabilityCheckManyView,
-    AvailabilityCheckView,
-)
+from .views_availability import AvailabilityBlockViewSet, AvailabilityCheckManyView, AvailabilityCheckView
 from .views_availability_monthly import MonthlyAvailabilityView
 
 # Imports de módulos isolados (GAP-001 fix)
@@ -70,12 +62,7 @@ from .views_gcal import (  # Core GCal; Dashboard views
 )
 from .views_health import features, readyz
 from .views_imports import ControleImportAcoesView, DATImportCadastrosView
-from .views_lookup import (
-    MunicipioLookup,
-    ProjetoLookup,
-    TipoEventoLookup,
-    UsuarioLookup,
-)
+from .views_lookup import MunicipioLookup, ProjetoLookup, TipoEventoLookup, UsuarioLookup
 from .views_metrics import (
     formadores_metrics,
     metrics_map,
@@ -101,12 +88,7 @@ from .views_options import (
     usuarios_options,
 )
 from .views_preagenda import PreAgendaListView
-from .views_reports import (
-    reports_by_uf,
-    reports_status_counts,
-    reports_top_projects,
-    reports_weekly_approved,
-)
+from .views_reports import reports_by_uf, reports_status_counts, reports_top_projects, reports_weekly_approved
 from .views_solicitacao import SolicitacaoViewSet
 from .views_validate import SolicitationValidateView
 

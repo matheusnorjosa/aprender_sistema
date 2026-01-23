@@ -24,15 +24,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import (
-    AuditLog,
-    Municipio,
-    Participation,
-    Projeto,
-    Solicitacao,
-    TipoEvento,
-    Usuario,
-)
+from apps.core.models import AuditLog, Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
 from apps.core.services.gcal_sync_service import (
     apply_one_solicitacao,
     build_attendees_for_solicitacao,

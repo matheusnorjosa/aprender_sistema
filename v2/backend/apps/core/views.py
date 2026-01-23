@@ -23,11 +23,7 @@ from apps.core.views.admin import (
     ProjetoViewSet,
     UsuarioAdminViewSet,
 )
-from apps.core.views.availability import (
-    AvailabilityBlockViewSet,
-    AvailabilityCheckManyView,
-    AvailabilityCheckView,
-)
+from apps.core.views.availability import AvailabilityBlockViewSet, AvailabilityCheckManyView, AvailabilityCheckView
 from apps.core.views.options import (
     CoordenadorOptionViewSet,
     FormadorOptionViewSet,

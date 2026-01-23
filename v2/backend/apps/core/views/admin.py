@@ -18,15 +18,7 @@ from rest_framework.response import Response
 
 from django_filters.rest_framework import DjangoFilterBackend
 
-from apps.core.models import (
-    AuditLog,
-    Compra,
-    Gerencia,
-    Municipio,
-    Produto,
-    Projeto,
-    Usuario,
-)
+from apps.core.models import AuditLog, Compra, Gerencia, Municipio, Produto, Projeto, Usuario
 from apps.core.permissions import IsControleOrDAT, IsDAT
 from apps.core.serializers import (
     AuditLogSerializer,

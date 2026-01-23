@@ -29,10 +29,7 @@ from django.db import transaction
 
 from apps.core.models import AcaoDAT, Municipio, Projeto, Usuario
 from apps.core.services.normalize import norm_text
-from apps.core.services.resolvers import (
-    resolve_user_by_email,
-    resolve_user_by_name,
-)
+from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 from apps.core.types import ExternalHash
 
 OUT_DIR: Path = Path(settings.BASE_DIR) / "out_etl"

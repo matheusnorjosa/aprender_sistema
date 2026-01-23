@@ -4,6 +4,7 @@
  */
 
 import { Space, Tag, Typography, Tooltip, Button } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import {
   EditOutlined,
   DeleteOutlined,
@@ -12,17 +13,46 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { renderStatusTag, renderModalidadeTag } from './helpers';
+import type { ID } from '../../../types';
 
 const { Text } = Typography;
 
 /**
- * Creates column definitions for formacoes table
- * @param {Object} handlers - Event handlers object
- * @param {Function} handlers.onEdit - Handler for edit action
- * @param {Function} handlers.onDelete - Handler for delete action
- * @returns {Array} Column definitions
+ * Formacao record interface
  */
-export function getColumns({ onEdit, onDelete }) {
+export interface FormacaoRecord {
+  id: ID;
+  data_formacao?: string;
+  horario_inicio?: string;
+  horario_fim?: string;
+  projeto_nome?: string;
+  municipio_nome?: string;
+  uf?: string;
+  coordenador_nome?: string;
+  formador_nome?: string;
+  modalidade?: string;
+  quantidade_prevista?: number;
+  quantidade_presente?: number;
+  status?: string;
+  lista_presenca_enviada?: boolean;
+  relatorio_enviado?: boolean;
+  fotos_enviadas?: boolean;
+}
+
+/**
+ * Column handlers interface
+ */
+export interface ColumnHandlers {
+  onEdit: (record: FormacaoRecord) => void;
+  onDelete: (record: FormacaoRecord) => void;
+}
+
+/**
+ * Creates column definitions for formacoes table
+ * @param handlers - Event handlers object
+ * @returns Column definitions
+ */
+export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<FormacaoRecord> {
   return [
     {
       title: 'Data',
@@ -31,7 +61,7 @@ export function getColumns({ onEdit, onDelete }) {
       width: 100,
       fixed: 'left',
       sorter: true,
-      render: (data) => (
+      render: (data: string | undefined) => (
         <div>
           <Text strong>{data ? dayjs(data).format('DD/MM/YYYY') : '-'}</Text>
         </div>
@@ -52,7 +82,7 @@ export function getColumns({ onEdit, onDelete }) {
       dataIndex: 'projeto_nome',
       key: 'projeto',
       width: 120,
-      render: (nome) => <Tag color="blue">{nome}</Tag>,
+      render: (nome: string | undefined) => <Tag color="blue">{nome}</Tag>,
     },
     {
       title: 'Município - UF',
@@ -83,7 +113,7 @@ export function getColumns({ onEdit, onDelete }) {
       dataIndex: 'modalidade',
       key: 'modalidade',
       width: 110,
-      render: (modalidade) => renderModalidadeTag(modalidade),
+      render: (modalidade: string | undefined) => renderModalidadeTag(modalidade),
     },
     {
       title: 'Participantes',
@@ -105,7 +135,7 @@ export function getColumns({ onEdit, onDelete }) {
       dataIndex: 'status',
       key: 'status',
       width: 120,
-      render: (status) => renderStatusTag(status),
+      render: (status: string | undefined) => renderStatusTag(status),
     },
     {
       title: 'Docs',

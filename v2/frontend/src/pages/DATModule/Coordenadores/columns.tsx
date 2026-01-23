@@ -4,6 +4,7 @@
  */
 
 import { Space, Tag, Typography, Tooltip, Button, Avatar, Badge, Switch } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import {
   EditOutlined,
   DeleteOutlined,
@@ -16,19 +17,42 @@ import {
   EyeOutlined,
 } from '@ant-design/icons';
 import { getAreaColor, getInitials } from './helpers';
+import type { ID } from '../../../types';
 
 const { Text } = Typography;
 
 /**
- * Creates column definitions for coordenadores table
- * @param {Object} handlers - Event handlers object
- * @param {Function} handlers.onView - Handler for view action
- * @param {Function} handlers.onEdit - Handler for edit action
- * @param {Function} handlers.onDelete - Handler for delete action
- * @param {Function} handlers.onToggleAtivo - Handler for toggle active status
- * @returns {Array} Column definitions
+ * Coordenador record interface
  */
-export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }) {
+export interface CoordenadorRecord {
+  id: ID;
+  nome: string;
+  cargo?: string;
+  area?: string;
+  email?: string;
+  telefone?: string;
+  foto_url?: string;
+  total_municipios?: number;
+  total_projetos?: number;
+  ativo?: boolean;
+}
+
+/**
+ * Column handlers interface
+ */
+export interface ColumnHandlers {
+  onView: (record: CoordenadorRecord) => void;
+  onEdit: (record: CoordenadorRecord) => void;
+  onDelete: (record: CoordenadorRecord) => void;
+  onToggleAtivo: (record: CoordenadorRecord) => void;
+}
+
+/**
+ * Creates column definitions for coordenadores table
+ * @param handlers - Event handlers object
+ * @returns Column definitions
+ */
+export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }: ColumnHandlers): ColumnsType<CoordenadorRecord> {
   return [
     {
       title: '',
@@ -36,7 +60,7 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }) {
       key: 'foto',
       width: 60,
       fixed: 'left',
-      render: (foto, record) => (
+      render: (foto: string | undefined, record) => (
         <Avatar
           src={foto}
           size={40}
@@ -53,7 +77,7 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }) {
       width: 180,
       fixed: 'left',
       sorter: true,
-      render: (nome, record) => (
+      render: (nome: string, record) => (
         <div>
           <Text strong>{nome}</Text>
           {record.cargo && (
@@ -72,7 +96,7 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }) {
       key: 'area',
       width: 120,
       sorter: true,
-      render: (area) => <Tag color={getAreaColor(area)}>{area || '-'}</Tag>,
+      render: (area: string | undefined) => <Tag color={getAreaColor(area)}>{area || '-'}</Tag>,
     },
     {
       title: 'Email',
@@ -80,7 +104,7 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }) {
       key: 'email',
       width: 200,
       ellipsis: true,
-      render: (email) =>
+      render: (email: string | undefined) =>
         email ? (
           <a href={`mailto:${email}`}>
             <MailOutlined className="mr-1" />
@@ -95,7 +119,7 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }) {
       dataIndex: 'telefone',
       key: 'telefone',
       width: 140,
-      render: (telefone) =>
+      render: (telefone: string | undefined) =>
         telefone ? (
           <span>
             <PhoneOutlined className="mr-1" />
@@ -112,11 +136,11 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }) {
       width: 100,
       align: 'center',
       sorter: true,
-      render: (total) => (
+      render: (total: number | undefined) => (
         <Badge
           count={total || 0}
           showZero
-          style={{ backgroundColor: total > 0 ? '#1890ff' : '#d9d9d9' }}
+          style={{ backgroundColor: total && total > 0 ? '#1890ff' : '#d9d9d9' }}
         >
           <EnvironmentOutlined className="text-gray-400 text-lg" />
         </Badge>
@@ -129,11 +153,11 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }) {
       width: 100,
       align: 'center',
       sorter: true,
-      render: (total) => (
+      render: (total: number | undefined) => (
         <Badge
           count={total || 0}
           showZero
-          style={{ backgroundColor: total > 0 ? '#52c41a' : '#d9d9d9' }}
+          style={{ backgroundColor: total && total > 0 ? '#52c41a' : '#d9d9d9' }}
         >
           <ProjectOutlined className="text-gray-400 text-lg" />
         </Badge>
@@ -145,7 +169,7 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }) {
       key: 'ativo',
       width: 90,
       align: 'center',
-      render: (ativo, record) => (
+      render: (ativo: boolean | undefined, record) => (
         <Tooltip title={ativo !== false ? 'Clique para desativar' : 'Clique para ativar'}>
           <Switch
             checked={ativo !== false}

@@ -12,22 +12,24 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from datetime import datetime
-from django.utils import timezone
+
 from django.core.cache import cache
+from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.core.models import (
-    Usuario,
-    Municipio,
-    Projeto,
-    TipoEvento,
-    Solicitacao,
-    AvailabilityBlock,
-    Participation,
-)
+import pytest
 
+from apps.core.models import (
+    AvailabilityBlock,
+    Municipio,
+    Participation,
+    Projeto,
+    Solicitacao,
+    TipoEvento,
+    Usuario,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -106,9 +108,7 @@ def setup_data():
         fim=timezone.make_aware(datetime(2025, 10, 3, 12, 0), tz),
         status="aprovado",
     )
-    Participation.objects.get_or_create(
-        solicitacao=sol1, usuario=ana, role="FORMADOR"
-    )
+    Participation.objects.get_or_create(solicitacao=sol1, usuario=ana, role="FORMADOR")
 
     # 2025-10-08 08:00-10:00 (Ana, 2h)
     sol2 = Solicitacao.objects.create(
@@ -120,9 +120,7 @@ def setup_data():
         fim=timezone.make_aware(datetime(2025, 10, 8, 10, 0), tz),
         status="aprovado",
     )
-    Participation.objects.get_or_create(
-        solicitacao=sol2, usuario=ana, role="FORMADOR"
-    )
+    Participation.objects.get_or_create(solicitacao=sol2, usuario=ana, role="FORMADOR")
 
     # 2025-10-08 14:00-16:00 (Ana, 2h)
     sol3 = Solicitacao.objects.create(
@@ -134,9 +132,7 @@ def setup_data():
         fim=timezone.make_aware(datetime(2025, 10, 8, 16, 0), tz),
         status="aprovado",
     )
-    Participation.objects.get_or_create(
-        solicitacao=sol3, usuario=ana, role="FORMADOR"
-    )
+    Participation.objects.get_or_create(solicitacao=sol3, usuario=ana, role="FORMADOR")
 
     # 2025-10-01 (Bruno, 4h)
     sol4 = Solicitacao.objects.create(
@@ -148,9 +144,7 @@ def setup_data():
         fim=timezone.make_aware(datetime(2025, 10, 1, 12, 0), tz),
         status="aprovado",
     )
-    Participation.objects.get_or_create(
-        solicitacao=sol4, usuario=bruno, role="FORMADOR"
-    )
+    Participation.objects.get_or_create(solicitacao=sol4, usuario=bruno, role="FORMADOR")
 
     # 2025-10-20 08:00-12:00 (Ana, 4h) - para gerar X
     sol5 = Solicitacao.objects.create(
@@ -162,9 +156,7 @@ def setup_data():
         fim=timezone.make_aware(datetime(2025, 10, 20, 12, 0), tz),
         status="aprovado",
     )
-    Participation.objects.get_or_create(
-        solicitacao=sol5, usuario=ana, role="FORMADOR"
-    )
+    Participation.objects.get_or_create(solicitacao=sol5, usuario=ana, role="FORMADOR")
 
     # Bloqueios aprovados
     # Ana: dia 05 (tipo=P)
@@ -206,6 +198,7 @@ def test_monthly_availability_codes(api_client, user_auth, setup_data):
     """
     # Debug: verificar se Participations foram criadas
     from apps.core.models import Participation
+
     part_count = Participation.objects.filter(role="FORMADOR").count()
     print(f"\n[DEBUG] Total Participations com role=FORMADOR: {part_count}")
 

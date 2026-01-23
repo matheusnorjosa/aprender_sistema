@@ -4,6 +4,7 @@ AS v2 — Usuario Model
 SSOT: Substitui IMPORTRANGE de Usuarios.xlsx
 Type-checked with Pyright (strict mode).
 """
+
 from __future__ import annotations
 
 from django.contrib.auth.models import AbstractUser
@@ -24,11 +25,9 @@ class Usuario(AbstractUser):
         db_index=True,
         validators=[
             RegexValidator(
-                regex=r'^\d{11}$',
-                message='CPF deve conter exatamente 11 dígitos numéricos.',
-                code='invalid_cpf'
+                regex=r"^\d{11}$", message="CPF deve conter exatamente 11 dígitos numéricos.", code="invalid_cpf"
             )
-        ]
+        ],
     )
     telefone = models.CharField(max_length=20, blank=True)
     cargo = models.CharField(max_length=100, blank=True)

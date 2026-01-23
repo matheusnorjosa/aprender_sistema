@@ -6,15 +6,18 @@ after Gunicorn workers/threads configuration.
 
 Target: 100-200 req/s (baseline: 10-50 req/s)
 """
+
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import concurrent.futures
 import time
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
+
+import pytest
 
 User = get_user_model()
 
@@ -88,9 +91,7 @@ class TestGunicornPerformance:
         durations = [r[2] for r in results]
 
         # All requests should succeed (200 OK)
-        assert all(
-            code == 200 for code in status_codes
-        ), f"Some requests failed: {status_codes}"
+        assert all(code == 200 for code in status_codes), f"Some requests failed: {status_codes}"
 
         # Calculate statistics
         avg_duration = sum(durations) / len(durations)
@@ -98,7 +99,7 @@ class TestGunicornPerformance:
         min_duration = min(durations)
 
         # Log statistics (pytest will capture this with -v)
-        print(f"\n📊 Performance Statistics:")
+        print("\n📊 Performance Statistics:")
         print(f"  Total requests: {num_requests}")
         print(f"  Concurrent workers: {num_workers}")
         print(f"  Average response time: {avg_duration:.3f}s")

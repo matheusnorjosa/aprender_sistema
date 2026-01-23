@@ -16,6 +16,7 @@ Saída:
     - out_etl/audit_users_crosscheck_enhanced.json
     - out_etl/audit_users_encontrados_por_aba.csv
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from typing import Any
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandParser
+
 from openpyxl import load_workbook
 from rapidfuzz import fuzz
 
@@ -59,7 +61,9 @@ def jaccard_similarity(set1: set[str], set2: set[str]) -> float:
     return len(intersection) / len(union) if union else 0.0
 
 
-def match_by_name(agenda_name: str, cadastrados_map: dict[str, dict[str, Any]], threshold: float | None = None) -> tuple[str | None, float]:
+def match_by_name(
+    agenda_name: str, cadastrados_map: dict[str, dict[str, Any]], threshold: float | None = None
+) -> tuple[str | None, float]:
     """
     Tenta encontrar match de agenda_name nos cadastrados.
 
@@ -167,7 +171,7 @@ class Command(BaseCommand):
         self.stdout.write(f"   ✅ {len(agendas)} abas processadas")
 
         # 3. Cross-check
-        self.stdout.write(f"\n3. Cross-check: matching nomes e emails")
+        self.stdout.write("\n3. Cross-check: matching nomes e emails")
         report = self._crosscheck(cadastrados, agendas)
 
         # 4. Gerar relatórios
@@ -266,11 +270,13 @@ class Command(BaseCommand):
                                 convidados.append(normalize_text(email))
 
                     if coordenador or formadores or convidados:
-                        eventos.append({
-                            "coordenador": coordenador,
-                            "formadores": formadores,
-                            "convidados": convidados,
-                        })
+                        eventos.append(
+                            {
+                                "coordenador": coordenador,
+                                "formadores": formadores,
+                                "convidados": convidados,
+                            }
+                        )
 
             agendas[sheet_name] = eventos
             self.stdout.write(f"   ✅ {sheet_name}: {len(eventos)} eventos")
@@ -289,11 +295,7 @@ class Command(BaseCommand):
         Retorna: dict com estatísticas e listas de não encontrados
         """
         # Mapas inversos: email -> nome_norm
-        email_to_user = {
-            data["email"]: key
-            for key, data in cadastrados.items()
-            if data["email"]
-        }
+        email_to_user = {data["email"]: key for key, data in cadastrados.items() if data["email"]}
 
         # Estatísticas
         stats = {
@@ -365,15 +367,13 @@ class Command(BaseCommand):
         # Top 20 não cadastrados (ordenação determinística: -freq, +nome)
         # Excluir emails de "Convidados" do ranking (mas manter para relatório geral)
         nao_cadastrados_freq_names_only = {
-            nome: freq
-            for nome, freq in nao_cadastrados_freq.items()
-            if not nome.startswith("[email]")
+            nome: freq for nome, freq in nao_cadastrados_freq.items() if not nome.startswith("[email]")
         }
 
         top_nao_cadastrados = sorted(
             nao_cadastrados_freq_names_only.items(),
-            key=lambda x: (-x[1], x[0])  # Ordenação: -freq, +nome (determinístico)
-        )[:constants.TOP_UNKNOWN_USERS_LIMIT]
+            key=lambda x: (-x[1], x[0]),  # Ordenação: -freq, +nome (determinístico)
+        )[: constants.TOP_UNKNOWN_USERS_LIMIT]
 
         stats["nomes_na_agenda_nao_cadastrados"] = {
             "top_20": [{"nome": nome, "freq": freq} for nome, freq in top_nao_cadastrados],
@@ -384,9 +384,7 @@ class Command(BaseCommand):
         for aba, eventos in agendas.items():
             nomes_na_aba = []
             for evento in eventos:
-                nomes_na_aba.extend(
-                    [normalize_text(p) for p in [evento["coordenador"]] + evento["formadores"] if p]
-                )
+                nomes_na_aba.extend([normalize_text(p) for p in [evento["coordenador"]] + evento["formadores"] if p])
 
             duplicados = [nome for nome in set(nomes_na_aba) if nomes_na_aba.count(nome) > 1]
             stats["duplicados_por_aba"][aba] = len(duplicados)

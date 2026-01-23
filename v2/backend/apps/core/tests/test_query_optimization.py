@@ -4,6 +4,7 @@ AS v2 — Query Optimization Tests
 Tests for N+1 query prevention (#406).
 Validates that ViewSets use select_related/prefetch_related correctly.
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false, reportAttributeAccessIssue=false, reportUnusedVariable=false
 
 from __future__ import annotations
@@ -11,9 +12,9 @@ from __future__ import annotations
 import uuid
 
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
-from django.db import connection
 from rest_framework.test import APIClient
 
 from apps.core.models import (
@@ -66,10 +67,9 @@ class TestAvailabilityBlockQueryOptimization(TestCase):
 
         # Count queries that would indicate N+1 (selecting from usuario table multiple times)
         usuario_select_queries = [
-            q for q in ctx.captured_queries
-            if "SELECT" in q["sql"].upper()
-            and "core_usuario" in q["sql"].lower()
-            and "WHERE" in q["sql"].upper()
+            q
+            for q in ctx.captured_queries
+            if "SELECT" in q["sql"].upper() and "core_usuario" in q["sql"].lower() and "WHERE" in q["sql"].upper()
         ]
 
         # With select_related, should have at most 2 usuario queries
@@ -127,10 +127,11 @@ class TestAvailabilityCheckManyQueryOptimization(TestCase):
 
         # Count usuario SELECT queries with WHERE id = (individual fetches)
         individual_usuario_queries = [
-            q for q in ctx.captured_queries
+            q
+            for q in ctx.captured_queries
             if "SELECT" in q["sql"].upper()
             and "core_usuario" in q["sql"].lower()
-            and ("WHERE" in q["sql"] and "\"id\" =" in q["sql"])
+            and ("WHERE" in q["sql"] and '"id" =' in q["sql"])
             and "IN" not in q["sql"].upper()  # Exclude batch queries
         ]
 
@@ -159,6 +160,7 @@ class TestUpdateFormadoresQueryOptimization(TestCase):
         )
         # Add to Coordenador group
         from django.contrib.auth.models import Group
+
         coord_group, _ = Group.objects.get_or_create(name="Coordenador")
         self.coord.groups.add(coord_group)
         self.client.force_authenticate(user=self.coord)
@@ -223,11 +225,12 @@ class TestUpdateFormadoresQueryOptimization(TestCase):
 
         # Count individual usuario SELECT queries (not batch)
         individual_usuario_queries = [
-            q for q in ctx.captured_queries
+            q
+            for q in ctx.captured_queries
             if "SELECT" in q["sql"].upper()
             and "core_usuario" in q["sql"].lower()
             and "WHERE" in q["sql"]
-            and "\"id\" =" in q["sql"]
+            and '"id" =' in q["sql"]
             and "IN" not in q["sql"].upper()
         ]
 
@@ -274,8 +277,8 @@ class TestSolicitacaoListQueryOptimization(TestCase):
                 municipio=self.municipio,
                 projeto=self.projeto,
                 tipo_evento=self.tipo_evento,
-                inicio=f"2026-01-{15+i%10:02d}T08:00:00Z",
-                fim=f"2026-01-{15+i%10:02d}T12:00:00Z",
+                inicio=f"2026-01-{15 + i % 10:02d}T08:00:00Z",
+                fim=f"2026-01-{15 + i % 10:02d}T12:00:00Z",
             )
 
     def test_list_solicitacoes_uses_select_related(self):
@@ -289,7 +292,8 @@ class TestSolicitacaoListQueryOptimization(TestCase):
 
         # Count SELECT queries for related tables (would be N+1 without select_related)
         related_select_queries = [
-            q for q in ctx.captured_queries
+            q
+            for q in ctx.captured_queries
             if "SELECT" in q["sql"].upper()
             and (
                 "core_municipio" in q["sql"].lower()
@@ -297,7 +301,7 @@ class TestSolicitacaoListQueryOptimization(TestCase):
                 or "core_tipoevento" in q["sql"].lower()
             )
             and "WHERE" in q["sql"]
-            and "\"id\" =" in q["sql"]
+            and '"id" =' in q["sql"]
         ]
 
         # With select_related, should have 0 individual related queries

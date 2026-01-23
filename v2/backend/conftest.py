@@ -8,10 +8,13 @@ Applied to:
 - pytest test suite (36 failing tests)
 - ETL imports (missing coordenador/usuario in planilhas)
 """
-import pytest
+
 from uuid import uuid4
-from django.db.models.signals import pre_save
+
 from django.contrib.auth.models import Group
+from django.db.models.signals import pre_save
+
+import pytest
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -21,7 +24,7 @@ def _ensure_default_test_user(django_db_setup, django_db_blocker, faker):
 
     Runs once per test function with unique CPF to avoid IntegrityError.
     """
-    from apps.core.models import Usuario, Solicitacao
+    from apps.core.models import Solicitacao, Usuario
 
     with django_db_blocker.unblock():
         # Create default test user with Python uuid4() (truly random, not seeded)

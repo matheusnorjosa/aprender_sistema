@@ -6,14 +6,13 @@ Usage:
     python manage.py link_projetos_gerencias --apply    # Apply
 """
 
-
 from __future__ import annotations
+
 from typing import Any
 
 from django.core.management.base import BaseCommand
 
 from apps.core.models import Gerencia, Projeto
-
 
 # Mapeamento gerência → projetos
 MAPEAMENTO = {
@@ -77,11 +76,7 @@ class Command(BaseCommand):
         apply_mode: bool = bool(options.get("apply", False))
 
         if not dry_run and not apply_mode:
-            self.stdout.write(
-                self.style.ERROR(
-                    "❌ Error: Use --dry-run (preview) or --apply (commit)"
-                )
-            )
+            self.stdout.write(self.style.ERROR("❌ Error: Use --dry-run (preview) or --apply (commit)"))
             return
 
         mode = "DRY-RUN" if dry_run else "APPLY"
@@ -94,9 +89,7 @@ class Command(BaseCommand):
                 gerencia = Gerencia.objects.get(nome=gerencia_nome)
             except Gerencia.DoesNotExist:
                 self.stdout.write(
-                    self.style.ERROR(
-                        f"  ❌ Gerencia not found: {gerencia_nome} (run seed_gerencias first)"
-                    )
+                    self.style.ERROR(f"  ❌ Gerencia not found: {gerencia_nome} (run seed_gerencias first)")
                 )
                 continue
 
@@ -113,23 +106,15 @@ class Command(BaseCommand):
                         if apply_mode:
                             projeto.gerencia = gerencia  # type: ignore[assignment]
                             projeto.save(update_fields=["gerencia"])
-                            self.stdout.write(
-                                self.style.SUCCESS(
-                                    f"  ✓ Linked: {projeto_nome} → {gerencia.nome_setor}"
-                                )
-                            )
+                            self.stdout.write(self.style.SUCCESS(f"  ✓ Linked: {projeto_nome} → {gerencia.nome_setor}"))
                         else:
                             self.stdout.write(
-                                self.style.WARNING(
-                                    f"  ⟳ Would link: {projeto_nome} → {gerencia.nome_setor}"
-                                )
+                                self.style.WARNING(f"  ⟳ Would link: {projeto_nome} → {gerencia.nome_setor}")
                             )
                         stats["linked"] += 1
 
                 except Projeto.DoesNotExist:
-                    self.stdout.write(
-                        self.style.ERROR(f"  ❌ Projeto not found: {projeto_nome}")
-                    )
+                    self.stdout.write(self.style.ERROR(f"  ❌ Projeto not found: {projeto_nome}"))
                     stats["not_found"] += 1
 
         # Summary
@@ -144,12 +129,6 @@ class Command(BaseCommand):
         self.stdout.write(summary)
 
         if dry_run:
-            self.stdout.write(
-                self.style.WARNING(
-                    "\n⚠️  Dry-run mode: No changes made. Use --apply to commit."
-                )
-            )
+            self.stdout.write(self.style.WARNING("\n⚠️  Dry-run mode: No changes made. Use --apply to commit."))
         else:
-            self.stdout.write(
-                self.style.SUCCESS(f"\n✅ {stats['linked']} projetos linked!")
-            )
+            self.stdout.write(self.style.SUCCESS(f"\n✅ {stats['linked']} projetos linked!"))

@@ -11,15 +11,16 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from pathlib import Path
+
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
 
-from apps.dat_ingest.services.parse_fluir import parse_fluir_eventos, get_formadores_fluir
+import pytest
 
+from apps.dat_ingest.services.parse_fluir import get_formadores_fluir, parse_fluir_eventos
 
 # Path to Fluir file (either Docker /app or CI path)
 FLUIR_FILE = Path(settings.BASE_DIR).parent / "data" / "csv-import" / "Acompanhamento de Agenda _ Fluir (1).xlsx"

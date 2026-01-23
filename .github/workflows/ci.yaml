@@ -28,22 +28,19 @@ jobs:
         run: pip install black isort flake8
 
       - name: Lint with Black
-        continue-on-error: true  # Non-blocking until codebase is formatted
         run: |
           cd v2/backend
-          black --check --diff . || echo "⚠️ Black found formatting issues (non-blocking)"
+          black --check --diff .
 
       - name: Lint with isort
-        continue-on-error: true  # Non-blocking until codebase is formatted
         run: |
           cd v2/backend
-          isort --check-only --diff . || echo "⚠️ isort found import ordering issues (non-blocking)"
+          isort --check-only --diff .
 
       - name: Lint with Flake8
-        continue-on-error: true  # Non-blocking until codebase is formatted
         run: |
           cd v2/backend
-          flake8 --max-line-length=120 --extend-ignore=E203,W503 . || echo "⚠️ Flake8 found style issues (non-blocking)"
+          flake8 apps/ config/
 
   # ----------------------------------------------------------------
   # Job 2: Tests (~10min)

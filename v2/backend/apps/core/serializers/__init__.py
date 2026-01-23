@@ -35,6 +35,18 @@ from apps.core.serializers.dat_registro import (
     DATRegistroListSerializer,
     DATRegistroUpdateSerializer,
 )
+from apps.core.serializers.organizacao import (
+    GerenciaSerializer,
+    MunicipioOptionSerializer,
+    MunicipioSerializer,
+    ProdutoOptionSerializer,
+    ProdutoSerializer,
+    ProjetoGeralOptionSerializer,
+    ProjetoGeralSerializer,
+    ProjetoOptionSerializer,
+    ProjetoSerializer,
+    TipoEventoOptionSerializer,
+)
 from apps.core.serializers.plano_formacoes import (
     AcompanhamentoNestedSerializer,
     AcompanhamentoSerializer,
@@ -45,18 +57,6 @@ from apps.core.serializers.plano_formacoes import (
     PlanoFormacoesSerializer,
     ProvaNestedSerializer,
     ProvaSerializer,
-)
-from apps.core.serializers.organizacao import (
-    GerenciaSerializer,
-    MunicipioOptionSerializer,
-    MunicipioSerializer,
-    ProdutoSerializer,
-    ProdutoOptionSerializer,
-    ProjetoGeralOptionSerializer,
-    ProjetoGeralSerializer,
-    ProjetoOptionSerializer,
-    ProjetoSerializer,
-    TipoEventoOptionSerializer,
 )
 from apps.core.serializers.solicitacao import (
     AuditLogTimelineSerializer,

@@ -3,6 +3,7 @@ AS v2 — GCal Sync Types
 
 Type definitions for GCal sync operations.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false
 
 from __future__ import annotations

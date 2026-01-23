@@ -14,10 +14,11 @@ from __future__ import annotations
 import csv
 import json
 
-import pytest
-from openpyxl import Workbook
 from django.core.management import call_command
 from django.test import override_settings
+
+import pytest
+from openpyxl import Workbook
 
 pytestmark = pytest.mark.django_db
 
@@ -51,37 +52,92 @@ def agenda_excel(tmp_path):
     # Aba ACerta
     ws_acerta = wb.active
     ws_acerta.title = "ACerta"
-    ws_acerta.append([
-        "Data", "Horário", "Município", "Tipo", "Projeto",
-        "Coordenador", "Formador 1", "Formador 2", "Formador 3", "Formador 4", "Formador 5",
-        "Convidados"
-    ])
-    ws_acerta.append([
-        "2025-01-10", "08:00-12:00", "Fortaleza", "Formação", "ACerta",
-        "João Silva", "Maria Santos", "", "", "", "",
-        "ana@external.com"  # Email de convidado
-    ])
+    ws_acerta.append(
+        [
+            "Data",
+            "Horário",
+            "Município",
+            "Tipo",
+            "Projeto",
+            "Coordenador",
+            "Formador 1",
+            "Formador 2",
+            "Formador 3",
+            "Formador 4",
+            "Formador 5",
+            "Convidados",
+        ]
+    )
+    ws_acerta.append(
+        [
+            "2025-01-10",
+            "08:00-12:00",
+            "Fortaleza",
+            "Formação",
+            "ACerta",
+            "João Silva",
+            "Maria Santos",
+            "",
+            "",
+            "",
+            "",
+            "ana@external.com",  # Email de convidado
+        ]
+    )
 
     # Aba Super
     ws_super = wb.create_sheet("Super")
-    ws_super.append([
-        "Data", "Horário", "Município", "Tipo", "Projeto",
-        "Coordenador", "Formador 1", "Formador 2", "Formador 3", "Formador 4", "Formador 5",
-        "Convidados"
-    ])
-    ws_super.append([
-        "2025-01-15", "14:00-17:00", "Caucaia", "Reunião", "Super",
-        "Pedro Costa", "Desconhecido Silva", "", "", "", "",  # "Desconhecido" não está cadastrado
-        ""
-    ])
+    ws_super.append(
+        [
+            "Data",
+            "Horário",
+            "Município",
+            "Tipo",
+            "Projeto",
+            "Coordenador",
+            "Formador 1",
+            "Formador 2",
+            "Formador 3",
+            "Formador 4",
+            "Formador 5",
+            "Convidados",
+        ]
+    )
+    ws_super.append(
+        [
+            "2025-01-15",
+            "14:00-17:00",
+            "Caucaia",
+            "Reunião",
+            "Super",
+            "Pedro Costa",
+            "Desconhecido Silva",
+            "",
+            "",
+            "",
+            "",  # "Desconhecido" não está cadastrado
+            "",
+        ]
+    )
 
     # Aba Brincando (sem eventos)
     ws_brincando = wb.create_sheet("Brincando")
-    ws_brincando.append([
-        "Data", "Horário", "Município", "Tipo", "Projeto",
-        "Coordenador", "Formador 1", "Formador 2", "Formador 3", "Formador 4", "Formador 5",
-        "Convidados"
-    ])
+    ws_brincando.append(
+        [
+            "Data",
+            "Horário",
+            "Município",
+            "Tipo",
+            "Projeto",
+            "Coordenador",
+            "Formador 1",
+            "Formador 2",
+            "Formador 3",
+            "Formador 4",
+            "Formador 5",
+            "Convidados",
+        ]
+    )
 
     path = tmp_path / "agenda.xlsx"
     wb.save(path)
@@ -199,27 +255,45 @@ def test_detecta_multi_setor(tmp_path):
     # Aba ACerta
     ws_acerta = wb_agenda.active
     ws_acerta.title = "ACerta"
-    ws_acerta.append([
-        "Data", "Horário", "Município", "Tipo", "Projeto",
-        "Coordenador", "Formador 1", "Formador 2", "Formador 3", "Formador 4", "Formador 5",
-        "Convidados"
-    ])
-    ws_acerta.append([
-        "2025-01-10", "08:00-12:00", "Fortaleza", "Formação", "ACerta",
-        "João Silva", "", "", "", "", "", ""
-    ])
+    ws_acerta.append(
+        [
+            "Data",
+            "Horário",
+            "Município",
+            "Tipo",
+            "Projeto",
+            "Coordenador",
+            "Formador 1",
+            "Formador 2",
+            "Formador 3",
+            "Formador 4",
+            "Formador 5",
+            "Convidados",
+        ]
+    )
+    ws_acerta.append(
+        ["2025-01-10", "08:00-12:00", "Fortaleza", "Formação", "ACerta", "João Silva", "", "", "", "", "", ""]
+    )
 
     # Aba Super (João aparece aqui também)
     ws_super = wb_agenda.create_sheet("Super")
-    ws_super.append([
-        "Data", "Horário", "Município", "Tipo", "Projeto",
-        "Coordenador", "Formador 1", "Formador 2", "Formador 3", "Formador 4", "Formador 5",
-        "Convidados"
-    ])
-    ws_super.append([
-        "2025-01-15", "14:00-17:00", "Caucaia", "Reunião", "Super",
-        "João Silva", "", "", "", "", "", ""
-    ])
+    ws_super.append(
+        [
+            "Data",
+            "Horário",
+            "Município",
+            "Tipo",
+            "Projeto",
+            "Coordenador",
+            "Formador 1",
+            "Formador 2",
+            "Formador 3",
+            "Formador 4",
+            "Formador 5",
+            "Convidados",
+        ]
+    )
+    ws_super.append(["2025-01-15", "14:00-17:00", "Caucaia", "Reunião", "Super", "João Silva", "", "", "", "", "", ""])
 
     agenda_path = tmp_path / "agenda.xlsx"
     wb_agenda.save(agenda_path)
@@ -259,25 +333,47 @@ def test_top_20_nao_cadastrados(tmp_path):
     wb_agenda = Workbook()
     ws_acerta = wb_agenda.active
     ws_acerta.title = "ACerta"
-    ws_acerta.append([
-        "Data", "Horário", "Município", "Tipo", "Projeto",
-        "Coordenador", "Formador 1", "Formador 2", "Formador 3", "Formador 4", "Formador 5",
-        "Convidados"
-    ])
+    ws_acerta.append(
+        [
+            "Data",
+            "Horário",
+            "Município",
+            "Tipo",
+            "Projeto",
+            "Coordenador",
+            "Formador 1",
+            "Formador 2",
+            "Formador 3",
+            "Formador 4",
+            "Formador 5",
+            "Convidados",
+        ]
+    )
 
     # Adicionar 10 eventos com "Fulano" (frequência alta)
     for i in range(10):
-        ws_acerta.append([
-            f"2025-01-{10+i}", "08:00-12:00", "Fortaleza", "Formação", "ACerta",
-            "Fulano Silva", "", "", "", "", "", ""
-        ])
+        ws_acerta.append(
+            [
+                f"2025-01-{10+i}",
+                "08:00-12:00",
+                "Fortaleza",
+                "Formação",
+                "ACerta",
+                "Fulano Silva",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+            ]
+        )
 
     # Adicionar 2 eventos com "Ciclano" (frequência baixa)
     for i in range(2):
-        ws_acerta.append([
-            f"2025-02-{10+i}", "08:00-12:00", "Caucaia", "Reunião", "ACerta",
-            "Ciclano Santos", "", "", "", "", "", ""
-        ])
+        ws_acerta.append(
+            [f"2025-02-{10+i}", "08:00-12:00", "Caucaia", "Reunião", "ACerta", "Ciclano Santos", "", "", "", "", "", ""]
+        )
 
     agenda_path = tmp_path / "agenda.xlsx"
     wb_agenda.save(agenda_path)

@@ -14,17 +14,19 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+import pytest
+
 from apps.core.models import (
-    Usuario,
     Municipio,
     Projeto,
-    TipoEvento,
     Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 
 
@@ -38,10 +40,10 @@ def api_client():
 def grupos():
     """Cria grupos Django."""
     grupos = {
-        'Coordenador': Group.objects.get_or_create(name='Coordenador')[0],
-        'Superintendência': Group.objects.get_or_create(name='Superintendência')[0],
-        'Controle': Group.objects.get_or_create(name='Controle')[0],
-        'DAT': Group.objects.get_or_create(name='DAT')[0],
+        "Coordenador": Group.objects.get_or_create(name="Coordenador")[0],
+        "Superintendência": Group.objects.get_or_create(name="Superintendência")[0],
+        "Controle": Group.objects.get_or_create(name="Controle")[0],
+        "DAT": Group.objects.get_or_create(name="DAT")[0],
     }
     return grupos
 
@@ -50,12 +52,9 @@ def grupos():
 def usuario_coordenador(grupos):
     """Usuário com perfil Coordenador."""
     user = Usuario.objects.create_user(
-        username='coord1',
-        password='senha123',
-        cpf='11111111111',
-        email='coord@test.com'
+        username="coord1", password="senha123", cpf="11111111111", email="coord@test.com"
     )
-    user.groups.add(grupos['Coordenador'])
+    user.groups.add(grupos["Coordenador"])
     return user
 
 
@@ -63,12 +62,9 @@ def usuario_coordenador(grupos):
 def usuario_superintendencia(grupos):
     """Usuário com perfil Superintendência."""
     user = Usuario.objects.create_user(
-        username='super1',
-        password='senha123',
-        cpf='22222222222',
-        email='super@test.com'
+        username="super1", password="senha123", cpf="22222222222", email="super@test.com"
     )
-    user.groups.add(grupos['Superintendência'])
+    user.groups.add(grupos["Superintendência"])
     return user
 
 
@@ -81,23 +77,13 @@ def municipio():
 @pytest.fixture
 def projeto_super():
     """Projeto com fluxo SUPER (requer aprovação)."""
-    return Projeto.objects.create(
-        nome="ACerta",
-        codigo="ACERTA",
-        fluxo="SUPER",
-        ativo=True
-    )
+    return Projeto.objects.create(nome="ACerta", codigo="ACERTA", fluxo="SUPER", ativo=True)
 
 
 @pytest.fixture
 def projeto_outros():
     """Projeto com fluxo NAO_SUPER (auto-aprovado)."""
-    return Projeto.objects.create(
-        nome="Alfabetização Ceará",
-        codigo="ALFCE",
-        fluxo="NAO_SUPER",
-        ativo=True
-    )
+    return Projeto.objects.create(nome="Alfabetização Ceará", codigo="ALFCE", fluxo="NAO_SUPER", ativo=True)
 
 
 @pytest.fixture
@@ -113,12 +99,7 @@ class TestSolicitacaoFluxoSUPER:
     """
 
     def test_projeto_super_cria_solicitacao_pendente(
-        self,
-        api_client,
-        usuario_coordenador,
-        municipio,
-        projeto_super,
-        tipo_evento
+        self, api_client, usuario_coordenador, municipio, projeto_super, tipo_evento
     ):
         """
         Teste PR 13/N-T1: Projeto SUPER → status inicial = 'pendente'.
@@ -131,32 +112,27 @@ class TestSolicitacaoFluxoSUPER:
 
         # Criar solicitação para projeto SUPER
         payload = {
-            'municipio': municipio.id,
-            'projeto': projeto_super.id,
-            'tipo': 'evento',
-            'tipo_evento': tipo_evento.id,
-            'inicio': (timezone.now() + timezone.timedelta(days=7)).isoformat(),
-            'fim': (timezone.now() + timezone.timedelta(days=7, hours=2)).isoformat(),
-            'coordenador_acompanha': False,
+            "municipio": municipio.id,
+            "projeto": projeto_super.id,
+            "tipo": "evento",
+            "tipo_evento": tipo_evento.id,
+            "inicio": (timezone.now() + timezone.timedelta(days=7)).isoformat(),
+            "fim": (timezone.now() + timezone.timedelta(days=7, hours=2)).isoformat(),
+            "coordenador_acompanha": False,
         }
 
-        response = api_client.post('/api/solicitacoes/', payload, format='json')
+        response = api_client.post("/api/solicitacoes/", payload, format="json")
 
         assert response.status_code == 201
-        assert response.data['status'] == 'pendente'
+        assert response.data["status"] == "pendente"
 
         # Verificar no banco
-        solicitacao = Solicitacao.objects.get(id=response.data['id'])
-        assert solicitacao.status == 'pendente'
-        assert solicitacao.projeto.fluxo == 'SUPER'
+        solicitacao = Solicitacao.objects.get(id=response.data["id"])
+        assert solicitacao.status == "pendente"
+        assert solicitacao.projeto.fluxo == "SUPER"
 
     def test_coordenador_acompanha_nao_afeta_fluxo_super(
-        self,
-        api_client,
-        usuario_coordenador,
-        municipio,
-        projeto_super,
-        tipo_evento
+        self, api_client, usuario_coordenador, municipio, projeto_super, tipo_evento
     ):
         """
         Teste PR 13/N-T2: coordenador_acompanha NÃO determina fluxo.
@@ -168,30 +144,24 @@ class TestSolicitacaoFluxoSUPER:
         api_client.force_authenticate(user=usuario_coordenador)
 
         payload = {
-            'municipio': municipio.id,
-            'projeto': projeto_super.id,
-            'tipo': 'evento',
-            'tipo_evento': tipo_evento.id,
-            'inicio': (timezone.now() + timezone.timedelta(days=7)).isoformat(),
-            'fim': (timezone.now() + timezone.timedelta(days=7, hours=2)).isoformat(),
-            'coordenador_acompanha': True,  # ← True, mas não afeta fluxo
-            'coordenador': usuario_coordenador.id,
+            "municipio": municipio.id,
+            "projeto": projeto_super.id,
+            "tipo": "evento",
+            "tipo_evento": tipo_evento.id,
+            "inicio": (timezone.now() + timezone.timedelta(days=7)).isoformat(),
+            "fim": (timezone.now() + timezone.timedelta(days=7, hours=2)).isoformat(),
+            "coordenador_acompanha": True,  # ← True, mas não afeta fluxo
+            "coordenador": usuario_coordenador.id,
         }
 
-        response = api_client.post('/api/solicitacoes/', payload, format='json')
+        response = api_client.post("/api/solicitacoes/", payload, format="json")
 
         assert response.status_code == 201
-        assert response.data['status'] == 'pendente'  # Ainda pendente!
-        assert response.data['coordenador_acompanha'] is True
+        assert response.data["status"] == "pendente"  # Ainda pendente!
+        assert response.data["coordenador_acompanha"] is True
 
     def test_super_requer_aprovacao_superintendencia(
-        self,
-        api_client,
-        usuario_coordenador,
-        usuario_superintendencia,
-        municipio,
-        projeto_super,
-        tipo_evento
+        self, api_client, usuario_coordenador, usuario_superintendencia, municipio, projeto_super, tipo_evento
     ):
         """
         Teste PR 13/N-T3: Projeto SUPER requer aprovação da Superintendência.
@@ -205,39 +175,34 @@ class TestSolicitacaoFluxoSUPER:
         api_client.force_authenticate(user=usuario_coordenador)
 
         payload = {
-            'municipio': municipio.id,
-            'projeto': projeto_super.id,
-            'tipo': 'evento',
-            'tipo_evento': tipo_evento.id,
-            'inicio': (timezone.now() + timezone.timedelta(days=7)).isoformat(),
-            'fim': (timezone.now() + timezone.timedelta(days=7, hours=2)).isoformat(),
-            'coordenador_acompanha': False,
+            "municipio": municipio.id,
+            "projeto": projeto_super.id,
+            "tipo": "evento",
+            "tipo_evento": tipo_evento.id,
+            "inicio": (timezone.now() + timezone.timedelta(days=7)).isoformat(),
+            "fim": (timezone.now() + timezone.timedelta(days=7, hours=2)).isoformat(),
+            "coordenador_acompanha": False,
         }
 
-        response = api_client.post('/api/solicitacoes/', payload, format='json')
-        solicitacao_id = response.data['id']
+        response = api_client.post("/api/solicitacoes/", payload, format="json")
+        solicitacao_id = response.data["id"]
 
         assert response.status_code == 201
-        assert response.data['status'] == 'pendente'
+        assert response.data["status"] == "pendente"
 
         # 2. Coordenador NÃO pode aprovar (403 esperado)
-        response_forbidden = api_client.patch(
-            f'/api/solicitacoes/{solicitacao_id}/approve/',
-            format='json'
-        )
+        response_forbidden = api_client.patch(f"/api/solicitacoes/{solicitacao_id}/approve/", format="json")
         assert response_forbidden.status_code == 403
 
         # 3. Superintendência aprova
         api_client.force_authenticate(user=usuario_superintendencia)
 
         response_approve = api_client.patch(
-            f'/api/solicitacoes/{solicitacao_id}/approve/',
-            {'justificativa': 'Aprovado para teste'},
-            format='json'
+            f"/api/solicitacoes/{solicitacao_id}/approve/", {"justificativa": "Aprovado para teste"}, format="json"
         )
 
         assert response_approve.status_code == 200
-        assert response_approve.data['solicitacao']['status'] == 'aprovado'
+        assert response_approve.data["solicitacao"]["status"] == "aprovado"
 
 
 @pytest.mark.django_db
@@ -247,12 +212,7 @@ class TestSolicitacaoFluxoNaoSuper:
     """
 
     def test_projeto_outros_cria_solicitacao_aprovada(
-        self,
-        api_client,
-        usuario_coordenador,
-        municipio,
-        projeto_outros,
-        tipo_evento
+        self, api_client, usuario_coordenador, municipio, projeto_outros, tipo_evento
     ):
         """
         Teste PR 13/N-T4: Projeto NAO_SUPER → status inicial = 'aprovado'.
@@ -265,32 +225,27 @@ class TestSolicitacaoFluxoNaoSuper:
         api_client.force_authenticate(user=usuario_coordenador)
 
         payload = {
-            'municipio': municipio.id,
-            'projeto': projeto_outros.id,
-            'tipo': 'evento',
-            'tipo_evento': tipo_evento.id,
-            'inicio': (timezone.now() + timezone.timedelta(days=7)).isoformat(),
-            'fim': (timezone.now() + timezone.timedelta(days=7, hours=2)).isoformat(),
-            'coordenador_acompanha': False,
+            "municipio": municipio.id,
+            "projeto": projeto_outros.id,
+            "tipo": "evento",
+            "tipo_evento": tipo_evento.id,
+            "inicio": (timezone.now() + timezone.timedelta(days=7)).isoformat(),
+            "fim": (timezone.now() + timezone.timedelta(days=7, hours=2)).isoformat(),
+            "coordenador_acompanha": False,
         }
 
-        response = api_client.post('/api/solicitacoes/', payload, format='json')
+        response = api_client.post("/api/solicitacoes/", payload, format="json")
 
         assert response.status_code == 201
-        assert response.data['status'] == 'aprovado'  # Auto-aprovado!
+        assert response.data["status"] == "aprovado"  # Auto-aprovado!
 
         # Verificar no banco
-        solicitacao = Solicitacao.objects.get(id=response.data['id'])
-        assert solicitacao.status == 'aprovado'
-        assert solicitacao.projeto.fluxo == 'NAO_SUPER'
+        solicitacao = Solicitacao.objects.get(id=response.data["id"])
+        assert solicitacao.status == "aprovado"
+        assert solicitacao.projeto.fluxo == "NAO_SUPER"
 
     def test_coordenador_acompanha_nao_afeta_fluxo_outros(
-        self,
-        api_client,
-        usuario_coordenador,
-        municipio,
-        projeto_outros,
-        tipo_evento
+        self, api_client, usuario_coordenador, municipio, projeto_outros, tipo_evento
     ):
         """
         Teste PR 13/N-T5: coordenador_acompanha NÃO determina fluxo (NAO_SUPER).
@@ -302,20 +257,20 @@ class TestSolicitacaoFluxoNaoSuper:
         api_client.force_authenticate(user=usuario_coordenador)
 
         payload = {
-            'municipio': municipio.id,
-            'projeto': projeto_outros.id,
-            'tipo': 'evento',
-            'tipo_evento': tipo_evento.id,
-            'inicio': (timezone.now() + timezone.timedelta(days=7)).isoformat(),
-            'fim': (timezone.now() + timezone.timedelta(days=7, hours=2)).isoformat(),
-            'coordenador_acompanha': False,  # ← False, mas não afeta fluxo
+            "municipio": municipio.id,
+            "projeto": projeto_outros.id,
+            "tipo": "evento",
+            "tipo_evento": tipo_evento.id,
+            "inicio": (timezone.now() + timezone.timedelta(days=7)).isoformat(),
+            "fim": (timezone.now() + timezone.timedelta(days=7, hours=2)).isoformat(),
+            "coordenador_acompanha": False,  # ← False, mas não afeta fluxo
         }
 
-        response = api_client.post('/api/solicitacoes/', payload, format='json')
+        response = api_client.post("/api/solicitacoes/", payload, format="json")
 
         assert response.status_code == 201
-        assert response.data['status'] == 'aprovado'  # Auto-aprovado!
-        assert response.data['coordenador_acompanha'] is False
+        assert response.data["status"] == "aprovado"  # Auto-aprovado!
+        assert response.data["coordenador_acompanha"] is False
 
 
 @pytest.mark.django_db
@@ -325,14 +280,7 @@ class TestPreAgendaFiltroPorFluxo:
     """
 
     def test_pre_agenda_filtra_por_super(
-        self,
-        api_client,
-        usuario_coordenador,
-        grupos,
-        municipio,
-        projeto_super,
-        projeto_outros,
-        tipo_evento
+        self, api_client, usuario_coordenador, grupos, municipio, projeto_super, projeto_outros, tipo_evento
     ):
         """
         Teste PR 13/N-T6: Pré-agenda filtra por fluxo corretamente.
@@ -344,54 +292,51 @@ class TestPreAgendaFiltroPorFluxo:
         """
         # Criar usuário Controle (tem acesso à pré-agenda)
         usuario_controle = Usuario.objects.create_user(
-            username='controle1',
-            password='senha123',
-            cpf='33333333333',
-            email='controle@test.com'
+            username="controle1", password="senha123", cpf="33333333333", email="controle@test.com"
         )
-        usuario_controle.groups.add(grupos['Controle'])
+        usuario_controle.groups.add(grupos["Controle"])
 
         # Criar 2 solicitações: 1 SUPER (pendente→aprovado) + 1 NAO_SUPER (auto-aprovado)
         sol_super = Solicitacao.objects.create(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
-            tipo='evento',
+            tipo="evento",
             tipo_evento=tipo_evento,
             inicio=timezone.now() + timezone.timedelta(days=7),
             fim=timezone.now() + timezone.timedelta(days=7, hours=2),
-            status='aprovado',  # Manualmente aprovada para teste
+            status="aprovado",  # Manualmente aprovada para teste
         )
 
         sol_outros = Solicitacao.objects.create(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_outros,
-            tipo='evento',
+            tipo="evento",
             tipo_evento=tipo_evento,
             inicio=timezone.now() + timezone.timedelta(days=8),
             fim=timezone.now() + timezone.timedelta(days=8, hours=2),
-            status='aprovado',
+            status="aprovado",
         )
 
         api_client.force_authenticate(user=usuario_controle)
 
         # Teste 1: Filtro super=1 (apenas SUPER)
-        response_super = api_client.get('/api/pre-agenda/?super=1')
+        response_super = api_client.get("/api/pre-agenda/?super=1")
         assert response_super.status_code == 200
-        assert response_super.data['count'] == 1
-        assert response_super.data['results'][0]['id'] == sol_super.id
+        assert response_super.data["count"] == 1
+        assert response_super.data["results"][0]["id"] == sol_super.id
 
         # Teste 2: Filtro super=0 (apenas NAO_SUPER)
-        response_outros = api_client.get('/api/pre-agenda/?super=0')
+        response_outros = api_client.get("/api/pre-agenda/?super=0")
         assert response_outros.status_code == 200
-        assert response_outros.data['count'] == 1
-        assert response_outros.data['results'][0]['id'] == sol_outros.id
+        assert response_outros.data["count"] == 1
+        assert response_outros.data["results"][0]["id"] == sol_outros.id
 
         # Teste 3: Sem filtro (ambos)
-        response_ambos = api_client.get('/api/pre-agenda/')
+        response_ambos = api_client.get("/api/pre-agenda/")
         assert response_ambos.status_code == 200
-        assert response_ambos.data['count'] == 2
+        assert response_ambos.data["count"] == 2
 
 
 @pytest.mark.django_db
@@ -401,13 +346,7 @@ class TestSerializerFluxo:
     """
 
     def test_serializer_retorna_fluxo_do_projeto(
-        self,
-        api_client,
-        usuario_coordenador,
-        grupos,
-        municipio,
-        projeto_super,
-        tipo_evento
+        self, api_client, usuario_coordenador, grupos, municipio, projeto_super, tipo_evento
     ):
         """
         Teste PR 13/N-T7: Serializer retorna fluxo do projeto vinculado.
@@ -418,44 +357,34 @@ class TestSerializerFluxo:
         """
         # Criar usuário Controle
         usuario_controle = Usuario.objects.create_user(
-            username='controle1',
-            password='senha123',
-            cpf='33333333333',
-            email='controle@test.com'
+            username="controle1", password="senha123", cpf="33333333333", email="controle@test.com"
         )
-        usuario_controle.groups.add(grupos['Controle'])
+        usuario_controle.groups.add(grupos["Controle"])
 
         # Criar solicitação SUPER aprovada
         sol = Solicitacao.objects.create(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
-            tipo='evento',
+            tipo="evento",
             tipo_evento=tipo_evento,
             inicio=timezone.now() + timezone.timedelta(days=7),
             fim=timezone.now() + timezone.timedelta(days=7, hours=2),
-            status='aprovado',
+            status="aprovado",
         )
 
         api_client.force_authenticate(user=usuario_controle)
 
         # Buscar na pré-agenda
-        response = api_client.get('/api/pre-agenda/')
+        response = api_client.get("/api/pre-agenda/")
 
         assert response.status_code == 200
-        assert response.data['count'] == 1
+        assert response.data["count"] == 1
 
-        item = response.data['results'][0]
-        assert item['fluxo'] == 'SUPER'  # Fluxo do projeto
+        item = response.data["results"][0]
+        assert item["fluxo"] == "SUPER"  # Fluxo do projeto
 
-    def test_serializer_fallback_outros(
-        self,
-        api_client,
-        usuario_coordenador,
-        grupos,
-        municipio,
-        tipo_evento
-    ):
+    def test_serializer_fallback_outros(self, api_client, usuario_coordenador, grupos, municipio, tipo_evento):
         """
         Teste PR 13/N-T8: Serializer usa fallback NAO_SUPER se projeto não tem fluxo.
 
@@ -464,33 +393,30 @@ class TestSerializerFluxo:
         """
         # Criar usuário Controle
         usuario_controle = Usuario.objects.create_user(
-            username='controle2',
-            password='senha123',
-            cpf='44444444444',
-            email='controle2@test.com'
+            username="controle2", password="senha123", cpf="44444444444", email="controle2@test.com"
         )
-        usuario_controle.groups.add(grupos['Controle'])
+        usuario_controle.groups.add(grupos["Controle"])
 
         # Criar solicitação SEM projeto (cenário raro, mas testável)
         sol = Solicitacao.objects.create(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=None,  # Sem projeto
-            tipo='reuniao',
+            tipo="reuniao",
             tipo_evento=tipo_evento,
             inicio=timezone.now() + timezone.timedelta(days=7),
             fim=timezone.now() + timezone.timedelta(days=7, hours=2),
-            status='aprovado',
+            status="aprovado",
         )
 
         api_client.force_authenticate(user=usuario_controle)
 
         # Buscar na pré-agenda
-        response = api_client.get('/api/pre-agenda/')
+        response = api_client.get("/api/pre-agenda/")
 
         assert response.status_code == 200
-        item = response.data['results'][0]
-        assert item['fluxo'] == 'NAO_SUPER'  # Fallback
+        item = response.data["results"][0]
+        assert item["fluxo"] == "NAO_SUPER"  # Fallback
 
 
 @pytest.mark.django_db
@@ -499,13 +425,7 @@ class TestProjetoSemFluxo:
     Testes para projetos sem campo fluxo definido (edge case).
     """
 
-    def test_projeto_sem_fluxo_usa_padrao_outros(
-        self,
-        api_client,
-        usuario_coordenador,
-        municipio,
-        tipo_evento
-    ):
+    def test_projeto_sem_fluxo_usa_padrao_outros(self, api_client, usuario_coordenador, municipio, tipo_evento):
         """
         Teste PR 13/N-T9: Projeto sem fluxo definido usa padrão NAO_SUPER.
 
@@ -516,25 +436,25 @@ class TestProjetoSemFluxo:
         # Criar projeto sem especificar fluxo (usa default)
         projeto_default = Projeto.objects.create(
             nome="Projeto Default",
-            ativo=True
+            ativo=True,
             # fluxo não especificado → usa default do modelo
         )
 
-        assert projeto_default.fluxo == 'NAO_SUPER'
+        assert projeto_default.fluxo == "NAO_SUPER"
 
         api_client.force_authenticate(user=usuario_coordenador)
 
         payload = {
-            'municipio': municipio.id,
-            'projeto': projeto_default.id,
-            'tipo': 'evento',
-            'tipo_evento': tipo_evento.id,
-            'inicio': (timezone.now() + timezone.timedelta(days=7)).isoformat(),
-            'fim': (timezone.now() + timezone.timedelta(days=7, hours=2)).isoformat(),
-            'coordenador_acompanha': False,
+            "municipio": municipio.id,
+            "projeto": projeto_default.id,
+            "tipo": "evento",
+            "tipo_evento": tipo_evento.id,
+            "inicio": (timezone.now() + timezone.timedelta(days=7)).isoformat(),
+            "fim": (timezone.now() + timezone.timedelta(days=7, hours=2)).isoformat(),
+            "coordenador_acompanha": False,
         }
 
-        response = api_client.post('/api/solicitacoes/', payload, format='json')
+        response = api_client.post("/api/solicitacoes/", payload, format="json")
 
         assert response.status_code == 201
-        assert response.data['status'] == 'aprovado'
+        assert response.data["status"] == "aprovado"

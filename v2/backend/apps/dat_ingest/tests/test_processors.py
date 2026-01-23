@@ -6,6 +6,7 @@ Valida processadores de planilhas (AgendaProcessor, DisponibilidadeProcessor, Co
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from datetime import date, datetime, time
 
 import pandas as pd
@@ -30,72 +31,81 @@ def temp_agenda_xlsx(tmp_path):
     ws.title = "Super"
 
     # Header (colunas A-T conforme parse_acompanhamento.py)
-    ws.append([
-        "Criado na Agenda",  # A
-        "", "",  # B, C
-        "Cancelar",  # D
-        "Município",  # E
-        "Encontro",  # F
-        "Tipo",  # G
-        "Data",  # H
-        "Hora Início",  # I
-        "Hora Fim",  # J
-        "Projeto",  # K
-        "Segmento",  # L
-        "Coord Acompanha",  # M
-        "Coordenador",  # N
-        "Formador 1",  # O
-        "Formador 2",  # P
-        "Formador 3",  # Q
-        "Formador 4",  # R
-        "Formador 5",  # S
-        "Convidados"  # T
-    ])
+    ws.append(
+        [
+            "Criado na Agenda",  # A
+            "",
+            "",  # B, C
+            "Cancelar",  # D
+            "Município",  # E
+            "Encontro",  # F
+            "Tipo",  # G
+            "Data",  # H
+            "Hora Início",  # I
+            "Hora Fim",  # J
+            "Projeto",  # K
+            "Segmento",  # L
+            "Coord Acompanha",  # M
+            "Coordenador",  # N
+            "Formador 1",  # O
+            "Formador 2",  # P
+            "Formador 3",  # Q
+            "Formador 4",  # R
+            "Formador 5",  # S
+            "Convidados",  # T
+        ]
+    )
 
     # Data rows (estrutura real da planilha)
     # Nota: OpenPyXL com data_only=True retorna date/time objects, não strings
-    ws.append([
-        "Sim",  # A - Criado na Agenda
-        "", "",  # B, C
-        "",  # D - Cancelar (vazio = não cancelado)
-        "Fortaleza - CE",  # E - Município
-        "Formação Inicial",  # F - Encontro
-        "Presencial",  # G - Tipo
-        date(2025, 1, 15),  # H - Data (date object)
-        time(14, 0),  # I - Hora Início (time object)
-        time(17, 0),  # J - Hora Fim (time object)
-        "ACerta",  # K - Projeto
-        "EI",  # L - Segmento
-        True,  # M - Coord Acompanha
-        "Ellen Damares",  # N - Coordenador
-        "João Silva",  # O - Formador 1
-        "Maria Santos",  # P - Formador 2
-        "",  # Q - Formador 3
-        "",  # R - Formador 4
-        "",  # S - Formador 5
-        ""  # T - Convidados
-    ])
-    ws.append([
-        "Sim",  # A
-        "", "",  # B, C
-        "",  # D
-        "Caucaia - CE",  # E
-        "Workshop",  # F
-        "Presencial",  # G
-        date(2025, 1, 20),  # H - Data (date object)
-        time(9, 0),  # I - Hora Início (time object)
-        time(12, 0),  # J - Hora Fim (time object)
-        "Novo Lendo",  # K - Projeto
-        "EF",  # L - Segmento
-        False,  # M
-        "Aurea Lucia",  # N
-        "Pedro Oliveira",  # O
-        "",  # P
-        "",  # Q
-        "",  # R
-        "",  # S
-        ""  # T
-    ])
+    ws.append(
+        [
+            "Sim",  # A - Criado na Agenda
+            "",
+            "",  # B, C
+            "",  # D - Cancelar (vazio = não cancelado)
+            "Fortaleza - CE",  # E - Município
+            "Formação Inicial",  # F - Encontro
+            "Presencial",  # G - Tipo
+            date(2025, 1, 15),  # H - Data (date object)
+            time(14, 0),  # I - Hora Início (time object)
+            time(17, 0),  # J - Hora Fim (time object)
+            "ACerta",  # K - Projeto
+            "EI",  # L - Segmento
+            True,  # M - Coord Acompanha
+            "Ellen Damares",  # N - Coordenador
+            "João Silva",  # O - Formador 1
+            "Maria Santos",  # P - Formador 2
+            "",  # Q - Formador 3
+            "",  # R - Formador 4
+            "",  # S - Formador 5
+            "",  # T - Convidados
+        ]
+    )
+    ws.append(
+        [
+            "Sim",  # A
+            "",
+            "",  # B, C
+            "",  # D
+            "Caucaia - CE",  # E
+            "Workshop",  # F
+            "Presencial",  # G
+            date(2025, 1, 20),  # H - Data (date object)
+            time(9, 0),  # I - Hora Início (time object)
+            time(12, 0),  # J - Hora Fim (time object)
+            "Novo Lendo",  # K - Projeto
+            "EF",  # L - Segmento
+            False,  # M
+            "Aurea Lucia",  # N
+            "Pedro Oliveira",  # O
+            "",  # P
+            "",  # Q
+            "",  # R
+            "",  # S
+            "",  # T
+        ]
+    )
 
     wb.save(filepath)
     return filepath
@@ -104,33 +114,15 @@ def temp_agenda_xlsx(tmp_path):
 @pytest.fixture
 def temp_users_df():
     """Cria DataFrame de usuários para matching"""
-    return pd.DataFrame([
-        {
-            "nome": "João Silva",
-            "email": "joao.silva@example.com",
-            "perfil": "Formador"
-        },
-        {
-            "nome": "Maria Santos",
-            "email": "maria.santos@example.com",
-            "perfil": "Formador"
-        },
-        {
-            "nome": "Pedro Oliveira",
-            "email": "pedro.oliveira@example.com",
-            "perfil": "Formador"
-        },
-        {
-            "nome": "Ellen Damares",
-            "email": "ellen.damares@example.com",
-            "perfil": "Coordenador"
-        },
-        {
-            "nome": "Aurea Lucia",
-            "email": "aurea.lucia@example.com",
-            "perfil": "Coordenador"
-        }
-    ])
+    return pd.DataFrame(
+        [
+            {"nome": "João Silva", "email": "joao.silva@example.com", "perfil": "Formador"},
+            {"nome": "Maria Santos", "email": "maria.santos@example.com", "perfil": "Formador"},
+            {"nome": "Pedro Oliveira", "email": "pedro.oliveira@example.com", "perfil": "Formador"},
+            {"nome": "Ellen Damares", "email": "ellen.damares@example.com", "perfil": "Coordenador"},
+            {"nome": "Aurea Lucia", "email": "aurea.lucia@example.com", "perfil": "Coordenador"},
+        ]
+    )
 
 
 @pytest.fixture
@@ -153,18 +145,22 @@ def temp_disponibilidade_xlsx(tmp_path):
     ws.append(["Usuário", "Inicio", "Fim", "Tipo"])
 
     # Data rows (datetimes completos, não separados)
-    ws.append([
-        "João Silva",
-        datetime(2025, 1, 10, 8, 0),    # Inicio completo
-        datetime(2025, 1, 10, 18, 0),   # Fim completo
-        "Total"                          # Tipo como string
-    ])
-    ws.append([
-        "Maria Santos",
-        datetime(2025, 1, 15, 14, 0),   # Inicio completo
-        datetime(2025, 1, 15, 17, 0),   # Fim completo
-        "Parcial"                        # Tipo como string
-    ])
+    ws.append(
+        [
+            "João Silva",
+            datetime(2025, 1, 10, 8, 0),  # Inicio completo
+            datetime(2025, 1, 10, 18, 0),  # Fim completo
+            "Total",  # Tipo como string
+        ]
+    )
+    ws.append(
+        [
+            "Maria Santos",
+            datetime(2025, 1, 15, 14, 0),  # Inicio completo
+            datetime(2025, 1, 15, 17, 0),  # Fim completo
+            "Parcial",  # Tipo como string
+        ]
+    )
 
     wb.save(filepath)
     return filepath
@@ -188,30 +184,39 @@ def temp_controle_xlsx(tmp_path):
     ws.title = "DESLOCAMENTO"
 
     # Header (estrutura corrigida: Origem, Tipo, Destino, Data, Pessoas...)
-    ws.append([
-        "Origem", "Tipo", "Destino", "Data",
-        "Pessoa 1", "Pessoa 2", "Pessoa 3", "Pessoa 4", "Pessoa 5", "Pessoa 6"
-    ])
+    ws.append(
+        ["Origem", "Tipo", "Destino", "Data", "Pessoa 1", "Pessoa 2", "Pessoa 3", "Pessoa 4", "Pessoa 5", "Pessoa 6"]
+    )
 
     # Data rows (uma linha pode ter várias pessoas)
-    ws.append([
-        "Fortaleza - CE",      # Origem (com UF)
-        "Deslocamento",        # Tipo
-        "Caucaia - CE",        # Destino
-        datetime(2025, 1, 15), # Data completa
-        "João Silva",          # Pessoa 1
-        None,                  # Pessoa 2 (vazio)
-        None, None, None, None # Demais pessoas vazias
-    ])
-    ws.append([
-        "Caucaia - CE",        # Origem (com UF)
-        "Retorno",             # Tipo
-        "Maracanaú - CE",      # Destino
-        datetime(2025, 1, 20), # Data completa
-        "Maria Santos",        # Pessoa 1
-        None,                  # Pessoa 2 (vazio)
-        None, None, None, None # Demais pessoas vazias
-    ])
+    ws.append(
+        [
+            "Fortaleza - CE",  # Origem (com UF)
+            "Deslocamento",  # Tipo
+            "Caucaia - CE",  # Destino
+            datetime(2025, 1, 15),  # Data completa
+            "João Silva",  # Pessoa 1
+            None,  # Pessoa 2 (vazio)
+            None,
+            None,
+            None,
+            None,  # Demais pessoas vazias
+        ]
+    )
+    ws.append(
+        [
+            "Caucaia - CE",  # Origem (com UF)
+            "Retorno",  # Tipo
+            "Maracanaú - CE",  # Destino
+            datetime(2025, 1, 20),  # Data completa
+            "Maria Santos",  # Pessoa 1
+            None,  # Pessoa 2 (vazio)
+            None,
+            None,
+            None,
+            None,  # Demais pessoas vazias
+        ]
+    )
 
     wb.save(filepath)
     return filepath
@@ -273,9 +278,9 @@ class TestAgendaProcessor:
     def test_tracks_missing_people(self, temp_agenda_xlsx):
         """Test: Detecta pessoas não encontradas no cadastro"""
         # DataFrame sem todos os usuários
-        incomplete_users = pd.DataFrame([
-            {"nome": "Ellen Damares", "email": "ellen@example.com", "perfil": "Coordenador"}
-        ])
+        incomplete_users = pd.DataFrame(
+            [{"nome": "Ellen Damares", "email": "ellen@example.com", "perfil": "Coordenador"}]
+        )
 
         processor = AgendaProcessor(temp_agenda_xlsx, incomplete_users)
         result = processor.process()
@@ -417,10 +422,20 @@ class TestControleProcessor:
         ws.title = "DESLOCAMENTO"
 
         # Apenas header, sem dados (estrutura corrigida 2025-11-19)
-        ws.append([
-            "Origem", "Tipo", "Destino", "Data",
-            "Pessoa 1", "Pessoa 2", "Pessoa 3", "Pessoa 4", "Pessoa 5", "Pessoa 6"
-        ])
+        ws.append(
+            [
+                "Origem",
+                "Tipo",
+                "Destino",
+                "Data",
+                "Pessoa 1",
+                "Pessoa 2",
+                "Pessoa 3",
+                "Pessoa 4",
+                "Pessoa 5",
+                "Pessoa 6",
+            ]
+        )
 
         wb.save(filepath)
 

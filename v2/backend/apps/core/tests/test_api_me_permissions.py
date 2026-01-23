@@ -10,10 +10,12 @@ Cobertura:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.contrib.auth.models import Group
 from django.urls import reverse
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import Usuario
 
@@ -24,9 +26,7 @@ def test_me_includes_groups_and_flag():
     """
     /api/me/ deve retornar groups (lista) e is_superintendencia (bool).
     """
-    user = Usuario.objects.create_user(
-        username="u1", email="u1@x.com", password="x", cpf="11111111111"
-    )
+    user = Usuario.objects.create_user(username="u1", email="u1@x.com", password="x", cpf="11111111111")
     group1, _ = Group.objects.get_or_create(name="Coordenador")
     group2, _ = Group.objects.get_or_create(name="Formador")
     user.groups.add(group1, group2)
@@ -52,9 +52,7 @@ def test_is_superintendencia_true_only_for_group():
     """
     is_superintendencia = True apenas se usuário pertence ao grupo "Superintendência" (case-sensitive).
     """
-    user = Usuario.objects.create_user(
-        username="u2", email="u2@x.com", password="x", cpf="22222222222"
-    )
+    user = Usuario.objects.create_user(username="u2", email="u2@x.com", password="x", cpf="22222222222")
     super_group, _ = Group.objects.get_or_create(name="Superintendência")
     user.groups.add(super_group)
 
@@ -75,9 +73,7 @@ def test_is_superintendencia_false_for_similar_name():
     """
     Grupo com nome parecido (ex: "superintendencia" minúsculo) não ativa flag.
     """
-    user = Usuario.objects.create_user(
-        username="u3", email="u3@x.com", password="x", cpf="33333333333"
-    )
+    user = Usuario.objects.create_user(username="u3", email="u3@x.com", password="x", cpf="33333333333")
     fake_group, _ = Group.objects.get_or_create(name="superintendencia")  # minúsculo
     user.groups.add(fake_group)
 
@@ -98,9 +94,7 @@ def test_me_no_groups_returns_empty_list():
     """
     Usuário sem grupos retorna groups=[] e is_superintendencia=False.
     """
-    user = Usuario.objects.create_user(
-        username="u4", email="u4@x.com", password="x", cpf="44444444444"
-    )
+    user = Usuario.objects.create_user(username="u4", email="u4@x.com", password="x", cpf="44444444444")
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -119,9 +113,7 @@ def test_superuser_always_has_access():
     """
     Superusers sempre têm is_superintendencia=True, mesmo sem grupo.
     """
-    user = Usuario.objects.create_superuser(
-        username="admin", email="admin@x.com", password="x", cpf="55555555555"
-    )
+    user = Usuario.objects.create_superuser(username="admin", email="admin@x.com", password="x", cpf="55555555555")
 
     client = APIClient()
     client.force_authenticate(user=user)

@@ -3,6 +3,7 @@ Tests for custom exception handling (#407 Error Handling).
 
 Tests the custom exception classes and exception handler.
 """
+
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false
 
 from __future__ import annotations

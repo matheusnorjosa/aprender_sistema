@@ -10,6 +10,7 @@ Agendamento via CELERY_BEAT_SCHEDULE no settings.py:
   - Executar a cada 5 minutos
   - Janela padrão: 90 dias atrás até 180 dias à frente
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -19,8 +20,9 @@ import logging
 from io import StringIO
 from typing import Any
 
-from celery import shared_task  # type: ignore[attr-defined]
 from django.core.management import call_command
+
+from celery import shared_task  # type: ignore[attr-defined]
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +90,8 @@ def task_publish_solicitacao_to_gcal(
         }
     """
     from django.conf import settings
-    from apps.core.models import Solicitacao, AuditLog, Usuario
+
+    from apps.core.models import AuditLog, Solicitacao, Usuario
     from apps.core.services.gcal_sync_service import apply_one_solicitacao
 
     # OAuth Phase 3: Verificar modo OAuth e criar cliente se necessário
@@ -141,9 +144,7 @@ def task_publish_solicitacao_to_gcal(
         s = Solicitacao.objects.get(id=solicitation_id)
 
         # Aplicar publicação (com cliente OAuth se disponível)
-        outcome = apply_one_solicitacao(
-            s, dry_run=dry_run, apply_blocked=apply_blocked, client=client
-        )
+        outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked, client=client)
 
         # Criar AuditLog (apenas se não for dry_run)
         if not dry_run:
@@ -243,7 +244,7 @@ def task_cancel_solicitacao_from_gcal(solicitation_id: int) -> dict[str, Any]:
             "error": str | None
         }
     """
-    from apps.core.models import Solicitacao, AuditLog
+    from apps.core.models import AuditLog, Solicitacao
     from apps.core.services.gcal_sync_service import cancel_solicitacao
 
     try:
@@ -313,6 +314,7 @@ def preview_then_apply_gcal() -> dict[str, Any]:
         dict: Resultado JSON (meta + totals + status)
     """
     from django.conf import settings
+
     from apps.core.models import AuditLog
 
     # ================================================================
@@ -403,12 +405,7 @@ def preview_then_apply_gcal() -> dict[str, Any]:
 
     # Verificar se há mudanças
     totals = preview_result.get("totals", {})
-    total_changes = (
-        totals.get("CREATE", 0)
-        + totals.get("UPDATE", 0)
-        + totals.get("ADOPT", 0)
-        + totals.get("DELETE", 0)
-    )
+    total_changes = totals.get("CREATE", 0) + totals.get("UPDATE", 0) + totals.get("ADOPT", 0) + totals.get("DELETE", 0)
 
     # Se sem mudanças, retornar preview (noop)
     if total_changes == 0:
@@ -521,7 +518,7 @@ def queue_gcal_sync_retry(
     Returns:
         dict: Result with action, status, and any errors
     """
-    from apps.core.models import Solicitacao, AuditLog
+    from apps.core.models import AuditLog, Solicitacao
     from apps.core.services.gcal.circuit_breaker import gcal_breaker
 
     # Check circuit breaker state

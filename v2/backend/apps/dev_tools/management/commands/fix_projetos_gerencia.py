@@ -10,6 +10,7 @@ Correções aplicadas:
 Data: 2025-12-01
 Issue: Hierarquia organizacional
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -39,9 +40,9 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.SUCCESS("✅ Modo APPLY: Mudanças serão aplicadas"))
 
-        self.stdout.write("\n" + "="*60)
+        self.stdout.write("\n" + "=" * 60)
         self.stdout.write("📊 CORREÇÃO DE PROJETOS → GERÊNCIAS")
-        self.stdout.write("="*60 + "\n")
+        self.stdout.write("=" * 60 + "\n")
 
         # Carregar gerências
         try:
@@ -124,7 +125,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(f"   ⚠️  Projeto {nome} não encontrado"))
 
         # Resumo final
-        self.stdout.write("\n" + "="*60)
+        self.stdout.write("\n" + "=" * 60)
         if dry_run:
             self.stdout.write(self.style.WARNING("🔍 DRY-RUN CONCLUÍDO: Nenhuma mudança foi aplicada"))
             self.stdout.write("   Execute sem --dry-run para aplicar as correções")
@@ -137,4 +138,4 @@ class Command(BaseCommand):
                 count = g.projetos.count()  # type: ignore[reportUnknownMemberType,reportUnknownVariableType,reportAttributeAccessIssue]
                 self.stdout.write(f"   {g.nome:25} → {count:2} projetos")
 
-        self.stdout.write("="*60)
+        self.stdout.write("=" * 60)

@@ -5,6 +5,7 @@ Models organizacionais: Municipio, Gerencia, EquipeGerencia, ProjetoGeral, Proje
 SSOT: Substitui IMPORTRANGE de planilhas organizacionais.
 Type-checked with Pyright (strict mode).
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -35,42 +36,32 @@ class ProjetoGeral(models.Model):
     """
 
     TIPO_CALCULO_CHOICES = [
-        ('por_aluno', 'Por Aluno (qtde_alunos / divisor)'),
-        ('por_professor', 'Por Professor (qtde_professores * multiplicador)'),
-        ('nao_aplicavel', 'Não Aplicável (não gera códigos)'),
+        ("por_aluno", "Por Aluno (qtde_alunos / divisor)"),
+        ("por_professor", "Por Professor (qtde_professores * multiplicador)"),
+        ("nao_aplicavel", "Não Aplicável (não gera códigos)"),
     ]
 
     nome = models.CharField(
-        max_length=100,
-        unique=True,
-        db_index=True,
-        help_text="Ex: ACERTA MATEMÁTICA, VIDA E LINGUAGEM"
+        max_length=100, unique=True, db_index=True, help_text="Ex: ACERTA MATEMÁTICA, VIDA E LINGUAGEM"
     )
-    usa_avaliar = models.BooleanField(
-        default=False,
-        help_text="Se o projeto utiliza a plataforma AVALIAR"
-    )
+    usa_avaliar = models.BooleanField(default=False, help_text="Se o projeto utiliza a plataforma AVALIAR")
     tipo_calculo_codigos = models.CharField(
         max_length=15,
         choices=TIPO_CALCULO_CHOICES,
-        default='por_professor',
-        help_text="Como calcular número de códigos FORMAR"
+        default="por_professor",
+        help_text="Como calcular número de códigos FORMAR",
     )
     divisor_aluno = models.PositiveIntegerField(
-        default=20,
-        help_text="Divisor quando tipo = por_aluno (ex: 200 alunos / 20 = 10 códigos)"
+        default=20, help_text="Divisor quando tipo = por_aluno (ex: 200 alunos / 20 = 10 códigos)"
     )
     multiplicador_professor = models.DecimalField(
         max_digits=3,
         decimal_places=2,
         default=Decimal("1.1"),
-        help_text="Multiplicador quando tipo = por_professor (ex: 10 professores * 1.1 = 11 códigos)"
+        help_text="Multiplicador quando tipo = por_professor (ex: 10 professores * 1.1 = 11 códigos)",
     )
     ativo = models.BooleanField(default=True)
-    descricao = models.TextField(
-        blank=True,
-        help_text="Descrição adicional do projeto geral"
-    )
+    descricao = models.TextField(blank=True, help_text="Descrição adicional do projeto geral")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -98,24 +89,16 @@ class Municipio(models.Model):
         unique=True,
         db_index=True,
         verbose_name="Codigo IBGE",
-        help_text="Codigo IBGE de 7 digitos do municipio"
+        help_text="Codigo IBGE de 7 digitos do municipio",
     )
     ativo = models.BooleanField(default=True)
 
     # Coordenadas geograficas para visualizacao em mapa
     latitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
-        null=True,
-        blank=True,
-        help_text="Latitude em graus decimais (-90 a 90)"
+        max_digits=9, decimal_places=6, null=True, blank=True, help_text="Latitude em graus decimais (-90 a 90)"
     )
     longitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
-        null=True,
-        blank=True,
-        help_text="Longitude em graus decimais (-180 a 180)"
+        max_digits=9, decimal_places=6, null=True, blank=True, help_text="Longitude em graus decimais (-180 a 180)"
     )
 
     class Meta:  # type: ignore[misc]
@@ -126,11 +109,11 @@ class Municipio(models.Model):
         constraints = [
             models.CheckConstraint(
                 check=models.Q(latitude__gte=-90, latitude__lte=90) | models.Q(latitude__isnull=True),
-                name="latitude_range"
+                name="latitude_range",
             ),
             models.CheckConstraint(
                 check=models.Q(longitude__gte=-180, longitude__lte=180) | models.Q(longitude__isnull=True),
-                name="longitude_range"
+                name="longitude_range",
             ),
         ]
 
@@ -216,10 +199,10 @@ class EquipeGerencia(models.Model):
     """
 
     PAPEL_CHOICES = [
-        ('GERENTE', 'Gerente'),
-        ('COORDENADOR', 'Coordenador'),
-        ('APOIO', 'Apoio de Coordenacao'),
-        ('FORMADOR', 'Formador'),
+        ("GERENTE", "Gerente"),
+        ("COORDENADOR", "Coordenador"),
+        ("APOIO", "Apoio de Coordenacao"),
+        ("FORMADOR", "Formador"),
     ]
 
     gerencia = models.ForeignKey(  # type: ignore[misc]
@@ -262,13 +245,11 @@ class EquipeGerencia(models.Model):
         ordering = ["gerencia", "papel", "usuario"]
         constraints = [
             models.UniqueConstraint(
-                fields=['gerencia', 'usuario', 'papel'],
-                name='unique_equipe_gerencia_usuario_papel',
+                fields=["gerencia", "usuario", "papel"],
+                name="unique_equipe_gerencia_usuario_papel",
             ),
             models.CheckConstraint(
-                check=(
-                    ~models.Q(papel='APOIO') | models.Q(coordenador_supervisor__isnull=False)
-                ),
+                check=(~models.Q(papel="APOIO") | models.Q(coordenador_supervisor__isnull=False)),
                 name="apoio_requires_supervisor",
                 violation_error_message="Apoio de Coordenacao deve ter um coordenador supervisor",
             ),
@@ -283,8 +264,8 @@ class Projeto(models.Model):
     """SSOT: Substitui IMPORTRANGE de Projetos"""
 
     FLUXO_CHOICES = [
-        ('SUPER', 'Superintendencia'),
-        ('NAO_SUPER', 'Nao-Superintendencia'),
+        ("SUPER", "Superintendencia"),
+        ("NAO_SUPER", "Nao-Superintendencia"),
     ]
 
     nome = models.CharField(max_length=200, unique=True, db_index=True)
@@ -292,16 +273,16 @@ class Projeto(models.Model):
         max_length=50,
         null=False,
         blank=True,
-        default='',
+        default="",
         db_index=True,
-        help_text="Codigo unico do projeto (ex: ACERTA, NLENDO). Unique apenas quando preenchido."
+        help_text="Codigo unico do projeto (ex: ACERTA, NLENDO). Unique apenas quando preenchido.",
     )
     fluxo = models.CharField(
         max_length=12,
         choices=FLUXO_CHOICES,
-        default='NAO_SUPER',
+        default="NAO_SUPER",
         db_index=True,
-        help_text="SUPER: requer aprovacao da Superintendencia. NAO_SUPER: auto-aprovado."
+        help_text="SUPER: requer aprovacao da Superintendencia. NAO_SUPER: auto-aprovado.",
     )
     descricao = models.TextField(blank=True)
     ativo = models.BooleanField(default=True)
@@ -323,7 +304,7 @@ class Projeto(models.Model):
         null=True,
         blank=True,
         related_name="projetos_especificos",
-        help_text="Projeto geral pai (ex: VIDA E LINGUAGEM para VIDA E LINGUAGEM 6)"
+        help_text="Projeto geral pai (ex: VIDA E LINGUAGEM para VIDA E LINGUAGEM 6)",
     )
 
     is_test = models.BooleanField(
@@ -338,14 +319,14 @@ class Projeto(models.Model):
         ordering = ["nome"]
         constraints = [
             models.UniqueConstraint(
-                fields=['codigo'],
-                condition=~models.Q(codigo=''),
-                name='unique_projeto_codigo_nonempty',
+                fields=["codigo"],
+                condition=~models.Q(codigo=""),
+                name="unique_projeto_codigo_nonempty",
             ),
             # Issue #136: Check constraint for fluxo choices
             models.CheckConstraint(
-                check=models.Q(fluxo__in=['SUPER', 'NAO_SUPER']),
-                name='projeto_fluxo_valid',
+                check=models.Q(fluxo__in=["SUPER", "NAO_SUPER"]),
+                name="projeto_fluxo_valid",
             ),
         ]
 
@@ -385,30 +366,13 @@ class Produto(models.Model):
         NL-C1 -> "Novo Lendo - Colecao 1" -> Projeto "Novo Lendo"
     """
 
-    codigo = models.CharField(
-        max_length=50,
-        unique=True,
-        db_index=True,
-        help_text="Codigo unico (ex: NL-C1, GE-KB)"
-    )
-    nome = models.CharField(
-        max_length=200,
-        help_text="Nome completo do produto"
-    )
-    descricao = models.TextField(
-        blank=True,
-        help_text="Descricao detalhada"
-    )
+    codigo = models.CharField(max_length=50, unique=True, db_index=True, help_text="Codigo unico (ex: NL-C1, GE-KB)")
+    nome = models.CharField(max_length=200, help_text="Nome completo do produto")
+    descricao = models.TextField(blank=True, help_text="Descricao detalhada")
     projeto: models.ForeignKey[Projeto] = models.ForeignKey(  # type: ignore[assignment]
-        "core.Projeto",
-        on_delete=models.PROTECT,
-        related_name="produtos",
-        help_text="Projeto vinculado"
+        "core.Projeto", on_delete=models.PROTECT, related_name="produtos", help_text="Projeto vinculado"
     )
-    ativo = models.BooleanField(
-        default=True,
-        help_text="Produto disponivel"
-    )
+    ativo = models.BooleanField(default=True, help_text="Produto disponivel")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

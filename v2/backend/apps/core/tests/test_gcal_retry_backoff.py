@@ -13,13 +13,17 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
+from unittest.mock import Mock, call, patch
+
 import pytest
-from unittest.mock import Mock, patch, call
+
 from apps.core.services.gcal_sync_service import _retry_with_backoff
 
 
 class MockHttpError(Exception):
     """Mock de googleapiclient.errors.HttpError"""
+
     def __init__(self, status_code, message="HTTP Error"):
         self.resp = Mock()
         self.resp.status = status_code
@@ -35,16 +39,12 @@ class TestRetryBackoff:
         """RF05: Sucesso na primeira tentativa não deve retentar"""
         mock_func = Mock(return_value="success")
 
-        result = _retry_with_backoff(
-            mock_func,
-            operation_name="test_op",
-            max_retries=3
-        )
+        result = _retry_with_backoff(mock_func, operation_name="test_op", max_retries=3)
 
         assert result == "success"
         assert mock_func.call_count == 1
 
-    @patch('apps.core.services.gcal.utils.time.sleep')
+    @patch("apps.core.services.gcal.utils.time.sleep")
     def test_retry_429_rate_limit_until_success(self, mock_sleep):
         """
         RF05: Rate limit (429) deve retentar até sucesso.
@@ -55,17 +55,10 @@ class TestRetryBackoff:
         - Tentativa 3: Sucesso
         """
         mock_func = Mock()
-        mock_func.side_effect = [
-            MockHttpError(429, "Rate Limit"),
-            MockHttpError(429, "Rate Limit"),
-            "success"
-        ]
+        mock_func.side_effect = [MockHttpError(429, "Rate Limit"), MockHttpError(429, "Rate Limit"), "success"]
 
         result = _retry_with_backoff(
-            mock_func,
-            operation_name="test_429",
-            max_retries=3,
-            initial_delay=0.01  # Delay baixo para testes rápidos
+            mock_func, operation_name="test_429", max_retries=3, initial_delay=0.01  # Delay baixo para testes rápidos
         )
 
         assert result == "success"
@@ -77,7 +70,7 @@ class TestRetryBackoff:
         assert calls[0] == pytest.approx(0.01, rel=0.1)
         assert calls[1] == pytest.approx(0.02, rel=0.1)
 
-    @patch('apps.core.services.gcal.utils.time.sleep')
+    @patch("apps.core.services.gcal.utils.time.sleep")
     def test_retry_500_server_error_until_success(self, mock_sleep):
         """
         RF05: Server error (5xx) deve retentar até sucesso.
@@ -87,37 +80,21 @@ class TestRetryBackoff:
         - Tentativa 2: Sucesso
         """
         mock_func = Mock()
-        mock_func.side_effect = [
-            MockHttpError(500, "Internal Server Error"),
-            "success"
-        ]
+        mock_func.side_effect = [MockHttpError(500, "Internal Server Error"), "success"]
 
-        result = _retry_with_backoff(
-            mock_func,
-            operation_name="test_500",
-            max_retries=3,
-            initial_delay=0.01
-        )
+        result = _retry_with_backoff(mock_func, operation_name="test_500", max_retries=3, initial_delay=0.01)
 
         assert result == "success"
         assert mock_func.call_count == 2
         assert mock_sleep.call_count == 1
 
-    @patch('apps.core.services.gcal.utils.time.sleep')
+    @patch("apps.core.services.gcal.utils.time.sleep")
     def test_retry_503_service_unavailable(self, mock_sleep):
         """RF05: 503 Service Unavailable deve retentar"""
         mock_func = Mock()
-        mock_func.side_effect = [
-            MockHttpError(503, "Service Unavailable"),
-            "success"
-        ]
+        mock_func.side_effect = [MockHttpError(503, "Service Unavailable"), "success"]
 
-        result = _retry_with_backoff(
-            mock_func,
-            operation_name="test_503",
-            max_retries=3,
-            initial_delay=0.01
-        )
+        result = _retry_with_backoff(mock_func, operation_name="test_503", max_retries=3, initial_delay=0.01)
 
         assert result == "success"
         assert mock_func.call_count == 2
@@ -132,11 +109,7 @@ class TestRetryBackoff:
         mock_func.side_effect = MockHttpError(400, "Bad Request")
 
         with pytest.raises(MockHttpError) as exc_info:
-            _retry_with_backoff(
-                mock_func,
-                operation_name="test_400",
-                max_retries=3
-            )
+            _retry_with_backoff(mock_func, operation_name="test_400", max_retries=3)
 
         assert exc_info.value.resp.status == 400
         assert mock_func.call_count == 1  # Apenas 1 tentativa
@@ -147,11 +120,7 @@ class TestRetryBackoff:
         mock_func.side_effect = MockHttpError(403, "Forbidden")
 
         with pytest.raises(MockHttpError):
-            _retry_with_backoff(
-                mock_func,
-                operation_name="test_403",
-                max_retries=3
-            )
+            _retry_with_backoff(mock_func, operation_name="test_403", max_retries=3)
 
         assert mock_func.call_count == 1
 
@@ -161,11 +130,7 @@ class TestRetryBackoff:
         mock_func.side_effect = MockHttpError(404, "Not Found")
 
         with pytest.raises(MockHttpError):
-            _retry_with_backoff(
-                mock_func,
-                operation_name="test_404",
-                max_retries=3
-            )
+            _retry_with_backoff(mock_func, operation_name="test_404", max_retries=3)
 
         assert mock_func.call_count == 1
 
@@ -179,11 +144,7 @@ class TestRetryBackoff:
         mock_func.side_effect = MockHttpError(409, "Conflict")
 
         # Não deve lançar exceção
-        result = _retry_with_backoff(
-            mock_func,
-            operation_name="test_409",
-            max_retries=3
-        )
+        result = _retry_with_backoff(mock_func, operation_name="test_409", max_retries=3)
 
         # 409 retorna None mas não falha
         assert result is None
@@ -198,16 +159,12 @@ class TestRetryBackoff:
         mock_func = Mock()
         mock_func.side_effect = MockHttpError(412, "Precondition Failed")
 
-        result = _retry_with_backoff(
-            mock_func,
-            operation_name="test_412",
-            max_retries=3
-        )
+        result = _retry_with_backoff(mock_func, operation_name="test_412", max_retries=3)
 
         assert result is None
         assert mock_func.call_count == 1
 
-    @patch('apps.core.services.gcal.utils.time.sleep')
+    @patch("apps.core.services.gcal.utils.time.sleep")
     def test_max_retries_exhausted(self, mock_sleep):
         """
         RF05: Após esgotar retries, deve lançar última exceção.
@@ -221,12 +178,7 @@ class TestRetryBackoff:
         mock_func.side_effect = MockHttpError(500, "Server Error")
 
         with pytest.raises(MockHttpError) as exc_info:
-            _retry_with_backoff(
-                mock_func,
-                operation_name="test_max_retries",
-                max_retries=3,
-                initial_delay=0.01
-            )
+            _retry_with_backoff(mock_func, operation_name="test_max_retries", max_retries=3, initial_delay=0.01)
 
         assert exc_info.value.resp.status == 500
         # 1 tentativa inicial + 3 retries = 4 chamadas
@@ -234,7 +186,7 @@ class TestRetryBackoff:
         # 3 sleeps (entre as tentativas)
         assert mock_sleep.call_count == 3
 
-    @patch('apps.core.services.gcal.utils.time.sleep')
+    @patch("apps.core.services.gcal.utils.time.sleep")
     def test_retry_after_header_respected(self, mock_sleep):
         """
         RF05: Header Retry-After deve ser respeitado.
@@ -247,19 +199,14 @@ class TestRetryBackoff:
         mock_func = Mock()
         mock_func.side_effect = [error, "success"]
 
-        result = _retry_with_backoff(
-            mock_func,
-            operation_name="test_retry_after",
-            max_retries=3,
-            initial_delay=1.0
-        )
+        result = _retry_with_backoff(mock_func, operation_name="test_retry_after", max_retries=3, initial_delay=1.0)
 
         assert result == "success"
         assert mock_sleep.call_count == 1
         # Deve usar Retry-After (5s) em vez de backoff exponencial
         assert mock_sleep.call_args[0][0] == 5.0
 
-    @patch('apps.core.services.gcal.utils.time.sleep')
+    @patch("apps.core.services.gcal.utils.time.sleep")
     def test_exponential_backoff_sequence(self, mock_sleep):
         """
         RF05: Backoff exponencial deve seguir sequência 1s, 2s, 4s.
@@ -271,14 +218,11 @@ class TestRetryBackoff:
             MockHttpError(500, "Error 1"),
             MockHttpError(500, "Error 2"),
             MockHttpError(500, "Error 3"),
-            "success"
+            "success",
         ]
 
         result = _retry_with_backoff(
-            mock_func,
-            operation_name="test_backoff_sequence",
-            max_retries=3,
-            initial_delay=1.0
+            mock_func, operation_name="test_backoff_sequence", max_retries=3, initial_delay=1.0
         )
 
         assert result == "success"
@@ -288,7 +232,7 @@ class TestRetryBackoff:
         calls = [c[0][0] for c in mock_sleep.call_args_list]
         assert calls == [1.0, 2.0, 4.0]
 
-    @patch('apps.core.services.gcal.utils.time.sleep')
+    @patch("apps.core.services.gcal.utils.time.sleep")
     def test_string_error_with_429_in_message(self, mock_sleep):
         """
         RF05: Deve detectar 429 por string matching quando objeto não tem resp.status.
@@ -296,42 +240,26 @@ class TestRetryBackoff:
         Cenário: Exceção genérica com "429" no texto.
         """
         mock_func = Mock()
-        mock_func.side_effect = [
-            Exception("HTTP 429 Rate Limit Exceeded"),
-            "success"
-        ]
+        mock_func.side_effect = [Exception("HTTP 429 Rate Limit Exceeded"), "success"]
 
-        result = _retry_with_backoff(
-            mock_func,
-            operation_name="test_string_429",
-            max_retries=3,
-            initial_delay=0.01
-        )
+        result = _retry_with_backoff(mock_func, operation_name="test_string_429", max_retries=3, initial_delay=0.01)
 
         assert result == "success"
         assert mock_func.call_count == 2
         assert mock_sleep.call_count == 1
 
-    @patch('apps.core.services.gcal.utils.time.sleep')
+    @patch("apps.core.services.gcal.utils.time.sleep")
     def test_string_error_with_500_in_message(self, mock_sleep):
         """RF05: Deve detectar 5xx por string matching"""
         mock_func = Mock()
-        mock_func.side_effect = [
-            Exception("HTTP 503 Service Unavailable"),
-            "success"
-        ]
+        mock_func.side_effect = [Exception("HTTP 503 Service Unavailable"), "success"]
 
-        result = _retry_with_backoff(
-            mock_func,
-            operation_name="test_string_503",
-            max_retries=3,
-            initial_delay=0.01
-        )
+        result = _retry_with_backoff(mock_func, operation_name="test_string_503", max_retries=3, initial_delay=0.01)
 
         assert result == "success"
         assert mock_func.call_count == 2
 
-    @patch('apps.core.services.gcal.utils.time.sleep')
+    @patch("apps.core.services.gcal.utils.time.sleep")
     def test_unknown_error_retries_conservatively(self, mock_sleep):
         """
         RF05: Erro desconhecido deve retentar conservadoramente.
@@ -339,17 +267,9 @@ class TestRetryBackoff:
         Cenário: Exceção sem código de status identificável.
         """
         mock_func = Mock()
-        mock_func.side_effect = [
-            Exception("Unknown network error"),
-            "success"
-        ]
+        mock_func.side_effect = [Exception("Unknown network error"), "success"]
 
-        result = _retry_with_backoff(
-            mock_func,
-            operation_name="test_unknown_error",
-            max_retries=3,
-            initial_delay=0.01
-        )
+        result = _retry_with_backoff(mock_func, operation_name="test_unknown_error", max_retries=3, initial_delay=0.01)
 
         assert result == "success"
         assert mock_func.call_count == 2

@@ -10,8 +10,10 @@ Verifies that:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.conf import settings
+
+import pytest
 
 
 class TestIncludeETLSetting:
@@ -57,9 +59,7 @@ class TestETLURLsConditional:
         response = client.get("/api/etl/reports/latest/")
         # 403 = endpoint exists but auth required
         # 404 = endpoint doesn't exist
-        assert response.status_code in [403, 401], (
-            f"Expected 403/401 (auth required), got {response.status_code}"
-        )
+        assert response.status_code in [403, 401], f"Expected 403/401 (auth required), got {response.status_code}"
 
     def test_core_urls_always_registered(self, client):
         """Core endpoints should always be accessible."""

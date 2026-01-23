@@ -10,20 +10,22 @@ Cenários testados:
 - ID de usuário inválido (handled gracefully)
 - Usuário não-privilegiado não pode checar outros (403)
 """
+
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from datetime import timedelta
 from uuid import uuid4
 
-import pytest
 from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from apps.core.models import AvailabilityBlock, Municipio, Usuario
+import pytest
 
+from apps.core.models import AvailabilityBlock, Municipio, Usuario
 
 pytestmark = pytest.mark.django_db
 
@@ -102,9 +104,7 @@ def municipio():
 class TestAvailabilityCheckManyEndpoint:
     """Testes para endpoint batch /api/availability/check-many/."""
 
-    def test_check_many_all_available(
-        self, user_controle, formador_1, formador_2, municipio
-    ):
+    def test_check_many_all_available(self, user_controle, formador_1, formador_2, municipio):
         """Todos os formadores disponíveis retorna ok=True.
 
         Cenário: Nenhum bloqueio ou conflito existe para os formadores.
@@ -137,9 +137,7 @@ class TestAvailabilityCheckManyEndpoint:
             assert result["ok"] is True, f"Formador {result['usuario_id']} should be available"
             assert len(result["conflicts"]) == 0
 
-    def test_check_many_one_blocked_by_availability_block(
-        self, user_controle, formador_1, formador_2, municipio
-    ):
+    def test_check_many_one_blocked_by_availability_block(self, user_controle, formador_1, formador_2, municipio):
         """Um formador bloqueado por AvailabilityBlock retorna ok=False.
 
         Cenário: formador_1 tem AvailabilityBlock tipo T no período.
@@ -213,9 +211,7 @@ class TestAvailabilityCheckManyEndpoint:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "usuarios_ids" in str(response.data).lower()
 
-    def test_check_many_invalid_user_id_handled_gracefully(
-        self, user_controle, formador_1, municipio
-    ):
+    def test_check_many_invalid_user_id_handled_gracefully(self, user_controle, formador_1, municipio):
         """ID de usuário inválido é tratado graciosamente.
 
         O endpoint retorna ok=False para usuário inexistente com código X,
@@ -256,9 +252,7 @@ class TestAvailabilityCheckManyEndpoint:
         conflict_codes = [c["code"] for c in results_map[invalid_id]["conflicts"]]
         assert "X" in conflict_codes, "Should have X (user not found) conflict"
 
-    def test_check_many_non_privileged_cannot_check_others(
-        self, user_formador, formador_1, municipio
-    ):
+    def test_check_many_non_privileged_cannot_check_others(self, user_formador, formador_1, municipio):
         """Usuário não-privilegiado não pode checar disponibilidade de outros.
 
         PA-02: Apenas Controle/Superintendência podem checar múltiplos usuários.
@@ -300,9 +294,7 @@ class TestAvailabilityCheckManyEndpoint:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "inicio" in str(response.data).lower() or "obrigat" in str(response.data).lower()
 
-    def test_check_many_fim_before_inicio_returns_error(
-        self, user_controle, formador_1, municipio
-    ):
+    def test_check_many_fim_before_inicio_returns_error(self, user_controle, formador_1, municipio):
         """fim antes de inicio retorna erro 400."""
         client = APIClient()
         client.force_authenticate(user=user_controle)

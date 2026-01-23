@@ -1,10 +1,12 @@
 """
 Parser para aba Bloqueios da planilha Disponibilidade
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 
 from __future__ import annotations
+
 from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
@@ -36,12 +38,12 @@ def parse_bloqueios(filepath: Path) -> list[dict[str, Any]]:
     """
     wb = load_workbook(filepath, data_only=True)
 
-    if 'Bloqueios' not in wb.sheetnames:
+    if "Bloqueios" not in wb.sheetnames:
         return []
 
-    ws = wb['Bloqueios']
+    ws = wb["Bloqueios"]
     bloqueios = []
-    tz = pytz.timezone('America/Fortaleza')
+    tz = pytz.timezone("America/Fortaleza")
 
     for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not row or len(row) < 4:
@@ -50,7 +52,7 @@ def parse_bloqueios(filepath: Path) -> list[dict[str, Any]]:
         # Estrutura correta: Usuário | Inicio | Fim | Tipo
         formador_nome = normalize_str(row[0]) if row[0] else ""
         inicio_raw = row[1]  # datetime completo
-        fim_raw = row[2]     # datetime completo
+        fim_raw = row[2]  # datetime completo
         tipo_raw = normalize_str(row[3]).upper() if row[3] else ""
 
         # Validar campos obrigatórios
@@ -58,10 +60,10 @@ def parse_bloqueios(filepath: Path) -> list[dict[str, Any]]:
             continue
 
         # Validar e normalizar tipo
-        if tipo_raw not in ['T', 'P', 'TOTAL', 'PARCIAL']:
+        if tipo_raw not in ["T", "P", "TOTAL", "PARCIAL"]:
             continue
 
-        tipo = 'T' if tipo_raw in ['TOTAL', 'T'] else 'P'
+        tipo = "T" if tipo_raw in ["TOTAL", "T"] else "P"
 
         # Processar datetimes
         try:
@@ -96,14 +98,16 @@ def parse_bloqueios(filepath: Path) -> list[dict[str, Any]]:
             # Erro ao processar datas, pular linha
             continue
 
-        bloqueios.append({
-            'formador_nome': formador_nome,
-            'tipo': tipo,
-            'inicio': inicio,
-            'fim': fim,
-            'motivo': '',  # Planilha não tem coluna de motivo
-            'src': f"{filepath.name}/Bloqueios",
-            'rownum': i,
-        })
+        bloqueios.append(
+            {
+                "formador_nome": formador_nome,
+                "tipo": tipo,
+                "inicio": inicio,
+                "fim": fim,
+                "motivo": "",  # Planilha não tem coluna de motivo
+                "src": f"{filepath.name}/Bloqueios",
+                "rownum": i,
+            }
+        )
 
     return bloqueios

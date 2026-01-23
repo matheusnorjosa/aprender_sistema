@@ -9,6 +9,7 @@ Issue #54: Extrair magic numbers para constantes.
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from decimal import Decimal
 
 from apps.dat_ingest import constants
@@ -16,12 +17,12 @@ from apps.dat_ingest import constants
 
 def test_constants_are_defined():
     """Todas as constantes ETL estão definidas."""
-    assert hasattr(constants, 'NAME_MATCH_JACCARD_MIN')
-    assert hasattr(constants, 'NAME_MATCH_SCORE_SUBSET')
-    assert hasattr(constants, 'NAME_MATCH_SCORE_FIRST_LAST')
-    assert hasattr(constants, 'TOP_UNKNOWN_USERS_LIMIT')
-    assert hasattr(constants, 'AUDIT_MIN_FREQUENCY')
-    assert hasattr(constants, 'AUDIT_MULTI_SECTOR_THRESHOLD')
+    assert hasattr(constants, "NAME_MATCH_JACCARD_MIN")
+    assert hasattr(constants, "NAME_MATCH_SCORE_SUBSET")
+    assert hasattr(constants, "NAME_MATCH_SCORE_FIRST_LAST")
+    assert hasattr(constants, "TOP_UNKNOWN_USERS_LIMIT")
+    assert hasattr(constants, "AUDIT_MIN_FREQUENCY")
+    assert hasattr(constants, "AUDIT_MULTI_SECTOR_THRESHOLD")
 
 
 def test_matching_constants_are_decimal():
@@ -55,9 +56,9 @@ def test_audit_thresholds_are_positive():
 def test_constants_values():
     """Valores esperados das constantes (baseline)."""
     # Matching scores (valores atuais do código)
-    assert constants.NAME_MATCH_JACCARD_MIN == Decimal('0.60')
-    assert constants.NAME_MATCH_SCORE_SUBSET == Decimal('0.90')
-    assert constants.NAME_MATCH_SCORE_FIRST_LAST == Decimal('0.85')
+    assert constants.NAME_MATCH_JACCARD_MIN == Decimal("0.60")
+    assert constants.NAME_MATCH_SCORE_SUBSET == Decimal("0.90")
+    assert constants.NAME_MATCH_SCORE_FIRST_LAST == Decimal("0.85")
 
     # Limits
     assert constants.TOP_UNKNOWN_USERS_LIMIT == 20

@@ -15,11 +15,13 @@ Tests:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from io import StringIO
 
-import pytest
 from django.contrib.auth.models import Group
 from django.core.management import call_command
+
+import pytest
 
 from apps.core.models import Gerencia, Usuario
 
@@ -67,9 +69,7 @@ def clean_gerentes(db):
 class TestSeedGerentesCommand:
     """Tests for seed_gerentes management command."""
 
-    def test_seed_gerentes_creates_group_if_not_exists(
-        self, clean_gerencias, clean_gerentes
-    ):
+    def test_seed_gerentes_creates_group_if_not_exists(self, clean_gerencias, clean_gerentes):
         """Test that command creates 'Gerência' group if it doesn't exist."""
         # Ensure group doesn't exist
         Group.objects.filter(name="Gerência").delete()
@@ -83,9 +83,7 @@ class TestSeedGerentesCommand:
         output = out.getvalue()
         assert "Created Django Group: Gerência" in output
 
-    def test_seed_gerentes_creates_missing_usuarios(
-        self, clean_gerencias, clean_gerentes
-    ):
+    def test_seed_gerentes_creates_missing_usuarios(self, clean_gerencias, clean_gerentes):
         """Test that command creates 4 missing usuarios."""
         # Verify 0 gerentes before
         assert Usuario.objects.filter(cargo="Gerente").count() == 0
@@ -187,9 +185,7 @@ class TestSeedGerentesCommand:
         output2 = out2.getvalue()
         assert "already exists" in output2.lower()
 
-    def test_seed_gerentes_dry_run_does_not_commit(
-        self, clean_gerencias, clean_gerentes
-    ):
+    def test_seed_gerentes_dry_run_does_not_commit(self, clean_gerencias, clean_gerentes):
         """Test that --dry-run doesn't commit changes."""
         # Run command with dry-run
         out = StringIO()
@@ -203,9 +199,7 @@ class TestSeedGerentesCommand:
         assert "DRY RUN" in output
         assert "Rolling back" in output
 
-    def test_seed_gerentes_handles_existing_usuarios(
-        self, clean_gerencias, clean_gerentes
-    ):
+    def test_seed_gerentes_handles_existing_usuarios(self, clean_gerencias, clean_gerentes):
         """Test that command handles existing usuarios correctly."""
         # Pre-create one gerente (Patrícia)
         Usuario.objects.create(
@@ -231,9 +225,7 @@ class TestSeedGerentesCommand:
         output = out.getvalue()
         assert "already exists" in output.lower()
 
-    def test_seed_gerentes_handles_superintendencia_multiple_managers(
-        self, clean_gerencias, clean_gerentes
-    ):
+    def test_seed_gerentes_handles_superintendencia_multiple_managers(self, clean_gerencias, clean_gerentes):
         """Test that SUPERINTENDENCIA with 4 managers only links first one."""
         # Run command
         out = StringIO()
@@ -272,9 +264,7 @@ class TestSeedGerentesCommand:
         assert generate_username("Fernanda", "Ramos Lopes") == "fernanda.lopes"
 
         # Test compound first name
-        assert (
-            generate_username("Gleice Anne", "Lima de Sousa") == "gleice.sousa"
-        )
+        assert generate_username("Gleice Anne", "Lima de Sousa") == "gleice.sousa"
 
         # Test with accents
         assert generate_username("Patrícia", "Lemos de Paiva") == "patricia.paiva"

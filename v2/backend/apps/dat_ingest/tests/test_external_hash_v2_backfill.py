@@ -10,15 +10,17 @@ Garante que:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import json
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import pytest
 from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase, TransactionTestCase
+
+import pytest
 
 from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
@@ -51,9 +53,7 @@ class TestBackfillExternalHashV2DryRun(TestCase):
         # Create test data
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
         self.tipo = TipoEvento.objects.create(nome="Presencial")
-        self.projeto = Projeto.objects.create(
-            nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True
-        )
+        self.projeto = Projeto.objects.create(nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True)
 
         # Create test solicitação
         tz = ZoneInfo("America/Fortaleza")
@@ -89,6 +89,7 @@ class TestBackfillExternalHashV2DryRun(TestCase):
     def test_dry_run_shows_would_update_count(self):
         """--dry-run mostra contadores corretos."""
         from io import StringIO
+
         out = StringIO()
 
         call_command("backfill_external_hash_v2", stdout=out)
@@ -109,9 +110,9 @@ class TestBackfillExternalHashV2DryRun(TestCase):
                 municipio=self.municipio,
                 tipo_evento=self.tipo,
                 projeto=self.projeto,
-                inicio=datetime(2025, 1, 16+i, 8, 0, tzinfo=tz),
-                fim=datetime(2025, 1, 16+i, 12, 0, tzinfo=tz),
-                encontro=str(i+2),
+                inicio=datetime(2025, 1, 16 + i, 8, 0, tzinfo=tz),
+                fim=datetime(2025, 1, 16 + i, 12, 0, tzinfo=tz),
+                encontro=str(i + 2),
                 segmento="EI",
                 status="pendente",
                 external_hash=f"old_hash_{i}",
@@ -151,9 +152,7 @@ class TestBackfillExternalHashV2Apply(TransactionTestCase):
 
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
         self.tipo = TipoEvento.objects.create(nome="Presencial")
-        self.projeto = Projeto.objects.create(
-            nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True
-        )
+        self.projeto = Projeto.objects.create(nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True)
 
     def test_apply_persists_new_hash(self):
         """--apply persiste o novo hash v2."""
@@ -323,9 +322,7 @@ class TestBackfillCollisionsReport(TestCase):
 
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
         self.tipo = TipoEvento.objects.create(nome="Presencial")
-        self.projeto = Projeto.objects.create(
-            nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True
-        )
+        self.projeto = Projeto.objects.create(nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True)
 
     def tearDown(self):
         """Clean up collision file."""

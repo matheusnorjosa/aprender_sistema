@@ -12,6 +12,7 @@ Regras de negócio:
 - Outros sem formadores → Coordenador também FORMADOR
 - Convidados (coluna T) ignorados neste ETL
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -141,9 +142,9 @@ class Command(BaseCommand):
                 raise CommandError(error_msg)
             else:
                 # Dry-run: apenas warning
-                self.stdout.write(self.style.WARNING(
-                    f"   ⚠️  {len(violations)} violation(s) detectadas (dry-run: sem abortar)"
-                ))
+                self.stdout.write(
+                    self.style.WARNING(f"   ⚠️  {len(violations)} violation(s) detectadas (dry-run: sem abortar)")
+                )
         else:
             self.stdout.write(self.style.SUCCESS("   ✅ All quality gates passed"))
 
@@ -196,7 +197,13 @@ class Command(BaseCommand):
 
         return participantes_map
 
-    def compute_external_hash(self, evento: dict[str, Any], coord_email: str, coord_name: str, participantes: list[dict[str, Any]] | None = None) -> str:
+    def compute_external_hash(
+        self,
+        evento: dict[str, Any],
+        coord_email: str,
+        coord_name: str,
+        participantes: list[dict[str, Any]] | None = None,
+    ) -> str:
         """
         Gera external_hash SHA1 a partir de campos-chave do evento.
 
@@ -246,9 +253,7 @@ class Command(BaseCommand):
             return hash_event_v2(row)
 
         # Fallback: hash v1 (8 campos) para back-compat
-        sector = normalize_sector(
-            evento.get("source_sheet", ""), evento.get("projeto", "")
-        )
+        sector = normalize_sector(evento.get("source_sheet", ""), evento.get("projeto", ""))
         municipio = evento.get("municipio", "").strip()
         tipo = evento.get("tipo", "").strip()
         data = evento.get("data", "").strip()
@@ -303,10 +308,12 @@ class Command(BaseCommand):
         if not coord:
             self.stdout.write(f"   ⚠️  Sem coordenador: {event_hash_csv}")
             self.stats["skipped"]["autor"] += 1
-            self.pendencias["outros"].append({
-                "event_hash": event_hash_csv,
-                "motivo": "autor_ausente",
-            })
+            self.pendencias["outros"].append(
+                {
+                    "event_hash": event_hash_csv,
+                    "motivo": "autor_ausente",
+                }
+            )
             return
 
         autor = resolve_user_by_email(coord.get("email", ""))
@@ -314,15 +321,15 @@ class Command(BaseCommand):
             autor = resolve_user_by_name(coord.get("display_name", ""))
 
         if not autor:
-            self.stdout.write(
-                f"   ⚠️  Autor não resolvido: {coord.get('email')} / {coord.get('display_name')}"
-            )
+            self.stdout.write(f"   ⚠️  Autor não resolvido: {coord.get('email')} / {coord.get('display_name')}")
             self.stats["skipped"]["autor"] += 1
-            self.pendencias["usuarios"].append({
-                "email": coord.get("email"),
-                "display_name": coord.get("display_name"),
-                "motivo": "coordenador_nao_encontrado",
-            })
+            self.pendencias["usuarios"].append(
+                {
+                    "email": coord.get("email"),
+                    "display_name": coord.get("display_name"),
+                    "motivo": "coordenador_nao_encontrado",
+                }
+            )
             return
 
         # Determinar municípios
@@ -337,17 +344,17 @@ class Command(BaseCommand):
         if not municipios_nomes:
             self.stdout.write(f"   ⚠️  Sem município: {event_hash_csv}")
             self.stats["skipped"]["fk"] += 1
-            self.pendencias["outros"].append({
-                "event_hash": event_hash_csv,
-                "motivo": "municipio_ausente",
-            })
+            self.pendencias["outros"].append(
+                {
+                    "event_hash": event_hash_csv,
+                    "motivo": "municipio_ausente",
+                }
+            )
             return
 
         # Processar cada município (gera 1 Solicitação por município)
         for municipio_nome in municipios_nomes:
-            self.process_solicitacao_for_municipio(
-                evento, autor, municipio_nome, participantes
-            )
+            self.process_solicitacao_for_municipio(evento, autor, municipio_nome, participantes)
 
     def find_coordenador(self, participantes: list[dict[str, Any]]) -> dict[str, Any] | None:
         """Retorna o primeiro COORDENADOR da lista de participantes."""
@@ -370,9 +377,7 @@ class Command(BaseCommand):
             self.pendencias["municipios"].append(municipio_nome)
             return
 
-        sector = normalize_sector(
-            evento.get("source_sheet", ""), evento.get("projeto", "")
-        )
+        sector = normalize_sector(evento.get("source_sheet", ""), evento.get("projeto", ""))
         projeto = resolve_projeto(sector)
         if not projeto:
             self.stdout.write(f"   ⚠️  Projeto não resolvido: {sector}")
@@ -396,25 +401,27 @@ class Command(BaseCommand):
         if not (data_evento and hora_inicio and hora_fim):
             self.stdout.write(f"   ⚠️  Data/hora inválida: {evento.get('event_hash')}")
             self.stats["skipped"]["intervalo_invalido"] += 1
-            self.pendencias["outros"].append({
-                "event_hash": evento.get("event_hash"),
-                "motivo": "data_hora_invalida",
-            })
+            self.pendencias["outros"].append(
+                {
+                    "event_hash": evento.get("event_hash"),
+                    "motivo": "data_hora_invalida",
+                }
+            )
             return
 
         # Combinar data + hora timezone-aware
-        inicio = timezone.make_aware(
-            datetime.combine(data_evento, hora_inicio), self.tz
-        )
+        inicio = timezone.make_aware(datetime.combine(data_evento, hora_inicio), self.tz)
         fim = timezone.make_aware(datetime.combine(data_evento, hora_fim), self.tz)
 
         if fim <= inicio:
             self.stdout.write(f"   ⚠️  Intervalo inválido (fim <= inicio): {evento.get('event_hash')}")
             self.stats["skipped"]["intervalo_invalido"] += 1
-            self.pendencias["outros"].append({
-                "event_hash": evento.get("event_hash"),
-                "motivo": "fim_menor_igual_inicio",
-            })
+            self.pendencias["outros"].append(
+                {
+                    "event_hash": evento.get("event_hash"),
+                    "motivo": "fim_menor_igual_inicio",
+                }
+            )
             return
 
         # Determinar status
@@ -492,7 +499,9 @@ class Command(BaseCommand):
             self.stats["solicitacoes"]["created"] += 1
             self.stdout.write(f"   [DRY-RUN] Solicitação: {external_hash[:8]}...")
 
-    def process_participations(self, solicitacao: Any, participantes: list[dict[str, Any]], evento: dict[str, Any]) -> None:
+    def process_participations(
+        self, solicitacao: Any, participantes: list[dict[str, Any]], evento: dict[str, Any]
+    ) -> None:
         """
         Cria/atualiza Participations para uma solicitação.
 
@@ -526,19 +535,13 @@ class Command(BaseCommand):
                 # Skip se ambos (email E display_name) vazios OU se display_name é indicador
                 if not email and not display_name:
                     self.stdout.write(f"      🚫 Participante vazio ({role}): sem email/nome")
-                    self.stats["skipped"]["indicators"] = (
-                        self.stats["skipped"].get("indicators", 0) + 1
-                    )
+                    self.stats["skipped"]["indicators"] = self.stats["skipped"].get("indicators", 0) + 1
                     continue
 
                 # Se display_name existe, verificar se é indicador
                 if display_name and not should_create_participation(display_name):
-                    self.stdout.write(
-                        f"      🚫 Indicador filtrado ({role}): {display_name}"
-                    )
-                    self.stats["skipped"]["indicators"] = (
-                        self.stats["skipped"].get("indicators", 0) + 1
-                    )
+                    self.stdout.write(f"      🚫 Indicador filtrado ({role}): {display_name}")
+                    self.stats["skipped"]["indicators"] = self.stats["skipped"].get("indicators", 0) + 1
                     continue
 
                 # Resolver usuário
@@ -547,15 +550,15 @@ class Command(BaseCommand):
                     user = resolve_user_by_name(display_name)
 
                 if not user:
-                    self.stdout.write(
-                        f"      ⚠️  Participante não resolvido ({role}): {email} / {display_name}"
+                    self.stdout.write(f"      ⚠️  Participante não resolvido ({role}): {email} / {display_name}")
+                    self.pendencias["usuarios"].append(
+                        {
+                            "email": email,
+                            "display_name": display_name,
+                            "role": role,
+                            "motivo": "nao_encontrado",
+                        }
                     )
-                    self.pendencias["usuarios"].append({
-                        "email": email,
-                        "display_name": display_name,
-                        "role": role,
-                        "motivo": "nao_encontrado",
-                    })
                     continue
 
                 # Criar Participation
@@ -570,7 +573,9 @@ class Command(BaseCommand):
                 else:
                     self.stats["participations"]["updated"] += 1
 
-    def calculate_metrics(self, eventos: list[dict[str, Any]], participantes_map: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    def calculate_metrics(
+        self, eventos: list[dict[str, Any]], participantes_map: dict[str, list[dict[str, Any]]]
+    ) -> dict[str, Any]:
         """
         Calcula métricas de qualidade de dados para quality gates (PR21).
 
@@ -688,8 +693,7 @@ class Command(BaseCommand):
         # Gate 1: Duplicates percentage
         if metrics["duplicates_pct"] > settings.ETL_MAX_DUPLICATES_PCT:
             msg = (
-                f"Duplicates threshold violated: {metrics['duplicates_pct']}% > "
-                f"{settings.ETL_MAX_DUPLICATES_PCT}%"
+                f"Duplicates threshold violated: {metrics['duplicates_pct']}% > " f"{settings.ETL_MAX_DUPLICATES_PCT}%"
             )
             violations.append({"gate": "ETL_MAX_DUPLICATES_PCT", "message": msg})
 
@@ -711,10 +715,7 @@ class Command(BaseCommand):
 
         # Gate 4: Invalid dates
         if settings.ETL_REQUIRE_ZERO_INVALID_DATES and metrics["invalid_dates_count"] > 0:
-            msg = (
-                f"Invalid dates detected: {metrics['invalid_dates_count']} "
-                f"(ETL_REQUIRE_ZERO_INVALID_DATES=True)"
-            )
+            msg = f"Invalid dates detected: {metrics['invalid_dates_count']} " f"(ETL_REQUIRE_ZERO_INVALID_DATES=True)"
             violations.append({"gate": "ETL_REQUIRE_ZERO_INVALID_DATES", "message": msg})
 
         return violations
@@ -767,12 +768,14 @@ class Command(BaseCommand):
                     metric_value = "N/A"
                     threshold = "N/A"
 
-                writer.writerow({
-                    "gate": gate,
-                    "message": message,
-                    "metric_value": metric_value,
-                    "threshold": threshold,
-                })
+                writer.writerow(
+                    {
+                        "gate": gate,
+                        "message": message,
+                        "metric_value": metric_value,
+                        "threshold": threshold,
+                    }
+                )
 
         self.stdout.write(f"   📄 Violações salvas em: {report_path}")
 
@@ -792,7 +795,7 @@ class Command(BaseCommand):
             json.dump(report, f, indent=2, ensure_ascii=False)
 
         self.stdout.write(f"\n📄 Relatório salvo em: {report_path}")
-        self.stdout.write(f"\n📊 Stats:")
+        self.stdout.write("\n📊 Stats:")
         self.stdout.write(f"   Solicitações: {self.stats['solicitacoes']}")
         self.stdout.write(f"   Participations: {self.stats['participations']}")
         self.stdout.write(f"   Skipped: {self.stats['skipped']}")

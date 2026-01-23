@@ -21,6 +21,7 @@ Usage:
         # Circuit is open, queue for later retry
         pass
 """
+
 # pyright: reportIncompatibleMethodOverride=false
 
 from __future__ import annotations
@@ -29,8 +30,9 @@ import logging
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
-import pybreaker
 from django.conf import settings
+
+import pybreaker
 
 if TYPE_CHECKING:
     from typing import ParamSpec
@@ -90,8 +92,8 @@ class GCalCircuitBreakerListener(pybreaker.CircuitBreakerListener):
 # Global circuit breaker instance for GCal operations
 # Issue #443: Use settings for fail_max and reset_timeout
 gcal_breaker = pybreaker.CircuitBreaker(
-    fail_max=getattr(settings, 'GCAL_CIRCUIT_BREAKER_FAIL_MAX', 5),
-    reset_timeout=getattr(settings, 'GCAL_CIRCUIT_BREAKER_RESET_TIMEOUT', 60),
+    fail_max=getattr(settings, "GCAL_CIRCUIT_BREAKER_FAIL_MAX", 5),
+    reset_timeout=getattr(settings, "GCAL_CIRCUIT_BREAKER_RESET_TIMEOUT", 60),
     state_storage=pybreaker.CircuitMemoryStorage(pybreaker.STATE_CLOSED),
     listeners=[GCalCircuitBreakerListener()],
     name="gcal_api",

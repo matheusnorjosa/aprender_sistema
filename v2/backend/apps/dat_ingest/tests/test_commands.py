@@ -6,15 +6,18 @@ Valida comandos Django de importação (load_full_pipeline, load_tipos_evento).
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from pathlib import Path
 
-import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
+
+import pytest
 from openpyxl import Workbook
 
 from apps.core.models import Municipio, Projeto, TipoEvento, Usuario
 from apps.dat_ingest.models.staging import StgMunicipio, StgProjeto, StgTipoEvento, StgUsuario
+
 # Nota: StgEvento não existe (Issue #39 - sem criar models/migrations novas)
 
 
@@ -27,22 +30,35 @@ def temp_users_file(tmp_path):
     ws.title = "Ativos"
 
     # Header
-    ws.append([
-        "Nome", "CPF", "Telefone", "Email", "Cargo",
-        "Gerência", "Perfil", "Superintendência", "Ativo"
-    ])
+    ws.append(["Nome", "CPF", "Telefone", "Email", "Cargo", "Gerência", "Perfil", "Superintendência", "Ativo"])
 
     # Data rows
-    ws.append([
-        "João Silva", "12345678901", "(85) 99999-9999",
-        "joao.silva@example.com", "Formador", "DAT",
-        "Formador", "", "Sim"
-    ])
-    ws.append([
-        "Ellen Damares", "98765432100", "(85) 88888-8888",
-        "ellen.damares@example.com", "Coordenadora", "Superintendência",
-        "Coordenador", "Sim", "Sim"
-    ])
+    ws.append(
+        [
+            "João Silva",
+            "12345678901",
+            "(85) 99999-9999",
+            "joao.silva@example.com",
+            "Formador",
+            "DAT",
+            "Formador",
+            "",
+            "Sim",
+        ]
+    )
+    ws.append(
+        [
+            "Ellen Damares",
+            "98765432100",
+            "(85) 88888-8888",
+            "ellen.damares@example.com",
+            "Coordenadora",
+            "Superintendência",
+            "Coordenador",
+            "Sim",
+            "Sim",
+        ]
+    )
 
     wb.save(filepath)
     return str(filepath)
@@ -59,23 +75,50 @@ def temp_agenda_file(tmp_path):
     ws.title = "Super"
 
     # Header
-    ws.append([
-        "Data", "Horário Inicial", "Horário Final", "Projeto",
-        "Tipo de Evento", "Município", "Coordenador", "Formador(es)",
-        "Situação", "Observações"
-    ])
+    ws.append(
+        [
+            "Data",
+            "Horário Inicial",
+            "Horário Final",
+            "Projeto",
+            "Tipo de Evento",
+            "Município",
+            "Coordenador",
+            "Formador(es)",
+            "Situação",
+            "Observações",
+        ]
+    )
 
     # Data rows
-    ws.append([
-        "2025-01-15", "14:00", "17:00", "ACerta",
-        "Formação Presencial", "Fortaleza - CE", "Ellen Damares",
-        "João Silva", "Realizado", ""
-    ])
-    ws.append([
-        "2025-01-20", "09:00", "12:00", "Novo Lendo",
-        "Workshop", "Caucaia - CE", "Ellen Damares",
-        "João Silva", "Agendado", ""
-    ])
+    ws.append(
+        [
+            "2025-01-15",
+            "14:00",
+            "17:00",
+            "ACerta",
+            "Formação Presencial",
+            "Fortaleza - CE",
+            "Ellen Damares",
+            "João Silva",
+            "Realizado",
+            "",
+        ]
+    )
+    ws.append(
+        [
+            "2025-01-20",
+            "09:00",
+            "12:00",
+            "Novo Lendo",
+            "Workshop",
+            "Caucaia - CE",
+            "Ellen Damares",
+            "João Silva",
+            "Agendado",
+            "",
+        ]
+    )
 
     wb.save(filepath)
     return str(filepath)
@@ -92,16 +135,10 @@ def temp_disponibilidade_file(tmp_path):
     ws.title = "Bloqueios"
 
     # Header
-    ws.append([
-        "Formador", "Tipo", "Data Início", "Hora Início",
-        "Data Fim", "Hora Fim", "Motivo", "Observações"
-    ])
+    ws.append(["Formador", "Tipo", "Data Início", "Hora Início", "Data Fim", "Hora Fim", "Motivo", "Observações"])
 
     # Data rows
-    ws.append([
-        "João Silva", "T", "2025-01-10", "08:00",
-        "2025-01-10", "18:00", "Férias", ""
-    ])
+    ws.append(["João Silva", "T", "2025-01-10", "08:00", "2025-01-10", "18:00", "Férias", ""])
 
     wb.save(filepath)
     return str(filepath)
@@ -118,16 +155,10 @@ def temp_controle_file(tmp_path):
     ws.title = "COMPRAS"
 
     # Header
-    ws.append([
-        "Código", "Produto", "Quantidade", "Município",
-        "Projeto", "Data", "Uso"
-    ])
+    ws.append(["Código", "Produto", "Quantidade", "Município", "Projeto", "Data", "Uso"])
 
     # Data rows
-    ws.append([
-        "COMP001", "Livros", 100, "Fortaleza - CE",
-        "ACerta", "2025-01-15", "Formação"
-    ])
+    ws.append(["COMP001", "Livros", 100, "Fortaleza - CE", "ACerta", "2025-01-15", "Formação"])
 
     wb.save(filepath)
     return str(filepath)
@@ -150,11 +181,7 @@ class TestLoadTiposEventoCommand:
         TipoEvento.objects.all().delete()
 
         # Executar comando
-        call_command(
-            "load_tipos_evento",
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
-        )
+        call_command("load_tipos_evento", "--agenda-file", temp_agenda_file, verbosity=0)
 
         # Verificar staging
         stg_count = StgTipoEvento.objects.count()
@@ -171,12 +198,7 @@ class TestLoadTiposEventoCommand:
         TipoEvento.objects.all().delete()
 
         # Executar com --dry-run
-        call_command(
-            "load_tipos_evento",
-            "--agenda-file", temp_agenda_file,
-            "--dry-run",
-            verbosity=0
-        )
+        call_command("load_tipos_evento", "--agenda-file", temp_agenda_file, "--dry-run", verbosity=0)
 
         # Verificar que não salvou nada
         assert StgTipoEvento.objects.count() == 0, "Dry-run não deve salvar em staging"
@@ -189,19 +211,11 @@ class TestLoadTiposEventoCommand:
         TipoEvento.objects.all().delete()
 
         # Primeira execução
-        call_command(
-            "load_tipos_evento",
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
-        )
+        call_command("load_tipos_evento", "--agenda-file", temp_agenda_file, verbosity=0)
         first_count = TipoEvento.objects.count()
 
         # Segunda execução
-        call_command(
-            "load_tipos_evento",
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
-        )
+        call_command("load_tipos_evento", "--agenda-file", temp_agenda_file, verbosity=0)
         second_count = TipoEvento.objects.count()
 
         assert first_count == second_count, "Não deve ter criado duplicatas"
@@ -225,10 +239,7 @@ class TestLoadFullPipelineCommand:
 
         # Executar pipeline
         call_command(
-            "load_full_pipeline",
-            "--users-file", temp_users_file,
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
+            "load_full_pipeline", "--users-file", temp_users_file, "--agenda-file", temp_agenda_file, verbosity=0
         )
 
         # Verificar usuários foram carregados
@@ -242,10 +253,7 @@ class TestLoadFullPipelineCommand:
 
         # Executar pipeline
         call_command(
-            "load_full_pipeline",
-            "--users-file", temp_users_file,
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
+            "load_full_pipeline", "--users-file", temp_users_file, "--agenda-file", temp_agenda_file, verbosity=0
         )
 
         # Verificar municípios foram carregados
@@ -258,10 +266,7 @@ class TestLoadFullPipelineCommand:
 
         # Executar pipeline
         call_command(
-            "load_full_pipeline",
-            "--users-file", temp_users_file,
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
+            "load_full_pipeline", "--users-file", temp_users_file, "--agenda-file", temp_agenda_file, verbosity=0
         )
 
         # Verificar projetos foram carregados
@@ -274,10 +279,7 @@ class TestLoadFullPipelineCommand:
 
         # Executar pipeline
         call_command(
-            "load_full_pipeline",
-            "--users-file", temp_users_file,
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
+            "load_full_pipeline", "--users-file", temp_users_file, "--agenda-file", temp_agenda_file, verbosity=0
         )
 
         # Verificar tipos evento foram carregados
@@ -291,10 +293,7 @@ class TestLoadFullPipelineCommand:
 
         # Executar pipeline
         call_command(
-            "load_full_pipeline",
-            "--users-file", temp_users_file,
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
+            "load_full_pipeline", "--users-file", temp_users_file, "--agenda-file", temp_agenda_file, verbosity=0
         )
 
         # Verificar eventos foram carregados em staging
@@ -311,10 +310,12 @@ class TestLoadFullPipelineCommand:
         # Executar com --dry-run
         call_command(
             "load_full_pipeline",
-            "--users-file", temp_users_file,
-            "--agenda-file", temp_agenda_file,
+            "--users-file",
+            temp_users_file,
+            "--agenda-file",
+            temp_agenda_file,
             "--dry-run",
-            verbosity=0
+            verbosity=0,
         )
 
         # Verificar que não salvou nada
@@ -335,10 +336,7 @@ class TestLoadFullPipelineCommand:
 
         # Primeira execução
         call_command(
-            "load_full_pipeline",
-            "--users-file", temp_users_file,
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
+            "load_full_pipeline", "--users-file", temp_users_file, "--agenda-file", temp_agenda_file, verbosity=0
         )
 
         first_usuarios = Usuario.objects.count()
@@ -349,10 +347,7 @@ class TestLoadFullPipelineCommand:
 
         # Segunda execução
         call_command(
-            "load_full_pipeline",
-            "--users-file", temp_users_file,
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
+            "load_full_pipeline", "--users-file", temp_users_file, "--agenda-file", temp_agenda_file, verbosity=0
         )
 
         # Verificar que não duplicou
@@ -366,43 +361,42 @@ class TestLoadFullPipelineCommand:
         """Test: Lida com arquivos opcionais (disponibilidade, controle)"""
         # Executar sem arquivos opcionais (não deve dar erro)
         call_command(
-            "load_full_pipeline",
-            "--users-file", temp_users_file,
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
+            "load_full_pipeline", "--users-file", temp_users_file, "--agenda-file", temp_agenda_file, verbosity=0
         )
 
         # Verificar que executou sem erros
         assert Usuario.objects.count() > 0
 
-    def test_processes_optional_disponibilidade(
-        self, temp_users_file, temp_agenda_file, temp_disponibilidade_file
-    ):
+    def test_processes_optional_disponibilidade(self, temp_users_file, temp_agenda_file, temp_disponibilidade_file):
         """Test: Processa arquivo de disponibilidade se fornecido"""
         # Executar com arquivo de disponibilidade
         call_command(
             "load_full_pipeline",
-            "--users-file", temp_users_file,
-            "--agenda-file", temp_agenda_file,
-            "--disponibilidade-file", temp_disponibilidade_file,
-            verbosity=0
+            "--users-file",
+            temp_users_file,
+            "--agenda-file",
+            temp_agenda_file,
+            "--disponibilidade-file",
+            temp_disponibilidade_file,
+            verbosity=0,
         )
 
         # Verificar que executou sem erros
         # (Transferência para SSOT pode ainda não estar implementada)
         assert Usuario.objects.count() > 0
 
-    def test_processes_optional_controle(
-        self, temp_users_file, temp_agenda_file, temp_controle_file
-    ):
+    def test_processes_optional_controle(self, temp_users_file, temp_agenda_file, temp_controle_file):
         """Test: Processa arquivo de controle se fornecido"""
         # Executar com arquivo de controle
         call_command(
             "load_full_pipeline",
-            "--users-file", temp_users_file,
-            "--agenda-file", temp_agenda_file,
-            "--controle-file", temp_controle_file,
-            verbosity=0
+            "--users-file",
+            temp_users_file,
+            "--agenda-file",
+            temp_agenda_file,
+            "--controle-file",
+            temp_controle_file,
+            verbosity=0,
         )
 
         # Verificar que executou sem erros
@@ -419,19 +413,12 @@ class TestCommandsIntegration:
         TipoEvento.objects.all().delete()
 
         # Primeiro: carregar tipos isoladamente
-        call_command(
-            "load_tipos_evento",
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
-        )
+        call_command("load_tipos_evento", "--agenda-file", temp_agenda_file, verbosity=0)
         tipos_count_after_first = TipoEvento.objects.count()
 
         # Depois: rodar pipeline completo
         call_command(
-            "load_full_pipeline",
-            "--users-file", temp_users_file,
-            "--agenda-file", temp_agenda_file,
-            verbosity=0
+            "load_full_pipeline", "--users-file", temp_users_file, "--agenda-file", temp_agenda_file, verbosity=0
         )
         tipos_count_after_pipeline = TipoEvento.objects.count()
 
@@ -450,10 +437,7 @@ class TestCommandsIntegration:
         # Executar comando com arquivo inválido (deve falhar)
         try:
             call_command(
-                "load_full_pipeline",
-                "--users-file", str(invalid_file),
-                "--agenda-file", temp_agenda_file,
-                verbosity=0
+                "load_full_pipeline", "--users-file", str(invalid_file), "--agenda-file", temp_agenda_file, verbosity=0
             )
         except Exception:
             pass  # Esperado

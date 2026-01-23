@@ -12,30 +12,25 @@ For new code, prefer importing directly from:
 - apps.core.services.gcal.payload (build_*, compute_payload_hash)
 - apps.core.services.gcal.sync (apply_one_solicitacao, upsert_one, etc.)
 """
+
 # pyright: reportUnusedImport=false, reportPrivateUsage=false
 
 from __future__ import annotations
 
-from apps.core.services.gcal import (
-    # Types
+from apps.core.services.gcal import (  # Types; Utils; Client; Validation; Payload; Sync
     Action,
+    CalendarClientAdapter,
     SyncOutcome,
-    # Utils
+    _event_id_for,
     _payload_hash,
     _retry_with_backoff,
-    # Client
-    CalendarClientAdapter,
-    # Validation
-    _event_id_for,
     _validate_event_id,
-    # Payload
+    apply_one_solicitacao,
     build_attendees_for_solicitacao,
     build_event_payload,
     build_preview_for_solicitacao,
-    compute_payload_hash,
-    # Sync
-    apply_one_solicitacao,
     cancel_solicitacao,
+    compute_payload_hash,
     resync_solicitacao,
     upsert_one,
 )

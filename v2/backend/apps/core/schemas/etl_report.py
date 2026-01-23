@@ -27,13 +27,14 @@ Exemplo de uso:
 
     report.save_to_file("out/etl/last_run.json")
 """
+
 # pyright: reportUnknownParameterType=false, reportMissingTypeArgument=false, reportUnknownMemberType=false, reportReturnType=false, reportArgumentType=false
 
-from dataclasses import dataclass, asdict, field
-from datetime import datetime
-from typing import List, Dict, Optional, Literal
 import json
 import os
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from typing import Dict, List, Literal, Optional
 
 
 @dataclass

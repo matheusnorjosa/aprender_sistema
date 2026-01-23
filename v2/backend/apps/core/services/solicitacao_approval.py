@@ -4,6 +4,7 @@ Solicitacao Approval Service - §1 Epic #459
 Service layer for approval/rejection operations.
 Extracted from views_solicitacao.py to follow Single Responsibility Principle.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false
 
 from __future__ import annotations

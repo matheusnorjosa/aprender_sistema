@@ -10,11 +10,13 @@ Cobertura:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.contrib.auth.models import Group
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
@@ -92,9 +94,7 @@ def setup_data():
 
     # Criar grupo Superintendência
     super_group, _ = Group.objects.get_or_create(name="Superintendência")
-    user_admin = Usuario.objects.create_user(
-        username="admin", email="admin@x.com", password="x", cpf="11111111111"
-    )
+    user_admin = Usuario.objects.create_user(username="admin", email="admin@x.com", password="x", cpf="11111111111")
     user_admin.groups.add(super_group)
 
     return {

@@ -15,6 +15,7 @@ Idempotence:
     - Não remove projetos com solicitações vinculadas
     - Pode ser executado múltiplas vezes sem efeitos colaterais
 """
+
 # pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -25,7 +26,6 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from apps.core.models import Gerencia, Projeto, Solicitacao
-
 
 # Correções baseadas em produtos.xlsx
 CORRECOES = {
@@ -66,9 +66,7 @@ class Command(BaseCommand):
         apply = options.get("apply", False)
 
         if not dry_run and not apply:
-            self.stderr.write(
-                self.style.ERROR("Especifique --dry-run ou --apply")
-            )
+            self.stderr.write(self.style.ERROR("Especifique --dry-run ou --apply"))
             return
 
         self.stdout.write("=" * 70)
@@ -81,9 +79,7 @@ class Command(BaseCommand):
         try:
             individual = Gerencia.objects.get(nome_setor="Individual")
         except Gerencia.DoesNotExist:
-            self.stderr.write(
-                self.style.ERROR("Gerência 'Individual' não encontrada!")
-            )
+            self.stderr.write(self.style.ERROR("Gerência 'Individual' não encontrada!"))
             return
 
         self.stdout.write(f"Gerência Individual: ID={individual.id}")
@@ -106,9 +102,7 @@ class Command(BaseCommand):
             try:
                 projeto = Projeto.objects.get(id=projeto_id)
             except Projeto.DoesNotExist:
-                self.stdout.write(
-                    self.style.WARNING(f"  [SKIP] Projeto ID={projeto_id} não existe")
-                )
+                self.stdout.write(self.style.WARNING(f"  [SKIP] Projeto ID={projeto_id} não existe"))
                 continue
 
             if projeto.gerencia_id == individual.id:
@@ -117,11 +111,7 @@ class Command(BaseCommand):
                 continue
 
             atual = projeto.gerencia.nome_setor if projeto.gerencia else "NENHUMA"
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"  [+] {projeto.nome}: {atual} → Individual"
-                )
-            )
+            self.stdout.write(self.style.SUCCESS(f"  [+] {projeto.nome}: {atual} → Individual"))
 
             if apply:
                 projeto.gerencia = individual
@@ -139,25 +129,19 @@ class Command(BaseCommand):
             try:
                 projeto = Projeto.objects.get(id=projeto_id)
             except Projeto.DoesNotExist:
-                self.stdout.write(
-                    self.style.WARNING(f"  [SKIP] Projeto ID={projeto_id} não existe")
-                )
+                self.stdout.write(self.style.WARNING(f"  [SKIP] Projeto ID={projeto_id} não existe"))
                 continue
 
             # Verificar se tem solicitações vinculadas
             sol_count = Solicitacao.objects.filter(projeto_id=projeto_id).count()
             if sol_count > 0:
                 self.stdout.write(
-                    self.style.ERROR(
-                        f"  [BLOQUEADO] {projeto.nome}: tem {sol_count} solicitações vinculadas"
-                    )
+                    self.style.ERROR(f"  [BLOQUEADO] {projeto.nome}: tem {sol_count} solicitações vinculadas")
                 )
                 stats["skipped_com_solicitacoes"] += 1
                 continue
 
-            self.stdout.write(
-                self.style.SUCCESS(f"  [-] {projeto.nome} (ID={projeto_id})")
-            )
+            self.stdout.write(self.style.SUCCESS(f"  [-] {projeto.nome} (ID={projeto_id})"))
 
             if apply:
                 projeto.delete()
@@ -177,7 +161,5 @@ class Command(BaseCommand):
 
         if dry_run:
             self.stdout.write("")
-            self.stdout.write(
-                self.style.WARNING("DRY-RUN: Nenhuma alteração foi feita no banco.")
-            )
+            self.stdout.write(self.style.WARNING("DRY-RUN: Nenhuma alteração foi feita no banco."))
             self.stdout.write("Execute com --apply para aplicar as alterações.")

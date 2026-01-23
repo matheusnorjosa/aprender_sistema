@@ -4,6 +4,7 @@ AS v2 — GCal Dashboard Summary Views
 Views for status summaries, metrics, and alerts.
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportFunctionMemberAccess=false
 
 from __future__ import annotations
@@ -43,30 +44,28 @@ class GCalStatusSummaryView(APIView):
         "total": 163
     }
     """
+
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas solicitações aprovadas
-        qs = Solicitacao.objects.filter(status='aprovado')
+        qs = Solicitacao.objects.filter(status="aprovado")
 
         # Aplicar filtros comuns
         qs = _apply_common_filters(qs, request)
 
         # Agregar contadores por gcal_status
-        summary = qs.values('gcal_status').annotate(count=Count('id'))
+        summary = qs.values("gcal_status").annotate(count=Count("id"))
 
         # Transformar em dict
-        counts = {item['gcal_status']: item['count'] for item in summary}
+        counts = {item["gcal_status"]: item["count"] for item in summary}
 
         # Garantir todas as chaves existem
-        for status_key in ['NONE', 'PENDING', 'PUBLISHED', 'ERROR']:
+        for status_key in ["NONE", "PENDING", "PUBLISHED", "ERROR"]:
             if status_key not in counts:
                 counts[status_key] = 0
 
-        return Response({
-            'counts': counts,
-            'total': sum(counts.values())
-        })
+        return Response({"counts": counts, "total": sum(counts.values())})
 
 
 class GCalListView(APIView):
@@ -85,23 +84,24 @@ class GCalListView(APIView):
         "results": [...]
     }
     """
+
     permission_classes = [IsAuthenticated, IsControleOrSuper]
     pagination_class = LargePagination
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas aprovadas
         # Fix N+1: prefetch participations with their users
-        qs = Solicitacao.objects.filter(status='aprovado').select_related(
-            'usuario', 'municipio', 'tipo_evento', 'projeto', 'projeto__gerencia'
-        ).prefetch_related(
-            'participations__usuario'
+        qs = (
+            Solicitacao.objects.filter(status="aprovado")
+            .select_related("usuario", "municipio", "tipo_evento", "projeto", "projeto__gerencia")
+            .prefetch_related("participations__usuario")
         )
 
         # Aplicar filtros comuns
         qs = _apply_common_filters(qs, request)
 
         # Ordenação: mais recentes primeiro
-        qs = qs.order_by('-inicio', '-id')
+        qs = qs.order_by("-inicio", "-id")
 
         # Paginação (#408)
         paginator = self.pagination_class()
@@ -113,10 +113,7 @@ class GCalListView(APIView):
 
         # Fallback (não deve acontecer com PageNumberPagination)
         serializer = SolicitacaoSerializer(qs[:500], many=True)
-        return Response({
-            'results': serializer.data,
-            'count': len(serializer.data)
-        })
+        return Response({"results": serializer.data, "count": len(serializer.data)})
 
 
 class DashboardMetricsView(APIView):
@@ -154,15 +151,16 @@ class DashboardMetricsView(APIView):
 
     Permissions: IsControleOrSuper
     """
+
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas solicitações aprovadas
-        qs = Solicitacao.objects.filter(status='aprovado')
+        qs = Solicitacao.objects.filter(status="aprovado")
 
         # Parse filtros de janela (start/end)
-        start_param = request.query_params.get('start')
-        end_param = request.query_params.get('end')
+        start_param = request.query_params.get("start")
+        end_param = request.query_params.get("end")
 
         start_date = None
         end_date = None
@@ -182,42 +180,50 @@ class DashboardMetricsView(APIView):
                 pass
 
         # Contadores por gcal_status
-        summary = qs.values('gcal_status').annotate(count=Count('id'))
-        counts = {item['gcal_status']: item['count'] for item in summary}
+        summary = qs.values("gcal_status").annotate(count=Count("id"))
+        counts = {item["gcal_status"]: item["count"] for item in summary}
 
         # Garantir todas as chaves existem
-        for status_key in ['NONE', 'PENDING', 'PUBLISHED', 'ERROR']:
+        for status_key in ["NONE", "PENDING", "PUBLISHED", "ERROR"]:
             if status_key not in counts:
                 counts[status_key] = 0
 
         # Recent errors (top 5, ordenados por updated_at desc)
-        error_qs = qs.filter(gcal_status=Solicitacao.GCalStatus.ERROR).select_related(
-            'municipio', 'projeto'
-        ).order_by('-updated_at')[:5]
+        error_qs = (
+            qs.filter(gcal_status=Solicitacao.GCalStatus.ERROR)
+            .select_related("municipio", "projeto")
+            .order_by("-updated_at")[:5]
+        )
 
         recent_errors = []
         for s in error_qs:
             # Gerar summary simples para exibição
-            municipio_nome = s.municipio.nome if s.municipio else ''
-            municipio_uf = s.municipio.uf if s.municipio else ''
-            projeto_nome = s.projeto.nome if s.projeto else ''
-            summary_text = f"{municipio_nome} - {municipio_uf} {projeto_nome}" if municipio_nome else f"Solicitação #{s.id}"
+            municipio_nome = s.municipio.nome if s.municipio else ""
+            municipio_uf = s.municipio.uf if s.municipio else ""
+            projeto_nome = s.projeto.nome if s.projeto else ""
+            summary_text = (
+                f"{municipio_nome} - {municipio_uf} {projeto_nome}" if municipio_nome else f"Solicitação #{s.id}"
+            )
 
-            recent_errors.append({
-                'id': s.id,
-                'summary': summary_text.strip(),
-                'gcal_last_error': s.gcal_last_error or '',
-                'updated_at': s.updated_at.isoformat() if s.updated_at else None
-            })
+            recent_errors.append(
+                {
+                    "id": s.id,
+                    "summary": summary_text.strip(),
+                    "gcal_last_error": s.gcal_last_error or "",
+                    "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+                }
+            )
 
-        return Response({
-            'counts': counts,
-            'recent_errors': recent_errors,
-            'window': {
-                'start': start_date.isoformat() if start_date else None,
-                'end': end_date.isoformat() if end_date else None
+        return Response(
+            {
+                "counts": counts,
+                "recent_errors": recent_errors,
+                "window": {
+                    "start": start_date.isoformat() if start_date else None,
+                    "end": end_date.isoformat() if end_date else None,
+                },
             }
-        })
+        )
 
 
 class AlertsSummaryView(APIView):
@@ -245,6 +251,7 @@ class AlertsSummaryView(APIView):
     Permissions: IsControleOrSuper
     Timezone-aware: Usa helper _filter_events_queryset (clamp local→UTC)
     """
+
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -253,23 +260,23 @@ class AlertsSummaryView(APIView):
 
         # Contar por gcal_status em uma única query (Issue #308: fix N+1)
         counts = qs.aggregate(
-            errors=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.ERROR)),
-            pending=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.PENDING)),
-            published=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.PUBLISHED)),
-            none=Count('id', filter=Q(gcal_status=Solicitacao.GCalStatus.NONE)),
+            errors=Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.ERROR)),
+            pending=Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.PENDING)),
+            published=Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.PUBLISHED)),
+            none=Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.NONE)),
         )
 
         # Extrair janela de query params (retornar como strings ou null)
-        start_param = request.query_params.get('start')
-        end_param = request.query_params.get('end')
+        start_param = request.query_params.get("start")
+        end_param = request.query_params.get("end")
 
-        return Response({
-            'errors': counts['errors'],
-            'pending': counts['pending'],
-            'published': counts['published'],
-            'none': counts['none'],
-            'window': {
-                'start': start_param if start_param else None,
-                'end': end_param if end_param else None
-            }
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "errors": counts["errors"],
+                "pending": counts["pending"],
+                "published": counts["published"],
+                "none": counts["none"],
+                "window": {"start": start_param if start_param else None, "end": end_param if end_param else None},
+            },
+            status=status.HTTP_200_OK,
+        )

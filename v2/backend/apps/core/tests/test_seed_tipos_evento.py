@@ -5,15 +5,18 @@ Valida:
 - Criação de 12 tipos padrão
 - Idempotência (rodar 2x não duplica)
 """
+
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from django.core.management import call_command
+
 from io import StringIO
 
-from apps.core.models import TipoEvento
+from django.core.management import call_command
 
+import pytest
+
+from apps.core.models import TipoEvento
 
 pytestmark = pytest.mark.django_db
 
@@ -43,9 +46,7 @@ def test_seed_tipos_evento_creates_standard_types():
     ]
 
     for nome in tipos_padrao:
-        TipoEvento.objects.get_or_create(
-            nome=nome, defaults={"descricao": f"Descrição de {nome}"}
-        )
+        TipoEvento.objects.get_or_create(nome=nome, defaults={"descricao": f"Descrição de {nome}"})
 
     # Verificar que foram criados 12 tipos
     assert TipoEvento.objects.count() == 12
@@ -79,18 +80,14 @@ def test_seed_tipos_evento_is_idempotent():
     ]
 
     for nome in tipos_padrao:
-        TipoEvento.objects.get_or_create(
-            nome=nome, defaults={"descricao": f"Descrição de {nome}"}
-        )
+        TipoEvento.objects.get_or_create(nome=nome, defaults={"descricao": f"Descrição de {nome}"})
 
     count_after_first_run = TipoEvento.objects.count()
     assert count_after_first_run == 12
 
     # 2ª execução (deve manter 12)
     for nome in tipos_padrao:
-        TipoEvento.objects.get_or_create(
-            nome=nome, defaults={"descricao": f"Descrição de {nome}"}
-        )
+        TipoEvento.objects.get_or_create(nome=nome, defaults={"descricao": f"Descrição de {nome}"})
 
     count_after_second_run = TipoEvento.objects.count()
     assert count_after_second_run == 12, "Idempotência falhou: contagem mudou"
@@ -123,9 +120,7 @@ def test_seed_tipos_evento_does_not_duplicate():
     ]
 
     for nome in tipos_padrao:
-        TipoEvento.objects.get_or_create(
-            nome=nome, defaults={"descricao": f"Descrição de {nome}"}
-        )
+        TipoEvento.objects.get_or_create(nome=nome, defaults={"descricao": f"Descrição de {nome}"})
 
     # Deve ter exatamente 12 (não 13)
     assert TipoEvento.objects.count() == 12

@@ -10,12 +10,14 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.core.models import Participation, Solicitacao, Municipio, TipoEvento, Projeto
+import pytest
+
+from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento
 
 pytestmark = pytest.mark.django_db
 
@@ -41,9 +43,7 @@ def factory_solicitacao():
 
         # Municipio
         if "municipio" not in kwargs:
-            municipio, _ = Municipio.objects.get_or_create(
-                nome="Fortaleza", uf="CE", defaults={"ativo": True}
-            )
+            municipio, _ = Municipio.objects.get_or_create(nome="Fortaleza", uf="CE", defaults={"ativo": True})
             kwargs["municipio"] = municipio
 
         # TipoEvento
@@ -55,9 +55,7 @@ def factory_solicitacao():
 
         # Projeto
         if "projeto" not in kwargs:
-            projeto, _ = Projeto.objects.get_or_create(
-                nome="Teste Projeto", defaults={"ativo": True}
-            )
+            projeto, _ = Projeto.objects.get_or_create(nome="Teste Projeto", defaults={"ativo": True})
             kwargs["projeto"] = projeto
 
         # Datas
@@ -99,12 +97,8 @@ def test_solicitacao_list_includes_participations(factory_solicitacao):
         last_name="Dois",
     )
 
-    Participation.objects.create(
-        solicitacao=solicitacao, usuario=u1, role=Participation.Role.COORDENADOR
-    )
-    Participation.objects.create(
-        solicitacao=solicitacao, usuario=u2, role=Participation.Role.FORMADOR
-    )
+    Participation.objects.create(solicitacao=solicitacao, usuario=u1, role=Participation.Role.COORDENADOR)
+    Participation.objects.create(solicitacao=solicitacao, usuario=u2, role=Participation.Role.FORMADOR)
 
     client = APIClient()
     # Autenticar como superuser para ver todas as solicitações

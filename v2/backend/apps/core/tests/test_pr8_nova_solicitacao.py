@@ -12,11 +12,13 @@ Testa:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
@@ -76,9 +78,7 @@ class TestOptionsAPI:
         """GET /api/options/municipios/ deve retornar apenas municípios ativos"""
         # Arrange
         client = APIClient()
-        user = Usuario.objects.create_user(
-            username="user1", password="pass", cpf="11111111111"
-        )
+        user = Usuario.objects.create_user(username="user1", password="pass", cpf="11111111111")
         client.force_authenticate(user=user)
 
         Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
@@ -97,10 +97,7 @@ class TestOptionsAPI:
         client = APIClient()
 
         # Act & Assert
-        assert (
-            client.get("/api/options/municipios/").status_code
-            == status.HTTP_403_FORBIDDEN
-        )
+        assert client.get("/api/options/municipios/").status_code == status.HTTP_403_FORBIDDEN
 
 
 class TestAvailabilityCheckMany:
@@ -110,15 +107,9 @@ class TestAvailabilityCheckMany:
         """POST /api/availability/check-many/ deve retornar ok=true quando todos disponíveis"""
         # Arrange
         client = APIClient()
-        user1 = Usuario.objects.create_user(
-            username="user1", password="pass", cpf="11111111111"
-        )
-        user2 = Usuario.objects.create_user(
-            username="user2", password="pass", cpf="22222222222"
-        )
-        coord = Usuario.objects.create_user(
-            username="coord", password="pass", cpf="33333333333"
-        )
+        user1 = Usuario.objects.create_user(username="user1", password="pass", cpf="11111111111")
+        user2 = Usuario.objects.create_user(username="user2", password="pass", cpf="22222222222")
+        coord = Usuario.objects.create_user(username="coord", password="pass", cpf="33333333333")
 
         # P2.2: check-many endpoint requires IsControleOrDAT permission
         controle_group, _ = Group.objects.get_or_create(name="Controle")
@@ -163,9 +154,7 @@ class TestSolicitacaoRBAC:
         """PR 8/N: Coordenador pode criar solicitação"""
         # Arrange
         client = APIClient()
-        coord = Usuario.objects.create_user(
-            username="coord1", password="pass", cpf="11111111111"
-        )
+        coord = Usuario.objects.create_user(username="coord1", password="pass", cpf="11111111111")
         group_coord, _ = Group.objects.get_or_create(name="Coordenador")
         coord.groups.add(group_coord)
 
@@ -208,9 +197,7 @@ class TestSolicitacaoRBAC:
         """PR 8/N: Formador NÃO pode criar solicitação"""
         # Arrange
         client = APIClient()
-        formador = Usuario.objects.create_user(
-            username="formador1", password="pass", cpf="11111111111"
-        )
+        formador = Usuario.objects.create_user(username="formador1", password="pass", cpf="11111111111")
         group_formador, _ = Group.objects.get_or_create(name="Formador")
         formador.groups.add(group_formador)
 
@@ -241,9 +228,7 @@ class TestSolicitacaoRBAC:
         """PR 8/N: Superuser pode criar solicitação"""
         # Arrange
         client = APIClient()
-        superuser = Usuario.objects.create_superuser(
-            username="admin", password="pass", cpf="11111111111"
-        )
+        superuser = Usuario.objects.create_superuser(username="admin", password="pass", cpf="11111111111")
         tipo_evento = TipoEvento.objects.create(nome="Formação")
         client.force_authenticate(user=superuser)
 

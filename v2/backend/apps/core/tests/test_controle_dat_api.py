@@ -16,15 +16,17 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from datetime import date
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from apps.core.models import AcaoControle, AcaoDAT, Municipio, Projeto
+import pytest
 
+from apps.core.models import AcaoControle, AcaoDAT, Municipio, Projeto
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
@@ -144,9 +146,7 @@ def test_filter_by_date_range():
 
     client = APIClient()
     client.force_authenticate(user=user)
-    response = client.get(
-        "/api/controle/acoes/", {"data_inicio": "2025-01-01", "data_fim": "2025-12-31"}
-    )
+    response = client.get("/api/controle/acoes/", {"data_inicio": "2025-01-01", "data_fim": "2025-12-31"})
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["count"] == 1

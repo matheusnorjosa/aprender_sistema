@@ -23,5 +23,5 @@ class CoreConfig(AppConfig):
         Admin registrado:
         - Registro explícito de modelos essenciais (Usuario, Projeto, Municipio, etc.)
         """
-        import apps.core.signals  # noqa: F401  # pyright: ignore[reportUnusedImport]
         import apps.core.admin  # noqa: F401
+        import apps.core.signals  # noqa: F401  # pyright: ignore[reportUnusedImport]

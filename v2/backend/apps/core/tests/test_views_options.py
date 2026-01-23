@@ -15,11 +15,13 @@ Covers:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from uuid import uuid4
 
 from django.core.cache import cache
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import (
     DATArea,
@@ -257,12 +259,8 @@ class TestCoordenadoresOptions:
 
     def test_returns_all_coordinators(self, api_client, usuario_autenticado):
         """Returns list of DAT coordinators."""
-        DATCoordenador.objects.create(
-            nome="Maria Silva", area="Formação", created_by=usuario_autenticado
-        )
-        DATCoordenador.objects.create(
-            nome="João Santos", area="Formação", created_by=usuario_autenticado
-        )
+        DATCoordenador.objects.create(nome="Maria Silva", area="Formação", created_by=usuario_autenticado)
+        DATCoordenador.objects.create(nome="João Santos", area="Formação", created_by=usuario_autenticado)
 
         api_client.force_authenticate(user=usuario_autenticado)
         response = api_client.get("/api/options/coordenadores/")
@@ -281,9 +279,7 @@ class TestCoordenadoresOptions:
 
     def test_cache_works(self, api_client, usuario_autenticado):
         """Results are cached for 5 minutes."""
-        DATCoordenador.objects.create(
-            nome="Coord Cache", area="Cache Test", created_by=usuario_autenticado
-        )
+        DATCoordenador.objects.create(nome="Coord Cache", area="Cache Test", created_by=usuario_autenticado)
 
         api_client.force_authenticate(user=usuario_autenticado)
 

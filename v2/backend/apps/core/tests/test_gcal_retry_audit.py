@@ -13,16 +13,19 @@ Cobertura:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from unittest.mock import patch, Mock, MagicMock
+
+from datetime import timedelta
+from unittest.mock import MagicMock, Mock, patch
+
 from django.contrib.auth.models import Group
 from django.utils import timezone
-from datetime import timedelta
-from rest_framework.test import APIClient
 from rest_framework import status as http_status
+from rest_framework.test import APIClient
+
+import pytest
 from googleapiclient.errors import HttpError
 
-from apps.core.models import Usuario, Solicitacao, Municipio, Projeto, TipoEvento, AuditLog
+from apps.core.models import AuditLog, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 
 @pytest.fixture
@@ -72,8 +75,8 @@ def create_http_error(status_code, reason="Test error"):
 class TestRetryBackoff:
     """Testes de retry com backoff exponencial"""
 
-    @patch('apps.core.services.gcal_google_client.GoogleCalendarClient._retry_with_backoff')
-    @patch('apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id')
+    @patch("apps.core.services.gcal_google_client.GoogleCalendarClient._retry_with_backoff")
+    @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
     def test_retry_on_429_rate_limit(self, mock_factory, mock_retry, solicitacao_aprovada):
         """
         Caso 1: Client deve fazer retry em 429 (rate limit) com backoff exponencial
@@ -106,8 +109,8 @@ class TestRetryBackoff:
         assert outcome.action == "CREATE"
         assert outcome.external_event_id == f"asv2-{solicitacao_aprovada.id}"
 
-    @patch('apps.core.services.gcal_google_client.GoogleCalendarClient._retry_with_backoff')
-    @patch('apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id')
+    @patch("apps.core.services.gcal_google_client.GoogleCalendarClient._retry_with_backoff")
+    @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
     def test_retry_on_5xx_server_error(self, mock_factory, mock_retry, solicitacao_aprovada):
         """
         Caso 2: Client deve fazer retry em 5xx (server error) com backoff exponencial
@@ -136,7 +139,7 @@ class TestRetryBackoff:
         assert call_count == 2
         assert outcome.action == "CREATE"
 
-    @patch('apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id')
+    @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
     def test_no_retry_on_404_not_found(self, mock_factory, solicitacao_aprovada):
         """
         Caso 3: Client NÃO deve fazer retry em 404 (esperado em alguns casos)
@@ -150,10 +153,7 @@ class TestRetryBackoff:
         # get() retorna None (404)
         mock_client.get.return_value = None
         # insert() sucede normalmente
-        mock_client.insert.return_value = {
-            "id": f"asv2-{solicitacao_aprovada.id}",
-            "summary": "Test"
-        }
+        mock_client.insert.return_value = {"id": f"asv2-{solicitacao_aprovada.id}", "summary": "Test"}
 
         outcome = apply_one_solicitacao(solicitacao_aprovada, dry_run=False, apply_blocked=True)
 
@@ -166,7 +166,7 @@ class TestRetryBackoff:
 class TestErrorPersistence:
     """Testes de persistência de erros em gcal_last_error"""
 
-    @patch('apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id')
+    @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
     def test_persist_error_on_failure(self, mock_factory, solicitacao_aprovada):
         """
         Caso 4: Erros devem ser persistidos em gcal_last_error
@@ -187,9 +187,12 @@ class TestErrorPersistence:
         # Verificar que erro foi persistido
         solicitacao_aprovada.refresh_from_db()
         assert solicitacao_aprovada.gcal_status == Solicitacao.GCalStatus.ERROR
-        assert "500" in solicitacao_aprovada.gcal_last_error or "Internal Server Error" in solicitacao_aprovada.gcal_last_error
+        assert (
+            "500" in solicitacao_aprovada.gcal_last_error
+            or "Internal Server Error" in solicitacao_aprovada.gcal_last_error
+        )
 
-    @patch('apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id')
+    @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
     def test_clear_error_on_success(self, mock_factory, solicitacao_aprovada):
         """
         Caso 5: gcal_last_error deve ser limpo em caso de sucesso
@@ -197,20 +200,13 @@ class TestErrorPersistence:
         from apps.core.services.gcal_sync_service import apply_one_solicitacao
 
         # Marcar erro anterior
-        solicitacao_aprovada.mark_gcal(
-            status=Solicitacao.GCalStatus.ERROR,
-            payload_hash=None,
-            error="Previous error"
-        )
+        solicitacao_aprovada.mark_gcal(status=Solicitacao.GCalStatus.ERROR, payload_hash=None, error="Previous error")
         solicitacao_aprovada.save()
 
         mock_client = MagicMock()
         mock_factory.return_value = (mock_client, "test-calendar-id")
         mock_client.get.return_value = None
-        mock_client.insert.return_value = {
-            "id": f"asv2-{solicitacao_aprovada.id}",
-            "summary": "Test"
-        }
+        mock_client.insert.return_value = {"id": f"asv2-{solicitacao_aprovada.id}", "summary": "Test"}
 
         # Aplicar com sucesso
         outcome = apply_one_solicitacao(solicitacao_aprovada, dry_run=False, apply_blocked=True)
@@ -226,10 +222,10 @@ class TestErrorPersistence:
 class TestAuditLog:
     """Testes de AuditLog para erros e sucessos"""
 
-    @patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
-    @patch('django.conf.settings.GCAL_CLIENT', 'fake')
-    @patch('rest_framework.throttling.AnonRateThrottle.allow_request', return_value=True)
-    @patch('rest_framework.throttling.UserRateThrottle.allow_request', return_value=True)
+    @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_audit_log_on_publish_request(
         self, mock_throttle1, mock_throttle2, mock_task, solicitacao_aprovada, usuario_controle
     ):
@@ -260,7 +256,7 @@ class TestAuditLog:
         assert audit_log.details["solicitacao_id"] == solicitacao_aprovada.id
         assert audit_log.details["task_id"] == "test-task-id"
 
-    @patch('apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id')
+    @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
     def test_task_logs_success_in_audit(self, mock_factory, solicitacao_aprovada):
         """
         Caso 7: Task deve registrar sucesso em AuditLog
@@ -270,17 +266,10 @@ class TestAuditLog:
         mock_client = MagicMock()
         mock_factory.return_value = (mock_client, "test-calendar-id")
         mock_client.get.return_value = None
-        mock_client.insert.return_value = {
-            "id": f"asv2-{solicitacao_aprovada.id}",
-            "summary": "Test"
-        }
+        mock_client.insert.return_value = {"id": f"asv2-{solicitacao_aprovada.id}", "summary": "Test"}
 
         # Executar task (síncrona para teste)
-        result = task_publish_solicitacao_to_gcal(
-            solicitacao_aprovada.id,
-            dry_run=False,
-            apply_blocked=True
-        )
+        result = task_publish_solicitacao_to_gcal(solicitacao_aprovada.id, dry_run=False, apply_blocked=True)
 
         assert result["action"] == "CREATE"
         assert result["error"] is None
@@ -295,7 +284,7 @@ class TestAuditLog:
         assert audit_log.details["solicitacao_id"] == solicitacao_aprovada.id
         assert audit_log.details["action"] == "CREATE"
 
-    @patch('apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id')
+    @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
     def test_task_logs_error_in_audit(self, mock_factory, solicitacao_aprovada):
         """
         Caso 8: Task deve registrar erro em AuditLog
@@ -308,11 +297,7 @@ class TestAuditLog:
         mock_client.insert.side_effect = create_http_error(500, "Server Error")
 
         # Executar task (deve tratar erro)
-        result = task_publish_solicitacao_to_gcal(
-            solicitacao_aprovada.id,
-            dry_run=False,
-            apply_blocked=True
-        )
+        result = task_publish_solicitacao_to_gcal(solicitacao_aprovada.id, dry_run=False, apply_blocked=True)
 
         assert result["action"] == "ERROR"
         assert result["error"] is not None
@@ -334,8 +319,8 @@ class TestAuditLog:
 class TestBackoffTiming:
     """Testes para validar tempos de backoff (fast-forward em testes)"""
 
-    @patch('time.sleep')
-    @patch('apps.core.services.gcal_google_client.GoogleCalendarClient.insert')
+    @patch("time.sleep")
+    @patch("apps.core.services.gcal_google_client.GoogleCalendarClient.insert")
     def test_exponential_backoff_timing(self, mock_insert, mock_sleep, solicitacao_aprovada):
         """
         Caso 9: Backoff deve seguir padrão exponencial (1s, 2s, 4s)
@@ -359,9 +344,7 @@ class TestBackoffTiming:
 
         # Executar retry_with_backoff (método real)
         try:
-            result = client._retry_with_backoff(
-                lambda: mock_insert("calendar-id", "event-id", {})
-            )
+            result = client._retry_with_backoff(lambda: mock_insert("calendar-id", "event-id", {}))
         except HttpError:
             pass  # Esperado se max_retries for atingido
 

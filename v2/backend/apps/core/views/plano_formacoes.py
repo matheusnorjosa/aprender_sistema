@@ -9,6 +9,7 @@ Endpoints:
 
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
@@ -16,13 +17,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from django.db.models import Count, Sum
-
-from django_filters import rest_framework as filters
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
+
+from django_filters import rest_framework as filters
+from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.core.models import (
     Acompanhamento,
@@ -91,11 +92,11 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         - destroy: apenas Superintendencia
     """
 
-    queryset = PlanoFormacoes.objects.select_related(
-        "municipio", "projeto", "coordenador", "created_by", "updated_by"
-    ).prefetch_related(
-        "formacoes", "acompanhamentos", "provas"
-    ).order_by("municipio__nome", "projeto__nome")
+    queryset = (
+        PlanoFormacoes.objects.select_related("municipio", "projeto", "coordenador", "created_by", "updated_by")
+        .prefetch_related("formacoes", "acompanhamentos", "provas")
+        .order_by("municipio__nome", "projeto__nome")
+    )
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = PlanoFormacoesFilter
@@ -143,32 +144,18 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         total_planos = qs.count()
 
         # Formacoes (via subquery)
-        total_formacoes = Formacao.objects.filter(
-            plano__in=qs,
-            data_formacao__isnull=False
-        ).count()
+        total_formacoes = Formacao.objects.filter(plano__in=qs, data_formacao__isnull=False).count()
 
-        total_realizadas = Formacao.objects.filter(
-            plano__in=qs,
-            realizada=True
-        ).count()
+        total_realizadas = Formacao.objects.filter(plano__in=qs, realizada=True).count()
 
         # CH total
         ch_total = qs.aggregate(total=Sum("ch_anual"))["total"] or 0
 
         # Por projeto (top 10)
-        por_projeto = list(
-            qs.values("projeto__nome")
-            .annotate(count=Count("id"))
-            .order_by("-count")[:10]
-        )
+        por_projeto = list(qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10])
 
         # Por UF
-        por_uf = list(
-            qs.values("municipio__uf")
-            .annotate(count=Count("id"))
-            .order_by("-count")
-        )
+        por_uf = list(qs.values("municipio__uf").annotate(count=Count("id")).order_by("-count"))
 
         # Por coordenador (top 10)
         por_coordenador = list(
@@ -181,19 +168,19 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         # Municipios distintos
         total_municipios = qs.values("municipio").distinct().count()
 
-        return Response({
-            "total_planos": total_planos,
-            "total_formacoes": total_formacoes,
-            "total_realizadas": total_realizadas,
-            "taxa_realizacao": round(
-                (total_realizadas / total_formacoes * 100) if total_formacoes > 0 else 0, 1
-            ),
-            "ch_total": float(ch_total),
-            "total_municipios": total_municipios,
-            "por_projeto": por_projeto,
-            "por_uf": por_uf,
-            "por_coordenador": por_coordenador,
-        })
+        return Response(
+            {
+                "total_planos": total_planos,
+                "total_formacoes": total_formacoes,
+                "total_realizadas": total_realizadas,
+                "taxa_realizacao": round((total_realizadas / total_formacoes * 100) if total_formacoes > 0 else 0, 1),
+                "ch_total": float(ch_total),
+                "total_municipios": total_municipios,
+                "por_projeto": por_projeto,
+                "por_uf": por_uf,
+                "por_coordenador": por_coordenador,
+            }
+        )
 
     @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
     def calendario(self, request: Request) -> Response:
@@ -209,10 +196,9 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         data_inicio = request.query_params.get("data_inicio")
         data_fim = request.query_params.get("data_fim")
 
-        formacoes_qs = Formacao.objects.filter(
-            plano__in=qs,
-            data_formacao__isnull=False
-        ).select_related("plano__municipio", "plano__projeto")
+        formacoes_qs = Formacao.objects.filter(plano__in=qs, data_formacao__isnull=False).select_related(
+            "plano__municipio", "plano__projeto"
+        )
 
         if data_inicio:
             formacoes_qs = formacoes_qs.filter(data_formacao__gte=data_inicio)
@@ -257,47 +243,35 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
             planos_projeto = qs.filter(projeto_id=proj["projeto__id"])
             total_planos = planos_projeto.count()
 
-            formacoes = Formacao.objects.filter(
-                plano__in=planos_projeto,
-                data_formacao__isnull=False
-            )
+            formacoes = Formacao.objects.filter(plano__in=planos_projeto, data_formacao__isnull=False)
             total_formacoes = formacoes.count()
             realizadas = formacoes.filter(realizada=True).count()
 
             ch_total = planos_projeto.aggregate(total=Sum("ch_anual"))["total"] or 0
 
             coordenadores = list(
-                planos_projeto.exclude(coordenador__isnull=True)
-                .values_list("coordenador__nome", flat=True)
-                .distinct()
+                planos_projeto.exclude(coordenador__isnull=True).values_list("coordenador__nome", flat=True).distinct()
             )
 
-            resumo.append({
-                "projeto_id": proj["projeto__id"],
-                "projeto_nome": proj["projeto__nome"],
-                "total_planos": total_planos,
-                "total_municipios": planos_projeto.values("municipio").distinct().count(),
-                "total_formacoes": total_formacoes,
-                "formacoes_realizadas": realizadas,
-                "taxa_realizacao": round(
-                    (realizadas / total_formacoes * 100) if total_formacoes > 0 else 0, 1
-                ),
-                "ch_total": float(ch_total),
-                "coordenadores": coordenadores,
-            })
+            resumo.append(
+                {
+                    "projeto_id": proj["projeto__id"],
+                    "projeto_nome": proj["projeto__nome"],
+                    "total_planos": total_planos,
+                    "total_municipios": planos_projeto.values("municipio").distinct().count(),
+                    "total_formacoes": total_formacoes,
+                    "formacoes_realizadas": realizadas,
+                    "taxa_realizacao": round((realizadas / total_formacoes * 100) if total_formacoes > 0 else 0, 1),
+                    "ch_total": float(ch_total),
+                    "coordenadores": coordenadores,
+                }
+            )
 
         resumo.sort(key=lambda x: x["projeto_nome"])
         return Response(resumo)
 
-    @action(
-        detail=True,
-        methods=["patch"],
-        url_path=r"formacao/(?P<numero>\d+)",
-        permission_classes=[IsDATOrSuper]
-    )
-    def update_formacao(
-        self, request: Request, pk: int | None = None, numero: str | None = None
-    ) -> Response:
+    @action(detail=True, methods=["patch"], url_path=r"formacao/(?P<numero>\d+)", permission_classes=[IsDATOrSuper])
+    def update_formacao(self, request: Request, pk: int | None = None, numero: str | None = None) -> Response:
         """
         Atualiza uma formacao especifica inline.
 
@@ -310,10 +284,7 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         try:
             formacao = plano.formacoes.get(numero_formacao=int(numero))
         except Formacao.DoesNotExist:
-            return Response(
-                {"detail": f"Formacao {numero} nao encontrada."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"detail": f"Formacao {numero} nao encontrada."}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = FormacaoSerializer(formacao, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -325,15 +296,8 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.data)
 
-    @action(
-        detail=True,
-        methods=["patch"],
-        url_path=r"acompanhamento/(?P<tipo>\w+)",
-        permission_classes=[IsDATOrSuper]
-    )
-    def update_acompanhamento(
-        self, request: Request, pk: int | None = None, tipo: str | None = None
-    ) -> Response:
+    @action(detail=True, methods=["patch"], url_path=r"acompanhamento/(?P<tipo>\w+)", permission_classes=[IsDATOrSuper])
+    def update_acompanhamento(self, request: Request, pk: int | None = None, tipo: str | None = None) -> Response:
         """
         Atualiza um acompanhamento especifico inline.
 
@@ -347,10 +311,7 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         try:
             acompanhamento = plano.acompanhamentos.get(tipo=tipo)
         except Acompanhamento.DoesNotExist:
-            return Response(
-                {"detail": f"Acompanhamento '{tipo}' nao encontrado."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"detail": f"Acompanhamento '{tipo}' nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = AcompanhamentoSerializer(acompanhamento, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -358,15 +319,8 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.data)
 
-    @action(
-        detail=True,
-        methods=["patch"],
-        url_path=r"prova/(?P<numero>\d+)",
-        permission_classes=[IsDATOrSuper]
-    )
-    def update_prova(
-        self, request: Request, pk: int | None = None, numero: str | None = None
-    ) -> Response:
+    @action(detail=True, methods=["patch"], url_path=r"prova/(?P<numero>\d+)", permission_classes=[IsDATOrSuper])
+    def update_prova(self, request: Request, pk: int | None = None, numero: str | None = None) -> Response:
         """
         Atualiza uma prova especifica inline.
 
@@ -379,10 +333,7 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         try:
             prova = plano.provas.get(numero_prova=int(numero))
         except Prova.DoesNotExist:
-            return Response(
-                {"detail": f"Prova {numero} nao encontrada."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"detail": f"Prova {numero} nao encontrada."}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = ProvaSerializer(prova, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)

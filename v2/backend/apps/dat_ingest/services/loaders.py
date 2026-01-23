@@ -1,10 +1,12 @@
 """
 ETL Loaders - Funções puras para carregar dados de planilhas Excel
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 
 from __future__ import annotations
+
 import hashlib
 from pathlib import Path
 from typing import Any
@@ -155,7 +157,7 @@ def parse_municipios(filepath: Path) -> list[dict[str, Any]]:
     # Fallback: procurar aba FILTRO_PROD.
     if ws is None:
         for nome in wb.sheetnames:
-            if 'FILTRO' in nome.upper() and 'PROD' in nome.upper():
+            if "FILTRO" in nome.upper() and "PROD" in nome.upper():
                 ws = wb[nome]
                 sheet_name = nome
                 break
@@ -181,13 +183,15 @@ def parse_municipios(filepath: Path) -> list[dict[str, Any]]:
 
             uf_normalizado = normalize_uf(uf) if uf else ""
 
-            municipios.append({
-                "nome": titlecase(nome),
-                "uf": uf_normalizado.upper() if uf_normalizado else "",
-                "ativo": ativo,
-                "src": f"{filepath.name}/{sheet_name}",
-                "rownum": i,
-            })
+            municipios.append(
+                {
+                    "nome": titlecase(nome),
+                    "uf": uf_normalizado.upper() if uf_normalizado else "",
+                    "ativo": ativo,
+                    "src": f"{filepath.name}/{sheet_name}",
+                    "rownum": i,
+                }
+            )
 
         # Formato FILTRO_PROD: Índice | Município - UF
         else:
@@ -212,13 +216,15 @@ def parse_municipios(filepath: Path) -> list[dict[str, Any]]:
 
             municipios_vistos.add(municipio_uf)
 
-            municipios.append({
-                "nome": titlecase(nome),
-                "uf": uf_normalizado.upper() if uf_normalizado else "",
-                "ativo": True,
-                "src": f"{filepath.name}/FILTRO_PROD",
-                "rownum": i,
-            })
+            municipios.append(
+                {
+                    "nome": titlecase(nome),
+                    "uf": uf_normalizado.upper() if uf_normalizado else "",
+                    "ativo": True,
+                    "src": f"{filepath.name}/FILTRO_PROD",
+                    "rownum": i,
+                }
+            )
 
     return municipios
 
@@ -251,7 +257,7 @@ def parse_projetos(filepath: Path) -> list[dict[str, Any]]:
     # Fallback: procurar aba FILTRO_PROD.
     if ws is None:
         for nome in wb.sheetnames:
-            if 'FILTRO' in nome.upper() and 'PROD' in nome.upper():
+            if "FILTRO" in nome.upper() and "PROD" in nome.upper():
                 ws = wb[nome]
                 sheet_name = nome
                 break
@@ -275,13 +281,15 @@ def parse_projetos(filepath: Path) -> list[dict[str, Any]]:
             if not nome:
                 continue
 
-            projetos.append({
-                "nome": nome,
-                "descricao": descricao,
-                "ativo": ativo,
-                "src": f"{filepath.name}/{sheet_name}",
-                "rownum": i,
-            })
+            projetos.append(
+                {
+                    "nome": nome,
+                    "descricao": descricao,
+                    "ativo": ativo,
+                    "src": f"{filepath.name}/{sheet_name}",
+                    "rownum": i,
+                }
+            )
 
         # Formato FILTRO_PROD: Índice | ... | ... | ... | Projeto (col E)
         else:

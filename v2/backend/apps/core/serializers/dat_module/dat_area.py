@@ -4,6 +4,7 @@ DATArea Serializers - §10 Epic #459
 Reference table serializers for DATArea.
 Extracted from serializers/dat_module.py.
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations

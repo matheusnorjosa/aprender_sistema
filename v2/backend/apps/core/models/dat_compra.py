@@ -6,6 +6,7 @@ Rastreia quantidade, uso e disponibilidade de produtos por municipio.
 
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
@@ -41,16 +42,10 @@ class DATCompra(models.Model):
 
     # Relacionamentos principais
     municipio: models.ForeignKey[Municipio] = models.ForeignKey(  # type: ignore[assignment]
-        "core.Municipio",
-        on_delete=models.PROTECT,
-        related_name="dat_compras",
-        verbose_name="Município"
+        "core.Municipio", on_delete=models.PROTECT, related_name="dat_compras", verbose_name="Município"
     )
     projeto: models.ForeignKey[Projeto] = models.ForeignKey(  # type: ignore[assignment]
-        "core.Projeto",
-        on_delete=models.PROTECT,
-        related_name="dat_compras",
-        verbose_name="Projeto"
+        "core.Projeto", on_delete=models.PROTECT, related_name="dat_compras", verbose_name="Projeto"
     )
     produto: models.ForeignKey[Produto | None] = models.ForeignKey(  # type: ignore[assignment]
         "core.Produto",
@@ -58,7 +53,7 @@ class DATCompra(models.Model):
         null=True,
         blank=True,
         related_name="dat_compras",
-        verbose_name="Produto"
+        verbose_name="Produto",
     )
 
     # Descrição (caso não use FK produto)
@@ -66,60 +61,36 @@ class DATCompra(models.Model):
         max_length=300,
         blank=True,
         verbose_name="Descrição do Produto",
-        help_text="Use quando produto não está cadastrado"
+        help_text="Use quando produto não está cadastrado",
     )
 
     # Quantidades
-    quantidade = models.PositiveIntegerField(
-        default=0,
-        verbose_name="Quantidade Adquirida"
-    )
-    quantidade_utilizada = models.PositiveIntegerField(
-        default=0,
-        verbose_name="Quantidade Utilizada"
-    )
+    quantidade = models.PositiveIntegerField(default=0, verbose_name="Quantidade Adquirida")
+    quantidade_utilizada = models.PositiveIntegerField(default=0, verbose_name="Quantidade Utilizada")
 
     # Valores
     valor_unitario = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal("0.00"),
-        verbose_name="Valor Unitário (R$)"
+        max_digits=10, decimal_places=2, default=Decimal("0.00"), verbose_name="Valor Unitário (R$)"
     )
 
     # Período
     ano_uso = models.PositiveSmallIntegerField(
-        verbose_name="Ano de Uso",
-        help_text="Ano em que o material será/foi utilizado"
+        verbose_name="Ano de Uso", help_text="Ano em que o material será/foi utilizado"
     )
-    data_compra = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data da Compra"
-    )
+    data_compra = models.DateField(null=True, blank=True, verbose_name="Data da Compra")
 
     # Status
     status_uso = models.CharField(
-        max_length=20,
-        choices=StatusUso.choices,
-        default=StatusUso.DISPONIVEL,
-        verbose_name="Status de Uso"
+        max_length=20, choices=StatusUso.choices, default=StatusUso.DISPONIVEL, verbose_name="Status de Uso"
     )
     ativo = models.BooleanField(default=True)
 
     # Observações
-    observacoes = models.TextField(
-        blank=True,
-        max_length=1000,
-        verbose_name="Observações"
-    )
+    observacoes = models.TextField(blank=True, max_length=1000, verbose_name="Observações")
 
     # Auditoria
     created_by: models.ForeignKey[Usuario] = models.ForeignKey(  # type: ignore[assignment]
-        "core.Usuario",
-        on_delete=models.PROTECT,
-        related_name="dat_compras_criadas",
-        verbose_name="Criado por"
+        "core.Usuario", on_delete=models.PROTECT, related_name="dat_compras_criadas", verbose_name="Criado por"
     )
     updated_by: models.ForeignKey[Usuario | None] = models.ForeignKey(  # type: ignore[assignment]
         "core.Usuario",
@@ -127,7 +98,7 @@ class DATCompra(models.Model):
         null=True,
         blank=True,
         related_name="dat_compras_atualizadas",
-        verbose_name="Atualizado por"
+        verbose_name="Atualizado por",
     )
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)

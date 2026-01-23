@@ -8,20 +8,23 @@ pelo projeto, não pelo campo coordenador_acompanha.
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from django.test import TestCase
-from django.contrib.auth.models import Group
-from django.utils import timezone
-from rest_framework.test import APIClient
-from rest_framework import status
+
 from datetime import timedelta
 
+from django.contrib.auth.models import Group
+from django.test import TestCase
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APIClient
+
+import pytest
+
 from apps.core.models import (
-    Usuario,
-    Projeto,
     Municipio,
-    TipoEvento,
+    Projeto,
     Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 
 
@@ -72,14 +75,14 @@ class TestFluxoPorProjeto(TestCase):
         # Criar projetos com diferentes fluxos
         self.projeto_super = Projeto.objects.create(
             nome="ACerta",
-            codigo='',  # Explicitly set empty string (default)
+            codigo="",  # Explicitly set empty string (default)
             fluxo="SUPER",
             ativo=True,
         )
 
         self.projeto_outros = Projeto.objects.create(
             nome="Workshop",
-            codigo='',  # Explicitly set empty string (default)
+            codigo="",  # Explicitly set empty string (default)
             fluxo="NAO_SUPER",
             ativo=True,
         )
@@ -197,12 +200,12 @@ class TestFluxoPorProjeto(TestCase):
         # Criar projeto sem fluxo definido (simula migration antiga)
         projeto_sem_fluxo = Projeto.objects.create(
             nome="Projeto Antigo",
-            codigo='',  # Explicitly set empty string (default)
+            codigo="",  # Explicitly set empty string (default)
             ativo=True,
             # fluxo será 'NAO_SUPER' por padrão do modelo
         )
         # Forçar fluxo como None para simular projeto antigo
-        Projeto.objects.filter(id=projeto_sem_fluxo.id).update(fluxo='NAO_SUPER')
+        Projeto.objects.filter(id=projeto_sem_fluxo.id).update(fluxo="NAO_SUPER")
         projeto_sem_fluxo.refresh_from_db()
 
         self.client.force_authenticate(user=self.coordenador)
@@ -300,14 +303,11 @@ class TestFluxoPorProjeto(TestCase):
         usuario_controle.groups.add(self.grupo_controle)
         self.client.force_authenticate(user=usuario_controle)
 
-        response = self.client.get(f"/api/pre-agenda/")
+        response = self.client.get("/api/pre-agenda/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # Encontrar a solicitação na resposta
-        item = next(
-            (i for i in response.data["results"] if i["id"] == solicitacao.id),
-            None
-        )
+        item = next((i for i in response.data["results"] if i["id"] == solicitacao.id), None)
 
         self.assertIsNotNone(item)
         self.assertEqual(item["fluxo"], "SUPER")
@@ -318,10 +318,12 @@ class TestFluxoPorProjeto(TestCase):
 
         Skip se CSV não existe (ex: CI sem dados de produção).
         """
-        from django.core.management import call_command
-        from django.conf import settings
-        from pathlib import Path
         from io import StringIO
+        from pathlib import Path
+
+        from django.conf import settings
+        from django.core.management import call_command
+
         import pytest
 
         # Path absoluto do CSV (não depende do CWD)
@@ -334,7 +336,7 @@ class TestFluxoPorProjeto(TestCase):
         # Criar projeto para atualizar
         projeto_teste = Projeto.objects.create(
             nome="Lendo e Escrevendo",  # Nome no CSV como SUPER
-            codigo='',  # Explicitly set empty string (default)
+            codigo="",  # Explicitly set empty string (default)
             fluxo="NAO_SUPER",  # Começar com NAO_SUPER
             ativo=True,
         )
@@ -376,7 +378,7 @@ class TestMigrationFluxoProjeto(TestCase):
         # Criar um projeto
         projeto = Projeto.objects.create(
             nome="Teste Migration",
-            codigo='',  # Explicitly set empty string (default)
+            codigo="",  # Explicitly set empty string (default)
             ativo=True,
         )
 
@@ -385,10 +387,7 @@ class TestMigrationFluxoProjeto(TestCase):
         self.assertEqual(projeto.fluxo, "NAO_SUPER")  # Valor padrão
 
         # Verificar choices
-        self.assertIn(
-            projeto.fluxo,
-            [choice[0] for choice in Projeto.FLUXO_CHOICES]
-        )
+        self.assertIn(projeto.fluxo, [choice[0] for choice in Projeto.FLUXO_CHOICES])
 
     def test_migration_backfill_projetos_existentes(self):
         """

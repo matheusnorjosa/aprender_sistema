@@ -14,20 +14,23 @@ Filtros: date_from, date_to, sector, q, status (gcal_status).
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from datetime import timedelta
+from unittest.mock import MagicMock, patch
+
 from django.contrib.auth.models import Group
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
-from unittest.mock import patch, MagicMock
+
+import pytest
 
 from apps.core.models import (
-    Usuario,
     Municipio,
-    TipoEvento,
     Projeto,
     Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 
 
@@ -148,17 +151,13 @@ class TestGCalStatusSummary:
         # DRF returns 403 for permission-protected endpoints without auth
         assert response.status_code in [401, 403]
 
-    def test_summary_requires_controle_permission(
-        self, api_client, usuario_coordenador
-    ):
+    def test_summary_requires_controle_permission(self, api_client, usuario_coordenador):
         """Apenas Controle/Super podem acessar."""
         api_client.force_authenticate(user=usuario_coordenador)
         response = api_client.get("/api/gcal/status-summary/")
         assert response.status_code == 403
 
-    def test_summary_returns_counts_and_total(
-        self, api_client, usuario_controle, setup_solicitacoes
-    ):
+    def test_summary_returns_counts_and_total(self, api_client, usuario_controle, setup_solicitacoes):
         """Retorna estrutura {counts, total} com todas as chaves."""
         api_client.force_authenticate(user=usuario_controle)
         response = api_client.get("/api/gcal/status-summary/")
@@ -184,9 +183,7 @@ class TestGCalStatusSummary:
         assert counts["ERROR"] == 1
         assert data["total"] == 4
 
-    def test_summary_supports_sector_filter(
-        self, api_client, usuario_controle, setup_solicitacoes
-    ):
+    def test_summary_supports_sector_filter(self, api_client, usuario_controle, setup_solicitacoes):
         """Filtro sector funciona."""
         api_client.force_authenticate(user=usuario_controle)
         response = api_client.get("/api/gcal/status-summary/?sector=Gestão")
@@ -207,17 +204,13 @@ class TestGCalList:
         response = api_client.get("/api/gcal/list/")
         assert response.status_code in [401, 403]
 
-    def test_list_requires_controle_permission(
-        self, api_client, usuario_coordenador
-    ):
+    def test_list_requires_controle_permission(self, api_client, usuario_coordenador):
         """Apenas Controle/Super podem acessar."""
         api_client.force_authenticate(user=usuario_coordenador)
         response = api_client.get("/api/gcal/list/")
         assert response.status_code == 403
 
-    def test_list_returns_results_and_count(
-        self, api_client, usuario_controle, setup_solicitacoes
-    ):
+    def test_list_returns_results_and_count(self, api_client, usuario_controle, setup_solicitacoes):
         """Retorna estrutura {results, count}."""
         api_client.force_authenticate(user=usuario_controle)
         response = api_client.get("/api/gcal/list/")
@@ -230,9 +223,7 @@ class TestGCalList:
         assert data["count"] == 4
         assert len(data["results"]) == 4
 
-    def test_list_includes_gcal_fields(
-        self, api_client, usuario_controle, setup_solicitacoes
-    ):
+    def test_list_includes_gcal_fields(self, api_client, usuario_controle, setup_solicitacoes):
         """Resultados incluem campos gcal_status, gcal_last_sync_at, etc."""
         api_client.force_authenticate(user=usuario_controle)
         response = api_client.get("/api/gcal/list/")
@@ -248,9 +239,7 @@ class TestGCalList:
         assert "gcal_last_error" in first_result
         # Note: gcal_payload_hash removed from serializer (internal implementation detail)
 
-    def test_list_filters_by_status(
-        self, api_client, usuario_controle, setup_solicitacoes
-    ):
+    def test_list_filters_by_status(self, api_client, usuario_controle, setup_solicitacoes):
         """Filtro status (gcal_status) funciona."""
         api_client.force_authenticate(user=usuario_controle)
         response = api_client.get("/api/gcal/list/?status=PUBLISHED")
@@ -263,9 +252,7 @@ class TestGCalList:
         result = data["results"][0]
         assert result["gcal_status"] == "PUBLISHED"
 
-    def test_list_filters_by_sector(
-        self, api_client, usuario_controle, setup_solicitacoes
-    ):
+    def test_list_filters_by_sector(self, api_client, usuario_controle, setup_solicitacoes):
         """Filtro sector funciona."""
         api_client.force_authenticate(user=usuario_controle)
         response = api_client.get("/api/gcal/list/?sector=Alfabetização")
@@ -284,17 +271,13 @@ class TestGCalDrift:
         response = api_client.get("/api/gcal/drift/")
         assert response.status_code in [401, 403]
 
-    def test_drift_requires_controle_permission(
-        self, api_client, usuario_coordenador
-    ):
+    def test_drift_requires_controle_permission(self, api_client, usuario_coordenador):
         """Apenas Controle/Super podem acessar."""
         api_client.force_authenticate(user=usuario_coordenador)
         response = api_client.get("/api/gcal/drift/")
         assert response.status_code == 403
 
-    def test_drift_returns_count_and_items(
-        self, api_client, usuario_controle, setup_solicitacoes
-    ):
+    def test_drift_returns_count_and_items(self, api_client, usuario_controle, setup_solicitacoes):
         """Retorna estrutura {count, items}."""
         api_client.force_authenticate(user=usuario_controle)
         response = api_client.get("/api/gcal/drift/")
@@ -305,9 +288,7 @@ class TestGCalDrift:
         assert "count" in data
         assert "items" in data
 
-    def test_drift_detects_changed_payload(
-        self, api_client, usuario_controle, setup_solicitacoes
-    ):
+    def test_drift_detects_changed_payload(self, api_client, usuario_controle, setup_solicitacoes):
         """Detecta quando payload mudou (hash diferente)."""
         from apps.core.services.gcal_sync_service import compute_payload_hash
 
@@ -343,17 +324,13 @@ class TestGCalBulkReapply:
         response = api_client.post("/api/gcal/publish-batch/", {})
         assert response.status_code in [401, 403]
 
-    def test_reapply_requires_controle_permission(
-        self, api_client, usuario_coordenador
-    ):
+    def test_reapply_requires_controle_permission(self, api_client, usuario_coordenador):
         """Apenas Controle/Super podem acessar."""
         api_client.force_authenticate(user=usuario_coordenador)
         response = api_client.post("/api/gcal/publish-batch/", {})
         assert response.status_code == 403
 
-    def test_reapply_requires_ids_field(
-        self, api_client, usuario_controle
-    ):
+    def test_reapply_requires_ids_field(self, api_client, usuario_controle):
         """Campo 'solicitacao_ids' é obrigatório."""
         api_client.force_authenticate(user=usuario_controle)
         response = api_client.post("/api/gcal/publish-batch/", {})
@@ -361,9 +338,7 @@ class TestGCalBulkReapply:
         assert response.status_code == 400
         assert "solicitacao_ids" in response.json()["detail"]
 
-    def test_reapply_validates_approved_status(
-        self, api_client, usuario_controle, setup_solicitacoes
-    ):
+    def test_reapply_validates_approved_status(self, api_client, usuario_controle, setup_solicitacoes):
         """Apenas solicitações aprovadas podem ser republicadas."""
         # Criar solicitação pendente
         sol_pendente = Solicitacao.objects.create(
@@ -392,10 +367,8 @@ class TestGCalBulkReapply:
         assert data["queued"] == 0
 
     @override_settings(FEATURE_AUTO_APPLY_ENABLED=True)
-    @patch('apps.core.tasks.task_publish_solicitacao_to_gcal')
-    def test_reapply_returns_queued_and_errors(
-        self, mock_task, api_client, usuario_controle, setup_solicitacoes
-    ):
+    @patch("apps.core.tasks.task_publish_solicitacao_to_gcal")
+    def test_reapply_returns_queued_and_errors(self, mock_task, api_client, usuario_controle, setup_solicitacoes):
         """
         Retorna estrutura {queued, errors, dry_run}.
 
@@ -430,9 +403,7 @@ class TestGCalBulkReapply:
         # Verificar que task foi enfileirado
         assert mock_delay.called
 
-    def test_reapply_marks_pending_when_not_dry_run(
-        self, api_client, usuario_controle, setup_solicitacoes
-    ):
+    def test_reapply_marks_pending_when_not_dry_run(self, api_client, usuario_controle, setup_solicitacoes):
         """Marca como PENDING quando dry_run=False."""
         sol1 = setup_solicitacoes["sol1"]
 
@@ -449,9 +420,7 @@ class TestGCalBulkReapply:
         sol1.refresh_from_db()
         assert sol1.gcal_status == Solicitacao.GCalStatus.PENDING
 
-    def test_reapply_dry_run_does_not_modify(
-        self, api_client, usuario_controle, setup_solicitacoes
-    ):
+    def test_reapply_dry_run_does_not_modify(self, api_client, usuario_controle, setup_solicitacoes):
         """Dry-run não modifica gcal_status."""
         sol1 = setup_solicitacoes["sol1"]
         original_status = sol1.gcal_status

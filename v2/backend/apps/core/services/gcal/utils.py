@@ -3,6 +3,7 @@ AS v2 — GCal Sync Utilities
 
 Utility functions for retry, hashing, circuit breaker integration.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from apps.core.types import JsonDict, PayloadHash
 logger = logging.getLogger(__name__)
 
 # Type variable para retry genérico
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def _retry_with_backoff(
@@ -61,9 +62,7 @@ def _retry_with_backoff(
 
             # Sucesso na tentativa
             if attempt > 0:
-                logger.info(
-                    f"{operation_name} succeeded after {attempt} retries"
-                )
+                logger.info(f"{operation_name} succeeded after {attempt} retries")
             return result
 
         except Exception as e:
@@ -75,27 +74,25 @@ def _retry_with_backoff(
             retry_after = None
 
             # Tentar extrair status code de exceções comuns
-            if hasattr(e, 'resp') and hasattr(e.resp, 'status'):
+            if hasattr(e, "resp") and hasattr(e.resp, "status"):
                 # googleapiclient.errors.HttpError
                 status_code = e.resp.status
 
                 # Extrair Retry-After header
-                if hasattr(e.resp, 'get'):
-                    retry_after = e.resp.get('Retry-After')
-            elif '429' in error_str:
+                if hasattr(e.resp, "get"):
+                    retry_after = e.resp.get("Retry-After")
+            elif "429" in error_str:
                 status_code = 429
-            elif '500' in error_str or '502' in error_str or '503' in error_str or '504' in error_str:
+            elif "500" in error_str or "502" in error_str or "503" in error_str or "504" in error_str:
                 status_code = 500  # Genérico para 5xx
-            elif '409' in error_str:
+            elif "409" in error_str:
                 status_code = 409
-            elif '412' in error_str:
+            elif "412" in error_str:
                 status_code = 412
 
             # VERIFICAR IDEMPOTÊNCIA PRIMEIRO (409/412 = sucesso)
             if status_code in (409, 412):
-                logger.info(
-                    f"{operation_name}: {status_code} treated as success (idempotency)"
-                )
+                logger.info(f"{operation_name}: {status_code} treated as success (idempotency)")
                 return None  # type: ignore[return-value]
 
             # Decidir se deve retentar
@@ -104,9 +101,7 @@ def _retry_with_backoff(
             if status_code == 429:
                 # Rate limit → sempre retry
                 should_retry = True
-                logger.warning(
-                    f"{operation_name}: Rate limit (429), attempt {attempt + 1}/{max_retries + 1}"
-                )
+                logger.warning(f"{operation_name}: Rate limit (429), attempt {attempt + 1}/{max_retries + 1}")
             elif status_code and status_code >= 500:
                 # Server error → retry
                 should_retry = True
@@ -115,9 +110,7 @@ def _retry_with_backoff(
                 )
             elif status_code and 400 <= status_code < 500:
                 # Client error (exceto 429) → não retry
-                logger.error(
-                    f"{operation_name}: Client error ({status_code}), aborting without retry"
-                )
+                logger.error(f"{operation_name}: Client error ({status_code}), aborting without retry")
                 raise
             else:
                 # Erro desconhecido → retry conservador
@@ -128,9 +121,7 @@ def _retry_with_backoff(
 
             # Se não deve retentar ou esgotou tentativas, lança exceção
             if not should_retry or attempt >= max_retries:
-                logger.error(
-                    f"{operation_name}: Failed after {attempt + 1} attempts. Last error: {error_str[:200]}"
-                )
+                logger.error(f"{operation_name}: Failed after {attempt + 1} attempts. Last error: {error_str[:200]}")
                 raise
 
             # Calcular delay
@@ -138,9 +129,9 @@ def _retry_with_backoff(
                 try:
                     delay = float(retry_after)
                 except (ValueError, TypeError):
-                    delay = initial_delay * (2 ** attempt)
+                    delay = initial_delay * (2**attempt)
             else:
-                delay = initial_delay * (2 ** attempt)
+                delay = initial_delay * (2**attempt)
 
             logger.info(f"{operation_name}: Retrying in {delay:.1f}s...")
             time.sleep(delay)
@@ -209,7 +200,5 @@ def _retry_with_circuit_breaker(
         )
         return cast(T, result)
     except CircuitBreakerError:
-        logger.warning(
-            f"{operation_name}: Circuit breaker opened due to repeated failures"
-        )
+        logger.warning(f"{operation_name}: Circuit breaker opened due to repeated failures")
         raise

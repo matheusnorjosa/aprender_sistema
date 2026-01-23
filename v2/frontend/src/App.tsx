@@ -35,6 +35,7 @@ import { logout as apiLogout } from './api/auth';
 import { LAYOUT, TIMING } from './constants';
 import { preloadSearchData } from './services/preloadSearchData';
 import OfflineBanner from './components/OfflineBanner';
+import type { CurrentUser } from './types';
 import './App.css';
 
 // ============================================================================
@@ -77,11 +78,30 @@ const { Header, Content, Sider } = Layout;
 const { SubMenu } = Menu;
 const { Text } = Typography;
 
-// Hook para controlar abertura de submenus (apenas um aberto por vez)
-function useMenuOpenKeys() {
-  const [openKeys, setOpenKeys] = useState([]);
+/**
+ * Alerts summary interface
+ */
+interface AlertsSummary {
+  errors: number;
+  pending: number;
+  published: number;
+  none: number;
+}
 
-  const onOpenChange = (keys) => {
+/**
+ * Hook return interface for menu open keys
+ */
+interface UseMenuOpenKeysReturn {
+  openKeys: string[];
+  onOpenChange: (keys: string[]) => void;
+  closeAllSubmenus: () => void;
+}
+
+// Hook para controlar abertura de submenus (apenas um aberto por vez)
+function useMenuOpenKeys(): UseMenuOpenKeysReturn {
+  const [openKeys, setOpenKeys] = useState<string[]>([]);
+
+  const onOpenChange = (keys: string[]) => {
     // Pegar apenas a última key aberta (fecha as outras)
     const latestOpenKey = keys.find((key) => openKeys.indexOf(key) === -1);
     setOpenKeys(latestOpenKey ? [latestOpenKey] : []);
@@ -96,7 +116,7 @@ function useMenuOpenKeys() {
 }
 
 // Componente de loading para Suspense
-function PageLoader() {
+function PageLoader(): JSX.Element {
   return (
     <div className="flex justify-center items-center" style={{ height: '100%', minHeight: '300px' }}>
       <Spin size="large" tip="Carregando página..." />
@@ -105,24 +125,24 @@ function PageLoader() {
 }
 
 // Componente 403 Forbidden
-function Forbidden() {
+function Forbidden(): JSX.Element {
   return <Result status="403" title="Sem permissão" subTitle="Você não tem permissão para acessar esta página." />;
 }
 
 // Componente principal que usa o tema
-function AppContent() {
+function AppContent(): JSX.Element {
   const { antThemeConfig } = useTheme();
   const colors = useBrandColors();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Issue #97: GCal Alerts (badge + toast)
-  const [alerts, setAlerts] = useState({ errors: 0, pending: 0, published: 0, none: 0 });
-  const [lastErrorsCount, setLastErrorsCount] = useState(0);
-  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [alerts, setAlerts] = useState<AlertsSummary>({ errors: 0, pending: 0, published: 0, none: 0 });
+  const [lastErrorsCount, setLastErrorsCount] = useState<number>(0);
+  const [cooldownUntil, setCooldownUntil] = useState<number>(0);
 
   // Issue #255: Ref para evitar memory leak (atualizações após unmount)
-  const isMountedRef = useRef(true);
+  const isMountedRef = useRef<boolean>(true);
 
   // Controle de submenus (apenas um aberto por vez)
   const { openKeys, onOpenChange, closeAllSubmenus } = useMenuOpenKeys();
@@ -132,7 +152,7 @@ function AppContent() {
     try {
       const userData = await getMe();
       if (isMountedRef.current) {
-        setUser(userData);
+        setUser(userData as unknown as CurrentUser);
         // Issue #418: Preload search data after successful login
         preloadSearchData().catch((err) => logger.warn('Search preload failed:', err));
       }
@@ -168,7 +188,7 @@ function AppContent() {
       return; // Não tem permissão, não fazer polling
     }
 
-    let intervalId = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const fetchAlerts = async () => {
       try {
@@ -300,7 +320,8 @@ function AppContent() {
 
   // Permissões compostas (Setor + Função)
   // canApproveSuper = pode aprovar solicitações SUPER (Gerente + Superintendência)
-  const canApproveSuper = user?.can_approve_super || false;
+  // Note: can_approve_super may be added by backend but not in strict types yet
+  const canApproveSuper = (user as unknown as { can_approve_super?: boolean })?.can_approve_super || false;
   // canCoordenador = pode criar solicitações
   const canCoordenador = user?.is_superuser || isCoordenador || inDAT;
   // canControle = acesso a funcionalidades de Controle
@@ -500,7 +521,7 @@ function AppContent() {
                 */}
                 <div className="flex items-center gap-2">
                   <UserOutlined />
-                  <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
+                  <Text strong>{(user as unknown as { name?: string })?.name || user?.username || 'Usuário'}</Text>
                 </div>
                 <Button
                   type="primary"
@@ -658,7 +679,7 @@ function AppContent() {
 }
 
 // App wrapper com ThemeProvider
-function App() {
+function App(): JSX.Element {
   return (
     <ThemeProvider>
       <AppContent />

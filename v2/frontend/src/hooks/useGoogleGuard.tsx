@@ -2,7 +2,7 @@
  * useGoogleGuard - §4 Epic #459
  *
  * Hook for Google OAuth connection checks before GCal operations.
- * Deduplicates Modal.confirm patterns found in PreAgendaPage.jsx and others.
+ * Deduplicates Modal.confirm patterns found in PreAgendaPage.tsx and others.
  *
  * Usage:
  *   const { requireGoogleConnection, handleGoogleError } = useGoogleGuard({
@@ -21,36 +21,55 @@ import { Modal } from 'antd';
 import { useCallback } from 'react';
 
 /**
- * @typedef {Object} GoogleStatus
- * @property {boolean} connected - Whether Google account is connected
- * @property {string} [email] - Connected Google email
+ * Google connection status interface
  */
+export interface GoogleStatus {
+  connected: boolean;
+  email?: string;
+}
 
 /**
- * @typedef {Object} UseGoogleGuardOptions
- * @property {GoogleStatus|null} googleStatus - Google connection status from useGoogleIntegration
- * @property {string} returnTo - Return URL after OAuth flow (e.g., '/pre-agenda')
+ * Hook options interface
  */
+export interface UseGoogleGuardOptions {
+  googleStatus: GoogleStatus | null;
+  returnTo: string;
+}
 
 /**
- * @typedef {Object} UseGoogleGuardReturn
- * @property {(actionDescription: string) => boolean} requireGoogleConnection - Check if connected, show modal if not
- * @property {(error: Error) => boolean} handleGoogleError - Handle 403 google_not_connected errors
- * @property {boolean} isConnected - Current connection status
+ * Hook return interface
  */
+export interface UseGoogleGuardReturn {
+  requireGoogleConnection: (actionDescription?: string) => boolean;
+  handleGoogleError: (error: unknown) => boolean;
+  isConnected: boolean;
+}
+
+/**
+ * API error with response interface
+ */
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      code?: string;
+      detail?: string;
+    };
+  };
+}
 
 /**
  * Hook for Google OAuth connection checks.
  *
- * @param {UseGoogleGuardOptions} options
- * @returns {UseGoogleGuardReturn}
+ * @param options - Hook options
+ * @returns Hook return object
  */
-export default function useGoogleGuard({ googleStatus, returnTo }) {
+export default function useGoogleGuard({ googleStatus, returnTo }: UseGoogleGuardOptions): UseGoogleGuardReturn {
   const isConnected = googleStatus?.connected ?? false;
 
   /**
    * Shows the "Connect Google" modal and redirects to OAuth flow.
-   * @param {string} actionDescription - What the user was trying to do (e.g., "publicar eventos")
+   * @param actionDescription - What the user was trying to do (e.g., "publicar eventos")
    */
   const showConnectModal = useCallback(
     (actionDescription = 'realizar esta ação') => {
@@ -78,8 +97,8 @@ export default function useGoogleGuard({ googleStatus, returnTo }) {
   /**
    * Check if Google is connected. If not, shows connection modal.
    *
-   * @param {string} actionDescription - What the user is trying to do
-   * @returns {boolean} true if connected (proceed), false if not (modal shown)
+   * @param actionDescription - What the user is trying to do
+   * @returns true if connected (proceed), false if not (modal shown)
    *
    * @example
    * const handlePublish = (id) => {
@@ -88,7 +107,7 @@ export default function useGoogleGuard({ googleStatus, returnTo }) {
    * };
    */
   const requireGoogleConnection = useCallback(
-    (actionDescription = 'realizar esta ação') => {
+    (actionDescription = 'realizar esta ação'): boolean => {
       if (googleStatus && !googleStatus.connected) {
         showConnectModal(actionDescription);
         return false;
@@ -101,8 +120,8 @@ export default function useGoogleGuard({ googleStatus, returnTo }) {
   /**
    * Handle API errors. If it's a 403 with code='google_not_connected', shows modal.
    *
-   * @param {Error} error - Axios error or similar
-   * @returns {boolean} true if error was handled (Google not connected), false otherwise
+   * @param error - Axios error or similar
+   * @returns true if error was handled (Google not connected), false otherwise
    *
    * @example
    * try {
@@ -113,9 +132,10 @@ export default function useGoogleGuard({ googleStatus, returnTo }) {
    * }
    */
   const handleGoogleError = useCallback(
-    (error) => {
-      const data = error.response?.data;
-      const status = error.response?.status;
+    (error: unknown): boolean => {
+      const apiError = error as ApiError;
+      const data = apiError.response?.data;
+      const status = apiError.response?.status;
 
       if (status === 403 && data?.code === 'google_not_connected') {
         Modal.confirm({

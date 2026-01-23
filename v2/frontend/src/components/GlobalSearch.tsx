@@ -5,7 +5,7 @@
  * Uses Fuse.js client-side index for fast, fuzzy search.
  *
  * Usage:
- * ```jsx
+ * ```tsx
  * <GlobalSearch
  *   onSelect={(item, type) => console.log('Selected:', item, type)}
  *   placeholder="Buscar..."
@@ -13,16 +13,38 @@
  * ```
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, type CSSProperties, type ReactNode } from 'react';
 import { Input, List, Typography, Tag, Empty, Spin, Popover } from 'antd';
 import { SearchOutlined, UserOutlined, EnvironmentOutlined, ProjectOutlined, CalendarOutlined } from '@ant-design/icons';
-import PropTypes from 'prop-types';
 import { useGlobalSearch } from '../hooks/useInstantSearch';
+import type { SearchResult } from '../services/searchIndex';
+import type { ID } from '../types';
 
 const { Text } = Typography;
 
+/**
+ * Search result item with ID for rendering
+ */
+export type SearchResultItem = SearchResult<{ id: ID; nome?: string; titulo?: string; [key: string]: unknown }>;
+
+/**
+ * Index configuration item
+ */
+interface IndexConfigItem {
+  label: string;
+  icon: ReactNode;
+  color: string;
+  displayField: string;
+  secondaryField: string | null;
+}
+
+/**
+ * Index configuration type
+ */
+type IndexConfigType = Record<string, IndexConfigItem>;
+
 // Index type configuration
-const INDEX_CONFIG = {
+const INDEX_CONFIG: IndexConfigType = {
   municipios: {
     label: 'Municipios',
     icon: <EnvironmentOutlined />,
@@ -54,11 +76,20 @@ const INDEX_CONFIG = {
 };
 
 /**
+ * SearchResultItemProps interface
+ */
+interface SearchResultItemProps {
+  item: SearchResultItem;
+  config: IndexConfigItem;
+  onClick: (item: SearchResultItem) => void;
+}
+
+/**
  * Search result item component.
  */
-function SearchResultItem({ item, config, onClick }) {
-  const displayValue = item[config.displayField] || item.nome || item.titulo;
-  const secondaryValue = config.secondaryField ? item[config.secondaryField] : null;
+function SearchResultItemComponent({ item, config, onClick }: SearchResultItemProps): JSX.Element {
+  const displayValue = item[config.displayField as keyof SearchResultItem] || item.nome || item.titulo;
+  const secondaryValue = config.secondaryField ? item[config.secondaryField as keyof SearchResultItem] : null;
   const matchScore = item._score !== undefined ? Math.round((1 - item._score) * 100) : null;
 
   return (
@@ -69,9 +100,9 @@ function SearchResultItem({ item, config, onClick }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
         <span style={{ color: '#1890ff' }}>{config.icon}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <Text ellipsis style={{ display: 'block' }}>{displayValue}</Text>
+          <Text ellipsis style={{ display: 'block' }}>{String(displayValue ?? '')}</Text>
           {secondaryValue && (
-            <Text type="secondary" style={{ fontSize: 12 }}>{secondaryValue}</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>{String(secondaryValue)}</Text>
           )}
         </div>
         {matchScore !== null && (
@@ -84,16 +115,19 @@ function SearchResultItem({ item, config, onClick }) {
   );
 }
 
-SearchResultItem.propTypes = {
-  item: PropTypes.object.isRequired,
-  config: PropTypes.object.isRequired,
-  onClick: PropTypes.func.isRequired,
-};
+/**
+ * GlobalSearch props interface
+ */
+export interface GlobalSearchProps {
+  onSelect?: (item: SearchResultItem, indexKey: string) => void;
+  placeholder?: string;
+  style?: CSSProperties;
+}
 
 /**
  * Global search with multi-index results.
  */
-export function GlobalSearch({ onSelect, placeholder = 'Buscar municipios, projetos, usuarios...', style }) {
+export function GlobalSearch({ onSelect, placeholder = 'Buscar municipios, projetos, usuarios...', style }: GlobalSearchProps): JSX.Element {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
 
@@ -115,7 +149,7 @@ export function GlobalSearch({ onSelect, placeholder = 'Buscar municipios, proje
 
   // Handle selection
   const handleSelect = useCallback(
-    (item, indexKey) => {
+    (item: SearchResultItem, indexKey: string) => {
       setQuery('');
       setOpen(false);
       onSelect?.(item, indexKey);
@@ -160,9 +194,9 @@ export function GlobalSearch({ onSelect, placeholder = 'Buscar municipios, proje
               </div>
               <List
                 size="small"
-                dataSource={items}
+                dataSource={items as SearchResultItem[]}
                 renderItem={(item) => (
-                  <SearchResultItem
+                  <SearchResultItemComponent
                     key={item.id}
                     item={item}
                     config={config}
@@ -208,11 +242,5 @@ export function GlobalSearch({ onSelect, placeholder = 'Buscar municipios, proje
     </Popover>
   );
 }
-
-GlobalSearch.propTypes = {
-  onSelect: PropTypes.func,
-  placeholder: PropTypes.string,
-  style: PropTypes.object,
-};
 
 export default GlobalSearch;

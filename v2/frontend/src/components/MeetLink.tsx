@@ -12,12 +12,18 @@
 
 import { Button, Space, message } from 'antd';
 import { VideoCameraOutlined, CopyOutlined } from '@ant-design/icons';
-import PropTypes from 'prop-types';
 
-export function MeetLink({ href }) {
+/**
+ * MeetLink props interface
+ */
+export interface MeetLinkProps {
+  href?: string | null;
+}
+
+export function MeetLink({ href }: MeetLinkProps): JSX.Element | null {
   if (!href) return null;
 
-  const handleCopy = () => {
+  const handleCopy = (): void => {
     navigator.clipboard.writeText(href)
       .then(() => {
         message.success('Link copiado para área de transferência!');
@@ -47,13 +53,5 @@ export function MeetLink({ href }) {
     </Space>
   );
 }
-
-MeetLink.propTypes = {
-  href: PropTypes.string,
-};
-
-MeetLink.defaultProps = {
-  href: null,
-};
 
 export default MeetLink;

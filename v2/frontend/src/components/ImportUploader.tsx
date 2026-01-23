@@ -22,38 +22,74 @@ import {
   Collapse,
   Tag,
   Result,
-  Spin
 } from 'antd';
 import {
   UploadOutlined,
   CheckCircleOutlined,
-  WarningOutlined,
   CloseCircleOutlined,
   FileExcelOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
+import type { UploadFile, UploadProps } from 'antd/es/upload/interface';
 
 const { Text, Title } = Typography;
 const { Panel } = Collapse;
 const { Dragger } = Upload;
 
-export default function ImportUploader({ label, onDryRun, onApply, description }) {
-  const [file, setFile] = useState(null);
-  const [validationResult, setValidationResult] = useState(null);
-  const [applyResult, setApplyResult] = useState(null);
+/**
+ * Validation/Apply result stats
+ */
+export interface ImportStats {
+  created?: number;
+  updated?: number;
+  unchanged?: number;
+}
+
+/**
+ * Validation result interface
+ */
+export interface ValidationResult {
+  stats?: ImportStats;
+  errors?: string[];
+  pendencias?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/**
+ * Apply result interface
+ */
+export interface ApplyResult {
+  stats?: ImportStats;
+  [key: string]: unknown;
+}
+
+/**
+ * ImportUploader props interface
+ */
+export interface ImportUploaderProps {
+  label: string;
+  onDryRun: (file: File) => Promise<ValidationResult>;
+  onApply: (file: File) => Promise<ApplyResult>;
+  description?: string;
+}
+
+export default function ImportUploader({ label, onDryRun, onApply, description }: ImportUploaderProps): JSX.Element {
+  const [file, setFile] = useState<File | null>(null);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [applyResult, setApplyResult] = useState<ApplyResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingApply, setLoadingApply] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Estado da validação
   const isValidated = validationResult !== null && !error;
-  const hasErrors = validationResult?.errors?.length > 0;
+  const hasErrors = (validationResult?.errors?.length ?? 0) > 0;
   const canApply = isValidated && !hasErrors && !applyResult;
 
   /**
    * Reset para nova importação
    */
-  const handleReset = () => {
+  const handleReset = (): void => {
     setFile(null);
     setValidationResult(null);
     setApplyResult(null);
@@ -63,7 +99,7 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
   /**
    * Validar importação (dry-run)
    */
-  const handleValidate = async () => {
+  const handleValidate = async (): Promise<void> => {
     if (!file) return;
 
     setLoading(true);
@@ -75,7 +111,7 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
       const report = await onDryRun(file);
       setValidationResult(report);
     } catch (err) {
-      setError(err.message || 'Erro ao validar arquivo');
+      setError((err as Error).message || 'Erro ao validar arquivo');
     } finally {
       setLoading(false);
     }
@@ -84,7 +120,7 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
   /**
    * Realizar importação (apply)
    */
-  const handleApply = async () => {
+  const handleApply = async (): Promise<void> => {
     if (!file) return;
 
     setLoadingApply(true);
@@ -95,7 +131,7 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
       setApplyResult(report);
       setValidationResult(null); // Limpar validação após apply
     } catch (err) {
-      setError(err.message || 'Erro ao importar arquivo');
+      setError((err as Error).message || 'Erro ao importar arquivo');
     } finally {
       setLoadingApply(false);
     }
@@ -104,10 +140,10 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
   /**
    * Props do upload
    */
-  const uploadProps = {
+  const uploadProps: UploadProps = {
     accept: '.csv,.xlsx,.xls',
     maxCount: 1,
-    beforeUpload: (selectedFile) => {
+    beforeUpload: (selectedFile: File) => {
       setFile(selectedFile);
       setValidationResult(null);
       setApplyResult(null);
@@ -122,7 +158,7 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
       name: file.name,
       status: 'done',
       size: file.size
-    }] : [],
+    } as UploadFile] : [],
   };
 
   return (
@@ -277,7 +313,7 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
               </Card>
 
               {/* Erros bloqueantes */}
-              {hasErrors && (
+              {hasErrors && validationResult.errors && (
                 <Alert
                   message="Erros encontrados"
                   description={

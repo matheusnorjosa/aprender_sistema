@@ -6,15 +6,59 @@
  */
 
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect } from 'react';
-import { theme } from 'antd';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { theme, type ThemeConfig } from 'antd';
 
-const ThemeContext = createContext();
+/**
+ * Theme mode type
+ */
+export type ThemeMode = 'light' | 'dark';
+
+/**
+ * Brand colors interface
+ */
+export interface BrandColors {
+  primary: string;
+  primaryDark: string;
+  primaryLight: string;
+  pageBackground: string;
+  cardBackground: string;
+  sidebarBackground: string;
+  borderLight: string;
+  borderDefault: string;
+  success: string;
+  warning: string;
+  error: string;
+  info: string;
+  successBg: string;
+  warningBg: string;
+  errorBg: string;
+}
+
+/**
+ * Theme context value interface
+ */
+export interface ThemeContextValue {
+  themeMode: ThemeMode;
+  setThemeMode: (mode: ThemeMode) => void;
+  toggleTheme: () => void;
+  isDark: boolean;
+  antThemeConfig: ThemeConfig;
+}
+
+/**
+ * Theme provider props
+ */
+interface ThemeProviderProps {
+  children: ReactNode;
+}
+
+const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 // ============================================================================
 // Issue #439: Centralized Brand Colors
 // ============================================================================
-export const BRAND_COLORS = {
+export const BRAND_COLORS: BrandColors = {
   // Primary brand colors
   primary: '#006B52',
   primaryDark: '#004B3D',
@@ -62,10 +106,10 @@ const lightThemeTokens = {
   borderRadius: 6,
 };
 
-export function ThemeProvider({ children }) {
+export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
   // Verificar preferência salva ou preferência do sistema
-  const getInitialTheme = () => {
-    const saved = localStorage.getItem('theme');
+  const getInitialTheme = (): ThemeMode => {
+    const saved = localStorage.getItem('theme') as ThemeMode | null;
     if (saved) return saved;
     // Verificar preferência do sistema
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -74,7 +118,7 @@ export function ThemeProvider({ children }) {
     return 'light';
   };
 
-  const [themeMode, setThemeMode] = useState(getInitialTheme);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(getInitialTheme);
 
   // Salvar preferência quando mudar
   useEffect(() => {
@@ -88,14 +132,14 @@ export function ThemeProvider({ children }) {
     }
   }, [themeMode]);
 
-  const toggleTheme = () => {
+  const toggleTheme = (): void => {
     setThemeMode((prev) => (prev === 'light' ? 'dark' : 'light'));
   };
 
   const isDark = themeMode === 'dark';
 
   // Configuração do Ant Design theme
-  const antThemeConfig = {
+  const antThemeConfig: ThemeConfig = {
     algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
     token: isDark ? darkThemeTokens : lightThemeTokens,
     components: {
@@ -114,7 +158,6 @@ export function ThemeProvider({ children }) {
         itemColor: '#ffffff',
         itemHoverColor: '#ffffff',
         itemSelectedColor: '#000000',
-        subMenuItemColor: '#ffffff',
         groupTitleColor: '#ffffff',
         iconSize: 16,
         collapsedIconSize: 16,
@@ -133,7 +176,7 @@ export function ThemeProvider({ children }) {
     },
   };
 
-  const value = {
+  const value: ThemeContextValue = {
     themeMode,
     setThemeMode,
     toggleTheme,
@@ -148,7 +191,7 @@ export function ThemeProvider({ children }) {
   );
 }
 
-export function useTheme() {
+export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext);
   if (!context) {
     throw new Error('useTheme must be used within a ThemeProvider');
@@ -161,7 +204,7 @@ export function useTheme() {
  *
  * Returns BRAND_COLORS with overrides for dark mode backgrounds.
  */
-export function useBrandColors() {
+export function useBrandColors(): BrandColors {
   const { isDark } = useTheme();
   return {
     ...BRAND_COLORS,

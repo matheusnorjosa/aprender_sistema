@@ -11,11 +11,16 @@ import {
 } from '@ant-design/icons';
 
 /**
- * Renders status icon based on status value
- * @param {string} status - Status value (concluido, em_andamento, pendente)
- * @returns {JSX.Element} Icon component with appropriate color
+ * Status type for workflow steps
  */
-export function renderStatusIcon(status) {
+export type WorkflowStatus = 'concluido' | 'em_andamento' | 'pendente';
+
+/**
+ * Renders status icon based on status value
+ * @param status - Status value (concluido, em_andamento, pendente)
+ * @returns Icon component with appropriate color
+ */
+export function renderStatusIcon(status: string | undefined): JSX.Element {
   switch (status) {
     case 'concluido':
       return <CheckCircleFilled className="text-green-500 text-lg" />;

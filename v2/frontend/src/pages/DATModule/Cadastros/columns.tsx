@@ -4,6 +4,7 @@
  */
 
 import { Space, Tag, Typography, Tooltip, Button, Steps } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import {
   EditOutlined,
   DeleteOutlined,
@@ -12,18 +13,54 @@ import {
 import dayjs from 'dayjs';
 import { PLATAFORMAS } from './constants';
 import { renderStatusIcon, getStepStatus, getCurrentStep } from './helpers';
+import type { ID } from '../../../types';
 
 const { Text } = Typography;
 
 /**
- * Creates column definitions for FORMAR platform
- * @param {Object} handlers - Event handlers object
- * @param {Function} handlers.onQuickStatusUpdate - Handler for quick status update
- * @param {Function} handlers.onEdit - Handler for edit action
- * @param {Function} handlers.onDelete - Handler for delete action
- * @returns {Array} Column definitions
+ * Cadastro record interface
  */
-export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }) {
+export interface CadastroRecord {
+  id: ID;
+  projeto_geral_nome: string;
+  municipio_nome: string;
+  uf: string;
+  quantidade_alunos?: number;
+  quantidade_professores?: number;
+  quantidade_codigos?: number;
+  status_criacao_curso?: string;
+  data_criacao_curso?: string;
+  status_chaves?: string;
+  data_chaves?: string;
+  status_instrucoes?: string;
+  data_instrucoes?: string;
+  status_envio?: string;
+  data_envio?: string;
+  status_recebidos?: string;
+  quantidade_recebidos?: number;
+  status_validados?: string;
+  quantidade_validados?: number;
+  status_importados?: string;
+  quantidade_importados?: number;
+  link_planilha?: string;
+  link_plataforma?: string;
+}
+
+/**
+ * Column handlers interface
+ */
+export interface ColumnHandlers {
+  onQuickStatusUpdate: (record: CadastroRecord, field: string, newStatus: string) => void;
+  onEdit: (record: CadastroRecord) => void;
+  onDelete: (record: CadastroRecord) => void;
+}
+
+/**
+ * Creates column definitions for FORMAR platform
+ * @param handlers - Event handlers object
+ * @returns Column definitions
+ */
+export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: ColumnHandlers): ColumnsType<CadastroRecord> {
   return [
     {
       title: 'Projeto',
@@ -31,7 +68,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }) {
       key: 'projeto',
       width: 120,
       fixed: 'left',
-      render: (nome) => <Tag color="blue">{nome}</Tag>,
+      render: (nome: string) => <Tag color="blue">{nome}</Tag>,
     },
     {
       title: 'Município - UF',
@@ -50,7 +87,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }) {
       key: 'alunos',
       width: 80,
       align: 'right',
-      render: (val) => val?.toLocaleString('pt-BR') || '-',
+      render: (val: number | undefined) => val?.toLocaleString('pt-BR') || '-',
     },
     {
       title: 'Profs.',
@@ -58,7 +95,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }) {
       key: 'professores',
       width: 80,
       align: 'right',
-      render: (val) => val?.toLocaleString('pt-BR') || '-',
+      render: (val: number | undefined) => val?.toLocaleString('pt-BR') || '-',
     },
     {
       title: 'Códs',
@@ -66,7 +103,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }) {
       key: 'codigos',
       width: 70,
       align: 'center',
-      render: (val) => (val ? <Tag>{val}</Tag> : '-'),
+      render: (val: number | undefined) => (val ? <Tag>{val}</Tag> : '-'),
     },
     {
       title: 'Criação Curso',
@@ -217,13 +254,10 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }) {
 
 /**
  * Creates column definitions for AVALIAR platform
- * @param {Object} handlers - Event handlers object
- * @param {Function} handlers.onQuickStatusUpdate - Handler for quick status update
- * @param {Function} handlers.onEdit - Handler for edit action
- * @param {Function} handlers.onDelete - Handler for delete action
- * @returns {Array} Column definitions
+ * @param handlers - Event handlers object
+ * @returns Column definitions
  */
-export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }) {
+export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: ColumnHandlers): ColumnsType<CadastroRecord> {
   return [
     {
       title: 'Projeto',
@@ -231,7 +265,7 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }) {
       key: 'projeto',
       width: 120,
       fixed: 'left',
-      render: (nome) => <Tag color="green">{nome}</Tag>,
+      render: (nome: string) => <Tag color="green">{nome}</Tag>,
     },
     {
       title: 'Município - UF',
@@ -316,7 +350,7 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }) {
       width: 300,
       render: (_, record) => {
         const etapas = PLATAFORMAS.AVALIAR.etapas;
-        const current = getCurrentStep(record, etapas);
+        const current = getCurrentStep(record as unknown as Record<string, unknown>, etapas);
 
         return (
           <Steps
@@ -324,7 +358,7 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }) {
             current={current}
             items={etapas.map((etapa) => ({
               title: etapa.label,
-              status: getStepStatus(record[`status_${etapa.key}`]),
+              status: getStepStatus(record[`status_${etapa.key}` as keyof CadastroRecord] as string | undefined),
             }))}
           />
         );

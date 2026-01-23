@@ -23,15 +23,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import (
-    DATArea,
-    DATCoordenador,
-    Municipio,
-    Produto,
-    Projeto,
-    TipoEvento,
-    Usuario,
-)
+from apps.core.models import DATArea, DATCoordenador, Municipio, Produto, Projeto, TipoEvento, Usuario
 
 
 @pytest.fixture

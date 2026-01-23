@@ -60,13 +60,7 @@ class Command(BaseCommand):
 
     def handle(self, *args: Any, **options: Any) -> None:
         """Execute LGPD data export."""
-        from apps.core.models import (
-            AuditLog,
-            AvailabilityBlock,
-            GoogleOAuthCredential,
-            Solicitacao,
-            Usuario,
-        )
+        from apps.core.models import AuditLog, AvailabilityBlock, GoogleOAuthCredential, Solicitacao, Usuario
 
         cpf = options.get("cpf")
         email = options.get("email")

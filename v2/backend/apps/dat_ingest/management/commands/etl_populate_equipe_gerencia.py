@@ -22,12 +22,7 @@ from typing import Any
 from django.core.management.base import BaseCommand
 from django.db.models import Count
 
-from apps.core.models import (
-    EquipeGerencia,
-    Gerencia,
-    Participation,
-    Usuario,
-)
+from apps.core.models import EquipeGerencia, Gerencia, Participation, Usuario
 
 
 class Command(BaseCommand):

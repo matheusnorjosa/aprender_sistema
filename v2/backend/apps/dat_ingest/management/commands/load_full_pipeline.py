@@ -15,10 +15,7 @@ from django.db import transaction
 
 from apps.core.models import Municipio, Projeto, TipoEvento, Usuario
 from apps.dat_ingest.models import StgMunicipio, StgProjeto, StgTipoEvento, StgUsuario
-from apps.dat_ingest.services.loaders import (
-    extract_tipos_evento_from_agenda,
-    parse_usuarios,
-)
+from apps.dat_ingest.services.loaders import extract_tipos_evento_from_agenda, parse_usuarios
 
 
 class Command(BaseCommand):

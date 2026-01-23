@@ -65,10 +65,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
         # Validar que credential é uma instância de GoogleOAuthCredential
         # Importar aqui para evitar circular import
         from apps.core.models import GoogleOAuthCredential
-        from apps.core.services.google_oauth import (
-            _decrypt_token,
-            refresh_access_token_safe,
-        )
+        from apps.core.services.google_oauth import _decrypt_token, refresh_access_token_safe
 
         if not isinstance(credential, GoogleOAuthCredential):
             raise TypeError(f"Expected GoogleOAuthCredential instance, got {type(credential)}")

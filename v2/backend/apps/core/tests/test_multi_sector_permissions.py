@@ -17,12 +17,7 @@ from rest_framework.test import APIClient, APIRequestFactory
 
 import pytest
 
-from apps.core.models import (
-    AvailabilityBlock,
-    EquipeGerencia,
-    Gerencia,
-    Usuario,
-)
+from apps.core.models import AvailabilityBlock, EquipeGerencia, Gerencia, Usuario
 from apps.core.permissions import HasSectorAccess
 
 

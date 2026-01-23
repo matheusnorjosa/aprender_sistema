@@ -11,7 +11,7 @@
  *   - "Sair agora": Logout imediato
  *
  * Uso:
- * ```jsx
+ * ```tsx
  * import useSessionMonitor from '../hooks/useSessionMonitor';
  * import SessionExpiryWarning from '../components/SessionExpiryWarning';
  *
@@ -35,18 +35,26 @@
 
 import { Modal, Button, Space, Typography } from 'antd';
 import { ClockCircleOutlined, LogoutOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 
 const { Text, Title } = Typography;
 
-export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }) {
+/**
+ * SessionExpiryWarning props interface
+ */
+export interface SessionExpiryWarningProps {
+  showWarning: boolean;
+  timeLeft: number;
+  renewSession: () => Promise<boolean>;
+}
+
+export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }: SessionExpiryWarningProps): JSX.Element {
   const navigate = useNavigate();
 
   /**
    * Formata tempo restante em MM:SS.
    */
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -55,7 +63,7 @@ export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }) {
   /**
    * Handler para renovar sessão.
    */
-  const handleRenew = async () => {
+  const handleRenew = async (): Promise<void> => {
     const success = await renewSession();
     if (!success) {
       // Se falhar, redirecionar para login
@@ -66,7 +74,7 @@ export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }) {
   /**
    * Handler para logout imediato.
    */
-  const handleLogout = () => {
+  const handleLogout = (): void => {
     navigate('/logout');
   };
 
@@ -133,11 +141,5 @@ export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }) {
     </Modal>
   );
 }
-
-SessionExpiryWarning.propTypes = {
-  showWarning: PropTypes.bool.isRequired,
-  timeLeft: PropTypes.number.isRequired,
-  renewSession: PropTypes.func.isRequired,
-};
 
 export default SessionExpiryWarning;

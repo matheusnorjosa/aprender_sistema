@@ -17,7 +17,7 @@
  * - PA-06: Controle explícito (ISO 9241-110)
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Button, Space, Tag, Typography, Popconfirm, Select, message } from 'antd';
 import {
   GoogleOutlined,
@@ -31,10 +31,40 @@ import logger from '../../utils/logger';
 
 const { Text, Title } = Typography;
 
-const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
-  const [calendars, setCalendars] = useState([]);
+/**
+ * Calendar item interface
+ */
+interface CalendarItem {
+  id: string;
+  summary: string;
+  primary?: boolean;
+}
+
+/**
+ * Google integration status interface
+ */
+export interface GoogleIntegrationStatus {
+  connected: boolean;
+  googleEmail?: string;
+  tokenExpiry?: string;
+  expiresInDays?: number | null;
+  isExpired?: boolean;
+  defaultCalendarId?: string;
+}
+
+/**
+ * GoogleIntegrationCard props interface
+ */
+export interface GoogleIntegrationCardProps {
+  status: GoogleIntegrationStatus | null;
+  onConnect: () => void;
+  onDisconnect: () => void;
+}
+
+const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegrationCardProps): JSX.Element | null => {
+  const [calendars, setCalendars] = useState<CalendarItem[]>([]);
   const [loadingCalendars, setLoadingCalendars] = useState(false);
-  const [selectedCalendar, setSelectedCalendar] = useState(null);
+  const [selectedCalendar, setSelectedCalendar] = useState<string | null>(null);
   const [savingCalendar, setSavingCalendar] = useState(false);
 
   // Extrair valores de status (ou usar defaults se status for null)
@@ -62,10 +92,10 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
     return null;
   }
 
-  const loadCalendars = async () => {
+  const loadCalendars = async (): Promise<void> => {
     try {
       setLoadingCalendars(true);
-      const response = await api.get('/integrations/google/calendars/');
+      const response = await api.get<{ calendars: CalendarItem[] }>('/integrations/google/calendars/');
       setCalendars(response.data.calendars || []);
     } catch (error) {
       logger.error('Erro ao carregar calendários:', error);
@@ -75,7 +105,7 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
     }
   };
 
-  const handleCalendarChange = async (calendarId) => {
+  const handleCalendarChange = async (calendarId: string): Promise<void> => {
     try {
       setSavingCalendar(true);
       await api.post('/integrations/google/select-calendar/', {
@@ -127,7 +157,7 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }) => {
   }
 
   // Estado: CONECTADO
-  const isExpiringSoon = expiresInDays !== null && expiresInDays <= 7;
+  const isExpiringSoon = expiresInDays !== null && expiresInDays !== undefined && expiresInDays <= 7;
   const cardColor = isExpired
     ? '#ff4d4f' // vermelho
     : isExpiringSoon

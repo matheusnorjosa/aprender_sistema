@@ -1,21 +1,53 @@
 /**
- * FormadoresPicker - Seleção de Formadores para Nova Solicitação
+ * CoordenadoresPicker - Seleção de Coordenadores Acompanhantes
  *
  * Componente específico para o wizard de nova solicitação.
- * Permite selecionar múltiplos formadores.
+ * Permite selecionar múltiplos coordenadores acompanhantes.
  */
 
 import { useState } from 'react';
 import { Space, Tag, AutoComplete, Spin } from 'antd';
 import { lookupUsuarios } from '../api/lookup';
 import logger from '../utils/logger';
+import type { ID } from '../types';
 
-export default function FormadoresPicker({ value = [], onChange }) {
-  const [options, setOptions] = useState([]);
+/**
+ * Coordenador item interface
+ */
+export interface CoordenadorItem {
+  id: ID;
+  email: string;
+  label: string;
+  name?: string;
+}
+
+/**
+ * AutoComplete option interface
+ */
+interface UserOption {
+  value: string;
+  label: string;
+  data: {
+    id: ID;
+    email: string;
+    label: string;
+  };
+}
+
+/**
+ * CoordenadoresPicker props interface
+ */
+export interface CoordenadoresPickerProps {
+  value?: CoordenadorItem[];
+  onChange?: (value: CoordenadorItem[]) => void;
+}
+
+export default function CoordenadoresPicker({ value = [], onChange }: CoordenadoresPickerProps): JSX.Element {
+  const [options, setOptions] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
 
-  const handleSearch = async (query) => {
+  const handleSearch = async (query: string): Promise<void> => {
     setSearch(query);
 
     // Permitir busca vazia (mostra lista inicial) ou com 2+ caracteres
@@ -26,23 +58,23 @@ export default function FormadoresPicker({ value = [], onChange }) {
 
     try {
       setLoading(true);
-      const results = await lookupUsuarios(query || '', 'Formador');
+      const results = await lookupUsuarios(query || '', 'Coordenador');
       setOptions(
         results.map(item => ({
-          value: item.id,
+          value: String(item.id),
           label: item.label,
           data: item,
         }))
       );
     } catch (error) {
-      logger.error('Erro ao buscar formadores:', error);
+      logger.error('Erro ao buscar coordenadores:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAdd = (selectedValue, option) => {
-    const newFormador = {
+  const handleAdd = (_selectedValue: string, option: UserOption): void => {
+    const newCoordenador: CoordenadorItem = {
       id: option.data.id,
       email: option.data.email,
       label: option.data.label,
@@ -50,44 +82,44 @@ export default function FormadoresPicker({ value = [], onChange }) {
     };
 
     // Verificar se já existe
-    const exists = value.some(f => f.id === newFormador.id || f.email === newFormador.email);
+    const exists = value.some(c => c.id === newCoordenador.id || c.email === newCoordenador.email);
     if (exists) {
       return;
     }
 
     if (onChange) {
-      onChange([...value, newFormador]);
+      onChange([...value, newCoordenador]);
     }
 
     // Limpar busca mas manter as opções para próxima seleção
     setSearch('');
   };
 
-  const handleRemove = (id) => {
+  const handleRemove = (id: ID): void => {
     if (onChange) {
-      onChange(value.filter((f) => f.id !== id));
+      onChange(value.filter((c) => c.id !== id));
     }
   };
 
   return (
     <div>
-      {/* Tags dos formadores selecionados */}
+      {/* Tags dos coordenadores selecionados */}
       {value.length > 0 && (
         <Space wrap className="mb-2">
-          {value.map((formador) => (
+          {value.map((coord) => (
             <Tag
-              key={formador.id}
+              key={coord.id}
               closable
-              onClose={() => handleRemove(formador.id)}
-              color="blue"
+              onClose={() => handleRemove(coord.id)}
+              color="green"
             >
-              {formador.label || formador.name}
+              {coord.label || coord.name}
             </Tag>
           ))}
         </Space>
       )}
 
-      {/* Autocomplete para adicionar formadores */}
+      {/* Autocomplete para adicionar coordenadores */}
       <AutoComplete
         value={search}
         options={options}

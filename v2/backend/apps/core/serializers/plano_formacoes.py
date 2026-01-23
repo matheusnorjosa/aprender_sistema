@@ -5,6 +5,7 @@ Serializers para PlanoFormacoes, Formacao, Acompanhamento, Prova.
 
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
@@ -20,7 +21,6 @@ from apps.core.models import (
     PlanoFormacoes,
     Prova,
 )
-
 
 # ============================================================
 # Nested Serializers (for inline display)
@@ -98,18 +98,10 @@ class PlanoFormacoesSerializer(serializers.ModelSerializer["PlanoFormacoes"]):
     provas = ProvaNestedSerializer(many=True, read_only=True)
 
     # FK names
-    municipio_nome = serializers.CharField(
-        source="municipio.nome", read_only=True
-    )
-    municipio_uf = serializers.CharField(
-        source="municipio.uf", read_only=True
-    )
-    projeto_nome = serializers.CharField(
-        source="projeto.nome", read_only=True
-    )
-    coordenador_nome = serializers.CharField(
-        source="coordenador.nome", read_only=True, allow_null=True
-    )
+    municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
+    municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
+    projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    coordenador_nome = serializers.CharField(source="coordenador.nome", read_only=True, allow_null=True)
 
     # Computed
     total_formacoes = serializers.IntegerField(read_only=True)
@@ -117,9 +109,7 @@ class PlanoFormacoesSerializer(serializers.ModelSerializer["PlanoFormacoes"]):
     taxa_realizacao = serializers.FloatField(read_only=True)
 
     # Audit
-    created_by_nome = serializers.CharField(
-        source="created_by.get_full_name", read_only=True
-    )
+    created_by_nome = serializers.CharField(source="created_by.get_full_name", read_only=True)
 
     class Meta:
         model = PlanoFormacoes
@@ -193,18 +183,10 @@ class PlanoFormacoesListSerializer(serializers.ModelSerializer["PlanoFormacoes"]
     """List serializer for PlanoFormacoes (table view with expanded formacoes)."""
 
     # FK names
-    municipio_nome = serializers.CharField(
-        source="municipio.nome", read_only=True
-    )
-    municipio_uf = serializers.CharField(
-        source="municipio.uf", read_only=True
-    )
-    projeto_nome = serializers.CharField(
-        source="projeto.nome", read_only=True
-    )
-    coordenador_nome = serializers.CharField(
-        source="coordenador.nome", read_only=True, allow_null=True
-    )
+    municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
+    municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
+    projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    coordenador_nome = serializers.CharField(source="coordenador.nome", read_only=True, allow_null=True)
 
     # Formacoes expandidas para exibicao em tabela (F1-F15)
     formacoes_list = serializers.SerializerMethodField()

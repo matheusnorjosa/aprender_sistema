@@ -4,6 +4,7 @@ Map Metrics Views - §9 Epic #459
 Map-related metrics endpoints for geographic visualization.
 Extracted from views_metrics.py.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -150,9 +151,7 @@ def metrics_map(request: Request) -> Response:
     by_status = {item["status"]: item["count"] for item in status_counts}
 
     # Formatar top projetos
-    top_projetos_list = [
-        {"nome": item["projeto__nome"], "count": item["count"]} for item in top_projetos
-    ]
+    top_projetos_list = [{"nome": item["projeto__nome"], "count": item["count"]} for item in top_projetos]
 
     return Response(
         {

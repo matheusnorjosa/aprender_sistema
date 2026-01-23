@@ -6,6 +6,7 @@ management commands (etl_upsert_*, etl_import_*, etc).
 
 Fase 5 - Desligamento gradual de planilhas
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 
@@ -57,7 +58,7 @@ def list_latest_reports(limit: int = 20) -> List[Dict[str, Any]]:
         files = []
         for entry in output_dir.iterdir():
             # Ignorar diretórios e arquivos ocultos
-            if entry.is_dir() or entry.name.startswith('.'):
+            if entry.is_dir() or entry.name.startswith("."):
                 continue
 
             # Obter metadados
@@ -66,32 +67,34 @@ def list_latest_reports(limit: int = 20) -> List[Dict[str, Any]]:
 
             # Determinar tipo de arquivo pela extensão
             ext = entry.suffix.lower()
-            if ext == '.json':
-                kind = 'json'
-            elif ext == '.csv':
-                kind = 'csv'
-            elif ext == '.txt' or ext == '.log':
-                kind = 'txt'
+            if ext == ".json":
+                kind = "json"
+            elif ext == ".csv":
+                kind = "csv"
+            elif ext == ".txt" or ext == ".log":
+                kind = "txt"
             else:
-                kind = 'other'
+                kind = "other"
 
             # Caminho relativo seguro (apenas nome do arquivo neste caso)
             path_rel = entry.name
 
-            files.append({
-                'filename': entry.name,
-                'size_bytes': stat.st_size,
-                'mtime_iso': mtime.isoformat(),
-                'kind': kind,
-                'path_rel': path_rel,
-            })
+            files.append(
+                {
+                    "filename": entry.name,
+                    "size_bytes": stat.st_size,
+                    "mtime_iso": mtime.isoformat(),
+                    "kind": kind,
+                    "path_rel": path_rel,
+                }
+            )
 
     except PermissionError:
         # Se não tivermos permissão, retornar lista vazia
         return []
 
     # Ordenar por mtime (mais recente primeiro)
-    files.sort(key=lambda x: x['mtime_iso'], reverse=True)  # type: ignore[misc]
+    files.sort(key=lambda x: x["mtime_iso"], reverse=True)  # type: ignore[misc]
 
     # Aplicar limite
     return files[:limit]
@@ -113,7 +116,7 @@ def get_report_path(filename: str) -> Optional[Path]:
         - Retorna None se caminho for suspeito
     """
     # Validar que filename não contém path traversal
-    if '..' in filename or '/' in filename or '\\' in filename:
+    if ".." in filename or "/" in filename or "\\" in filename:
         return None
 
     output_dir = Path(settings.ETL_OUTPUT_DIR)

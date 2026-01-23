@@ -23,14 +23,17 @@ Estrutura esperada (aba "Acompanhamento"):
 
 
 from __future__ import annotations
+
 import hashlib
 import logging
-from datetime import datetime, time as dtime, timedelta
+from datetime import datetime
+from datetime import time as dtime
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
-from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 

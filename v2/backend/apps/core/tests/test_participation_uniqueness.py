@@ -9,12 +9,14 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.utils import timezone
 
-from apps.core.models import Participation, Solicitacao, Municipio, TipoEvento, Projeto
+import pytest
+
+from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento
 
 pytestmark = pytest.mark.django_db
 
@@ -34,17 +36,11 @@ def factory_solicitacao():
             cpf="12345678901",
         )
 
-        municipio = Municipio.objects.create(
-            nome="Fortaleza", uf="CE", ativo=True
-        )
+        municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
 
-        tipo_evento = TipoEvento.objects.create(
-            nome="Formação", descricao="Formação continuada"
-        )
+        tipo_evento = TipoEvento.objects.create(nome="Formação", descricao="Formação continuada")
 
-        projeto = Projeto.objects.create(
-            nome="Teste Projeto", ativo=True
-        )
+        projeto = Projeto.objects.create(nome="Teste Projeto", ativo=True)
 
         defaults = {
             "usuario": user,

@@ -8,10 +8,11 @@ e que executar múltiplas vezes não causa efeitos colaterais.
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from django.core.management import call_command
-from django.contrib.auth.models import Group
 
+from django.contrib.auth.models import Group
+from django.core.management import call_command
+
+import pytest
 
 pytestmark = pytest.mark.django_db
 
@@ -32,8 +33,7 @@ def test_seed_rbac_creates_groups():
     ]
 
     for group_name in expected_groups:
-        assert Group.objects.filter(name=group_name).exists(), \
-            f"Grupo {group_name} não foi criado"
+        assert Group.objects.filter(name=group_name).exists(), f"Grupo {group_name} não foi criado"
 
 
 def test_seed_rbac_idempotent():
@@ -69,10 +69,8 @@ def test_seed_rbac_assigns_permissions():
 
     # Verificar que Superintendência tem permissões
     super_group = Group.objects.get(name="Superintendência")
-    assert super_group.permissions.count() > 0, \
-        "Superintendência deveria ter permissões"
+    assert super_group.permissions.count() > 0, "Superintendência deveria ter permissões"
 
     # Verificar que Coordenador tem permissões
     coord_group = Group.objects.get(name="Coordenador")
-    assert coord_group.permissions.count() > 0, \
-        "Coordenador deveria ter permissões"
+    assert coord_group.permissions.count() > 0, "Coordenador deveria ter permissões"

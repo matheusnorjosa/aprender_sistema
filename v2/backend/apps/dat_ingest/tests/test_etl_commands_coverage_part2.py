@@ -17,15 +17,16 @@ Test patterns:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import csv
 from io import StringIO
 
-import pytest
 from django.contrib.auth.models import Group
 from django.core.management import call_command
 
-from apps.core.models import Projeto, Usuario
+import pytest
 
+from apps.core.models import Projeto, Usuario
 
 # =============================================================================
 # Tests: seed_formadores_fluir
@@ -307,6 +308,7 @@ class TestImportUsuariosFromCsv:
     def test_command_requires_file_argument(self):
         """Test: Command requires --file argument."""
         from django.core.management.base import CommandError
+
         with pytest.raises(CommandError) as exc_info:
             call_command("import_usuarios_from_csv")
         assert "--file" in str(exc_info.value)
@@ -326,8 +328,7 @@ class TestImportUsuariosFromCsv:
         # Create CSV
         csv_file = tmp_path / "usuarios.csv"
         csv_file.write_text(
-            "nome_display,email,papel_sugerido\n"
-            "Test User,testuser_dryrun@test.com,Formador\n",
+            "nome_display,email,papel_sugerido\n" "Test User,testuser_dryrun@test.com,Formador\n",
             encoding="utf-8",
         )
 
@@ -351,13 +352,13 @@ class TestImportUsuariosFromCsv:
         This test verifies the command runs and shows appropriate output.
         """
         import uuid
+
         unique_email = f"newuser_{uuid.uuid4().hex[:8]}@test.com"
 
         # Create CSV
         csv_file = tmp_path / "usuarios.csv"
         csv_file.write_text(
-            f"nome_display,email,papel_sugerido\n"
-            f"New Test User,{unique_email},Formador\n",
+            f"nome_display,email,papel_sugerido\n" f"New Test User,{unique_email},Formador\n",
             encoding="utf-8",
         )
 
@@ -380,9 +381,7 @@ class TestImportUsuariosFromCsv:
         """Test: Skips users with invalid email."""
         csv_file = tmp_path / "usuarios.csv"
         csv_file.write_text(
-            "nome_display,email,papel_sugerido\n"
-            "Invalid User,not-an-email,Formador\n"
-            "Empty Email User,,Formador\n",
+            "nome_display,email,papel_sugerido\n" "Invalid User,not-an-email,Formador\n" "Empty Email User,,Formador\n",
             encoding="utf-8",
         )
 
@@ -412,8 +411,7 @@ class TestImportUsuariosFromCsv:
 
         csv_file = tmp_path / "usuarios.csv"
         csv_file.write_text(
-            f"nome_display,email,papel_sugerido\n"
-            f"Existing User,{existing_email},Formador\n",
+            f"nome_display,email,papel_sugerido\n" f"Existing User,{existing_email},Formador\n",
             encoding="utf-8",
         )
 
@@ -431,12 +429,12 @@ class TestImportUsuariosFromCsv:
     def test_idempotent(self, tmp_path):
         """Test: Running twice produces same result."""
         import uuid
+
         unique_email = f"idempotent_{uuid.uuid4().hex[:8]}@test.com"
 
         csv_file = tmp_path / "usuarios.csv"
         csv_file.write_text(
-            f"nome_display,email,papel_sugerido\n"
-            f"Idempotent User,{unique_email},Formador\n",
+            f"nome_display,email,papel_sugerido\n" f"Idempotent User,{unique_email},Formador\n",
             encoding="utf-8",
         )
 
@@ -479,8 +477,7 @@ class TestImportUsuariosFromCsv:
 
         csv_file = tmp_path / "usuarios.csv"
         csv_file.write_text(
-            f"nome_display,email,papel_sugerido\n"
-            f"Coord User,{unique_email},Coordenador\n",
+            f"nome_display,email,papel_sugerido\n" f"Coord User,{unique_email},Coordenador\n",
             encoding="utf-8",
         )
 

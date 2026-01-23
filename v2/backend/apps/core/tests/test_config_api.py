@@ -18,11 +18,12 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import Client
 from django.urls import reverse
+
+import pytest
 
 from apps.core.models import AuditLog, Config
 
@@ -38,11 +39,7 @@ def client() -> Client:
 @pytest.fixture
 def dat_user(db: Any) -> Any:
     """Create a DAT user."""
-    user = User.objects.create_user(
-        username="dat_user",
-        email="dat@example.com",
-        password="testpass123"
-    )
+    user = User.objects.create_user(username="dat_user", email="dat@example.com", password="testpass123")
     dat_group, _ = Group.objects.get_or_create(name="DAT")
     user.groups.add(dat_group)
     return user
@@ -51,11 +48,7 @@ def dat_user(db: Any) -> Any:
 @pytest.fixture
 def super_user(db: Any) -> Any:
     """Create a Superintendência user."""
-    user = User.objects.create_user(
-        username="super_user",
-        email="super@example.com",
-        password="testpass123"
-    )
+    user = User.objects.create_user(username="super_user", email="super@example.com", password="testpass123")
     super_group, _ = Group.objects.get_or_create(name="Superintendência")
     user.groups.add(super_group)
     return user
@@ -64,11 +57,7 @@ def super_user(db: Any) -> Any:
 @pytest.fixture
 def coordenador_user(db: Any) -> Any:
     """Create a Coordenador user (no DAT/Super access)."""
-    user = User.objects.create_user(
-        username="coordenador",
-        email="coord@example.com",
-        password="testpass123"
-    )
+    user = User.objects.create_user(username="coordenador", email="coord@example.com", password="testpass123")
     coord_group, _ = Group.objects.get_or_create(name="Coordenador")
     user.groups.add(coord_group)
     return user
@@ -140,11 +129,7 @@ def test_config_put_endpoint(client: Client, dat_user: Any) -> None:
         "ENABLE_ADVANCED_FILTERS": True,
     }
 
-    response = client.put(
-        url,
-        data=payload,
-        content_type="application/json"
-    )
+    response = client.put(url, data=payload, content_type="application/json")
 
     assert response.status_code == 200
     data = response.json()
@@ -252,11 +237,7 @@ def test_config_validation(client: Client, dat_user: Any) -> None:
         "ENABLE_ADVANCED_FILTERS": False,
     }
 
-    response = client.put(
-        url,
-        data=payload,
-        content_type="application/json"
-    )
+    response = client.put(url, data=payload, content_type="application/json")
 
     assert response.status_code == 400
     errors = response.json()
@@ -266,11 +247,7 @@ def test_config_validation(client: Client, dat_user: Any) -> None:
     payload["TRAVEL_BUFFER_MINUTES"] = 120
     payload["AVAILABILITY_DAILY_LIMIT_HOURS"] = 15  # Invalid: max_value=12
 
-    response = client.put(
-        url,
-        data=payload,
-        content_type="application/json"
-    )
+    response = client.put(url, data=payload, content_type="application/json")
 
     assert response.status_code == 400
     errors = response.json()
@@ -280,11 +257,7 @@ def test_config_validation(client: Client, dat_user: Any) -> None:
     payload["AVAILABILITY_DAILY_LIMIT_HOURS"] = 8
     payload["BATCH_SIZE"] = 10  # Invalid: min_value=50
 
-    response = client.put(
-        url,
-        data=payload,
-        content_type="application/json"
-    )
+    response = client.put(url, data=payload, content_type="application/json")
 
     assert response.status_code == 400
     errors = response.json()
@@ -294,11 +267,7 @@ def test_config_validation(client: Client, dat_user: Any) -> None:
     payload["BATCH_SIZE"] = 200
     payload["SEND_UPDATES"] = "invalid_choice"  # Invalid: must be none/all/externalOnly
 
-    response = client.put(
-        url,
-        data=payload,
-        content_type="application/json"
-    )
+    response = client.put(url, data=payload, content_type="application/json")
 
     assert response.status_code == 400
     errors = response.json()
@@ -339,11 +308,7 @@ def test_config_audit_log(client: Client, dat_user: Any) -> None:
         "ENABLE_ADVANCED_FILTERS": False,
     }
 
-    response = client.put(
-        url,
-        data=payload,
-        content_type="application/json"
-    )
+    response = client.put(url, data=payload, content_type="application/json")
 
     assert response.status_code == 200
 

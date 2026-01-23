@@ -11,6 +11,7 @@ Saída:
 
 Issue #55: Revisão de performance com microbenchmarks.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -18,20 +19,20 @@ from __future__ import annotations
 import json
 import time
 import tracemalloc
-from pathlib import Path
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
-from django.core.management.base import BaseCommand, CommandParser
 from django.conf import settings
+from django.core.management.base import BaseCommand, CommandParser
 
+from apps.dat_ingest import constants
 from apps.dat_ingest.management.commands.audit_agenda_users import (
-    normalize_text,
     extract_tokens,
     jaccard_similarity,
     match_by_name,
+    normalize_text,
 )
-from apps.dat_ingest import constants
 
 
 class Command(BaseCommand):
@@ -105,17 +106,14 @@ class Command(BaseCommand):
 
         # Benchmark 2: name_matching (operação complexa)
         start = time.perf_counter()
-        for name in synthetic_names[:min(100, size)]:  # Limitar a 100 para evitar O(n²) explosão
+        for name in synthetic_names[: min(100, size)]:  # Limitar a 100 para evitar O(n²) explosão
             match_by_name(name, synthetic_map)
         matching_elapsed = (time.perf_counter() - start) * 1000  # ms
 
         # Benchmark 3: top_aggregation (ordenação + limite)
         freq_map = {name: i % 50 for i, name in enumerate(synthetic_names)}  # Frequências sintéticas
         start = time.perf_counter()
-        top_users = sorted(
-            freq_map.items(),
-            key=lambda x: (-x[1], x[0])
-        )[:constants.TOP_UNKNOWN_USERS_LIMIT]
+        top_users = sorted(freq_map.items(), key=lambda x: (-x[1], x[0]))[: constants.TOP_UNKNOWN_USERS_LIMIT]
         aggregation_elapsed = (time.perf_counter() - start) * 1000  # ms
 
         # Medir memória pico

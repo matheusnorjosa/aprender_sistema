@@ -13,6 +13,7 @@ RD-06: Timezone-aware (UTC storage, America/Fortaleza comparison)
 RD-07: Prioridade de checagem (reporta todos)
 RD-08: Mensagens com formador, intervalo, tipo, detalhe
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 import pytz
+
 from apps.core.models import AvailabilityBlock, Municipio, Solicitacao, Usuario
 from apps.core.services.config_service import get_cfg
 from apps.core.types import ConflictCode
@@ -144,13 +146,9 @@ def check_conflicts(
 
     # Carregar configurações (RD-04, RD-05) com fallback para settings
     cfg: dict[str, str] = get_cfg("availability", {})
-    buffer_min: int = int(
-        cfg.get("TRAVEL_BUFFER_MINUTES")
-        or getattr(settings, "TRAVEL_BUFFER_MINUTES", 120)
-    )
+    buffer_min: int = int(cfg.get("TRAVEL_BUFFER_MINUTES") or getattr(settings, "TRAVEL_BUFFER_MINUTES", 120))
     daily_limit_h: float = float(
-        cfg.get("AVAILABILITY_DAILY_LIMIT_HOURS")
-        or getattr(settings, "AVAILABILITY_DAILY_LIMIT_HOURS", 8)
+        cfg.get("AVAILABILITY_DAILY_LIMIT_HOURS") or getattr(settings, "AVAILABILITY_DAILY_LIMIT_HOURS", 8)
     )
 
     conflicts: list[Conflict] = []
@@ -158,9 +156,7 @@ def check_conflicts(
     # ================================================================
     # RD-02, RD-03: BLOQUEIOS aprovados
     # ================================================================
-    blocks = AvailabilityBlock.objects.filter(
-        usuario=usuario, status="aprovado"
-    ).filter(
+    blocks = AvailabilityBlock.objects.filter(usuario=usuario, status="aprovado").filter(
         Q(inicio__lt=fim) & Q(fim__gt=inicio)  # Interseção
     )
 
@@ -211,16 +207,12 @@ def check_conflicts(
     # RD-04 sempre verifica buffer. Se municipio=None, trata como cidade diferente.
     # Evento imediatamente anterior
     prev_ev: Solicitacao | None = (
-        Solicitacao.objects.filter(usuario=usuario, status="aprovado", fim__lte=inicio)
-        .order_by("-fim")
-        .first()
+        Solicitacao.objects.filter(usuario=usuario, status="aprovado", fim__lte=inicio).order_by("-fim").first()
     )
 
     # Evento imediatamente posterior
     next_ev: Solicitacao | None = (
-        Solicitacao.objects.filter(usuario=usuario, status="aprovado", inicio__gte=fim)
-        .order_by("inicio")
-        .first()
+        Solicitacao.objects.filter(usuario=usuario, status="aprovado", inicio__gte=fim).order_by("inicio").first()
     )
 
     # Verificar buffer anterior
@@ -283,17 +275,13 @@ def check_conflicts(
     local_tz: pytz.BaseTzInfo = pytz.timezone(tz_name)
 
     # Início e fim do dia no timezone local, convertidos para UTC para query
-    day_start: datetime = local_tz.localize(
-        datetime.combine(inicio_date, time.min)
-    )
-    day_end: datetime = local_tz.localize(
-        datetime.combine(inicio_date, time.max)
-    )
+    day_start: datetime = local_tz.localize(datetime.combine(inicio_date, time.min))
+    day_end: datetime = local_tz.localize(datetime.combine(inicio_date, time.max))
 
     # Seleção ampla: eventos que tocam o dia do início (usando ranges UTC)
-    same_day_events = Solicitacao.objects.filter(
-        usuario=usuario, status="aprovado"
-    ).filter(Q(inicio__range=(day_start, day_end)) | Q(fim__range=(day_start, day_end)))
+    same_day_events = Solicitacao.objects.filter(usuario=usuario, status="aprovado").filter(
+        Q(inicio__range=(day_start, day_end)) | Q(fim__range=(day_start, day_end))
+    )
 
     # Somar duração dos eventos existentes no dia
     total_minutes: int = 0

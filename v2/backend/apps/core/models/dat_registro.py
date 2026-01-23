@@ -7,6 +7,7 @@ Integra dados das plataformas FORMAR e AVALIAR.
 Ref: v2/docs/SPEC_DAT_REGISTROS.md
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
@@ -44,17 +45,17 @@ class DATRegistro(models.Model):
     """
 
     STATUS_CHOICES = [
-        ('concluido', 'Concluído'),
-        ('pendente', 'Pendente'),
-        ('em_andamento', 'Em Andamento'),
-        ('nao_aplicavel', 'Não Aplicável'),
-        ('erro', 'Erro'),
+        ("concluido", "Concluído"),
+        ("pendente", "Pendente"),
+        ("em_andamento", "Em Andamento"),
+        ("nao_aplicavel", "Não Aplicável"),
+        ("erro", "Erro"),
     ]
 
     TURMA_STATUS_CHOICES = [
-        ('criada', 'Criada'),
-        ('pendente', 'Pendente'),
-        ('erro', 'Erro'),
+        ("criada", "Criada"),
+        ("pendente", "Pendente"),
+        ("erro", "Erro"),
     ]
 
     # ═══════════════════════════════════════════════════════════════
@@ -72,24 +73,21 @@ class DATRegistro(models.Model):
         on_delete=models.PROTECT,
         related_name="dat_registros",
         verbose_name="Projeto Geral",
-        help_text="Ex: ACERTA MATEMÁTICA, VIDA E LINGUAGEM"
+        help_text="Ex: ACERTA MATEMÁTICA, VIDA E LINGUAGEM",
     )
     projeto: models.ForeignKey[Projeto] = models.ForeignKey(  # type: ignore[assignment]
         "core.Projeto",
         on_delete=models.PROTECT,
         related_name="dat_registros",
         verbose_name="Projeto Específico",
-        help_text="Ex: VIDA E LINGUAGEM 6, ACERTA BRASIL MATEMATICA"
+        help_text="Ex: VIDA E LINGUAGEM 6, ACERTA BRASIL MATEMATICA",
     )
-    aluno_qtde = models.PositiveIntegerField(
-        verbose_name="Quantidade de Alunos",
-        help_text="Total de alunos na turma"
-    )
+    aluno_qtde = models.PositiveIntegerField(verbose_name="Quantidade de Alunos", help_text="Total de alunos na turma")
     professor_qtde = models.PositiveIntegerField(
         null=True,
         blank=True,
         verbose_name="Quantidade de Professores",
-        help_text="Total de professores (necessário para cálculo de códigos)"
+        help_text="Total de professores (necessário para cálculo de códigos)",
     )
 
     # ═══════════════════════════════════════════════════════════════
@@ -97,22 +95,13 @@ class DATRegistro(models.Model):
     # ═══════════════════════════════════════════════════════════════
 
     reuniao_dat = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data Reunião DAT",
-        help_text="Data da reunião de alinhamento DAT"
+        null=True, blank=True, verbose_name="Data Reunião DAT", help_text="Data da reunião de alinhamento DAT"
     )
     turma_formar_id = models.PositiveIntegerField(
-        null=True,
-        blank=True,
-        verbose_name="ID Turma FORMAR",
-        help_text="ID do curso na plataforma FORMAR"
+        null=True, blank=True, verbose_name="ID Turma FORMAR", help_text="ID do curso na plataforma FORMAR"
     )
     turma_formar_status = models.CharField(
-        max_length=10,
-        choices=TURMA_STATUS_CHOICES,
-        default='pendente',
-        verbose_name="Status Turma FORMAR"
+        max_length=10, choices=TURMA_STATUS_CHOICES, default="pendente", verbose_name="Status Turma FORMAR"
     )
 
     # Calculado automaticamente baseado em projeto_geral
@@ -120,51 +109,26 @@ class DATRegistro(models.Model):
         null=True,
         blank=True,
         verbose_name="Nº de Códigos",
-        help_text="Calculado automaticamente baseado em projeto_geral"
+        help_text="Calculado automaticamente baseado em projeto_geral",
     )
 
     # Status de envio FORMAR com datas
     chaves_inscricao_status = models.CharField(
-        max_length=15,
-        choices=STATUS_CHOICES,
-        default='pendente',
-        verbose_name="Chaves de Inscrição"
+        max_length=15, choices=STATUS_CHOICES, default="pendente", verbose_name="Chaves de Inscrição"
     )
-    chaves_inscricao_data = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data Chaves Inscrição"
-    )
+    chaves_inscricao_data = models.DateField(null=True, blank=True, verbose_name="Data Chaves Inscrição")
 
     instrucoes_status = models.CharField(
-        max_length=15,
-        choices=STATUS_CHOICES,
-        default='pendente',
-        verbose_name="Instruções"
+        max_length=15, choices=STATUS_CHOICES, default="pendente", verbose_name="Instruções"
     )
-    instrucoes_data = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data Instruções"
-    )
+    instrucoes_data = models.DateField(null=True, blank=True, verbose_name="Data Instruções")
 
     envio_codigos_status = models.CharField(
-        max_length=15,
-        choices=STATUS_CHOICES,
-        default='pendente',
-        verbose_name="Envio de Códigos"
+        max_length=15, choices=STATUS_CHOICES, default="pendente", verbose_name="Envio de Códigos"
     )
-    envio_codigos_data = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data Envio Códigos"
-    )
+    envio_codigos_data = models.DateField(null=True, blank=True, verbose_name="Data Envio Códigos")
 
-    obs_formar = models.TextField(
-        blank=True,
-        max_length=1000,
-        verbose_name="Observações FORMAR"
-    )
+    obs_formar = models.TextField(blank=True, max_length=1000, verbose_name="Observações FORMAR")
 
     # ═══════════════════════════════════════════════════════════════
     # SEÇÃO 3: PLATAFORMA AVALIAR
@@ -172,53 +136,30 @@ class DATRegistro(models.Model):
 
     # Derivado de projeto_geral.usa_avaliar (readonly no form)
     usa_avaliar = models.BooleanField(
-        default=False,
-        verbose_name="Usa AVALIAR",
-        help_text="Preenchido automaticamente baseado no Projeto Geral"
+        default=False, verbose_name="Usa AVALIAR", help_text="Preenchido automaticamente baseado no Projeto Geral"
     )
 
     alunos_recebidos_status = models.CharField(
-        max_length=15,
-        choices=STATUS_CHOICES,
-        default='nao_aplicavel',
-        verbose_name="Alunos Recebidos"
+        max_length=15, choices=STATUS_CHOICES, default="nao_aplicavel", verbose_name="Alunos Recebidos"
     )
     alunos_recebidos_datas = models.JSONField(
         default=list,
         blank=True,
         verbose_name="Datas Recebimento",
-        help_text="Array de datas: ['2025-03-12', '2025-04-25']"
+        help_text="Array de datas: ['2025-03-12', '2025-04-25']",
     )
 
     alunos_validados_status = models.CharField(
-        max_length=15,
-        choices=STATUS_CHOICES,
-        default='nao_aplicavel',
-        verbose_name="Alunos Validados"
+        max_length=15, choices=STATUS_CHOICES, default="nao_aplicavel", verbose_name="Alunos Validados"
     )
-    alunos_validados_datas = models.JSONField(
-        default=list,
-        blank=True,
-        verbose_name="Datas Validação"
-    )
+    alunos_validados_datas = models.JSONField(default=list, blank=True, verbose_name="Datas Validação")
 
     alunos_importados_status = models.CharField(
-        max_length=15,
-        choices=STATUS_CHOICES,
-        default='nao_aplicavel',
-        verbose_name="Alunos Importados"
+        max_length=15, choices=STATUS_CHOICES, default="nao_aplicavel", verbose_name="Alunos Importados"
     )
-    alunos_importados_datas = models.JSONField(
-        default=list,
-        blank=True,
-        verbose_name="Datas Importação"
-    )
+    alunos_importados_datas = models.JSONField(default=list, blank=True, verbose_name="Datas Importação")
 
-    obs_avaliar = models.TextField(
-        blank=True,
-        max_length=1000,
-        verbose_name="Observações AVALIAR"
-    )
+    obs_avaliar = models.TextField(blank=True, max_length=1000, verbose_name="Observações AVALIAR")
 
     # ═══════════════════════════════════════════════════════════════
     # AUDITORIA E ETL
@@ -231,13 +172,10 @@ class DATRegistro(models.Model):
         blank=True,
         db_index=True,
         verbose_name="Hash Externo",
-        help_text="Para idempotência de importação ETL"
+        help_text="Para idempotência de importação ETL",
     )
     created_by: models.ForeignKey[Usuario] = models.ForeignKey(  # type: ignore[assignment]
-        "core.Usuario",
-        on_delete=models.PROTECT,
-        related_name="dat_registros_criados",
-        verbose_name="Criado por"
+        "core.Usuario", on_delete=models.PROTECT, related_name="dat_registros_criados", verbose_name="Criado por"
     )
     updated_by: models.ForeignKey[Usuario | None] = models.ForeignKey(  # type: ignore[assignment]
         "core.Usuario",
@@ -245,7 +183,7 @@ class DATRegistro(models.Model):
         null=True,
         blank=True,
         related_name="dat_registros_atualizados",
-        verbose_name="Atualizado por"
+        verbose_name="Atualizado por",
     )
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -263,8 +201,7 @@ class DATRegistro(models.Model):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["municipio", "projeto_geral", "projeto"],
-                name="unique_dat_registro_municipio_projeto"
+                fields=["municipio", "projeto_geral", "projeto"], name="unique_dat_registro_municipio_projeto"
             ),
         ]
 
@@ -282,9 +219,9 @@ class DATRegistro(models.Model):
 
         # Atualizar status AVALIAR se não usa
         if not self.usa_avaliar:
-            self.alunos_recebidos_status = 'nao_aplicavel'
-            self.alunos_validados_status = 'nao_aplicavel'
-            self.alunos_importados_status = 'nao_aplicavel'
+            self.alunos_recebidos_status = "nao_aplicavel"
+            self.alunos_validados_status = "nao_aplicavel"
+            self.alunos_importados_status = "nao_aplicavel"
 
         super().save(*args, **kwargs)
 
@@ -302,15 +239,15 @@ class DATRegistro(models.Model):
 
         tipo = self.projeto_geral.tipo_calculo_codigos
 
-        if tipo == 'nao_aplicavel':
+        if tipo == "nao_aplicavel":
             return None
 
-        if tipo == 'por_aluno':
+        if tipo == "por_aluno":
             if self.aluno_qtde and self.projeto_geral.divisor_aluno:
                 return math.ceil(self.aluno_qtde / self.projeto_geral.divisor_aluno)
             return None
 
-        if tipo == 'por_professor':
+        if tipo == "por_professor":
             if self.professor_qtde and self.projeto_geral.multiplicador_professor:
                 mult = float(self.projeto_geral.multiplicador_professor)
                 return math.ceil(self.professor_qtde * mult)
@@ -322,7 +259,7 @@ class DATRegistro(models.Model):
     def turma_formar_url(self) -> str | None:
         """Gera URL da turma na plataforma FORMAR."""
         if self.turma_formar_id:
-            base_url = getattr(settings, 'FORMAR_PLATFORM_BASE_URL', 'https://www.aprenderformar.com.br/plataforma')
+            base_url = getattr(settings, "FORMAR_PLATFORM_BASE_URL", "https://www.aprenderformar.com.br/plataforma")
             return f"{base_url}/course/view.php?id={self.turma_formar_id}"
         return None
 
@@ -337,23 +274,27 @@ class DATRegistro(models.Model):
             - 'pendente_avaliar': Campos AVALIAR pendentes (se usa_avaliar)
         """
         # Verifica campos FORMAR obrigatórios
-        formar_ok = all([
-            self.chaves_inscricao_status == 'concluido',
-            self.instrucoes_status == 'concluido',
-            self.envio_codigos_status == 'concluido',
-        ])
+        formar_ok = all(
+            [
+                self.chaves_inscricao_status == "concluido",
+                self.instrucoes_status == "concluido",
+                self.envio_codigos_status == "concluido",
+            ]
+        )
 
         if not formar_ok:
-            return 'pendente_formar'
+            return "pendente_formar"
 
         # Se usa AVALIAR, verifica campos AVALIAR
         if self.usa_avaliar:
-            avaliar_ok = all([
-                self.alunos_recebidos_status == 'concluido',
-                self.alunos_validados_status == 'concluido',
-                self.alunos_importados_status == 'concluido',
-            ])
+            avaliar_ok = all(
+                [
+                    self.alunos_recebidos_status == "concluido",
+                    self.alunos_validados_status == "concluido",
+                    self.alunos_importados_status == "concluido",
+                ]
+            )
             if not avaliar_ok:
-                return 'pendente_avaliar'
+                return "pendente_avaliar"
 
-        return 'completo'
+        return "completo"

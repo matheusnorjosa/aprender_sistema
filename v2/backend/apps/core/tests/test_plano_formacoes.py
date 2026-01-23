@@ -7,14 +7,18 @@ Tests:
 - Stats and calendar endpoints
 - Inline update actions
 """
+
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 
 from __future__ import annotations
-import pytest
+
 from datetime import date
 from decimal import Decimal
+
 from django.contrib.auth import get_user_model
+
+import pytest
 
 from apps.core.models import (
     Acompanhamento,
@@ -32,6 +36,7 @@ User = get_user_model()
 def user(db):
     """Create a test user with DAT permissions."""
     from django.contrib.auth.models import Group
+
     user = User.objects.create_user(
         username="testuser",
         cpf="12345678901",
@@ -320,11 +325,12 @@ class TestProvaModel:
         # This should fail due to CheckConstraint
         with pytest.raises(IntegrityError):
             from django.db import connection
+
             with connection.cursor() as cursor:
                 cursor.execute(
                     "INSERT INTO core_prova (plano_id, numero_prova, realizada, observacoes, created_at, updated_at) "
                     "VALUES (%s, %s, %s, %s, NOW(), NOW())",
-                    [plano.id, 0, False, ""]  # numero_prova=0 is invalid
+                    [plano.id, 0, False, ""],  # numero_prova=0 is invalid
                 )
 
     def test_observacoes_max_length(self, plano):

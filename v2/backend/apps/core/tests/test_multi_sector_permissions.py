@@ -10,10 +10,12 @@ Conforme PLAN_multi_sector_availability.md:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework.test import APIClient, APIRequestFactory
+
+import pytest
 
 from apps.core.models import (
     AvailabilityBlock,
@@ -45,12 +47,8 @@ class TestHasSectorAccessPermission(TestCase):
         self.formador_group = Group.objects.create(name="Formador")
 
         # Criar gerências
-        self.gerencia_vidas = Gerencia.objects.create(
-            nome="GERENCIA 2", nome_setor="Vidas"
-        )
-        self.gerencia_fluir = Gerencia.objects.create(
-            nome="GERENCIA 3", nome_setor="Fluir"
-        )
+        self.gerencia_vidas = Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")
+        self.gerencia_fluir = Gerencia.objects.create(nome="GERENCIA 3", nome_setor="Fluir")
 
         # Criar usuários
         self.superuser = Usuario.objects.create_superuser(
@@ -168,9 +166,7 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
         self.controle_group = Group.objects.create(name="Controle")
 
         # Criar gerências
-        self.gerencia_vidas = Gerencia.objects.create(
-            nome="GERENCIA 2", nome_setor="Vidas"
-        )
+        self.gerencia_vidas = Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")
 
         # Criar usuários
         self.superuser = Usuario.objects.create_superuser(
@@ -270,6 +266,7 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
 
         # Criar usuários com CPF único
         import uuid
+
         unique_suffix = uuid.uuid4().hex[:8]
 
         self.superuser = Usuario.objects.create_superuser(

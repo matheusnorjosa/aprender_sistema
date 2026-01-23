@@ -13,6 +13,7 @@ Grupos criados:
 Permissões atribuídas por grupo conforme PR 12/N.
 Atualizado em 2025-12-01: Adicionado grupo "Apoio de Coordenação".
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 from __future__ import annotations
 
@@ -140,16 +141,10 @@ class Command(BaseCommand):
                     p = Permission.objects.get(content_type=ct, codename=code)
                     g.permissions.add(p)
                     if verbose:
-                        self.stdout.write(
-                            f"  ✅ Permissão atribuída: {group_name} → {code}"
-                        )
+                        self.stdout.write(f"  ✅ Permissão atribuída: {group_name} → {code}")
                 except Permission.DoesNotExist:
                     # Silencioso: permissão não existe (pode ser normal)
                     if verbose:
-                        self.stdout.write(
-                            self.style.WARNING(
-                                f"  ⚠️  Permissão não encontrada: {code}"
-                            )
-                        )
+                        self.stdout.write(self.style.WARNING(f"  ⚠️  Permissão não encontrada: {code}"))
 
         self.stdout.write(self.style.SUCCESS("RBAC seeds aplicados (idempotente)."))

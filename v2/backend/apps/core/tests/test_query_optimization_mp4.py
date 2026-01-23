@@ -13,12 +13,13 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-import pytest
 from django.contrib.auth.models import Group
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
@@ -61,17 +62,11 @@ def usuario_super(db: None, grupos: dict[str, Group]) -> User:
 
 
 @pytest.fixture
-def solicitacoes_published(
-    db: None, usuario_controle: User, usuario_super: User
-) -> list[Solicitacao]:
+def solicitacoes_published(db: None, usuario_controle: User, usuario_super: User) -> list[Solicitacao]:
     """Cria 10 solicitações PUBLISHED para testar N+1."""
     # Criar dependências
-    municipio = Municipio.objects.create(
-        nome="Salvador", uf="BA", ibge_code="2927408"
-    )
-    projeto = Projeto.objects.create(
-        nome="ACERTA", codigo="ACERTA", fluxo="NAO_SUPER"
-    )
+    municipio = Municipio.objects.create(nome="Salvador", uf="BA", ibge_code="2927408")
+    projeto = Projeto.objects.create(nome="ACERTA", codigo="ACERTA", fluxo="NAO_SUPER")
     tipo_evento = TipoEvento.objects.create(nome="Formação")
 
     # Criar 10 solicitações
@@ -178,8 +173,7 @@ class TestDashboardEventsExportOptimization:
 
         # Validar número de queries (máximo 3)
         assert len(queries) <= 3, (
-            f"Expected ≤3 queries with select_related, got {len(queries)}. "
-            f"Queries: {[q['sql'] for q in queries]}"
+            f"Expected ≤3 queries with select_related, got {len(queries)}. " f"Queries: {[q['sql'] for q in queries]}"
         )
 
 
@@ -288,9 +282,7 @@ class TestBatchViewsAlgorithmOptimization:
         error_ids = [err["id"] for err in response.data["errors"]]
         assert 99999 in error_ids
         assert 88888 in error_ids
-        assert all(
-            "não encontrada" in err["detail"] for err in response.data["errors"]
-        )
+        assert all("não encontrada" in err["detail"] for err in response.data["errors"])
 
 
 @pytest.mark.django_db

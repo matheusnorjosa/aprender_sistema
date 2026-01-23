@@ -3,9 +3,11 @@ Tests for DAT Registros module.
 
 Ref: v2/docs/SPEC_DAT_REGISTROS.md
 """
+
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import json
 from decimal import Decimal
 
@@ -441,6 +443,7 @@ class ProjetoGeralAPITests(APITestCase):
     def test_list_projects_gerais(self):
         """GET /api/projetos-gerais/ should list all projetos gerais."""
         import uuid
+
         suffix = str(uuid.uuid4())[:8]
         ProjetoGeral.objects.create(nome=f"Test PG 1 {suffix}", usa_avaliar=True)
         ProjetoGeral.objects.create(nome=f"Test PG 2 {suffix}", usa_avaliar=False)
@@ -482,6 +485,7 @@ class ProjetoGeralAPITests(APITestCase):
     def test_create_projeto_geral_allowed_for_dat(self):
         """POST /api/projetos-gerais/ should work for DAT users."""
         import uuid
+
         suffix = str(uuid.uuid4())[:8]
 
         self.client.force_authenticate(user=self.dat_user)
@@ -497,6 +501,7 @@ class ProjetoGeralAPITests(APITestCase):
     def test_projetos_action_lists_specific_projects(self):
         """GET /api/projetos-gerais/{id}/projetos/ should list linked projects."""
         import uuid
+
         suffix = str(uuid.uuid4())[:8]
 
         pg = ProjetoGeral.objects.create(nome=f"PG with Projects {suffix}", usa_avaliar=True)

@@ -11,12 +11,12 @@
  * Used by hooks and components.
  */
 
-import axios from 'axios';
+import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 import { ensureCsrfToken, API_BASE } from './api/config';
 import logger from './utils/logger';
 
 // Create axios instance
-const api = axios.create({
+const api: AxiosInstance = axios.create({
   baseURL: API_BASE,
   withCredentials: true,
   headers: {
@@ -25,10 +25,10 @@ const api = axios.create({
 });
 
 // Add CSRF token to all mutating requests (Issue #135: async interceptor)
-api.interceptors.request.use(async (config) => {
+api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const method = config.method?.toUpperCase();
 
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+  if (method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     const csrfToken = await ensureCsrfToken();
 
     if (csrfToken) {

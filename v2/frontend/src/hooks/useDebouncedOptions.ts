@@ -7,7 +7,7 @@
  * - TTL de 5 min (sincronizado com cache backend)
  *
  * Uso:
- * ```jsx
+ * ```tsx
  * import useDebouncedOptions from '../hooks/useDebouncedOptions';
  *
  * function MyComponent() {
@@ -24,22 +24,51 @@
  * - CP3: Backend cache 5 min
  */
 
-import { useState, useEffect, useCallback, useRef } from 'prop-types';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api';
 import { TIMING } from '../constants';
 
 const CACHE_TTL = 300000; // 5 minutos em ms (sincronizado com backend)
 
-const useDebouncedOptions = (endpoint, params = {}) => {
-  const [options, setOptions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const debounceTimerRef = useRef(null);
+/**
+ * Query parameters for options
+ */
+export type OptionsParams = Record<string, string | number | boolean | undefined>;
+
+/**
+ * Cached data structure
+ */
+interface CachedData<T> {
+  data: T;
+  timestamp: number;
+}
+
+/**
+ * Return type for useDebouncedOptions
+ */
+export interface UseDebouncedOptionsReturn<T> {
+  options: T[];
+  loading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+}
+
+/**
+ * Hook for debounced options fetching with caching
+ */
+const useDebouncedOptions = <T = unknown>(
+  endpoint: string,
+  params: OptionsParams = {}
+): UseDebouncedOptionsReturn<T> => {
+  const [options, setOptions] = useState<T[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Gera cache key baseado no endpoint e params.
    */
-  const getCacheKey = useCallback((url, queryParams) => {
+  const getCacheKey = useCallback((url: string, queryParams: OptionsParams): string => {
     const paramString = Object.keys(queryParams).length
       ? JSON.stringify(queryParams)
       : '';
@@ -49,12 +78,12 @@ const useDebouncedOptions = (endpoint, params = {}) => {
   /**
    * Verifica cache no sessionStorage.
    */
-  const getFromCache = useCallback((key) => {
+  const getFromCache = useCallback(<U>(key: string): U | null => {
     try {
       const cached = sessionStorage.getItem(key);
       if (!cached) return null;
 
-      const { data, timestamp } = JSON.parse(cached);
+      const { data, timestamp }: CachedData<U> = JSON.parse(cached);
       const age = Date.now() - timestamp;
 
       // Cache expirado?
@@ -72,7 +101,7 @@ const useDebouncedOptions = (endpoint, params = {}) => {
   /**
    * Salva no cache (sessionStorage).
    */
-  const saveToCache = useCallback((key, data) => {
+  const saveToCache = useCallback(<U>(key: string, data: U): void => {
     try {
       sessionStorage.setItem(
         key,
@@ -89,11 +118,11 @@ const useDebouncedOptions = (endpoint, params = {}) => {
   /**
    * Busca options do backend com debounce.
    */
-  const fetchOptions = useCallback(async () => {
+  const fetchOptions = useCallback(async (): Promise<void> => {
     const cacheKey = getCacheKey(endpoint, params);
 
     // 1. Tentar cache primeiro
-    const cachedData = getFromCache(cacheKey);
+    const cachedData = getFromCache<T[]>(cacheKey);
     if (cachedData) {
       setOptions(cachedData);
       return;
@@ -104,13 +133,14 @@ const useDebouncedOptions = (endpoint, params = {}) => {
     setError(null);
 
     try {
-      const response = await api.get(endpoint, { params });
+      const response = await api.get<T[]>(endpoint, { params });
       const data = response.data;
 
       setOptions(data);
       saveToCache(cacheKey, data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Erro ao carregar opções');
+      const axiosError = err as { response?: { data?: { error?: string } } };
+      setError(axiosError.response?.data?.error || 'Erro ao carregar opções');
       setOptions([]);
     } finally {
       setLoading(false);

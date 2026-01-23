@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Table, Select, InputNumber, Button, Tag, Space, Alert, Spin } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import {
   FileTextOutlined,
   FileExcelOutlined,
@@ -27,9 +28,38 @@ import logger from '../../utils/logger';
 const { Option } = Select;
 
 /**
+ * File kind type
+ */
+type FileKind = 'json' | 'csv' | 'txt' | 'other';
+
+/**
+ * Report record interface
+ */
+interface ReportRecord {
+  filename: string;
+  kind: FileKind;
+  size_bytes: number;
+  mtime_iso: string;
+  path_rel: string;
+}
+
+/**
+ * Reports response interface
+ */
+interface ReportsResponse {
+  count: number;
+  reports: ReportRecord[];
+}
+
+/**
+ * Filter kind type
+ */
+type FilterKindType = 'all' | FileKind;
+
+/**
  * Formatar tamanho em bytes para formato legível (KB, MB)
  */
-function formatBytes(bytes) {
+function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -39,7 +69,7 @@ function formatBytes(bytes) {
 /**
  * Ícone por tipo de arquivo
  */
-function getFileIcon(kind) {
+function getFileIcon(kind: FileKind): JSX.Element {
   switch (kind) {
     case 'json':
       return <FileTextOutlined className="text-green-500" />;
@@ -55,8 +85,12 @@ function getFileIcon(kind) {
 /**
  * Tag de tipo de arquivo com cor
  */
-function FileTypeTag({ kind }) {
-  const colors = {
+interface FileTypeTagProps {
+  kind: FileKind;
+}
+
+function FileTypeTag({ kind }: FileTypeTagProps): JSX.Element {
+  const colors: Record<FileKind, string> = {
     json: 'green',
     csv: 'blue',
     txt: 'default',
@@ -66,15 +100,15 @@ function FileTypeTag({ kind }) {
   return <Tag color={colors[kind] || 'default'}>{kind.toUpperCase()}</Tag>;
 }
 
-export default function EtlReportsPage() {
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [count, setCount] = useState(0);
+export default function EtlReportsPage(): JSX.Element {
+  const [reports, setReports] = useState<ReportRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [count, setCount] = useState<number>(0);
 
   // Filtros
-  const [limit, setLimit] = useState(20);
-  const [filterKind, setFilterKind] = useState('all'); // all, json, csv, txt, other
+  const [limit, setLimit] = useState<number>(20);
+  const [filterKind, setFilterKind] = useState<FilterKindType>('all');
 
   /**
    * Calcular limite efetivo (garantir entre 1-100, fallback 20)
@@ -89,19 +123,19 @@ export default function EtlReportsPage() {
     setError(null);
 
     try {
-      const data = await listLatestReports(effectiveLimit);
+      const data = await listLatestReports(effectiveLimit) as ReportsResponse;
       setCount(data.count);
       setReports(data.reports || []);
     } catch (err) {
       logger.error('Erro ao buscar relatórios ETL:', err);
 
       // Tratar erro 403 (permissão)
-      if (err.message.includes('403') || err.message.includes('Forbidden')) {
+      if ((err as Error).message.includes('403') || (err as Error).message.includes('Forbidden')) {
         setError(
           'Você não tem permissão para acessar relatórios ETL. Apenas grupos Controle e Superintendência podem visualizar.'
         );
       } else {
-        setError(err.message || 'Erro ao carregar relatórios. Tente novamente.');
+        setError((err as Error).message || 'Erro ao carregar relatórios. Tente novamente.');
       }
     } finally {
       setLoading(false);
@@ -125,13 +159,13 @@ export default function EtlReportsPage() {
   /**
    * Colunas da tabela
    */
-  const columns = [
+  const columns: ColumnsType<ReportRecord> = [
     {
       title: 'Arquivo',
       dataIndex: 'filename',
       key: 'filename',
       width: '40%',
-      render: (filename, record) => (
+      render: (filename: string, record) => (
         <Space>
           {getFileIcon(record.kind)}
           <span className="font-mono text-sm">{filename}</span>
@@ -143,21 +177,21 @@ export default function EtlReportsPage() {
       dataIndex: 'kind',
       key: 'kind',
       width: '10%',
-      render: (kind) => <FileTypeTag kind={kind} />,
+      render: (kind: FileKind) => <FileTypeTag kind={kind} />,
     },
     {
       title: 'Tamanho',
       dataIndex: 'size_bytes',
       key: 'size',
       width: '15%',
-      render: (bytes) => <span className="text-gray-600">{formatBytes(bytes)}</span>,
+      render: (bytes: number) => <span className="text-gray-600">{formatBytes(bytes)}</span>,
     },
     {
       title: 'Data/Hora',
       dataIndex: 'mtime_iso',
       key: 'mtime',
       width: '20%',
-      render: (isoDate) => (
+      render: (isoDate: string) => (
         <span className="text-gray-600">
           {dayjs(isoDate).format('DD/MM/YYYY HH:mm')}
         </span>

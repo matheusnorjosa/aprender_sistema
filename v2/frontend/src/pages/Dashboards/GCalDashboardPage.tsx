@@ -32,6 +32,10 @@ import {
   Divider,
   Spin,
 } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import type { TablePaginationConfig } from 'antd/es/table';
+import type { MenuProps } from 'antd';
+import type { Dayjs } from 'dayjs';
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -54,8 +58,132 @@ import { ensureCsrfToken } from '../../api/config';
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
+/**
+ * GCal status type
+ */
+type GCalStatus = 'NONE' | 'PENDING' | 'PUBLISHED' | 'ERROR';
+
+/**
+ * Status counts interface
+ */
+interface StatusCounts {
+  NONE: number;
+  PENDING: number;
+  PUBLISHED: number;
+  ERROR: number;
+}
+
+/**
+ * Recent error interface
+ */
+interface RecentError {
+  id: number;
+  summary: string;
+  gcal_last_error: string;
+  updated_at: string;
+}
+
+/**
+ * Metrics data interface
+ */
+interface MetricsData {
+  counts: StatusCounts;
+  recent_errors: RecentError[];
+}
+
+/**
+ * Event record interface
+ */
+interface EventRecord {
+  id: number;
+  summary: string;
+  gcal_status: GCalStatus;
+  gcal_last_sync_at: string | null;
+  gcal_last_error: string | null;
+}
+
+/**
+ * Event detail participation interface
+ */
+interface Participation {
+  email: string;
+  role: string;
+  ch_horas?: number;
+  observacao?: string;
+}
+
+/**
+ * Timeline log interface
+ */
+interface TimelineLog {
+  action: string;
+  usuario_nome: string;
+  created_at: string;
+  details?: Record<string, unknown>;
+}
+
+/**
+ * Event detail interface
+ */
+interface EventDetail {
+  id: number;
+  municipio_nome: string | null;
+  projeto_nome: string | null;
+  tipo_evento_nome: string | null;
+  inicio: string | null;
+  fim: string | null;
+  usuario_username: string | null;
+  coordenador_username: string | null;
+  fluxo: string;
+  gcal_status: GCalStatus;
+  external_event_id: string | null;
+  gcal_last_sync_at: string | null;
+  meet_link: string | null;
+  gcal_payload_hash: string | null;
+  gcal_last_error: string | null;
+  updated_at: string | null;
+  participations: Participation[];
+  timeline: TimelineLog[];
+}
+
+/**
+ * Success rate data interface
+ */
+interface SuccessRateData {
+  rate: number;
+  published: number;
+  error: number;
+}
+
+/**
+ * Top insight item interface
+ */
+interface TopInsightItem {
+  name: string;
+  count: number;
+  published: number;
+  error: number;
+  rate: number;
+}
+
+/**
+ * Top insights data interface
+ */
+interface TopInsightsData {
+  items: TopInsightItem[];
+}
+
+/**
+ * Pagination state interface
+ */
+interface PaginationState {
+  current: number;
+  pageSize: number;
+  total: number;
+}
+
 // Status badge colors
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<GCalStatus, string> = {
   NONE: 'default',
   PENDING: 'processing',
   PUBLISHED: 'success',
@@ -63,7 +191,7 @@ const STATUS_COLORS = {
 };
 
 // Status icons
-const STATUS_ICONS = {
+const STATUS_ICONS: Record<GCalStatus, JSX.Element> = {
   NONE: <MinusCircleOutlined />,
   PENDING: <ClockCircleOutlined />,
   PUBLISHED: <CheckCircleOutlined />,
@@ -71,42 +199,51 @@ const STATUS_ICONS = {
 };
 
 // Status labels
-const STATUS_LABELS = {
+const STATUS_LABELS: Record<GCalStatus, string> = {
   NONE: 'Não Publicado',
   PENDING: 'Pendente',
   PUBLISHED: 'Publicado',
   ERROR: 'Erro',
 };
 
-export default function GCalDashboardPage() {
-  const [metrics, setMetrics] = useState(null);
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [tableLoading, setTableLoading] = useState(false);
-  const [pagination, setPagination] = useState({
+// Helper: Determinar cor da timeline baseado na action
+function getTimelineColor(action: string): string {
+  if (action.includes('ERROR')) return 'red';
+  if (action.includes('PUBLISH') || action.includes('RESYNC')) return 'green';
+  if (action.includes('REQUESTED') || action.includes('PENDING')) return 'blue';
+  if (action.includes('CANCEL')) return 'orange';
+  return 'gray';
+}
+
+export default function GCalDashboardPage(): JSX.Element {
+  const [metrics, setMetrics] = useState<MetricsData | null>(null);
+  const [events, setEvents] = useState<EventRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [tableLoading, setTableLoading] = useState<boolean>(false);
+  const [pagination, setPagination] = useState<PaginationState>({
     current: 1,
     pageSize: 20,
     total: 0,
   });
 
   // Filtros
-  const [dateRange, setDateRange] = useState([
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs().subtract(30, 'days'),
     dayjs().add(30, 'days'),
   ]);
-  const [statusFilter, setStatusFilter] = useState(null);
+  const [statusFilter, setStatusFilter] = useState<GCalStatus | null>(null);
 
   // Drawer (Issue #98)
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedEventId, setSelectedEventId] = useState(null);
-  const [eventDetail, setEventDetail] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [eventDetail, setEventDetail] = useState<EventDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState<boolean>(false);
 
   // Insights (Issue #99)
-  const [successRate, setSuccessRate] = useState(null);
-  const [topInsights, setTopInsights] = useState(null);
-  const [insightsLoading, setInsightsLoading] = useState(false);
-  const [topMetric, setTopMetric] = useState('municipios');
+  const [successRate, setSuccessRate] = useState<SuccessRateData | null>(null);
+  const [topInsights, setTopInsights] = useState<TopInsightsData | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState<boolean>(false);
+  const [topMetric, setTopMetric] = useState<string>('municipios');
 
   useEffect(() => {
     loadMetrics();
@@ -156,8 +293,8 @@ export default function GCalDashboardPage() {
     setTableLoading(true);
     try {
       const params = new URLSearchParams();
-      params.append('page', page);
-      params.append('page_size', pageSize);
+      params.append('page', String(page));
+      params.append('page_size', String(pageSize));
 
       if (dateRange && dateRange[0] && dateRange[1]) {
         params.append('start', dateRange[0].format('YYYY-MM-DD'));
@@ -191,8 +328,8 @@ export default function GCalDashboardPage() {
     }
   };
 
-  const handleTableChange = useCallback((newPagination) => {
-    loadEvents(newPagination.current, newPagination.pageSize);
+  const handleTableChange = useCallback((newPagination: TablePaginationConfig) => {
+    loadEvents(newPagination.current || 1, newPagination.pageSize || 20);
   }, []);
 
   // Issue #99: Carregar insights (success rate + top insights)
@@ -232,7 +369,7 @@ export default function GCalDashboardPage() {
     try {
       const params = new URLSearchParams();
       params.append('metric', topMetric);
-      params.append('limit', 5);
+      params.append('limit', '5');
 
       if (dateRange && dateRange[0] && dateRange[1]) {
         params.append('start', dateRange[0].format('YYYY-MM-DD'));
@@ -263,7 +400,7 @@ export default function GCalDashboardPage() {
     loadInsights();
   };
 
-  const handleExport = (format) => {
+  const handleExport = (format: string) => {
     // Construir URL de export com os mesmos filtros ativos
     const params = new URLSearchParams();
     params.append('export_format', format);
@@ -284,14 +421,14 @@ export default function GCalDashboardPage() {
   };
 
   // Issue #98: Abrir Drawer com detalhes do evento
-  const handleRowClick = async (record) => {
+  const handleRowClick = async (record: EventRecord) => {
     setSelectedEventId(record.id);
     setDrawerOpen(true);
     await loadEventDetail(record.id);
   };
 
   // Issue #98: Buscar detalhes do evento
-  const loadEventDetail = async (eventId) => {
+  const loadEventDetail = async (eventId: number) => {
     setDetailLoading(true);
     try {
       const response = await fetch(`/api/gcal/dashboard/events/${eventId}/detail/`, {
@@ -355,7 +492,7 @@ export default function GCalDashboardPage() {
       }
     } catch (error) {
       logger.error('Erro ao reapliar:', error);
-      message.error(error.message || 'Erro ao reapliar evento');
+      message.error((error as Error).message || 'Erro ao reapliar evento');
     }
   };
 
@@ -395,12 +532,12 @@ export default function GCalDashboardPage() {
       }
     } catch (error) {
       logger.error('Erro ao ressincronizar:', error);
-      message.error(error.message || 'Erro ao ressincronizar evento');
+      message.error((error as Error).message || 'Erro ao ressincronizar evento');
     }
   };
 
   // Menu items para dropdown de Export (memoized §16 Epic #459)
-  const exportMenuItems = useMemo(() => [
+  const exportMenuItems: MenuProps['items'] = useMemo(() => [
     {
       key: 'csv',
       label: 'Exportar CSV',
@@ -416,7 +553,7 @@ export default function GCalDashboardPage() {
   ], [dateRange, statusFilter]);
 
   // Columns memoized (§16 Epic #459)
-  const columns = useMemo(() => [
+  const columns: ColumnsType<EventRecord> = useMemo(() => [
     {
       title: 'ID',
       dataIndex: 'id',
@@ -428,14 +565,14 @@ export default function GCalDashboardPage() {
       dataIndex: 'summary',
       key: 'summary',
       ellipsis: true,
-      render: (text) => text || '-',
+      render: (text: string) => text || '-',
     },
     {
       title: 'Status GCal',
       dataIndex: 'gcal_status',
       key: 'gcal_status',
       width: 140,
-      render: (status) => (
+      render: (status: GCalStatus) => (
         <Tag color={STATUS_COLORS[status]} icon={STATUS_ICONS[status]}>
           {STATUS_LABELS[status]}
         </Tag>
@@ -446,7 +583,7 @@ export default function GCalDashboardPage() {
       dataIndex: 'gcal_last_sync_at',
       key: 'gcal_last_sync_at',
       width: 180,
-      render: (datetime) =>
+      render: (datetime: string | null) =>
         datetime ? dayjs(datetime).format('DD/MM/YYYY HH:mm') : '-',
     },
     {
@@ -454,7 +591,7 @@ export default function GCalDashboardPage() {
       dataIndex: 'gcal_last_error',
       key: 'gcal_last_error',
       ellipsis: true,
-      render: (error) =>
+      render: (error: string | null) =>
         error ? (
           <Tooltip title={error}>
             <Text type="danger" ellipsis style={{ maxWidth: 200 }}>
@@ -468,7 +605,7 @@ export default function GCalDashboardPage() {
   ], []);
 
   // Issue #99: Colunas para Top Insights (memoized §16 Epic #459)
-  const topInsightsColumns = useMemo(() => [
+  const topInsightsColumns: ColumnsType<TopInsightItem> = useMemo(() => [
     {
       title: 'Nome',
       dataIndex: 'name',
@@ -488,7 +625,7 @@ export default function GCalDashboardPage() {
       key: 'published',
       width: 100,
       align: 'center',
-      render: (value) => <Text type="success">{value}</Text>,
+      render: (value: number) => <Text type="success">{value}</Text>,
     },
     {
       title: 'Erros',
@@ -496,7 +633,7 @@ export default function GCalDashboardPage() {
       key: 'error',
       width: 80,
       align: 'center',
-      render: (value) => <Text type="danger">{value}</Text>,
+      render: (value: number) => <Text type="danger">{value}</Text>,
     },
     {
       title: 'Taxa (%)',
@@ -504,7 +641,7 @@ export default function GCalDashboardPage() {
       key: 'rate',
       width: 100,
       align: 'center',
-      render: (rate) => {
+      render: (rate: number) => {
         const percentage = (rate * 100).toFixed(1);
         const color = rate >= 0.8 ? '#52c41a' : rate >= 0.5 ? '#faad14' : '#f5222d';
         return <Text style={{ color, fontWeight: 'bold' }}>{percentage}%</Text>;
@@ -526,7 +663,7 @@ export default function GCalDashboardPage() {
       {/* Filtros */}
       <Card
         className="mb-6"
-        bodyStyle={{ padding: '16px' }}
+        styles={{ body: { padding: '16px' } }}
       >
         <Space size="middle" wrap>
           <div>
@@ -535,7 +672,7 @@ export default function GCalDashboardPage() {
             </Text>
             <RangePicker
               value={dateRange}
-              onChange={setDateRange}
+              onChange={(dates) => dates && setDateRange(dates as [Dayjs, Dayjs])}
               format="DD/MM/YYYY"
               allowClear={false}
             />
@@ -885,13 +1022,4 @@ export default function GCalDashboardPage() {
       </Drawer>
     </div>
   );
-}
-
-// Helper: Determinar cor da timeline baseado na action
-function getTimelineColor(action) {
-  if (action.includes('ERROR')) return 'red';
-  if (action.includes('PUBLISH') || action.includes('RESYNC')) return 'green';
-  if (action.includes('REQUESTED') || action.includes('PENDING')) return 'blue';
-  if (action.includes('CANCEL')) return 'orange';
-  return 'gray';
 }

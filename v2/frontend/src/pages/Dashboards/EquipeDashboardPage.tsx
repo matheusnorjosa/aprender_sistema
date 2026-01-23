@@ -27,9 +27,9 @@ import {
   Tag,
   message,
 } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import {
   RiseOutlined,
-  FallOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   ClockCircleOutlined,
@@ -46,14 +46,55 @@ import logger from '../../utils/logger';
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-export default function EquipeDashboardPage() {
-  const [days, setDays] = useState(7);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+/**
+ * Productivity data interface
+ */
+interface ProductivityData {
+  period: string;
+  events_created: number;
+  approval_rate: number;
+  avg_approval_time_hours: number;
+  gcal_error_rate: number;
+}
 
-  const [productivityData, setProductivityData] = useState(null);
-  const [formadoresData, setFormadoresData] = useState(null);
-  const [qualityData, setQualityData] = useState(null);
+/**
+ * Formador record interface
+ */
+interface FormadorRecord {
+  id: number;
+  nome: string;
+  eventos: number;
+  horas_trabalhadas: number;
+  municipios_atendidos: number;
+}
+
+/**
+ * Formadores data interface
+ */
+interface FormadoresData {
+  period: string;
+  formadores: FormadorRecord[];
+}
+
+/**
+ * Quality data interface
+ */
+interface QualityData {
+  period: string;
+  rejection_rate: number;
+  conflict_rate: number;
+  rework_rate: number;
+  avg_publish_time_minutes: number;
+}
+
+export default function EquipeDashboardPage(): JSX.Element {
+  const [days, setDays] = useState<number>(7);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [productivityData, setProductivityData] = useState<ProductivityData | null>(null);
+  const [formadoresData, setFormadoresData] = useState<FormadoresData | null>(null);
+  const [qualityData, setQualityData] = useState<QualityData | null>(null);
 
   const loadAllMetrics = useCallback(async () => {
     setLoading(true);
@@ -85,7 +126,7 @@ export default function EquipeDashboardPage() {
       setQualityData(qual);
     } catch (err) {
       logger.error('Erro ao carregar métricas:', err);
-      setError(err.message);
+      setError((err as Error).message);
       message.error('Erro ao carregar métricas da equipe');
     } finally {
       setLoading(false);
@@ -128,19 +169,57 @@ export default function EquipeDashboardPage() {
   };
 
   // Helper para threshold de cores
-  const getThresholdColor = (value, goodThreshold, direction = 'lower') => {
+  const getThresholdStatus = (value: number, goodThreshold: number, direction: 'lower' | 'higher' = 'lower'): 'success' | 'exception' => {
     if (direction === 'lower') {
       // Valores BAIXOS são bons (ex: taxa de rejeição)
-      return value <= goodThreshold ? 'green' : 'red';
+      return value <= goodThreshold ? 'success' : 'exception';
     }
     // Valores ALTOS são bons (ex: taxa de aprovação)
-    return value >= goodThreshold ? 'green' : 'red';
+    return value >= goodThreshold ? 'success' : 'exception';
   };
 
-  const getThresholdStatus = (value, goodThreshold, direction = 'lower') => {
-    const color = getThresholdColor(value, goodThreshold, direction);
-    return color === 'green' ? 'success' : 'exception';
-  };
+  // Columns for formadores table
+  const formadoresColumns: ColumnsType<FormadorRecord> = [
+    {
+      title: '#',
+      key: 'rank',
+      width: 50,
+      align: 'center',
+      render: (_, __, index) => <Text type="secondary">{index + 1}</Text>,
+    },
+    {
+      title: 'Nome',
+      dataIndex: 'nome',
+      key: 'nome',
+      ellipsis: true,
+    },
+    {
+      title: 'Eventos',
+      dataIndex: 'eventos',
+      key: 'eventos',
+      width: 80,
+      align: 'right',
+      sorter: (a, b) => b.eventos - a.eventos,
+      render: (val: number) => <Text strong>{val}</Text>,
+    },
+    {
+      title: 'Horas',
+      dataIndex: 'horas_trabalhadas',
+      key: 'horas',
+      width: 80,
+      align: 'right',
+      sorter: (a, b) => b.horas_trabalhadas - a.horas_trabalhadas,
+      render: (val: number) => `${val}h`,
+    },
+    {
+      title: 'Municípios',
+      dataIndex: 'municipios_atendidos',
+      key: 'municipios',
+      width: 90,
+      align: 'right',
+      sorter: (a, b) => b.municipios_atendidos - a.municipios_atendidos,
+    },
+  ];
 
   if (error) {
     return (
@@ -316,47 +395,7 @@ export default function EquipeDashboardPage() {
                   rowKey="id"
                   pagination={{ pageSize: 5, size: 'small' }}
                   size="small"
-                  columns={[
-                    {
-                      title: '#',
-                      key: 'rank',
-                      width: 50,
-                      align: 'center',
-                      render: (_, __, index) => <Text type="secondary">{index + 1}</Text>,
-                    },
-                    {
-                      title: 'Nome',
-                      dataIndex: 'nome',
-                      key: 'nome',
-                      ellipsis: true,
-                    },
-                    {
-                      title: 'Eventos',
-                      dataIndex: 'eventos',
-                      key: 'eventos',
-                      width: 80,
-                      align: 'right',
-                      sorter: (a, b) => b.eventos - a.eventos,
-                      render: (val) => <Text strong>{val}</Text>,
-                    },
-                    {
-                      title: 'Horas',
-                      dataIndex: 'horas_trabalhadas',
-                      key: 'horas',
-                      width: 80,
-                      align: 'right',
-                      sorter: (a, b) => b.horas_trabalhadas - a.horas_trabalhadas,
-                      render: (val) => `${val}h`,
-                    },
-                    {
-                      title: 'Municípios',
-                      dataIndex: 'municipios_atendidos',
-                      key: 'municipios',
-                      width: 90,
-                      align: 'right',
-                      sorter: (a, b) => b.municipios_atendidos - a.municipios_atendidos,
-                    },
-                  ]}
+                  columns={formadoresColumns}
                 />
               </Card>
             </Col>

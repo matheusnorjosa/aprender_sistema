@@ -26,6 +26,7 @@ import {
   Alert,
   Empty,
 } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import logger from '../../utils/logger';
 import {
   CalendarOutlined,
@@ -41,18 +42,62 @@ import {
 
 const { Title, Text } = Typography;
 
+/**
+ * KPIs data interface
+ */
+interface KPIs {
+  eventos_futuros: number;
+  eventos_aprovados: number;
+  total_formadores: number;
+  aprovacoes_pendentes: number;
+}
+
+/**
+ * Fluxo item interface
+ */
+interface FluxoItem {
+  fluxo: string;
+  quantidade: number;
+}
+
+/**
+ * Gerencia item interface
+ */
+interface GerenciaItem {
+  gerencia: string;
+  porcentagem: number;
+}
+
+/**
+ * Coordenador item interface
+ */
+interface CoordenadorItem {
+  nome: string;
+  eventos: number;
+}
+
+/**
+ * Dashboard data interface
+ */
+interface DashboardData {
+  kpis: KPIs;
+  por_fluxo: FluxoItem[];
+  por_gerencia: GerenciaItem[];
+  top_coordenadores: CoordenadorItem[];
+}
+
 // Cores para os graficos
-const FLUXO_COLORS = {
+const FLUXO_COLORS: Record<string, string> = {
   SUPER: '#1890ff',
   NAO_SUPER: '#52c41a',
 };
 
 const GERENCIA_COLORS = ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1'];
 
-export default function DashboardsPage() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+export default function DashboardsPage(): JSX.Element {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -71,7 +116,7 @@ export default function DashboardsPage() {
       setData(result);
     } catch (err) {
       logger.error('Erro ao carregar dashboard:', err);
-      setError(err.message || 'Erro ao carregar dados do dashboard');
+      setError((err as Error).message || 'Erro ao carregar dados do dashboard');
     } finally {
       setLoading(false);
     }
@@ -83,7 +128,7 @@ export default function DashboardsPage() {
 
   const handleExportCSV = () => {
     // TODO: Implementar export real
-    logger.info('Export CSV solicitado');
+    logger.debug('Export CSV solicitado');
   };
 
   // Loading state
@@ -128,6 +173,43 @@ export default function DashboardsPage() {
   // Calcular max para Progress bars
   const maxFluxo = Math.max(...por_fluxo.map((f) => f.quantidade), 1);
   const maxCoord = top_coordenadores.length > 0 ? top_coordenadores[0].eventos : 1;
+
+  // Columns for top coordenadores table
+  const columns: ColumnsType<CoordenadorItem> = [
+    {
+      title: 'Posicao',
+      key: 'posicao',
+      width: 100,
+      render: (_, __, index) => (
+        <Tag color={index < 3 ? 'gold' : 'default'}>
+          {index + 1}o
+        </Tag>
+      ),
+    },
+    {
+      title: 'Coordenador',
+      dataIndex: 'nome',
+      key: 'nome',
+    },
+    {
+      title: 'Eventos',
+      dataIndex: 'eventos',
+      key: 'eventos',
+      align: 'right',
+      render: (eventos: number) => <Text strong>{eventos}</Text>,
+    },
+    {
+      title: 'Progresso',
+      key: 'progresso',
+      render: (_, record) => (
+        <Progress
+          percent={(record.eventos / maxCoord) * 100}
+          showInfo={false}
+          strokeColor="#52c41a"
+        />
+      ),
+    },
+  ];
 
   return (
     <div className="p-6">
@@ -306,41 +388,7 @@ export default function DashboardsPage() {
                 dataSource={top_coordenadores}
                 rowKey="nome"
                 pagination={false}
-                columns={[
-                  {
-                    title: 'Posicao',
-                    key: 'posicao',
-                    width: 100,
-                    render: (_, __, index) => (
-                      <Tag color={index < 3 ? 'gold' : 'default'}>
-                        {index + 1}o
-                      </Tag>
-                    ),
-                  },
-                  {
-                    title: 'Coordenador',
-                    dataIndex: 'nome',
-                    key: 'nome',
-                  },
-                  {
-                    title: 'Eventos',
-                    dataIndex: 'eventos',
-                    key: 'eventos',
-                    align: 'right',
-                    render: (eventos) => <Text strong>{eventos}</Text>,
-                  },
-                  {
-                    title: 'Progresso',
-                    key: 'progresso',
-                    render: (_, record) => (
-                      <Progress
-                        percent={(record.eventos / maxCoord) * 100}
-                        showInfo={false}
-                        strokeColor="#52c41a"
-                      />
-                    ),
-                  },
-                ]}
+                columns={columns}
               />
             )}
           </Card>

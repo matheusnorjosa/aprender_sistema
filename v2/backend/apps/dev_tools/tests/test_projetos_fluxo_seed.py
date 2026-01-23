@@ -85,9 +85,7 @@ class TestSeedProjetosFluxoFromSheets(TestCase):
         - "Novo  Lendo" → "novo lendo"
         - "Brincando & Aprendendo" → "brincando aprendendo"
         """
-        from apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets import (
-            Command,
-        )
+        from apps.dev_tools.management.commands.seed_projetos_fluxo_from_sheets import Command
 
         cmd = Command()
 

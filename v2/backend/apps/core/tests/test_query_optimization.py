@@ -17,14 +17,7 @@ from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 
-from apps.core.models import (
-    AvailabilityBlock,
-    Municipio,
-    Participation,
-    Projeto,
-    Solicitacao,
-    TipoEvento,
-)
+from apps.core.models import AvailabilityBlock, Municipio, Participation, Projeto, Solicitacao, TipoEvento
 
 Usuario = get_user_model()
 

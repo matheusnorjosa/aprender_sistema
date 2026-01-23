@@ -25,12 +25,7 @@ from rest_framework.response import Response
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
 
-from apps.core.models import (
-    Acompanhamento,
-    Formacao,
-    PlanoFormacoes,
-    Prova,
-)
+from apps.core.models import Acompanhamento, Formacao, PlanoFormacoes, Prova
 from apps.core.permissions import IsDATOrSuper, IsSuperintendenciaOnly
 from apps.core.serializers import (
     AcompanhamentoSerializer,

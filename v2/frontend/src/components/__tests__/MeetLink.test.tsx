@@ -7,7 +7,6 @@
  * - Botão "Copiar link" com clipboard
  */
 
-import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import MeetLink from '../MeetLink'
@@ -24,7 +23,7 @@ Object.assign(navigator, {
 describe('MeetLink', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockClipboard.writeText.mockResolvedValue()
+    mockClipboard.writeText.mockResolvedValue(undefined)
   })
 
   // ============================================================================

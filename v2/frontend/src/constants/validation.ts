@@ -19,4 +19,4 @@ export const VALIDATION = {
   TRAVEL_BUFFER_MAX: 480,
   BATCH_SIZE_MIN: 50,
   BATCH_SIZE_MAX: 1000,
-};
+} as const;

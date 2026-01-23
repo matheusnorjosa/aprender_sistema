@@ -51,11 +51,7 @@ class Command(BaseCommand):
 
     def handle(self, *args: Any, **options: Any) -> None:
         """Execute compliance audit."""
-        from apps.core.models import (
-            AuditLog,
-            AvailabilityBlock,
-            Solicitacao,
-        )
+        from apps.core.models import AuditLog, AvailabilityBlock, Solicitacao
 
         days = options["days"]
         since = timezone.now() - timedelta(days=days)

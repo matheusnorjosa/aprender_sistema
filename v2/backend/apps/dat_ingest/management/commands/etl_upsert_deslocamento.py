@@ -26,10 +26,7 @@ from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 
 from apps.core.models import Deslocamento
-from apps.dat_ingest.services.resolvers import (
-    resolve_user_by_email,
-    resolve_user_by_name,
-)
+from apps.dat_ingest.services.resolvers import resolve_user_by_email, resolve_user_by_name
 
 
 class Command(BaseCommand):

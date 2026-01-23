@@ -13,11 +13,7 @@ import pandas as pd
 import pytest
 from openpyxl import Workbook
 
-from apps.dat_ingest.services.processors import (
-    AgendaProcessor,
-    ControleProcessor,
-    DisponibilidadeProcessor,
-)
+from apps.dat_ingest.services.processors import AgendaProcessor, ControleProcessor, DisponibilidadeProcessor
 
 
 @pytest.fixture

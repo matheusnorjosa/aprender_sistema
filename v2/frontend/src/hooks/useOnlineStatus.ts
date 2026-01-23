@@ -5,7 +5,7 @@
  * Uses navigator.onLine and online/offline events.
  *
  * Usage:
- * ```jsx
+ * ```tsx
  * const isOnline = useOnlineStatus();
  *
  * if (!isOnline) {
@@ -18,16 +18,16 @@ import { useState, useEffect } from 'react';
 
 /**
  * Track browser online/offline status.
- * @returns {boolean} Whether the browser is online
+ * @returns Whether the browser is online
  */
-export function useOnlineStatus() {
-  const [isOnline, setIsOnline] = useState(
+export function useOnlineStatus(): boolean {
+  const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = (): void => setIsOnline(true);
+    const handleOffline = (): void => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);

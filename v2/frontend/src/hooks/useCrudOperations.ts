@@ -26,33 +26,94 @@
  *   <Button onClick={() => crud.confirmDelete(record)}>Excluir</Button>
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { message, Modal } from 'antd';
 import logger from '../utils/logger';
+import type { ID, PaginatedResponse } from '../types';
+
+/**
+ * Query parameters for list operations
+ */
+export interface ListParams {
+  page?: number;
+  pageSize?: number;
+  page_size?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Pagination state
+ */
+export interface PaginationState {
+  current: number;
+  pageSize: number;
+  total: number;
+}
+
+/**
+ * Operation result
+ */
+export interface OperationResult<T = unknown> {
+  success: boolean;
+  data?: T;
+  total?: number;
+  error?: Error;
+}
+
+/**
+ * Delete confirmation options
+ */
+export interface DeleteConfirmOptions {
+  idField?: string;
+  nameField?: string;
+  onSuccess?: () => void;
+}
+
+/**
+ * CRUD config options
+ */
+export interface CrudConfig<T> {
+  listFn: (params: ListParams) => Promise<PaginatedResponse<T> | T[]>;
+  createFn?: (data: Partial<T>) => Promise<T>;
+  updateFn?: (id: ID, data: Partial<T>) => Promise<T>;
+  deleteFn?: (id: ID) => Promise<void>;
+  entityName?: string;
+  pageSize?: number;
+}
+
+/**
+ * Return type for useCrudOperations
+ */
+export interface UseCrudOperationsReturn<T> {
+  data: T[];
+  loading: boolean;
+  pagination: PaginationState;
+  fetchData: (params?: ListParams) => Promise<OperationResult<T[]>>;
+  handleCreate: (values: Partial<T>) => Promise<OperationResult<T>>;
+  handleUpdate: (id: ID, values: Partial<T>) => Promise<OperationResult<T>>;
+  handleSave: (values: Partial<T>, id?: ID | null) => Promise<OperationResult<T>>;
+  handleDelete: (id: ID) => Promise<OperationResult>;
+  confirmDelete: (record: T & { id?: ID; nome?: string }, options?: DeleteConfirmOptions) => void;
+  handleTableChange: (page: number, newPageSize?: number, extraParams?: ListParams) => void;
+  refresh: (extraParams?: ListParams) => Promise<OperationResult<T[]>>;
+  setData: Dispatch<SetStateAction<T[]>>;
+  setPagination: Dispatch<SetStateAction<PaginationState>>;
+}
 
 /**
  * Hook for standardized CRUD operations
- *
- * @param {Object} config - Configuration object
- * @param {Function} config.listFn - API function to list records
- * @param {Function} [config.createFn] - API function to create record
- * @param {Function} [config.updateFn] - API function to update record
- * @param {Function} [config.deleteFn] - API function to delete record
- * @param {string} [config.entityName='registro'] - Entity name for messages
- * @param {number} [config.pageSize=15] - Default page size
- * @returns {Object} CRUD state and handlers
  */
-export function useCrudOperations({
+export function useCrudOperations<T extends Record<string, unknown>>({
   listFn,
   createFn,
   updateFn,
   deleteFn,
   entityName = 'registro',
   pageSize = 15,
-}) {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({
+}: CrudConfig<T>): UseCrudOperationsReturn<T> {
+  const [data, setData] = useState<T[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [pagination, setPagination] = useState<PaginationState>({
     current: 1,
     pageSize,
     total: 0,
@@ -60,12 +121,11 @@ export function useCrudOperations({
 
   /**
    * Fetch data with optional params
-   * @param {Object} params - Query params (filters, page, etc)
    */
-  const fetchData = useCallback(async (params = {}) => {
+  const fetchData = useCallback(async (params: ListParams = {}): Promise<OperationResult<T[]>> => {
     setLoading(true);
     try {
-      const queryParams = {
+      const queryParams: ListParams = {
         page: params.page || pagination.current,
         page_size: params.pageSize || pagination.pageSize,
         ...params,
@@ -74,20 +134,21 @@ export function useCrudOperations({
       const response = await listFn(queryParams);
 
       // Handle both paginated and non-paginated responses
-      const results = response.results || response || [];
-      const total = response.count ?? results.length;
+      const results = (response as PaginatedResponse<T>).results || (response as T[]) || [];
+      const total = (response as PaginatedResponse<T>).count ?? results.length;
 
       setData(results);
       setPagination(prev => ({
         ...prev,
-        current: queryParams.page,
+        current: queryParams.page as number,
         total,
       }));
 
       return { success: true, data: results, total };
     } catch (error) {
-      message.error(`Erro ao carregar ${entityName}s: ${error.message}`);
-      return { success: false, error };
+      const err = error as Error;
+      message.error(`Erro ao carregar ${entityName}s: ${err.message}`);
+      return { success: false, error: err };
     } finally {
       setLoading(false);
     }
@@ -95,10 +156,8 @@ export function useCrudOperations({
 
   /**
    * Create a new record
-   * @param {Object} values - Record data
-   * @returns {Promise<{success: boolean, data?: Object, error?: Error}>}
    */
-  const handleCreate = useCallback(async (values) => {
+  const handleCreate = useCallback(async (values: Partial<T>): Promise<OperationResult<T>> => {
     if (!createFn) {
       logger.warn('createFn not provided to useCrudOperations');
       return { success: false };
@@ -109,18 +168,16 @@ export function useCrudOperations({
       message.success(`${entityName} criado com sucesso`);
       return { success: true, data: result };
     } catch (error) {
-      message.error(`Erro ao criar ${entityName}: ${error.message}`);
-      return { success: false, error };
+      const err = error as Error;
+      message.error(`Erro ao criar ${entityName}: ${err.message}`);
+      return { success: false, error: err };
     }
   }, [createFn, entityName]);
 
   /**
    * Update an existing record
-   * @param {number|string} id - Record ID
-   * @param {Object} values - Updated data
-   * @returns {Promise<{success: boolean, data?: Object, error?: Error}>}
    */
-  const handleUpdate = useCallback(async (id, values) => {
+  const handleUpdate = useCallback(async (id: ID, values: Partial<T>): Promise<OperationResult<T>> => {
     if (!updateFn) {
       logger.warn('updateFn not provided to useCrudOperations');
       return { success: false };
@@ -131,18 +188,16 @@ export function useCrudOperations({
       message.success(`${entityName} atualizado com sucesso`);
       return { success: true, data: result };
     } catch (error) {
-      message.error(`Erro ao atualizar ${entityName}: ${error.message}`);
-      return { success: false, error };
+      const err = error as Error;
+      message.error(`Erro ao atualizar ${entityName}: ${err.message}`);
+      return { success: false, error: err };
     }
   }, [updateFn, entityName]);
 
   /**
    * Create or update based on whether id exists
-   * @param {Object} values - Record data
-   * @param {number|string|null} id - Record ID (null for create)
-   * @returns {Promise<{success: boolean, data?: Object, error?: Error}>}
    */
-  const handleSave = useCallback(async (values, id = null) => {
+  const handleSave = useCallback(async (values: Partial<T>, id: ID | null = null): Promise<OperationResult<T>> => {
     if (id) {
       return handleUpdate(id, values);
     }
@@ -151,10 +206,8 @@ export function useCrudOperations({
 
   /**
    * Delete a record (direct, no confirmation)
-   * @param {number|string} id - Record ID
-   * @returns {Promise<{success: boolean, error?: Error}>}
    */
-  const handleDelete = useCallback(async (id) => {
+  const handleDelete = useCallback(async (id: ID): Promise<OperationResult> => {
     if (!deleteFn) {
       logger.warn('deleteFn not provided to useCrudOperations');
       return { success: false };
@@ -165,27 +218,24 @@ export function useCrudOperations({
       message.success(`${entityName} excluído com sucesso`);
       return { success: true };
     } catch (error) {
-      message.error(`Erro ao excluir ${entityName}: ${error.message}`);
-      return { success: false, error };
+      const err = error as Error;
+      message.error(`Erro ao excluir ${entityName}: ${err.message}`);
+      return { success: false, error: err };
     }
   }, [deleteFn, entityName]);
 
   /**
    * Delete with confirmation modal
-   * @param {Object} record - Record to delete
-   * @param {Object} [options] - Options
-   * @param {string} [options.idField='id'] - Field name for ID
-   * @param {string} [options.nameField='nome'] - Field name for display name
-   * @param {Function} [options.onSuccess] - Callback after successful delete
    */
-  const confirmDelete = useCallback((record, options = {}) => {
+  const confirmDelete = useCallback((record: T & { id?: ID; nome?: string }, options: DeleteConfirmOptions = {}): void => {
     const {
       idField = 'id',
       nameField = 'nome',
       onSuccess,
     } = options;
 
-    const recordName = record[nameField] || `#${record[idField]}`;
+    const recordId = record[idField] as ID;
+    const recordName = (record[nameField] as string) || `#${recordId}`;
 
     Modal.confirm({
       title: `Excluir ${entityName}?`,
@@ -194,7 +244,7 @@ export function useCrudOperations({
       okType: 'danger',
       cancelText: 'Cancelar',
       onOk: async () => {
-        const result = await handleDelete(record[idField]);
+        const result = await handleDelete(recordId);
         if (result.success && onSuccess) {
           onSuccess();
         }
@@ -205,11 +255,8 @@ export function useCrudOperations({
 
   /**
    * Handle table pagination change
-   * @param {number} page - New page number
-   * @param {number} newPageSize - New page size
-   * @param {Object} [extraParams] - Additional params to include
    */
-  const handleTableChange = useCallback((page, newPageSize, extraParams = {}) => {
+  const handleTableChange = useCallback((page: number, newPageSize?: number, extraParams: ListParams = {}): void => {
     setPagination(prev => ({
       ...prev,
       current: page,
@@ -220,9 +267,8 @@ export function useCrudOperations({
 
   /**
    * Refresh current page
-   * @param {Object} [extraParams] - Additional params to include
    */
-  const refresh = useCallback((extraParams = {}) => {
+  const refresh = useCallback((extraParams: ListParams = {}): Promise<OperationResult<T[]>> => {
     return fetchData({ page: pagination.current, ...extraParams });
   }, [fetchData, pagination.current]);
 

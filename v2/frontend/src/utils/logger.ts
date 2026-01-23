@@ -11,34 +11,42 @@
  *   logger.error('erro', error);
  */
 
-const isDev = import.meta.env.DEV;
+const isDev: boolean = import.meta.env.DEV;
 
-const logger = {
+export interface Logger {
+  log: (...args: unknown[]) => void;
+  debug: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+  api: (label: string, data: unknown) => void;
+}
+
+const logger: Logger = {
   /**
    * Log geral (equivalente a console.log)
    */
-  log: (...args) => {
+  log: (...args: unknown[]): void => {
     if (isDev) console.log(...args);
   },
 
   /**
    * Log de debug com prefixo [DEBUG]
    */
-  debug: (...args) => {
+  debug: (...args: unknown[]): void => {
     if (isDev) console.log('[DEBUG]', ...args);
   },
 
   /**
    * Warning (sempre loga, mas sem dados sensíveis em prod)
    */
-  warn: (...args) => {
+  warn: (...args: unknown[]): void => {
     if (isDev) console.warn(...args);
   },
 
   /**
    * Error (sempre loga em dev, mensagem genérica em prod)
    */
-  error: (...args) => {
+  error: (...args: unknown[]): void => {
     if (isDev) {
       console.error(...args);
     }
@@ -49,7 +57,7 @@ const logger = {
   /**
    * Log de API request/response (útil para debugging)
    */
-  api: (label, data) => {
+  api: (label: string, data: unknown): void => {
     if (isDev) {
       console.log(`[API] ${label}:`, data);
     }

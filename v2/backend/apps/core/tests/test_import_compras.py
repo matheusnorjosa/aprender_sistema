@@ -11,16 +11,18 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 import tempfile
-from pathlib import Path
 from datetime import date
+from pathlib import Path
+
 from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
+import pytest
+
 from apps.core.models import Compra, Municipio, Projeto, Usuario
 from apps.core.services.controle_imports import import_compras_from_file
-
 
 pytestmark = pytest.mark.django_db
 
@@ -318,12 +320,11 @@ def test_import_compras_requires_controle_group():
 
     # Tentar importar
     from pathlib import Path
+
     from django.conf import settings
+
     csv_path = str(Path(settings.BASE_DIR) / "data/csv-import/compras.csv")
-    response = client.post(
-        "/api/controle/import-compras/?dry_run=true",
-        data={"path": csv_path}
-    )
+    response = client.post("/api/controle/import-compras/?dry_run=true", data={"path": csv_path})
 
     # Deve retornar 403 Forbidden
     assert response.status_code == 403
@@ -351,12 +352,11 @@ def test_import_compras_allowed_for_controle():
 
     # Tentar importar (arquivo não existe, mas não deve dar 403)
     from pathlib import Path
+
     from django.conf import settings
+
     csv_path = str(Path(settings.BASE_DIR) / "data/csv-import/compras_nao_existe.csv")
-    response = client.post(
-        "/api/controle/import-compras/?dry_run=true",
-        data={"path": csv_path}
-    )
+    response = client.post("/api/controle/import-compras/?dry_run=true", data={"path": csv_path})
 
     # Deve retornar 400 (arquivo não encontrado) ou 200, mas NÃO 403
     assert response.status_code in (200, 400)
@@ -383,12 +383,11 @@ def test_import_compras_allowed_for_superintendencia():
 
     # Tentar importar (arquivo não existe, mas não deve dar 403)
     from pathlib import Path
+
     from django.conf import settings
+
     csv_path = str(Path(settings.BASE_DIR) / "data/csv-import/compras_nao_existe.csv")
-    response = client.post(
-        "/api/controle/import-compras/?dry_run=true",
-        data={"path": csv_path}
-    )
+    response = client.post("/api/controle/import-compras/?dry_run=true", data={"path": csv_path})
 
     # Deve retornar 400 (arquivo não encontrado) ou 200, mas NÃO 403
     assert response.status_code in (200, 400)

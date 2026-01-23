@@ -6,24 +6,24 @@ Endpoints:
 - GET /api/dat/acoes/ - Lista AcaoDAT
 - POST /api/dat/acoes/ - Cria AcaoDAT
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
-from typing import Any
-from django.db.models import QuerySet
-from rest_framework.request import Request
-from rest_framework.response import Response
 
-from django.db.models import Q
+from typing import Any
+
+from django.db.models import Q, QuerySet
 from rest_framework import generics, status
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .models import AcaoControle, AcaoDAT
 from .permissions import IsControleOrSuper, IsDATOrSuper
 from .serializers import (
     AcaoControleSerializer,
-    AcaoDATSerializer,
     AcaoDATCreateSerializer,
+    AcaoDATSerializer,
 )
 
 
@@ -50,9 +50,9 @@ class ControleAcoesListView(generics.ListAPIView):
 
     permission_classes = [IsControleOrSuper]
     serializer_class = AcaoControleSerializer
-    queryset = AcaoControle.objects.select_related(
-        "municipio", "projeto", "coordenador"
-    ).order_by("-data_reuniao", "-data_entrega")
+    queryset = AcaoControle.objects.select_related("municipio", "projeto", "coordenador").order_by(
+        "-data_reuniao", "-data_entrega"
+    )
 
     def get_queryset(self) -> QuerySet:
         """
@@ -78,10 +78,12 @@ class ControleAcoesListView(generics.ListAPIView):
             for field in date_fields:
                 if data_inicio and data_fim:
                     # Intervalo: data_inicio <= field <= data_fim
-                    q_filter |= Q(**{
-                        f"{field}__gte": data_inicio,
-                        f"{field}__lte": data_fim,
-                    })
+                    q_filter |= Q(
+                        **{
+                            f"{field}__gte": data_inicio,
+                            f"{field}__lte": data_fim,
+                        }
+                    )
                 elif data_inicio:
                     # Apenas início: field >= data_inicio
                     q_filter |= Q(**{f"{field}__gte": data_inicio})
@@ -126,9 +128,9 @@ class DATAcoesListCreateView(generics.ListCreateAPIView):
     """
 
     permission_classes = [IsDATOrSuper]
-    queryset = AcaoDAT.objects.select_related(
-        "municipio", "projeto", "responsavel"
-    ).order_by("-data_registro", "municipio_id")
+    queryset = AcaoDAT.objects.select_related("municipio", "projeto", "responsavel").order_by(
+        "-data_registro", "municipio_id"
+    )
 
     def get_serializer_class(self):
         """
@@ -184,8 +186,4 @@ class DATAcoesListCreateView(generics.ListCreateAPIView):
         read_serializer = AcaoDATSerializer(instance)
         headers = self.get_success_headers(read_serializer.data)
 
-        return Response(
-            read_serializer.data,
-            status=status.HTTP_201_CREATED,
-            headers=headers
-        )
+        return Response(read_serializer.data, status=status.HTTP_201_CREATED, headers=headers)

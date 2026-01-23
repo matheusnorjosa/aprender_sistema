@@ -18,13 +18,15 @@ Test patterns:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from io import StringIO
 from unittest.mock import patch
 
-import pytest
 from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.core.management.base import CommandError
+
+import pytest
 
 from apps.core.models import (
     Municipio,
@@ -35,7 +37,6 @@ from apps.core.models import (
     Usuario,
 )
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -45,6 +46,7 @@ from apps.core.models import (
 def usuario_formador(db):
     """Creates a user who will be a formador."""
     import uuid
+
     return Usuario.objects.create_user(
         username="formador_test",
         email="formador@test.com",
@@ -59,6 +61,7 @@ def usuario_formador(db):
 def usuario_coordenador(db):
     """Creates a user who will be a coordenador."""
     import uuid
+
     return Usuario.objects.create_user(
         username="coordenacao_maria",
         email="coordenacao@test.com",
@@ -73,6 +76,7 @@ def usuario_coordenador(db):
 def usuario_sem_participacao(db):
     """Creates a user without participations."""
     import uuid
+
     return Usuario.objects.create_user(
         username="semparticipacao",
         email="sempart@test.com",
@@ -126,9 +130,7 @@ def solicitacao_sem_coordenador(db, usuario_formador, municipio, projeto, tipo_e
 
 
 @pytest.fixture
-def solicitacao_com_participacao(
-    db, usuario_formador, usuario_coordenador, municipio, projeto, tipo_evento
-):
+def solicitacao_com_participacao(db, usuario_formador, usuario_coordenador, municipio, projeto, tipo_evento):
     """Creates a solicitacao with participation."""
     from django.utils import timezone
 
@@ -242,9 +244,7 @@ class TestBackfillCoordenador:
         assert sol.coordenador == first_coordenador
         assert "Nothing to update" in out.getvalue()
 
-    def test_does_not_affect_solicitacoes_with_coordenador(
-        self, solicitacao_com_participacao
-    ):
+    def test_does_not_affect_solicitacoes_with_coordenador(self, solicitacao_com_participacao):
         """Test: Does not modify solicitacoes that already have coordenador."""
         sol = solicitacao_com_participacao
         original_coordenador = sol.coordenador
@@ -512,9 +512,7 @@ class TestEtlImportDatCadastros:
         """Test: --dry-run simulates without writing."""
         out = StringIO()
 
-        with patch(
-            "apps.dat_ingest.management.commands.etl_import_dat_cadastros.import_dat_cadastros"
-        ) as mock_import:
+        with patch("apps.dat_ingest.management.commands.etl_import_dat_cadastros.import_dat_cadastros") as mock_import:
             mock_import.return_value = {
                 "stats": {
                     "created": 0,
@@ -555,9 +553,7 @@ class TestEtlImportDatCadastros:
         """Test: Without --dry-run, applies changes."""
         out = StringIO()
 
-        with patch(
-            "apps.dat_ingest.management.commands.etl_import_dat_cadastros.import_dat_cadastros"
-        ) as mock_import:
+        with patch("apps.dat_ingest.management.commands.etl_import_dat_cadastros.import_dat_cadastros") as mock_import:
             mock_import.return_value = {
                 "stats": {
                     "created": 1,

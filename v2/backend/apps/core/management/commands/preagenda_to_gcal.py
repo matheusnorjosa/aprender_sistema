@@ -33,6 +33,7 @@ Exemplos:
     # IDs específicos
     python manage.py preagenda_to_gcal --ids 1,2,3 --dry-run
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportReturnType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -140,11 +141,7 @@ class Command(BaseCommand):
                     )
                 )
                 return
-            self.stderr.write(
-                self.style.ERROR(
-                    "GCAL_CALENDAR_ID não configurado e --calendar-id não informado."
-                )
-            )
+            self.stderr.write(self.style.ERROR("GCAL_CALENDAR_ID não configurado e --calendar-id não informado."))
             self.stderr.write("Configure GCAL_CALENDAR_ID no .env ou use --calendar-id")
             sys.exit(2)
 
@@ -156,11 +153,7 @@ class Command(BaseCommand):
                 since_dt = datetime.fromisoformat(options["since"])
                 since = timezone.make_aware(since_dt, timezone.utc)
             except ValueError:
-                self.stderr.write(
-                    self.style.ERROR(
-                        f"Formato inválido para --since: {options['since']}"
-                    )
-                )
+                self.stderr.write(self.style.ERROR(f"Formato inválido para --since: {options['since']}"))
                 sys.exit(2)
         else:
             since = now - timedelta(days=90)
@@ -170,11 +163,7 @@ class Command(BaseCommand):
                 until_dt = datetime.fromisoformat(options["until"])
                 until = timezone.make_aware(until_dt, timezone.utc)
             except ValueError:
-                self.stderr.write(
-                    self.style.ERROR(
-                        f"Formato inválido para --until: {options['until']}"
-                    )
-                )
+                self.stderr.write(self.style.ERROR(f"Formato inválido para --until: {options['until']}"))
                 sys.exit(2)
         else:
             until = now + timedelta(days=180)
@@ -217,31 +206,23 @@ class Command(BaseCommand):
             client = FakeCalendarClient()
             if not output_json:
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"[CLIENT: fake] Usando FakeCalendarClient (in-memory, sem side effects)"
-                    )
+                    self.style.WARNING("[CLIENT: fake] Usando FakeCalendarClient (in-memory, sem side effects)")
                 )
 
         # Avisos
         if dry_run and not output_json:
-            self.stdout.write(
-                self.style.WARNING("[DRY-RUN MODE] Nenhuma alteração será feita")
-            )
+            self.stdout.write(self.style.WARNING("[DRY-RUN MODE] Nenhuma alteração será feita"))
 
         # ================================================================
         # REDIS LOCK (Single-Flight com escopo)
         # ================================================================
         # Lock key com escopo: preagenda_to_gcal:lock:{calendar_id}:{since}:{until}
         # Evita execuções concorrentes do mesmo escopo
-        lock_key = (
-            f"preagenda_to_gcal:lock:{cal_id}:{since.isoformat()}:{until.isoformat()}"
-        )
+        lock_key = f"preagenda_to_gcal:lock:{cal_id}:{since.isoformat()}:{until.isoformat()}"
         lock_timeout = 300  # 5 minutos TTL
 
         if not cache.add(lock_key, "locked", timeout=lock_timeout):
-            self.stderr.write(
-                self.style.ERROR("❌ Outra instância já está processando este escopo.")
-            )
+            self.stderr.write(self.style.ERROR("❌ Outra instância já está processando este escopo."))
             self.stderr.write(f"   Lock key: {lock_key}")
             self.stderr.write(f"   Aguarde {lock_timeout}s ou use escopo diferente.")
             sys.exit(1)
@@ -366,9 +347,7 @@ class Command(BaseCommand):
                                 cache.touch(lock_key, lock_timeout)
                                 if verbose:
                                     self.stdout.write(
-                                        self.style.WARNING(
-                                            f"[LOCK RENEWED] {processed_count} processados"
-                                        )
+                                        self.style.WARNING(f"[LOCK RENEWED] {processed_count} processados")
                                     )
                         except (AttributeError, NotImplementedError):
                             # Backend de cache não suporta touch, continuar normalmente
@@ -422,8 +401,7 @@ class Command(BaseCommand):
                 if dry_run:
                     self.stdout.write(
                         self.style.WARNING(
-                            "Nenhuma alteração foi feita (modo dry-run). "
-                            "Execute sem --dry-run para aplicar."
+                            "Nenhuma alteração foi feita (modo dry-run). " "Execute sem --dry-run para aplicar."
                         )
                     )
 

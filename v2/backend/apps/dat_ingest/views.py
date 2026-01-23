@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsControleOrSuper
+
 from .services.etl_observability import list_latest_reports
 
 
@@ -43,29 +44,29 @@ class EtlReportsLatestView(APIView):
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """List latest ETL reports"""
         # Parse limit parameter
-        limit_str: str = request.query_params.get('limit', '20')
+        limit_str: str = request.query_params.get("limit", "20")
 
         try:
             limit: int = int(limit_str)
         except ValueError:
             return Response(
                 {
-                    'detail': 'Parâmetro limit deve ser um número inteiro',
-                    'param': 'limit',
-                    'value': limit_str,
+                    "detail": "Parâmetro limit deve ser um número inteiro",
+                    "param": "limit",
+                    "value": limit_str,
                 },
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Validate limit range
         if not (1 <= limit <= 100):
             return Response(
                 {
-                    'detail': 'Parâmetro limit deve estar entre 1 e 100',
-                    'param': 'limit',
-                    'value': limit,
+                    "detail": "Parâmetro limit deve estar entre 1 e 100",
+                    "param": "limit",
+                    "value": limit,
                 },
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Get reports
@@ -74,12 +75,16 @@ class EtlReportsLatestView(APIView):
         except Exception as e:
             # Log error but return empty list (graceful degradation)
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Error listing ETL reports: {e}")
             reports = []
 
-        return Response({
-            'count': len(reports),
-            'limit': limit,
-            'reports': reports,
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "count": len(reports),
+                "limit": limit,
+                "reports": reports,
+            },
+            status=status.HTTP_200_OK,
+        )

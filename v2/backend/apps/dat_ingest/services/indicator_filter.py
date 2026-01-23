@@ -15,10 +15,12 @@ PADRÕES IDENTIFICADOS:
 - Grupos genéricos: "Coordenadores", "Formadores"
 - Outros indicadores de turma/série
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 
 from __future__ import annotations
+
 import re
 from typing import Optional
 
@@ -51,9 +53,7 @@ def is_indicator_token(name: Optional[str]) -> bool:
     # Remover acentos (é → e, ã → a, etc.)
     import unicodedata
 
-    name_norm = (
-        unicodedata.normalize("NFKD", name_norm).encode("ascii", "ignore").decode("ascii")
-    )
+    name_norm = unicodedata.normalize("NFKD", name_norm).encode("ascii", "ignore").decode("ascii")
 
     if not name_norm:
         return False

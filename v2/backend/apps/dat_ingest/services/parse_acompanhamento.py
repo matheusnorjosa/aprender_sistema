@@ -2,10 +2,12 @@
 Parser para planilha Acompanhamento de Agenda
 Abas: ACerta, Outros, Super, Brincando, Vidas
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 
 from __future__ import annotations
+
 from datetime import datetime, time
 from pathlib import Path
 from typing import Any
@@ -16,7 +18,7 @@ from openpyxl import load_workbook
 from .normalizers import normalize_str, parse_bool
 
 
-def combine_datetime(data, hora, tz_name='America/Fortaleza'):
+def combine_datetime(data, hora, tz_name="America/Fortaleza"):
     """Combina date e time em timezone-aware datetime"""
     if not data or not hora:
         return None
@@ -24,8 +26,8 @@ def combine_datetime(data, hora, tz_name='America/Fortaleza'):
     # Converter hora para time se for string
     if isinstance(hora, str):
         try:
-            hora = datetime.strptime(hora, '%H:%M').time()
-        except:
+            hora = datetime.strptime(hora, "%H:%M").time()
+        except ValueError:
             return None
     elif not isinstance(hora, time):
         return None
@@ -109,33 +111,35 @@ def parse_acompanhamento_aba(filepath: Path, aba_name: str) -> list[dict[str, An
             continue
 
         # Determinar status
-        if cancelar and cancelar.lower() in ['x', 'remarcado', 'cancelado']:
-            status = 'cancelado'
-        elif criado_agenda and criado_agenda.upper() == 'SIM':
-            status = 'aprovado'
+        if cancelar and cancelar.lower() in ["x", "remarcado", "cancelado"]:
+            status = "cancelado"
+        elif criado_agenda and criado_agenda.upper() == "SIM":
+            status = "aprovado"
         else:
-            status = 'pendente'
+            status = "pendente"
 
         # Coletar formadores não vazios
         formadores = [f for f in [formador1, formador2, formador3, formador4, formador5] if f]
 
-        solicitacoes.append({
-            'municipio_nome_uf': municipio_uf,
-            'projeto_nome': projeto_nome,
-            'tipo': 'evento',
-            'encontro': encontro,
-            'segmento': segmento,
-            'coordenador_acompanha': parse_bool(coord_acompanha, default=False),
-            'coordenador_nome': coordenador_nome,
-            'formadores': formadores,
-            'convidados': convidados,
-            'inicio': inicio,
-            'fim': fim,
-            'status': status,
-            'tipo_modal': tipo_modal,  # Presencial/Remoto
-            'src': f"{filepath.name}/{aba_name}",
-            'rownum': i,
-        })
+        solicitacoes.append(
+            {
+                "municipio_nome_uf": municipio_uf,
+                "projeto_nome": projeto_nome,
+                "tipo": "evento",
+                "encontro": encontro,
+                "segmento": segmento,
+                "coordenador_acompanha": parse_bool(coord_acompanha, default=False),
+                "coordenador_nome": coordenador_nome,
+                "formadores": formadores,
+                "convidados": convidados,
+                "inicio": inicio,
+                "fim": fim,
+                "status": status,
+                "tipo_modal": tipo_modal,  # Presencial/Remoto
+                "src": f"{filepath.name}/{aba_name}",
+                "rownum": i,
+            }
+        )
 
     return solicitacoes
 
@@ -152,10 +156,10 @@ def parse_acompanhamento_super(filepath: Path) -> list[dict[str, Any]]:
     """
     wb = load_workbook(filepath, data_only=True)
 
-    if 'Super' not in wb.sheetnames:
+    if "Super" not in wb.sheetnames:
         return []
 
-    ws = wb['Super']
+    ws = wb["Super"]
     solicitacoes = []
 
     for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
@@ -195,37 +199,39 @@ def parse_acompanhamento_super(filepath: Path) -> list[dict[str, Any]]:
             continue
 
         # Determinar status (prioridade: cancelar > aprovacao > criado)
-        if cancelar and cancelar.lower() in ['x', 'remarcado', 'cancelado']:
-            status = 'cancelado'
-        elif aprovacao and 'APROVADO' in aprovacao.upper():
-            status = 'aprovado'
-        elif aprovacao and ('REPROVADO' in aprovacao.upper() or 'REJEITADO' in aprovacao.upper()):
-            status = 'cancelado'
-        elif criado_agenda and criado_agenda.upper() == 'SIM':
-            status = 'aprovado'
+        if cancelar and cancelar.lower() in ["x", "remarcado", "cancelado"]:
+            status = "cancelado"
+        elif aprovacao and "APROVADO" in aprovacao.upper():
+            status = "aprovado"
+        elif aprovacao and ("REPROVADO" in aprovacao.upper() or "REJEITADO" in aprovacao.upper()):
+            status = "cancelado"
+        elif criado_agenda and criado_agenda.upper() == "SIM":
+            status = "aprovado"
         else:
-            status = 'pendente'
+            status = "pendente"
 
         formadores = [f for f in [formador1, formador2, formador3, formador4, formador5] if f]
 
-        solicitacoes.append({
-            'municipio_nome_uf': municipio_uf,
-            'projeto_nome': projeto_nome,
-            'tipo': 'evento',
-            'encontro': encontro,
-            'segmento': segmento,
-            'coordenador_acompanha': parse_bool(coord_acompanha, default=False),
-            'coordenador_nome': coordenador_nome,
-            'formadores': formadores,
-            'convidados': convidados,
-            'inicio': inicio,
-            'fim': fim,
-            'status': status,
-            'tipo_modal': tipo_modal,
-            'aprovacao_super': aprovacao,  # Campo extra
-            'src': f"{filepath.name}/Super",
-            'rownum': i,
-        })
+        solicitacoes.append(
+            {
+                "municipio_nome_uf": municipio_uf,
+                "projeto_nome": projeto_nome,
+                "tipo": "evento",
+                "encontro": encontro,
+                "segmento": segmento,
+                "coordenador_acompanha": parse_bool(coord_acompanha, default=False),
+                "coordenador_nome": coordenador_nome,
+                "formadores": formadores,
+                "convidados": convidados,
+                "inicio": inicio,
+                "fim": fim,
+                "status": status,
+                "tipo_modal": tipo_modal,
+                "aprovacao_super": aprovacao,  # Campo extra
+                "src": f"{filepath.name}/Super",
+                "rownum": i,
+            }
+        )
 
     return solicitacoes
 
@@ -240,7 +246,7 @@ def parse_todas_abas_acompanhamento(filepath: Path) -> list[dict[str, Any]]:
     todas = []
 
     # Abas normais
-    for aba in ['ACerta', 'Outros', 'Brincando', 'Vidas']:
+    for aba in ["ACerta", "Outros", "Brincando", "Vidas"]:
         todas.extend(parse_acompanhamento_aba(filepath, aba))
 
     # Aba Super (tem coluna de aprovação)

@@ -6,6 +6,7 @@ Validates:
 - Key endpoints are documented
 - Error schemas are included
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -50,7 +51,7 @@ class TestOpenAPISchema(TestCase):
         # Version may include API version suffix like "2.0.0 (v1)"
         self.assertTrue(
             schema["info"]["version"].startswith("2.0.0"),
-            f"Expected version to start with '2.0.0', got '{schema['info']['version']}'"
+            f"Expected version to start with '2.0.0', got '{schema['info']['version']}'",
         )
         self.assertIn("Aprender", schema["info"]["title"])
 
@@ -65,8 +66,7 @@ class TestOpenAPISchema(TestCase):
 
         # Check that solicitacoes endpoints are documented
         self.assertTrue(
-            any("/solicitacoes" in path for path in paths.keys()),
-            "Schema should contain solicitacoes endpoints"
+            any("/solicitacoes" in path for path in paths.keys()), "Schema should contain solicitacoes endpoints"
         )
 
     def test_schema_contains_availability_endpoints(self) -> None:
@@ -80,8 +80,7 @@ class TestOpenAPISchema(TestCase):
 
         # Check that availability endpoints are documented
         self.assertTrue(
-            any("/availability" in path for path in paths.keys()),
-            "Schema should contain availability endpoints"
+            any("/availability" in path for path in paths.keys()), "Schema should contain availability endpoints"
         )
 
     def test_swagger_ui_endpoint_returns_200(self) -> None:
@@ -156,7 +155,4 @@ class TestSchemaConfiguration(TestCase):
 
         rf_settings = settings.REST_FRAMEWORK
 
-        self.assertEqual(
-            rf_settings.get("DEFAULT_SCHEMA_CLASS"),
-            "drf_spectacular.openapi.AutoSchema"
-        )
+        self.assertEqual(rf_settings.get("DEFAULT_SCHEMA_CLASS"), "drf_spectacular.openapi.AutoSchema")

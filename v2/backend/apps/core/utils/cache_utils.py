@@ -3,6 +3,7 @@ Cache utilities for AS v2 (CP3 - Cache Availability Checks).
 
 Provides caching decorator for availability checks and invalidation utilities.
 """
+
 import hashlib
 import json
 from functools import wraps
@@ -53,9 +54,7 @@ def cache_availability_check(timeout: int = 300) -> Callable[[F], F]:
                 return cached_result
 
             # Cache miss: executar função
-            result = func(
-                usuario=usuario, inicio=inicio, fim=fim, municipio=municipio, **kwargs
-            )
+            result = func(usuario=usuario, inicio=inicio, fim=fim, municipio=municipio, **kwargs)
 
             # Salvar no cache
             cache.set(cache_key, result, timeout=timeout)
@@ -126,7 +125,7 @@ def cache_static_endpoint(timeout: int = 300) -> Callable[[F], F]:
 
             # Gerar cache key baseado no nome da função (incluir query params se presente)
             # args[0] é self ou request (dependendo se é method ou function-based view)
-            request = args[0] if args else None
+            _request = args[0] if args else None  # noqa: F841 - reserved for future cache key
 
             # Para function-based views DRF, args[0] é o Request
             cache_key = f"static_endpoint:{func.__module__}.{func.__name__}"

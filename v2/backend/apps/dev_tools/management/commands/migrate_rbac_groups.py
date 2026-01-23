@@ -10,64 +10,64 @@ Este comando:
 2. Identifica usuários que precisam do grupo "Gerente"
 3. Adiciona o grupo "Gerente" aos usuários identificados
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false
 
 from __future__ import annotations
 
 from typing import Any
 
-from django.core.management.base import BaseCommand, CommandParser
 from django.contrib.auth.models import Group
+from django.core.management.base import BaseCommand, CommandParser
 
 from apps.core.models import Usuario
-
 
 # Definição dos grupos de SETOR e FUNÇÃO
 # Setores baseados no mapeamento de gerências (docs/MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md)
 SETOR_GROUPS: list[str] = [
     # Gerências de projeto
-    'Superintendência',  # SUPERINTENDENCIA - Fluxo SUPER
-    'Vidas',             # GERENCIA 2 - Fluxo NAO_SUPER
-    'Fluir',             # GERENCIA 3 - Fluxo NAO_SUPER
-    'ACerta',            # GERENCIA 4 - Fluxo NAO_SUPER
-    'Brincando',         # GERENCIA 5 - Fluxo NAO_SUPER
-    'Sou da Paz',        # GERENCIA 6 - Fluxo NAO_SUPER
+    "Superintendência",  # SUPERINTENDENCIA - Fluxo SUPER
+    "Vidas",  # GERENCIA 2 - Fluxo NAO_SUPER
+    "Fluir",  # GERENCIA 3 - Fluxo NAO_SUPER
+    "ACerta",  # GERENCIA 4 - Fluxo NAO_SUPER
+    "Brincando",  # GERENCIA 5 - Fluxo NAO_SUPER
+    "Sou da Paz",  # GERENCIA 6 - Fluxo NAO_SUPER
     # Setores administrativos/operacionais
-    'DAT',               # Departamento de Apoio Técnico
-    'Controle',          # Setor de Controle
-    'Gerência',          # Gerência genérica
-    'Diretoria',         # Diretoria - Acesso a dashboards
+    "DAT",  # Departamento de Apoio Técnico
+    "Controle",  # Setor de Controle
+    "Gerência",  # Gerência genérica
+    "Diretoria",  # Diretoria - Acesso a dashboards
 ]
-FUNCAO_GROUPS: list[str] = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente']
+FUNCAO_GROUPS: list[str] = ["Formador", "Coordenador", "Apoio de Coordenação", "Gerente"]
 
 
 class Command(BaseCommand):
-    help = 'Migra usuários para nova estrutura RBAC (Setor + Função)'
+    help = "Migra usuários para nova estrutura RBAC (Setor + Função)"
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Preview das mudanças sem aplicar',
+            "--dry-run",
+            action="store_true",
+            help="Preview das mudanças sem aplicar",
         )
         parser.add_argument(
-            '--user',
+            "--user",
             type=str,
-            help='Migrar apenas um usuário específico (username)',
+            help="Migrar apenas um usuário específico (username)",
         )
         parser.add_argument(
-            '--add-gerente',
+            "--add-gerente",
             type=str,
-            help='Adicionar grupo Gerente a um usuário específico (username)',
+            help="Adicionar grupo Gerente a um usuário específico (username)",
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
-        dry_run: bool = options['dry_run']
-        specific_user: str | None = options['user']
-        add_gerente_user: str | None = options['add_gerente']
+        dry_run: bool = options["dry_run"]
+        specific_user: str | None = options["user"]
+        add_gerente_user: str | None = options["add_gerente"]
 
         if dry_run:
-            self.stdout.write(self.style.WARNING('=== MODO DRY-RUN (preview) ===\n'))
+            self.stdout.write(self.style.WARNING("=== MODO DRY-RUN (preview) ===\n"))
 
         # Se --add-gerente foi especificado, adiciona grupo Gerente ao usuário
         if add_gerente_user:
@@ -78,58 +78,54 @@ class Command(BaseCommand):
         if specific_user:
             users = Usuario.objects.filter(username=specific_user)
         else:
-            users = Usuario.objects.filter(is_active=True).order_by('username')
+            users = Usuario.objects.filter(is_active=True).order_by("username")
 
-        self.stdout.write(f'\nAnalisando {users.count()} usuários...\n')
-        self.stdout.write('-' * 80)
+        self.stdout.write(f"\nAnalisando {users.count()} usuários...\n")
+        self.stdout.write("-" * 80)
 
-        gerente_group = Group.objects.get(name='Gerente')
+        gerente_group = Group.objects.get(name="Gerente")
         users_to_update: list[tuple[Usuario, str]] = []
 
         for user in users:
-            groups: list[str] = list(user.groups.values_list('name', flat=True))
+            groups: list[str] = list(user.groups.values_list("name", flat=True))
             setores: list[str] = [g for g in groups if g in SETOR_GROUPS]
             funcoes: list[str] = [g for g in groups if g in FUNCAO_GROUPS]
 
             # Identificar se o usuário precisa do grupo Gerente
             # Regra: Se é superuser ou está em Gerência, provavelmente é gerente
             needs_gerente = False
-            reason = ''
+            reason = ""
 
             if user.is_superuser:
                 needs_gerente = True
-                reason = 'is_superuser=True'
-            elif 'Gerência' in setores and 'Gerente' not in funcoes:
+                reason = "is_superuser=True"
+            elif "Gerência" in setores and "Gerente" not in funcoes:
                 needs_gerente = True
-                reason = 'Está em Gerência mas não tem função Gerente'
+                reason = "Está em Gerência mas não tem função Gerente"
 
             self.stdout.write(
-                f'\n{user.username}:\n'
+                f"\n{user.username}:\n"
                 f'  Setores: {setores or "Nenhum"}\n'
                 f'  Funções: {funcoes or "Nenhum"}\n'
-                f'  is_superuser: {user.is_superuser}'
+                f"  is_superuser: {user.is_superuser}"
             )
 
             if needs_gerente:
                 users_to_update.append((user, reason))
-                self.stdout.write(
-                    self.style.WARNING(f'  → Precisa do grupo Gerente: {reason}')
-                )
+                self.stdout.write(self.style.WARNING(f"  → Precisa do grupo Gerente: {reason}"))
 
-        self.stdout.write('\n' + '-' * 80)
-        self.stdout.write(f'\nResumo: {len(users_to_update)} usuários precisam do grupo Gerente\n')
+        self.stdout.write("\n" + "-" * 80)
+        self.stdout.write(f"\nResumo: {len(users_to_update)} usuários precisam do grupo Gerente\n")
 
         if users_to_update and not dry_run:
-            self.stdout.write(self.style.SUCCESS('\nAplicando mudanças...\n'))
+            self.stdout.write(self.style.SUCCESS("\nAplicando mudanças...\n"))
             for user, reason in users_to_update:
                 user.groups.add(gerente_group)
-                self.stdout.write(f'  ✓ {user.username}: adicionado ao grupo Gerente')
+                self.stdout.write(f"  ✓ {user.username}: adicionado ao grupo Gerente")
 
-            self.stdout.write(self.style.SUCCESS('\nMigração concluída!'))
+            self.stdout.write(self.style.SUCCESS("\nMigração concluída!"))
         elif users_to_update:
-            self.stdout.write(
-                self.style.WARNING('\nUse sem --dry-run para aplicar as mudanças.')
-            )
+            self.stdout.write(self.style.WARNING("\nUse sem --dry-run para aplicar as mudanças."))
 
     def _add_gerente_to_user(self, username: str, dry_run: bool) -> None:
         """Adiciona grupo Gerente a um usuário específico."""
@@ -139,18 +135,18 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f'Usuário "{username}" não encontrado.'))
             return
 
-        gerente_group = Group.objects.get(name='Gerente')
-        groups: list[str] = list(user.groups.values_list('name', flat=True))
+        gerente_group = Group.objects.get(name="Gerente")
+        groups: list[str] = list(user.groups.values_list("name", flat=True))
 
-        self.stdout.write(f'\nUsuário: {user.username}')
-        self.stdout.write(f'Grupos atuais: {groups}')
+        self.stdout.write(f"\nUsuário: {user.username}")
+        self.stdout.write(f"Grupos atuais: {groups}")
 
-        if 'Gerente' in groups:
-            self.stdout.write(self.style.SUCCESS('  → Já possui o grupo Gerente'))
+        if "Gerente" in groups:
+            self.stdout.write(self.style.SUCCESS("  → Já possui o grupo Gerente"))
             return
 
         if dry_run:
-            self.stdout.write(self.style.WARNING('  → Seria adicionado ao grupo Gerente'))
+            self.stdout.write(self.style.WARNING("  → Seria adicionado ao grupo Gerente"))
         else:
             user.groups.add(gerente_group)
-            self.stdout.write(self.style.SUCCESS('  ✓ Adicionado ao grupo Gerente'))
+            self.stdout.write(self.style.SUCCESS("  ✓ Adicionado ao grupo Gerente"))

@@ -8,18 +8,20 @@ Validam:
 - Validação de parâmetros (metric, limit)
 - Filtros timezone-aware com bordas inclusivas
 """
+
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from apps.core.models import Solicitacao, Municipio, Projeto, TipoEvento
-from django.contrib.auth import get_user_model
+from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento
 
 User = get_user_model()
 
@@ -42,39 +44,39 @@ class TestGCalInsights(TestCase):
     def setUp(self):
         """Setup comum para todos os testes."""
         self.client = APIClient()
-        self.url_success_rate = '/api/gcal/dashboard/insights/success-rate/'
-        self.url_top = '/api/gcal/dashboard/insights/top/'
+        self.url_success_rate = "/api/gcal/dashboard/insights/success-rate/"
+        self.url_top = "/api/gcal/dashboard/insights/top/"
 
         # Timezone local
-        self.tz_local = ZoneInfo('America/Fortaleza')
+        self.tz_local = ZoneInfo("America/Fortaleza")
 
         # Criar grupos
-        self.group_controle = Group.objects.get_or_create(name='Controle')[0]
-        self.group_coordenador = Group.objects.get_or_create(name='Coordenador')[0]
+        self.group_controle = Group.objects.get_or_create(name="Controle")[0]
+        self.group_coordenador = Group.objects.get_or_create(name="Coordenador")[0]
 
         # Criar usuários (com CPFs únicos para evitar unique constraint violation)
         self.user_controle = User.objects.create_user(
-            username='controle_insights',
-            email='controle_insights@example.com',
-            password='password123',
-            cpf='33333333333'
+            username="controle_insights",
+            email="controle_insights@example.com",
+            password="password123",
+            cpf="33333333333",
         )
         self.user_controle.groups.add(self.group_controle)
 
         self.user_coordenador = User.objects.create_user(
-            username='coordenador_insights',
-            email='coordenador_insights@example.com',
-            password='password123',
-            cpf='44444444444'
+            username="coordenador_insights",
+            email="coordenador_insights@example.com",
+            password="password123",
+            cpf="44444444444",
         )
         self.user_coordenador.groups.add(self.group_coordenador)
 
         # Criar fixtures (municipios, projetos, tipo_evento)
-        self.municipio_fortaleza = Municipio.objects.create(nome='Fortaleza - CE')
-        self.municipio_caucaia = Municipio.objects.create(nome='Caucaia - CE')
-        self.projeto_super = Projeto.objects.create(nome='Projeto SUPER', fluxo='SUPER')
-        self.projeto_outros = Projeto.objects.create(nome='Projeto OUTROS', fluxo='NAO_SUPER')
-        self.tipo_evento = TipoEvento.objects.create(nome='Formação')
+        self.municipio_fortaleza = Municipio.objects.create(nome="Fortaleza - CE")
+        self.municipio_caucaia = Municipio.objects.create(nome="Caucaia - CE")
+        self.projeto_super = Projeto.objects.create(nome="Projeto SUPER", fluxo="SUPER")
+        self.projeto_outros = Projeto.objects.create(nome="Projeto OUTROS", fluxo="NAO_SUPER")
+        self.tipo_evento = TipoEvento.objects.create(nome="Formação")
 
     def test_success_rate_requires_authentication(self):
         """
@@ -109,7 +111,7 @@ class TestGCalInsights(TestCase):
         # Criar 4 PUBLISHED
         for i in range(4):
             Solicitacao.objects.create(
-                status='aprovado',
+                status="aprovado",
                 inicio=ref_date.replace(hour=10 + i),
                 fim=ref_date.replace(hour=11 + i),
                 municipio=self.municipio_fortaleza,
@@ -117,13 +119,13 @@ class TestGCalInsights(TestCase):
                 tipo_evento=self.tipo_evento,
                 usuario=self.user_controle,
                 coordenador=self.user_coordenador,
-                gcal_status=Solicitacao.GCalStatus.PUBLISHED
+                gcal_status=Solicitacao.GCalStatus.PUBLISHED,
             )
 
         # Criar 2 ERROR
         for i in range(2):
             Solicitacao.objects.create(
-                status='aprovado',
+                status="aprovado",
                 inicio=ref_date.replace(hour=14 + i),
                 fim=ref_date.replace(hour=15 + i),
                 municipio=self.municipio_fortaleza,
@@ -131,12 +133,12 @@ class TestGCalInsights(TestCase):
                 tipo_evento=self.tipo_evento,
                 usuario=self.user_controle,
                 coordenador=self.user_coordenador,
-                gcal_status=Solicitacao.GCalStatus.ERROR
+                gcal_status=Solicitacao.GCalStatus.ERROR,
             )
 
         # Criar 1 PENDING
         Solicitacao.objects.create(
-            status='aprovado',
+            status="aprovado",
             inicio=ref_date.replace(hour=16),
             fim=ref_date.replace(hour=17),
             municipio=self.municipio_fortaleza,
@@ -144,12 +146,12 @@ class TestGCalInsights(TestCase):
             tipo_evento=self.tipo_evento,
             usuario=self.user_controle,
             coordenador=self.user_coordenador,
-            gcal_status=Solicitacao.GCalStatus.PENDING
+            gcal_status=Solicitacao.GCalStatus.PENDING,
         )
 
         # Criar 1 NONE
         Solicitacao.objects.create(
-            status='aprovado',
+            status="aprovado",
             inicio=ref_date.replace(hour=18),
             fim=ref_date.replace(hour=19),
             municipio=self.municipio_fortaleza,
@@ -157,7 +159,7 @@ class TestGCalInsights(TestCase):
             tipo_evento=self.tipo_evento,
             usuario=self.user_controle,
             coordenador=self.user_coordenador,
-            gcal_status=Solicitacao.GCalStatus.NONE
+            gcal_status=Solicitacao.GCalStatus.NONE,
         )
 
         # Autenticar como Controle
@@ -170,13 +172,13 @@ class TestGCalInsights(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
 
-        self.assertEqual(data['published'], 4)
-        self.assertEqual(data['error'], 2)
-        self.assertEqual(data['pending'], 1)
-        self.assertEqual(data['none'], 1)
-        self.assertEqual(data['rate'], 0.6667)  # 4 / (4 + 2) = 0.6667 (arredondado)
-        self.assertIsNone(data['window']['start'])
-        self.assertIsNone(data['window']['end'])
+        self.assertEqual(data["published"], 4)
+        self.assertEqual(data["error"], 2)
+        self.assertEqual(data["pending"], 1)
+        self.assertEqual(data["none"], 1)
+        self.assertEqual(data["rate"], 0.6667)  # 4 / (4 + 2) = 0.6667 (arredondado)
+        self.assertIsNone(data["window"]["start"])
+        self.assertIsNone(data["window"]["end"])
 
     def test_top_municipios_basic_counts_and_rate(self):
         """
@@ -193,7 +195,7 @@ class TestGCalInsights(TestCase):
         # Fortaleza: 3 PUBLISHED, 1 ERROR
         for i in range(3):
             Solicitacao.objects.create(
-                status='aprovado',
+                status="aprovado",
                 inicio=ref_date.replace(hour=10 + i),
                 fim=ref_date.replace(hour=11 + i),
                 municipio=self.municipio_fortaleza,
@@ -201,11 +203,11 @@ class TestGCalInsights(TestCase):
                 tipo_evento=self.tipo_evento,
                 usuario=self.user_controle,
                 coordenador=self.user_coordenador,
-                gcal_status=Solicitacao.GCalStatus.PUBLISHED
+                gcal_status=Solicitacao.GCalStatus.PUBLISHED,
             )
 
         Solicitacao.objects.create(
-            status='aprovado',
+            status="aprovado",
             inicio=ref_date.replace(hour=14),
             fim=ref_date.replace(hour=15),
             municipio=self.municipio_fortaleza,
@@ -213,12 +215,12 @@ class TestGCalInsights(TestCase):
             tipo_evento=self.tipo_evento,
             usuario=self.user_controle,
             coordenador=self.user_coordenador,
-            gcal_status=Solicitacao.GCalStatus.ERROR
+            gcal_status=Solicitacao.GCalStatus.ERROR,
         )
 
         # Caucaia: 1 PUBLISHED, 2 ERROR
         Solicitacao.objects.create(
-            status='aprovado',
+            status="aprovado",
             inicio=ref_date.replace(hour=10),
             fim=ref_date.replace(hour=11),
             municipio=self.municipio_caucaia,
@@ -226,12 +228,12 @@ class TestGCalInsights(TestCase):
             tipo_evento=self.tipo_evento,
             usuario=self.user_controle,
             coordenador=self.user_coordenador,
-            gcal_status=Solicitacao.GCalStatus.PUBLISHED
+            gcal_status=Solicitacao.GCalStatus.PUBLISHED,
         )
 
         for i in range(2):
             Solicitacao.objects.create(
-                status='aprovado',
+                status="aprovado",
                 inicio=ref_date.replace(hour=12 + i),
                 fim=ref_date.replace(hour=13 + i),
                 municipio=self.municipio_caucaia,
@@ -239,36 +241,36 @@ class TestGCalInsights(TestCase):
                 tipo_evento=self.tipo_evento,
                 usuario=self.user_controle,
                 coordenador=self.user_coordenador,
-                gcal_status=Solicitacao.GCalStatus.ERROR
+                gcal_status=Solicitacao.GCalStatus.ERROR,
             )
 
         # Autenticar como Controle
         self.client.force_authenticate(user=self.user_controle)
 
         # Request top municipios
-        response = self.client.get(self.url_top, {'metric': 'municipios', 'limit': 5})
+        response = self.client.get(self.url_top, {"metric": "municipios", "limit": 5})
 
         # Validar response
         self.assertEqual(response.status_code, 200)
         data = response.json()
 
-        self.assertEqual(data['metric'], 'municipios')
-        self.assertEqual(data['limit'], 5)
-        self.assertEqual(len(data['items']), 2)
+        self.assertEqual(data["metric"], "municipios")
+        self.assertEqual(data["limit"], 5)
+        self.assertEqual(len(data["items"]), 2)
 
         # Primeiro: Caucaia (2 erros, rate 0.3333)
-        self.assertEqual(data['items'][0]['name'], 'Caucaia - CE')
-        self.assertEqual(data['items'][0]['count'], 3)
-        self.assertEqual(data['items'][0]['published'], 1)
-        self.assertEqual(data['items'][0]['error'], 2)
-        self.assertEqual(data['items'][0]['rate'], 0.3333)
+        self.assertEqual(data["items"][0]["name"], "Caucaia - CE")
+        self.assertEqual(data["items"][0]["count"], 3)
+        self.assertEqual(data["items"][0]["published"], 1)
+        self.assertEqual(data["items"][0]["error"], 2)
+        self.assertEqual(data["items"][0]["rate"], 0.3333)
 
         # Segundo: Fortaleza (1 erro, rate 0.75)
-        self.assertEqual(data['items'][1]['name'], 'Fortaleza - CE')
-        self.assertEqual(data['items'][1]['count'], 4)
-        self.assertEqual(data['items'][1]['published'], 3)
-        self.assertEqual(data['items'][1]['error'], 1)
-        self.assertEqual(data['items'][1]['rate'], 0.75)
+        self.assertEqual(data["items"][1]["name"], "Fortaleza - CE")
+        self.assertEqual(data["items"][1]["count"], 4)
+        self.assertEqual(data["items"][1]["published"], 3)
+        self.assertEqual(data["items"][1]["error"], 1)
+        self.assertEqual(data["items"][1]["rate"], 0.75)
 
     def test_top_projetos_basic_counts_and_rate(self):
         """
@@ -285,7 +287,7 @@ class TestGCalInsights(TestCase):
         # SUPER: 2 PUBLISHED
         for i in range(2):
             Solicitacao.objects.create(
-                status='aprovado',
+                status="aprovado",
                 inicio=ref_date.replace(hour=10 + i),
                 fim=ref_date.replace(hour=11 + i),
                 municipio=self.municipio_fortaleza,
@@ -293,12 +295,12 @@ class TestGCalInsights(TestCase):
                 tipo_evento=self.tipo_evento,
                 usuario=self.user_controle,
                 coordenador=self.user_coordenador,
-                gcal_status=Solicitacao.GCalStatus.PUBLISHED
+                gcal_status=Solicitacao.GCalStatus.PUBLISHED,
             )
 
         # OUTROS: 1 ERROR
         Solicitacao.objects.create(
-            status='aprovado',
+            status="aprovado",
             inicio=ref_date.replace(hour=14),
             fim=ref_date.replace(hour=15),
             municipio=self.municipio_fortaleza,
@@ -306,36 +308,36 @@ class TestGCalInsights(TestCase):
             tipo_evento=self.tipo_evento,
             usuario=self.user_controle,
             coordenador=self.user_coordenador,
-            gcal_status=Solicitacao.GCalStatus.ERROR
+            gcal_status=Solicitacao.GCalStatus.ERROR,
         )
 
         # Autenticar como Controle
         self.client.force_authenticate(user=self.user_controle)
 
         # Request top projetos
-        response = self.client.get(self.url_top, {'metric': 'projetos', 'limit': 5})
+        response = self.client.get(self.url_top, {"metric": "projetos", "limit": 5})
 
         # Validar response
         self.assertEqual(response.status_code, 200)
         data = response.json()
 
-        self.assertEqual(data['metric'], 'projetos')
-        self.assertEqual(data['limit'], 5)
-        self.assertEqual(len(data['items']), 2)
+        self.assertEqual(data["metric"], "projetos")
+        self.assertEqual(data["limit"], 5)
+        self.assertEqual(len(data["items"]), 2)
 
         # Primeiro: OUTROS (1 erro, rate 0.0)
-        self.assertEqual(data['items'][0]['name'], 'Projeto OUTROS')
-        self.assertEqual(data['items'][0]['count'], 1)
-        self.assertEqual(data['items'][0]['published'], 0)
-        self.assertEqual(data['items'][0]['error'], 1)
-        self.assertEqual(data['items'][0]['rate'], 0.0)
+        self.assertEqual(data["items"][0]["name"], "Projeto OUTROS")
+        self.assertEqual(data["items"][0]["count"], 1)
+        self.assertEqual(data["items"][0]["published"], 0)
+        self.assertEqual(data["items"][0]["error"], 1)
+        self.assertEqual(data["items"][0]["rate"], 0.0)
 
         # Segundo: SUPER (0 erros, rate 1.0)
-        self.assertEqual(data['items'][1]['name'], 'Projeto SUPER')
-        self.assertEqual(data['items'][1]['count'], 2)
-        self.assertEqual(data['items'][1]['published'], 2)
-        self.assertEqual(data['items'][1]['error'], 0)
-        self.assertEqual(data['items'][1]['rate'], 1.0)
+        self.assertEqual(data["items"][1]["name"], "Projeto SUPER")
+        self.assertEqual(data["items"][1]["count"], 2)
+        self.assertEqual(data["items"][1]["published"], 2)
+        self.assertEqual(data["items"][1]["error"], 0)
+        self.assertEqual(data["items"][1]["rate"], 1.0)
 
     def test_top_metric_invalid_returns_400(self):
         """
@@ -344,12 +346,12 @@ class TestGCalInsights(TestCase):
         self.client.force_authenticate(user=self.user_controle)
 
         # Request com metric inválido
-        response = self.client.get(self.url_top, {'metric': 'usuarios'})
+        response = self.client.get(self.url_top, {"metric": "usuarios"})
 
         # Validar response
         self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertIn('inválido', data['detail'])
+        self.assertIn("inválido", data["detail"])
 
     def test_top_limit_bounds(self):
         """
@@ -363,9 +365,9 @@ class TestGCalInsights(TestCase):
 
         # Criar 25 municípios com 1 evento ERROR cada
         for i in range(25):
-            municipio = Municipio.objects.create(nome=f'Municipio {i}')
+            municipio = Municipio.objects.create(nome=f"Municipio {i}")
             Solicitacao.objects.create(
-                status='aprovado',
+                status="aprovado",
                 inicio=ref_date,
                 fim=ref_date + timedelta(hours=1),
                 municipio=municipio,
@@ -373,25 +375,25 @@ class TestGCalInsights(TestCase):
                 tipo_evento=self.tipo_evento,
                 usuario=self.user_controle,
                 coordenador=self.user_coordenador,
-                gcal_status=Solicitacao.GCalStatus.ERROR
+                gcal_status=Solicitacao.GCalStatus.ERROR,
             )
 
         # Autenticar como Controle
         self.client.force_authenticate(user=self.user_controle)
 
         # Teste 1: limit=-5 → clamp para 1
-        response = self.client.get(self.url_top, {'metric': 'municipios', 'limit': -5})
+        response = self.client.get(self.url_top, {"metric": "municipios", "limit": -5})
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data['limit'], 1)
-        self.assertEqual(len(data['items']), 1)
+        self.assertEqual(data["limit"], 1)
+        self.assertEqual(len(data["items"]), 1)
 
         # Teste 2: limit=25 → clamp para 20
-        response = self.client.get(self.url_top, {'metric': 'municipios', 'limit': 25})
+        response = self.client.get(self.url_top, {"metric": "municipios", "limit": 25})
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data['limit'], 20)
-        self.assertEqual(len(data['items']), 20)
+        self.assertEqual(data["limit"], 20)
+        self.assertEqual(len(data["items"]), 20)
 
     def test_filters_respected_boundaries(self):
         """
@@ -410,7 +412,7 @@ class TestGCalInsights(TestCase):
 
         # Evento dentro do período (incluir)
         Solicitacao.objects.create(
-            status='aprovado',
+            status="aprovado",
             inicio=ref_date,
             fim=ref_date + timedelta(hours=2),
             municipio=self.municipio_fortaleza,
@@ -418,12 +420,12 @@ class TestGCalInsights(TestCase):
             tipo_evento=self.tipo_evento,
             usuario=self.user_controle,
             coordenador=self.user_coordenador,
-            gcal_status=Solicitacao.GCalStatus.PUBLISHED
+            gcal_status=Solicitacao.GCalStatus.PUBLISHED,
         )
 
         # Evento um dia antes (excluir)
         Solicitacao.objects.create(
-            status='aprovado',
+            status="aprovado",
             inicio=ref_date - timedelta(days=1),
             fim=ref_date - timedelta(days=1, hours=-1),
             municipio=self.municipio_fortaleza,
@@ -431,12 +433,12 @@ class TestGCalInsights(TestCase):
             tipo_evento=self.tipo_evento,
             usuario=self.user_controle,
             coordenador=self.user_coordenador,
-            gcal_status=Solicitacao.GCalStatus.ERROR
+            gcal_status=Solicitacao.GCalStatus.ERROR,
         )
 
         # Evento um dia depois (excluir)
         Solicitacao.objects.create(
-            status='aprovado',
+            status="aprovado",
             inicio=ref_date + timedelta(days=1),
             fim=ref_date + timedelta(days=1, hours=1),
             municipio=self.municipio_fortaleza,
@@ -444,27 +446,24 @@ class TestGCalInsights(TestCase):
             tipo_evento=self.tipo_evento,
             usuario=self.user_controle,
             coordenador=self.user_coordenador,
-            gcal_status=Solicitacao.GCalStatus.ERROR
+            gcal_status=Solicitacao.GCalStatus.ERROR,
         )
 
         # Autenticar como Controle
         self.client.force_authenticate(user=self.user_controle)
 
         # Request com start=end=2025-02-20
-        response = self.client.get(self.url_success_rate, {
-            'start': '2025-02-20',
-            'end': '2025-02-20'
-        })
+        response = self.client.get(self.url_success_rate, {"start": "2025-02-20", "end": "2025-02-20"})
 
         # Validar response
         self.assertEqual(response.status_code, 200)
         data = response.json()
 
         # Deve incluir apenas o evento de 2025-02-20
-        self.assertEqual(data['published'], 1)
-        self.assertEqual(data['error'], 0)
-        self.assertEqual(data['pending'], 0)
-        self.assertEqual(data['none'], 0)
-        self.assertEqual(data['rate'], 1.0)  # 1 / (1 + 0) = 1.0
-        self.assertEqual(data['window']['start'], '2025-02-20')
-        self.assertEqual(data['window']['end'], '2025-02-20')
+        self.assertEqual(data["published"], 1)
+        self.assertEqual(data["error"], 0)
+        self.assertEqual(data["pending"], 0)
+        self.assertEqual(data["none"], 0)
+        self.assertEqual(data["rate"], 1.0)  # 1 / (1 + 0) = 1.0
+        self.assertEqual(data["window"]["start"], "2025-02-20")
+        self.assertEqual(data["window"]["end"], "2025-02-20")

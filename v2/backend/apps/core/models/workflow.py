@@ -4,6 +4,7 @@ AS v2 — Workflow Models
 Models de workflow operacional: Deslocamento, AcaoControle, AcaoDAT.
 Type-checked with Pyright (strict mode).
 """
+
 from __future__ import annotations
 
 from django.db import models
@@ -25,34 +26,20 @@ class Deslocamento(models.Model):
         "core.Usuario",
         on_delete=models.PROTECT,
         related_name="deslocamentos",
-        help_text="Usuario que realizou o deslocamento"
+        help_text="Usuario que realizou o deslocamento",
     )
-    origem = models.CharField(
-        max_length=200,
-        help_text="Municipio/local de origem"
-    )
-    destino = models.CharField(
-        max_length=200,
-        help_text="Municipio/local de destino"
-    )
-    start_date = models.DateField(
-        help_text="Data de inicio do deslocamento"
-    )
-    end_date = models.DateField(
-        help_text="Data de fim do deslocamento"
-    )
-    observacao = models.TextField(
-        null=True,
-        blank=True,
-        help_text="Observacoes sobre o deslocamento"
-    )
+    origem = models.CharField(max_length=200, help_text="Municipio/local de origem")
+    destino = models.CharField(max_length=200, help_text="Municipio/local de destino")
+    start_date = models.DateField(help_text="Data de inicio do deslocamento")
+    end_date = models.DateField(help_text="Data de fim do deslocamento")
+    observacao = models.TextField(null=True, blank=True, help_text="Observacoes sobre o deslocamento")
     external_hash = models.CharField(
         max_length=64,
         unique=True,
         null=True,
         blank=True,
         db_index=True,
-        help_text="Hash SHA1 para idempotencia de import"
+        help_text="Hash SHA1 para idempotencia de import",
     )
 
     created_at = models.DateTimeField(default=timezone.now)
@@ -69,8 +56,8 @@ class Deslocamento(models.Model):
         ]
 
     def __str__(self) -> str:
-        start_fmt = self.start_date.strftime('%d/%m/%Y')
-        end_fmt = self.end_date.strftime('%d/%m/%Y')
+        start_fmt = self.start_date.strftime("%d/%m/%Y")
+        end_fmt = self.end_date.strftime("%d/%m/%Y")
         return f"{self.usuario_id} {start_fmt}->{end_fmt} {self.origem}->{self.destino}"  # type: ignore[attr-defined]
 
 
@@ -104,16 +91,10 @@ class AcaoControle(models.Model):
         related_name="acoes_controle",
         verbose_name="Coordenador",
     )
-    data_entrega = models.DateField(
-        null=True, blank=True, verbose_name="Data da Entrega"
-    )
+    data_entrega = models.DateField(null=True, blank=True, verbose_name="Data da Entrega")
     data_carta = models.DateField(null=True, blank=True, verbose_name="Data da Carta")
-    contato_inicial = models.DateField(
-        null=True, blank=True, verbose_name="Contato inicial"
-    )
-    data_reuniao = models.DateField(
-        null=True, blank=True, verbose_name="Data Reuniao Alinhamento"
-    )
+    contato_inicial = models.DateField(null=True, blank=True, verbose_name="Contato inicial")
+    data_reuniao = models.DateField(null=True, blank=True, verbose_name="Data Reuniao Alinhamento")
     observacao = models.TextField(null=True, blank=True, verbose_name="Observacao")
     external_hash = models.CharField(
         max_length=64,
@@ -136,9 +117,7 @@ class AcaoControle(models.Model):
         ]
 
     def __str__(self) -> str:
-        data_display = (
-            self.data_entrega or self.data_reuniao or ""
-        )
+        data_display = self.data_entrega or self.data_reuniao or ""
         return f"{self.municipio_id} | {self.projeto_id} | {data_display}"  # type: ignore[attr-defined]
 
 
@@ -173,9 +152,7 @@ class AcaoDAT(models.Model):
         verbose_name="Responsavel",
     )
     observacao = models.TextField(null=True, blank=True, verbose_name="Observacao")
-    data_registro = models.DateField(
-        null=True, blank=True, verbose_name="Data de registro"
-    )
+    data_registro = models.DateField(null=True, blank=True, verbose_name="Data de registro")
     external_hash = models.CharField(
         max_length=64,
         unique=True,

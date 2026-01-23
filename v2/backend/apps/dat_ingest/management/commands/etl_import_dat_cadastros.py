@@ -5,6 +5,7 @@ Usage:
     python manage.py etl_import_dat_cadastros /path/to/file.csv --dry-run
     python manage.py etl_import_dat_cadastros /path/to/file.xlsx
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -106,7 +107,7 @@ class Command(BaseCommand):
         self.stdout.write("\n" + "=" * 80)
         self.stdout.write(self.style.SUCCESS("REPORT"))
         self.stdout.write("=" * 80)
-        self.stdout.write(f"Full report saved to: out_etl/import_dat_cadastros_report.json")
+        self.stdout.write("Full report saved to: out_etl/import_dat_cadastros_report.json")
 
         if dry_run:
             self.stdout.write(self.style.WARNING("\n[DRY-RUN] No changes were committed to the database"))

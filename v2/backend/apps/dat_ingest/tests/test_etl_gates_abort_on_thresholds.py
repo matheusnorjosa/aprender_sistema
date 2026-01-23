@@ -13,14 +13,16 @@ Garante que:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import json
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 from django.conf import settings
 from django.core.management import CommandError, call_command
 from django.test import TestCase, override_settings
+
+import pytest
 
 from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
@@ -42,16 +44,12 @@ class TestETLGatesDuplicates(TestCase):
         )
         self.municipio = Municipio.objects.create(nome="Fortaleza", ativo=True)
         self.tipo = TipoEvento.objects.create(nome="Presencial")
-        self.projeto = Projeto.objects.create(
-            nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True
-        )
+        self.projeto = Projeto.objects.create(nome="ACerta", codigo="ACERTA", fluxo="NAO_SUPER", ativo=True)
 
     @override_settings(ETL_MAX_DUPLICATES_PCT=1.0)
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_eventos_csv")
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_participantes_csv")
-    def test_abort_when_duplicates_exceed_threshold(
-        self, mock_participantes, mock_eventos
-    ):
+    def test_abort_when_duplicates_exceed_threshold(self, mock_participantes, mock_eventos):
         """ETL aborta apply quando duplicatas% > ETL_MAX_DUPLICATES_PCT."""
         # Mock CSVs com 100 eventos, 5 duplicatas (5% > 1% threshold)
         mock_eventos.return_value = [
@@ -84,9 +82,7 @@ class TestETLGatesDuplicates(TestCase):
     @override_settings(ETL_MAX_DUPLICATES_PCT=10.0)
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_eventos_csv")
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_participantes_csv")
-    def test_allow_when_duplicates_below_threshold(
-        self, mock_participantes, mock_eventos
-    ):
+    def test_allow_when_duplicates_below_threshold(self, mock_participantes, mock_eventos):
         """ETL permite apply quando duplicatas% < ETL_MAX_DUPLICATES_PCT."""
         # Mock CSVs com 100 eventos, 5 duplicatas (5% < 10% threshold)
         mock_eventos.return_value = [
@@ -129,9 +125,7 @@ class TestETLGatesUnknownUsers(TestCase):
     @override_settings(ETL_MAX_UNKNOWN_USERS=50)
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_eventos_csv")
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_participantes_csv")
-    def test_abort_when_unknown_users_exceed_threshold(
-        self, mock_participantes, mock_eventos
-    ):
+    def test_abort_when_unknown_users_exceed_threshold(self, mock_participantes, mock_eventos):
         """ETL aborta apply quando unknown_users > ETL_MAX_UNKNOWN_USERS."""
         # Mock CSVs com 100 eventos, 60 pessoas sem cadastro (> 50 threshold)
         mock_eventos.return_value = [
@@ -170,9 +164,7 @@ class TestETLGatesUnknownUsers(TestCase):
     @override_settings(ETL_MAX_UNKNOWN_USERS=100)
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_eventos_csv")
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_participantes_csv")
-    def test_allow_when_unknown_users_below_threshold(
-        self, mock_participantes, mock_eventos
-    ):
+    def test_allow_when_unknown_users_below_threshold(self, mock_participantes, mock_eventos):
         """ETL permite apply quando unknown_users < ETL_MAX_UNKNOWN_USERS."""
         # Mock CSVs com 50 pessoas sem cadastro (< 100 threshold)
         mock_eventos.return_value = [
@@ -211,9 +203,7 @@ class TestETLGatesInvalidIntervals(TestCase):
     @override_settings(ETL_REQUIRE_ZERO_INVALID_INTERVALS=True)
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_eventos_csv")
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_participantes_csv")
-    def test_abort_when_invalid_intervals_and_flag_true(
-        self, mock_participantes, mock_eventos
-    ):
+    def test_abort_when_invalid_intervals_and_flag_true(self, mock_participantes, mock_eventos):
         """ETL aborta apply quando há intervalos inválidos (fim <= início) e flag=True."""
         # Mock CSVs com 1 evento com intervalo inválido
         mock_eventos.return_value = [
@@ -241,9 +231,7 @@ class TestETLGatesInvalidIntervals(TestCase):
     @override_settings(ETL_REQUIRE_ZERO_INVALID_INTERVALS=False)
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_eventos_csv")
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_participantes_csv")
-    def test_allow_when_invalid_intervals_and_flag_false(
-        self, mock_participantes, mock_eventos
-    ):
+    def test_allow_when_invalid_intervals_and_flag_false(self, mock_participantes, mock_eventos):
         """ETL permite apply quando há intervalos inválidos mas flag=False."""
         # Mock CSVs com 1 evento com intervalo inválido
         mock_eventos.return_value = [
@@ -281,9 +269,7 @@ class TestETLGatesInvalidDates(TestCase):
     @override_settings(ETL_REQUIRE_ZERO_INVALID_DATES=True)
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_eventos_csv")
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_participantes_csv")
-    def test_abort_when_invalid_dates_and_flag_true(
-        self, mock_participantes, mock_eventos
-    ):
+    def test_abort_when_invalid_dates_and_flag_true(self, mock_participantes, mock_eventos):
         """ETL aborta apply quando há datas inválidas e flag=True."""
         # Mock CSVs com 1 evento com data inválida
         mock_eventos.return_value = [
@@ -311,9 +297,7 @@ class TestETLGatesInvalidDates(TestCase):
     @override_settings(ETL_REQUIRE_ZERO_INVALID_DATES=False)
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_eventos_csv")
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_participantes_csv")
-    def test_allow_when_invalid_dates_and_flag_false(
-        self, mock_participantes, mock_eventos
-    ):
+    def test_allow_when_invalid_dates_and_flag_false(self, mock_participantes, mock_eventos):
         """ETL permite apply quando há datas inválidas mas flag=False."""
         # Mock CSVs com 1 evento com data inválida
         mock_eventos.return_value = [
@@ -351,9 +335,7 @@ class TestETLGatesDryRunAlwaysAllowed(TestCase):
     @override_settings(ETL_MAX_DUPLICATES_PCT=1.0)
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_eventos_csv")
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_participantes_csv")
-    def test_dry_run_allowed_even_with_duplicate_violations(
-        self, mock_participantes, mock_eventos
-    ):
+    def test_dry_run_allowed_even_with_duplicate_violations(self, mock_participantes, mock_eventos):
         """Dry-run é permitido mesmo com violação de duplicatas."""
         # Mock CSVs com 100 eventos, 10 duplicatas (10% > 1% threshold)
         mock_eventos.return_value = [
@@ -388,9 +370,7 @@ class TestETLGatesDryRunAlwaysAllowed(TestCase):
     @override_settings(ETL_REQUIRE_ZERO_INVALID_INTERVALS=True)
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_eventos_csv")
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_participantes_csv")
-    def test_dry_run_allowed_even_with_invalid_interval_violations(
-        self, mock_participantes, mock_eventos
-    ):
+    def test_dry_run_allowed_even_with_invalid_interval_violations(self, mock_participantes, mock_eventos):
         """Dry-run é permitido mesmo com intervalos inválidos."""
         # Mock CSVs com intervalo inválido
         mock_eventos.return_value = [
@@ -436,9 +416,7 @@ class TestETLGatesMetricsReporting(TestCase):
 
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_eventos_csv")
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_participantes_csv")
-    def test_metrics_file_generated_on_dry_run(
-        self, mock_participantes, mock_eventos
-    ):
+    def test_metrics_file_generated_on_dry_run(self, mock_participantes, mock_eventos):
         """ETL gera etl_metrics.json no dry-run."""
         mock_eventos.return_value = [
             {
@@ -479,9 +457,7 @@ class TestETLGatesMetricsReporting(TestCase):
     @override_settings(ETL_MAX_DUPLICATES_PCT=1.0)
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_eventos_csv")
     @patch("apps.dat_ingest.management.commands.etl_upsert_acompanhamento.Command.load_participantes_csv")
-    def test_violations_file_generated_when_gates_violated(
-        self, mock_participantes, mock_eventos
-    ):
+    def test_violations_file_generated_when_gates_violated(self, mock_participantes, mock_eventos):
         """ETL gera etl_violations.csv quando há violações."""
         # Mock CSVs com violações
         mock_eventos.return_value = [

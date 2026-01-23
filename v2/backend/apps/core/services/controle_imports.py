@@ -6,6 +6,7 @@ Importa Compras da aba "🟥 COMPRAS" da Planilha de Controle.
 - Dry-run mode para preview
 - Relatório JSON em out_etl/import_compras_report.json
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -23,9 +24,9 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.core.models import Compra, Municipio, Projeto
-from apps.core.types import ExternalHash
 from apps.core.services.normalize import norm_text
 from apps.core.services.resolvers import resolve_municipio, resolve_projeto
+from apps.core.types import ExternalHash
 
 OUT_DIR: Path = Path(settings.BASE_DIR) / "out_etl"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -78,6 +79,7 @@ def parse_date_flexible(v: str | None) -> date | None:
 @dataclass
 class ImportStats:
     """Estatísticas de importação."""
+
     created: int = 0
     updated: int = 0
     skipped: int = 0
@@ -87,6 +89,7 @@ class ImportStats:
 @dataclass
 class ImportPendencias:
     """Pendências encontradas durante importação."""
+
     municipios: list[dict[str, Any]] = field(default_factory=list)
     projetos: list[dict[str, Any]] = field(default_factory=list)
     linhas_invalidas: list[dict[str, Any]] = field(default_factory=list)
@@ -121,8 +124,7 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> dict[str, An
         wb = load_workbook(p, data_only=True, read_only=True)
         ws = wb.active
         headers: list[str] = [
-            str(c.value).strip() if c.value is not None else ""
-            for c in next(ws.iter_rows(min_row=1, max_row=1))
+            str(c.value).strip() if c.value is not None else "" for c in next(ws.iter_rows(min_row=1, max_row=1))
         ]
         for row in ws.iter_rows(min_row=2):
             rec: dict[str, Any] = {}
@@ -170,52 +172,48 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> dict[str, An
     # Resolver municípios e projetos
     def _build_ext_key(r: dict[str, Any]) -> str:
         """Constrói chave para external_hash (mesma lógica em dry-run e apply)."""
-        return "|".join([
-            str(r["municipio_obj"].id),
-            str(r["projeto_obj"].id),
-            r["codigo"],
-            r["produto_norm"],
-            str(r["quantidade"]),
-            str(r["data"]),
-            r["uso_norm"],
-        ])
+        return "|".join(
+            [
+                str(r["municipio_obj"].id),
+                str(r["projeto_obj"].id),
+                r["codigo"],
+                r["produto_norm"],
+                str(r["quantidade"]),
+                str(r["data"]),
+                r["uso_norm"],
+            ]
+        )
 
     resolved: list[dict[str, Any]] = []
     for i, r in enumerate(normalized, start=2):
         # Validar campos obrigatórios
         if not r["municipio"] or r["quantidade"] is None or not r["codigo"]:
             stats.skipped += 1
-            pendencias.linhas_invalidas.append({
-                "row": i,
-                "motivo": "municipio/quantidade/codigo inválidos",
-                "dados": {
-                    "municipio": r["municipio"],
-                    "quantidade": r["quantidade"],
-                    "codigo": r["codigo"],
+            pendencias.linhas_invalidas.append(
+                {
+                    "row": i,
+                    "motivo": "municipio/quantidade/codigo inválidos",
+                    "dados": {
+                        "municipio": r["municipio"],
+                        "quantidade": r["quantidade"],
+                        "codigo": r["codigo"],
+                    },
                 }
-            })
+            )
             continue
 
         # Resolver município
         mun_obj: Municipio | None = resolve_municipio(r["municipio"])
         if not mun_obj:
             stats.skipped += 1
-            pendencias.municipios.append({
-                "row": i,
-                "municipio": r["municipio"],
-                "uf": r["uf"]
-            })
+            pendencias.municipios.append({"row": i, "municipio": r["municipio"], "uf": r["uf"]})
             continue
 
         # Resolver projeto (obrigatório)
         proj_obj: Projeto | None = _infer_projeto_from_produto(r["produto_norm"])
         if not proj_obj:
             stats.skipped += 1
-            pendencias.projetos.append({
-                "row": i,
-                "produto": r["produto"],
-                "produto_norm": r["produto_norm"]
-            })
+            pendencias.projetos.append({"row": i, "produto": r["produto"], "produto_norm": r["produto_norm"]})
             continue
 
         resolved.append({**r, "municipio_obj": mun_obj, "projeto_obj": proj_obj})
@@ -240,10 +238,7 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> dict[str, An
 
                 obj: Compra
                 created: bool
-                obj, created = Compra.objects.update_or_create(
-                    external_hash=ext_hash,
-                    defaults=defaults
-                )
+                obj, created = Compra.objects.update_or_create(external_hash=ext_hash, defaults=defaults)
 
                 if created:
                     stats.created += 1
@@ -282,10 +277,7 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> dict[str, An
 
     # Salvar relatório em arquivo
     report_path: Path = OUT_DIR / "import_compras_report.json"
-    report_path.write_text(
-        json.dumps(report, ensure_ascii=False, indent=2),
-        encoding="utf-8"
-    )
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
     return report
 

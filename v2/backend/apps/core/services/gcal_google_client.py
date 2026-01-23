@@ -3,6 +3,7 @@ Google Calendar Client - Real implementation
 
 Cliente real para Google Calendar API usando Service Account.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from collections.abc import Callable
 from typing import TypeVar
 
 from django.conf import settings
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -25,7 +27,7 @@ from apps.core.types import CalendarId, EventId, JsonDict
 logger = logging.getLogger(__name__)
 
 # Type variable para retry genérico
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class GoogleCalendarClient(CalendarClientAdapter):
@@ -74,14 +76,10 @@ class GoogleCalendarClient(CalendarClientAdapter):
                 )
 
         # Criar credentials
-        self.credentials = service_account.Credentials.from_service_account_info(
-            creds_data, scopes=self.SCOPES
-        )
+        self.credentials = service_account.Credentials.from_service_account_info(creds_data, scopes=self.SCOPES)
 
         # Build service
-        self.service = build(
-            "calendar", "v3", credentials=self.credentials, cache_discovery=False
-        )
+        self.service = build("calendar", "v3", credentials=self.credentials, cache_discovery=False)
 
         logger.info("GoogleCalendarClient initialized with Service Account")
 
@@ -104,7 +102,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
         try:
             return json.loads(credentials_json)
         except json.JSONDecodeError:
-            raise ValueError(f"Invalid credentials: not a file or valid JSON")
+            raise ValueError("Invalid credentials: not a file or valid JSON")
 
     def _retry_with_backoff(self, func: Callable[[], T], max_retries: int = 3) -> T:
         """
@@ -158,11 +156,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
         """
 
         def _get():
-            return (
-                self.service.events()
-                .get(calendarId=calendar_id, eventId=event_id)
-                .execute()
-            )
+            return self.service.events().get(calendarId=calendar_id, eventId=event_id).execute()
 
         try:
             return self._retry_with_backoff(_get)
@@ -197,7 +191,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
                     calendarId=calendar_id,
                     body=body,
                     sendUpdates=send_updates,
-                    conferenceDataVersion=1  # RF06: Necessário para criar Google Meet
+                    conferenceDataVersion=1,  # RF06: Necessário para criar Google Meet
                 )
                 .execute()
             )
@@ -230,7 +224,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
                     eventId=event_id,
                     body=body,
                     sendUpdates=send_updates,
-                    conferenceDataVersion=1  # RF06: Necessário para atualizar Google Meet
+                    conferenceDataVersion=1,  # RF06: Necessário para atualizar Google Meet
                 )
                 .execute()
             )
@@ -272,6 +266,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
             Lista de dicts com informações dos calendários:
             [{"id": str, "summary": str, "primary": bool}, ...]
         """
+
         def _list_calendars():
             # Usando calendarList API para listar calendários do usuário
             calendar_list = self.service.calendarList().list().execute()

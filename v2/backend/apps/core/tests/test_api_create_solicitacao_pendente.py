@@ -8,13 +8,16 @@ RD-06: Datas devem ser timezone-aware (UTC).
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from django.utils import timezone
-from datetime import timedelta
-from rest_framework.test import APIClient
-from rest_framework import status as http_status
 
-from apps.core.models import Solicitacao, Usuario, TipoEvento, Municipio
+from datetime import timedelta
+
+from django.utils import timezone
+from rest_framework import status as http_status
+from rest_framework.test import APIClient
+
+import pytest
+
+from apps.core.models import Municipio, Solicitacao, TipoEvento, Usuario
 from apps.core.tests.conftest import get_field_errors
 
 
@@ -55,9 +58,7 @@ class TestAPICreateSolicitacaoPendente:
     Testes de criação de Solicitacao via API.
     """
 
-    def test_create_solicitacao_is_pendente_by_default(
-        self, user_test, tipo_evento_test, municipio_test
-    ):
+    def test_create_solicitacao_is_pendente_by_default(self, user_test, tipo_evento_test, municipio_test):
         """
         Test: POST /api/solicitacoes/ com payload válido cria solicitação pendente (PA-01).
         """
@@ -79,14 +80,12 @@ class TestAPICreateSolicitacaoPendente:
 
         response = client.post("/api/solicitacoes/", payload, format="json")
 
-        assert response.status_code == http_status.HTTP_201_CREATED, (
-            f"Esperado 201, obtido {response.status_code}: {response.data}"
-        )
+        assert (
+            response.status_code == http_status.HTTP_201_CREATED
+        ), f"Esperado 201, obtido {response.status_code}: {response.data}"
 
         # Verificar status pendente (PA-01)
-        assert response.data["status"] == "pendente", (
-            "Status deve ser 'pendente' ao criar solicitação (PA-01)"
-        )
+        assert response.data["status"] == "pendente", "Status deve ser 'pendente' ao criar solicitação (PA-01)"
 
         # Verificar datas timezone-aware (RD-06)
         solicitacao = Solicitacao.objects.get(pk=response.data["id"])
@@ -99,9 +98,7 @@ class TestAPICreateSolicitacaoPendente:
         assert solicitacao.municipio == municipio_test
         assert solicitacao.observacoes == "Teste de criação via API"
 
-    def test_create_solicitacao_cannot_override_status(
-        self, user_test, tipo_evento_test, municipio_test
-    ):
+    def test_create_solicitacao_cannot_override_status(self, user_test, tipo_evento_test, municipio_test):
         """
         Test: Tentar criar solicitação com status aprovado deve ser ignorado (PA-01).
         O serializer marca status como read_only.
@@ -125,21 +122,17 @@ class TestAPICreateSolicitacaoPendente:
 
         response = client.post("/api/solicitacoes/", payload, format="json")
 
-        assert response.status_code == http_status.HTTP_201_CREATED, (
-            f"Esperado 201, obtido {response.status_code}"
-        )
+        assert response.status_code == http_status.HTTP_201_CREATED, f"Esperado 201, obtido {response.status_code}"
 
         # Status deve ser pendente, ignorando payload
-        assert response.data["status"] == "pendente", (
-            "Status deve ser 'pendente' mesmo que payload tente especificar 'aprovado' (PA-01)"
-        )
+        assert (
+            response.data["status"] == "pendente"
+        ), "Status deve ser 'pendente' mesmo que payload tente especificar 'aprovado' (PA-01)"
 
         solicitacao = Solicitacao.objects.get(pk=response.data["id"])
         assert solicitacao.status == "pendente", "Status no DB deve ser 'pendente' (PA-01)"
 
-    def test_create_solicitacao_requires_valid_interval(
-        self, user_test, tipo_evento_test, municipio_test
-    ):
+    def test_create_solicitacao_requires_valid_interval(self, user_test, tipo_evento_test, municipio_test):
         """
         Test: Criar solicitação com fim <= inicio deve falhar.
         """
@@ -159,9 +152,7 @@ class TestAPICreateSolicitacaoPendente:
 
         response = client.post("/api/solicitacoes/", payload, format="json")
 
-        assert response.status_code == http_status.HTTP_400_BAD_REQUEST, (
-            "Criar com fim == inicio deve retornar 400"
-        )
+        assert response.status_code == http_status.HTTP_400_BAD_REQUEST, "Criar com fim == inicio deve retornar 400"
         errors = get_field_errors(response)
         assert "fim" in errors, "Deve retornar erro no campo 'fim'"
 
@@ -176,9 +167,7 @@ class TestAPICreateSolicitacaoPendente:
 
         response2 = client.post("/api/solicitacoes/", payload2, format="json")
 
-        assert response2.status_code == http_status.HTTP_400_BAD_REQUEST, (
-            "Criar com fim < inicio deve retornar 400"
-        )
+        assert response2.status_code == http_status.HTTP_400_BAD_REQUEST, "Criar com fim < inicio deve retornar 400"
 
     def test_create_solicitacao_municipio_optional(self, user_test, tipo_evento_test):
         """
@@ -202,17 +191,15 @@ class TestAPICreateSolicitacaoPendente:
 
         response = client.post("/api/solicitacoes/", payload, format="json")
 
-        assert response.status_code == http_status.HTTP_201_CREATED, (
-            f"Criar sem município deve funcionar (esperado 201, obtido {response.status_code})"
-        )
+        assert (
+            response.status_code == http_status.HTTP_201_CREATED
+        ), f"Criar sem município deve funcionar (esperado 201, obtido {response.status_code})"
 
         solicitacao = Solicitacao.objects.get(pk=response.data["id"])
         assert solicitacao.municipio is None, "Município deve ser None quando não informado"
         assert solicitacao.status == "pendente", "Status deve ser pendente (PA-01)"
 
-    def test_create_solicitacao_external_event_id_is_readonly(
-        self, user_test, tipo_evento_test, municipio_test
-    ):
+    def test_create_solicitacao_external_event_id_is_readonly(self, user_test, tipo_evento_test, municipio_test):
         """
         Test: external_event_id é read-only, não pode ser definido na criação.
         """
@@ -234,14 +221,14 @@ class TestAPICreateSolicitacaoPendente:
 
         response = client.post("/api/solicitacoes/", payload, format="json")
 
-        assert response.status_code == http_status.HTTP_201_CREATED, (
-            f"Criar com external_event_id no payload deve funcionar (esperado 201, obtido {response.status_code})"
-        )
+        assert (
+            response.status_code == http_status.HTTP_201_CREATED
+        ), f"Criar com external_event_id no payload deve funcionar (esperado 201, obtido {response.status_code})"
 
         solicitacao = Solicitacao.objects.get(pk=response.data["id"])
-        assert solicitacao.external_event_id is None, (
-            "external_event_id deve ser None (campo read-only, ignorado na criação)"
-        )
+        assert (
+            solicitacao.external_event_id is None
+        ), "external_event_id deve ser None (campo read-only, ignorado na criação)"
 
     def test_unauthenticated_cannot_create_solicitacao(self, tipo_evento_test, municipio_test):
         """

@@ -14,16 +14,18 @@ Issue: #150
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import importlib
-import pytest
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
 from django.apps import apps
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
-from apps.core.models import Projeto, Solicitacao, Municipio, Usuario, TipoEvento
+import pytest
 
+from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 # Import migration function dynamically (module name starts with number)
 migration_module = importlib.import_module("apps.core.migrations.0036_consolidate_duplicate_projetos")
@@ -239,23 +241,17 @@ class TestProjectDedupMigration:
         data = setup_duplicate_projects
 
         # Antes da migration: contar solicitações por projeto duplicado
-        leio_dup_count_before = Solicitacao.objects.filter(
-            projeto__nome="LEIO ESCREVO E CALCULO"
-        ).count()
+        leio_dup_count_before = Solicitacao.objects.filter(projeto__nome="LEIO ESCREVO E CALCULO").count()
         assert leio_dup_count_before == 2  # sol_leio_1 + sol_leio_2
 
         # Executar migration
         consolidate_projetos(apps, None)
 
         # Após migration: todas devem apontar para canônico
-        leio_dup_count_after = Solicitacao.objects.filter(
-            projeto__nome="LEIO ESCREVO E CALCULO"
-        ).count()
+        leio_dup_count_after = Solicitacao.objects.filter(projeto__nome="LEIO ESCREVO E CALCULO").count()
         assert leio_dup_count_after == 0  # Nenhuma solicitação aponta para duplicado
 
-        leio_canonical_count = Solicitacao.objects.filter(
-            projeto__nome="LEIO, ESCREVO E CALCULO"
-        ).count()
+        leio_canonical_count = Solicitacao.objects.filter(projeto__nome="LEIO, ESCREVO E CALCULO").count()
         assert leio_canonical_count == 2  # Ambas migraram para canônico
 
     def test_migration_deletes_all_duplicates(self, setup_duplicate_projects):

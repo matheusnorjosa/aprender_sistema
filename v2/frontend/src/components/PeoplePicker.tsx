@@ -6,23 +6,61 @@
  */
 
 import { useState } from 'react';
-import { Card, Space, Tag, AutoComplete, Spin, Button } from 'antd';
-import { PlusOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { Card, Space, Tag, AutoComplete, Spin } from 'antd';
 import { lookupUsuarios } from '../api/lookup';
 import logger from '../utils/logger';
+import type { ID } from '../types';
+
+/**
+ * Person item interface
+ */
+export interface PersonItem {
+  id: ID;
+  email: string;
+  label: string;
+}
+
+/**
+ * PeoplePicker value interface
+ */
+export interface PeoplePickerValue {
+  formadores: PersonItem[];
+  coordAcompanha: PersonItem[];
+}
+
+/**
+ * AutoComplete option interface
+ */
+interface UserOption {
+  value: string;
+  label: string;
+  data: {
+    id: ID;
+    email: string;
+    label: string;
+  };
+}
+
+/**
+ * PeoplePicker props interface
+ */
+export interface PeoplePickerProps {
+  value?: PeoplePickerValue;
+  onChange?: (value: PeoplePickerValue) => void;
+}
 
 export default function PeoplePicker({
   value = { formadores: [], coordAcompanha: [] },
   onChange,
-}) {
-  const [formadoresOptions, setFormadoresOptions] = useState([]);
-  const [coordOptions, setCoordOptions] = useState([]);
+}: PeoplePickerProps): JSX.Element {
+  const [formadoresOptions, setFormadoresOptions] = useState<UserOption[]>([]);
+  const [coordOptions, setCoordOptions] = useState<UserOption[]>([]);
   const [loadingFormadores, setLoadingFormadores] = useState(false);
   const [loadingCoord, setLoadingCoord] = useState(false);
   const [formadorSearch, setFormadorSearch] = useState('');
   const [coordSearch, setCoordSearch] = useState('');
 
-  const handleSearchFormadores = async (query) => {
+  const handleSearchFormadores = async (query: string): Promise<void> => {
     setFormadorSearch(query);
 
     // Permitir busca vazia (mostra lista inicial) ou com 2+ caracteres
@@ -36,7 +74,7 @@ export default function PeoplePicker({
       const results = await lookupUsuarios(query || '', 'Formador');
       setFormadoresOptions(
         results.map(item => ({
-          value: item.id,
+          value: String(item.id),
           label: item.label,
           data: item,
         }))
@@ -48,7 +86,7 @@ export default function PeoplePicker({
     }
   };
 
-  const handleSearchCoord = async (query) => {
+  const handleSearchCoord = async (query: string): Promise<void> => {
     setCoordSearch(query);
 
     // Permitir busca vazia (mostra lista inicial) ou com 2+ caracteres
@@ -62,7 +100,7 @@ export default function PeoplePicker({
       const results = await lookupUsuarios(query || '', 'Coordenador');
       setCoordOptions(
         results.map(item => ({
-          value: item.id,
+          value: String(item.id),
           label: item.label,
           data: item,
         }))
@@ -74,8 +112,8 @@ export default function PeoplePicker({
     }
   };
 
-  const handleAddFormador = (selectedValue, option) => {
-    const newFormador = {
+  const handleAddFormador = (_selectedValue: string, option: UserOption): void => {
+    const newFormador: PersonItem = {
       id: option.data.id,
       email: option.data.email,
       label: option.data.label,
@@ -87,7 +125,7 @@ export default function PeoplePicker({
       return;
     }
 
-    const updated = {
+    const updated: PeoplePickerValue = {
       ...value,
       formadores: [...value.formadores, newFormador],
     };
@@ -101,8 +139,8 @@ export default function PeoplePicker({
     // Não limpar formadoresOptions para permitir múltiplas seleções
   };
 
-  const handleAddCoord = (selectedValue, option) => {
-    const newCoord = {
+  const handleAddCoord = (_selectedValue: string, option: UserOption): void => {
+    const newCoord: PersonItem = {
       id: option.data.id,
       email: option.data.email,
       label: option.data.label,
@@ -114,7 +152,7 @@ export default function PeoplePicker({
       return;
     }
 
-    const updated = {
+    const updated: PeoplePickerValue = {
       ...value,
       coordAcompanha: [...value.coordAcompanha, newCoord],
     };
@@ -128,8 +166,8 @@ export default function PeoplePicker({
     // Não limpar coordOptions para permitir múltiplas seleções
   };
 
-  const handleRemoveFormador = (id) => {
-    const updated = {
+  const handleRemoveFormador = (id: ID): void => {
+    const updated: PeoplePickerValue = {
       ...value,
       formadores: value.formadores.filter((f) => f.id !== id),
     };
@@ -139,8 +177,8 @@ export default function PeoplePicker({
     }
   };
 
-  const handleRemoveCoord = (id) => {
-    const updated = {
+  const handleRemoveCoord = (id: ID): void => {
+    const updated: PeoplePickerValue = {
       ...value,
       coordAcompanha: value.coordAcompanha.filter((c) => c.id !== id),
     };

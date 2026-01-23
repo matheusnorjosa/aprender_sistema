@@ -13,22 +13,49 @@
 
 import { useState } from 'react';
 import { Form, DatePicker, Select, Input, Button } from 'antd';
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 
 const { TextArea } = Input;
 const { Option } = Select;
 
-export default function BlockForm({ onSubmit }) {
-  const [form] = Form.useForm();
+/**
+ * Block form values interface
+ */
+interface BlockFormValues {
+  inicio: Dayjs;
+  fim: Dayjs;
+  tipo: 'T' | 'P';
+  motivo?: string;
+}
+
+/**
+ * Block payload interface
+ */
+export interface BlockPayload {
+  inicio: string;
+  fim: string;
+  tipo: 'T' | 'P';
+  motivo: string;
+}
+
+/**
+ * BlockForm props interface
+ */
+export interface BlockFormProps {
+  onSubmit: (payload: BlockPayload) => Promise<void>;
+}
+
+export default function BlockForm({ onSubmit }: BlockFormProps): JSX.Element {
+  const [form] = Form.useForm<BlockFormValues>();
   const [loading, setLoading] = useState(false);
 
   /**
    * Handler para submit do formulário.
    */
-  const handleSubmit = async (values) => {
+  const handleSubmit = async (values: BlockFormValues): Promise<void> => {
     setLoading(true);
     try {
-      const payload = {
+      const payload: BlockPayload = {
         inicio: values.inicio.toISOString(),
         fim: values.fim.toISOString(),
         tipo: values.tipo,
@@ -49,9 +76,9 @@ export default function BlockForm({ onSubmit }) {
   /**
    * Valida que início < fim.
    */
-  const validateDateRange = () => {
-    const inicio = form.getFieldValue('inicio');
-    const fim = form.getFieldValue('fim');
+  const validateDateRange = (): Promise<void> => {
+    const inicio = form.getFieldValue('inicio') as Dayjs | undefined;
+    const fim = form.getFieldValue('fim') as Dayjs | undefined;
 
     if (inicio && fim && inicio.isAfter(fim)) {
       return Promise.reject(new Error('Início deve ser anterior ao fim!'));

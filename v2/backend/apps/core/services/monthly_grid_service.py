@@ -15,6 +15,7 @@ Precedência: X > D1 > 2 > E > T/P > D
 Calcula CH mês/ano, ranking por CH mês (denso).
 Details_index para dias com E/2/X/D1 (lista de eventos).
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false
 
 from __future__ import annotations
@@ -84,34 +85,22 @@ def build_monthly_grid(
     year_end = date(year, 12, 31)
 
     # Converter para datetime aware (início/fim do mês)
-    month_start = timezone.make_aware(
-        datetime.combine(first_day, datetime.min.time()), tz
-    )
-    month_end = timezone.make_aware(
-        datetime.combine(last_day, datetime.max.time()), tz
-    )
+    month_start = timezone.make_aware(datetime.combine(first_day, datetime.min.time()), tz)
+    month_end = timezone.make_aware(datetime.combine(last_day, datetime.max.time()), tz)
 
     # Converter para datetime aware (início/fim do ano)
-    year_start_dt = timezone.make_aware(
-        datetime.combine(year_start, datetime.min.time()), tz
-    )
-    year_end_dt = timezone.make_aware(
-        datetime.combine(year_end, datetime.max.time()), tz
-    )
+    year_start_dt = timezone.make_aware(datetime.combine(year_start, datetime.min.time()), tz)
+    year_end_dt = timezone.make_aware(datetime.combine(year_end, datetime.max.time()), tz)
 
     # 1. Pessoas (via Participation) - filtrar por gerência quando especificado
     participations_qs = Participation.objects.filter(role=role)
 
     if gerencia_id is not None:
         # Filtrar por gerência específica
-        participations_qs = participations_qs.filter(
-            solicitacao__projeto__gerencia_id=gerencia_id
-        )
+        participations_qs = participations_qs.filter(solicitacao__projeto__gerencia_id=gerencia_id)
     else:
         # Fallback para comportamento anterior (apenas SUPER)
-        participations_qs = participations_qs.filter(
-            solicitacao__projeto__fluxo='SUPER'
-        )
+        participations_qs = participations_qs.filter(solicitacao__projeto__fluxo="SUPER")
 
     if q and q.strip():
         q_lower = q.strip().lower()
@@ -160,9 +149,7 @@ def build_monthly_grid(
     events_q = events_q.prefetch_related(
         Prefetch(
             "participations",
-            queryset=Participation.objects.filter(
-                role=role, usuario_id__in=user_ids
-            ).select_related("usuario"),
+            queryset=Participation.objects.filter(role=role, usuario_id__in=user_ids).select_related("usuario"),
         )
     ).select_related("municipio", "tipo_evento")
 
@@ -201,9 +188,7 @@ def build_monthly_grid(
         end_date = event_end_local.date()
 
         # Encontrar usuários desse evento com o role específico
-        event_users = [
-            p.usuario_id for p in event.participations.all() if p.role == role
-        ]
+        event_users = [p.usuario_id for p in event.participations.all() if p.role == role]
 
         while current <= end_date:
             day_num = current.day
@@ -222,15 +207,11 @@ def build_monthly_grid(
                 continue
 
             # CH mês: interseção com mês
-            ch_month_hours = _calc_hours_in_range(
-                event.inicio, event.fim, month_start, month_end
-            )
+            ch_month_hours = _calc_hours_in_range(event.inicio, event.fim, month_start, month_end)
             user_data[uid]["ch_month"] += ch_month_hours
 
             # CH ano: interseção com ano
-            ch_year_hours = _calc_hours_in_range(
-                event.inicio, event.fim, year_start_dt, year_end_dt
-            )
+            ch_year_hours = _calc_hours_in_range(event.inicio, event.fim, year_start_dt, year_end_dt)
             user_data[uid]["ch_year"] += ch_year_hours
 
     # 6. Distribuir bloqueios por dia/pessoa
@@ -347,9 +328,7 @@ def build_monthly_grid(
             # Details para E/2/X/D1 com chave "row:col" (0-based)
             if code in ["E", "2", "X", "D1"]:
                 detail_key = f"{row_idx}:{col_idx}"
-                details_index[detail_key] = [
-                    _event_to_detail(e, tz) for e in events_day
-                ]
+                details_index[detail_key] = [_event_to_detail(e, tz) for e in events_day]
 
     # 10. Ranking denso por CH mês (desc)
     people_sorted_by_ch = sorted(people, key=lambda p: p["ch_month"], reverse=True)

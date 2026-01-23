@@ -9,15 +9,17 @@ Tests for:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from datetime import timedelta
 
 from django.utils import timezone
-
-import pytest
-from apps.core.models import AvailabilityBlock, Usuario
-from apps.core.tests.conftest import get_field_errors
 from rest_framework import status as http_status
 from rest_framework.test import APIClient
+
+import pytest
+
+from apps.core.models import AvailabilityBlock, Usuario
+from apps.core.tests.conftest import get_field_errors
 
 
 @pytest.fixture
@@ -69,12 +71,8 @@ class TestAPIMe:
         assert "last_name" in response.data, "Resposta deve conter 'last_name'"
 
         # Verificar valores corretos
-        assert (
-            response.data["id"] == user_test.id
-        ), "ID deve corresponder ao usuário autenticado"
-        assert (
-            response.data["username"] == user_test.username
-        ), "Username deve corresponder"
+        assert response.data["id"] == user_test.id, "ID deve corresponder ao usuário autenticado"
+        assert response.data["username"] == user_test.username, "Username deve corresponder"
         assert response.data["email"] == user_test.email, "Email deve corresponder"
 
     def test_api_me_requires_authentication(self):
@@ -131,9 +129,7 @@ class TestAPIAvailabilityBlocks:
         assert (
             block.usuario == user_test
         ), "usuario deve ser automaticamente preenchido com request.user (perform_create)"
-        assert (
-            response.data["usuario"] == user_test.id
-        ), "Resposta deve retornar usuario correto"
+        assert response.data["usuario"] == user_test.id, "Resposta deve retornar usuario correto"
 
     def test_create_block_cannot_override_usuario(self, user_test, another_user):
         """
@@ -165,15 +161,9 @@ class TestAPIAvailabilityBlocks:
 
         # Verificar que usuario foi preenchido com request.user, não com o do payload
         block = AvailabilityBlock.objects.get(pk=response.data["id"])
-        assert (
-            block.usuario == user_test
-        ), "usuario deve ser request.user, ignorando payload (campo read_only)"
-        assert (
-            block.usuario != another_user
-        ), "usuario NÃO deve ser o especificado no payload"
-        assert (
-            response.data["usuario"] == user_test.id
-        ), "Resposta deve retornar request.user.id"
+        assert block.usuario == user_test, "usuario deve ser request.user, ignorando payload (campo read_only)"
+        assert block.usuario != another_user, "usuario NÃO deve ser o especificado no payload"
+        assert response.data["usuario"] == user_test.id, "Resposta deve retornar request.user.id"
 
     def test_create_block_validates_date_interval(self, user_test):
         """
@@ -194,9 +184,7 @@ class TestAPIAvailabilityBlocks:
 
         response = client.post("/api/availability-blocks/", payload, format="json")
 
-        assert (
-            response.status_code == http_status.HTTP_400_BAD_REQUEST
-        ), "Criar com fim == inicio deve retornar 400"
+        assert response.status_code == http_status.HTTP_400_BAD_REQUEST, "Criar com fim == inicio deve retornar 400"
         errors = get_field_errors(response)
         assert "fim" in errors, "Deve retornar erro no campo 'fim'"
 
@@ -232,12 +220,8 @@ class TestAPIAvailabilityBlocks:
 
         # Verificar que status é aprovado (auto-aprovação)
         block = AvailabilityBlock.objects.get(pk=response.data["id"])
-        assert (
-            block.status == "aprovado"
-        ), "Status deve ser 'aprovado' (auto-aprovação de bloqueios)"
-        assert (
-            response.data["status"] == "aprovado"
-        ), "Resposta deve retornar status='aprovado'"
+        assert block.status == "aprovado", "Status deve ser 'aprovado' (auto-aprovação de bloqueios)"
+        assert response.data["status"] == "aprovado", "Resposta deve retornar status='aprovado'"
 
     def test_unauthenticated_cannot_create_block(self):
         """

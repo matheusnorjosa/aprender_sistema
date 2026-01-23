@@ -7,19 +7,22 @@ Valida:
 - Cache de endpoints estáticos (municípios, projetos, tipos)
 - Invalidação de cache estático
 """
+
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 
 from __future__ import annotations
+
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
-import pytest
-import pytz
 from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APIClient
+
+import pytest
+import pytz
 
 from apps.core.models import (
     AvailabilityBlock,
@@ -97,21 +100,15 @@ def test_availability_check_cached(clear_cache, usuario_formador, municipio):
     fim = inicio + timedelta(hours=2)
 
     # Primeira chamada: cache miss
-    result1 = check_conflicts(
-        usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio
-    )
+    result1 = check_conflicts(usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio)
 
     # Segunda chamada com mesmos parâmetros: cache hit
-    result2 = check_conflicts(
-        usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio
-    )
+    result2 = check_conflicts(usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio)
 
     # Terceira chamada com parâmetros diferentes: cache miss
     inicio_diff = inicio + timedelta(days=1)
     fim_diff = inicio_diff + timedelta(hours=2)
-    result3 = check_conflicts(
-        usuario=usuario_formador, inicio=inicio_diff, fim=fim_diff, municipio=municipio
-    )
+    result3 = check_conflicts(usuario=usuario_formador, inicio=inicio_diff, fim=fim_diff, municipio=municipio)
 
     # Validações
     assert result1.ok is True
@@ -122,9 +119,7 @@ def test_availability_check_cached(clear_cache, usuario_formador, municipio):
 
 
 @pytest.mark.django_db
-def test_cache_invalidated_on_solicitacao_create(
-    clear_cache, usuario_formador, municipio, projeto_super, tipo_evento
-):
+def test_cache_invalidated_on_solicitacao_create(clear_cache, usuario_formador, municipio, projeto_super, tipo_evento):
     """
     Test: Cache é invalidado ao criar Solicitacao.
 
@@ -138,9 +133,7 @@ def test_cache_invalidated_on_solicitacao_create(
     fim = inicio + timedelta(hours=2)
 
     # Primeira chamada: sem conflitos
-    result1 = check_conflicts(
-        usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio
-    )
+    result1 = check_conflicts(usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio)
     assert result1.ok is True
 
     # Criar solicitação aprovada (conflita)
@@ -155,17 +148,13 @@ def test_cache_invalidated_on_solicitacao_create(
     )
 
     # Segunda chamada: cache invalidado, agora tem conflito
-    result2 = check_conflicts(
-        usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio
-    )
+    result2 = check_conflicts(usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio)
     assert result2.ok is False
     assert len(result2.conflicts) > 0
 
 
 @pytest.mark.django_db
-def test_cache_invalidated_on_solicitacao_update(
-    clear_cache, usuario_formador, municipio, projeto_super, tipo_evento
-):
+def test_cache_invalidated_on_solicitacao_update(clear_cache, usuario_formador, municipio, projeto_super, tipo_evento):
     """
     Test: Cache é invalidado ao atualizar Solicitacao.
 
@@ -191,9 +180,7 @@ def test_cache_invalidated_on_solicitacao_update(
     )
 
     # Cachear resultado (pendente não conflita)
-    result1 = check_conflicts(
-        usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio
-    )
+    result1 = check_conflicts(usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio)
     assert result1.ok is True
 
     # Aprovar solicitação (agora conflita)
@@ -201,16 +188,12 @@ def test_cache_invalidated_on_solicitacao_update(
     sol.save()
 
     # Cache invalidado, agora tem conflito
-    result2 = check_conflicts(
-        usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio
-    )
+    result2 = check_conflicts(usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio)
     assert result2.ok is False
 
 
 @pytest.mark.django_db
-def test_cache_invalidated_on_solicitacao_delete(
-    clear_cache, usuario_formador, municipio, projeto_super, tipo_evento
-):
+def test_cache_invalidated_on_solicitacao_delete(clear_cache, usuario_formador, municipio, projeto_super, tipo_evento):
     """
     Test: Cache é invalidado ao deletar Solicitacao.
 
@@ -236,25 +219,19 @@ def test_cache_invalidated_on_solicitacao_delete(
     )
 
     # Cachear resultado com conflito
-    result1 = check_conflicts(
-        usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio
-    )
+    result1 = check_conflicts(usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio)
     assert result1.ok is False
 
     # Deletar solicitação
     sol.delete()
 
     # Cache invalidado, agora não tem conflito
-    result2 = check_conflicts(
-        usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio
-    )
+    result2 = check_conflicts(usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio)
     assert result2.ok is True
 
 
 @pytest.mark.django_db
-def test_cache_invalidated_on_availability_block_create(
-    clear_cache, usuario_formador, municipio
-):
+def test_cache_invalidated_on_availability_block_create(clear_cache, usuario_formador, municipio):
     """
     Test: Cache é invalidado ao criar AvailabilityBlock.
 
@@ -268,9 +245,7 @@ def test_cache_invalidated_on_availability_block_create(
     fim = inicio + timedelta(hours=2)
 
     # Cachear resultado sem bloqueios
-    result1 = check_conflicts(
-        usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio
-    )
+    result1 = check_conflicts(usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio)
     assert result1.ok is True
 
     # Criar bloqueio total aprovado
@@ -284,9 +259,7 @@ def test_cache_invalidated_on_availability_block_create(
     )
 
     # Cache invalidado, agora tem conflito
-    result2 = check_conflicts(
-        usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio
-    )
+    result2 = check_conflicts(usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio)
     assert result2.ok is False
     assert result2.conflicts[0].code == "T"
 
@@ -417,9 +390,7 @@ def test_static_cache_invalidated_on_projeto_update(clear_cache):
     client.force_authenticate(user=usuario)
 
     # Criar projeto ativo
-    projeto = Projeto.objects.create(
-        nome="Projeto Cache", codigo="PCACHE", fluxo="SUPER", ativo=True
-    )
+    projeto = Projeto.objects.create(nome="Projeto Cache", codigo="PCACHE", fluxo="SUPER", ativo=True)
 
     # Cachear resultado
     response1 = client.get("/api/options/projetos/")

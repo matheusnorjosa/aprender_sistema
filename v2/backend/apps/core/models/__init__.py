@@ -35,6 +35,7 @@ Type-checked with Pyright (strict mode).
 
 from __future__ import annotations
 
+from apps.core.models.acompanhamento import Acompanhamento
 from apps.core.models.agenda import AvailabilityBlock
 from apps.core.models.auditoria import AuditLog
 from apps.core.models.compra import Compra
@@ -45,10 +46,7 @@ from apps.core.models.dat_compra import DATCompra
 from apps.core.models.dat_coordenador import DATArea, DATCoordenador
 from apps.core.models.dat_formacao import DATFormacao
 from apps.core.models.dat_registro import DATRegistro
-from apps.core.models.plano_formacoes import PlanoFormacoes
 from apps.core.models.formacao import Formacao
-from apps.core.models.acompanhamento import Acompanhamento
-from apps.core.models.prova import Prova
 from apps.core.models.integracao import GoogleOAuthCredential
 from apps.core.models.organizacao import (
     EquipeGerencia,
@@ -59,6 +57,8 @@ from apps.core.models.organizacao import (
     ProjetoGeral,
     TipoEvento,
 )
+from apps.core.models.plano_formacoes import PlanoFormacoes
+from apps.core.models.prova import Prova
 from apps.core.models.solicitacao import Participation, Solicitacao
 from apps.core.models.usuario import Usuario
 from apps.core.models.workflow import AcaoControle, AcaoDAT, Deslocamento

@@ -4,6 +4,7 @@ AS v2 — Integracao Models
 Models de integracao com servicos externos: GoogleOAuthCredential.
 Type-checked with Pyright (strict mode).
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -45,44 +46,43 @@ class GoogleOAuthCredential(models.Model):
         on_delete=models.CASCADE,
         related_name="google_oauth",
         verbose_name="Usuario",
-        help_text="Usuario Controle que conectou sua conta Google"
+        help_text="Usuario Controle que conectou sua conta Google",
     )
     google_email = models.EmailField(
         max_length=255,
         db_index=True,
         verbose_name="E-mail Google",
-        help_text="E-mail da conta Google conectada (ex: operacional1@aprendereditora.com.br)"
+        help_text="E-mail da conta Google conectada (ex: operacional1@aprendereditora.com.br)",
     )
     access_token_encrypted = models.BinaryField(
         verbose_name="Access Token (criptografado)",
-        help_text="Access token criptografado com Fernet (GCAL_ENCRYPTION_KEY)"
+        help_text="Access token criptografado com Fernet (GCAL_ENCRYPTION_KEY)",
     )
     refresh_token_encrypted = models.BinaryField(
         verbose_name="Refresh Token (criptografado)",
-        help_text="Refresh token criptografado com Fernet (GCAL_ENCRYPTION_KEY)"
+        help_text="Refresh token criptografado com Fernet (GCAL_ENCRYPTION_KEY)",
     )
     token_expiry = models.DateTimeField(
-        verbose_name="Expiracao do Token",
-        help_text="Timestamp UTC de expiracao do access token (geralmente 1h)"
+        verbose_name="Expiracao do Token", help_text="Timestamp UTC de expiracao do access token (geralmente 1h)"
     )
     scope = models.CharField(
         max_length=500,
         default="https://www.googleapis.com/auth/calendar",
         verbose_name="Scopes OAuth",
-        help_text="Permissoes concedidas pelo usuario (separadas por espaco)"
+        help_text="Permissoes concedidas pelo usuario (separadas por espaco)",
     )
     default_calendar_id = models.CharField(
         max_length=255,
         blank=True,
         default="",
         verbose_name="Calendario Padrao",
-        help_text="ID do calendario padrao (ex: 'primary' ou ID especifico)"
+        help_text="ID do calendario padrao (ex: 'primary' ou ID especifico)",
     )
     allowed_calendars = models.JSONField(  # type: ignore[misc]
         default=list,
         blank=True,
         verbose_name="Calendarios Permitidos",
-        help_text="Lista de IDs de calendarios que o usuario pode publicar (GAP-5: multi-calendar futuro)"
+        help_text="Lista de IDs de calendarios que o usuario pode publicar (GAP-5: multi-calendar futuro)",
     )
 
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Conectado em")
@@ -100,7 +100,7 @@ class GoogleOAuthCredential(models.Model):
         ]
 
     def __str__(self) -> str:
-        expiry_fmt = self.token_expiry.strftime('%d/%m/%Y %H:%M') if self.token_expiry else "N/A"
+        expiry_fmt = self.token_expiry.strftime("%d/%m/%Y %H:%M") if self.token_expiry else "N/A"
         return f"{self.user.username} ({self.google_email}) - expira: {expiry_fmt}"  # type: ignore[reportUnknownMemberType]
 
     def is_expired(self) -> bool:

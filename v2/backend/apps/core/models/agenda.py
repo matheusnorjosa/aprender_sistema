@@ -5,6 +5,7 @@ Models de agenda e bloqueios: AvailabilityBlock.
 Clausulas Petreas: RD-02, RD-03, RD-06.
 Type-checked with Pyright (strict mode).
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -43,9 +44,7 @@ class AvailabilityBlock(models.Model):
     inicio = models.DateTimeField(help_text="Inicio do bloqueio (UTC)")
     fim = models.DateTimeField(help_text="Fim do bloqueio (UTC)")
     tipo = models.CharField(max_length=1, choices=TIPO_CHOICES, default="T")
-    motivo = models.CharField(
-        max_length=255, blank=True, help_text="Motivo do bloqueio"
-    )
+    motivo = models.CharField(max_length=255, blank=True, help_text="Motivo do bloqueio")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="aprovado")
 
     created_at = models.DateTimeField(default=timezone.now)
@@ -68,13 +67,13 @@ class AvailabilityBlock(models.Model):
             ),
             # Issue #136: Check constraint for status choices
             models.CheckConstraint(
-                check=models.Q(status__in=['pendente', 'aprovado', 'reprovado']),
-                name='availability_block_status_valid',
+                check=models.Q(status__in=["pendente", "aprovado", "reprovado"]),
+                name="availability_block_status_valid",
             ),
             # Issue #136: Check constraint for tipo choices
             models.CheckConstraint(
-                check=models.Q(tipo__in=['T', 'P']),
-                name='availability_block_tipo_valid',
+                check=models.Q(tipo__in=["T", "P"]),
+                name="availability_block_tipo_valid",
             ),
         ]
 

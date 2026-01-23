@@ -1,6 +1,7 @@
 """
 Pre-agenda API Views - Lista solicitações aprovadas com filtros por fluxo.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -31,32 +32,32 @@ class PreAgendaListView(generics.ListAPIView):
 
     Permissions: IsControleOrDAT
     """
+
     permission_classes = [IsControleOrDAT]
     serializer_class = SolicitacaoSerializer
 
     def get_queryset(self) -> QuerySet[Solicitacao]:
         """Retorna apenas solicitações aprovadas, com filtros opcionais."""
-        queryset: QuerySet[Solicitacao] = Solicitacao.objects.filter(status='aprovado').select_related(
-            'usuario', 'municipio', 'projeto', 'tipo_evento', 'coordenador'
-        ).prefetch_related('participations__usuario')
+        queryset: QuerySet[Solicitacao] = (
+            Solicitacao.objects.filter(status="aprovado")
+            .select_related("usuario", "municipio", "projeto", "tipo_evento", "coordenador")
+            .prefetch_related("participations__usuario")
+        )
 
         # Filtro por fluxo do projeto
-        super_param: str | None = self.request.query_params.get('super')
-        if super_param == '1':
+        super_param: str | None = self.request.query_params.get("super")
+        if super_param == "1":
             # Apenas projetos SUPER
-            queryset = queryset.filter(projeto__fluxo='SUPER')
-        elif super_param == '0':
+            queryset = queryset.filter(projeto__fluxo="SUPER")
+        elif super_param == "0":
             # Apenas projetos NAO_SUPER
-            queryset = queryset.filter(projeto__fluxo='NAO_SUPER')
+            queryset = queryset.filter(projeto__fluxo="NAO_SUPER")
 
-        return queryset.order_by('-created_at')
+        return queryset.order_by("-created_at")
 
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Override para retornar formato paginado com count."""
         queryset: QuerySet[Solicitacao] = self.get_queryset()
         serializer: SolicitacaoSerializer = self.get_serializer(queryset, many=True)
 
-        return Response({
-            'count': queryset.count(),
-            'results': serializer.data
-        })
+        return Response({"count": queryset.count(), "results": serializer.data})

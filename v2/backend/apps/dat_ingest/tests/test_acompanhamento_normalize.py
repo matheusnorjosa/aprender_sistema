@@ -11,9 +11,9 @@ from datetime import date, time
 from apps.dat_ingest.services.acompanhamento_normalize import (
     norm_text,
     normalize_sector,
-    split_municipios_super,
     parse_date_iso,
     parse_time_iso,
+    split_municipios_super,
 )
 
 

@@ -7,8 +7,9 @@ Garante que executar o ETL 2x com os mesmos dados produz 0 inserts/updates na 2�
 
 from __future__ import annotations
 
-import pytest
 from django.core.management import call_command
+
+import pytest
 from openpyxl import Workbook
 
 from apps.core.models import Municipio, Projeto, TipoEvento, Usuario
@@ -27,24 +28,28 @@ def temp_xlsx_usuarios(tmp_path):
     ws.append(["Nome", "CPF", "Telefone", "Email", "Perfil", "Superintendência", "Ativo"])
 
     # Data rows
-    ws.append([
-        "João Silva",
-        "12345678901",
-        "(85) 99999-9999",
-        "joao@example.com",
-        "Formador",
-        "",
-        "Sim",
-    ])
-    ws.append([
-        "Maria Santos",
-        "98765432100",
-        "(85) 88888-8888",
-        "maria@example.com",
-        "Coordenador",
-        "",
-        "Sim",
-    ])
+    ws.append(
+        [
+            "João Silva",
+            "12345678901",
+            "(85) 99999-9999",
+            "joao@example.com",
+            "Formador",
+            "",
+            "Sim",
+        ]
+    )
+    ws.append(
+        [
+            "Maria Santos",
+            "98765432100",
+            "(85) 88888-8888",
+            "maria@example.com",
+            "Coordenador",
+            "",
+            "Sim",
+        ]
+    )
 
     wb.save(filepath)
     return filepath
@@ -164,9 +169,9 @@ class TestETLIdempotency:
         assert second_count == first_count, "Não deve ter duplicado usuários"
 
         # Verify test emails exist
-        emails = set(Usuario.objects.filter(
-            email__in=["joao@example.com", "maria@example.com"]
-        ).values_list("email", flat=True))
+        emails = set(
+            Usuario.objects.filter(email__in=["joao@example.com", "maria@example.com"]).values_list("email", flat=True)
+        )
         assert emails == {"joao@example.com", "maria@example.com"}
 
     def test_etl_upsert_core_idempotent_municipios(self, temp_xlsx_municipios):

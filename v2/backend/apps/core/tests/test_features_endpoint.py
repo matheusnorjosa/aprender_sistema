@@ -13,10 +13,12 @@ Endpoint testado:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import Usuario
 
@@ -39,9 +41,7 @@ def test_features_requires_authentication():
 
 def test_features_authenticated_user_allowed():
     """Usuário autenticado tem acesso a /api/features/."""
-    user = Usuario.objects.create_user(
-        username="user1", email="user@x.com", password="x", cpf="11111111111"
-    )
+    user = Usuario.objects.create_user(username="user1", email="user@x.com", password="x", cpf="11111111111")
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -59,9 +59,7 @@ def test_features_authenticated_user_allowed():
 
 def test_features_response_structure():
     """Resposta de /api/features/ tem estrutura esperada."""
-    user = Usuario.objects.create_user(
-        username="user1", email="user@x.com", password="x", cpf="11111111111"
-    )
+    user = Usuario.objects.create_user(username="user1", email="user@x.com", password="x", cpf="11111111111")
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -80,7 +78,7 @@ def test_features_response_structure():
     assert "SHOW_PRE_AGENDA" in data
 
 
-@override_settings(GCAL_CLIENT='fake')
+@override_settings(GCAL_CLIENT="fake")
 def test_features_default_values():
     """
     Flags padrão estão corretas (seguras para go-live).
@@ -88,9 +86,7 @@ def test_features_default_values():
     Issue #130: Forçar GCAL_CLIENT='fake' para garantir que GCAL_MODE derivado
     seja 'fake' independente da configuração do ambiente Docker.
     """
-    user = Usuario.objects.create_user(
-        username="user1", email="user@x.com", password="x", cpf="11111111111"
-    )
+    user = Usuario.objects.create_user(username="user1", email="user@x.com", password="x", cpf="11111111111")
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -116,9 +112,7 @@ def test_features_default_values():
 
 def test_features_returns_fallback_when_no_config():
     """Se não houver Config, retorna fallback de settings."""
-    user = Usuario.objects.create_user(
-        username="user1", email="user@x.com", password="x", cpf="11111111111"
-    )
+    user = Usuario.objects.create_user(username="user1", email="user@x.com", password="x", cpf="11111111111")
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -147,9 +141,7 @@ def test_features_config_overrides_fallback():
         },
     )
 
-    user = Usuario.objects.create_user(
-        username="user1", email="user@x.com", password="x", cpf="11111111111"
-    )
+    user = Usuario.objects.create_user(username="user1", email="user@x.com", password="x", cpf="11111111111")
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -175,9 +167,7 @@ def test_features_config_overrides_fallback():
 
 def test_features_boolean_flags_are_booleans():
     """Flags booleanas retornam bool (não string)."""
-    user = Usuario.objects.create_user(
-        username="user1", email="user@x.com", password="x", cpf="11111111111"
-    )
+    user = Usuario.objects.create_user(username="user1", email="user@x.com", password="x", cpf="11111111111")
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -196,9 +186,7 @@ def test_features_boolean_flags_are_booleans():
 
 def test_features_gcal_mode_is_string():
     """GCAL_MODE retorna string."""
-    user = Usuario.objects.create_user(
-        username="user1", email="user@x.com", password="x", cpf="11111111111"
-    )
+    user = Usuario.objects.create_user(username="user1", email="user@x.com", password="x", cpf="11111111111")
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -220,9 +208,7 @@ def test_features_gcal_mode_is_string():
 
 def test_features_superuser_has_access():
     """Superuser tem acesso a /api/features/."""
-    user = Usuario.objects.create_superuser(
-        username="admin", email="admin@x.com", password="x", cpf="99999999999"
-    )
+    user = Usuario.objects.create_superuser(username="admin", email="admin@x.com", password="x", cpf="99999999999")
 
     client = APIClient()
     client.force_authenticate(user=user)

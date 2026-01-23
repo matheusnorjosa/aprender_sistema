@@ -1,10 +1,12 @@
 """
 Parser para aba DESLOCAMENTO da planilha Disponibilidade
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 
 from __future__ import annotations
+
 from datetime import datetime, time
 from pathlib import Path
 from typing import Any
@@ -45,7 +47,7 @@ def parse_deslocamentos(filepath: Path) -> list[dict[str, Any]]:
     # Procurar aba (pode ter nome com maiúsculas/minúsculas)
     aba_name = None
     for nome in wb.sheetnames:
-        if 'DESLOCAMENTO' in nome.upper():
+        if "DESLOCAMENTO" in nome.upper():
             aba_name = nome
             break
 
@@ -54,7 +56,7 @@ def parse_deslocamentos(filepath: Path) -> list[dict[str, Any]]:
 
     ws = wb[aba_name]
     deslocamentos = []
-    tz = pytz.timezone('America/Fortaleza')
+    tz = pytz.timezone("America/Fortaleza")
 
     for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not row or len(row) < 5:
@@ -98,14 +100,16 @@ def parse_deslocamentos(filepath: Path) -> list[dict[str, Any]]:
 
         # Criar um registro para cada pessoa
         for pessoa_nome in pessoas:
-            deslocamentos.append({
-                'formador_nome': pessoa_nome,
-                'origem_nome_uf': origem,
-                'destino_nome_uf': destino,
-                'data': data_aware,
-                'tipo': tipo,  # Guardado em observacao pelo ETL
-                'src': f"{filepath.name}/{aba_name}",
-                'rownum': i,
-            })
+            deslocamentos.append(
+                {
+                    "formador_nome": pessoa_nome,
+                    "origem_nome_uf": origem,
+                    "destino_nome_uf": destino,
+                    "data": data_aware,
+                    "tipo": tipo,  # Guardado em observacao pelo ETL
+                    "src": f"{filepath.name}/{aba_name}",
+                    "rownum": i,
+                }
+            )
 
     return deslocamentos

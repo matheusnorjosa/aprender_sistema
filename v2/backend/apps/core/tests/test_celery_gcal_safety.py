@@ -11,12 +11,15 @@ Valida que a task preview_then_apply_gcal respeita flags de segurança:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-from unittest.mock import patch, MagicMock
-import pytest
+
+from unittest.mock import MagicMock, patch
+
 from django.test import TestCase, override_settings
 
-from apps.core.tasks import preview_then_apply_gcal
+import pytest
+
 from apps.core.models import AuditLog
+from apps.core.tasks import preview_then_apply_gcal
 
 
 @pytest.fixture
@@ -63,9 +66,7 @@ class CeleryGCalSafetyTests(TestCase):
                 # Simular stdout do preview
                 with patch("apps.core.tasks.StringIO") as mock_stringio:
                     mock_stdout = MagicMock()
-                    mock_stdout.getvalue.return_value = (
-                        '{"totals": {"CREATE": 5, "UPDATE": 2}, "meta": {}}'
-                    )
+                    mock_stdout.getvalue.return_value = '{"totals": {"CREATE": 5, "UPDATE": 2}, "meta": {}}'
                     mock_stringio.return_value = mock_stdout
 
                     # Executar task
@@ -285,9 +286,7 @@ class CeleryGCalSafetyTests(TestCase):
                 with patch("apps.core.tasks.StringIO") as mock_stringio:
                     # Simular 2 chamadas: preview OK, apply COM ERRO
                     mock_stdout1 = MagicMock()
-                    mock_stdout1.getvalue.return_value = (
-                        '{"error": false, "totals": {"CREATE": 5}, "meta": {}}'
-                    )
+                    mock_stdout1.getvalue.return_value = '{"error": false, "totals": {"CREATE": 5}, "meta": {}}'
 
                     mock_stdout2 = MagicMock()
                     mock_stdout2.getvalue.return_value = (

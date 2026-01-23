@@ -6,6 +6,7 @@ Validates:
 - /api/ backward compatible endpoints work
 - Deprecation decorator adds proper headers
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -94,6 +95,7 @@ class TestDeprecationDecorator(TestCase):
 
     def test_deprecated_endpoint_adds_headers(self) -> None:
         """deprecated_endpoint should add X-Deprecated headers."""
+
         # Note: deprecated_endpoint must be OUTERMOST decorator (before api_view)
         @deprecated_endpoint("Use /new-endpoint/", removal_version="v2")
         @api_view(["GET"])
@@ -102,6 +104,7 @@ class TestDeprecationDecorator(TestCase):
 
         # Simulate request
         from rest_framework.test import APIRequestFactory
+
         factory = APIRequestFactory()
         request = factory.get("/old/")
         response = old_endpoint(request)
@@ -109,6 +112,7 @@ class TestDeprecationDecorator(TestCase):
         self.assertEqual(response["X-Deprecated"], "true")
         self.assertEqual(response["X-Deprecated-Message"], "Use /new-endpoint/")
         self.assertEqual(response["X-Removal-Version"], "v2")
+
 
 class TestVersioningConfiguration(TestCase):
     """Tests for versioning DRF configuration."""
@@ -119,9 +123,6 @@ class TestVersioningConfiguration(TestCase):
 
         rf_settings = settings.REST_FRAMEWORK
 
-        self.assertEqual(
-            rf_settings.get("DEFAULT_VERSIONING_CLASS"),
-            "rest_framework.versioning.URLPathVersioning"
-        )
+        self.assertEqual(rf_settings.get("DEFAULT_VERSIONING_CLASS"), "rest_framework.versioning.URLPathVersioning")
         self.assertEqual(rf_settings.get("DEFAULT_VERSION"), "v1")
         self.assertIn("v1", rf_settings.get("ALLOWED_VERSIONS", []))

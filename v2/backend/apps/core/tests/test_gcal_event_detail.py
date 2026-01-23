@@ -13,14 +13,17 @@ Cobertura:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from datetime import timedelta
+
 from django.contrib.auth.models import Group
 from django.utils import timezone
-from rest_framework.test import APIClient
 from rest_framework import status as http_status
+from rest_framework.test import APIClient
 
-from apps.core.models import Usuario, Solicitacao, Municipio, Projeto, TipoEvento, AuditLog
+import pytest
+
+from apps.core.models import AuditLog, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 
 @pytest.fixture

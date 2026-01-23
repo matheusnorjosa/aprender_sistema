@@ -15,7 +15,6 @@ from django.http import HttpRequest
 
 from .models import Usuario
 
-
 User = get_user_model()
 
 
@@ -37,11 +36,7 @@ class CPFOrUsernameBackend(ModelBackend):
     """
 
     def authenticate(
-        self,
-        request: HttpRequest | None,
-        username: str | None = None,
-        password: str | None = None,
-        **kwargs: Any
+        self, request: HttpRequest | None, username: str | None = None, password: str | None = None, **kwargs: Any
     ) -> Usuario | None:
         """
         Authenticate user by CPF or username.
@@ -59,7 +54,7 @@ class CPFOrUsernameBackend(ModelBackend):
             return None
 
         # Remove punctuation (dots, hyphens, spaces)
-        clean_input = re.sub(r'[.\-\s]', '', username)
+        clean_input = re.sub(r"[.\-\s]", "", username)
 
         # Try CPF if input is 11 digits
         if clean_input.isdigit() and len(clean_input) == 11:

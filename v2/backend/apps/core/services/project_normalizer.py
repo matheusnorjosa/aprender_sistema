@@ -9,7 +9,6 @@ Issue: #150
 
 from __future__ import annotations
 
-
 # Mapeamento de nomes canônicos e suas variantes conhecidas
 CANONICAL_PROJECT_NAMES: dict[str, list[str]] = {
     # Nome canônico: [lista de variantes]

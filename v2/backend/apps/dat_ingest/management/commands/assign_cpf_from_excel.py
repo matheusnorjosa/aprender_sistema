@@ -27,6 +27,7 @@ Lógica:
     5. DRY-RUN: relatar sem persistir
     6. APPLY: transaction.atomic() + save(update_fields=["cpf"])
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -37,12 +38,12 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
-from django.core.management.base import BaseCommand, CommandParser
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
-from openpyxl import load_workbook
 
+from openpyxl import load_workbook
 
 User = get_user_model()
 
@@ -69,7 +70,7 @@ def is_placeholder_cpf(cpf: str | None) -> bool:
         return False
 
     # Padrão: 000000000XX (9 zeros + até 3 dígitos)
-    return cpf.startswith('000000000')
+    return cpf.startswith("000000000")
 
 
 def validate_cpf(cpf: str | None) -> bool:
@@ -121,7 +122,7 @@ def clean_cpf(cpf_raw: Any) -> str | None:
         return None
 
     # Remove tudo que não é dígito
-    cpf_clean = re.sub(r'\D', '', str(cpf_raw))
+    cpf_clean = re.sub(r"\D", "", str(cpf_raw))
 
     # Valida 11 dígitos
     if len(cpf_clean) != 11 or not cpf_clean.isdigit():
@@ -187,7 +188,7 @@ class Command(BaseCommand):
         self.stdout.write(f"   ✅ {len(excel_data)} linhas lidas")
 
         # 2. Processar matches
-        self.stdout.write(f"\n2. Processando matches (email → nome)")
+        self.stdout.write("\n2. Processando matches (email → nome)")
         result = self._process_matches(excel_data, apply_mode)
 
         # 3. Gerar relatório
@@ -235,12 +236,14 @@ class Command(BaseCommand):
                 if not final_nome:
                     continue
 
-                data.append({
-                    "nome": final_nome,
-                    "nome_completo": nome_completo,
-                    "email": normalize_text(email),
-                    "cpf_raw": cpf_raw,
-                })
+                data.append(
+                    {
+                        "nome": final_nome,
+                        "nome_completo": nome_completo,
+                        "email": normalize_text(email),
+                        "cpf_raw": cpf_raw,
+                    }
+                )
 
         wb.close()
         return data
@@ -297,12 +300,14 @@ class Command(BaseCommand):
 
             # Validar CPF
             if not cpf_clean:
-                skipped.append({
-                    "nome": row["nome"],
-                    "email": row["email"],
-                    "reason": "CPF inválido ou ausente",
-                    "cpf_raw": str(row["cpf_raw"]),
-                })
+                skipped.append(
+                    {
+                        "nome": row["nome"],
+                        "email": row["email"],
+                        "reason": "CPF inválido ou ausente",
+                        "cpf_raw": str(row["cpf_raw"]),
+                    }
+                )
                 continue
 
             # Contar CPF para detectar duplicidades
@@ -323,13 +328,15 @@ class Command(BaseCommand):
 
                 # Verificar duplicidade de CPF na planilha
                 if cpf_clean in duplicated_cpfs:
-                    conflicts.append({
-                        "nome": row["nome"],
-                        "email": row["email"],
-                        "cpf": cpf_clean,
-                        "reason": "CPF duplicado na planilha",
-                        "duplicados": duplicated_cpfs[cpf_clean],
-                    })
+                    conflicts.append(
+                        {
+                            "nome": row["nome"],
+                            "email": row["email"],
+                            "cpf": cpf_clean,
+                            "reason": "CPF duplicado na planilha",
+                            "duplicados": duplicated_cpfs[cpf_clean],
+                        }
+                    )
                     continue
 
                 # 1. Match por email (preferencial)
@@ -340,12 +347,14 @@ class Command(BaseCommand):
                     user_by_email = users_by_email.get(row["email"])
                     if user_by_email is None:
                         # Email ambíguo (múltiplos usuários com mesmo email)
-                        conflicts.append({
-                            "nome": row["nome"],
-                            "email": row["email"],
-                            "cpf": cpf_clean,
-                            "reason": "Email ambíguo (múltiplos usuários)",
-                        })
+                        conflicts.append(
+                            {
+                                "nome": row["nome"],
+                                "email": row["email"],
+                                "cpf": cpf_clean,
+                                "reason": "Email ambíguo (múltiplos usuários)",
+                            }
+                        )
                         continue
                     elif user_by_email:
                         matched_user = user_by_email
@@ -357,12 +366,14 @@ class Command(BaseCommand):
                     user_by_name = users_by_name.get(nome_norm)
                     if user_by_name is None:
                         # Nome ambíguo
-                        conflicts.append({
-                            "nome": row["nome"],
-                            "email": row["email"],
-                            "cpf": cpf_clean,
-                            "reason": "Nome ambíguo (múltiplos usuários)",
-                        })
+                        conflicts.append(
+                            {
+                                "nome": row["nome"],
+                                "email": row["email"],
+                                "cpf": cpf_clean,
+                                "reason": "Nome ambíguo (múltiplos usuários)",
+                            }
+                        )
                         continue
                     elif user_by_name:
                         matched_user = user_by_name
@@ -370,42 +381,50 @@ class Command(BaseCommand):
 
                 # Nenhum match encontrado
                 if not matched_user:
-                    skipped.append({
-                        "nome": row["nome"],
-                        "email": row["email"],
-                        "cpf": cpf_clean,
-                        "reason": "Usuário não encontrado no banco",
-                    })
+                    skipped.append(
+                        {
+                            "nome": row["nome"],
+                            "email": row["email"],
+                            "cpf": cpf_clean,
+                            "reason": "Usuário não encontrado no banco",
+                        }
+                    )
                     continue
 
                 # Match encontrado
                 # Verificar se CPF já está preenchido (não-placeholder) e é diferente
                 if matched_user.cpf and not is_placeholder_cpf(matched_user.cpf) and matched_user.cpf != cpf_clean:
-                    conflicts.append({
-                        "nome": row["nome"],
-                        "email": row["email"],
-                        "cpf_planilha": cpf_clean,
-                        "cpf_banco": matched_user.cpf,
-                        "username": matched_user.username,
-                        "reason": "CPF divergente (banco != planilha)",
-                    })
+                    conflicts.append(
+                        {
+                            "nome": row["nome"],
+                            "email": row["email"],
+                            "cpf_planilha": cpf_clean,
+                            "cpf_banco": matched_user.cpf,
+                            "username": matched_user.username,
+                            "reason": "CPF divergente (banco != planilha)",
+                        }
+                    )
                     continue
 
                 # Atualizar CPF
-                prev_cpf = "(vazio)" if not matched_user.cpf or is_placeholder_cpf(matched_user.cpf) else matched_user.cpf
+                prev_cpf = (
+                    "(vazio)" if not matched_user.cpf or is_placeholder_cpf(matched_user.cpf) else matched_user.cpf
+                )
                 matched_user.cpf = cpf_clean
 
                 if apply_mode:
                     matched_user.save(update_fields=["cpf"])
 
-                updated.append({
-                    "username": matched_user.username,
-                    "nome": row["nome"],
-                    "email": row["email"],
-                    "cpf": cpf_clean,
-                    "prev_cpf": prev_cpf,
-                    "match_method": match_method,
-                })
+                updated.append(
+                    {
+                        "username": matched_user.username,
+                        "nome": row["nome"],
+                        "email": row["email"],
+                        "cpf": cpf_clean,
+                        "prev_cpf": prev_cpf,
+                        "match_method": match_method,
+                    }
+                )
 
             # Se não é APPLY, rollback
             if not apply_mode:

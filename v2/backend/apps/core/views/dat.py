@@ -5,6 +5,7 @@ ViewSets para DATRegistro e ProjetoGeral (acompanhamento de turmas).
 
 Ref: v2/docs/SPEC_DAT_REGISTROS.md
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -12,14 +13,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.db.models import Count, Q, QuerySet
-
-from django_filters import rest_framework as filters
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from django_filters import rest_framework as filters
+from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.core.models import DATRegistro, ProjetoGeral
 from apps.core.permissions import IsDATOrSuper, IsSuperintendenciaOnly
@@ -184,45 +185,49 @@ class DATRegistroViewSet(viewsets.ModelViewSet):
         writer = csv.writer(output)
 
         # Header
-        writer.writerow([
-            "Município",
-            "UF",
-            "Projeto Geral",
-            "Projeto",
-            "Qtde Alunos",
-            "Qtde Professores",
-            "Reunião DAT",
-            "Turma FORMAR ID",
-            "Nº Códigos",
-            "Chaves Inscrição",
-            "Instruções",
-            "Envio Códigos",
-            "Usa AVALIAR",
-            "Alunos Recebidos",
-            "Alunos Validados",
-            "Alunos Importados",
-        ])
+        writer.writerow(
+            [
+                "Município",
+                "UF",
+                "Projeto Geral",
+                "Projeto",
+                "Qtde Alunos",
+                "Qtde Professores",
+                "Reunião DAT",
+                "Turma FORMAR ID",
+                "Nº Códigos",
+                "Chaves Inscrição",
+                "Instruções",
+                "Envio Códigos",
+                "Usa AVALIAR",
+                "Alunos Recebidos",
+                "Alunos Validados",
+                "Alunos Importados",
+            ]
+        )
 
         # Rows
         for r in queryset:
-            writer.writerow([
-                r.municipio.nome,
-                r.municipio.uf,
-                r.projeto_geral.nome,
-                r.projeto.nome,
-                r.aluno_qtde,
-                r.professor_qtde or "",
-                r.reuniao_dat or "",
-                r.turma_formar_id or "",
-                r.nr_codigos or "",
-                r.chaves_inscricao_status,
-                r.instrucoes_status,
-                r.envio_codigos_status,
-                "Sim" if r.usa_avaliar else "Não",
-                r.alunos_recebidos_status,
-                r.alunos_validados_status,
-                r.alunos_importados_status,
-            ])
+            writer.writerow(
+                [
+                    r.municipio.nome,
+                    r.municipio.uf,
+                    r.projeto_geral.nome,
+                    r.projeto.nome,
+                    r.aluno_qtde,
+                    r.professor_qtde or "",
+                    r.reuniao_dat or "",
+                    r.turma_formar_id or "",
+                    r.nr_codigos or "",
+                    r.chaves_inscricao_status,
+                    r.instrucoes_status,
+                    r.envio_codigos_status,
+                    "Sim" if r.usa_avaliar else "Não",
+                    r.alunos_recebidos_status,
+                    r.alunos_validados_status,
+                    r.alunos_importados_status,
+                ]
+            )
 
         # Response
         response = HttpResponse(output.getvalue(), content_type="text/csv")
@@ -248,34 +253,38 @@ class DATRegistroViewSet(viewsets.ModelViewSet):
 
         # Agregação em uma única query (Issue #308: fix N+1)
         stats = qs.aggregate(
-            total=Count('id'),
-            completos_formar=Count('id', filter=Q(
-                chaves_inscricao_status="concluido",
-                instrucoes_status="concluido",
-                envio_codigos_status="concluido",
-            )),
-            usa_avaliar_count=Count('id', filter=Q(usa_avaliar=True)),
-            completos_avaliar=Count('id', filter=Q(
-                usa_avaliar=True,
-                alunos_recebidos_status="concluido",
-                alunos_validados_status="concluido",
-                alunos_importados_status="concluido",
-            )),
+            total=Count("id"),
+            completos_formar=Count(
+                "id",
+                filter=Q(
+                    chaves_inscricao_status="concluido",
+                    instrucoes_status="concluido",
+                    envio_codigos_status="concluido",
+                ),
+            ),
+            usa_avaliar_count=Count("id", filter=Q(usa_avaliar=True)),
+            completos_avaliar=Count(
+                "id",
+                filter=Q(
+                    usa_avaliar=True,
+                    alunos_recebidos_status="concluido",
+                    alunos_validados_status="concluido",
+                    alunos_importados_status="concluido",
+                ),
+            ),
         )
 
-        por_uf = (
-            qs.values("municipio__uf")
-            .annotate(count=Count("id"))
-            .order_by("-count")
-        )
+        por_uf = qs.values("municipio__uf").annotate(count=Count("id")).order_by("-count")
 
-        return Response({
-            "total": stats['total'],
-            "completos_formar": stats['completos_formar'],
-            "completos_avaliar": stats['completos_avaliar'],
-            "usa_avaliar": stats['usa_avaliar_count'],
-            "por_uf": list(por_uf),
-        })
+        return Response(
+            {
+                "total": stats["total"],
+                "completos_formar": stats["completos_formar"],
+                "completos_avaliar": stats["completos_avaliar"],
+                "usa_avaliar": stats["usa_avaliar_count"],
+                "por_uf": list(por_uf),
+            }
+        )
 
 
 class ProjetoGeralViewSet(viewsets.ModelViewSet):

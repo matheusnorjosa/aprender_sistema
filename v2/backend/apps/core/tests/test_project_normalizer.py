@@ -13,14 +13,15 @@ Issue: #150
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import pytest
 
 from apps.core.services.project_normalizer import (
-    normalize_project_name,
-    is_known_variant,
-    get_canonical_name,
-    list_all_variants,
     CANONICAL_PROJECT_NAMES,
+    get_canonical_name,
+    is_known_variant,
+    list_all_variants,
+    normalize_project_name,
 )
 
 
@@ -219,8 +220,7 @@ class TestNormalizerIntegration:
             for variant in variants:
                 normalized = normalize_project_name(variant)
                 assert normalized == canonical, (
-                    f"Variant '{variant}' should normalize to '{canonical}', "
-                    f"got '{normalized}'"
+                    f"Variant '{variant}' should normalize to '{canonical}', " f"got '{normalized}'"
                 )
 
     def test_all_variants_are_known(self) -> None:
@@ -229,9 +229,7 @@ class TestNormalizerIntegration:
 
         for canonical, variants in all_variants.items():
             for variant in variants:
-                assert is_known_variant(variant) is True, (
-                    f"Variant '{variant}' should be recognized as known variant"
-                )
+                assert is_known_variant(variant) is True, f"Variant '{variant}' should be recognized as known variant"
 
     def test_all_variants_return_canonical_via_get(self) -> None:
         """Todas as variantes devem retornar canônico via get_canonical_name()."""
@@ -241,8 +239,7 @@ class TestNormalizerIntegration:
             for variant in variants:
                 result = get_canonical_name(variant)
                 assert result == canonical, (
-                    f"Variant '{variant}' should return canonical '{canonical}', "
-                    f"got '{result}'"
+                    f"Variant '{variant}' should return canonical '{canonical}', " f"got '{result}'"
                 )
 
     def test_canonical_names_not_variants_of_themselves(self) -> None:
@@ -250,9 +247,7 @@ class TestNormalizerIntegration:
         all_variants = list_all_variants()
 
         for canonical in all_variants.keys():
-            assert is_known_variant(canonical) is False, (
-                f"Canonical name '{canonical}' should NOT be a variant"
-            )
-            assert get_canonical_name(canonical) is None, (
-                f"Canonical name '{canonical}' should return None from get_canonical_name()"
-            )
+            assert is_known_variant(canonical) is False, f"Canonical name '{canonical}' should NOT be a variant"
+            assert (
+                get_canonical_name(canonical) is None
+            ), f"Canonical name '{canonical}' should return None from get_canonical_name()"

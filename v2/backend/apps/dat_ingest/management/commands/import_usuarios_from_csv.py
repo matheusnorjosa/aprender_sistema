@@ -11,6 +11,7 @@ REGRAS:
 CSV ESPERADO:
 nome_display,email,papel_sugerido,gerente_sugerido,origem_mais_frequente,frequencia,papeis_observados,setores
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -83,15 +84,15 @@ class Command(BaseCommand):
 
             # Validar email
             if not email or not self.is_valid_email(email):
-                self.stdout.write(
-                    self.style.WARNING(f"  ⚠️  Sem email válido: {nome} (skipped)")
-                )
+                self.stdout.write(self.style.WARNING(f"  ⚠️  Sem email válido: {nome} (skipped)"))
                 stats["skipped_no_email"] += 1
-                pendencias.append({
-                    "nome": nome,
-                    "motivo": "email_invalido",
-                    "email": email,
-                })
+                pendencias.append(
+                    {
+                        "nome": nome,
+                        "motivo": "email_invalido",
+                        "email": email,
+                    }
+                )
                 continue
 
             # Verificar se já existe
@@ -127,33 +128,19 @@ class Command(BaseCommand):
                                 grupo = Group.objects.get(name=grupo_nome)
                                 usuario.groups.add(grupo)
                             except Group.DoesNotExist:
-                                self.stdout.write(
-                                    self.style.WARNING(
-                                        f"    ⚠️  Grupo '{grupo_nome}' não existe"
-                                    )
-                                )
+                                self.stdout.write(self.style.WARNING(f"    ⚠️  Grupo '{grupo_nome}' não existe"))
 
-                        self.stdout.write(
-                            self.style.SUCCESS(
-                                f"  ✅ Criado: {nome} ({email}) | Grupo: {grupo_nome}"
-                            )
-                        )
+                        self.stdout.write(self.style.SUCCESS(f"  ✅ Criado: {nome} ({email}) | Grupo: {grupo_nome}"))
                         stats["created"] += 1
 
                 except Exception as e:
-                    self.stdout.write(
-                        self.style.ERROR(f"  ❌ Erro ao criar '{nome}': {e}")
-                    )
+                    self.stdout.write(self.style.ERROR(f"  ❌ Erro ao criar '{nome}': {e}"))
                     stats["errors"] += 1
 
             else:
                 # Dry-run
                 grupo_nome = self.map_papel_to_grupo(papel_sugerido)
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"  ✅ [DRY-RUN] Criaria: {nome} ({email}) | Grupo: {grupo_nome}"
-                    )
-                )
+                self.stdout.write(self.style.SUCCESS(f"  ✅ [DRY-RUN] Criaria: {nome} ({email}) | Grupo: {grupo_nome}"))
                 stats["created"] += 1
 
         # Sumário
@@ -166,17 +153,11 @@ class Command(BaseCommand):
         self.stdout.write("-" * 80)
 
         if stats["skipped_no_email"] > 0:
-            self.stdout.write(
-                self.style.WARNING(
-                    f"\n⚠️  {stats['skipped_no_email']} usuário(s) sem email válido!"
-                )
-            )
+            self.stdout.write(self.style.WARNING(f"\n⚠️  {stats['skipped_no_email']} usuário(s) sem email válido!"))
             self.stdout.write("   Preencha emails no CSV antes de importar.")
 
         if not apply:
-            self.stdout.write(
-                self.style.WARNING("\n⚠️  DRY-RUN: Use --apply para criar usuários")
-            )
+            self.stdout.write(self.style.WARNING("\n⚠️  DRY-RUN: Use --apply para criar usuários"))
 
         self.stdout.write("\n✅ Import concluído!\n")
 

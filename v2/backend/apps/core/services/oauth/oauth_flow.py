@@ -9,6 +9,7 @@ Security features:
 - Open redirect prevention (_is_safe_url)
 - Domain validation (@aprendereditora.com.br)
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false
 
 from __future__ import annotations
@@ -18,9 +19,10 @@ import os
 from typing import Any
 from urllib.parse import urlencode, urlparse
 
-import requests
 from django.conf import settings
 from django.utils import timezone
+
+import requests
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -133,8 +135,7 @@ def validate_oauth_state(state: str, user_id: int) -> dict:
         # Verificar user_id match
         if state_user_id != user_id:
             logger.error(
-                f"❌ OAuth state validation: user_id mismatch "
-                f"(state={state_user_id}, authenticated={user_id})"
+                f"❌ OAuth state validation: user_id mismatch " f"(state={state_user_id}, authenticated={user_id})"
             )
             return {"valid": False, "return_to": "/pre-agenda", "error": "User ID mismatch"}
 
@@ -143,9 +144,7 @@ def validate_oauth_state(state: str, user_id: int) -> dict:
         cached_state: Any = cache.get(cache_key)
 
         if not cached_state:
-            logger.error(
-                f"❌ OAuth state validation: token not found or expired ({csrf_token[:8]}...)"
-            )
+            logger.error(f"❌ OAuth state validation: token not found or expired ({csrf_token[:8]}...)")
             return {
                 "valid": False,
                 "return_to": "/pre-agenda",
@@ -155,9 +154,7 @@ def validate_oauth_state(state: str, user_id: int) -> dict:
         # Validar return_to
         cached_return_to: str = cached_state.get("return_to", "/pre-agenda")
         if not _is_safe_url(cached_return_to):
-            logger.warning(
-                f"⚠️ OAuth state validation: unsafe return_to in cache ({cached_return_to})"
-            )
+            logger.warning(f"⚠️ OAuth state validation: unsafe return_to in cache ({cached_return_to})")
             cached_return_to = "/pre-agenda"
 
         # Remover state do cache (one-time use)
@@ -283,9 +280,7 @@ def exchange_code_for_tokens(code: str) -> dict:
     redirect_uri: str | None = os.getenv("GCAL_OAUTH_REDIRECT_URI")
 
     if not all([client_id, client_secret, redirect_uri]):
-        raise ValueError(
-            "❌ Variáveis OAuth não configuradas (client_id, client_secret, redirect_uri)"
-        )
+        raise ValueError("❌ Variáveis OAuth não configuradas (client_id, client_secret, redirect_uri)")
 
     token_url: str = "https://oauth2.googleapis.com/token"
     payload: dict[str, str] = {  # type: ignore[assignment]
@@ -315,9 +310,7 @@ def exchange_code_for_tokens(code: str) -> dict:
         access_token: str = data["access_token"]
         userinfo_url: str = "https://www.googleapis.com/oauth2/v2/userinfo"
         headers: dict[str, str] = {"Authorization": f"Bearer {access_token}"}
-        userinfo_response: requests.Response = requests.get(
-            userinfo_url, headers=headers, timeout=10
-        )
+        userinfo_response: requests.Response = requests.get(userinfo_url, headers=headers, timeout=10)
         userinfo_response.raise_for_status()
         userinfo: dict[str, Any] = userinfo_response.json()
 
@@ -328,10 +321,7 @@ def exchange_code_for_tokens(code: str) -> dict:
         # Validar domínio permitido
         allowed_domain: str = os.getenv("GCAL_ALLOWED_DOMAIN", "aprendereditora.com.br")
         if not email.endswith(f"@{allowed_domain}"):
-            raise ValueError(
-                f"❌ Domínio não permitido: {email}. "
-                f"Apenas contas @{allowed_domain} são aceitas."
-            )
+            raise ValueError(f"❌ Domínio não permitido: {email}. " f"Apenas contas @{allowed_domain} são aceitas.")
 
         return {
             "access_token": data["access_token"],

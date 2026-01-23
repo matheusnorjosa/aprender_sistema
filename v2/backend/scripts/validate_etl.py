@@ -6,17 +6,25 @@ Valida contagens, integridade referencial e regras de negócio
 
 import os
 import sys
+
 import django
 
 # Setup Django
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
-from django.db.models import Count, Q, F
+from django.db.models import Count, F, Q
+
 from apps.core.models import (
-    Usuario, Municipio, Projeto, TipoEvento,
-    Solicitacao, Participation, AvailabilityBlock, Deslocamento
+    AvailabilityBlock,
+    Deslocamento,
+    Municipio,
+    Participation,
+    Projeto,
+    Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 
 
@@ -33,25 +41,25 @@ def validate_counts():
 
     # Contagens esperadas baseadas na Sessão 2
     expected = {
-        'Usuários': (117, 117),  # (min, max)
-        'Municípios': (87, 87),
-        'Projetos': (31, 31),
-        'Tipos de Evento': (1, 10),  # Pelo menos 1 (default)
-        'Solicitações': (1500, 1700),  # ~1625
-        'Participações': (1800, 2000),  # ~1915
-        'Bloqueios': (0, 100),  # Esperado 0 (sem dados na planilha)
-        'Deslocamentos': (0, 100),  # Esperado 0 (sem dados na planilha)
+        "Usuários": (117, 117),  # (min, max)
+        "Municípios": (87, 87),
+        "Projetos": (31, 31),
+        "Tipos de Evento": (1, 10),  # Pelo menos 1 (default)
+        "Solicitações": (1500, 1700),  # ~1625
+        "Participações": (1800, 2000),  # ~1915
+        "Bloqueios": (0, 100),  # Esperado 0 (sem dados na planilha)
+        "Deslocamentos": (0, 100),  # Esperado 0 (sem dados na planilha)
     }
 
     models = {
-        'Usuários': Usuario,
-        'Municípios': Municipio,
-        'Projetos': Projeto,
-        'Tipos de Evento': TipoEvento,
-        'Solicitações': Solicitacao,
-        'Participações': Participation,
-        'Bloqueios': AvailabilityBlock,
-        'Deslocamentos': Deslocamento,
+        "Usuários": Usuario,
+        "Municípios": Municipio,
+        "Projetos": Projeto,
+        "Tipos de Evento": TipoEvento,
+        "Solicitações": Solicitacao,
+        "Participações": Participation,
+        "Bloqueios": AvailabilityBlock,
+        "Deslocamentos": Deslocamento,
     }
 
     results = []
@@ -69,17 +77,11 @@ def validate_counts():
             ok = False
             all_ok = False
 
-        results.append({
-            'name': name,
-            'count': count,
-            'expected': f"{min_exp}-{max_exp}",
-            'status': status,
-            'ok': ok
-        })
+        results.append({"name": name, "count": count, "expected": f"{min_exp}-{max_exp}", "status": status, "ok": ok})
 
         print(f"{status} {name:20} {count:6} (esperado: {min_exp}-{max_exp})")
 
-    total = sum(r['count'] for r in results)
+    total = sum(r["count"] for r in results)
     print(f"\n{'─' * 80}")
     print(f"   {'TOTAL GERAL:':20} {total:6} registros")
     print(f"{'─' * 80}")
@@ -118,10 +120,7 @@ def validate_referential_integrity():
         print(f"✅ Todas solicitações têm tipo de evento")
 
     # 4. Participações sem usuário (exceto convidados)
-    orphan_participations = Participation.objects.filter(
-        usuario__isnull=True,
-        guest_email__isnull=True
-    ).count()
+    orphan_participations = Participation.objects.filter(usuario__isnull=True, guest_email__isnull=True).count()
     if orphan_participations > 0:
         print(f"❌ {orphan_participations} Participações sem usuário nem email")
         all_ok = False
@@ -146,7 +145,7 @@ def validate_business_rules():
     all_ok = True
 
     # 1. Datas inválidas (fim < início)
-    invalid_dates = Solicitacao.objects.filter(fim__lt=F('inicio')).count()
+    invalid_dates = Solicitacao.objects.filter(fim__lt=F("inicio")).count()
     if invalid_dates > 0:
         print(f"❌ {invalid_dates} Solicitações com data fim < início")
         all_ok = False
@@ -154,9 +153,7 @@ def validate_business_rules():
         print(f"✅ Todas solicitações têm datas válidas (fim >= início)")
 
     # 2. Solicitações sem participações
-    no_participations = Solicitacao.objects.annotate(
-        num_parts=Count('participations')
-    ).filter(num_parts=0).count()
+    no_participations = Solicitacao.objects.annotate(num_parts=Count("participations")).filter(num_parts=0).count()
 
     if no_participations > 0:
         print(f"⚠️  {no_participations} Solicitações sem participações (pode ser normal)")
@@ -164,9 +161,9 @@ def validate_business_rules():
         print(f"✅ Todas solicitações têm pelo menos 1 participação")
 
     # 3. CPFs duplicados
-    duplicate_cpfs = Usuario.objects.exclude(cpf='').values('cpf').annotate(
-        count=Count('id')
-    ).filter(count__gt=1).count()
+    duplicate_cpfs = (
+        Usuario.objects.exclude(cpf="").values("cpf").annotate(count=Count("id")).filter(count__gt=1).count()
+    )
 
     if duplicate_cpfs > 0:
         print(f"❌ {duplicate_cpfs} CPFs duplicados")
@@ -175,9 +172,7 @@ def validate_business_rules():
         print(f"✅ Nenhum CPF duplicado")
 
     # 4. Emails duplicados
-    duplicate_emails = Usuario.objects.values('email').annotate(
-        count=Count('id')
-    ).filter(count__gt=1).count()
+    duplicate_emails = Usuario.objects.values("email").annotate(count=Count("id")).filter(count__gt=1).count()
 
     if duplicate_emails > 0:
         print(f"❌ {duplicate_emails} Emails duplicados")
@@ -186,7 +181,7 @@ def validate_business_rules():
         print(f"✅ Nenhum email duplicado")
 
     # 5. Municípios sem UF (pode ser normal para alguns casos como "AMIGOS DO BEM")
-    no_uf = Municipio.objects.filter(Q(uf='') | Q(uf__isnull=True)).count()
+    no_uf = Municipio.objects.filter(Q(uf="") | Q(uf__isnull=True)).count()
     if no_uf > 0:
         print(f"ℹ️  {no_uf} Municípios sem UF (pode ser normal)")
     else:
@@ -201,34 +196,35 @@ def generate_statistics():
 
     # 1. Solicitações por status
     print("📊 Solicitações por status:")
-    for status in Solicitacao.objects.values('status').annotate(
-        total=Count('id')
-    ).order_by('-total'):
+    for status in Solicitacao.objects.values("status").annotate(total=Count("id")).order_by("-total"):
         print(f"   {status['status']:15} {status['total']:5}")
 
     # 2. Top 5 projetos
     print("\n📊 Top 5 projetos com mais solicitações:")
-    for proj in Solicitacao.objects.values('projeto__nome').annotate(
-        total=Count('id')
-    ).order_by('-total')[:5]:
+    for proj in Solicitacao.objects.values("projeto__nome").annotate(total=Count("id")).order_by("-total")[:5]:
         print(f"   {proj['projeto__nome']:30} {proj['total']:5}")
 
     # 3. Top 5 municípios
     print("\n📊 Top 5 municípios com mais solicitações:")
-    for mun in Solicitacao.objects.values('municipio__nome', 'municipio__uf').annotate(
-        total=Count('id')
-    ).order_by('-total')[:5]:
-        uf = mun['municipio__uf'] or '??'
+    for mun in (
+        Solicitacao.objects.values("municipio__nome", "municipio__uf")
+        .annotate(total=Count("id"))
+        .order_by("-total")[:5]
+    ):
+        uf = mun["municipio__uf"] or "??"
         print(f"   {mun['municipio__nome']:25} - {uf:2}  {mun['total']:5}")
 
     # 4. Participações por solicitação
-    stats = Solicitacao.objects.annotate(
-        num_parts=Count('participations')
-    ).values('num_parts').annotate(count=Count('id')).order_by('num_parts')
+    stats = (
+        Solicitacao.objects.annotate(num_parts=Count("participations"))
+        .values("num_parts")
+        .annotate(count=Count("id"))
+        .order_by("num_parts")
+    )
 
     if stats:
-        total_parts = sum(s['num_parts'] * s['count'] for s in stats)
-        total_sols = sum(s['count'] for s in stats)
+        total_parts = sum(s["num_parts"] * s["count"] for s in stats)
+        total_sols = sum(s["count"] for s in stats)
         avg_parts = total_parts / total_sols if total_sols > 0 else 0
 
         print(f"\n📊 Participações por solicitação:")
@@ -241,9 +237,12 @@ def generate_statistics():
 
     # 5. Usuários mais ativos (top formadores)
     print("\n📊 Top 5 formadores mais ativos:")
-    for user in Participation.objects.filter(role='FORMADOR').values(
-        'usuario__first_name', 'usuario__last_name'
-    ).annotate(total=Count('id')).order_by('-total')[:5]:
+    for user in (
+        Participation.objects.filter(role="FORMADOR")
+        .values("usuario__first_name", "usuario__last_name")
+        .annotate(total=Count("id"))
+        .order_by("-total")[:5]
+    ):
         nome = f"{user['usuario__first_name']} {user['usuario__last_name']}"
         print(f"   {nome:30} {user['total']:5} participações")
 
@@ -288,5 +287,5 @@ def main():
     return exit_code
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     exit(main())

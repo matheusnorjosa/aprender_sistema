@@ -1,115 +1,114 @@
 """
 Core API URLs (v2-only, views ativas isoladas)
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportMissingImports=false
 
 from __future__ import annotations
 
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
+
 from drf_spectacular.views import (
     SpectacularAPIView,
-    SpectacularSwaggerView,
     SpectacularRedocView,
+    SpectacularSwaggerView,
 )
+
+from .views import DATRegistroViewSet  # DAT Registros module
+from .views import GerenciaViewSet  # Issue #145
+from .views import GroupViewSet  # Criado (Fase 1 Iteração 2, GAP-002)
+from .views import ProdutoViewSet  # Issue #146
+from .views import ProjetoGeralViewSet  # DAT Registros module
+from .views import UsuarioAdminViewSet  # Reativado (Fase 1 Iteração 2, GAP-001)
+from .views import (  # DAT Module ViewSets; Plano Formacoes (novo modelo estruturado)
+    AuditLogViewSet,
+    CompraViewSet,
+    DATAcaoViewSet,
+    DATAreaViewSet,
+    DATCadastroViewSet,
+    DATCompraViewSet,
+    DATCoordenadorViewSet,
+    DATFormacaoViewSet,
+    MunicipioViewSet,
+    PlanoFormacoesViewSet,
+    ProjetoViewSet,
+)
+from .views.stats import HomeStatsView
+from .views_auth import csrf_token, login, logout, ping
+from .views_availability import (
+    AvailabilityBlockViewSet,
+    AvailabilityCheckManyView,
+    AvailabilityCheckView,
+)
+from .views_availability_monthly import MonthlyAvailabilityView
 
 # Imports de módulos isolados (GAP-001 fix)
 from .views_basic import CurrentUserView, api_root
-from .views_health import features, readyz
-from .views.stats import HomeStatsView
-from .views_auth import csrf_token, login, logout, ping
-from .views_solicitacao import SolicitacaoViewSet
-from .views_availability import (
-    AvailabilityBlockViewSet,
-    AvailabilityCheckView,
-    AvailabilityCheckManyView,
-)
-from .views_availability_monthly import MonthlyAvailabilityView
-from .views_controle_imports import ImportComprasView
-from .views_imports import ControleImportAcoesView, DATImportCadastrosView
 from .views_compras import ControleComprasListView
+from .views_config import config_view  # Issue #187
 from .views_controle_dat import ControleAcoesListView, DATAcoesListCreateView
-from .views_metrics import (
-    metrics_map,
-    metrics_map_coordinators,
-    productivity_metrics,
-    formadores_metrics,
-    quality_metrics,
-)
-from .views_reports import (
-    reports_status_counts,
-    reports_top_projects,
-    reports_weekly_approved,
-    reports_by_uf,
-)
-from .views_options import (
-    municipios_options,
-    projetos_options,
-    tipos_evento_options,
-    usuarios_options,
-    produtos_options,
-    coordenadores_options,
-    areas_options,
-)
-from .views_preagenda import PreAgendaListView
-from .views_gcal import (
-    # Core GCal
-    gcal_calendars,
-    gcal_health,
-    # Dashboard views
-    GCalStatusSummaryView,
-    GCalListView,
-    GCalDriftView,
-    GCalPublishBatchView,
-    DashboardMetricsView,
-    DashboardEventsView,
-    AlertsSummaryView,  # Issue #97
+from .views_controle_imports import ImportComprasView
+from .views_dashboard import dashboard_overview  # Issue #311
+from .views_deslocamento import DeslocamentoViewSet  # Issue #188
+from .views_gcal import AlertsSummaryView  # Issue #97
+from .views_gcal import EventDetailAPIView  # Issue #98
+from .views_gcal import SuccessRateView  # Issue #99
+from .views_gcal import TopInsightsView  # Issue #99
+from .views_gcal import (  # Core GCal; Dashboard views
     DashboardEventsExportView,
+    DashboardEventsView,
+    DashboardMetricsView,
     GCalBatchReapplyView,
     GCalBatchResyncView,
-    EventDetailAPIView,  # Issue #98
-    SuccessRateView,  # Issue #99
-    TopInsightsView,  # Issue #99
+    GCalDriftView,
+    GCalListView,
+    GCalPublishBatchView,
+    GCalStatusSummaryView,
+    gcal_calendars,
+    gcal_health,
 )
+from .views_health import features, readyz
+from .views_imports import ControleImportAcoesView, DATImportCadastrosView
 from .views_lookup import (
     MunicipioLookup,
     ProjetoLookup,
     TipoEventoLookup,
     UsuarioLookup,
 )
-from .views_validate import SolicitationValidateView
+from .views_metrics import (
+    formadores_metrics,
+    metrics_map,
+    metrics_map_coordinators,
+    productivity_metrics,
+    quality_metrics,
+)
 from .views_oauth import (
-    google_oauth_start,
     google_oauth_callback,
-    google_oauth_status,
     google_oauth_disconnect,
     google_oauth_list_calendars,
     google_oauth_select_calendar,
+    google_oauth_start,
+    google_oauth_status,
 )
-from .views_config import config_view  # Issue #187
-from .views_deslocamento import DeslocamentoViewSet  # Issue #188
-from .views_dashboard import dashboard_overview  # Issue #311
-from .views import (
-    MunicipioViewSet,
-    ProjetoViewSet,
-    ProdutoViewSet,  # Issue #146
-    GerenciaViewSet,  # Issue #145
-    CompraViewSet,
-    UsuarioAdminViewSet,  # Reativado (Fase 1 Iteração 2, GAP-001)
-    GroupViewSet,  # Criado (Fase 1 Iteração 2, GAP-002)
-    AuditLogViewSet,
-    DATRegistroViewSet,  # DAT Registros module
-    ProjetoGeralViewSet,  # DAT Registros module
-    # DAT Module ViewSets
-    DATAreaViewSet,
-    DATCoordenadorViewSet,
-    DATAcaoViewSet,
-    DATCompraViewSet,
-    DATCadastroViewSet,
-    DATFormacaoViewSet,
-    # Plano Formacoes (novo modelo estruturado)
-    PlanoFormacoesViewSet,
+from .views_options import (
+    areas_options,
+    coordenadores_options,
+    municipios_options,
+    produtos_options,
+    projetos_options,
+    tipos_evento_options,
+    usuarios_options,
 )
+from .views_preagenda import PreAgendaListView
+from .views_reports import (
+    reports_by_uf,
+    reports_status_counts,
+    reports_top_projects,
+    reports_weekly_approved,
+)
+from .views_solicitacao import SolicitacaoViewSet
+from .views_validate import SolicitationValidateView
 
 app_name = "core"
 
@@ -126,7 +125,9 @@ router.register(r"projetos", ProjetoViewSet, basename="projeto")
 router.register(r"produtos", ProdutoViewSet, basename="produto")  # Issue #146
 router.register(r"gerencias", GerenciaViewSet, basename="gerencia")  # Issue #145
 router.register(r"compras", CompraViewSet, basename="compra")
-router.register(r"usuarios-admin", UsuarioAdminViewSet, basename="usuario-admin")  # Reativado (Fase 1 Iteração 2, GAP-001)
+router.register(
+    r"usuarios-admin", UsuarioAdminViewSet, basename="usuario-admin"
+)  # Reativado (Fase 1 Iteração 2, GAP-001)
 router.register(r"grupos", GroupViewSet, basename="grupo")  # Criado (Fase 1 Iteração 2, GAP-002)
 router.register(r"audit-logs", AuditLogViewSet, basename="audit-log")
 router.register(r"deslocamentos", DeslocamentoViewSet, basename="deslocamento")  # Issue #188

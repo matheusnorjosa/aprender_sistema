@@ -19,6 +19,7 @@ Invalidação automática:
     - Via signal post_save em apps/core/signals.py
     - Chama bust_cfg(key) automaticamente quando Config é salvo
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -61,9 +62,7 @@ def get_cfg(key: str, default: Any = None) -> Any:
     from apps.core.models import Config
 
     # Buscar no DB (ordem: effective_at DESC, updated_at DESC)
-    row = (
-        Config.objects.filter(key=key).order_by("-effective_at", "-updated_at").first()
-    )
+    row = Config.objects.filter(key=key).order_by("-effective_at", "-updated_at").first()
 
     val = row.value if row else default
 

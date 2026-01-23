@@ -4,6 +4,7 @@ Google Calendar Client - OAuth implementation
 Cliente OAuth para Google Calendar API usando credenciais de usuário.
 Permite que usuários do grupo Controle publiquem eventos usando suas próprias contas Google.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.utils import timezone
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -60,30 +62,24 @@ class OAuthCalendarClient(CalendarClientAdapter):
             ValueError: Se client_id/client_secret não configurados
             Exception: Se refresh falhar
         """
+        # Validar que credential é uma instância de GoogleOAuthCredential
+        # Importar aqui para evitar circular import
+        from apps.core.models import GoogleOAuthCredential
         from apps.core.services.google_oauth import (
             _decrypt_token,
             refresh_access_token_safe,
         )
 
-        # Validar que credential é uma instância de GoogleOAuthCredential
-        # Importar aqui para evitar circular import
-        from apps.core.models import GoogleOAuthCredential
-
         if not isinstance(credential, GoogleOAuthCredential):
-            raise TypeError(
-                f"Expected GoogleOAuthCredential instance, got {type(credential)}"
-            )
+            raise TypeError(f"Expected GoogleOAuthCredential instance, got {type(credential)}")
 
         # Refresh token se expirado (thread-safe com select_for_update)
         if credential.is_expired():
-            logger.info(
-                f"🔄 Access token expired for {credential.google_email}, refreshing..."
-            )
+            logger.info(f"🔄 Access token expired for {credential.google_email}, refreshing...")
             credential = refresh_access_token_safe(credential)
         else:
             logger.debug(
-                f"✅ Access token still valid for {credential.google_email}, "
-                f"expires at {credential.token_expiry}"
+                f"✅ Access token still valid for {credential.google_email}, " f"expires at {credential.token_expiry}"
             )
 
         # Obter client_id e client_secret do env
@@ -91,9 +87,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
         client_secret = os.getenv("GCAL_OAUTH_CLIENT_SECRET")
 
         if not client_id or not client_secret:
-            raise ValueError(
-                "❌ GCAL_OAUTH_CLIENT_ID e GCAL_OAUTH_CLIENT_SECRET não configuradas"
-            )
+            raise ValueError("❌ GCAL_OAUTH_CLIENT_ID e GCAL_OAUTH_CLIENT_SECRET não configuradas")
 
         # Descriptografar tokens
         access_token = _decrypt_token(credential.access_token_encrypted)
@@ -110,16 +104,13 @@ class OAuthCalendarClient(CalendarClientAdapter):
         )
 
         # Build service
-        self.service = build(
-            "calendar", "v3", credentials=self.credentials, cache_discovery=False
-        )
+        self.service = build("calendar", "v3", credentials=self.credentials, cache_discovery=False)
 
         # Armazenar referência ao credential para logging
         self.credential = credential
 
         logger.info(
-            f"✅ OAuthCalendarClient initialized for {credential.google_email} "
-            f"(user_id={credential.user_id})"
+            f"✅ OAuthCalendarClient initialized for {credential.google_email} " f"(user_id={credential.user_id})"
         )
 
     def get_default_calendar_id(self) -> str:
@@ -136,16 +127,12 @@ class OAuthCalendarClient(CalendarClientAdapter):
         # Preferir calendário selecionado pelo usuário
         if self.credential.default_calendar_id:
             calendar_id = self.credential.default_calendar_id
-            logger.debug(
-                f"📅 Using user-selected calendar: {calendar_id}"
-            )
+            logger.debug(f"📅 Using user-selected calendar: {calendar_id}")
             return calendar_id
 
         # Fallback: usar calendário principal (email)
         calendar_id = self.credential.google_email
-        logger.debug(
-            f"📧 Using primary calendar (no selection): {calendar_id}"
-        )
+        logger.debug(f"📧 Using primary calendar (no selection): {calendar_id}")
         return calendar_id
 
     def _resolve_calendar_id(self, calendar_id: str) -> str:
@@ -163,9 +150,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
         """
         # Se for o email principal do usuário OAuth, usar "primary"
         if calendar_id == self.credential.google_email:
-            logger.debug(
-                f"📧 Resolved {calendar_id} → 'primary' for OAuth user"
-            )
+            logger.debug(f"📧 Resolved {calendar_id} → 'primary' for OAuth user")
             return "primary"
         # Caso contrário, usar o calendar_id original
         return calendar_id
@@ -224,11 +209,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
         calendar_id = self._resolve_calendar_id(calendar_id)
 
         def _get():
-            return (
-                self.service.events()
-                .get(calendarId=calendar_id, eventId=event_id)
-                .execute()
-            )
+            return self.service.events().get(calendarId=calendar_id, eventId=event_id).execute()
 
         try:
             return self._retry_with_backoff(_get)
@@ -335,9 +316,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
         def _delete():
             return (
                 self.service.events()
-                .delete(
-                    calendarId=calendar_id, eventId=event_id, sendUpdates=send_updates
-                )
+                .delete(calendarId=calendar_id, eventId=event_id, sendUpdates=send_updates)
                 .execute()
             )
 
@@ -346,10 +325,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
         except HttpError as e:
             if e.resp.status == 404:
                 # Evento já não existe → idempotente
-                logger.debug(
-                    f"Event {event_id} already deleted (404) "
-                    f"[user: {self.credential.google_email}]"
-                )
+                logger.debug(f"Event {event_id} already deleted (404) " f"[user: {self.credential.google_email}]")
                 return
             raise
 
@@ -400,10 +376,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
                 "details": f"Successfully connected to Google Calendar API. {len(calendars)} calendars found.",
             }
         except Exception as e:
-            logger.error(
-                f"Google Calendar OAuth health check failed for "
-                f"{self.credential.google_email}: {e}"
-            )
+            logger.error(f"Google Calendar OAuth health check failed for " f"{self.credential.google_email}: {e}")
             return {
                 "status": "unhealthy",
                 "client_type": "oauth",

@@ -319,10 +319,7 @@ def hash_event_v2(row: dict[str, str]) -> str:
         'a1b2c3...'  # SHA1 hash
     """
     # 1. sector - mapear de aba + projeto (com alias IDEB)
-    sector = normalize_sector(
-        row.get("source_sheet", ""),
-        row.get("projeto", "")
-    )
+    sector = normalize_sector(row.get("source_sheet", ""), row.get("projeto", ""))
     sector_norm = norm_text(sector)
 
     # 2. municipio
@@ -383,23 +380,23 @@ def hash_event_v2(row: dict[str, str]) -> str:
 
     # Construir string canônica
     parts = [
-        sector_norm,           # 1
-        municipio_norm,        # 2
-        encontro_norm,         # 3
-        tipo_norm,             # 4
-        data_norm,             # 5
-        hora_inicio_norm,      # 6
-        hora_fim_norm,         # 7
-        projeto_norm,          # 8
-        segmento_norm,         # 9
+        sector_norm,  # 1
+        municipio_norm,  # 2
+        encontro_norm,  # 3
+        tipo_norm,  # 4
+        data_norm,  # 5
+        hora_inicio_norm,  # 6
+        hora_fim_norm,  # 7
+        projeto_norm,  # 8
+        segmento_norm,  # 9
         coord_acompanha_norm,  # 10
-        coordenador_norm,      # 11
-        formadores_norm[0],    # 12 (formador1)
-        formadores_norm[1],    # 13 (formador2)
-        formadores_norm[2],    # 14 (formador3)
-        formadores_norm[3],    # 15 (formador4)
-        formadores_norm[4],    # 16 (formador5)
-        aprovacao_norm,        # 17
+        coordenador_norm,  # 11
+        formadores_norm[0],  # 12 (formador1)
+        formadores_norm[1],  # 13 (formador2)
+        formadores_norm[2],  # 14 (formador3)
+        formadores_norm[3],  # 15 (formador4)
+        formadores_norm[4],  # 16 (formador5)
+        aprovacao_norm,  # 17
     ]
 
     # Join com pipe delimiter

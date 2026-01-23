@@ -4,6 +4,7 @@ AS v2 — Compra Model
 Model de compras de materiais/produtos.
 Type-checked with Pyright (strict mode).
 """
+
 from __future__ import annotations
 
 from django.db import models
@@ -20,9 +21,7 @@ class Compra(models.Model):
     """
 
     codigo = models.CharField(
-        max_length=50,
-        db_index=True,
-        help_text="Codigo da compra (ex: COMP-001) - DEPRECATED: Use produto FK"
+        max_length=50, db_index=True, help_text="Codigo da compra (ex: COMP-001) - DEPRECATED: Use produto FK"
     )
     produto = models.ForeignKey(  # type: ignore[misc]
         "core.Produto",
@@ -30,34 +29,18 @@ class Compra(models.Model):
         related_name="compras",
         null=True,  # Temporary: Migration 0035 will populate and make NOT NULL
         blank=True,
-        help_text="Produto comprado (substitui codigo string)"
+        help_text="Produto comprado (substitui codigo string)",
     )
     projeto = models.ForeignKey(  # type: ignore[misc]
-        "core.Projeto",
-        on_delete=models.PROTECT,
-        related_name="compras",
-        help_text="Projeto vinculado a compra"
+        "core.Projeto", on_delete=models.PROTECT, related_name="compras", help_text="Projeto vinculado a compra"
     )
     municipio = models.ForeignKey(  # type: ignore[misc]
-        "core.Municipio",
-        on_delete=models.PROTECT,
-        related_name="compras",
-        help_text="Municipio destino da compra"
+        "core.Municipio", on_delete=models.PROTECT, related_name="compras", help_text="Municipio destino da compra"
     )
-    quantidade = models.IntegerField(
-        help_text="Quantidade de itens comprados"
-    )
-    data = models.DateField(
-        help_text="Data da compra"
-    )
-    uso = models.TextField(
-        help_text="Uso/finalidade da compra (ex: Formacao inicial)"
-    )
-    external_hash = models.CharField(
-        max_length=64,
-        db_index=True,
-        help_text="Hash SHA256 para idempotencia de import"
-    )
+    quantidade = models.IntegerField(help_text="Quantidade de itens comprados")
+    data = models.DateField(help_text="Data da compra")
+    uso = models.TextField(help_text="Uso/finalidade da compra (ex: Formacao inicial)")
+    external_hash = models.CharField(max_length=64, db_index=True, help_text="Hash SHA256 para idempotencia de import")
 
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)

@@ -23,11 +23,13 @@ portanto este teste valida que o parsing continua funcionando corretamente.
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from datetime import datetime, time
 from unittest.mock import MagicMock, patch
 
-import pytz
 from django.test import TestCase
+
+import pytz
 
 from apps.dat_ingest.services.parse_acompanhamento import (
     combine_datetime,
@@ -67,6 +69,7 @@ class TestSuperDateParsing(TestCase):
 
         # Criar mock worksheet
         mock_ws = MagicMock()
+
         # iter_rows() deve retornar iterador com a linha de dados
         # quando chamado com min_row=2, values_only=True
         def mock_iter_rows(min_row=1, values_only=False):

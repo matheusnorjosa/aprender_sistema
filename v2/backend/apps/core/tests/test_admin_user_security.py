@@ -11,8 +11,9 @@ Valida hardening do serializer de admin de usuários:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-from django.test import TestCase
+
 from django.contrib.auth.models import Group
+from django.test import TestCase
 from rest_framework.test import APIRequestFactory
 
 from apps.core.models import Usuario

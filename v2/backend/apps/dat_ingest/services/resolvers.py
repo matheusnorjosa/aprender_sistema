@@ -7,20 +7,22 @@ Use: from apps.core.services.resolvers import resolve_municipio, ...
 Este arquivo mantido apenas para compatibilidade com imports existentes.
 Será removido em versão futura.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportPrivateUsage=false
 
 # Re-export all from core.services.resolvers for backward compatibility
 
 from __future__ import annotations
+
 from apps.core.services.resolvers import (
-    resolve_user_by_email,
-    resolve_user_by_name,
+    _nfkd,
+    _split_city_uf,
+    normalize_projeto_name,
     resolve_municipio,
     resolve_projeto,
     resolve_tipo_evento,
-    normalize_projeto_name,
-    _nfkd,
-    _split_city_uf,
+    resolve_user_by_email,
+    resolve_user_by_name,
 )
 
 __all__ = [

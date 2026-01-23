@@ -21,6 +21,7 @@ ALIASES:
 
 Implementado em: resolvers.normalize_projeto()
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false
 
 from __future__ import annotations
@@ -115,18 +116,14 @@ class Command(BaseCommand):
                         )
 
                         if created:
-                            self.stdout.write(
-                                self.style.SUCCESS(f"  ✅ Criado: {nome} ({projeto.codigo})")
-                            )
+                            self.stdout.write(self.style.SUCCESS(f"  ✅ Criado: {nome} ({projeto.codigo})"))
                             stats["created"] += 1
                         else:
                             self.stdout.write(f"  ℹ️  Já existe: {nome} (ID: {projeto.id})")
                             stats["already_exists"] += 1
 
                     except Exception as e:
-                        self.stdout.write(
-                            self.style.ERROR(f"  ❌ Erro ao criar '{nome}': {e}")
-                        )
+                        self.stdout.write(self.style.ERROR(f"  ❌ Erro ao criar '{nome}': {e}"))
                         stats["errors"] += 1
 
         else:
@@ -139,9 +136,7 @@ class Command(BaseCommand):
                     self.stdout.write(f"  ℹ️  [DRY-RUN] Já existe: {nome}")
                     stats["already_exists"] += 1
                 else:
-                    self.stdout.write(
-                        self.style.SUCCESS(f"  ✅ [DRY-RUN] Criaria: {nome}")
-                    )
+                    self.stdout.write(self.style.SUCCESS(f"  ✅ [DRY-RUN] Criaria: {nome}"))
                     stats["created"] += 1
 
         # Sumário
@@ -154,27 +149,15 @@ class Command(BaseCommand):
 
         # Verificação final
         if not dry_run and stats["errors"] == 0:
-            total_existentes = Projeto.objects.filter(
-                nome__in=[p["nome"] for p in projetos]
-            ).count()
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"\n✅ Verificação: {total_existentes}/6 projetos existem no banco"
-                )
-            )
+            total_existentes = Projeto.objects.filter(nome__in=[p["nome"] for p in projetos]).count()
+            self.stdout.write(self.style.SUCCESS(f"\n✅ Verificação: {total_existentes}/6 projetos existem no banco"))
 
             if total_existentes < 6:
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"⚠️  Apenas {total_existentes}/6 projetos encontrados. Verifique!"
-                    )
+                    self.style.WARNING(f"⚠️  Apenas {total_existentes}/6 projetos encontrados. Verifique!")
                 )
         elif not dry_run and stats["errors"] > 0:
-            self.stdout.write(
-                self.style.ERROR(
-                    f"\n❌ FALHA: {stats['errors']} erro(s) ao criar projetos"
-                )
-            )
+            self.stdout.write(self.style.ERROR(f"\n❌ FALHA: {stats['errors']} erro(s) ao criar projetos"))
             raise Exception("Seed de projetos falhou com erros")
 
         self.stdout.write("\n✅ Seed de projetos concluído!\n")

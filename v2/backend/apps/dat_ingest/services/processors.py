@@ -4,10 +4,12 @@ ETL Processors - Classes para processar planilhas (Shim/Adapter para testes Issu
 Este módulo fornece wrappers/adapters mínimos para os testes sem reescrever toda a lógica.
 As implementações delegam para as funções parse_* e loaders existentes.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 
 from __future__ import annotations
+
 import hashlib
 from pathlib import Path
 from typing import Any
@@ -46,11 +48,11 @@ class AgendaProcessor:
 
         # Adicionar campo 'setor' extraído de 'src' (formato: "filename/abaname")
         for record in records:
-            src = record.get('src', '')
-            if '/' in src:
-                record['setor'] = src.split('/')[-1]
+            src = record.get("src", "")
+            if "/" in src:
+                record["setor"] = src.split("/")[-1]
             else:
-                record['setor'] = ''
+                record["setor"] = ""
 
         self.data = pd.DataFrame(records)
         return self.data
@@ -103,21 +105,21 @@ class AgendaProcessor:
             fluxo = "SUPER" if setor and setor.strip().upper() == "SUPER" else "NAO_SUPER"
 
             # Gerar event_uid único (hash baseado em projeto + tipo_evento + municipio + idx)
-            event_uid = hashlib.sha256(
-                f"{projeto}{tipo_evento}{municipio}{idx}".encode()
-            ).hexdigest()[:16]
+            event_uid = hashlib.sha256(f"{projeto}{tipo_evento}{municipio}{idx}".encode()).hexdigest()[:16]
 
-            events_list.append({
-                "projeto": projeto,
-                "tipo_evento": tipo_evento,
-                "municipio": municipio,
-                "coordenador": coordenador_raw,  # Nome original
-                "coordenador_encontrado": coordenador_encontrado,  # Email resolvido
-                "formadores_lista": formadores_nomes,  # Nomes originais
-                "formadores_encontrados": formadores_encontrados,  # Emails resolvidos
-                "fluxo": fluxo,
-                "event_uid": event_uid,
-            })
+            events_list.append(
+                {
+                    "projeto": projeto,
+                    "tipo_evento": tipo_evento,
+                    "municipio": municipio,
+                    "coordenador": coordenador_raw,  # Nome original
+                    "coordenador_encontrado": coordenador_encontrado,  # Email resolvido
+                    "formadores_lista": formadores_nomes,  # Nomes originais
+                    "formadores_encontrados": formadores_encontrados,  # Emails resolvidos
+                    "fluxo": fluxo,
+                    "event_uid": event_uid,
+                }
+            )
 
         events_df = pd.DataFrame(events_list)
 

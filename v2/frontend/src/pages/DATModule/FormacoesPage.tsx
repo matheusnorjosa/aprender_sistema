@@ -43,6 +43,7 @@ import {
   TeamOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import {
   listFormacoes,
@@ -55,7 +56,7 @@ import {
   getProjetosOptions,
   getCoordenadoresOptions,
 } from '../../api/datModule';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import {
   STATUS_OPTIONS,
   MODALIDADE_OPTIONS,
@@ -68,27 +69,106 @@ import { renderStatusTag } from './Formacoes/helpers';
 
 const { Title, Text } = Typography;
 
-export default function FormacoesPage() {
-  const [formacoes, setFormacoes] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
-  const [stats, setStats] = useState(null);
-  const [viewMode, setViewMode] = useState(VIEW_MODES.TABLE);
-  const [calendarData, setCalendarData] = useState([]);
+// ============================================================
+// TYPE DEFINITIONS
+// ============================================================
+
+interface FormacaoRecord {
+  id: number;
+  projeto: number;
+  projeto_nome: string;
+  municipio: number;
+  municipio_nome: string;
+  uf: string;
+  coordenador: number | null;
+  coordenador_nome: string | null;
+  data_formacao: string | null;
+  horario_inicio: string | null;
+  horario_fim: string | null;
+  status: string | null;
+  [key: string]: any;
+}
+
+interface FormacoesFilters {
+  search: string;
+  uf: string | undefined;
+  municipio: number | undefined;
+  projeto: number | undefined;
+  coordenador: number | undefined;
+  status: string | undefined;
+  modalidade: string | undefined;
+  data_inicio: any;
+  data_fim: any;
+}
+
+interface FormacaoFormValues {
+  projeto: number;
+  municipio: number;
+  coordenador: number | null;
+  [key: string]: any;
+}
+
+interface FormacoesStats {
+  total: number;
+  este_mes: number;
+  realizadas: number;
+  total_participantes: number;
+}
+
+interface PaginationState {
+  current: number;
+  pageSize: number;
+  total: number;
+}
+
+interface MunicipioOption {
+  id: number;
+  nome: string;
+  uf: string;
+}
+
+interface ProjetoOption {
+  id: number;
+  nome: string;
+}
+
+interface CoordenadorOption {
+  id: number;
+  nome: string;
+}
+
+interface CalendarFormacaoItem {
+  id: number;
+  data_formacao: string;
+  projeto_nome: string;
+  municipio_nome: string;
+  uf: string;
+  status: string | null;
+  [key: string]: any;
+}
+
+
+export default function FormacoesPage(): JSX.Element {
+  const [formacoes, setFormacoes] = useState<FormacaoRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [pagination, setPagination] = useState<PaginationState>({ current: 1, pageSize: 15, total: 0 });
+  const [stats, setStats] = useState<FormacoesStats | null>(null);
+  const [viewMode, setViewMode] = useState<string>(VIEW_MODES.TABLE);
+  const [calendarData, setCalendarData] = useState<CalendarFormacaoItem[]>([]);
 
   // Filter states - using DEFAULT_FILTERS from constants
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<FormacoesFilters>(DEFAULT_FILTERS as FormacoesFilters);
 
   // Options for dropdowns
-  const [municipios, setMunicipios] = useState([]);
-  const [projetos, setProjetos] = useState([]);
-  const [coordenadores, setCoordenadores] = useState([]);
+  const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
+  const [projetos, setProjetos] = useState<ProjetoOption[]>([]);
+  const [coordenadores, setCoordenadores] = useState<CoordenadorOption[]>([]);
 
   // Modal states
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingFormacao, setEditingFormacao] = useState(null);
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [editingFormacao, setEditingFormacao] = useState<FormacaoRecord | null>(null);
 
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<FormacaoFormValues>();
 
   // Load options on mount
   useEffect(() => {
@@ -99,11 +179,11 @@ export default function FormacoesPage() {
           getProjetosOptions(),
           getCoordenadoresOptions(),
         ]);
-        setMunicipios(munData.results || munData || []);
-        setProjetos(projData.results || projData || []);
-        setCoordenadores(coordData.results || coordData || []);
+        setMunicipios((munData as any).results || munData || []);
+        setProjetos((projData as any).results || projData || []);
+        setCoordenadores((coordData as any).results || coordData || []);
       } catch (error) {
-        message.error(`Erro ao carregar opções: ${error.message}`);
+        message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
     };
     loadOptions();
@@ -113,7 +193,7 @@ export default function FormacoesPage() {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params = {
+      const params: any = {
         page,
         page_size: pagination.pageSize,
         ordering: 'data_formacao',
@@ -135,21 +215,21 @@ export default function FormacoesPage() {
         getFormacoesStats(params),
       ]);
 
-      setFormacoes(data.results || data || []);
+      setFormacoes((data as any).results || data || []);
       setPagination((prev) => ({
         ...prev,
         current: page,
-        total: data.count || (data.results || data || []).length,
+        total: data.count || ((data as any).results || data || []).length,
       }));
-      setStats(statsData);
+      setStats(statsData as unknown as FormacoesStats);
 
       // Load calendar data if in calendar view
       if (viewMode === VIEW_MODES.CALENDAR) {
         const calData = await getFormacoesCalendario(params);
-        setCalendarData(calData.results || calData || []);
+        setCalendarData((calData as any).results || calData || []);
       }
     } catch (error) {
-      message.error(`Erro ao carregar dados: ${error.message}`);
+      message.error(`Erro ao carregar dados: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -171,7 +251,7 @@ export default function FormacoesPage() {
     setModalVisible(true);
   };
 
-  const handleEdit = (record) => {
+  const handleEdit = (record: FormacaoRecord) => {
     setEditingFormacao(record);
     form.setFieldsValue({
       ...record,
@@ -182,7 +262,7 @@ export default function FormacoesPage() {
     setModalVisible(true);
   };
 
-  const handleSave = async (values) => {
+  const handleSave = async (values: FormacaoFormValues) => {
     try {
       const payload = {
         ...values,
@@ -202,11 +282,11 @@ export default function FormacoesPage() {
       form.resetFields();
       fetchData(pagination.current);
     } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      message.error(`Erro: ${(error as Error).message}`);
     }
   };
 
-  const handleDelete = (record) => {
+  const handleDelete = (record: FormacaoRecord) => {
     Modal.confirm({
       title: 'Confirmar exclusão',
       content: `Excluir formação de "${record.projeto_nome}" em "${record.municipio_nome}"?`,
@@ -219,14 +299,14 @@ export default function FormacoesPage() {
           message.success('Formação excluída com sucesso');
           fetchData(pagination.current);
         } catch (error) {
-          message.error(`Erro ao excluir: ${error.message}`);
+          message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
       },
     });
   };
 
   // Calendar cell renderer
-  const dateCellRender = (date) => {
+  const dateCellRender = (date: Dayjs) => {
     const dayFormacoes = calendarData.filter(
       (f) => dayjs(f.data_formacao).isSame(date, 'day')
     );
@@ -263,7 +343,7 @@ export default function FormacoesPage() {
 
   // Table columns - using extracted getColumns from ./Formacoes/columns (memoized §16 Epic #459)
   const columns = useMemo(
-    () => getColumns({ onEdit: handleEdit, onDelete: handleDelete }),
+    () => getColumns({ onEdit: handleEdit, onDelete: handleDelete } as any),
     [handleEdit, handleDelete]
   );
 
@@ -364,7 +444,7 @@ export default function FormacoesPage() {
               placeholder="Município, projeto..."
               allowClear
               value={filters.search}
-              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters((prev: any) => ({ ...prev, search: e.target.value }))}
               onSearch={() => fetchData(1)}
             />
           </Col>
@@ -381,7 +461,7 @@ export default function FormacoesPage() {
               showSearch
               optionFilterProp="label"
               value={filters.projeto}
-              onChange={(val) => setFilters((prev) => ({ ...prev, projeto: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, projeto: val }))}
               options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
@@ -396,7 +476,7 @@ export default function FormacoesPage() {
               placeholder="Todos"
               allowClear
               value={filters.uf}
-              onChange={(val) => setFilters((prev) => ({ ...prev, uf: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, uf: val }))}
               options={UF_OPTIONS}
               showSearch
             />
@@ -414,7 +494,7 @@ export default function FormacoesPage() {
               showSearch
               optionFilterProp="label"
               value={filters.coordenador}
-              onChange={(val) => setFilters((prev) => ({ ...prev, coordenador: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, coordenador: val }))}
               options={coordenadores.map((c) => ({ label: c.nome, value: c.id }))}
             />
           </Col>
@@ -429,7 +509,7 @@ export default function FormacoesPage() {
               placeholder="Todos"
               allowClear
               value={filters.status}
-              onChange={(val) => setFilters((prev) => ({ ...prev, status: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, status: val }))}
               options={STATUS_OPTIONS}
             />
           </Col>
@@ -444,7 +524,7 @@ export default function FormacoesPage() {
               placeholder="Todas"
               allowClear
               value={filters.modalidade}
-              onChange={(val) => setFilters((prev) => ({ ...prev, modalidade: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, modalidade: val }))}
               options={MODALIDADE_OPTIONS}
             />
           </Col>
@@ -459,7 +539,7 @@ export default function FormacoesPage() {
               format="DD/MM/YYYY"
               value={[filters.data_inicio, filters.data_fim]}
               onChange={(dates) =>
-                setFilters((prev) => ({
+                setFilters((prev: any) => ({
                   ...prev,
                   data_inicio: dates?.[0] || undefined,
                   data_fim: dates?.[1] || undefined,
@@ -495,7 +575,7 @@ export default function FormacoesPage() {
           }
         >
           <Table
-            columns={columns}
+            columns={columns as any}
             dataSource={formacoes}
             rowKey="id"
             loading={loading}
@@ -537,7 +617,7 @@ export default function FormacoesPage() {
                               size="small"
                               onClick={() => {
                                 Modal.destroyAll();
-                                handleEdit(f);
+                                handleEdit(f as any);
                               }}
                             >
                               Editar

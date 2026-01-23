@@ -57,10 +57,72 @@ import {
   getProjetosOptions,
   getCoordenadoresOptions,
 } from '../../api/datModule';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import { UF_OPTIONS } from '../../constants';
 
 const { Title, Text } = Typography;
+
+// ============================================================
+// TYPE DEFINITIONS
+// ============================================================
+
+interface AcaoRecord {
+  id: number;
+  municipio: number;
+  municipio_nome: string;
+  municipio_uf: string;
+  projeto: number;
+  projeto_nome: string;
+  coordenador: number | null;
+  coordenador_nome: string | null;
+  [key: string]: any;
+}
+
+interface AcoesFilters {
+  search: string;
+  uf: string | undefined;
+  municipio: number | undefined;
+  projeto: number | undefined;
+  coordenador: number | undefined;
+  status_geral: string | undefined;
+}
+
+interface AcaoFormValues {
+  municipio: number;
+  projeto: number;
+  coordenador: number | null;
+  [key: string]: any;
+}
+
+interface AcoesStats {
+  total: number;
+  cartas_enviadas: number;
+  reunioes_realizadas: number;
+  entregas_concluidas: number;
+}
+
+interface PaginationState {
+  current: number;
+  pageSize: number;
+  total: number;
+}
+
+interface MunicipioOption {
+  id: number;
+  nome: string;
+  uf: string;
+}
+
+interface ProjetoOption {
+  id: number;
+  nome: string;
+}
+
+interface CoordenadorOption {
+  id: number;
+  nome: string;
+}
+
 
 // Status options para cada etapa
 const STATUS_OPTIONS = [
@@ -78,11 +140,11 @@ const STATUS_COLORS = {
   na: 'default',
 };
 
-export default function AcoesPage() {
-  const [acoes, setAcoes] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
-  const [stats, setStats] = useState(null);
+export default function AcoesPage(): JSX.Element {
+  const [acoes, setAcoes] = useState<AcaoRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [pagination, setPagination] = useState<PaginationState>({ current: 1, pageSize: 15, total: 0 });
+  const [stats, setStats] = useState<AcoesStats | null>(null);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -95,15 +157,15 @@ export default function AcoesPage() {
   });
 
   // Options for dropdowns
-  const [municipios, setMunicipios] = useState([]);
-  const [projetos, setProjetos] = useState([]);
-  const [coordenadores, setCoordenadores] = useState([]);
+  const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
+  const [projetos, setProjetos] = useState<ProjetoOption[]>([]);
+  const [coordenadores, setCoordenadores] = useState<CoordenadorOption[]>([]);
 
   // Modal states
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingAcao, setEditingAcao] = useState(null);
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [editingAcao, setEditingAcao] = useState<AcaoRecord | null>(null);
 
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<AcaoFormValues>();
 
   // Load options on mount
   useEffect(() => {
@@ -114,11 +176,11 @@ export default function AcoesPage() {
           getProjetosOptions(),
           getCoordenadoresOptions(),
         ]);
-        setMunicipios(munData.results || munData || []);
-        setProjetos(projData.results || projData || []);
-        setCoordenadores(coordData.results || coordData || []);
+        setMunicipios((munData as any).results || munData || []);
+        setProjetos((projData as any).results || projData || []);
+        setCoordenadores((coordData as any).results || coordData || []);
       } catch (error) {
-        message.error(`Erro ao carregar opções: ${error.message}`);
+        message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
     };
     loadOptions();
@@ -128,7 +190,7 @@ export default function AcoesPage() {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params = {
+      const params: any = {
         page,
         page_size: pagination.pageSize,
         ordering: '-updated_at',
@@ -147,15 +209,15 @@ export default function AcoesPage() {
         getAcoesStats(params),
       ]);
 
-      setAcoes(data.results || data || []);
+      setAcoes((data as any).results || data || []);
       setPagination((prev) => ({
         ...prev,
         current: page,
-        total: data.count || (data.results || data || []).length,
+        total: data.count || ((data as any).results || data || []).length,
       }));
-      setStats(statsData);
+      setStats(statsData as unknown as AcoesStats);
     } catch (error) {
-      message.error(`Erro ao carregar dados: ${error.message}`);
+      message.error(`Erro ao carregar dados: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -185,7 +247,7 @@ export default function AcoesPage() {
   };
 
   // Memoized handlers (§3 Epic #459)
-  const handleEdit = useCallback((record) => {
+  const handleEdit = useCallback((record: AcaoRecord) => {
     setEditingAcao(record);
     form.setFieldsValue({
       ...record,
@@ -197,7 +259,7 @@ export default function AcoesPage() {
     setModalVisible(true);
   }, [form]);
 
-  const handleSave = async (values) => {
+  const handleSave = async (values: AcaoFormValues) => {
     try {
       const payload = {
         ...values,
@@ -218,11 +280,11 @@ export default function AcoesPage() {
       form.resetFields();
       fetchData(pagination.current);
     } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      message.error(`Erro: ${(error as Error).message}`);
     }
   };
 
-  const handleDelete = useCallback((record) => {
+  const handleDelete = useCallback((record: AcaoRecord) => {
     Modal.confirm({
       title: 'Confirmar exclusão',
       content: `Excluir ação "${record.projeto_nome}" em "${record.municipio_nome}"?`,
@@ -235,14 +297,14 @@ export default function AcoesPage() {
           message.success('Ação excluída com sucesso');
           fetchData(pagination.current);
         } catch (error) {
-          message.error(`Erro ao excluir: ${error.message}`);
+          message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
       },
     });
   }, [fetchData, pagination.current]);
 
   // Status icon renderer - memoized (§3 Epic #459)
-  const renderStatusIcon = useCallback((status) => {
+  const renderStatusIcon = useCallback((status: string | null) => {
     switch (status) {
       case 'concluido':
         return <CheckCircleFilled className="text-green-500 text-lg" />;
@@ -258,7 +320,7 @@ export default function AcoesPage() {
   }, []);
 
   // Calculate progress based on status - memoized (§3 Epic #459)
-  const calculateProgress = useCallback((record) => {
+  const calculateProgress = useCallback((record: AcaoRecord) => {
     const etapas = [
       record.status_carta,
       record.status_contato,
@@ -275,7 +337,7 @@ export default function AcoesPage() {
       title: 'Município - UF',
       key: 'municipio_uf',
       width: 180,
-      fixed: 'left',
+      fixed: 'left' as const,
       render: (_, record) => (
         <Text strong>
           {record.municipio_nome} - {record.municipio_uf}
@@ -313,7 +375,7 @@ export default function AcoesPage() {
       ),
       key: 'carta',
       width: 100,
-      align: 'center',
+      align: 'center' as const,
       render: (_, record) => (
         <Space direction="vertical" size={0} align="center">
           {renderStatusIcon(record.status_carta)}
@@ -334,7 +396,7 @@ export default function AcoesPage() {
       ),
       key: 'contato',
       width: 100,
-      align: 'center',
+      align: 'center' as const,
       render: (_, record) => (
         <Space direction="vertical" size={0} align="center">
           {renderStatusIcon(record.status_contato)}
@@ -355,7 +417,7 @@ export default function AcoesPage() {
       ),
       key: 'reuniao',
       width: 100,
-      align: 'center',
+      align: 'center' as const,
       render: (_, record) => (
         <Space direction="vertical" size={0} align="center">
           {renderStatusIcon(record.status_reuniao)}
@@ -376,7 +438,7 @@ export default function AcoesPage() {
       ),
       key: 'entrega',
       width: 100,
-      align: 'center',
+      align: 'center' as const,
       render: (_, record) => (
         <Space direction="vertical" size={0} align="center">
           {renderStatusIcon(record.status_entrega)}
@@ -418,7 +480,7 @@ export default function AcoesPage() {
       title: 'Ações',
       key: 'acoes',
       width: 100,
-      fixed: 'right',
+      fixed: 'right' as const,
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="Editar">
@@ -529,7 +591,7 @@ export default function AcoesPage() {
               placeholder="Município, projeto..."
               allowClear
               value={filters.search}
-              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters((prev: any) => ({ ...prev, search: e.target.value }))}
               onSearch={() => fetchData(1)}
             />
           </Col>
@@ -544,7 +606,7 @@ export default function AcoesPage() {
               placeholder="Todos"
               allowClear
               value={filters.uf}
-              onChange={(val) => setFilters((prev) => ({ ...prev, uf: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, uf: val }))}
               options={UF_OPTIONS}
               showSearch
             />
@@ -562,7 +624,7 @@ export default function AcoesPage() {
               showSearch
               optionFilterProp="label"
               value={filters.municipio}
-              onChange={(val) => setFilters((prev) => ({ ...prev, municipio: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, municipio: val }))}
               options={municipios.map((m) => ({ label: `${m.nome} - ${m.uf}`, value: m.id }))}
             />
           </Col>
@@ -579,7 +641,7 @@ export default function AcoesPage() {
               showSearch
               optionFilterProp="label"
               value={filters.projeto}
-              onChange={(val) => setFilters((prev) => ({ ...prev, projeto: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, projeto: val }))}
               options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
@@ -596,7 +658,7 @@ export default function AcoesPage() {
               showSearch
               optionFilterProp="label"
               value={filters.coordenador}
-              onChange={(val) => setFilters((prev) => ({ ...prev, coordenador: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, coordenador: val }))}
               options={coordenadores.map((c) => ({ label: c.nome, value: c.id }))}
             />
           </Col>
@@ -611,7 +673,7 @@ export default function AcoesPage() {
               placeholder="Todos"
               allowClear
               value={filters.status_geral}
-              onChange={(val) => setFilters((prev) => ({ ...prev, status_geral: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, status_geral: val }))}
               options={[
                 { label: 'Em Andamento', value: 'em_andamento' },
                 { label: 'Concluídos', value: 'concluido' },
@@ -680,7 +742,7 @@ export default function AcoesPage() {
         </div>
 
         <Table
-          columns={columns}
+          columns={columns as any}
           dataSource={acoes}
           rowKey="id"
           loading={loading}

@@ -55,10 +55,73 @@ import {
   getProdutosOptions,
 } from '../../api/datModule';
 import { useCrudOperations } from '../../hooks/useCrudOperations';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import { UF_OPTIONS } from '../../constants';
 
 const { Title, Text } = Typography;
+
+// ============================================================
+// TYPE DEFINITIONS
+// ============================================================
+
+interface CompraRecord {
+  id: number;
+  projeto: number;
+  projeto_nome: string;
+  produto: number;
+  produto_nome: string;
+  codigo_produto: string | null;
+  uf: string;
+  municipio: number;
+  municipio_nome: string;
+  quantidade: number;
+  quantidade_utilizada: number | null;
+  valor_unitario: number | null;
+  [key: string]: any;
+}
+
+interface ComprasFilters {
+  search: string;
+  uf: string | undefined;
+  municipio: number | undefined;
+  projeto: number | undefined;
+  produto: number | undefined;
+  status: string | undefined;
+  ano_uso: number | undefined;
+}
+
+interface CompraFormValues {
+  projeto: number;
+  produto: number;
+  uf: string;
+  municipio: number;
+  quantidade: number;
+  [key: string]: any;
+}
+
+interface ComprasStats {
+  total_itens: number;
+  total_produtos: number;
+  total_disponivel: number;
+  valor_total: number;
+}
+
+interface MunicipioOption {
+  id: number;
+  nome: string;
+  uf: string;
+}
+
+interface ProjetoOption {
+  id: number;
+  nome: string;
+}
+
+interface ProdutoOption {
+  id: number;
+  nome: string;
+}
+
 
 // Status options
 const STATUS_OPTIONS = [
@@ -74,7 +137,7 @@ const ANO_OPTIONS = [currentYear - 1, currentYear, currentYear + 1].map(
   (year) => ({ label: String(year), value: year })
 );
 
-export default function ComprasPage() {
+export default function ComprasPage(): JSX.Element {
   // Issue #302: Use useCrudOperations hook for standardized CRUD
   const crud = useCrudOperations({
     listFn: listCompras,
@@ -85,7 +148,7 @@ export default function ComprasPage() {
     pageSize: 15,
   });
 
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState<ComprasStats | null>(null);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -99,15 +162,15 @@ export default function ComprasPage() {
   });
 
   // Options for dropdowns
-  const [municipios, setMunicipios] = useState([]);
-  const [projetos, setProjetos] = useState([]);
-  const [produtos, setProdutos] = useState([]);
+  const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
+  const [projetos, setProjetos] = useState<ProjetoOption[]>([]);
+  const [produtos, setProdutos] = useState<ProdutoOption[]>([]);
 
   // Modal states
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingCompra, setEditingCompra] = useState(null);
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [editingCompra, setEditingCompra] = useState<CompraRecord | null>(null);
 
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<CompraFormValues>();
 
   // Load options on mount
   useEffect(() => {
@@ -118,11 +181,11 @@ export default function ComprasPage() {
           getProjetosOptions(),
           getProdutosOptions(),
         ]);
-        setMunicipios(munData.results || munData || []);
-        setProjetos(projData.results || projData || []);
-        setProdutos(prodData.results || prodData || []);
+        setMunicipios((munData as any).results || munData || []);
+        setProjetos((projData as any).results || projData || []);
+        setProdutos((prodData as any).results || prodData || []);
       } catch (error) {
-        message.error(`Erro ao carregar opções: ${error.message}`);
+        message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
     };
     loadOptions();
@@ -130,7 +193,7 @@ export default function ComprasPage() {
 
   // Fetch data with filters (uses crud hook internally)
   const fetchData = useCallback(async (page = 1) => {
-    const params = {
+    const params: any = {
       page,
       ordering: '-updated_at',
     };
@@ -150,7 +213,7 @@ export default function ComprasPage() {
       getComprasStats(params).catch(() => null),
     ]);
 
-    setStats(statsData);
+    setStats(statsData as unknown as ComprasStats);
   }, [filters, crud]);
 
   useEffect(() => {
@@ -177,7 +240,7 @@ export default function ComprasPage() {
     setModalVisible(true);
   };
 
-  const handleEdit = (record) => {
+  const handleEdit = (record: CompraRecord) => {
     setEditingCompra(record);
     form.setFieldsValue({
       ...record,
@@ -188,7 +251,7 @@ export default function ComprasPage() {
   };
 
   // Issue #302: Simplified handleSave using crud hook
-  const handleSave = async (values) => {
+  const handleSave = async (values: CompraFormValues) => {
     const payload = {
       ...values,
       data_compra: values.data_compra ? values.data_compra.format('YYYY-MM-DD') : null,
@@ -205,7 +268,7 @@ export default function ComprasPage() {
   };
 
   // Issue #302: Simplified handleDelete using crud hook
-  const handleDelete = (record) => {
+  const handleDelete = (record: CompraRecord) => {
     crud.confirmDelete(record, {
       nameField: 'produto_nome',
       onSuccess: () => fetchData(crud.pagination.current),
@@ -213,12 +276,12 @@ export default function ComprasPage() {
   };
 
   // Calculate disponível
-  const calcularDisponivel = (quantidade, utilizado) => {
+  const calcularDisponivel = (quantidade: number, utilizado: number | null): number => {
     return (quantidade || 0) - (utilizado || 0);
   };
 
   // Status tag renderer
-  const renderStatusTag = (status, disponivel, quantidade) => {
+  const renderStatusTag = (status: string | null, disponivel: number, quantidade: number): JSX.Element => {
     if (!status) {
       // Auto-calculate based on disponível
       if (disponivel === 0) {
@@ -241,7 +304,7 @@ export default function ComprasPage() {
       dataIndex: 'projeto_nome',
       key: 'projeto',
       width: 120,
-      fixed: 'left',
+      fixed: 'left' as const,
       render: (nome) => <Tag color="blue">{nome}</Tag>,
     },
     {
@@ -249,7 +312,7 @@ export default function ComprasPage() {
       dataIndex: 'produto_nome',
       key: 'produto',
       width: 200,
-      fixed: 'left',
+      fixed: 'left' as const,
       render: (nome, record) => (
         <div>
           <Text strong>{nome}</Text>
@@ -282,7 +345,7 @@ export default function ComprasPage() {
       dataIndex: 'quantidade',
       key: 'quantidade',
       width: 100,
-      align: 'right',
+      align: 'right' as const,
       render: (val) => (
         <Text strong style={{ color: '#1890ff' }}>
           {val?.toLocaleString('pt-BR') || 0}
@@ -294,14 +357,14 @@ export default function ComprasPage() {
       dataIndex: 'quantidade_utilizada',
       key: 'utilizado',
       width: 100,
-      align: 'right',
+      align: 'right' as const,
       render: (val) => val?.toLocaleString('pt-BR') || 0,
     },
     {
       title: 'Disponível',
       key: 'disponivel',
       width: 120,
-      align: 'right',
+      align: 'right' as const,
       render: (_, record) => {
         const disponivel = calcularDisponivel(record.quantidade, record.quantidade_utilizada);
         const percent = record.quantidade > 0 ? Math.round((disponivel / record.quantidade) * 100) : 0;
@@ -327,7 +390,7 @@ export default function ComprasPage() {
       dataIndex: 'ano_uso',
       key: 'ano_uso',
       width: 90,
-      align: 'center',
+      align: 'center' as const,
       render: (ano) => ano ? <Tag>{ano}</Tag> : '-',
     },
     {
@@ -344,7 +407,7 @@ export default function ComprasPage() {
       dataIndex: 'valor_unitario',
       key: 'valor_unitario',
       width: 100,
-      align: 'right',
+      align: 'right' as const,
       render: (val) =>
         val ? (
           <Text type="secondary">
@@ -358,7 +421,7 @@ export default function ComprasPage() {
       title: 'Valor Total',
       key: 'valor_total',
       width: 120,
-      align: 'right',
+      align: 'right' as const,
       render: (_, record) => {
         const total = (record.quantidade || 0) * (record.valor_unitario || 0);
         return total > 0 ? (
@@ -374,7 +437,7 @@ export default function ComprasPage() {
       title: 'Ações',
       key: 'acoes',
       width: 100,
-      fixed: 'right',
+      fixed: 'right' as const,
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="Editar">
@@ -486,7 +549,7 @@ export default function ComprasPage() {
               placeholder="Produto, código..."
               allowClear
               value={filters.search}
-              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters((prev: any) => ({ ...prev, search: e.target.value }))}
               onSearch={() => fetchData(1)}
             />
           </Col>
@@ -503,7 +566,7 @@ export default function ComprasPage() {
               showSearch
               optionFilterProp="label"
               value={filters.projeto}
-              onChange={(val) => setFilters((prev) => ({ ...prev, projeto: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, projeto: val }))}
               options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
@@ -520,7 +583,7 @@ export default function ComprasPage() {
               showSearch
               optionFilterProp="label"
               value={filters.produto}
-              onChange={(val) => setFilters((prev) => ({ ...prev, produto: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, produto: val }))}
               options={produtos.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
@@ -535,7 +598,7 @@ export default function ComprasPage() {
               placeholder="Todos"
               allowClear
               value={filters.uf}
-              onChange={(val) => setFilters((prev) => ({ ...prev, uf: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, uf: val }))}
               options={UF_OPTIONS}
               showSearch
             />
@@ -553,7 +616,7 @@ export default function ComprasPage() {
               showSearch
               optionFilterProp="label"
               value={filters.municipio}
-              onChange={(val) => setFilters((prev) => ({ ...prev, municipio: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, municipio: val }))}
               options={municipios.map((m) => ({ label: `${m.nome} - ${m.uf}`, value: m.id }))}
             />
           </Col>
@@ -568,7 +631,7 @@ export default function ComprasPage() {
               placeholder="Todos"
               allowClear
               value={filters.ano_uso}
-              onChange={(val) => setFilters((prev) => ({ ...prev, ano_uso: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, ano_uso: val }))}
               options={ANO_OPTIONS}
             />
           </Col>
@@ -583,7 +646,7 @@ export default function ComprasPage() {
               placeholder="Todos"
               allowClear
               value={filters.status}
-              onChange={(val) => setFilters((prev) => ({ ...prev, status: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, status: val }))}
               options={STATUS_OPTIONS}
             />
           </Col>
@@ -614,7 +677,7 @@ export default function ComprasPage() {
         }
       >
         <Table
-          columns={columns}
+          columns={columns as any}
           dataSource={crud.data}
           rowKey="id"
           loading={crud.loading}
@@ -630,11 +693,11 @@ export default function ComprasPage() {
           }}
           size="middle"
           summary={(pageData) => {
-            const totalQtd = pageData.reduce((sum, r) => sum + (r.quantidade || 0), 0);
-            const totalUtilizado = pageData.reduce((sum, r) => sum + (r.quantidade_utilizada || 0), 0);
+            const totalQtd = pageData.reduce((sum: number, r: any) => sum + (r.quantidade || 0), 0);
+            const totalUtilizado = pageData.reduce((sum: number, r: any) => sum + (r.quantidade_utilizada || 0), 0);
             const totalDisponivel = totalQtd - totalUtilizado;
             const totalValor = pageData.reduce(
-              (sum, r) => sum + (r.quantidade || 0) * (r.valor_unitario || 0),
+              (sum: number, r: any) => sum + (r.quantidade || 0) * (r.valor_unitario || 0),
               0
             );
 
@@ -860,7 +923,7 @@ export default function ComprasPage() {
                     precision={2}
                     style={{ width: '100%' }}
                     formatter={(value) => `R$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                    parser={(value) => value.replace(/R\$\s?|\.(?=\d{3})/g, '').replace(',', '.')}
+                    parser={(value) => (value?.replace(/R\$\s?|\.(?=\d{3})/g, '').replace(',', '.') || '0') as unknown as 0}
                   />
                 </Form.Item>
               </Col>

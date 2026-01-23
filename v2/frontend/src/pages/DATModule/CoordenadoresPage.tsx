@@ -62,7 +62,7 @@ import {
   getProjetosOptions,
   getMunicipiosOptions,
 } from '../../api/datModule';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import logger from '../../utils/logger';
 import {
   AREAS_DEFAULT,
@@ -74,32 +74,94 @@ import { getColumns } from './Coordenadores/columns';
 import { getAreaColor, getInitials, groupByArea } from './Coordenadores/helpers';
 
 const { Title, Text } = Typography;
+
+// ============================================================
+// TYPE DEFINITIONS
+// ============================================================
+
+interface CoordenadorRecord {
+  id: number;
+  nome: string;
+  area: string | null;
+  cargo: string | null;
+  email: string | null;
+  telefone: string | null;
+  foto_url: string | null;
+  data_admissao: string | null;
+  ativo: boolean;
+  total_municipios: number;
+  total_projetos: number;
+  total_formacoes: number;
+  [key: string]: any;
+}
+
+interface CoordenadoresFilters {
+  search: string;
+  area: string | undefined;
+  ativo: boolean | undefined;
+}
+
+interface CoordenadorFormValues {
+  nome: string;
+  area: string | null;
+  cargo: string | null;
+  ativo: boolean;
+  [key: string]: any;
+}
+
+interface CoordenadoresStats {
+  total: number;
+  ativos: number;
+  areas: number;
+  media_projetos: string | number;
+}
+
+interface PaginationState {
+  current: number;
+  pageSize: number;
+  total: number;
+}
+
+interface AreaOption {
+  id: number;
+  nome: string;
+}
+
+interface AlocacaoRecord {
+  id: number;
+  projeto_nome: string;
+  projeto: string;
+  municipio_nome: string;
+  municipio: string;
+  uf: string | null;
+}
+
 const { Panel } = Collapse;
 
-export default function CoordenadoresPage() {
-  const [coordenadores, setCoordenadores] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
-  const [stats, setStats] = useState(null);
-  const [viewMode, setViewMode] = useState(VIEW_MODES.CARDS);
+export default function CoordenadoresPage(): JSX.Element {
+  const [coordenadores, setCoordenadores] = useState<CoordenadorRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [pagination, setPagination] = useState<PaginationState>({ current: 1, pageSize: 15, total: 0 });
+  const [stats, setStats] = useState<CoordenadoresStats | null>(null);
+  const [viewMode, setViewMode] = useState<string>(VIEW_MODES.CARDS);
 
   // Filter states - using DEFAULT_FILTERS from constants
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<CoordenadoresFilters>(DEFAULT_FILTERS as CoordenadoresFilters);
 
   // Options for dropdowns (projetos/municipios reserved for future use)
-  const [areas, setAreas] = useState([]);
-  const [_projetos, setProjetos] = useState([]);
-  const [_municipios, setMunicipios] = useState([]);
+  const [areas, setAreas] = useState<(AreaOption | string)[]>([]);
+  const [_projetos, setProjetos] = useState<any[]>([]);
+  const [_municipios, setMunicipios] = useState<any[]>([]);
 
   // Modal states
-  const [modalVisible, setModalVisible] = useState(false);
-  const [detailModalVisible, setDetailModalVisible] = useState(false);
-  const [editingCoordenador, setEditingCoordenador] = useState(null);
-  const [viewingCoordenador, setViewingCoordenador] = useState(null);
-  const [alocacoes, setAlocacoes] = useState([]);
-  const [loadingAlocacoes, setLoadingAlocacoes] = useState(false);
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [detailModalVisible, setDetailModalVisible] = useState<boolean>(false);
+  const [editingCoordenador, setEditingCoordenador] = useState<CoordenadorRecord | null>(null);
+  const [viewingCoordenador, setViewingCoordenador] = useState<CoordenadorRecord | null>(null);
+  const [alocacoes, setAlocacoes] = useState<AlocacaoRecord[]>([]);
+  const [loadingAlocacoes, setLoadingAlocacoes] = useState<boolean>(false);
 
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<CoordenadorFormValues>();
 
   // Load options on mount
   useEffect(() => {
@@ -112,15 +174,15 @@ export default function CoordenadoresPage() {
         ]);
 
         // Use áreas da API ou padrão
-        const areasList = (areasData.results || areasData || []).length > 0
-          ? areasData.results || areasData
+        const areasList = ((areasData as any).results || areasData || []).length > 0
+          ? (areasData as any).results || areasData
           : AREAS_DEFAULT.map((a, i) => ({ id: i + 1, nome: a }));
 
         setAreas(areasList);
-        setProjetos(projData.results || projData || []);
-        setMunicipios(munData.results || munData || []);
+        setProjetos((projData as any).results || projData || []);
+        setMunicipios((munData as any).results || munData || []);
       } catch (error) {
-        message.error(`Erro ao carregar opções: ${error.message}`);
+        message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
     };
     loadOptions();
@@ -130,7 +192,7 @@ export default function CoordenadoresPage() {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params = {
+      const params: any = {
         page,
         page_size: pagination.pageSize,
         ordering: 'nome',
@@ -143,28 +205,28 @@ export default function CoordenadoresPage() {
 
       const data = await listCoordenadoresDAT(params);
 
-      const results = data.results || data || [];
-      setCoordenadores(results);
+      const results = (data as any).results || data || [];
+      setCoordenadores((results as any) as CoordenadorRecord[]);
       setPagination((prev) => ({
         ...prev,
         current: page,
-        total: data.count || results.length,
+        total: (data as any).count || (results as any[]).length,
       }));
 
       // Calculate stats
-      const ativos = results.filter((c) => c.ativo !== false).length;
-      const areasUnicas = [...new Set(results.map((c) => c.area))].filter(Boolean).length;
-      const totalProjetos = results.reduce((sum, c) => sum + (c.total_projetos || 0), 0);
-      const mediaProjetos = results.length > 0 ? (totalProjetos / results.length).toFixed(1) : 0;
+      const ativos = (results as any[]).filter((c) => c.ativo !== false).length;
+      const areasUnicas = [...new Set((results as any[]).map((c) => c.area))].filter(Boolean).length;
+      const totalProjetos = (results as any[]).reduce((sum, c) => sum + (c.total_projetos || 0), 0);
+      const mediaProjetos = (results as any[]).length > 0 ? (totalProjetos / (results as any[]).length).toFixed(1) : 0;
 
       setStats({
-        total: data.count || results.length,
+        total: (data as any).count || (results as any[]).length,
         ativos,
         areas: areasUnicas,
         media_projetos: mediaProjetos,
       });
     } catch (error) {
-      message.error(`Erro ao carregar dados: ${error.message}`);
+      message.error(`Erro ao carregar dados: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -180,11 +242,11 @@ export default function CoordenadoresPage() {
   };
 
   // Load alocações for detail view
-  const loadAlocacoes = async (coordenadorId) => {
+  const loadAlocacoes = async (coordenadorId: number) => {
     setLoadingAlocacoes(true);
     try {
       const data = await getCoordenadorAlocacoes(coordenadorId);
-      setAlocacoes(data.results || data || []);
+      setAlocacoes((data as any).results || data || []);
     } catch (error) {
       logger.error('Erro ao carregar alocações:', error);
       setAlocacoes([]);
@@ -202,7 +264,7 @@ export default function CoordenadoresPage() {
   };
 
   // Memoized handlers (§2 Epic #459)
-  const handleEdit = useCallback((record) => {
+  const handleEdit = useCallback((record: CoordenadorRecord) => {
     setEditingCoordenador(record);
     form.setFieldsValue({
       ...record,
@@ -211,13 +273,13 @@ export default function CoordenadoresPage() {
     setModalVisible(true);
   }, [form]);
 
-  const handleView = useCallback(async (record) => {
+  const handleView = useCallback(async (record: CoordenadorRecord) => {
     setViewingCoordenador(record);
     setDetailModalVisible(true);
     await loadAlocacoes(record.id);
   }, []);
 
-  const handleSave = async (values) => {
+  const handleSave = async (values: CoordenadorFormValues) => {
     try {
       const payload = {
         ...values,
@@ -235,11 +297,11 @@ export default function CoordenadoresPage() {
       form.resetFields();
       fetchData(pagination.current);
     } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      message.error(`Erro: ${(error as Error).message}`);
     }
   };
 
-  const handleDelete = useCallback((record) => {
+  const handleDelete = useCallback((record: CoordenadorRecord) => {
     Modal.confirm({
       title: 'Confirmar exclusão',
       content: (
@@ -261,26 +323,26 @@ export default function CoordenadoresPage() {
           message.success('Coordenador excluído com sucesso');
           fetchData(pagination.current);
         } catch (error) {
-          message.error(`Erro ao excluir: ${error.message}`);
+          message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
       },
     });
   }, [fetchData, pagination.current]);
 
-  const handleToggleAtivo = useCallback(async (record) => {
+  const handleToggleAtivo = useCallback(async (record: CoordenadorRecord) => {
     try {
       await updateCoordenadorDAT(record.id, { ativo: !record.ativo });
       message.success(`Coordenador ${record.ativo ? 'desativado' : 'ativado'}`);
       fetchData(pagination.current);
     } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      message.error(`Erro: ${(error as Error).message}`);
     }
   }, [fetchData, pagination.current]);
 
   // Issue #303: Helper functions extracted to ./Coordenadores/helpers.js
   // Group coordenadores by area using extracted helper - memoized (§2 Epic #459)
   const coordenadoresByArea = useMemo(
-    () => groupByArea(coordenadores),
+    () => groupByArea(coordenadores as any),
     [coordenadores]
   );
 
@@ -383,7 +445,7 @@ export default function CoordenadoresPage() {
   // Area view renderer
   const renderAreaView = () => (
     <Collapse defaultActiveKey={Object.keys(coordenadoresByArea)}>
-      {Object.entries(coordenadoresByArea).map(([area, coords]) => (
+      {Object.entries(coordenadoresByArea).map(([area, coords]: [string, any[]]) => (
         <Panel
           key={area}
           header={
@@ -542,7 +604,7 @@ export default function CoordenadoresPage() {
               placeholder="Nome, email..."
               allowClear
               value={filters.search}
-              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters((prev: any) => ({ ...prev, search: e.target.value }))}
               onSearch={() => fetchData(1)}
             />
           </Col>
@@ -558,7 +620,7 @@ export default function CoordenadoresPage() {
               allowClear
               showSearch
               value={filters.area}
-              onChange={(val) => setFilters((prev) => ({ ...prev, area: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, area: val }))}
               options={areas.map((a) => ({
                 label: typeof a === 'string' ? a : a.nome,
                 value: typeof a === 'string' ? a : a.nome,
@@ -576,7 +638,7 @@ export default function CoordenadoresPage() {
               placeholder="Todos"
               allowClear
               value={filters.ativo}
-              onChange={(val) => setFilters((prev) => ({ ...prev, ativo: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, ativo: val }))}
               options={[
                 { label: 'Ativos', value: true },
                 { label: 'Inativos', value: false },
@@ -612,7 +674,7 @@ export default function CoordenadoresPage() {
           }
         >
           <Table
-            columns={columns}
+            columns={columns as any}
             dataSource={coordenadores}
             rowKey="id"
             loading={loading}

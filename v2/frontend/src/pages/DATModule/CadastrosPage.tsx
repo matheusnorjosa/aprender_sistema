@@ -61,35 +61,93 @@ import {
   DEFAULT_FILTERS,
 } from './Cadastros/constants';
 import { getColumnsFormar, getColumnsAvaliar } from './Cadastros/columns';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 
 const { Title, Text } = Typography;
 
-export default function CadastrosPage() {
+// ============================================================
+// TYPE DEFINITIONS
+// ============================================================
+
+interface CadastroRecord {
+  id: number;
+  municipio: number;
+  municipio_nome: string;
+  projeto_geral: number;
+  projeto_geral_nome: string;
+  plataforma: 'FORMAR' | 'AVALIAR';
+  quantidade_alunos: number | null;
+  quantidade_professores: number | null;
+  quantidade_codigos: number | null;
+  [key: string]: any;
+}
+
+interface CadastrosFilters {
+  search: string;
+  uf: string | undefined;
+  municipio: number | undefined;
+  projeto_geral: number | undefined;
+  status_etapa: string | undefined;
+}
+
+interface CadastroFormValues {
+  plataforma: 'FORMAR' | 'AVALIAR';
+  projeto_geral: number;
+  municipio: number;
+  [key: string]: any;
+}
+
+interface CadastrosStats {
+  total_formar: number;
+  total_avaliar: number;
+  pendentes: number;
+  em_andamento: number;
+  concluidos: number;
+}
+
+interface PaginationState {
+  current: number;
+  pageSize: number;
+  total: number;
+}
+
+interface MunicipioOption {
+  id: number;
+  nome: string;
+  uf: string;
+}
+
+interface ProjetoGeralOption {
+  id: number;
+  nome: string;
+}
+
+
+export default function CadastrosPage(): JSX.Element {
   // Issue #303: State management - this page has complex logic (stats, tabs, filters)
   // that doesn't fit useCrudOperations hook. Constants extracted to ./Cadastros/constants.js
-  const [cadastros, setCadastros] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [cadastros, setCadastros] = useState<CadastroRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 15,
     total: 0,
   });
-  const [stats, setStats] = useState(null);
-  const [activeTab, setActiveTab] = useState('FORMAR');
+  const [stats, setStats] = useState<CadastrosStats | null>(null);
+  const [activeTab, setActiveTab] = useState<'FORMAR' | 'AVALIAR'>('FORMAR');
 
   // Filter states - using DEFAULT_FILTERS from constants
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<CadastrosFilters>(DEFAULT_FILTERS as CadastrosFilters);
 
   // Options for dropdowns
-  const [municipios, setMunicipios] = useState([]);
-  const [projetosGerais, setProjetosGerais] = useState([]);
+  const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
+  const [projetosGerais, setProjetosGerais] = useState<ProjetoGeralOption[]>([]);
 
   // Modal states
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingCadastro, setEditingCadastro] = useState(null);
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [editingCadastro, setEditingCadastro] = useState<CadastroRecord | null>(null);
 
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<CadastroFormValues>();
 
   // Load options on mount
   useEffect(() => {
@@ -99,10 +157,10 @@ export default function CadastrosPage() {
           getMunicipiosOptions(),
           getProjetosGeraisOptions(),
         ]);
-        setMunicipios(munData.results || munData || []);
-        setProjetosGerais(pgData.results || pgData || []);
+        setMunicipios((munData as any).results || munData || []);
+        setProjetosGerais((pgData as any).results || pgData || []);
       } catch (error) {
-        message.error(`Erro ao carregar opções: ${error.message}`);
+        message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
     };
     loadOptions();
@@ -112,7 +170,7 @@ export default function CadastrosPage() {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params = {
+      const params: any = {
         page,
         page_size: pagination.pageSize,
         ordering: '-updated_at',
@@ -131,15 +189,15 @@ export default function CadastrosPage() {
         getCadastrosStats(params),
       ]);
 
-      setCadastros(data.results || data || []);
+      setCadastros((data as any).results || data || []);
       setPagination((prev) => ({
         ...prev,
         current: page,
-        total: data.count || (data.results || data || []).length,
+        total: data.count || ((data as any).results || data || []).length,
       }));
-      setStats(statsData);
+      setStats(statsData as unknown as CadastrosStats);
     } catch (error) {
-      message.error(`Erro ao carregar dados: ${error.message}`);
+      message.error(`Erro ao carregar dados: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -162,7 +220,7 @@ export default function CadastrosPage() {
     setModalVisible(true);
   };
 
-  const handleEdit = (record) => {
+  const handleEdit = (record: CadastroRecord) => {
     setEditingCadastro(record);
     form.setFieldsValue({
       ...record,
@@ -177,7 +235,7 @@ export default function CadastrosPage() {
     setModalVisible(true);
   };
 
-  const handleSave = async (values) => {
+  const handleSave = async (values: CadastroFormValues) => {
     try {
       const payload = {
         ...values,
@@ -201,11 +259,11 @@ export default function CadastrosPage() {
       form.resetFields();
       fetchData(pagination.current);
     } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      message.error(`Erro: ${(error as Error).message}`);
     }
   };
 
-  const handleDelete = (record) => {
+  const handleDelete = (record: CadastroRecord) => {
     Modal.confirm({
       title: 'Confirmar exclusão',
       content: `Excluir cadastro de "${record.municipio_nome}"?`,
@@ -218,20 +276,20 @@ export default function CadastrosPage() {
           message.success('Cadastro excluído com sucesso');
           fetchData(pagination.current);
         } catch (error) {
-          message.error(`Erro ao excluir: ${error.message}`);
+          message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
       },
     });
   };
 
   // Quick status update
-  const handleQuickStatusUpdate = async (record, etapa, newStatus) => {
+  const handleQuickStatusUpdate = async (record: CadastroRecord, etapa: string, newStatus: string) => {
     try {
       await updateCadastroEtapa(record.id, etapa, newStatus);
       message.success('Status atualizado');
       fetchData(pagination.current);
     } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      message.error(`Erro: ${(error as Error).message}`);
     }
   };
 
@@ -244,8 +302,8 @@ export default function CadastrosPage() {
 
   const currentColumns =
     activeTab === 'FORMAR'
-      ? getColumnsFormar(columnHandlers)
-      : getColumnsAvaliar(columnHandlers);
+      ? getColumnsFormar(columnHandlers as any)
+      : getColumnsAvaliar(columnHandlers as any);
   const currentPlataforma = PLATAFORMAS[activeTab];
 
   return (
@@ -275,7 +333,7 @@ export default function CadastrosPage() {
       <Card className="mb-4">
         <Tabs
           activeKey={activeTab}
-          onChange={setActiveTab}
+          onChange={(key) => setActiveTab(key as 'FORMAR' | 'AVALIAR')}
           items={[
             {
               key: 'FORMAR',
@@ -359,7 +417,7 @@ export default function CadastrosPage() {
               placeholder="Município, projeto..."
               allowClear
               value={filters.search}
-              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters((prev: any) => ({ ...prev, search: e.target.value }))}
               onSearch={() => fetchData(1)}
             />
           </Col>
@@ -376,7 +434,7 @@ export default function CadastrosPage() {
               showSearch
               optionFilterProp="label"
               value={filters.projeto_geral}
-              onChange={(val) => setFilters((prev) => ({ ...prev, projeto_geral: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, projeto_geral: val }))}
               options={projetosGerais.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
@@ -391,7 +449,7 @@ export default function CadastrosPage() {
               placeholder="Todos"
               allowClear
               value={filters.uf}
-              onChange={(val) => setFilters((prev) => ({ ...prev, uf: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, uf: val }))}
               options={UF_OPTIONS}
               showSearch
             />
@@ -409,7 +467,7 @@ export default function CadastrosPage() {
               showSearch
               optionFilterProp="label"
               value={filters.municipio}
-              onChange={(val) => setFilters((prev) => ({ ...prev, municipio: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, municipio: val }))}
               options={municipios.map((m) => ({ label: `${m.nome} - ${m.uf}`, value: m.id }))}
             />
           </Col>
@@ -424,7 +482,7 @@ export default function CadastrosPage() {
               placeholder="Todos"
               allowClear
               value={filters.status_etapa}
-              onChange={(val) => setFilters((prev) => ({ ...prev, status_etapa: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, status_etapa: val }))}
               options={[
                 { label: 'Pendentes', value: 'pendente' },
                 { label: 'Em Andamento', value: 'em_andamento' },
@@ -470,7 +528,7 @@ export default function CadastrosPage() {
         }
       >
         <Table
-          columns={currentColumns}
+          columns={currentColumns as any}
           dataSource={cadastros}
           rowKey="id"
           loading={loading}

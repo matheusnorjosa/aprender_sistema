@@ -51,7 +51,7 @@ import {
   VideoCameraOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 
 import {
   listPlanoFormacoes,
@@ -69,6 +69,108 @@ import {
 import { getMunicipiosOptions, getProjetosOptions, getCoordenadoresOptions } from '../../api/datModule';
 
 const { Title, Text } = Typography;
+
+// ============================================================
+// TYPE DEFINITIONS
+// ============================================================
+
+interface FormacaoItem {
+  id?: number;
+  numero: number;
+  data: string | null;
+  ch: number;
+  modalidade: string | null;
+  realizada: boolean;
+}
+
+interface AcompanhamentoItem {
+  id?: number;
+  tipo: string;
+  data: string | null;
+  realizado: boolean;
+}
+
+interface ProvaItem {
+  id?: number;
+  numero: number;
+  data: string | null;
+  realizada: boolean;
+}
+
+interface PlanoFormacaoRecord {
+  id: number;
+  municipio: number;
+  municipio_nome: string;
+  municipio_uf: string;
+  projeto: number;
+  projeto_nome: string;
+  coordenador: number | null;
+  coordenador_nome: string | null;
+  ch_estudo: number | null;
+  ch_anual: number;
+  observacoes: string | null;
+  formacoes_list: FormacaoItem[];
+  acompanhamentos_list: AcompanhamentoItem[];
+  provas_list: ProvaItem[];
+}
+
+interface PlanoFormacoesFilters {
+  search: string;
+  uf: string | undefined;
+  municipio: number | undefined;
+  projeto: number | undefined;
+  coordenador: number | undefined;
+}
+
+interface PlanoFormacaoFormValues {
+  municipio: number;
+  projeto: number;
+  coordenador: number | null;
+  ch_estudo: number | null;
+  observacoes: string | null;
+}
+
+interface FormacaoInlineFormValues {
+  data_formacao: Dayjs | null;
+  carga_horaria: number | null;
+  modalidade: string | null;
+  realizada: boolean;
+}
+
+interface PlanoFormacoesStats {
+  total_planos: number;
+  total_formacoes: number;
+  total_realizadas: number;
+  taxa_realizacao: string;
+  ch_total: number;
+}
+
+interface PaginationState {
+  current: number;
+  pageSize: number;
+  total: number;
+}
+
+interface MunicipioOption {
+  id: number;
+  nome: string;
+}
+
+interface ProjetoOption {
+  id: number;
+  nome: string;
+}
+
+interface CoordenadorOption {
+  id: number;
+  nome: string;
+}
+
+interface EditingFormacaoState {
+  plano: PlanoFormacaoRecord;
+  formacao: FormacaoItem;
+}
+
 
 // ============================================================
 // CONSTANTS
@@ -90,21 +192,21 @@ const STATUS_OPTIONS = [
 // COMPONENT
 // ============================================================
 
-export default function PlanoFormacoesPage() {
+export default function PlanoFormacoesPage(): JSX.Element {
   // Data state
-  const [planos, setPlanos] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [planos, setPlanos] = useState<PlanoFormacaoRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 15,
     total: 0,
   });
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState<PlanoFormacoesStats | null>(null);
 
   // Options state
-  const [municipios, setMunicipios] = useState([]);
-  const [projetos, setProjetos] = useState([]);
-  const [coordenadores, setCoordenadores] = useState([]);
+  const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
+  const [projetos, setProjetos] = useState<ProjetoOption[]>([]);
+  const [coordenadores, setCoordenadores] = useState<CoordenadorOption[]>([]);
 
   // Filter state
   const [filters, setFilters] = useState({
@@ -116,21 +218,21 @@ export default function PlanoFormacoesPage() {
   });
 
   // View mode
-  const [viewMode, setViewMode] = useState('table'); // 'table' | 'calendar' | 'resumo'
+  const [viewMode, setViewMode] = useState<'table' | 'calendar' | 'resumo'>('table'); // 'table' | 'calendar' | 'resumo'
 
   // Modal state
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingPlano, setEditingPlano] = useState(null);
-  const [form] = Form.useForm();
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [editingPlano, setEditingPlano] = useState<PlanoFormacaoRecord | null>(null);
+  const [form] = Form.useForm<PlanoFormacaoFormValues>();
 
   // Formacao edit modal
-  const [formacaoModalVisible, setFormacaoModalVisible] = useState(false);
-  const [editingFormacao, setEditingFormacao] = useState(null);
-  const [formacaoForm] = Form.useForm();
+  const [formacaoModalVisible, setFormacaoModalVisible] = useState<boolean>(false);
+  const [editingFormacao, setEditingFormacao] = useState<EditingFormacaoState | null>(null);
+  const [formacaoForm] = Form.useForm<FormacaoInlineFormValues>();
 
   // Detail modal
-  const [detailModalVisible, setDetailModalVisible] = useState(false);
-  const [detailPlano, setDetailPlano] = useState(null);
+  const [detailModalVisible, setDetailModalVisible] = useState<boolean>(false);
+  const [detailPlano, setDetailPlano] = useState<PlanoFormacaoRecord | null>(null);
 
   // ============================================================
   // DATA LOADING
@@ -145,11 +247,11 @@ export default function PlanoFormacoesPage() {
           getProjetosOptions(),
           getCoordenadoresOptions(),
         ]);
-        setMunicipios(munData.results || munData || []);
-        setProjetos(projData.results || projData || []);
-        setCoordenadores(coordData.results || coordData || []);
+        setMunicipios((munData as any).results || munData || []);
+        setProjetos((projData as any).results || projData || []);
+        setCoordenadores((coordData as any).results || coordData || []);
       } catch (error) {
-        message.error(`Erro ao carregar opcoes: ${error.message}`);
+        message.error(`Erro ao carregar opcoes: ${(error as Error).message}`);
       }
     };
     loadOptions();
@@ -159,7 +261,7 @@ export default function PlanoFormacoesPage() {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params = {
+      const params: any = {
         page,
         page_size: pagination.pageSize,
         ordering: 'municipio__nome,projeto__nome',
@@ -176,15 +278,15 @@ export default function PlanoFormacoesPage() {
         getPlanoFormacoesStats(params),
       ]);
 
-      setPlanos(data.results || data || []);
+      setPlanos((data as any).results || data || []);
       setPagination((prev) => ({
         ...prev,
         current: page,
-        total: data.count || (data.results || data || []).length,
+        total: data.count || ((data as any).results || data || []).length,
       }));
-      setStats(statsData);
+      setStats(statsData as unknown as PlanoFormacoesStats);
     } catch (error) {
-      message.error(`Erro ao carregar dados: ${error.message}`);
+      message.error(`Erro ao carregar dados: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -214,7 +316,7 @@ export default function PlanoFormacoesPage() {
     setModalVisible(true);
   };
 
-  const handleEdit = (record) => {
+  const handleEdit = (record: PlanoFormacaoRecord) => {
     setEditingPlano(record);
     form.setFieldsValue({
       municipio: record.municipio,
@@ -226,7 +328,7 @@ export default function PlanoFormacoesPage() {
     setModalVisible(true);
   };
 
-  const handleDelete = (record) => {
+  const handleDelete = (record: PlanoFormacaoRecord) => {
     Modal.confirm({
       title: 'Confirmar exclusao',
       content: `Excluir plano de "${record.municipio_nome}" - "${record.projeto_nome}"? Esta acao ira remover todas as formacoes, acompanhamentos e provas associadas.`,
@@ -239,36 +341,36 @@ export default function PlanoFormacoesPage() {
           message.success('Plano excluido com sucesso');
           fetchData(pagination.current);
         } catch (error) {
-          message.error(`Erro ao excluir: ${error.message}`);
+          message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
       },
     });
   };
 
-  const handleSave = async (values) => {
+  const handleSave = async (values: PlanoFormacaoFormValues) => {
     try {
       if (editingPlano) {
-        await updatePlanoFormacoes(editingPlano.id, values);
+        await updatePlanoFormacoes(editingPlano.id, values as any);
         message.success('Plano atualizado com sucesso');
       } else {
-        await createPlanoFormacoes(values);
+        await createPlanoFormacoes(values as any);
         message.success('Plano criado com sucesso');
       }
       setModalVisible(false);
       form.resetFields();
       fetchData(pagination.current);
     } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      message.error(`Erro: ${(error as Error).message}`);
     }
   };
 
-  const handleViewDetail = (record) => {
+  const handleViewDetail = (record: PlanoFormacaoRecord) => {
     setDetailPlano(record);
     setDetailModalVisible(true);
   };
 
   // Formacao cell click
-  const handleFormacaoClick = (plano, formacao) => {
+  const handleFormacaoClick = (plano: PlanoFormacaoRecord, formacao: FormacaoItem) => {
     setEditingFormacao({ plano, formacao });
     formacaoForm.setFieldsValue({
       data_formacao: formacao.data ? dayjs(formacao.data) : null,
@@ -279,7 +381,7 @@ export default function PlanoFormacoesPage() {
     setFormacaoModalVisible(true);
   };
 
-  const handleFormacaoSave = async (values) => {
+  const handleFormacaoSave = async (values: FormacaoInlineFormValues) => {
     try {
       const payload = {
         ...values,
@@ -290,7 +392,7 @@ export default function PlanoFormacoesPage() {
       setFormacaoModalVisible(false);
       fetchData(pagination.current);
     } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      message.error(`Erro: ${(error as Error).message}`);
     }
   };
 
@@ -298,7 +400,7 @@ export default function PlanoFormacoesPage() {
   // RENDER HELPERS
   // ============================================================
 
-  const renderFormacaoCell = (plano, formacao) => {
+  const renderFormacaoCell = (plano: PlanoFormacaoRecord, formacao: FormacaoItem | undefined) => {
     if (!formacao) return <Text type="secondary">-</Text>;
 
     const hasData = formacao.data;
@@ -331,7 +433,7 @@ export default function PlanoFormacoesPage() {
     );
   };
 
-  const renderAcompanhamentoCell = (plano, index) => {
+  const renderAcompanhamentoCell = (plano: PlanoFormacaoRecord, index: number) => {
     const acomp = plano.acompanhamentos_list?.[index];
     if (!acomp) return <Text type="secondary">-</Text>;
 
@@ -349,7 +451,7 @@ export default function PlanoFormacoesPage() {
     );
   };
 
-  const renderProvaCell = (plano, index) => {
+  const renderProvaCell = (plano: PlanoFormacaoRecord, index: number) => {
     const prova = plano.provas_list?.[index];
     if (!prova) return <Text type="secondary">-</Text>;
 
@@ -377,7 +479,7 @@ export default function PlanoFormacoesPage() {
       dataIndex: 'municipio_nome',
       key: 'municipio',
       width: 150,
-      fixed: 'left',
+      fixed: 'left' as const,
       render: (nome, record) => (
         <div>
           <Text strong>{nome}</Text>
@@ -390,7 +492,7 @@ export default function PlanoFormacoesPage() {
       dataIndex: 'coordenador_nome',
       key: 'coordenador',
       width: 100,
-      fixed: 'left',
+      fixed: 'left' as const,
       ellipsis: true,
       render: (nome) => nome || <Text type="secondary">-</Text>,
     },
@@ -399,7 +501,7 @@ export default function PlanoFormacoesPage() {
       dataIndex: 'projeto_nome',
       key: 'projeto',
       width: 150,
-      fixed: 'left',
+      fixed: 'left' as const,
       ellipsis: true,
     },
     // 15 formacoes columns
@@ -407,7 +509,7 @@ export default function PlanoFormacoesPage() {
       title: `F${i + 1}`,
       key: `f${i + 1}`,
       width: 70,
-      align: 'center',
+      align: 'center' as const,
       render: (_, record) => {
         const formacao = record.formacoes_list?.find((f) => f.numero === i + 1);
         return renderFormacaoCell(record, formacao);
@@ -418,49 +520,49 @@ export default function PlanoFormacoesPage() {
       dataIndex: 'ch_anual',
       key: 'ch_anual',
       width: 60,
-      align: 'center',
+      align: 'center' as const,
       render: (ch) => <Text strong>{ch}h</Text>,
     },
     {
       title: 'A1',
       key: 'a1',
       width: 50,
-      align: 'center',
+      align: 'center' as const,
       render: (_, record) => renderAcompanhamentoCell(record, 0),
     },
     {
       title: 'A2',
       key: 'a2',
       width: 50,
-      align: 'center',
+      align: 'center' as const,
       render: (_, record) => renderAcompanhamentoCell(record, 1),
     },
     {
       title: 'P1',
       key: 'p1',
       width: 50,
-      align: 'center',
+      align: 'center' as const,
       render: (_, record) => renderProvaCell(record, 0),
     },
     {
       title: 'P2',
       key: 'p2',
       width: 50,
-      align: 'center',
+      align: 'center' as const,
       render: (_, record) => renderProvaCell(record, 1),
     },
     {
       title: 'P3',
       key: 'p3',
       width: 50,
-      align: 'center',
+      align: 'center' as const,
       render: (_, record) => renderProvaCell(record, 2),
     },
     {
       title: 'Acoes',
       key: 'acoes',
       width: 100,
-      fixed: 'right',
+      fixed: 'right' as const,
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="Ver detalhes">
@@ -594,7 +696,7 @@ export default function PlanoFormacoesPage() {
               placeholder="Municipio, projeto..."
               allowClear
               value={filters.search}
-              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters((prev: any) => ({ ...prev, search: e.target.value }))}
               onSearch={() => fetchData(1)}
             />
           </Col>
@@ -609,7 +711,7 @@ export default function PlanoFormacoesPage() {
               showSearch
               optionFilterProp="label"
               value={filters.municipio}
-              onChange={(val) => setFilters((prev) => ({ ...prev, municipio: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, municipio: val }))}
               options={municipios.map((m) => ({ label: m.nome, value: m.id }))}
             />
           </Col>
@@ -624,7 +726,7 @@ export default function PlanoFormacoesPage() {
               showSearch
               optionFilterProp="label"
               value={filters.projeto}
-              onChange={(val) => setFilters((prev) => ({ ...prev, projeto: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, projeto: val }))}
               options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
@@ -639,7 +741,7 @@ export default function PlanoFormacoesPage() {
               showSearch
               optionFilterProp="label"
               value={filters.coordenador}
-              onChange={(val) => setFilters((prev) => ({ ...prev, coordenador: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, coordenador: val }))}
               options={coordenadores.map((c) => ({ label: c.nome, value: c.id }))}
             />
           </Col>
@@ -656,7 +758,7 @@ export default function PlanoFormacoesPage() {
       {viewMode === 'table' && (
         <Card>
           <Table
-            columns={columns}
+            columns={columns as any}
             dataSource={planos}
             rowKey="id"
             loading={loading}

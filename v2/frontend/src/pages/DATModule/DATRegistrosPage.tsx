@@ -52,7 +52,7 @@ import {
   getMunicipiosOptions,
   getProjetosOptions,
 } from '../../api/datModule';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import {
   STATUS_OPTIONS,
   UF_OPTIONS,
@@ -64,25 +64,86 @@ import { getColumns } from './DATRegistros/columns';
 
 const { Title, Text } = Typography;
 
-export default function DATRegistrosPage() {
-  const [registros, setRegistros] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
+// ============================================================
+// TYPE DEFINITIONS
+// ============================================================
+
+interface DATRegistroRecord {
+  id: number;
+  municipio: number;
+  municipio_nome: string;
+  municipio_uf: string;
+  projeto_geral: number;
+  projeto_geral_nome: string;
+  projeto: number;
+  projeto_nome: string;
+  [key: string]: any;
+}
+
+interface DATRegistrosFilters {
+  regiao: string | undefined;
+  uf: string | undefined;
+  municipio: number | undefined;
+  projeto_geral: number | undefined;
+  usa_avaliar: string | undefined;
+  status_formar: string | undefined;
+}
+
+interface DATRegistroFormValues {
+  municipio: number;
+  projeto_geral: number;
+  projeto: number;
+  [key: string]: any;
+}
+
+interface PaginationState {
+  current: number;
+  pageSize: number;
+  total: number;
+}
+
+interface ProjetoGeralOption {
+  id: number;
+  nome: string;
+}
+
+interface MunicipioOption {
+  id: number;
+  nome: string;
+  uf: string;
+}
+
+interface ProjetoOption {
+  id: number;
+  nome: string;
+  codigo: string;
+}
+
+interface UFOption {
+  label: string;
+  value: string;
+}
+
+
+export default function DATRegistrosPage(): JSX.Element {
+  const [registros, setRegistros] = useState<DATRegistroRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [pagination, setPagination] = useState<PaginationState>({ current: 1, pageSize: 15, total: 0 });
 
   // Filter states - using DEFAULT_FILTERS from constants
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<DATRegistrosFilters>(DEFAULT_FILTERS as unknown as DATRegistrosFilters);
 
   // Options for dropdowns
-  const [projetosGerais, setProjetosGerais] = useState([]);
-  const [municipios, setMunicipios] = useState([]);
-  const [projetos, setProjetos] = useState([]);
-  const [filteredUFs, setFilteredUFs] = useState(UF_OPTIONS);
+  const [projetosGerais, setProjetosGerais] = useState<ProjetoGeralOption[]>([]);
+  const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
+  const [projetos, setProjetos] = useState<ProjetoOption[]>([]);
+  const [filteredUFs, setFilteredUFs] = useState<UFOption[]>(UF_OPTIONS as UFOption[]);
 
   // Modal states
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingRegistro, setEditingRegistro] = useState(null);
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [editingRegistro, setEditingRegistro] = useState<DATRegistroRecord | null>(null);
 
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<DATRegistroFormValues>();
 
   // Load options on mount
   useEffect(() => {
@@ -93,11 +154,11 @@ export default function DATRegistrosPage() {
           getMunicipiosOptions(),
           getProjetosOptions(),
         ]);
-        setProjetosGerais(pgData.results || pgData || []);
-        setMunicipios(munData.results || munData || []);
-        setProjetos(projData.results || projData || []);
+        setProjetosGerais((pgData as any).results || pgData || []);
+        setMunicipios((munData as any).results || munData || []);
+        setProjetos((projData as any).results || projData || []);
       } catch (error) {
-        message.error(`Erro ao carregar opções: ${error.message}`);
+        message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
     };
     loadOptions();
@@ -107,7 +168,7 @@ export default function DATRegistrosPage() {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params = {
+      const params: any = {
         page,
         page_size: pagination.pageSize,
         ordering: '-created_at',
@@ -121,14 +182,14 @@ export default function DATRegistrosPage() {
       if (filters.status_formar) params.status_formar = filters.status_formar;
 
       const data = await listDATRegistros(params);
-      setRegistros(data.results || data || []);
+      setRegistros((data as any).results || data || []);
       setPagination((prev) => ({
         ...prev,
         current: page,
-        total: data.count || (data.results || data || []).length,
+        total: data.count || ((data as any).results || data || []).length,
       }));
     } catch (error) {
-      message.error(`Erro ao carregar dados: ${error.message}`);
+      message.error(`Erro ao carregar dados: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -139,19 +200,19 @@ export default function DATRegistrosPage() {
   }, [fetchData]);
 
   // Handle region filter change
-  const handleRegiaoChange = (regiao) => {
-    setFilters((prev) => ({ ...prev, regiao, uf: undefined }));
+  const handleRegiaoChange = (regiao: string | undefined) => {
+    setFilters((prev: any) => ({ ...prev, regiao, uf: undefined }));
     if (regiao && REGIAO_UFS[regiao]) {
-      setFilteredUFs(UF_OPTIONS.filter((uf) => REGIAO_UFS[regiao].includes(uf.value)));
+      setFilteredUFs((UF_OPTIONS as UFOption[]).filter((uf) => (REGIAO_UFS as any)[regiao as string]?.includes(uf.value)));
     } else {
-      setFilteredUFs(UF_OPTIONS);
+      setFilteredUFs(UF_OPTIONS as UFOption[]);
     }
   };
 
   // Clear all filters
   const handleClearFilters = () => {
-    setFilters(DEFAULT_FILTERS);
-    setFilteredUFs(UF_OPTIONS);
+    setFilters(DEFAULT_FILTERS as any);
+    setFilteredUFs(UF_OPTIONS as UFOption[]);
   };
 
   // Apply filters
@@ -162,7 +223,7 @@ export default function DATRegistrosPage() {
   // Export to CSV
   const handleExport = async () => {
     try {
-      const blob = await exportDATRegistros(filters);
+      const blob = await exportDATRegistros(filters as any);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -171,7 +232,7 @@ export default function DATRegistrosPage() {
       window.URL.revokeObjectURL(url);
       message.success('Exportação realizada com sucesso');
     } catch (error) {
-      message.error(`Erro ao exportar: ${error.message}`);
+      message.error(`Erro ao exportar: ${(error as Error).message}`);
     }
   };
 
@@ -182,7 +243,7 @@ export default function DATRegistrosPage() {
     setModalVisible(true);
   };
 
-  const handleEdit = (record) => {
+  const handleEdit = (record: DATRegistroRecord) => {
     setEditingRegistro(record);
     form.setFieldsValue({
       ...record,
@@ -191,7 +252,7 @@ export default function DATRegistrosPage() {
     setModalVisible(true);
   };
 
-  const handleSave = async (values) => {
+  const handleSave = async (values: DATRegistroFormValues) => {
     try {
       const payload = {
         ...values,
@@ -209,11 +270,11 @@ export default function DATRegistrosPage() {
       form.resetFields();
       fetchData(pagination.current);
     } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      message.error(`Erro: ${(error as Error).message}`);
     }
   };
 
-  const handleDelete = (record) => {
+  const handleDelete = (record: DATRegistroRecord) => {
     Modal.confirm({
       title: 'Confirmar exclusão',
       content: `Excluir registro de "${record.municipio_nome}"? Esta ação requer permissão de Superintendência.`,
@@ -226,7 +287,7 @@ export default function DATRegistrosPage() {
           message.success('Registro excluído com sucesso');
           fetchData(pagination.current);
         } catch (error) {
-          message.error(`Erro ao excluir: ${error.message}`);
+          message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
       },
     });
@@ -291,7 +352,7 @@ export default function DATRegistrosPage() {
               placeholder="Todos"
               allowClear
               value={filters.uf}
-              onChange={(val) => setFilters((prev) => ({ ...prev, uf: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, uf: val }))}
               options={filteredUFs}
               showSearch
             />
@@ -309,7 +370,7 @@ export default function DATRegistrosPage() {
               showSearch
               optionFilterProp="label"
               value={filters.municipio}
-              onChange={(val) => setFilters((prev) => ({ ...prev, municipio: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, municipio: val }))}
               options={municipios.map((m) => ({ label: `${m.nome} - ${m.uf}`, value: m.id }))}
             />
           </Col>
@@ -324,7 +385,7 @@ export default function DATRegistrosPage() {
               placeholder="Todos"
               allowClear
               value={filters.projeto_geral}
-              onChange={(val) => setFilters((prev) => ({ ...prev, projeto_geral: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, projeto_geral: val }))}
               options={projetosGerais.map((pg) => ({ label: pg.nome, value: pg.id }))}
             />
           </Col>
@@ -339,7 +400,7 @@ export default function DATRegistrosPage() {
               placeholder="Todos"
               allowClear
               value={filters.usa_avaliar}
-              onChange={(val) => setFilters((prev) => ({ ...prev, usa_avaliar: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, usa_avaliar: val }))}
               options={[
                 { label: 'Sim', value: 'true' },
                 { label: 'Não', value: 'false' },
@@ -357,7 +418,7 @@ export default function DATRegistrosPage() {
               placeholder="Todos"
               allowClear
               value={filters.status_formar}
-              onChange={(val) => setFilters((prev) => ({ ...prev, status_formar: val }))}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, status_formar: val }))}
               options={[
                 { label: 'Completo', value: 'completo' },
                 { label: 'Pendente', value: 'pendente' },
@@ -416,7 +477,7 @@ export default function DATRegistrosPage() {
         </div>
 
         <Table
-          columns={columns}
+          columns={columns as any}
           dataSource={registros}
           rowKey="id"
           loading={loading}

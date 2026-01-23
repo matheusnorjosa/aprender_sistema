@@ -4,6 +4,7 @@ Management command to backfill coordenador field from usuario.
 For events imported via ETL where coordenador is NULL,
 set coordenador = usuario (the coordenador from spreadsheet column N).
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -32,10 +33,7 @@ class Command(BaseCommand):
         self.stdout.write(f"🔄 Backfilling coordenador field (dry_run={dry_run})")
 
         # Find all solicitacoes where coordenador is NULL but usuario is not
-        events_to_update = Solicitacao.objects.filter(
-            coordenador__isnull=True,
-            usuario__isnull=False
-        )
+        events_to_update = Solicitacao.objects.filter(coordenador__isnull=True, usuario__isnull=False)
 
         total = events_to_update.count()
         self.stdout.write(f"   Found {total} events to update")
@@ -55,5 +53,5 @@ class Command(BaseCommand):
             self.stdout.write(f"\n   [DRY-RUN] Would update {total} events")
         else:
             # Update all events
-            updated = events_to_update.update(coordenador=F('usuario'))
+            updated = events_to_update.update(coordenador=F("usuario"))
             self.stdout.write(self.style.SUCCESS(f"   ✅ Updated {updated} events"))

@@ -11,11 +11,14 @@ Testa:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from datetime import date
+
 from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import Compra, Municipio, Projeto, Usuario
 
@@ -132,15 +135,11 @@ class TestMunicipioAPI:
         assert response.status_code == status.HTTP_201_CREATED
         assert Municipio.objects.filter(nome="Caucaia").exists()
 
-    def test_dat_can_update_municipio(
-        self, api_client, usuario_dat, municipio_sample
-    ):
+    def test_dat_can_update_municipio(self, api_client, usuario_dat, municipio_sample):
         """DAT pode atualizar município"""
         api_client.force_authenticate(user=usuario_dat)
         payload = {"ativo": False}
-        response = api_client.patch(
-            f"/api/municipios/{municipio_sample.id}/", payload, format="json"
-        )
+        response = api_client.patch(f"/api/municipios/{municipio_sample.id}/", payload, format="json")
         assert response.status_code == status.HTTP_200_OK
         municipio_sample.refresh_from_db()
         assert municipio_sample.ativo is False
@@ -159,17 +158,13 @@ class TestMunicipioAPI:
         response = api_client.post("/api/municipios/", payload, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_formador_cannot_access_municipios(
-        self, api_client, usuario_formador, municipio_sample
-    ):
+    def test_formador_cannot_access_municipios(self, api_client, usuario_formador, municipio_sample):
         """Formador NÃO pode acessar endpoint de municípios"""
         api_client.force_authenticate(user=usuario_formador)
         response = api_client.get("/api/municipios/")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_filter_municipios_by_uf(
-        self, api_client, usuario_dat, municipio_sample, db
-    ):
+    def test_filter_municipios_by_uf(self, api_client, usuario_dat, municipio_sample, db):
         """Filtrar municípios por UF"""
         Municipio.objects.create(nome="Juazeiro do Norte", uf="CE")
         Municipio.objects.create(nome="Recife", uf="PE")
@@ -178,9 +173,7 @@ class TestMunicipioAPI:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data["results"]) == 2
 
-    def test_search_municipios_by_nome(
-        self, api_client, usuario_dat, municipio_sample
-    ):
+    def test_search_municipios_by_nome(self, api_client, usuario_dat, municipio_sample):
         """Buscar municípios por nome"""
         api_client.force_authenticate(user=usuario_dat)
         response = api_client.get("/api/municipios/?search=Fortal")
@@ -256,18 +249,14 @@ class TestCompraAPI:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data["results"]) == 1
 
-    def test_controle_can_list_compras(
-        self, api_client, usuario_controle, compra_sample
-    ):
+    def test_controle_can_list_compras(self, api_client, usuario_controle, compra_sample):
         """Controle pode listar compras (read-only)"""
         api_client.force_authenticate(user=usuario_controle)
         response = api_client.get("/api/compras/")
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data["results"]) == 1
 
-    def test_dat_can_create_compra(
-        self, api_client, usuario_dat, municipio_sample, projeto_sample
-    ):
+    def test_dat_can_create_compra(self, api_client, usuario_dat, municipio_sample, projeto_sample):
         """DAT pode criar compra"""
         api_client.force_authenticate(user=usuario_dat)
         payload = {
@@ -283,9 +272,7 @@ class TestCompraAPI:
         assert response.status_code == status.HTTP_201_CREATED
         assert Compra.objects.filter(codigo="COMP-002").exists()
 
-    def test_controle_cannot_create_compra(
-        self, api_client, usuario_controle, municipio_sample, projeto_sample
-    ):
+    def test_controle_cannot_create_compra(self, api_client, usuario_controle, municipio_sample, projeto_sample):
         """Controle NÃO pode criar compra (apenas importar)"""
         api_client.force_authenticate(user=usuario_controle)
         payload = {
@@ -299,17 +286,13 @@ class TestCompraAPI:
         response = api_client.post("/api/compras/", payload, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_formador_cannot_access_compras(
-        self, api_client, usuario_formador, compra_sample
-    ):
+    def test_formador_cannot_access_compras(self, api_client, usuario_formador, compra_sample):
         """Formador NÃO pode acessar compras"""
         api_client.force_authenticate(user=usuario_formador)
         response = api_client.get("/api/compras/")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_filter_compras_by_projeto(
-        self, api_client, usuario_dat, compra_sample, municipio_sample, db
-    ):
+    def test_filter_compras_by_projeto(self, api_client, usuario_dat, compra_sample, municipio_sample, db):
         """Filtrar compras por projeto"""
         projeto2 = Projeto.objects.create(nome="Ciências")
         Compra.objects.create(
@@ -332,9 +315,7 @@ class TestCompraAPI:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data["results"]) == 1
 
-    def test_compra_quantidade_validation(
-        self, api_client, usuario_dat, municipio_sample, projeto_sample
-    ):
+    def test_compra_quantidade_validation(self, api_client, usuario_dat, municipio_sample, projeto_sample):
         """Validação: quantidade não pode ser negativa"""
         api_client.force_authenticate(user=usuario_dat)
         payload = {

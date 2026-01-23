@@ -5,6 +5,7 @@ Model de logs de auditoria.
 Clausula Petrea: PA-05 (registro de aprovacoes/reprovacoes).
 Type-checked with Pyright (strict mode).
 """
+
 from __future__ import annotations
 
 from django.db import models
@@ -26,23 +27,20 @@ class AuditLog(models.Model):
         null=True,
         blank=True,
         related_name="audit_logs",
-        help_text="Usuario que executou a acao (se aplicavel)"
+        help_text="Usuario que executou a acao (se aplicavel)",
     )
     action = models.CharField(
-        max_length=50,
-        db_index=True,
-        help_text="Acao executada (ex: CELERY_GCAL_SYNC, approve, reject)"
+        max_length=50, db_index=True, help_text="Acao executada (ex: CELERY_GCAL_SYNC, approve, reject)"
     )
     model_name = models.CharField(
         max_length=60,
         null=True,
         blank=True,
         db_index=True,
-        help_text="Nome do modelo relacionado (opcional, ex: Solicitacao, Compra)"
+        help_text="Nome do modelo relacionado (opcional, ex: Solicitacao, Compra)",
     )
     details = models.JSONField(  # type: ignore[misc]
-        default=dict,
-        help_text="Detalhes da operacao (status, applied, reason, etc.)"
+        default=dict, help_text="Detalhes da operacao (status, applied, reason, etc.)"
     )
     created_at = models.DateTimeField(default=timezone.now)
 

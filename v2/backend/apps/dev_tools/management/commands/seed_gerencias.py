@@ -5,14 +5,13 @@ Usage:
     python manage.py seed_gerencias
 """
 
-
 from __future__ import annotations
+
 from typing import Any
 
 from django.core.management.base import BaseCommand
 
 from apps.core.models import Gerencia
-
 
 GERENCIAS = [
     {
@@ -74,11 +73,7 @@ class Command(BaseCommand):
 
             if created:
                 created_count += 1
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"  ✓ Created: {gerencia.nome} ({gerencia.nome_setor})"
-                    )
-                )
+                self.stdout.write(self.style.SUCCESS(f"  ✓ Created: {gerencia.nome} ({gerencia.nome_setor})"))
             else:
                 # Atualizar campos se mudaram
                 updated = False
@@ -92,15 +87,9 @@ class Command(BaseCommand):
                 if updated:
                     gerencia.save()
                     updated_count += 1
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"  ⟳ Updated: {gerencia.nome} ({gerencia.nome_setor})"
-                        )
-                    )
+                    self.stdout.write(self.style.WARNING(f"  ⟳ Updated: {gerencia.nome} ({gerencia.nome_setor})"))
                 else:
-                    self.stdout.write(
-                        f"  - Skipped (already exists): {gerencia.nome}"
-                    )
+                    self.stdout.write(f"  - Skipped (already exists): {gerencia.nome}")
 
         self.stdout.write(
             self.style.SUCCESS(

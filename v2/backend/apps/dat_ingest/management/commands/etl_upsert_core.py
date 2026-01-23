@@ -1,6 +1,7 @@
 """
 ETL Command: Upsert staging → SSOT tables (idempotent by natural keys)
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -135,9 +136,7 @@ class Command(BaseCommand):
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"  ✗ Error processing {email}: {e}"))
 
-        self.stdout.write(
-            f"  Usuarios: {created_count} created, {updated_count} updated, {unchanged_count} unchanged"
-        )
+        self.stdout.write(f"  Usuarios: {created_count} created, {updated_count} updated, {unchanged_count} unchanged")
         return created_count, updated_count, unchanged_count
 
     @transaction.atomic
@@ -171,9 +170,7 @@ class Command(BaseCommand):
             }
 
             try:
-                obj, created = Municipio.objects.update_or_create(
-                    nome=nome, uf=uf, defaults=defaults
-                )
+                obj, created = Municipio.objects.update_or_create(nome=nome, uf=uf, defaults=defaults)
 
                 if created:
                     created_count += 1
@@ -240,9 +237,7 @@ class Command(BaseCommand):
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"  ✗ Error processing {nome}: {e}"))
 
-        self.stdout.write(
-            f"  Projetos: {created_count} created, {updated_count} updated, {unchanged_count} unchanged"
-        )
+        self.stdout.write(f"  Projetos: {created_count} created, {updated_count} updated, {unchanged_count} unchanged")
         return created_count, updated_count, unchanged_count
 
     @transaction.atomic

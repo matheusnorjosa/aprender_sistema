@@ -11,9 +11,11 @@ Testa models, serializers e ViewSets para:
 
 Ref: .claude/plans/linear-scribbling-boole.md
 """
+
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from datetime import date, time, timedelta
 from decimal import Decimal
 
@@ -51,11 +53,7 @@ class DATAreaModelTests(TestCase):
 
     def test_create_area(self):
         """DATArea should be created with correct fields."""
-        area = DATArea.objects.create(
-            nome="Tecnologia",
-            cor="blue",
-            ordem=1
-        )
+        area = DATArea.objects.create(nome="Tecnologia", cor="blue", ordem=1)
         self.assertEqual(area.nome, "Tecnologia")
         self.assertEqual(area.cor, "blue")
         self.assertTrue(area.ativo)
@@ -74,11 +72,10 @@ class DATCoordenadorModelTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         import uuid
+
         uid = uuid.uuid4().hex[:6]
         cls.user = User.objects.create_user(
-            username=f"testuser_{uid}",
-            password="test123",
-            cpf=f"111{uid}11"  # 11 chars
+            username=f"testuser_{uid}", password="test123", cpf=f"111{uid}11"  # 11 chars
         )
 
     def test_create_coordenador(self):
@@ -89,7 +86,7 @@ class DATCoordenadorModelTests(TestCase):
             telefone="85999999999",
             area="DAT",
             cargo="Coordenador",
-            created_by=self.user
+            created_by=self.user,
         )
         self.assertEqual(coord.nome, "João Silva")
         self.assertEqual(coord.area, "DAT")
@@ -98,11 +95,7 @@ class DATCoordenadorModelTests(TestCase):
 
     def test_coordenador_properties(self):
         """DATCoordenador properties should return correct values."""
-        coord = DATCoordenador.objects.create(
-            nome="Maria Santos",
-            area="Tecnologia",
-            created_by=self.user
-        )
+        coord = DATCoordenador.objects.create(nome="Maria Santos", area="Tecnologia", created_by=self.user)
         # Initially no relations
         self.assertEqual(coord.total_municipios, 0)
         self.assertEqual(coord.total_projetos, 0)
@@ -115,31 +108,19 @@ class DATAcaoModelTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         import uuid
+
         uid = uuid.uuid4().hex[:5]
         cls.user = User.objects.create_user(
-            username=f"testuser_acao_{uid}",
-            password="test123",
-            cpf=f"222{uid}222"  # 11 chars
+            username=f"testuser_acao_{uid}", password="test123", cpf=f"222{uid}222"  # 11 chars
         )
         cls.municipio = Municipio.objects.create(nome=f"Fortaleza_{uid}", uf="CE")
-        cls.projeto = Projeto.objects.create(
-            nome=f"Projeto Teste_{uid}",
-            codigo=f"PT{uid[:4]}",
-            fluxo="NAO_SUPER"
-        )
-        cls.coordenador = DATCoordenador.objects.create(
-            nome="Coordenador Teste",
-            area="DAT",
-            created_by=cls.user
-        )
+        cls.projeto = Projeto.objects.create(nome=f"Projeto Teste_{uid}", codigo=f"PT{uid[:4]}", fluxo="NAO_SUPER")
+        cls.coordenador = DATCoordenador.objects.create(nome="Coordenador Teste", area="DAT", created_by=cls.user)
 
     def test_create_acao(self):
         """DATAcao should be created with correct fields."""
         acao = DATAcao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            coordenador=self.coordenador,
-            created_by=self.user
+            municipio=self.municipio, projeto=self.projeto, coordenador=self.coordenador, created_by=self.user
         )
         self.assertEqual(acao.status_carta, "pendente")
         self.assertEqual(acao.status_contato, "pendente")
@@ -151,11 +132,7 @@ class DATAcaoModelTests(TestCase):
 
     def test_progresso_property(self):
         """DATAcao progresso should calculate correctly."""
-        acao = DATAcao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            created_by=self.user
-        )
+        acao = DATAcao.objects.create(municipio=self.municipio, projeto=self.projeto, created_by=self.user)
         # All pending = 0%
         self.assertEqual(acao.progresso, 0)
 
@@ -177,11 +154,7 @@ class DATAcaoModelTests(TestCase):
 
     def test_etapa_atual_property(self):
         """DATAcao etapa_atual should return correct stage."""
-        acao = DATAcao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            created_by=self.user
-        )
+        acao = DATAcao.objects.create(municipio=self.municipio, projeto=self.projeto, created_by=self.user)
         self.assertEqual(acao.etapa_atual, "Carta")
 
         acao.status_carta = "concluido"
@@ -198,17 +171,9 @@ class DATAcaoModelTests(TestCase):
 
     def test_unique_municipio_projeto(self):
         """DATAcao should be unique per municipio+projeto."""
-        DATAcao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            created_by=self.user
-        )
+        DATAcao.objects.create(municipio=self.municipio, projeto=self.projeto, created_by=self.user)
         with self.assertRaises(IntegrityError):
-            DATAcao.objects.create(
-                municipio=self.municipio,
-                projeto=self.projeto,
-                created_by=self.user
-            )
+            DATAcao.objects.create(municipio=self.municipio, projeto=self.projeto, created_by=self.user)
 
 
 class DATCompraModelTests(TestCase):
@@ -217,17 +182,14 @@ class DATCompraModelTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         import uuid
+
         uid = uuid.uuid4().hex[:5]
         cls.user = User.objects.create_user(
-            username=f"testuser_compra_{uid}",
-            password="test123",
-            cpf=f"333{uid}333"  # 11 chars
+            username=f"testuser_compra_{uid}", password="test123", cpf=f"333{uid}333"  # 11 chars
         )
         cls.municipio = Municipio.objects.create(nome=f"Fortaleza_compra_{uid}", uf="CE")
         cls.projeto = Projeto.objects.create(
-            nome=f"Projeto Teste_compra_{uid}",
-            codigo=f"PC{uid[:4]}",
-            fluxo="NAO_SUPER"
+            nome=f"Projeto Teste_compra_{uid}", codigo=f"PC{uid[:4]}", fluxo="NAO_SUPER"
         )
 
     def test_create_compra(self):
@@ -239,7 +201,7 @@ class DATCompraModelTests(TestCase):
             quantidade=100,
             valor_unitario=Decimal("50.00"),
             ano_uso=2025,
-            created_by=self.user
+            created_by=self.user,
         )
         self.assertEqual(compra.quantidade, 100)
         self.assertEqual(compra.quantidade_utilizada, 0)
@@ -254,7 +216,7 @@ class DATCompraModelTests(TestCase):
             quantidade=100,
             quantidade_utilizada=30,
             ano_uso=2025,
-            created_by=self.user
+            created_by=self.user,
         )
         self.assertEqual(compra.disponivel, 70)
 
@@ -267,7 +229,7 @@ class DATCompraModelTests(TestCase):
             quantidade=10,
             valor_unitario=Decimal("25.50"),
             ano_uso=2025,
-            created_by=self.user
+            created_by=self.user,
         )
         self.assertEqual(compra.valor_total, Decimal("255.00"))
 
@@ -279,7 +241,7 @@ class DATCompraModelTests(TestCase):
             descricao_produto="Material",
             quantidade=100,
             ano_uso=2025,
-            created_by=self.user
+            created_by=self.user,
         )
         self.assertEqual(compra.status_uso, "disponivel")
 
@@ -298,25 +260,18 @@ class DATCadastroModelTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         import uuid
+
         uid = uuid.uuid4().hex[:5]
         cls.user = User.objects.create_user(
-            username=f"testuser_cadastro_{uid}",
-            password="test123",
-            cpf=f"444{uid}444"  # 11 chars
+            username=f"testuser_cadastro_{uid}", password="test123", cpf=f"444{uid}444"  # 11 chars
         )
         cls.municipio = Municipio.objects.create(nome=f"Fortaleza_cadastro_{uid}", uf="CE")
-        cls.projeto_geral = ProjetoGeral.objects.create(
-            nome=f"PG Teste_cadastro_{uid}",
-            usa_avaliar=True
-        )
+        cls.projeto_geral = ProjetoGeral.objects.create(nome=f"PG Teste_cadastro_{uid}", usa_avaliar=True)
 
     def test_create_cadastro_formar(self):
         """DATCadastro FORMAR should be created correctly."""
         cadastro = DATCadastro.objects.create(
-            municipio=self.municipio,
-            projeto_geral=self.projeto_geral,
-            plataforma="FORMAR",
-            created_by=self.user
+            municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="FORMAR", created_by=self.user
         )
         self.assertEqual(cadastro.plataforma, "FORMAR")
         self.assertEqual(cadastro.status_criacao_curso, "pendente")
@@ -324,10 +279,7 @@ class DATCadastroModelTests(TestCase):
     def test_create_cadastro_avaliar(self):
         """DATCadastro AVALIAR should be created correctly."""
         cadastro = DATCadastro.objects.create(
-            municipio=self.municipio,
-            projeto_geral=self.projeto_geral,
-            plataforma="AVALIAR",
-            created_by=self.user
+            municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="AVALIAR", created_by=self.user
         )
         self.assertEqual(cadastro.plataforma, "AVALIAR")
         self.assertEqual(cadastro.status_recebidos, "pendente")
@@ -335,10 +287,7 @@ class DATCadastroModelTests(TestCase):
     def test_progresso_formar(self):
         """DATCadastro progresso_formar should calculate correctly."""
         cadastro = DATCadastro.objects.create(
-            municipio=self.municipio,
-            projeto_geral=self.projeto_geral,
-            plataforma="FORMAR",
-            created_by=self.user
+            municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="FORMAR", created_by=self.user
         )
         self.assertEqual(cadastro.progresso_formar, 0)
 
@@ -355,10 +304,7 @@ class DATCadastroModelTests(TestCase):
     def test_progresso_avaliar(self):
         """DATCadastro progresso_avaliar should calculate correctly."""
         cadastro = DATCadastro.objects.create(
-            municipio=self.municipio,
-            projeto_geral=self.projeto_geral,
-            plataforma="AVALIAR",
-            created_by=self.user
+            municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="AVALIAR", created_by=self.user
         )
         self.assertEqual(cadastro.progresso_avaliar, 0)
 
@@ -374,17 +320,11 @@ class DATCadastroModelTests(TestCase):
     def test_unique_municipio_projeto_plataforma(self):
         """DATCadastro should be unique per municipio+projeto_geral+plataforma."""
         DATCadastro.objects.create(
-            municipio=self.municipio,
-            projeto_geral=self.projeto_geral,
-            plataforma="FORMAR",
-            created_by=self.user
+            municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="FORMAR", created_by=self.user
         )
         with self.assertRaises(IntegrityError):
             DATCadastro.objects.create(
-                municipio=self.municipio,
-                projeto_geral=self.projeto_geral,
-                plataforma="FORMAR",
-                created_by=self.user
+                municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="FORMAR", created_by=self.user
             )
 
 
@@ -394,17 +334,14 @@ class DATFormacaoModelTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         import uuid
+
         uid = uuid.uuid4().hex[:5]
         cls.user = User.objects.create_user(
-            username=f"testuser_formacao_{uid}",
-            password="test123",
-            cpf=f"555{uid}555"  # 11 chars
+            username=f"testuser_formacao_{uid}", password="test123", cpf=f"555{uid}555"  # 11 chars
         )
         cls.municipio = Municipio.objects.create(nome=f"Fortaleza_formacao_{uid}", uf="CE")
         cls.projeto = Projeto.objects.create(
-            nome=f"Projeto Teste_formacao_{uid}",
-            codigo=f"PF{uid[:4]}",
-            fluxo="NAO_SUPER"
+            nome=f"Projeto Teste_formacao_{uid}", codigo=f"PF{uid[:4]}", fluxo="NAO_SUPER"
         )
 
     def test_create_formacao(self):
@@ -418,7 +355,7 @@ class DATFormacaoModelTests(TestCase):
             horario_fim=time(12, 0),
             modalidade="presencial",
             quantidade_prevista=50,
-            created_by=self.user
+            created_by=self.user,
         )
         self.assertEqual(formacao.status, "agendada")
         self.assertEqual(formacao.modalidade, "presencial")
@@ -432,7 +369,7 @@ class DATFormacaoModelTests(TestCase):
             data_formacao=date.today(),
             horario_inicio=time(9, 0),
             horario_fim=time(12, 0),
-            created_by=self.user
+            created_by=self.user,
         )
         self.assertEqual(formacao.duracao_horas, 3.0)
 
@@ -447,7 +384,7 @@ class DATFormacaoModelTests(TestCase):
             horario_fim=time(12, 0),
             quantidade_prevista=100,
             quantidade_presente=75,
-            created_by=self.user
+            created_by=self.user,
         )
         self.assertEqual(formacao.taxa_presenca, 75.0)
 
@@ -460,7 +397,7 @@ class DATFormacaoModelTests(TestCase):
             data_formacao=date.today(),
             horario_inicio=time(9, 0),
             horario_fim=time(12, 0),
-            created_by=self.user
+            created_by=self.user,
         )
         self.assertFalse(formacao.documentacao_completa)
 
@@ -483,6 +420,7 @@ class DATModuleAPITestCase(APITestCase):
     @classmethod
     def setUpTestData(cls):
         import uuid
+
         # Create groups
         cls.dat_group, _ = Group.objects.get_or_create(name="DAT")
         cls.super_group, _ = Group.objects.get_or_create(name="Superintendência")
@@ -491,49 +429,30 @@ class DATModuleAPITestCase(APITestCase):
         # Create users with unique CPFs (exactly 11 chars)
         uid = uuid.uuid4().hex[:5]
         cls.dat_user = User.objects.create_user(
-            username=f"dat_user_{uid}",
-            password="test123",
-            cpf=f"666{uid}666"  # 11 chars
+            username=f"dat_user_{uid}", password="test123", cpf=f"666{uid}666"  # 11 chars
         )
         cls.dat_user.groups.add(cls.dat_group)
 
         uid2 = uuid.uuid4().hex[:5]
         cls.super_user = User.objects.create_user(
-            username=f"super_user_{uid2}",
-            password="test123",
-            cpf=f"777{uid2}777"  # 11 chars
+            username=f"super_user_{uid2}", password="test123", cpf=f"777{uid2}777"  # 11 chars
         )
         cls.super_user.groups.add(cls.super_group, cls.gerente_group)
 
         uid3 = uuid.uuid4().hex[:5]
         cls.regular_user = User.objects.create_user(
-            username=f"regular_user_{uid3}",
-            password="test123",
-            cpf=f"888{uid3}888"  # 11 chars
+            username=f"regular_user_{uid3}", password="test123", cpf=f"888{uid3}888"  # 11 chars
         )
 
         # Create base data with unique names
         uid = uuid.uuid4().hex[:8]
         cls.municipio = Municipio.objects.create(nome=f"Fortaleza_api_{uid}", uf="CE")
         cls.municipio2 = Municipio.objects.create(nome=f"Caucaia_api_{uid}", uf="CE")
-        cls.projeto = Projeto.objects.create(
-            nome=f"Projeto Teste_api_{uid}",
-            codigo=f"PA{uid[:4]}",
-            fluxo="NAO_SUPER"
-        )
-        cls.projeto_geral = ProjetoGeral.objects.create(
-            nome=f"PG Teste_api_{uid}",
-            usa_avaliar=True
-        )
-        cls.area, _ = DATArea.objects.get_or_create(
-            nome="DAT",
-            defaults={"cor": "blue", "ordem": 1}
-        )
+        cls.projeto = Projeto.objects.create(nome=f"Projeto Teste_api_{uid}", codigo=f"PA{uid[:4]}", fluxo="NAO_SUPER")
+        cls.projeto_geral = ProjetoGeral.objects.create(nome=f"PG Teste_api_{uid}", usa_avaliar=True)
+        cls.area, _ = DATArea.objects.get_or_create(nome="DAT", defaults={"cor": "blue", "ordem": 1})
         cls.coordenador = DATCoordenador.objects.create(
-            nome=f"Coordenador Teste_{uid}",
-            email=f"coord_{uid}@test.com",
-            area="DAT",
-            created_by=cls.dat_user
+            nome=f"Coordenador Teste_{uid}", email=f"coord_{uid}@test.com", area="DAT", created_by=cls.dat_user
         )
 
 
@@ -583,11 +502,7 @@ class DATCoordenadorAPITests(DATModuleAPITestCase):
         """DAT user should create coordenador."""
         self.client.force_authenticate(user=self.dat_user)
         url = reverse("core:dat-coordenador-list")
-        data = {
-            "nome": "Novo Coordenador",
-            "email": "novo@test.com",
-            "area": "Tecnologia"
-        }
+        data = {"nome": "Novo Coordenador", "email": "novo@test.com", "area": "Tecnologia"}
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["nome"], "Novo Coordenador")
@@ -602,11 +517,7 @@ class DATCoordenadorAPITests(DATModuleAPITestCase):
     def test_delete_coordenador_super_user(self):
         """Super user should delete coordenador."""
         self.client.force_authenticate(user=self.super_user)
-        coord = DATCoordenador.objects.create(
-            nome="To Delete",
-            area="Test",
-            created_by=self.dat_user
-        )
+        coord = DATCoordenador.objects.create(nome="To Delete", area="Test", created_by=self.dat_user)
         url = reverse("core:dat-coordenador-detail", args=[coord.id])
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
@@ -635,27 +546,16 @@ class DATAcaoAPITests(DATModuleAPITestCase):
         """DAT user should create acao."""
         self.client.force_authenticate(user=self.dat_user)
         url = reverse("core:dat-acao-ciclo-list")
-        data = {
-            "municipio": self.municipio.id,
-            "projeto": self.projeto.id,
-            "coordenador": self.coordenador.id
-        }
+        data = {"municipio": self.municipio.id, "projeto": self.projeto.id, "coordenador": self.coordenador.id}
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_update_acao_status(self):
         """DAT user should update acao status."""
         self.client.force_authenticate(user=self.dat_user)
-        acao = DATAcao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            created_by=self.dat_user
-        )
+        acao = DATAcao.objects.create(municipio=self.municipio, projeto=self.projeto, created_by=self.dat_user)
         url = reverse("core:dat-acao-ciclo-detail", args=[acao.id])
-        response = self.client.patch(url, {
-            "status_carta": "concluido",
-            "data_carta": "2025-01-15"
-        })
+        response = self.client.patch(url, {"status_carta": "concluido", "data_carta": "2025-01-15"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         acao.refresh_from_db()
         self.assertEqual(acao.status_carta, "concluido")
@@ -664,11 +564,7 @@ class DATAcaoAPITests(DATModuleAPITestCase):
         """Stats action should return aggregated data."""
         self.client.force_authenticate(user=self.dat_user)
         # Create some acoes
-        DATAcao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            created_by=self.dat_user
-        )
+        DATAcao.objects.create(municipio=self.municipio, projeto=self.projeto, created_by=self.dat_user)
         url = reverse("core:dat-acao-ciclo-stats")
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -689,7 +585,7 @@ class DATCompraAPITests(DATModuleAPITestCase):
             "descricao_produto": "Kit Pedagógico",
             "quantidade": 100,
             "valor_unitario": "50.00",
-            "ano_uso": 2025
+            "ano_uso": 2025,
         }
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -703,7 +599,7 @@ class DATCompraAPITests(DATModuleAPITestCase):
             descricao_produto="Material",
             quantidade=100,
             ano_uso=2025,
-            created_by=self.dat_user
+            created_by=self.dat_user,
         )
         url = reverse("core:dat-compra-material-stats")
         response = self.client.get(url)
@@ -718,11 +614,7 @@ class DATCadastroAPITests(DATModuleAPITestCase):
         """DAT user should create cadastro."""
         self.client.force_authenticate(user=self.dat_user)
         url = reverse("core:dat-cadastro-list")
-        data = {
-            "municipio": self.municipio.id,
-            "projeto_geral": self.projeto_geral.id,
-            "plataforma": "FORMAR"
-        }
+        data = {"municipio": self.municipio.id, "projeto_geral": self.projeto_geral.id, "plataforma": "FORMAR"}
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -730,17 +622,10 @@ class DATCadastroAPITests(DATModuleAPITestCase):
         """Etapa action should update specific stage."""
         self.client.force_authenticate(user=self.dat_user)
         cadastro = DATCadastro.objects.create(
-            municipio=self.municipio,
-            projeto_geral=self.projeto_geral,
-            plataforma="FORMAR",
-            created_by=self.dat_user
+            municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="FORMAR", created_by=self.dat_user
         )
         url = reverse("core:dat-cadastro-etapa", args=[cadastro.id])
-        response = self.client.post(url, {
-            "etapa": "chaves",
-            "status": "concluido",
-            "data": "2025-01-15"
-        })
+        response = self.client.post(url, {"etapa": "chaves", "status": "concluido", "data": "2025-01-15"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         cadastro.refresh_from_db()
         self.assertEqual(cadastro.status_chaves, "concluido")
@@ -749,16 +634,10 @@ class DATCadastroAPITests(DATModuleAPITestCase):
         """Etapa action should reject invalid stage."""
         self.client.force_authenticate(user=self.dat_user)
         cadastro = DATCadastro.objects.create(
-            municipio=self.municipio,
-            projeto_geral=self.projeto_geral,
-            plataforma="FORMAR",
-            created_by=self.dat_user
+            municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="FORMAR", created_by=self.dat_user
         )
         url = reverse("core:dat-cadastro-etapa", args=[cadastro.id])
-        response = self.client.post(url, {
-            "etapa": "invalid_etapa",
-            "status": "concluido"
-        })
+        response = self.client.post(url, {"etapa": "invalid_etapa", "status": "concluido"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
@@ -777,7 +656,7 @@ class DATFormacaoAPITests(DATModuleAPITestCase):
             "horario_inicio": "09:00",
             "horario_fim": "12:00",
             "modalidade": "presencial",
-            "quantidade_prevista": 50
+            "quantidade_prevista": 50,
         }
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -793,13 +672,16 @@ class DATFormacaoAPITests(DATModuleAPITestCase):
             data_formacao=today,
             horario_inicio=time(9, 0),
             horario_fim=time(12, 0),
-            created_by=self.dat_user
+            created_by=self.dat_user,
         )
         url = reverse("core:dat-formacao-calendario")
-        response = self.client.get(url, {
-            "data_inicio": (today - timedelta(days=1)).isoformat(),
-            "data_fim": (today + timedelta(days=1)).isoformat()
-        })
+        response = self.client.get(
+            url,
+            {
+                "data_inicio": (today - timedelta(days=1)).isoformat(),
+                "data_fim": (today + timedelta(days=1)).isoformat(),
+            },
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
 
@@ -822,7 +704,7 @@ class DATFormacaoAPITests(DATModuleAPITestCase):
             horario_fim=time(12, 0),
             quantidade_prevista=50,
             quantidade_presente=40,
-            created_by=self.dat_user
+            created_by=self.dat_user,
         )
         url = reverse("core:dat-formacao-stats")
         response = self.client.get(url)
@@ -854,11 +736,7 @@ class DATModulePermissionTests(DATModuleAPITestCase):
 
         for url in endpoints:
             response = self.client.get(url)
-            self.assertEqual(
-                response.status_code,
-                status.HTTP_403_FORBIDDEN,
-                f"Expected 403 for {url}"
-            )
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, f"Expected 403 for {url}")
 
     def test_dat_user_can_access_all_endpoints(self):
         """DAT user should access all DAT endpoints."""
@@ -874,35 +752,24 @@ class DATModulePermissionTests(DATModuleAPITestCase):
 
         for url in endpoints:
             response = self.client.get(url)
-            self.assertEqual(
-                response.status_code,
-                status.HTTP_200_OK,
-                f"Expected 200 for {url}"
-            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK, f"Expected 200 for {url}")
 
     def test_super_user_can_delete(self):
         """Super user should be able to delete records."""
         self.client.force_authenticate(user=self.super_user)
 
         # Create records to delete
-        acao = DATAcao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            created_by=self.dat_user
-        )
+        acao = DATAcao.objects.create(municipio=self.municipio, projeto=self.projeto, created_by=self.dat_user)
         compra = DATCompra.objects.create(
             municipio=self.municipio,
             projeto=self.projeto,
             descricao_produto="Test",
             quantidade=10,
             ano_uso=2025,
-            created_by=self.dat_user
+            created_by=self.dat_user,
         )
         cadastro = DATCadastro.objects.create(
-            municipio=self.municipio,
-            projeto_geral=self.projeto_geral,
-            plataforma="FORMAR",
-            created_by=self.dat_user
+            municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="FORMAR", created_by=self.dat_user
         )
         formacao = DATFormacao.objects.create(
             municipio=self.municipio,
@@ -911,25 +778,25 @@ class DATModulePermissionTests(DATModuleAPITestCase):
             data_formacao=date.today(),
             horario_inicio=time(9, 0),
             horario_fim=time(12, 0),
-            created_by=self.dat_user
+            created_by=self.dat_user,
         )
 
         # Delete all
         self.assertEqual(
             self.client.delete(reverse("core:dat-acao-ciclo-detail", args=[acao.id])).status_code,
-            status.HTTP_204_NO_CONTENT
+            status.HTTP_204_NO_CONTENT,
         )
         self.assertEqual(
             self.client.delete(reverse("core:dat-compra-material-detail", args=[compra.id])).status_code,
-            status.HTTP_204_NO_CONTENT
+            status.HTTP_204_NO_CONTENT,
         )
         self.assertEqual(
             self.client.delete(reverse("core:dat-cadastro-detail", args=[cadastro.id])).status_code,
-            status.HTTP_204_NO_CONTENT
+            status.HTTP_204_NO_CONTENT,
         )
         self.assertEqual(
             self.client.delete(reverse("core:dat-formacao-detail", args=[formacao.id])).status_code,
-            status.HTTP_204_NO_CONTENT
+            status.HTTP_204_NO_CONTENT,
         )
 
     def test_dat_user_cannot_delete(self):
@@ -939,7 +806,7 @@ class DATModulePermissionTests(DATModuleAPITestCase):
         acao = DATAcao.objects.create(
             municipio=self.municipio2,  # Use different municipio to avoid constraint
             projeto=self.projeto,
-            created_by=self.dat_user
+            created_by=self.dat_user,
         )
 
         response = self.client.delete(reverse("core:dat-acao-ciclo-detail", args=[acao.id]))

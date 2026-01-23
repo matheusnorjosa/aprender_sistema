@@ -3,6 +3,7 @@ AS v2 — API Deprecation Utilities (#410)
 
 Provides decorators and utilities for marking endpoints as deprecated.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ def deprecated_endpoint(message: str, removal_version: str = "v2") -> Callable[[
     Returns:
         Decorated function that adds deprecation headers
     """
+
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -46,7 +48,7 @@ def deprecated_endpoint(message: str, removal_version: str = "v2") -> Callable[[
             response["X-Deprecated-Message"] = message
             response["X-Removal-Version"] = removal_version
             return response
+
         return wrapper  # type: ignore[return-value]
+
     return decorator
-
-

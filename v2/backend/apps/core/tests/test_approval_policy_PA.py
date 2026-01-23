@@ -12,24 +12,26 @@ Garante que:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from uuid import uuid4
-from django.utils import timezone
+
 from datetime import timedelta
+from unittest.mock import MagicMock, patch
+from uuid import uuid4
+
 from django.contrib.auth.models import Group
-from rest_framework.test import APIClient
-from unittest.mock import patch, MagicMock
 from django.test import override_settings
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import (
-    Solicitacao,
     AuditLog,
-    Usuario,
     Municipio,
     Projeto,
+    Solicitacao,
     TipoEvento,
+    Usuario,
 )
-
 
 pytestmark = pytest.mark.django_db
 
@@ -66,13 +68,8 @@ def usuario_superintendencia(faker):
 @pytest.fixture
 def solicitacao_pendente(usuario_comum):
     """Solicitação pendente para testes (projeto SUPER)."""
-    municipio, _ = Municipio.objects.get_or_create(
-        nome="Fortaleza", defaults={"uf": "CE", "ativo": True}
-    )
-    projeto, _ = Projeto.objects.get_or_create(
-        nome="Projeto Teste SUPER",
-        defaults={"ativo": True, "fluxo": "SUPER"}
-    )
+    municipio, _ = Municipio.objects.get_or_create(nome="Fortaleza", defaults={"uf": "CE", "ativo": True})
+    projeto, _ = Projeto.objects.get_or_create(nome="Projeto Teste SUPER", defaults={"ativo": True, "fluxo": "SUPER"})
     tipo_evento, _ = TipoEvento.objects.get_or_create(nome="Formação")
 
     now = timezone.now()
@@ -188,9 +185,7 @@ def test_non_privileged_user_gets_403_on_approval_endpoint(
     client = APIClient()
     client.force_authenticate(user=usuario_comum)
 
-    response_approve = client.patch(
-        f"/api/solicitacoes/{solicitacao_pendente.id}/approve/"
-    )
+    response_approve = client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/approve/")
     response_reject = client.patch(
         f"/api/solicitacoes/{solicitacao_pendente.id}/reject/",
         {"justificativa": "teste"},
@@ -211,7 +206,7 @@ def test_non_privileged_user_gets_403_on_approval_endpoint(
 # ===================================================================
 
 
-@override_settings(GCAL_CLIENT='fake', GCAL_AUTH_MODE='service_account')
+@override_settings(GCAL_CLIENT="fake", GCAL_AUTH_MODE="service_account")
 @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_calendar_integration_not_called_before_approval(
     mock_celery_task,
@@ -238,15 +233,14 @@ def test_calendar_integration_not_called_before_approval(
 
     # Endpoint deve rejeitar com 400 (apenas aprovadas podem publicar)
     assert response.status_code == 400, (
-        f"Publish de solicitação pendente deve retornar 400, "
-        f"recebido: {response.status_code}"
+        f"Publish de solicitação pendente deve retornar 400, " f"recebido: {response.status_code}"
     )
 
     # Task Celery não deve ser enfileirada
     mock_celery_task.assert_not_called()
 
 
-@override_settings(GCAL_CLIENT='google', GCAL_AUTH_MODE='service_account')
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
 @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_calendar_integration_is_called_after_approval(
     mock_celery_task,
@@ -262,10 +256,12 @@ def test_calendar_integration_is_called_after_approval(
     Complementa test_calendar_integration_not_called_before_approval para
     cobertura completa de PA-03 (caminho negativo + positivo).
     """
-    from unittest.mock import MagicMock
-    from django.utils import timezone
     from datetime import timedelta
-    from apps.core.models import Solicitacao, Municipio, Projeto, TipoEvento, Usuario
+    from unittest.mock import MagicMock
+
+    from django.utils import timezone
+
+    from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
     # Mock task.delay() para retornar objeto com id serializável (evita JSON error)
     mock_task_result = MagicMock()
@@ -273,12 +269,8 @@ def test_calendar_integration_is_called_after_approval(
     mock_celery_task.return_value = mock_task_result
 
     # Criar Solicitacao já aprovada (evita caminho lento de aprovação)
-    mun, _ = Municipio.objects.get_or_create(
-        nome="Fortaleza", defaults={"uf": "CE", "ativo": True}
-    )
-    proj, _ = Projeto.objects.get_or_create(
-        nome="Projeto Teste SUPER", defaults={"ativo": True, "fluxo": "SUPER"}
-    )
+    mun, _ = Municipio.objects.get_or_create(nome="Fortaleza", defaults={"uf": "CE", "ativo": True})
+    proj, _ = Projeto.objects.get_or_create(nome="Projeto Teste SUPER", defaults={"ativo": True, "fluxo": "SUPER"})
     tipo, _ = TipoEvento.objects.get_or_create(nome="Formação")
     coord = Usuario.objects.create_user(
         username=f"coord_pa03_{uuid4().hex[:8]}",

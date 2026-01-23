@@ -13,15 +13,18 @@ Cobertura:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from unittest.mock import patch, Mock, ANY
+
+from datetime import timedelta
+from unittest.mock import ANY, Mock, patch
+
 from django.contrib.auth.models import Group
 from django.utils import timezone
-from datetime import timedelta
-from rest_framework.test import APIClient
 from rest_framework import status
+from rest_framework.test import APIClient
 
-from apps.core.models import Usuario, Solicitacao, Municipio, Projeto, TipoEvento
+import pytest
+
+from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 
 def mock_task_result(task_id="fake-task-id"):
@@ -92,10 +95,10 @@ def solicitacao_published(usuario_controle):
 class TestPublishEndpoint:
     """Testes para POST /api/solicitacoes/{id}/publish/"""
 
-    @patch('apps.core.services.gcal_sync_service.apply_one_solicitacao')
-    @patch('django.conf.settings.GCAL_CLIENT', 'fake')
-    @patch('rest_framework.throttling.AnonRateThrottle.allow_request', return_value=True)
-    @patch('rest_framework.throttling.UserRateThrottle.allow_request', return_value=True)
+    @patch("apps.core.services.gcal_sync_service.apply_one_solicitacao")
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_publish_dry_run_not_persists_status(
         self, mock_throttle1, mock_throttle2, mock_apply, solicitacao_aprovada, usuario_controle
     ):
@@ -104,6 +107,7 @@ class TestPublishEndpoint:
         """
         # Mock apply_one_solicitacao to return a fake outcome
         from apps.core.services.gcal_sync_service import SyncOutcome
+
         mock_apply.return_value = SyncOutcome(
             action="DRY_RUN",
             solicitation_id=solicitacao_aprovada.id,
@@ -127,10 +131,10 @@ class TestPublishEndpoint:
         solicitacao_aprovada.refresh_from_db()
         assert solicitacao_aprovada.gcal_status == Solicitacao.GCalStatus.NONE
 
-    @patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
-    @patch('django.conf.settings.GCAL_CLIENT', 'fake')
-    @patch('rest_framework.throttling.AnonRateThrottle.allow_request', return_value=True)
-    @patch('rest_framework.throttling.UserRateThrottle.allow_request', return_value=True)
+    @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_publish_apply_enqueues_task_and_marks_pending(
         self, mock_throttle1, mock_throttle2, mock_task, solicitacao_aprovada, usuario_controle
     ):
@@ -153,17 +157,15 @@ class TestPublishEndpoint:
         assert response.data.get("task_id") == "fake-task-id"
 
         # Verificar que task foi chamada (usando ANY para args posicionais)
-        mock_task.assert_called_once_with(
-            ANY, dry_run=False, apply_blocked=True
-        )
+        mock_task.assert_called_once_with(ANY, dry_run=False, apply_blocked=True)
 
         # Status deve ser PENDING
         solicitacao_aprovada.refresh_from_db()
         assert solicitacao_aprovada.gcal_status == Solicitacao.GCalStatus.PENDING
 
-    @patch('django.conf.settings.GCAL_CLIENT', 'fake')
-    @patch('rest_framework.throttling.AnonRateThrottle.allow_request', return_value=True)
-    @patch('rest_framework.throttling.UserRateThrottle.allow_request', return_value=True)
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_publish_apply_blocked_returns_409_when_not_forced(
         self, mock_throttle1, mock_throttle2, solicitacao_aprovada, usuario_controle
     ):
@@ -185,10 +187,10 @@ class TestPublishEndpoint:
         # §1 Epic #459: standardized error format puts details in 'errors' key
         assert response.data.get("errors", {}).get("features_apply_blocked") is True
 
-    @patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
-    @patch('django.conf.settings.GCAL_CLIENT', 'fake')
-    @patch('rest_framework.throttling.AnonRateThrottle.allow_request', return_value=True)
-    @patch('rest_framework.throttling.UserRateThrottle.allow_request', return_value=True)
+    @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_publish_apply_blocked_forced_succeeds(
         self, mock_throttle1, mock_throttle2, mock_task, solicitacao_aprovada, usuario_controle
     ):
@@ -207,16 +209,12 @@ class TestPublishEndpoint:
         )
 
         assert response.status_code == status.HTTP_202_ACCEPTED
-        mock_task.assert_called_once_with(
-            ANY, dry_run=False, apply_blocked=True
-        )
+        mock_task.assert_called_once_with(ANY, dry_run=False, apply_blocked=True)
 
-    @patch('django.conf.settings.GCAL_CLIENT', 'fake')
-    @patch('rest_framework.throttling.AnonRateThrottle.allow_request', return_value=True)
-    @patch('rest_framework.throttling.UserRateThrottle.allow_request', return_value=True)
-    def test_publish_requires_approved_status(
-        self, mock_throttle1, mock_throttle2, usuario_controle
-    ):
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
+    def test_publish_requires_approved_status(self, mock_throttle1, mock_throttle2, usuario_controle):
         """
         Validação: Apenas solicitações aprovadas podem ser publicadas
         """
@@ -252,10 +250,10 @@ class TestPublishEndpoint:
 class TestResyncEndpoint:
     """Testes para POST /api/solicitacoes/{id}/resync-gcal/"""
 
-    @patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
-    @patch('django.conf.settings.GCAL_CLIENT', 'fake')
-    @patch('rest_framework.throttling.AnonRateThrottle.allow_request', return_value=True)
-    @patch('rest_framework.throttling.UserRateThrottle.allow_request', return_value=True)
+    @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_resync_forces_update_by_resetting_hash(
         self, mock_throttle1, mock_throttle2, mock_task, solicitacao_published, usuario_controle
     ):
@@ -280,16 +278,12 @@ class TestResyncEndpoint:
         assert solicitacao_published.gcal_status == Solicitacao.GCalStatus.PENDING
 
         # Verificar que task foi enfileirada (endpoint hardcodes apply_blocked=False)
-        mock_task.assert_called_once_with(
-            ANY, dry_run=False, apply_blocked=False
-        )
+        mock_task.assert_called_once_with(ANY, dry_run=False, apply_blocked=False)
 
-    @patch('django.conf.settings.GCAL_CLIENT', 'fake')
-    @patch('rest_framework.throttling.AnonRateThrottle.allow_request', return_value=True)
-    @patch('rest_framework.throttling.UserRateThrottle.allow_request', return_value=True)
-    def test_resync_requires_approved_status(
-        self, mock_throttle1, mock_throttle2, usuario_controle
-    ):
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
+    def test_resync_requires_approved_status(self, mock_throttle1, mock_throttle2, usuario_controle):
         """
         Validação: Apenas solicitações aprovadas podem ser resync
         """
@@ -324,7 +318,7 @@ class TestResyncEndpoint:
 class TestIdempotence:
     """Testes de idempotência: eventId asv2-{id}, sendUpdates='none'"""
 
-    @patch('django.conf.settings.GCAL_CLIENT', 'fake')
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
     def test_event_id_format_is_asv2_id(self, solicitacao_aprovada):
         """
         Validar que eventId segue padrão asv2-{id}
@@ -337,7 +331,7 @@ class TestIdempotence:
         # Verificar eventId
         assert outcome.external_event_id == f"asv2-{solicitacao_aprovada.id}"
 
-    @patch('django.conf.settings.GCAL_CLIENT', 'fake')
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
     def test_send_updates_is_none(self, solicitacao_aprovada):
         """
         Validar que sendUpdates='none' é usado no fake client

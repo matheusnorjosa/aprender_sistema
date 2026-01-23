@@ -6,6 +6,7 @@ GET /api/stats/home/ retorna métricas personalizadas por perfil:
 - upcoming_events: Formador=seus eventos, Coord=setor
 - my_requests: Só para quem pode criar solicitações, filtrado por setor
 """
+
 # pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
@@ -59,11 +60,7 @@ class HomeStatsView(APIView):
         can_create = is_superuser or is_dat or is_coordenador or is_apoio
 
         # Obter setores do usuário via EquipeGerencia
-        user_gerencias = list(
-            EquipeGerencia.objects.filter(usuario=user).values_list(
-                "gerencia_id", flat=True
-            )
-        )
+        user_gerencias = list(EquipeGerencia.objects.filter(usuario=user).values_list("gerencia_id", flat=True))
 
         # === APROVAÇÕES PENDENTES ===
         pending_approvals = None
@@ -85,9 +82,7 @@ class HomeStatsView(APIView):
 
         if is_formador and not (is_coordenador or is_apoio or is_dat or is_superuser):
             # Formador: apenas eventos onde é participante ou é o usuário principal
-            upcoming_qs = upcoming_qs.filter(
-                Q(usuario=user) | Q(participations__usuario=user)
-            ).distinct()
+            upcoming_qs = upcoming_qs.filter(Q(usuario=user) | Q(participations__usuario=user)).distinct()
         elif user_gerencias and not is_superuser:
             # Coordenador/Apoio: eventos do seu setor
             upcoming_qs = upcoming_qs.filter(projeto__gerencia_id__in=user_gerencias)

@@ -3,6 +3,7 @@ AS v2 — GCal Sync Operations
 
 Core synchronization operations for Google Calendar.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportPrivateUsage=false, reportUnusedImport=false
 
 from __future__ import annotations
@@ -90,16 +91,13 @@ def apply_one_solicitacao(
     else:
         # Cliente fornecido externamente (OAuth mode), usar calendário preferido
         # Verificar se cliente tem método get_default_calendar_id (OAuthCalendarClient)
-        if hasattr(client, 'get_default_calendar_id'):
+        if hasattr(client, "get_default_calendar_id"):
             calendar_id = client.get_default_calendar_id()
         else:
             # Fallback para clientes antigos
             import os
-            calendar_id = (
-                getattr(settings, "GCAL_CALENDAR_ID", None)
-                or os.getenv("GCAL_CALENDAR_ID")
-                or "primary"
-            )
+
+            calendar_id = getattr(settings, "GCAL_CALENDAR_ID", None) or os.getenv("GCAL_CALENDAR_ID") or "primary"
 
     try:
         # Chamar upsert_one com payload pré-calculado (PR14)
@@ -230,9 +228,7 @@ def upsert_one(
 
             # Não aprovado sem evento vinculado → SKIP
             action = "SKIP"
-            return SyncOutcome(
-                action, s.id, None, f"Solicitação #{s.id} (não aprovado)"
-            )
+            return SyncOutcome(action, s.id, None, f"Solicitação #{s.id} (não aprovado)")
 
         # Caso 2: Aprovado → CREATE/UPDATE/ADOPT
         deterministic_eid = _event_id_for(s)
@@ -372,9 +368,7 @@ def upsert_one(
             s.last_synced_at = timezone.now()
             s.last_sync_action = action or "ERROR"
             s.last_sync_error = str(e)[:500]  # Limitar tamanho do erro
-            s.save(
-                update_fields=["last_synced_at", "last_sync_action", "last_sync_error"]
-            )
+            s.save(update_fields=["last_synced_at", "last_sync_action", "last_sync_error"])
         raise
 
 
@@ -395,14 +389,12 @@ def resync_solicitacao(s: Solicitacao, *, apply_blocked: bool = False) -> SyncOu
     Raises:
         ValueError: Se status != 'aprovado'
     """
-    if s.status != 'aprovado':
-        raise ValueError(
-            f"Apenas solicitações aprovadas podem ser resincronizadas (status atual: {s.status})"
-        )
+    if s.status != "aprovado":
+        raise ValueError(f"Apenas solicitações aprovadas podem ser resincronizadas (status atual: {s.status})")
 
     # Resetar hash para forçar UPDATE (mesmo se já publicado)
     s.gcal_payload_hash = None
-    s.save(update_fields=['gcal_payload_hash'])
+    s.save(update_fields=["gcal_payload_hash"])
 
     # Reutilizar apply_one_solicitacao
     return apply_one_solicitacao(s, dry_run=False, apply_blocked=apply_blocked)
@@ -453,14 +445,18 @@ def cancel_solicitacao(s: Solicitacao) -> SyncOutcome:
     s.last_synced_at = timezone.now()
     s.last_sync_action = "DELETE"
     s.last_sync_error = None
-    s.save(update_fields=[
-        'external_event_id', 'meet_link', 'gcal_payload_hash',
-        'gcal_status', 'last_synced_at', 'last_sync_action', 'last_sync_error'
-    ])
+    s.save(
+        update_fields=[
+            "external_event_id",
+            "meet_link",
+            "gcal_payload_hash",
+            "gcal_status",
+            "last_synced_at",
+            "last_sync_action",
+            "last_sync_error",
+        ]
+    )
 
     return SyncOutcome(
-        action="DELETE",
-        solicitation_id=s.id,
-        external_event_id=None,
-        summary=f"Solicitação #{s.id} (cancelada)"
+        action="DELETE", solicitation_id=s.id, external_event_id=None, summary=f"Solicitação #{s.id} (cancelada)"
     )

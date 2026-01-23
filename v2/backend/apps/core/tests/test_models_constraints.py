@@ -7,13 +7,16 @@ Valida constraints de modelos (fim > inicio, status default = pendente).
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
+from datetime import timedelta
+
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils import timezone
-from datetime import timedelta
 
-from apps.core.models import Solicitacao, AvailabilityBlock, Usuario, TipoEvento, Municipio
+import pytest
+
+from apps.core.models import AvailabilityBlock, Municipio, Solicitacao, TipoEvento, Usuario
 
 
 @pytest.fixture
@@ -45,9 +48,7 @@ class TestSolicitacaoConstraints:
     Testes de constraints do modelo Solicitacao.
     """
 
-    def test_solicitacao_end_after_start_constraint(
-        self, usuario_test, tipo_evento_test, municipio_test
-    ):
+    def test_solicitacao_end_after_start_constraint(self, usuario_test, tipo_evento_test, municipio_test):
         """
         Test: Solicitacao não pode ter fim <= inicio.
         Deve falhar na validação (full_clean) ou na constraint do DB.
@@ -167,9 +168,7 @@ class TestDefaultStatusPendente:
     Testes de status default = pendente (PA-01).
     """
 
-    def test_defaults_status_pendente_solicitacao(
-        self, usuario_test, tipo_evento_test, municipio_test
-    ):
+    def test_defaults_status_pendente_solicitacao(self, usuario_test, tipo_evento_test, municipio_test):
         """
         Test: Solicitacao sem informar status → default pendente (PA-01).
         """
@@ -211,9 +210,7 @@ class TestDefaultStatusPendente:
 
         assert block.status == "aprovado", "Status default do bloqueio deve ser 'aprovado' (auto-aprovação)"
 
-    def test_solicitacao_cannot_be_created_approved(
-        self, usuario_test, tipo_evento_test, municipio_test
-    ):
+    def test_solicitacao_cannot_be_created_approved(self, usuario_test, tipo_evento_test, municipio_test):
         """
         Test: Mesmo que tente criar com status aprovado, deve começar pendente.
         (Validação adicional: PA-01 - nunca auto-aprovar)
@@ -236,6 +233,4 @@ class TestDefaultStatusPendente:
         # Nota: Este teste documenta que o model permite criar com status aprovado.
         # A regra PA-01 é garantida pela API (serializer marca status como read_only).
         # Aqui verificamos apenas que o campo aceita o valor, mas a API deve bloquear.
-        assert (
-            solicitacao.status == "aprovado"
-        ), "Model permite, mas API/Serializer deve bloquear (status read_only)"
+        assert solicitacao.status == "aprovado", "Model permite, mas API/Serializer deve bloquear (status read_only)"

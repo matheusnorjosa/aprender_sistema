@@ -26,7 +26,9 @@ from apps.core.utils.cache_utils import invalidate_availability_cache, invalidat
 
 
 @receiver(post_save, sender=Config)
-def _cfg_invalidate(sender: type[Config], instance: Config, **kwargs: Any) -> None:  # pyright: ignore[reportUnusedFunction]
+def _cfg_invalidate(
+    sender: type[Config], instance: Config, **kwargs: Any
+) -> None:  # pyright: ignore[reportUnusedFunction]
     """
     Invalida cache quando Config é salvo.
 
@@ -47,7 +49,9 @@ def _cfg_invalidate(sender: type[Config], instance: Config, **kwargs: Any) -> No
 
 
 @receiver([post_save, post_delete], sender=Solicitacao)
-def _invalidate_cache_on_solicitacao_change(sender: type[Solicitacao], instance: Solicitacao, **kwargs: Any) -> None:  # pyright: ignore[reportUnusedFunction]
+def _invalidate_cache_on_solicitacao_change(
+    sender: type[Solicitacao], instance: Solicitacao, **kwargs: Any
+) -> None:  # pyright: ignore[reportUnusedFunction]
     """
     Invalida cache de availability ao modificar Solicitacao.
 
@@ -66,7 +70,9 @@ def _invalidate_cache_on_solicitacao_change(sender: type[Solicitacao], instance:
 
 
 @receiver([post_save, post_delete], sender=AvailabilityBlock)
-def _invalidate_cache_on_block_change(sender: type[AvailabilityBlock], instance: AvailabilityBlock, **kwargs: Any) -> None:  # pyright: ignore[reportUnusedFunction]
+def _invalidate_cache_on_block_change(
+    sender: type[AvailabilityBlock], instance: AvailabilityBlock, **kwargs: Any
+) -> None:  # pyright: ignore[reportUnusedFunction]
     """
     Invalida cache de availability ao modificar AvailabilityBlock (bloqueio de agenda).
 
@@ -90,7 +96,9 @@ def _invalidate_cache_on_block_change(sender: type[AvailabilityBlock], instance:
 
 
 @receiver([post_save, post_delete], sender=Municipio)
-def _invalidate_cache_on_municipio_change(sender: type[Municipio], instance: Municipio, **kwargs: Any) -> None:  # pyright: ignore[reportUnusedFunction]
+def _invalidate_cache_on_municipio_change(
+    sender: type[Municipio], instance: Municipio, **kwargs: Any
+) -> None:  # pyright: ignore[reportUnusedFunction]
     """
     Invalida cache de endpoints estáticos ao modificar Municipio.
 
@@ -106,7 +114,9 @@ def _invalidate_cache_on_municipio_change(sender: type[Municipio], instance: Mun
 
 
 @receiver([post_save, post_delete], sender=Projeto)
-def _invalidate_cache_on_projeto_change(sender: type[Projeto], instance: Projeto, **kwargs: Any) -> None:  # pyright: ignore[reportUnusedFunction]
+def _invalidate_cache_on_projeto_change(
+    sender: type[Projeto], instance: Projeto, **kwargs: Any
+) -> None:  # pyright: ignore[reportUnusedFunction]
     """
     Invalida cache de endpoints estáticos ao modificar Projeto.
 
@@ -122,7 +132,9 @@ def _invalidate_cache_on_projeto_change(sender: type[Projeto], instance: Projeto
 
 
 @receiver([post_save, post_delete], sender=TipoEvento)
-def _invalidate_cache_on_tipo_evento_change(sender: type[TipoEvento], instance: TipoEvento, **kwargs: Any) -> None:  # pyright: ignore[reportUnusedFunction]
+def _invalidate_cache_on_tipo_evento_change(
+    sender: type[TipoEvento], instance: TipoEvento, **kwargs: Any
+) -> None:  # pyright: ignore[reportUnusedFunction]
     """
     Invalida cache de endpoints estáticos ao modificar TipoEvento.
 

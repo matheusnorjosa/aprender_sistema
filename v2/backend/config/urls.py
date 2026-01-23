@@ -57,6 +57,7 @@ def healthz_detailed(request: HttpRequest) -> JsonResponse:
     # GCal circuit breaker check
     try:
         from apps.core.services.gcal.circuit_breaker import get_circuit_state
+
         checks["gcal_circuit"] = get_circuit_state()
     except ImportError:
         checks["gcal_circuit"] = "not_configured"
@@ -72,11 +73,13 @@ def healthz_detailed(request: HttpRequest) -> JsonResponse:
     else:
         status = "degraded"
 
-    return JsonResponse({
-        "status": status,
-        "environment": settings.ENVIRONMENT,
-        "checks": checks,
-    })
+    return JsonResponse(
+        {
+            "status": status,
+            "environment": settings.ENVIRONMENT,
+            "checks": checks,
+        }
+    )
 
 
 urlpatterns = [
@@ -112,6 +115,7 @@ if settings.DEBUG:
 # Debug Toolbar (DEBUG mode only)
 if settings.DEBUG and "debug_toolbar" in settings.INSTALLED_APPS:
     import debug_toolbar
+
     urlpatterns.insert(0, path("__debug__/", include(debug_toolbar.urls)))
 
 # Django Silk (Staging profiler)

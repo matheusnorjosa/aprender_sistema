@@ -13,6 +13,7 @@ Permissions:
 Cache:
 - Invalidação automática via signal post_save (apps/core/signals.py)
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ from apps.core.serializers import ConfigSerializer
 from apps.core.services.config_service import bust_cfg, get_cfg
 
 
-@api_view(['GET', 'PUT'])
+@api_view(["GET", "PUT"])
 @permission_classes([IsDAT | IsSuperintendencia])
 def config_view(request: Request) -> Response:
     """
@@ -68,7 +69,7 @@ def config_view(request: Request) -> Response:
         }
     """
 
-    if request.method == 'GET':
+    if request.method == "GET":
         # Ler de cada chave do Config model via get_cfg (cache-enabled)
         availability = get_cfg("availability", {})
         gcal_sync = get_cfg("gcal_sync", {})
@@ -101,7 +102,7 @@ def config_view(request: Request) -> Response:
         serializer = ConfigSerializer(data)
         return Response(serializer.data)
 
-    elif request.method == 'PUT':
+    elif request.method == "PUT":
         serializer = ConfigSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -119,7 +120,7 @@ def config_view(request: Request) -> Response:
                     "BLOCK_AUTO_APPROVE": vd["BLOCK_AUTO_APPROVE"],
                 },
                 "effective_at": timezone.now(),
-            }
+            },
         )
 
         Config.objects.update_or_create(
@@ -133,7 +134,7 @@ def config_view(request: Request) -> Response:
                     "SEND_UPDATES": vd["SEND_UPDATES"],
                 },
                 "effective_at": timezone.now(),
-            }
+            },
         )
 
         Config.objects.update_or_create(
@@ -145,7 +146,7 @@ def config_view(request: Request) -> Response:
                     "AUTOCOMPLETE_DEBOUNCE_MS": vd["AUTOCOMPLETE_DEBOUNCE_MS"],
                 },
                 "effective_at": timezone.now(),
-            }
+            },
         )
 
         Config.objects.update_or_create(
@@ -157,7 +158,7 @@ def config_view(request: Request) -> Response:
                     "ENABLE_ADVANCED_FILTERS": vd["ENABLE_ADVANCED_FILTERS"],
                 },
                 "effective_at": timezone.now(),
-            }
+            },
         )
 
         # AuditLog (Issue #187 requirement)
@@ -169,7 +170,7 @@ def config_view(request: Request) -> Response:
                 "changed_fields": list(vd.keys()),
                 "ip_address": request.META.get("REMOTE_ADDR", "unknown"),
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-            }
+            },
         )
 
         # Invalidar cache (automático via signal, mas garantir)

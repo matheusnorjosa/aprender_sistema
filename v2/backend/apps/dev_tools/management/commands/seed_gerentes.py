@@ -18,6 +18,7 @@ Mapping (Planilha Gerência → Database Gerencia.nome_setor):
 - "Sou da Paz" → nome_setor="Sou da Paz" (GERENCIA 6)
 - "Individual" → nome_setor="Individual" (GERENCIA INDIVIDUAL)
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
@@ -25,10 +26,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
 from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
+
+import pandas as pd
 
 from apps.core.models import Gerencia, Usuario
 
@@ -133,9 +135,7 @@ class Command(BaseCommand):
         dry_run = options.get("dry_run", False)
 
         if dry_run:
-            self.stdout.write(
-                self.style.WARNING("\n🔍 DRY RUN MODE - No changes will be committed\n")
-            )
+            self.stdout.write(self.style.WARNING("\n🔍 DRY RUN MODE - No changes will be committed\n"))
 
         self.stdout.write("Seeding gerentes...\n")
 
@@ -149,9 +149,7 @@ class Command(BaseCommand):
         # Get or create "Gerência" group
         gerencia_group, group_created = Group.objects.get_or_create(name="Gerência")
         if group_created:
-            self.stdout.write(
-                self.style.SUCCESS("  ✓ Created Django Group: Gerência")
-            )
+            self.stdout.write(self.style.SUCCESS("  ✓ Created Django Group: Gerência"))
         else:
             self.stdout.write("  - Group 'Gerência' already exists")
 
@@ -179,29 +177,19 @@ class Command(BaseCommand):
                 if created:
                     users_created += 1
                     self.stdout.write(
-                        self.style.SUCCESS(
-                            f"  ✓ Created usuario: {usuario.username} ({first_name} {last_name})"
-                        )
+                        self.style.SUCCESS(f"  ✓ Created usuario: {usuario.username} ({first_name} {last_name})")
                     )
                 else:
                     users_existing += 1
-                    self.stdout.write(
-                        f"  - Usuario already exists: {usuario.username} ({first_name} {last_name})"
-                    )
+                    self.stdout.write(f"  - Usuario already exists: {usuario.username} ({first_name} {last_name})")
 
                 # 2. Add to "Gerência" group
                 if not usuario.groups.filter(name="Gerência").exists():
                     usuario.groups.add(gerencia_group)
                     group_assignments += 1
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"    → Added {usuario.username} to group 'Gerência'"
-                        )
-                    )
+                    self.stdout.write(self.style.SUCCESS(f"    → Added {usuario.username} to group 'Gerência'"))
                 else:
-                    self.stdout.write(
-                        f"    - {usuario.username} already in group 'Gerência'"
-                    )
+                    self.stdout.write(f"    - {usuario.username} already in group 'Gerência'")
 
                 # 3. Link to Gerencia via gerente FK
                 try:
@@ -219,9 +207,7 @@ class Command(BaseCommand):
                             )
                         )
                     elif gerencia.gerente == usuario:
-                        self.stdout.write(
-                            f"    - {usuario.username} already linked to {gerencia.nome}"
-                        )
+                        self.stdout.write(f"    - {usuario.username} already linked to {gerencia.nome}")
                     else:
                         # SUPERINTENDENCIA has multiple managers - only first one gets linked
                         self.stdout.write(
@@ -238,24 +224,18 @@ class Command(BaseCommand):
             # Rollback if dry-run
             if dry_run:
                 transaction.set_rollback(True)
-                self.stdout.write(
-                    self.style.WARNING("\n🔄 Rolling back (dry-run mode)")
-                )
+                self.stdout.write(self.style.WARNING("\n🔄 Rolling back (dry-run mode)"))
 
         # Summary
         self.stdout.write("\n" + "=" * 60)
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"""
+        self.stdout.write(self.style.SUCCESS(f"""
 ✅ Seed complete:
   - Usuarios created: {users_created}
   - Usuarios existing: {users_existing}
   - Group assignments: {group_assignments}
   - Gerencia FK links: {gerencia_links}
   - Errors: {len(errors)}
-"""
-            )
-        )
+"""))
 
         if errors:
             self.stdout.write(self.style.ERROR("\n❌ Errors:"))
@@ -264,26 +244,16 @@ class Command(BaseCommand):
 
         if dry_run:
             self.stdout.write(
-                self.style.WARNING(
-                    "\n⚠️  DRY RUN: No changes committed. Run without --dry-run to apply."
-                )
+                self.style.WARNING("\n⚠️  DRY RUN: No changes committed. Run without --dry-run to apply.")
             )
         else:
             self.stdout.write("\n" + "=" * 60)
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"\n✅ {len(GERENTES)} gerentes seeded to group 'Gerência'"
-                )
-            )
+            self.stdout.write(self.style.SUCCESS(f"\n✅ {len(GERENTES)} gerentes seeded to group 'Gerência'"))
 
             # Verification
             self.stdout.write("\n🔍 Verification:")
             gerencia_count = Group.objects.get(name="Gerência").user_set.count()  # type: ignore[attr-defined]
             self.stdout.write(f"  - Users in 'Gerência' group: {gerencia_count}")
 
-            gerencias_with_gerente = Gerencia.objects.filter(
-                gerente__isnull=False
-            ).count()
-            self.stdout.write(
-                f"  - Gerencias with gerente assigned: {gerencias_with_gerente}/7"
-            )
+            gerencias_with_gerente = Gerencia.objects.filter(gerente__isnull=False).count()
+            self.stdout.write(f"  - Gerencias with gerente assigned: {gerencias_with_gerente}/7")

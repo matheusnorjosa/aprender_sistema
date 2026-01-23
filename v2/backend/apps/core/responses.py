@@ -4,6 +4,7 @@ AS v2 — Standardized API Response Factory (#411)
 Provides consistent response format across custom endpoints.
 ViewSets continue using DRF standard pagination format.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false
 
 from __future__ import annotations
@@ -31,21 +32,11 @@ class APIResponse:
             }
         }
         """
-        response_data = {
-            "data": data,
-            "meta": {
-                "timestamp": timezone.now().isoformat(),
-                **(meta or {})
-            }
-        }
+        response_data = {"data": data, "meta": {"timestamp": timezone.now().isoformat(), **(meta or {})}}
         return Response(response_data)
 
     @staticmethod
-    def list(
-        items: list[Any],
-        total: int | None = None,
-        meta: dict[str, Any] | None = None
-    ) -> Response:
+    def list(items: list[Any], total: int | None = None, meta: dict[str, Any] | None = None) -> Response:
         """
         Standardized list response (non-paginated).
 
@@ -59,11 +50,7 @@ class APIResponse:
         }
         """
         return APIResponse.success(
-            data={
-                "items": items,
-                "total": total if total is not None else len(items)
-            },
-            meta=meta
+            data={"items": items, "total": total if total is not None else len(items)}, meta=meta
         )
 
     @staticmethod
@@ -80,10 +67,4 @@ class APIResponse:
             "meta": {...}
         }
         """
-        return APIResponse.success(
-            data={
-                "available": ok,
-                "conflicts": conflicts or []
-            }
-        )
-
+        return APIResponse.success(data={"available": ok, "conflicts": conflicts or []})

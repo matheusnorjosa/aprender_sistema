@@ -5,6 +5,7 @@ Validates:
 - GCalListView returns paginated response
 - metrics_map respects limit parameter
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -222,4 +223,3 @@ class TestPaginationClasses(TestCase):
         self.assertEqual(pagination.page_size, 200)
         self.assertEqual(pagination.page_size_query_param, "page_size")
         self.assertEqual(pagination.max_page_size, 1000)
-

@@ -24,17 +24,18 @@ Output:
 
 
 from __future__ import annotations
-from typing import Any
-from pathlib import Path
-from datetime import datetime
-import json
 
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
-from django.conf import settings
 
-from apps.core.models import Solicitacao, Projeto, Municipio, Usuario, Participation, TipoEvento
-from apps.dat_ingest.services.parse_fluir import parse_fluir_eventos, get_formadores_fluir
+from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.dat_ingest.services.parse_fluir import get_formadores_fluir, parse_fluir_eventos
 
 
 class Command(BaseCommand):
@@ -67,9 +68,7 @@ class Command(BaseCommand):
         min_eventos: int = int(options.get("min_eventos", 100))
 
         if not dry_run and not apply_mode:
-            self.stderr.write(
-                self.style.ERROR("❌ ERRO: Especifique --dry-run ou --apply")
-            )
+            self.stderr.write(self.style.ERROR("❌ ERRO: Especifique --dry-run ou --apply"))
             return
 
         mode = "DRY-RUN (preview)" if dry_run else "APPLY (commit)"
@@ -99,9 +98,7 @@ class Command(BaseCommand):
         # Gate 1: Min eventos
         if len(eventos_raw) < min_eventos:
             self.stderr.write(
-                self.style.ERROR(
-                    f"❌ GATE 1 FALHOU: Menos de {min_eventos} eventos ({len(eventos_raw)})"
-                )
+                self.style.ERROR(f"❌ GATE 1 FALHOU: Menos de {min_eventos} eventos ({len(eventos_raw)})")
             )
             return
         self.stdout.write(f"  ✅ GATE 1: {len(eventos_raw)} eventos >= {min_eventos}")
@@ -111,9 +108,7 @@ class Command(BaseCommand):
             projeto_fluir = Projeto.objects.get(nome="FLUIR DAS EMOÇÕES")
             self.stdout.write(f"  ✅ GATE 2: Projeto 'FLUIR DAS EMOÇÕES' existe (ID: {projeto_fluir.id})")
         except Projeto.DoesNotExist:
-            self.stderr.write(
-                self.style.ERROR("❌ GATE 2 FALHOU: Projeto 'FLUIR DAS EMOÇÕES' não existe")
-            )
+            self.stderr.write(self.style.ERROR("❌ GATE 2 FALHOU: Projeto 'FLUIR DAS EMOÇÕES' não existe"))
             return
 
         # Gate 3: Formadores existem
@@ -126,17 +121,11 @@ class Command(BaseCommand):
 
         if formadores_faltantes:
             self.stderr.write(
-                self.style.ERROR(
-                    f"❌ GATE 3 FALHOU: {len(formadores_faltantes)} formadores não encontrados:"
-                )
+                self.style.ERROR(f"❌ GATE 3 FALHOU: {len(formadores_faltantes)} formadores não encontrados:")
             )
             for nome in formadores_faltantes:
                 self.stderr.write(f"     - {nome}")
-            self.stderr.write(
-                self.style.WARNING(
-                    "\n💡 Rode: python manage.py seed_formadores_fluir"
-                )
-            )
+            self.stderr.write(self.style.WARNING("\n💡 Rode: python manage.py seed_formadores_fluir"))
             return
         self.stdout.write(f"  ✅ GATE 3: Todos os {len(formadores_esperados)} formadores existem")
 
@@ -157,32 +146,20 @@ class Command(BaseCommand):
                 stats[result["action"]] += 1
 
                 if result["action"] == "error":
-                    self.stdout.write(
-                        self.style.ERROR(f"  [{i}/{len(eventos_raw)}] ❌ {result['message']}")
-                    )
+                    self.stdout.write(self.style.ERROR(f"  [{i}/{len(eventos_raw)}] ❌ {result['message']}"))
                 elif result["action"] == "created":
-                    self.stdout.write(
-                        self.style.SUCCESS(f"  [{i}/{len(eventos_raw)}] ✅ Criado: {result['message']}")
-                    )
+                    self.stdout.write(self.style.SUCCESS(f"  [{i}/{len(eventos_raw)}] ✅ Criado: {result['message']}"))
                 elif result["action"] == "skipped":
-                    self.stdout.write(
-                        self.style.NOTICE(f"  [{i}/{len(eventos_raw)}] ⏭️  {result['message']}")
-                    )
+                    self.stdout.write(self.style.NOTICE(f"  [{i}/{len(eventos_raw)}] ⏭️  {result['message']}"))
 
             except Exception as e:
                 stats["errors"] += 1
-                self.stdout.write(
-                    self.style.ERROR(f"  [{i}/{len(eventos_raw)}] ❌ Erro: {e}")
-                )
+                self.stdout.write(self.style.ERROR(f"  [{i}/{len(eventos_raw)}] ❌ Erro: {e}"))
 
         # 4. Gate 4: Max 10% rejeições
         rejeicao_rate = (stats["errors"] / len(eventos_raw)) * 100 if eventos_raw else 0
         if rejeicao_rate > 10:
-            self.stderr.write(
-                self.style.ERROR(
-                    f"❌ GATE 4 FALHOU: Taxa de rejeição {rejeicao_rate:.1f}% > 10%"
-                )
-            )
+            self.stderr.write(self.style.ERROR(f"❌ GATE 4 FALHOU: Taxa de rejeição {rejeicao_rate:.1f}% > 10%"))
             return
         self.stdout.write(f"  ✅ GATE 4: Taxa de rejeição {rejeicao_rate:.1f}% <= 10%")
 
@@ -208,9 +185,7 @@ class Command(BaseCommand):
 
         self.stdout.write("=" * 60)
 
-    def _process_evento(
-        self, evento_data: dict[str, Any], projeto: Projeto, dry_run: bool
-    ) -> dict[str, str]:
+    def _process_evento(self, evento_data: dict[str, Any], projeto: Projeto, dry_run: bool) -> dict[str, str]:
         """
         Processa um evento individual.
 
@@ -311,9 +286,7 @@ class Command(BaseCommand):
         import unicodedata
 
         nome_sem_acento = "".join(
-            c
-            for c in unicodedata.normalize("NFD", nome_completo)
-            if unicodedata.category(c) != "Mn"
+            c for c in unicodedata.normalize("NFD", nome_completo) if unicodedata.category(c) != "Mn"
         )
         username = nome_sem_acento.lower().replace(" ", "_")
         return username

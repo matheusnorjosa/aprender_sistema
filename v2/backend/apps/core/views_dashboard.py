@@ -4,6 +4,7 @@ AS v2 - Dashboard Overview API
 Endpoint consolidado para métricas do dashboard principal.
 Ref: Issue #311
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -64,9 +65,7 @@ def dashboard_overview(request: Request) -> Response:
     eventos_aprovados = qs_aprovadas.count()
 
     # Total formadores participantes (conta Participation de solicitacoes aprovadas)
-    total_formadores = Participation.objects.filter(
-        solicitacao__status="aprovado"
-    ).count()
+    total_formadores = Participation.objects.filter(solicitacao__status="aprovado").count()
 
     aprovacoes_pendentes = qs_all.filter(status="pendente").count()
 
@@ -82,8 +81,7 @@ def dashboard_overview(request: Request) -> Response:
     qs_30d = qs_aprovadas.filter(inicio__date__gte=start_30d)
 
     por_fluxo_raw = (
-        qs_30d
-        .exclude(projeto__isnull=True)
+        qs_30d.exclude(projeto__isnull=True)
         .values("projeto__fluxo")
         .annotate(quantidade=Count("id"))
         .order_by("-quantidade")
@@ -99,8 +97,7 @@ def dashboard_overview(request: Request) -> Response:
 
     # Por Gerência (últimos 30 dias)
     por_gerencia_raw = (
-        qs_30d
-        .exclude(projeto__gerencia__isnull=True)
+        qs_30d.exclude(projeto__gerencia__isnull=True)
         .values("projeto__gerencia__nome")
         .annotate(quantidade=Count("id"))
         .order_by("-quantidade")
@@ -112,18 +109,14 @@ def dashboard_overview(request: Request) -> Response:
         {
             "gerencia": item["projeto__gerencia__nome"] or "Sem Gerência",
             "quantidade": item["quantidade"],
-            "porcentagem": round(
-                (item["quantidade"] / total_gerencia * 100) if total_gerencia > 0 else 0,
-                1
-            ),
+            "porcentagem": round((item["quantidade"] / total_gerencia * 100) if total_gerencia > 0 else 0, 1),
         }
         for item in por_gerencia_raw[:5]  # Top 5
     ]
 
     # Top Coordenadores (por eventos criados nos últimos 30 dias)
     top_coord_raw = (
-        qs_30d
-        .exclude(usuario__isnull=True)
+        qs_30d.exclude(usuario__isnull=True)
         .values("usuario__first_name", "usuario__last_name", "usuario__username")
         .annotate(eventos=Count("id"))
         .order_by("-eventos")[:5]
@@ -134,14 +127,18 @@ def dashboard_overview(request: Request) -> Response:
         first = item["usuario__first_name"] or ""
         last = item["usuario__last_name"] or ""
         nome_completo = f"{first} {last}".strip()
-        top_coordenadores.append({
-            "nome": nome_completo or item["usuario__username"],
-            "eventos": item["eventos"],
-        })
+        top_coordenadores.append(
+            {
+                "nome": nome_completo or item["usuario__username"],
+                "eventos": item["eventos"],
+            }
+        )
 
-    return Response({
-        "kpis": kpis,
-        "por_fluxo": por_fluxo,
-        "por_gerencia": por_gerencia,
-        "top_coordenadores": top_coordenadores,
-    })
+    return Response(
+        {
+            "kpis": kpis,
+            "por_fluxo": por_fluxo,
+            "por_gerencia": por_gerencia,
+            "top_coordenadores": top_coordenadores,
+        }
+    )

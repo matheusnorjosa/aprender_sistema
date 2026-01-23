@@ -12,6 +12,7 @@ Regras de negócio:
   - Dados variáveis (datas/obs) atualizam o mesmo registro
 - Relatório em out_etl/import_acoes_controle_report.json
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -27,12 +28,12 @@ from django.conf import settings
 from django.db import transaction
 
 from apps.core.models import AcaoControle, Municipio, Projeto, Usuario
-from apps.core.types import ExternalHash
 from apps.core.services.normalize import norm_text
 from apps.core.services.resolvers import (
     resolve_user_by_email,
     resolve_user_by_name,
 )
+from apps.core.types import ExternalHash
 
 OUT_DIR: Path = Path(settings.BASE_DIR) / "out_etl"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -75,11 +76,13 @@ def import_acoes_controle(file_path: str, dry_run: bool = False) -> dict[str, An
                     continue
             except Exception as e:
                 stats["skipped"]["other"] += 1
-                pendencias["outros"].append({
-                    "linha": idx,
-                    "erro": str(e),
-                    "row": row,
-                })
+                pendencias["outros"].append(
+                    {
+                        "linha": idx,
+                        "erro": str(e),
+                        "row": row,
+                    }
+                )
 
         if dry_run:
             transaction.set_rollback(True)
@@ -119,6 +122,7 @@ def _load_file(file_path: str) -> list[dict[str, Any]]:
             return list(reader)
     elif ext in [".xlsx", ".xls"]:
         import openpyxl
+
         wb = openpyxl.load_workbook(file_path, read_only=True)
         ws = wb.active
         rows = list(ws.iter_rows(values_only=True))
@@ -196,7 +200,9 @@ def _normalize_headers(row: dict[str, Any]) -> dict[str, str | None]:
     return normalized
 
 
-def _process_row(row: dict[str, Any], idx: int, stats: dict[str, Any], pendencias: dict[str, list[dict[str, Any]]]) -> str | None:
+def _process_row(
+    row: dict[str, Any], idx: int, stats: dict[str, Any], pendencias: dict[str, list[dict[str, Any]]]
+) -> str | None:
     """
     Processa uma linha do CSV/XLSX.
 

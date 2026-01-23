@@ -3,6 +3,7 @@ AS v2 — GCal Event ID Validation
 
 Validation utilities for Google Calendar event IDs.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -42,10 +43,7 @@ def _validate_event_id(event_id: EventId) -> bool:
 
     # Verificar caracteres permitidos (a-z, 0-9, -, _)
     if not re.match(r"^[a-z0-9_-]+$", event_id):
-        raise ValueError(
-            f"eventId contém caracteres inválidos: {event_id}. "
-            "Permitido: a-z, 0-9, -, _"
-        )
+        raise ValueError(f"eventId contém caracteres inválidos: {event_id}. " "Permitido: a-z, 0-9, -, _")
 
     return True
 

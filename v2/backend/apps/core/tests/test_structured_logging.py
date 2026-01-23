@@ -17,8 +17,9 @@ import logging
 import threading
 from typing import TYPE_CHECKING
 
-import pytest
 from django.test import RequestFactory
+
+import pytest
 
 from apps.core.logging_filters import ContextFilter, RequestIDFilter
 from apps.core.middleware import RequestIDMiddleware

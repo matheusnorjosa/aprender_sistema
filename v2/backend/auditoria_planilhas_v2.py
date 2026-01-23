@@ -5,19 +5,19 @@ Usa hash v2 (17 campos) idêntico ao PR21
 Gera relatórios CSV em v2/.agents/outbox/ com análise completa
 """
 
-import os
-import sys
 import hashlib
+import os
 import re
+import sys
 import unicodedata
-from pathlib import Path
-from datetime import datetime, date, time
-from typing import Dict, List, Tuple, Optional, Any
 from collections import defaultdict
+from datetime import date, datetime, time
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
-import requests
 import pytz
+import requests
 
 # Configuração
 TZ = pytz.timezone("America/Fortaleza")
@@ -348,13 +348,11 @@ def col_letter_to_index(letter: str) -> int:
     """Converte letra de coluna (A, B, ..., AA) para índice (0, 1, ..., 26)"""
     result = 0
     for char in letter:
-        result = result * 26 + (ord(char.upper()) - ord('A') + 1)
+        result = result * 26 + (ord(char.upper()) - ord("A") + 1)
     return result - 1
 
 
-def process_events_sheet(
-    df: pd.DataFrame, sheet_name: str, source: str
-) -> List[Dict[str, Any]]:
+def process_events_sheet(df: pd.DataFrame, sheet_name: str, source: str) -> List[Dict[str, Any]]:
     """Processa uma aba de eventos (ACerta, Brincando, Vidas, Outros, Super)"""
     events = []
 
@@ -629,26 +627,30 @@ def main():
     if only_local:
         for h in only_local:
             row = df_local[df_local["external_hash_v2"] == h].iloc[0]
-            divergencias.append({
-                "tipo": "Apenas em XLSX local",
-                "sheet": row["sheet"],
-                "municipio": row["municipio_raw"],
-                "data": row["data"],
-                "tipo_evento": row["tipo"],
-                "hash": h,
-            })
+            divergencias.append(
+                {
+                    "tipo": "Apenas em XLSX local",
+                    "sheet": row["sheet"],
+                    "municipio": row["municipio_raw"],
+                    "data": row["data"],
+                    "tipo_evento": row["tipo"],
+                    "hash": h,
+                }
+            )
 
     if only_sheets:
         for h in only_sheets:
             row = df_sheets[df_sheets["external_hash_v2"] == h].iloc[0]
-            divergencias.append({
-                "tipo": "Apenas em Google Sheets",
-                "sheet": row["sheet"],
-                "municipio": row["municipio_raw"],
-                "data": row["data"],
-                "tipo_evento": row["tipo"],
-                "hash": h,
-            })
+            divergencias.append(
+                {
+                    "tipo": "Apenas em Google Sheets",
+                    "sheet": row["sheet"],
+                    "municipio": row["municipio_raw"],
+                    "data": row["data"],
+                    "tipo_evento": row["tipo"],
+                    "hash": h,
+                }
+            )
 
     df_divergencias = pd.DataFrame(divergencias)
     output_file = OUTPUT_DIR / "relatorio_divergencias_sheets_vs_xlsx.csv"
@@ -676,8 +678,10 @@ def main():
         sheet_all = df_events[df_events["sheet"] == sheet]
         duplicados = len(sheet_all[sheet_all.duplicated(subset=["external_hash_v2"], keep=False)])
 
-        print(f"{sheet:15} | Total: {total:4} | Sem município: {sem_municipio:3} | "
-              f"Sem data: {sem_data:3} | Duplicados (local↔sheets): {duplicados//2:3}")
+        print(
+            f"{sheet:15} | Total: {total:4} | Sem município: {sem_municipio:3} | "
+            f"Sem data: {sem_data:3} | Duplicados (local↔sheets): {duplicados//2:3}"
+        )
 
     print()
     print("📊 RESUMO SUPER (Aprovação/Tempo)")

@@ -12,29 +12,29 @@ Total: 12 testes
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from unittest.mock import patch, MagicMock
+
+from unittest.mock import MagicMock, patch
+
 from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.core.models import (
-    Usuario, Municipio, TipoEvento, Projeto, Solicitacao, AuditLog
-)
-from apps.core.services.gcal_sync_service import (
-    resync_solicitacao, cancel_solicitacao, SyncOutcome
-)
-from apps.core.tasks import task_cancel_solicitacao_from_gcal
+import pytest
 
+from apps.core.models import AuditLog, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.services.gcal_sync_service import SyncOutcome, cancel_solicitacao, resync_solicitacao
+from apps.core.tasks import task_cancel_solicitacao_from_gcal
 
 # ============================================================================
 # FIXTURES
 # ============================================================================
 
+
 @pytest.fixture
 def api_client():
     """DRF API client."""
     return APIClient()
+
 
 @pytest.fixture
 def grupo_super(db):
@@ -54,10 +54,7 @@ def grupo_controle(db):
 def usuario_super(db, grupo_super):
     """Usuário com perfil Superintendência."""
     usuario = Usuario.objects.create_user(
-        username="superintendente",
-        email="super@example.com",
-        password="testpass123",
-        cpf="11111111111"
+        username="superintendente", email="super@example.com", password="testpass123", cpf="11111111111"
     )
     usuario.groups.add(grupo_super)
     return usuario
@@ -67,10 +64,7 @@ def usuario_super(db, grupo_super):
 def usuario_controle(db, grupo_controle):
     """Usuário com perfil Controle."""
     usuario = Usuario.objects.create_user(
-        username="controle",
-        email="controle@example.com",
-        password="testpass123",
-        cpf="22222222222"
+        username="controle", email="controle@example.com", password="testpass123", cpf="22222222222"
     )
     usuario.groups.add(grupo_controle)
     return usuario
@@ -80,39 +74,26 @@ def usuario_controle(db, grupo_controle):
 def usuario_coordenador(db):
     """Usuário coordenador (sem permissões especiais)."""
     return Usuario.objects.create_user(
-        username="coordenador",
-        email="coord@example.com",
-        password="testpass123",
-        cpf="33333333333"
+        username="coordenador", email="coord@example.com", password="testpass123", cpf="33333333333"
     )
 
 
 @pytest.fixture
 def municipio(db):
     """Município de teste."""
-    return Municipio.objects.create(
-        nome="Fortaleza",
-        uf="CE",
-        ibge_code="2304400"
-    )
+    return Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code="2304400")
 
 
 @pytest.fixture
 def tipo_evento(db):
     """Tipo de evento de teste."""
-    return TipoEvento.objects.create(
-        nome="Formação",
-        cor="#0000FF"
-    )
+    return TipoEvento.objects.create(nome="Formação", cor="#0000FF")
 
 
 @pytest.fixture
 def projeto(db):
     """Projeto de teste."""
-    return Projeto.objects.create(
-        nome="Projeto Teste",
-        fluxo="SUPER"
-    )
+    return Projeto.objects.create(nome="Projeto Teste", fluxo="SUPER")
 
 
 @pytest.fixture
@@ -126,7 +107,7 @@ def solicitacao_aprovada(db, usuario_coordenador, municipio, tipo_evento, projet
         inicio=timezone.now() + timezone.timedelta(days=1),
         fim=timezone.now() + timezone.timedelta(days=1, hours=2),
         status="aprovado",
-        observacoes="Teste resync/cancel"
+        observacoes="Teste resync/cancel",
     )
 
 
@@ -146,6 +127,7 @@ def solicitacao_publicada(db, solicitacao_aprovada):
 # ============================================================================
 # TESTES: HELPERS (3 testes)
 # ============================================================================
+
 
 @pytest.mark.django_db
 class TestResyncHelper:
@@ -167,7 +149,7 @@ class TestResyncHelper:
             action="UPDATE",
             solicitation_id=solicitacao_publicada.id,
             external_event_id="test-event-123",
-            summary="Updated event"
+            summary="Updated event",
         )
 
         # Validar hash inicial
@@ -181,9 +163,7 @@ class TestResyncHelper:
         assert solicitacao_publicada.gcal_payload_hash is None
 
         # Validar que apply foi chamado
-        mock_apply.assert_called_once_with(
-            solicitacao_publicada, dry_run=False, apply_blocked=False
-        )
+        mock_apply.assert_called_once_with(solicitacao_publicada, dry_run=False, apply_blocked=False)
 
         # Validar outcome
         assert outcome.action == "UPDATE"
@@ -205,9 +185,7 @@ class TestCancelHelper:
 
     @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
     @patch("apps.core.services.gcal.sync._retry_with_backoff")
-    def test_cancel_deletes_and_clears_fields(
-        self, mock_retry, mock_get_client, solicitacao_publicada
-    ):
+    def test_cancel_deletes_and_clears_fields(self, mock_retry, mock_get_client, solicitacao_publicada):
         """Cancel deleta evento e limpa campos."""
         # Configurar mocks
         mock_client = MagicMock()
@@ -240,6 +218,7 @@ class TestCancelHelper:
 # TESTES: TASK CELERY (2 testes)
 # ============================================================================
 
+
 @pytest.mark.django_db
 class TestCancelTask:
     """Testes para task_cancel_solicitacao_from_gcal."""
@@ -252,7 +231,7 @@ class TestCancelTask:
             action="DELETE",
             solicitation_id=solicitacao_publicada.id,
             external_event_id=None,
-            summary=f"Solicitação #{solicitacao_publicada.id} (cancelada)"
+            summary=f"Solicitação #{solicitacao_publicada.id} (cancelada)",
         )
 
         # Executar task
@@ -264,10 +243,7 @@ class TestCancelTask:
         assert result["error"] is None
 
         # Validar AuditLog criado
-        audit = AuditLog.objects.filter(
-            action="CANCEL_GCAL",
-            model_name="Solicitacao"
-        ).last()
+        audit = AuditLog.objects.filter(action="CANCEL_GCAL", model_name="Solicitacao").last()
         assert audit is not None
         assert audit.details["solicitacao_id"] == solicitacao_publicada.id
         assert audit.details["action"] == "DELETE"
@@ -285,13 +261,12 @@ class TestCancelTask:
 # TESTES: ENDPOINTS (7 testes)
 # ============================================================================
 
+
 @pytest.mark.django_db
 class TestResyncEndpoint:
     """Testes para POST /api/solicitacoes/{id}/resync-gcal/."""
 
-    def test_resync_endpoint_requires_approved(
-        self, api_client, usuario_controle, solicitacao_aprovada
-    ):
+    def test_resync_endpoint_requires_approved(self, api_client, usuario_controle, solicitacao_aprovada):
         """Endpoint retorna 400 se solicitação não aprovada."""
         api_client.force_authenticate(user=usuario_controle)
 
@@ -299,36 +274,27 @@ class TestResyncEndpoint:
         solicitacao_aprovada.status = "pendente"
         solicitacao_aprovada.save()
 
-        response = api_client.post(
-            f"/api/solicitacoes/{solicitacao_aprovada.id}/resync-gcal/"
-        )
+        response = api_client.post(f"/api/solicitacoes/{solicitacao_aprovada.id}/resync-gcal/")
 
         assert response.status_code == 400
         assert "aprovadas" in response.data["detail"]
 
     @patch("apps.core.tasks.task_publish_solicitacao_to_gcal")
-    def test_resync_endpoint_success(
-        self, mock_task, api_client, usuario_controle, solicitacao_aprovada
-    ):
+    def test_resync_endpoint_success(self, mock_task, api_client, usuario_controle, solicitacao_aprovada):
         """Endpoint retorna 202 + task_id + cria AuditLog."""
         api_client.force_authenticate(user=usuario_controle)
 
         # Configurar mock task
         mock_task.delay.return_value = MagicMock(id="task-123")
 
-        response = api_client.post(
-            f"/api/solicitacoes/{solicitacao_aprovada.id}/resync-gcal/"
-        )
+        response = api_client.post(f"/api/solicitacoes/{solicitacao_aprovada.id}/resync-gcal/")
 
         assert response.status_code == 202
         assert response.data["task_id"] == "task-123"
         assert "Resincronização solicitada" in response.data["detail"]
 
         # Validar AuditLog
-        audit = AuditLog.objects.filter(
-            action="RESYNC_GCAL_REQUESTED",
-            model_name="Solicitacao"
-        ).last()
+        audit = AuditLog.objects.filter(action="RESYNC_GCAL_REQUESTED", model_name="Solicitacao").last()
         assert audit is not None
         assert audit.usuario == usuario_controle
         assert audit.details["solicitacao_id"] == solicitacao_aprovada.id
@@ -337,15 +303,11 @@ class TestResyncEndpoint:
         solicitacao_aprovada.refresh_from_db()
         assert solicitacao_aprovada.gcal_status == Solicitacao.GCalStatus.PENDING
 
-    def test_resync_endpoint_requires_permission(
-        self, api_client, usuario_coordenador, solicitacao_aprovada
-    ):
+    def test_resync_endpoint_requires_permission(self, api_client, usuario_coordenador, solicitacao_aprovada):
         """Endpoint retorna 403 para usuários sem permissão (IsControleOrSuper)."""
         api_client.force_authenticate(user=usuario_coordenador)
 
-        response = api_client.post(
-            f"/api/solicitacoes/{solicitacao_aprovada.id}/resync-gcal/"
-        )
+        response = api_client.post(f"/api/solicitacoes/{solicitacao_aprovada.id}/resync-gcal/")
 
         assert response.status_code == 403
 
@@ -354,45 +316,34 @@ class TestResyncEndpoint:
 class TestCancelEndpoint:
     """Testes para POST /api/solicitacoes/{id}/cancel-gcal/."""
 
-    def test_cancel_endpoint_requires_published(
-        self, api_client, usuario_controle, solicitacao_aprovada
-    ):
+    def test_cancel_endpoint_requires_published(self, api_client, usuario_controle, solicitacao_aprovada):
         """Endpoint retorna 409 se evento não publicado."""
         api_client.force_authenticate(user=usuario_controle)
 
         # Solicitação aprovada mas não publicada
         assert solicitacao_aprovada.external_event_id is None
 
-        response = api_client.post(
-            f"/api/solicitacoes/{solicitacao_aprovada.id}/cancel-gcal/"
-        )
+        response = api_client.post(f"/api/solicitacoes/{solicitacao_aprovada.id}/cancel-gcal/")
 
         assert response.status_code == 409
         assert "não possui evento publicado" in response.data["detail"]
 
     @patch("apps.core.tasks.task_cancel_solicitacao_from_gcal")
-    def test_cancel_endpoint_success(
-        self, mock_task, api_client, usuario_controle, solicitacao_publicada
-    ):
+    def test_cancel_endpoint_success(self, mock_task, api_client, usuario_controle, solicitacao_publicada):
         """Endpoint retorna 202 + task_id + cria AuditLog."""
         api_client.force_authenticate(user=usuario_controle)
 
         # Configurar mock task
         mock_task.delay.return_value = MagicMock(id="task-456")
 
-        response = api_client.post(
-            f"/api/solicitacoes/{solicitacao_publicada.id}/cancel-gcal/"
-        )
+        response = api_client.post(f"/api/solicitacoes/{solicitacao_publicada.id}/cancel-gcal/")
 
         assert response.status_code == 202
         assert response.data["task_id"] == "task-456"
         assert "Cancelamento solicitado" in response.data["detail"]
 
         # Validar AuditLog
-        audit = AuditLog.objects.filter(
-            action="CANCEL_GCAL_REQUESTED",
-            model_name="Solicitacao"
-        ).last()
+        audit = AuditLog.objects.filter(action="CANCEL_GCAL_REQUESTED", model_name="Solicitacao").last()
         assert audit is not None
         assert audit.usuario == usuario_controle
         assert audit.details["solicitacao_id"] == solicitacao_publicada.id
@@ -402,15 +353,11 @@ class TestCancelEndpoint:
         solicitacao_publicada.refresh_from_db()
         assert solicitacao_publicada.gcal_status == Solicitacao.GCalStatus.PENDING
 
-    def test_cancel_endpoint_requires_permission(
-        self, api_client, usuario_coordenador, solicitacao_publicada
-    ):
+    def test_cancel_endpoint_requires_permission(self, api_client, usuario_coordenador, solicitacao_publicada):
         """Endpoint retorna 403 para usuários sem permissão (IsControleOrSuper)."""
         api_client.force_authenticate(user=usuario_coordenador)
 
-        response = api_client.post(
-            f"/api/solicitacoes/{solicitacao_publicada.id}/cancel-gcal/"
-        )
+        response = api_client.post(f"/api/solicitacoes/{solicitacao_publicada.id}/cancel-gcal/")
 
         assert response.status_code == 403
 

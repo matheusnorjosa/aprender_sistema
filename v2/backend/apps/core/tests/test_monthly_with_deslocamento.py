@@ -10,19 +10,22 @@ Valida precedência:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from datetime import date, datetime, timedelta
+
 from django.utils import timezone
 
+import pytest
+
 from apps.core.models import (
-    Usuario,
-    Municipio,
-    Projeto,
-    TipoEvento,
-    Solicitacao,
     AvailabilityBlock,
-    Participation,
     Deslocamento,
+    Municipio,
+    Participation,
+    Projeto,
+    Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 from apps.core.services.monthly_grid_service import build_monthly_grid
 

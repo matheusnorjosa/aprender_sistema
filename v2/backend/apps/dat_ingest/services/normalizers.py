@@ -1,10 +1,12 @@
 """
 Normalizers - Funções utilitárias para limpar e normalizar dados de ETL
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false
 
 
 from __future__ import annotations
+
 import re
 from typing import Optional
 
@@ -221,14 +223,14 @@ def normalize_text(value: Optional[str]) -> str:
     text = normalize_str(value)
 
     # Remove acentos (NFD = decomposição, filtra apenas caracteres base)
-    text = unicodedata.normalize('NFD', text)
-    text = ''.join(char for char in text if unicodedata.category(char) != 'Mn')
+    text = unicodedata.normalize("NFD", text)
+    text = "".join(char for char in text if unicodedata.category(char) != "Mn")
 
     # Remove caracteres especiais (mantém apenas letras, números e espaços)
-    text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
+    text = re.sub(r"[^a-zA-Z0-9\s]", "", text)
 
     # Lowercase e colapsa espaços múltiplos
-    text = re.sub(r'\s+', ' ', text.lower().strip())
+    text = re.sub(r"\s+", " ", text.lower().strip())
 
     return text
 
@@ -323,8 +325,10 @@ def parse_datetime(date_val, time_val=None):
         >>> parse_datetime("2025-01-15")
         datetime.datetime(2025, 1, 15, 0, 0)
     """
+    from datetime import datetime
+    from datetime import time as time_type
+
     from dateutil import parser
-    from datetime import datetime, time as time_type
 
     if not date_val:
         return None

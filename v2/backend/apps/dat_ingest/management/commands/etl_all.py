@@ -1,6 +1,7 @@
 """
 ETL Command: Orchestrator (etl_load_xlsx → etl_upsert_core + direct imports)
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -35,10 +36,10 @@ class Command(BaseCommand):
     # Aliases para formadores com nomes compostos ou sobrenomes diferentes
     # Mapeamento: Nome na planilha → username no banco
     FORMADOR_ALIASES = {
-        'Michele Macedo': 'michelerondonaprender',  # Alessandra Michele Macedo Rondon
-        'Icaro Maciel': 'icarochaves.aprender',     # Francisco Icaro Maciel Forte Chaves
-        'Janieri Martins': 'janieriaajj',           # Janieri Scipião (sobrenome diferente)
-        'Laís Aline': 'coordenacao42',              # Lais Aline Nascimento Fahel Evangelista
+        "Michele Macedo": "michelerondonaprender",  # Alessandra Michele Macedo Rondon
+        "Icaro Maciel": "icarochaves.aprender",  # Francisco Icaro Maciel Forte Chaves
+        "Janieri Martins": "janieriaajj",  # Janieri Scipião (sobrenome diferente)
+        "Laís Aline": "coordenacao42",  # Lais Aline Nascimento Fahel Evangelista
     }
 
     # ========== HELPER METHODS FOR FK RESOLUTION ==========
@@ -66,9 +67,7 @@ class Command(BaseCommand):
             # Try exact match: first_name + last_name
             primeiro = partes[0]
             resto = " ".join(partes[1:])
-            usuario = Usuario.objects.filter(
-                first_name__iexact=primeiro, last_name__icontains=resto
-            ).first()
+            usuario = Usuario.objects.filter(first_name__iexact=primeiro, last_name__icontains=resto).first()
             if usuario:
                 return usuario
 
@@ -175,9 +174,7 @@ class Command(BaseCommand):
             if not formador:
                 errors += 1
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"  ⚠ Formador not found: {b['formador_nome']} (row {b['rownum']})"
-                    )
+                    self.style.WARNING(f"  ⚠ Formador not found: {b['formador_nome']} (row {b['rownum']})")
                 )
                 continue
 
@@ -206,13 +203,9 @@ class Command(BaseCommand):
 
             except Exception as e:
                 errors += 1
-                self.stdout.write(
-                    self.style.ERROR(f"  ✗ Error creating bloqueio (row {b['rownum']}): {e}")
-                )
+                self.stdout.write(self.style.ERROR(f"  ✗ Error creating bloqueio (row {b['rownum']}): {e}"))
 
-        self.stdout.write(
-            f"  Bloqueios: {created} created, {skipped} skipped, {errors} errors"
-        )
+        self.stdout.write(f"  Bloqueios: {created} created, {skipped} skipped, {errors} errors")
 
     def import_deslocamentos(self, data_dir: Path, dry_run: bool = False, force: bool = False) -> None:
         """Import travel/displacement records from Disponibilidade spreadsheet"""
@@ -238,27 +231,21 @@ class Command(BaseCommand):
             if not formador:
                 errors += 1
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"  ⚠ Formador not found: {d['formador_nome']} (row {d['rownum']})"
-                    )
+                    self.style.WARNING(f"  ⚠ Formador not found: {d['formador_nome']} (row {d['rownum']})")
                 )
                 continue
 
             if not origem:
                 errors += 1
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"  ⚠ Origem not found: {d['origem_nome_uf']} (row {d['rownum']})"
-                    )
+                    self.style.WARNING(f"  ⚠ Origem not found: {d['origem_nome_uf']} (row {d['rownum']})")
                 )
                 continue
 
             if not destino:
                 errors += 1
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"  ⚠ Destino not found: {d['destino_nome_uf']} (row {d['rownum']})"
-                    )
+                    self.style.WARNING(f"  ⚠ Destino not found: {d['destino_nome_uf']} (row {d['rownum']})")
                 )
                 continue
 
@@ -296,13 +283,9 @@ class Command(BaseCommand):
 
             except Exception as e:
                 errors += 1
-                self.stdout.write(
-                    self.style.ERROR(f"  ✗ Error creating deslocamento (row {d['rownum']}): {e}")
-                )
+                self.stdout.write(self.style.ERROR(f"  ✗ Error creating deslocamento (row {d['rownum']}): {e}"))
 
-        self.stdout.write(
-            f"  Deslocamentos: {created} created, {skipped} skipped, {errors} errors"
-        )
+        self.stdout.write(f"  Deslocamentos: {created} created, {skipped} skipped, {errors} errors")
 
     def import_solicitacoes(self, data_dir: Path, dry_run: bool = False, force: bool = False) -> None:
         """Import solicitações from Acompanhamento spreadsheet (5 tabs)"""
@@ -346,19 +329,13 @@ class Command(BaseCommand):
             if not municipio:
                 errors += 1
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"  ⚠ Município not found: {s['municipio_nome_uf']} (row {s['rownum']})"
-                    )
+                    self.style.WARNING(f"  ⚠ Município not found: {s['municipio_nome_uf']} (row {s['rownum']})")
                 )
                 continue
 
             if not projeto:
                 errors += 1
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"  ⚠ Projeto not found: {s['projeto_nome']} (row {s['rownum']})"
-                    )
-                )
+                self.stdout.write(self.style.WARNING(f"  ⚠ Projeto not found: {s['projeto_nome']} (row {s['rownum']})"))
                 continue
 
             if dry_run:
@@ -373,9 +350,7 @@ class Command(BaseCommand):
                 external_hash = hashlib.sha1(hash_string.encode()).hexdigest()
 
                 # Check if already exists (idempotency by external_hash)
-                solicitacao = Solicitacao.objects.filter(
-                    external_hash=external_hash
-                ).first()
+                solicitacao = Solicitacao.objects.filter(external_hash=external_hash).first()
 
                 if solicitacao and not force:
                     skipped += 1
@@ -387,9 +362,7 @@ class Command(BaseCommand):
                             if not Participation.objects.filter(
                                 solicitacao=solicitacao, usuario=formador, role="FORMADOR"
                             ).exists():
-                                Participation.objects.create(
-                                    solicitacao=solicitacao, usuario=formador, role="FORMADOR"
-                                )
+                                Participation.objects.create(solicitacao=solicitacao, usuario=formador, role="FORMADOR")
                                 created_participations += 1
                     continue
 
@@ -413,9 +386,7 @@ class Command(BaseCommand):
 
                 # Create Participation for coordenador (Issue: coordenadores na grade)
                 if coordenador:
-                    Participation.objects.create(
-                        solicitacao=solicitacao, usuario=coordenador, role="COORDENADOR"
-                    )
+                    Participation.objects.create(solicitacao=solicitacao, usuario=coordenador, role="COORDENADOR")
                     created_participations += 1
 
                 # Create Participations for each formador
@@ -428,26 +399,18 @@ class Command(BaseCommand):
                         ).exists():
                             continue  # User is already coordenador, don't add as formador
 
-                        Participation.objects.create(
-                            solicitacao=solicitacao, usuario=formador, role="FORMADOR"
-                        )
+                        Participation.objects.create(solicitacao=solicitacao, usuario=formador, role="FORMADOR")
                         created_participations += 1
                     else:
                         self.stdout.write(
-                            self.style.WARNING(
-                                f"  ⚠ Formador not found for participation: {formador_nome}"
-                            )
+                            self.style.WARNING(f"  ⚠ Formador not found for participation: {formador_nome}")
                         )
 
             except Exception as e:
                 errors += 1
-                self.stdout.write(
-                    self.style.ERROR(f"  ✗ Error creating solicitação (row {s['rownum']}): {e}")
-                )
+                self.stdout.write(self.style.ERROR(f"  ✗ Error creating solicitação (row {s['rownum']}): {e}"))
 
-        self.stdout.write(
-            f"  Solicitações: {created_solicitacoes} created, {skipped} skipped, {errors} errors"
-        )
+        self.stdout.write(f"  Solicitações: {created_solicitacoes} created, {skipped} skipped, {errors} errors")
         self.stdout.write(f"  Participations: {created_participations} created")
 
     # ========== MAIN HANDLER ==========
@@ -489,9 +452,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("=" * 80))
 
         # Step 1: Load .xlsx → staging tables
-        self.stdout.write(
-            self.style.SUCCESS("\n[STEP 1/5] Loading .xlsx files to staging tables...")
-        )
+        self.stdout.write(self.style.SUCCESS("\n[STEP 1/5] Loading .xlsx files to staging tables..."))
         call_command(
             "etl_load_xlsx",
             dir=str(directory),
@@ -500,9 +461,7 @@ class Command(BaseCommand):
         )
 
         # Step 2: Upsert staging → SSOT tables
-        self.stdout.write(
-            self.style.SUCCESS("\n[STEP 2/5] Upserting staging → SSOT tables...")
-        )
+        self.stdout.write(self.style.SUCCESS("\n[STEP 2/5] Upserting staging → SSOT tables..."))
         call_command(
             "etl_upsert_core",
             dry_run=dry_run,

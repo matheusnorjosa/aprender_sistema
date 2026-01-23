@@ -15,6 +15,7 @@ USO:
     python manage.py backfill_user_groups --dry-run  # Simula
     python manage.py backfill_user_groups --apply     # Aplica
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -66,13 +67,11 @@ class Command(BaseCommand):
             return
 
         # Buscar usuários com participações mas sem grupo
-        usuarios_sem_grupo = Usuario.objects.annotate(
-            num_participacoes=Count("event_participations")
-        ).filter(num_participacoes__gt=0, groups__isnull=True)
-
-        self.stdout.write(
-            f"📊 Usuários com participações mas sem grupo: {usuarios_sem_grupo.count()}\n"
+        usuarios_sem_grupo = Usuario.objects.annotate(num_participacoes=Count("event_participations")).filter(
+            num_participacoes__gt=0, groups__isnull=True
         )
+
+        self.stdout.write(f"📊 Usuários com participações mas sem grupo: {usuarios_sem_grupo.count()}\n")
 
         stats = {
             "atribuido_formador": 0,
@@ -84,12 +83,8 @@ class Command(BaseCommand):
 
         for usuario in usuarios_sem_grupo:
             # Contar participações por role (para exibição)
-            num_coordenador = usuario.event_participations.filter(
-                role="COORDENADOR"
-            ).count()
-            num_formador = usuario.event_participations.filter(
-                role="FORMADOR"
-            ).count()
+            num_coordenador = usuario.event_participations.filter(role="COORDENADOR").count()
+            num_formador = usuario.event_participations.filter(role="FORMADOR").count()
             total_participacoes = usuario.event_participations.count()
 
             # REGRA CORRETA: Baseado no USERNAME, não nas participações
@@ -106,11 +101,7 @@ class Command(BaseCommand):
                 stats["atribuido_formador"] += 1
             else:
                 # Sem participações e sem padrão coordenacao
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"  ⚠️  {usuario.username:30s} | Sem participações (skip)"
-                    )
-                )
+                self.stdout.write(self.style.WARNING(f"  ⚠️  {usuario.username:30s} | Sem participações (skip)"))
                 stats["sem_participacoes"] += 1
                 continue
 
@@ -125,11 +116,7 @@ class Command(BaseCommand):
                             )
                         )
                 except Exception as e:
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"  ❌ Erro ao atribuir grupo para {usuario.username}: {e}"
-                        )
-                    )
+                    self.stdout.write(self.style.ERROR(f"  ❌ Erro ao atribuir grupo para {usuario.username}: {e}"))
                     stats["erros"] += 1
             else:
                 # Dry-run
@@ -138,30 +125,20 @@ class Command(BaseCommand):
                 )
 
         # Verificar usuários que já têm grupo
-        usuarios_com_grupo = Usuario.objects.annotate(
-            num_grupos=Count("groups")
-        ).filter(num_grupos__gt=0)
+        usuarios_com_grupo = Usuario.objects.annotate(num_grupos=Count("groups")).filter(num_grupos__gt=0)
         stats["ja_tem_grupo"] = usuarios_com_grupo.count()
 
         # Sumário
         self.stdout.write("\n" + "-" * 80)
         self.stdout.write("📊 SUMÁRIO:")
         self.stdout.write(f"   Atribuído 'Formador': {stats['atribuido_formador']}")
-        self.stdout.write(
-            f"   Atribuído 'Coordenador': {stats['atribuido_coordenador']}"
-        )
-        self.stdout.write(
-            f"   Sem participações (skip): {stats['sem_participacoes']}"
-        )
+        self.stdout.write(f"   Atribuído 'Coordenador': {stats['atribuido_coordenador']}")
+        self.stdout.write(f"   Sem participações (skip): {stats['sem_participacoes']}")
         self.stdout.write(f"   Já tinham grupo: {stats['ja_tem_grupo']}")
         self.stdout.write(f"   Erros: {stats['erros']}")
         self.stdout.write("-" * 80)
 
         if dry_run:
-            self.stdout.write(
-                self.style.WARNING(
-                    "\n⚠️  DRY-RUN: Use --apply para aplicar as mudanças"
-                )
-            )
+            self.stdout.write(self.style.WARNING("\n⚠️  DRY-RUN: Use --apply para aplicar as mudanças"))
 
         self.stdout.write("\n✅ Backfill concluído!\n")

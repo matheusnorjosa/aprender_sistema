@@ -11,10 +11,12 @@ Testes com override_settings para fake vs google client.
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+import pytest
 
 from apps.core.models import Usuario
 

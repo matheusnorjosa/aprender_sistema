@@ -9,35 +9,81 @@
  */
 
 import { useState } from 'react';
-import { Card, Space, Typography, Select, Input, Button, Tag } from 'antd';
-import { PlusOutlined, CloseOutlined } from '@ant-design/icons';
+import { Card, Space, Typography, Select, Input, Tag } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import type { ID } from '../types';
 
 const { Text, Title } = Typography;
+
+/**
+ * Current user interface
+ */
+export interface CurrentUser {
+  id: ID;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+/**
+ * User option interface
+ */
+export interface UserOption {
+  id: ID;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+/**
+ * ParticipantsPicker value interface
+ */
+export interface ParticipantsPickerValue {
+  formadorIds: ID[];
+  formadorEmails: string[];
+  coordAcompanhaIds: ID[];
+  coordAcompanhaEmails: string[];
+}
+
+/**
+ * ParticipantsPicker props interface
+ */
+export interface ParticipantsPickerProps {
+  currentUser?: CurrentUser | null;
+  value?: ParticipantsPickerValue;
+  onChange?: (value: ParticipantsPickerValue) => void;
+  usuariosOptions?: UserOption[];
+}
+
+/**
+ * Selection type
+ */
+type SelectionType = 'id' | 'email';
 
 export default function ParticipantsPicker({
   currentUser,
   value = { formadorIds: [], formadorEmails: [], coordAcompanhaIds: [], coordAcompanhaEmails: [] },
   onChange,
   usuariosOptions = [],
-}) {
-  const [formadorType, setFormadorType] = useState('id'); // 'id' ou 'email'
-  const [coordType, setCoordType] = useState('id'); // 'id' ou 'email'
+}: ParticipantsPickerProps): JSX.Element {
+  const [formadorType, setFormadorType] = useState<SelectionType>('id');
+  const [coordType, setCoordType] = useState<SelectionType>('id');
 
-  const handleAddFormador = (item) => {
+  const handleAddFormador = (item: ID | string): void => {
     const updated = { ...value };
     if (formadorType === 'id') {
-      if (!updated.formadorIds.includes(item)) {
-        updated.formadorIds = [...updated.formadorIds, item];
+      if (!updated.formadorIds.includes(item as ID)) {
+        updated.formadorIds = [...updated.formadorIds, item as ID];
       }
     } else {
-      if (!updated.formadorEmails.includes(item)) {
-        updated.formadorEmails = [...updated.formadorEmails, item];
+      if (!updated.formadorEmails.includes(item as string)) {
+        updated.formadorEmails = [...updated.formadorEmails, item as string];
       }
     }
     onChange?.(updated);
   };
 
-  const handleRemoveFormador = (item, type) => {
+  const handleRemoveFormador = (item: ID | string, type: SelectionType): void => {
     const updated = { ...value };
     if (type === 'id') {
       updated.formadorIds = updated.formadorIds.filter((id) => id !== item);
@@ -47,21 +93,21 @@ export default function ParticipantsPicker({
     onChange?.(updated);
   };
 
-  const handleAddCoord = (item) => {
+  const handleAddCoord = (item: ID | string): void => {
     const updated = { ...value };
     if (coordType === 'id') {
-      if (!updated.coordAcompanhaIds.includes(item)) {
-        updated.coordAcompanhaIds = [...updated.coordAcompanhaIds, item];
+      if (!updated.coordAcompanhaIds.includes(item as ID)) {
+        updated.coordAcompanhaIds = [...updated.coordAcompanhaIds, item as ID];
       }
     } else {
-      if (!updated.coordAcompanhaEmails.includes(item)) {
-        updated.coordAcompanhaEmails = [...updated.coordAcompanhaEmails, item];
+      if (!updated.coordAcompanhaEmails.includes(item as string)) {
+        updated.coordAcompanhaEmails = [...updated.coordAcompanhaEmails, item as string];
       }
     }
     onChange?.(updated);
   };
 
-  const handleRemoveCoord = (item, type) => {
+  const handleRemoveCoord = (item: ID | string, type: SelectionType): void => {
     const updated = { ...value };
     if (type === 'id') {
       updated.coordAcompanhaIds = updated.coordAcompanhaIds.filter((id) => id !== item);
@@ -71,7 +117,7 @@ export default function ParticipantsPicker({
     onChange?.(updated);
   };
 
-  const getUserLabel = (userId) => {
+  const getUserLabel = (userId: ID): string => {
     const user = usuariosOptions.find((u) => u.id === userId);
     return user ? `${user.first_name} ${user.last_name}` : `ID ${userId}`;
   };
@@ -109,7 +155,7 @@ export default function ParticipantsPicker({
                   style={{ width: 300 }}
                   showSearch
                   filterOption={(input, option) =>
-                    option.label.toLowerCase().includes(input.toLowerCase())
+                    (option?.label as string)?.toLowerCase().includes(input.toLowerCase()) ?? false
                   }
                   options={usuariosOptions.map((u) => ({
                     label: `${u.first_name} ${u.last_name} (${u.email})`,
@@ -173,7 +219,7 @@ export default function ParticipantsPicker({
                   style={{ width: 300 }}
                   showSearch
                   filterOption={(input, option) =>
-                    option.label.toLowerCase().includes(input.toLowerCase())
+                    (option?.label as string)?.toLowerCase().includes(input.toLowerCase()) ?? false
                   }
                   options={usuariosOptions.map((u) => ({
                     label: `${u.first_name} ${u.last_name} (${u.email})`,

@@ -7,16 +7,19 @@
  * - Props passadas corretamente
  */
 
-import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import RemoteSelect from '../RemoteSelect'
+import RemoteSelect, { type OptionItem } from '../RemoteSelect'
+
+interface TestItem extends OptionItem {
+  nome: string;
+}
 
 describe('RemoteSelect', () => {
   const mockFetchOptions = vi.fn()
-  const mockRenderLabel = (item) => item.nome
+  const mockRenderLabel = (item: TestItem) => item.nome
 
-  const mockOptions = [
+  const mockOptions: TestItem[] = [
     { id: 1, nome: 'Fortaleza' },
     { id: 2, nome: 'Sobral' },
     { id: 3, nome: 'Juazeiro do Norte' },

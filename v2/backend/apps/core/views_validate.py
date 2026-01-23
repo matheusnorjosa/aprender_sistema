@@ -54,12 +54,7 @@ from rest_framework.views import APIView
 
 import pytz
 
-from apps.core.services.resolvers import (
-    resolve_municipio,
-    resolve_projeto,
-    resolve_tipo_evento,
-    resolve_user_by_email,
-)
+from apps.core.services.resolvers import resolve_municipio, resolve_projeto, resolve_tipo_evento, resolve_user_by_email
 
 from .models import Municipio, Projeto, TipoEvento
 

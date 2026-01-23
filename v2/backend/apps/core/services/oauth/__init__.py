@@ -7,11 +7,7 @@ Re-exports from token_manager and oauth_flow for convenience.
 
 # pyright: reportUnknownVariableType=false, reportMissingImports=false
 
-from .oauth_flow import (
-    build_authorization_url,
-    exchange_code_for_tokens,
-    validate_oauth_state,
-)
+from .oauth_flow import build_authorization_url, exchange_code_for_tokens, validate_oauth_state
 from .token_manager import (
     _get_fernet_key,
     decrypt_token,

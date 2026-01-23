@@ -19,14 +19,7 @@ from datetime import timedelta
 from django.test import TestCase
 from django.utils import timezone
 
-from apps.core.models import (
-    AvailabilityBlock,
-    Municipio,
-    Projeto,
-    Solicitacao,
-    TipoEvento,
-    Usuario,
-)
+from apps.core.models import AvailabilityBlock, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 
 class TestAvailabilityBlockAutoApproval(TestCase):

@@ -21,12 +21,7 @@ from rest_framework.response import Response
 
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import (
-    OpenApiExample,
-    OpenApiParameter,
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema, extend_schema_view
 
 from .api_schemas import (
     COMMON_ERROR_RESPONSES,
@@ -51,14 +46,9 @@ from .services.solicitacao_approval import (
     batch_reject_solicitacoes,
     reject_solicitacao,
 )
-from .services.solicitacao_publish import (
-    cancel_from_gcal,
-)
+from .services.solicitacao_publish import cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
-from .services.solicitacao_publish import (
-    publish_to_gcal,
-    resync_to_gcal,
-)
+from .services.solicitacao_publish import publish_to_gcal, resync_to_gcal
 
 logger = logging.getLogger(__name__)
 

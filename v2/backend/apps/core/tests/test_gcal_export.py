@@ -27,13 +27,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.core.models import (
-    Municipio,
-    Projeto,
-    Solicitacao,
-    TipoEvento,
-    Usuario,
-)
+from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 User = get_user_model()
 

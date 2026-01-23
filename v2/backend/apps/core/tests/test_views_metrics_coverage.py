@@ -26,14 +26,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import (
-    Municipio,
-    Participation,
-    Projeto,
-    Solicitacao,
-    TipoEvento,
-    Usuario,
-)
+from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
 
 pytestmark = pytest.mark.django_db
 

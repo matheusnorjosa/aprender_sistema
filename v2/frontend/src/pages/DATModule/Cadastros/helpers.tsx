@@ -9,13 +9,31 @@ import {
   ExclamationCircleFilled,
   MinusCircleFilled,
 } from '@ant-design/icons';
+import type { Etapa } from './constants';
+
+/**
+ * Status type for workflow steps
+ */
+export type WorkflowStatus = 'concluido' | 'em_andamento' | 'pendente' | 'na';
+
+/**
+ * Ant Design Steps status type
+ */
+export type StepsStatus = 'finish' | 'process' | 'wait' | 'error';
+
+/**
+ * Cadastro record interface (partial, for helper functions)
+ */
+export interface CadastroRecord {
+  [key: string]: unknown;
+}
 
 /**
  * Renders status icon based on status value
- * @param {string} status - Status value (concluido, em_andamento, pendente, na)
- * @returns {JSX.Element} Icon component with appropriate color
+ * @param status - Status value (concluido, em_andamento, pendente, na)
+ * @returns Icon component with appropriate color
  */
-export function renderStatusIcon(status) {
+export function renderStatusIcon(status: string | undefined): JSX.Element {
   switch (status) {
     case 'concluido':
       return <CheckCircleFilled className="text-green-500 text-lg" />;
@@ -32,10 +50,10 @@ export function renderStatusIcon(status) {
 
 /**
  * Maps status to Ant Design Steps status
- * @param {string} status - Status value
- * @returns {string} Steps status (finish, process, wait)
+ * @param status - Status value
+ * @returns Steps status (finish, process, wait)
  */
-export function getStepStatus(status) {
+export function getStepStatus(status: string | undefined): StepsStatus {
   switch (status) {
     case 'concluido':
       return 'finish';
@@ -50,11 +68,11 @@ export function getStepStatus(status) {
 
 /**
  * Calculate current step index based on completed etapas
- * @param {Object} record - Cadastro record
- * @param {Array} etapas - Array of etapa definitions
- * @returns {number} Current step index
+ * @param record - Cadastro record
+ * @param etapas - Array of etapa definitions
+ * @returns Current step index
  */
-export function getCurrentStep(record, etapas) {
+export function getCurrentStep(record: CadastroRecord, etapas: Etapa[]): number {
   for (let i = 0; i < etapas.length; i++) {
     const status = record[`status_${etapas[i].key}`];
     if (status !== 'concluido') {

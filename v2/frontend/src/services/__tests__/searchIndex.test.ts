@@ -1,7 +1,7 @@
 /**
  * Tests for SearchIndex service.
  *
- * @see searchIndex.js
+ * @see searchIndex.ts
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

@@ -5,7 +5,7 @@
  * Used with instant search to delay search until typing stops.
  *
  * Usage:
- * ```jsx
+ * ```tsx
  * const [query, setQuery] = useState('');
  * const debouncedQuery = useDebouncedValue(query, 150);
  *
@@ -21,12 +21,12 @@ import { useState, useEffect } from 'react';
 
 /**
  * Debounce a value with configurable delay.
- * @param {any} value - Value to debounce
- * @param {number} delay - Delay in milliseconds (default: 300)
- * @returns {any} Debounced value
+ * @param value - Value to debounce
+ * @param delay - Delay in milliseconds (default: 300)
+ * @returns Debounced value
  */
-export function useDebouncedValue(value, delay = 300) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
+export function useDebouncedValue<T>(value: T, delay: number = 300): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
   useEffect(() => {
     const timer = setTimeout(() => {

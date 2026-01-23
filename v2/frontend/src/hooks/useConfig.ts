@@ -27,22 +27,41 @@ import { message } from 'antd';
 import logger from '../utils/logger';
 
 /**
- * Hook to manage system configuration
- *
- * @returns {Object} Config state and actions
- * @returns {Object|null} config - Current config object or null if loading
- * @returns {boolean} loading - True while fetching config
- * @returns {Function} saveConfig - Async function to save config (returns Promise<boolean>)
- * @returns {Function} reload - Async function to reload config from server
+ * System configuration object
  */
-export function useConfig() {
-  const [config, setConfig] = useState(null);
-  const [loading, setLoading] = useState(true);
+export interface SystemConfig {
+  buffer_deslocamento_minutos?: number;
+  session_cookie_age?: number;
+  batch_size?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Validation errors from backend
+ */
+type ValidationErrors = Record<string, string | string[]>;
+
+/**
+ * Return type for useConfig hook
+ */
+export interface UseConfigReturn {
+  config: SystemConfig | null;
+  loading: boolean;
+  saveConfig: (values: SystemConfig) => Promise<boolean>;
+  reload: () => Promise<void>;
+}
+
+/**
+ * Hook to manage system configuration
+ */
+export function useConfig(): UseConfigReturn {
+  const [config, setConfig] = useState<SystemConfig | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   /**
    * Load config from server
    */
-  const loadConfig = async () => {
+  const loadConfig = async (): Promise<void> => {
     setLoading(true);
     try {
       const res = await fetch('/api/config/', {
@@ -53,7 +72,7 @@ export function useConfig() {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       }
 
-      const data = await res.json();
+      const data: SystemConfig = await res.json();
       setConfig(data);
     } catch (error) {
       message.error('Erro ao carregar configurações');
@@ -66,10 +85,10 @@ export function useConfig() {
   /**
    * Save config to server
    *
-   * @param {Object} values - Config values to save
-   * @returns {Promise<boolean>} True if save succeeded, false otherwise
+   * @param values - Config values to save
+   * @returns True if save succeeded, false otherwise
    */
-  const saveConfig = async (values) => {
+  const saveConfig = async (values: SystemConfig): Promise<boolean> => {
     try {
       const res = await fetch('/api/config/', {
         method: 'PUT',
@@ -81,7 +100,7 @@ export function useConfig() {
       });
 
       if (!res.ok) {
-        const errors = await res.json();
+        const errors: ValidationErrors = await res.json();
         logger.error('useConfig saveConfig validation errors:', errors);
 
         // Display validation errors
@@ -97,7 +116,7 @@ export function useConfig() {
         return false;
       }
 
-      const data = await res.json();
+      const data: SystemConfig = await res.json();
       setConfig(data);
       message.success('Configurações salvas com sucesso!');
       return true;

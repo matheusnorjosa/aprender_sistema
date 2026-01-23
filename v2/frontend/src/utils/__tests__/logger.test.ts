@@ -7,17 +7,23 @@
  * - Métodos: log, debug, warn, error, api
  */
 
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, test, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest'
+
+type ConsoleSpy = MockInstance<(...args: unknown[]) => void>;
 
 describe('logger', () => {
-  let consoleSpy
+  let consoleSpy: {
+    log: ConsoleSpy;
+    warn: ConsoleSpy;
+    error: ConsoleSpy;
+  };
 
   beforeEach(() => {
     // Spy nos métodos do console
     consoleSpy = {
-      log: vi.spyOn(console, 'log').mockImplementation(() => {}),
-      warn: vi.spyOn(console, 'warn').mockImplementation(() => {}),
-      error: vi.spyOn(console, 'error').mockImplementation(() => {}),
+      log: vi.spyOn(console, 'log').mockImplementation(() => {}) as ConsoleSpy,
+      warn: vi.spyOn(console, 'warn').mockImplementation(() => {}) as ConsoleSpy,
+      error: vi.spyOn(console, 'error').mockImplementation(() => {}) as ConsoleSpy,
     }
   })
 
@@ -33,7 +39,7 @@ describe('logger', () => {
 
     test('log() deve chamar console.log', async () => {
       // Re-import para pegar nova env
-      const { default: logger } = await import('../logger.js')
+      const { default: logger } = await import('../logger')
 
       logger.log('test message')
 
@@ -41,7 +47,7 @@ describe('logger', () => {
     })
 
     test('debug() deve chamar console.log com prefixo [DEBUG]', async () => {
-      const { default: logger } = await import('../logger.js')
+      const { default: logger } = await import('../logger')
 
       logger.debug('debug info', { data: 123 })
 
@@ -49,7 +55,7 @@ describe('logger', () => {
     })
 
     test('warn() deve chamar console.warn', async () => {
-      const { default: logger } = await import('../logger.js')
+      const { default: logger } = await import('../logger')
 
       logger.warn('warning message')
 
@@ -57,7 +63,7 @@ describe('logger', () => {
     })
 
     test('error() deve chamar console.error', async () => {
-      const { default: logger } = await import('../logger.js')
+      const { default: logger } = await import('../logger')
       const testError = new Error('test error')
 
       logger.error('error message', testError)
@@ -66,7 +72,7 @@ describe('logger', () => {
     })
 
     test('api() deve chamar console.log com prefixo [API]', async () => {
-      const { default: logger } = await import('../logger.js')
+      const { default: logger } = await import('../logger')
 
       logger.api('GET /users', { status: 200 })
 
@@ -81,7 +87,7 @@ describe('logger', () => {
 
     test('log() NÃO deve chamar console.log', async () => {
       vi.resetModules()
-      const { default: logger } = await import('../logger.js')
+      const { default: logger } = await import('../logger')
 
       logger.log('test message')
 
@@ -90,7 +96,7 @@ describe('logger', () => {
 
     test('debug() NÃO deve chamar console.log', async () => {
       vi.resetModules()
-      const { default: logger } = await import('../logger.js')
+      const { default: logger } = await import('../logger')
 
       logger.debug('debug info')
 
@@ -99,7 +105,7 @@ describe('logger', () => {
 
     test('warn() NÃO deve chamar console.warn', async () => {
       vi.resetModules()
-      const { default: logger } = await import('../logger.js')
+      const { default: logger } = await import('../logger')
 
       logger.warn('warning')
 
@@ -108,7 +114,7 @@ describe('logger', () => {
 
     test('error() NÃO deve chamar console.error (evita exposição)', async () => {
       vi.resetModules()
-      const { default: logger } = await import('../logger.js')
+      const { default: logger } = await import('../logger')
 
       logger.error('error')
 
@@ -117,7 +123,7 @@ describe('logger', () => {
 
     test('api() NÃO deve chamar console.log', async () => {
       vi.resetModules()
-      const { default: logger } = await import('../logger.js')
+      const { default: logger } = await import('../logger')
 
       logger.api('GET /users', {})
 

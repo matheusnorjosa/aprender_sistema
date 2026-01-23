@@ -10,7 +10,7 @@
 
 import { useState, useEffect } from 'react';
 import { DatePicker, TimePicker, Space, Typography } from 'antd';
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 
@@ -20,10 +20,36 @@ dayjs.tz.setDefault('America/Fortaleza');
 
 const { Text } = Typography;
 
-export default function DateTimeRange({ value = {}, onChange }) {
-  const [date, setDate] = useState(value.date ? dayjs(value.date) : null);
-  const [start, setStart] = useState(value.start ? dayjs(value.start, 'HH:mm') : null);
-  const [end, setEnd] = useState(value.end ? dayjs(value.end, 'HH:mm') : null);
+/**
+ * DateTimeRange value interface
+ */
+export interface DateTimeRangeValue {
+  date?: string | null;
+  start?: string | null;
+  end?: string | null;
+}
+
+/**
+ * DateTimeRange props interface
+ */
+export interface DateTimeRangeProps {
+  value?: DateTimeRangeValue;
+  onChange?: (value: DateTimeRangeValue) => void;
+}
+
+/**
+ * Internal state for change trigger
+ */
+interface ChangeState {
+  date: Dayjs | null;
+  start: Dayjs | null;
+  end: Dayjs | null;
+}
+
+export default function DateTimeRange({ value = {}, onChange }: DateTimeRangeProps): JSX.Element {
+  const [date, setDate] = useState<Dayjs | null>(value.date ? dayjs(value.date) : null);
+  const [start, setStart] = useState<Dayjs | null>(value.start ? dayjs(value.start, 'HH:mm') : null);
+  const [end, setEnd] = useState<Dayjs | null>(value.end ? dayjs(value.end, 'HH:mm') : null);
 
   useEffect(() => {
     if (value.date) setDate(dayjs(value.date));
@@ -31,24 +57,24 @@ export default function DateTimeRange({ value = {}, onChange }) {
     if (value.end) setEnd(dayjs(value.end, 'HH:mm'));
   }, [value]);
 
-  const handleDateChange = (newDate) => {
+  const handleDateChange = (newDate: Dayjs | null): void => {
     setDate(newDate);
     triggerChange({ date: newDate, start, end });
   };
 
-  const handleStartChange = (newStart) => {
+  const handleStartChange = (newStart: Dayjs | null): void => {
     setStart(newStart);
     triggerChange({ date, start: newStart, end });
   };
 
-  const handleEndChange = (newEnd) => {
+  const handleEndChange = (newEnd: Dayjs | null): void => {
     setEnd(newEnd);
     triggerChange({ date, start, end: newEnd });
   };
 
-  const triggerChange = (changedValue) => {
+  const triggerChange = (changedValue: ChangeState): void => {
     if (onChange) {
-      const formatted = {
+      const formatted: DateTimeRangeValue = {
         date: changedValue.date ? changedValue.date.format('YYYY-MM-DD') : null,
         start: changedValue.start ? changedValue.start.format('HH:mm') : null,
         end: changedValue.end ? changedValue.end.format('HH:mm') : null,

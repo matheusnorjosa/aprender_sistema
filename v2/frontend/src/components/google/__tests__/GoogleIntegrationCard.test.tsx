@@ -13,10 +13,9 @@
  * - PA-06: Controle explícito (ISO 9241-110)
  */
 
-import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, test, expect, vi } from 'vitest';
-import GoogleIntegrationCard from '../GoogleIntegrationCard';
+import GoogleIntegrationCard, { type GoogleIntegrationStatus } from '../GoogleIntegrationCard';
 
 describe('GoogleIntegrationCard', () => {
   // ============================================================================
@@ -33,7 +32,7 @@ describe('GoogleIntegrationCard', () => {
 
   test('não deve renderizar quando status é undefined', () => {
     const { container } = render(
-      <GoogleIntegrationCard onConnect={() => {}} onDisconnect={() => {}} />
+      <GoogleIntegrationCard status={null} onConnect={() => {}} onDisconnect={() => {}} />
     );
 
     expect(container.firstChild).toBeNull();
@@ -44,10 +43,10 @@ describe('GoogleIntegrationCard', () => {
   // ============================================================================
 
   test('deve renderizar card vermelho quando desconectado', () => {
-    const status = {
+    const status: GoogleIntegrationStatus = {
       connected: false,
-      googleEmail: null,
-      tokenExpiry: null,
+      googleEmail: undefined,
+      tokenExpiry: undefined,
       expiresInDays: null,
       isExpired: false,
     };
@@ -80,7 +79,7 @@ describe('GoogleIntegrationCard', () => {
   // ============================================================================
 
   test('deve renderizar card verde quando conectado (não expirando)', () => {
-    const status = {
+    const status: GoogleIntegrationStatus = {
       connected: true,
       googleEmail: 'controle@aprendereditora.com.br',
       tokenExpiry: '2025-12-31T23:59:59Z',
@@ -111,7 +110,7 @@ describe('GoogleIntegrationCard', () => {
   });
 
   test('deve renderizar card amarelo quando expirando (≤7 dias)', () => {
-    const status = {
+    const status: GoogleIntegrationStatus = {
       connected: true,
       googleEmail: 'controle@aprendereditora.com.br',
       tokenExpiry: '2025-12-07T23:59:59Z',
@@ -136,7 +135,7 @@ describe('GoogleIntegrationCard', () => {
   });
 
   test('deve renderizar card vermelho quando expirado', () => {
-    const status = {
+    const status: GoogleIntegrationStatus = {
       connected: true,
       googleEmail: 'controle@aprendereditora.com.br',
       tokenExpiry: '2025-01-01T00:00:00Z',
@@ -166,10 +165,10 @@ describe('GoogleIntegrationCard', () => {
   });
 
   test('deve renderizar sem data de expiração se tokenExpiry for null', () => {
-    const status = {
+    const status: GoogleIntegrationStatus = {
       connected: true,
       googleEmail: 'controle@aprendereditora.com.br',
-      tokenExpiry: null,
+      tokenExpiry: undefined,
       expiresInDays: null,
       isExpired: false,
     };
@@ -191,7 +190,7 @@ describe('GoogleIntegrationCard', () => {
   // ============================================================================
 
   test('deve exibir Popconfirm ao clicar "Desconectar"', async () => {
-    const status = {
+    const status: GoogleIntegrationStatus = {
       connected: true,
       googleEmail: 'controle@aprendereditora.com.br',
       tokenExpiry: '2025-12-31T23:59:59Z',
@@ -227,7 +226,7 @@ describe('GoogleIntegrationCard', () => {
   });
 
   test('deve chamar onDisconnect ao confirmar Popconfirm', async () => {
-    const status = {
+    const status: GoogleIntegrationStatus = {
       connected: true,
       googleEmail: 'controle@aprendereditora.com.br',
       tokenExpiry: '2025-12-31T23:59:59Z',
@@ -260,7 +259,7 @@ describe('GoogleIntegrationCard', () => {
   });
 
   test('NÃO deve chamar onDisconnect ao cancelar Popconfirm', async () => {
-    const status = {
+    const status: GoogleIntegrationStatus = {
       connected: true,
       googleEmail: 'controle@aprendereditora.com.br',
       tokenExpiry: '2025-12-31T23:59:59Z',
@@ -295,7 +294,7 @@ describe('GoogleIntegrationCard', () => {
   // ============================================================================
 
   test('deve formatar data de expiração em pt-BR', () => {
-    const status = {
+    const status: GoogleIntegrationStatus = {
       connected: true,
       googleEmail: 'controle@aprendereditora.com.br',
       tokenExpiry: '2025-12-31T23:59:59Z',
@@ -315,23 +314,3 @@ describe('GoogleIntegrationCard', () => {
     expect(dateText).toBeInTheDocument();
   });
 });
-
-// ============================================================================
-// RESUMO DOS TESTES
-// ============================================================================
-
-// Testes do Componente (12):
-// ✅ Não renderiza quando status null
-// ✅ Não renderiza quando status undefined
-// ✅ Card vermelho desconectado + botão conectar
-// ✅ Card verde conectado (≥8 dias)
-// ✅ Card amarelo expirando (≤7 dias)
-// ✅ Card vermelho expirado + botão reconectar
-// ✅ Renderiza sem tokenExpiry
-// ✅ Popconfirm aparece ao clicar desconectar
-// ✅ onDisconnect chamado ao confirmar
-// ✅ onDisconnect NÃO chamado ao cancelar
-// ✅ Formatação de data pt-BR
-//
-// Total: 11 testes
-// Cobertura esperada: ~95%

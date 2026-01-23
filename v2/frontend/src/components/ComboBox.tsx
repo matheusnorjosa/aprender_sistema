@@ -8,6 +8,36 @@
 import { useState, useEffect } from 'react';
 import { AutoComplete, Spin } from 'antd';
 import logger from '../utils/logger';
+import type { ID } from '../types';
+
+/**
+ * Lookup item interface
+ */
+export interface LookupItem {
+  id: ID;
+  label: string;
+  [key: string]: unknown;
+}
+
+/**
+ * AutoComplete option interface
+ */
+interface AutoCompleteOption {
+  value: string;
+  label: string;
+  data: LookupItem;
+}
+
+/**
+ * ComboBox props interface
+ */
+export interface ComboBoxProps {
+  value?: LookupItem | null;
+  onChange?: (item: LookupItem | null) => void;
+  lookupFunction: (query: string) => Promise<LookupItem[]>;
+  placeholder?: string;
+  disabled?: boolean;
+}
 
 export default function ComboBox({
   value = null,
@@ -15,14 +45,14 @@ export default function ComboBox({
   lookupFunction,
   placeholder = 'Digite para buscar...',
   disabled = false,
-}) {
-  const [options, setOptions] = useState([]);
+}: ComboBoxProps): JSX.Element {
+  const [options, setOptions] = useState<AutoCompleteOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchValue, setSearchValue] = useState('');
 
   // Carregar opções iniciais
   useEffect(() => {
-    const loadInitial = async () => {
+    const loadInitial = async (): Promise<void> => {
       try {
         setLoading(true);
         const results = await lookupFunction('');
@@ -49,7 +79,7 @@ export default function ComboBox({
     }
   }, [value]);
 
-  const handleSearch = async (query) => {
+  const handleSearch = async (query: string): Promise<void> => {
     setSearchValue(query);
 
     if (!query || query.length < 2) {
@@ -85,13 +115,13 @@ export default function ComboBox({
     }
   };
 
-  const handleSelect = (value, option) => {
+  const handleSelect = (_value: string, option: AutoCompleteOption): void => {
     if (onChange) {
       onChange(option.data);
     }
   };
 
-  const handleChange = (text) => {
+  const handleChange = (text: string): void => {
     setSearchValue(text);
 
     // Se o texto está vazio, limpar seleção

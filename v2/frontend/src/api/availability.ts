@@ -1,0 +1,156 @@
+/**
+ * API Client - Availability Blocks
+ *
+ * Consome endpoints do backend AS v2 para gerenciar bloqueios de disponibilidade.
+ */
+
+import { fetchAPI, buildUrl, type QueryParams } from './config';
+import type {
+  ID,
+  CurrentUser,
+  AvailabilityBlock,
+  AvailabilityBlockPayload,
+  AvailabilityCheckResponse,
+  Gerencia,
+} from '../types';
+
+/**
+ * Block filter parameters
+ */
+export interface BlockFilters {
+  owner?: string;
+  [key: string]: string | undefined;
+}
+
+/**
+ * Availability check parameters
+ */
+export interface AvailabilityCheckParams {
+  usuario_id: ID;
+  inicio: string;
+  fim: string;
+  municipio_id?: ID;
+}
+
+/**
+ * Monthly availability parameters
+ */
+export interface MonthlyAvailabilityParams {
+  year: number;
+  month: number;
+  role?: 'FORMADOR' | 'COORDENADOR';
+  sector?: string;
+  q?: string;
+}
+
+/**
+ * Monthly grid response
+ */
+export interface MonthlyGridResponse {
+  days: string[];
+  legend: Record<string, string>;
+  people: Array<{ id: ID; nome: string; email: string }>;
+  cells: Record<string, Record<string, string>>;
+  details_index: Record<string, unknown>;
+}
+
+/**
+ * Feature flags response
+ */
+export interface FeatureFlags {
+  apply_blocked: boolean;
+  GCAL_CLIENT: boolean;
+  PREVIEW_ONLY: boolean;
+  [key: string]: unknown;
+}
+
+/**
+ * Busca informações do usuário atual.
+ */
+export async function getMe(): Promise<CurrentUser> {
+  return await fetchAPI('/me/');
+}
+
+/**
+ * Lista bloqueios de disponibilidade.
+ *
+ * @param params - Parâmetros de filtro
+ */
+export async function getBlocks(params: BlockFilters = { owner: 'me' }): Promise<AvailabilityBlock[]> {
+  const url = buildUrl('/availability-blocks/', params);
+  const data = await fetchAPI<{ results?: AvailabilityBlock[] } | AvailabilityBlock[]>(url);
+
+  // DRF retorna { results: [...], count: N } quando paginado
+  return (data as { results: AvailabilityBlock[] }).results || (data as AvailabilityBlock[]);
+}
+
+/**
+ * Cria novo bloqueio de disponibilidade.
+ *
+ * @param data - Dados do bloqueio
+ */
+export async function createBlock(data: AvailabilityBlockPayload): Promise<AvailabilityBlock> {
+  return await fetchAPI('/availability-blocks/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Remove bloqueio de disponibilidade.
+ *
+ * Apenas bloqueios com status='pendente' podem ser removidos.
+ *
+ * @param id - ID do bloqueio
+ */
+export async function deleteBlock(id: ID): Promise<void> {
+  await fetchAPI(`/availability-blocks/${id}/`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Checa disponibilidade de um usuário (consultivo).
+ *
+ * @param params - Parâmetros da checagem
+ */
+export async function checkAvailability(params: AvailabilityCheckParams): Promise<AvailabilityCheckResponse> {
+  const url = buildUrl('/availability/check/', params as unknown as QueryParams);
+  return await fetchAPI(url);
+}
+
+/**
+ * Busca grade mensal de disponibilidade.
+ *
+ * @param params - Parâmetros da consulta
+ */
+export async function getMonthlyAvailability(params: MonthlyAvailabilityParams): Promise<MonthlyGridResponse> {
+  const url = buildUrl('/availability/monthly/', params as unknown as QueryParams);
+  return await fetchAPI(url);
+}
+
+/**
+ * Busca grade mensal de disponibilidade (versão genérica).
+ *
+ * @param params - Parâmetros da consulta
+ */
+export async function getMonthly(params: QueryParams): Promise<MonthlyGridResponse> {
+  const url = buildUrl('/availability/monthly/', params);
+  return await fetchAPI(url);
+}
+
+/**
+ * Busca feature flags do sistema.
+ */
+export async function getFeatures(): Promise<FeatureFlags> {
+  return await fetchAPI('/features/');
+}
+
+/**
+ * Busca lista de gerências disponíveis.
+ */
+export async function getGerencias(): Promise<Gerencia[]> {
+  const data = await fetchAPI<{ results?: Gerencia[] } | Gerencia[]>('/gerencias/');
+  // DRF retorna { results: [...], count: N } quando paginado
+  return (data as { results: Gerencia[] }).results || (data as Gerencia[]);
+}

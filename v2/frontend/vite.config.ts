@@ -5,12 +5,10 @@ import { visualizer } from 'rollup-plugin-visualizer'
 
 // Backend URL para proxy (servidor-side apenas)
 // PROXY_TARGET é usado apenas pelo servidor Vite, não pelo browser
-// eslint-disable-next-line no-undef
-const API_URL = process.env.PROXY_TARGET || 'http://localhost:8002'
+const API_URL: string = process.env.PROXY_TARGET || 'http://localhost:8002'
 
 // Gap 8 - PLAN_maturity_gaps.md: Bundle analysis
-// eslint-disable-next-line no-undef
-const ANALYZE = process.env.ANALYZE === 'true'
+const ANALYZE: boolean = process.env.ANALYZE === 'true'
 
 // https://vite.dev/config/
 export default defineConfig({

@@ -20,4 +20,4 @@ export const TIMING = {
 
   // Delays
   GCAL_DETAIL_LOAD_DELAY_MS: 2000,
-};
+} as const;

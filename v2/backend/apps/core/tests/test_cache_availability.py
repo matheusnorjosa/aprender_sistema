@@ -24,14 +24,7 @@ from rest_framework.test import APIClient
 import pytest
 import pytz
 
-from apps.core.models import (
-    AvailabilityBlock,
-    Municipio,
-    Projeto,
-    Solicitacao,
-    TipoEvento,
-    Usuario,
-)
+from apps.core.models import AvailabilityBlock, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 from apps.core.services.availability_service import check_conflicts
 
 

@@ -26,13 +26,7 @@ from typing import Any
 from django.db.models import Prefetch, Q
 from django.utils import timezone
 
-from apps.core.models import (
-    AvailabilityBlock,
-    Deslocamento,
-    Participation,
-    Solicitacao,
-    Usuario,
-)
+from apps.core.models import AvailabilityBlock, Deslocamento, Participation, Solicitacao, Usuario
 from apps.core.types import UserId
 
 

@@ -14,13 +14,7 @@ from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.core.exceptions import (
-    APIError,
-    ConflictError,
-    NotFoundError,
-    ServiceUnavailableError,
-    ValidationAPIError,
-)
+from apps.core.exceptions import APIError, ConflictError, NotFoundError, ServiceUnavailableError, ValidationAPIError
 from apps.core.models import Usuario
 
 

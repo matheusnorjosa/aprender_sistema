@@ -25,10 +25,7 @@ from apps.core.models import Solicitacao
 from apps.core.permissions import IsControleOrSuper
 from apps.core.serializers import EventDetailSerializer, SolicitacaoSerializer
 from apps.core.services.gcal import compute_payload_hash
-from apps.core.views_gcal.helpers import (
-    DashboardEventsPagination,
-    _filter_events_queryset,
-)
+from apps.core.views_gcal.helpers import DashboardEventsPagination, _filter_events_queryset
 
 
 class DashboardEventsView(APIView):

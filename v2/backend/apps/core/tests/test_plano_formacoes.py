@@ -20,14 +20,7 @@ from django.contrib.auth import get_user_model
 
 import pytest
 
-from apps.core.models import (
-    Acompanhamento,
-    Formacao,
-    Municipio,
-    PlanoFormacoes,
-    Projeto,
-    Prova,
-)
+from apps.core.models import Acompanhamento, Formacao, Municipio, PlanoFormacoes, Projeto, Prova
 
 User = get_user_model()
 

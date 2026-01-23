@@ -19,13 +19,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import (
-    Municipio,
-    Projeto,
-    Solicitacao,
-    TipoEvento,
-    Usuario,
-)
+from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 
 @pytest.fixture

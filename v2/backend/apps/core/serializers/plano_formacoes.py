@@ -15,12 +15,7 @@ from typing import Any
 
 from rest_framework import serializers  # type: ignore[attr-defined]
 
-from apps.core.models import (
-    Acompanhamento,
-    Formacao,
-    PlanoFormacoes,
-    Prova,
-)
+from apps.core.models import Acompanhamento, Formacao, PlanoFormacoes, Prova
 
 # ============================================================
 # Nested Serializers (for inline display)

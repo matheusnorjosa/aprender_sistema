@@ -66,14 +66,7 @@ class TestModelsBackwardsCompatibility:
 
     def test_direct_import_organizacao(self) -> None:
         """Import direto: from apps.core.models.organizacao import X"""
-        from apps.core.models.organizacao import (
-            EquipeGerencia,
-            Gerencia,
-            Municipio,
-            Produto,
-            Projeto,
-            TipoEvento,
-        )
+        from apps.core.models.organizacao import EquipeGerencia, Gerencia, Municipio, Produto, Projeto, TipoEvento
 
         assert Municipio is not None
         assert Gerencia is not None

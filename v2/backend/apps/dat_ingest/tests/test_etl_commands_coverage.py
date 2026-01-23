@@ -28,14 +28,7 @@ from django.core.management.base import CommandError
 
 import pytest
 
-from apps.core.models import (
-    Municipio,
-    Participation,
-    Projeto,
-    Solicitacao,
-    TipoEvento,
-    Usuario,
-)
+from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
 
 # =============================================================================
 # Fixtures

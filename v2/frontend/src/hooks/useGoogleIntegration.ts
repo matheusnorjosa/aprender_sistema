@@ -25,30 +25,61 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../api';
 import logger from '../utils/logger';
 
-const useGoogleIntegration = () => {
-  const [status, setStatus] = useState({
+/**
+ * Google integration status
+ */
+export interface GoogleIntegrationStatus {
+  connected: boolean;
+  googleEmail: string | null;
+  tokenExpiry: string | null;
+  expiresInDays: number | null;
+  isExpired: boolean;
+}
+
+/**
+ * Disconnect result
+ */
+export interface DisconnectResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Return type for useGoogleIntegration
+ */
+export interface UseGoogleIntegrationReturn {
+  status: GoogleIntegrationStatus;
+  loading: boolean;
+  error: string | null;
+  fetchStatus: () => Promise<void>;
+  disconnect: () => Promise<DisconnectResult>;
+}
+
+const useGoogleIntegration = (): UseGoogleIntegrationReturn => {
+  const [status, setStatus] = useState<GoogleIntegrationStatus>({
     connected: false,
     googleEmail: null,
     tokenExpiry: null,
     expiresInDays: null,
     isExpired: false,
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   /**
    * Carrega status da integração do backend.
    */
-  const fetchStatus = useCallback(async () => {
+  const fetchStatus = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await api.get('/integrations/google/status/');
+      const response = await api.get<GoogleIntegrationStatus>('/integrations/google/status/');
       setStatus(response.data);
     } catch (err) {
       logger.error('Erro ao carregar status Google:', err);
-      setError(err.response?.data?.error || 'Erro ao carregar status da integração');
+      const axiosError = err as { response?: { data?: { error?: string } } };
+      setError(axiosError.response?.data?.error || 'Erro ao carregar status da integração');
     } finally {
       setLoading(false);
     }
@@ -57,7 +88,7 @@ const useGoogleIntegration = () => {
   /**
    * Desconecta conta Google (revoga refresh_token).
    */
-  const disconnect = useCallback(async () => {
+  const disconnect = useCallback(async (): Promise<DisconnectResult> => {
     setLoading(true);
     setError(null);
 
@@ -76,8 +107,10 @@ const useGoogleIntegration = () => {
       return { success: true };
     } catch (err) {
       logger.error('Erro ao desconectar Google:', err);
-      setError(err.response?.data?.error || 'Erro ao desconectar conta Google');
-      return { success: false, error: err.response?.data?.error };
+      const axiosError = err as { response?: { data?: { error?: string } } };
+      const errorMessage = axiosError.response?.data?.error || 'Erro ao desconectar conta Google';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }

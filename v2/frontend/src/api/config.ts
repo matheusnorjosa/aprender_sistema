@@ -10,18 +10,28 @@ import logger from '../utils/logger';
 import { TIMING } from '../constants';
 
 /**
+ * Fetch options for API calls
+ */
+export interface FetchOptions extends Omit<RequestInit, 'headers'> {
+  headers?: Record<string, string>;
+}
+
+/**
+ * Query parameters for building URLs
+ */
+export type QueryParams = Record<string, string | number | boolean | null | undefined>;
+
+/**
  * Base API URL (can be overridden by VITE_API_URL env var)
  */
-export const API_BASE = import.meta.env.VITE_API_URL || '/api';
+export const API_BASE: string = import.meta.env.VITE_API_URL || '/api';
 
 /**
  * Extrai token CSRF do cookie 'csrftoken'.
- *
- * @returns {string|null} CSRF token ou null se não encontrado
  */
-export function getCsrfToken() {
+export function getCsrfToken(): string | null {
   const name = 'csrftoken';
-  let cookieValue = null;
+  let cookieValue: string | null = null;
 
   if (document.cookie && document.cookie !== '') {
     const cookies = document.cookie.split(';');
@@ -39,22 +49,21 @@ export function getCsrfToken() {
 
 // Cache de token CSRF em memória (Issue #135 - suporte a HttpOnly)
 // Issue #258: Adiciona TTL para evitar token stale
-let cachedCsrfToken = null;
-let csrfTokenTimestamp = null;
+let cachedCsrfToken: string | null = null;
+let csrfTokenTimestamp: number | null = null;
 
 /**
  * Limpa o cache de CSRF token (usar no logout ou em erro 401/403).
  */
-export function clearCsrfCache() {
+export function clearCsrfCache(): void {
   cachedCsrfToken = null;
   csrfTokenTimestamp = null;
 }
 
 /**
  * Verifica se o token CSRF em cache ainda é válido (não expirou).
- * @returns {boolean} true se o token é válido
  */
-function isCsrfTokenValid() {
+function isCsrfTokenValid(): boolean {
   if (!cachedCsrfToken || !csrfTokenTimestamp) {
     return false;
   }
@@ -64,10 +73,8 @@ function isCsrfTokenValid() {
 
 /**
  * Busca um token CSRF fresco do servidor.
- *
- * @returns {Promise<string|null>} CSRF token fresco
  */
-async function fetchFreshCsrfToken() {
+async function fetchFreshCsrfToken(): Promise<string | null> {
   try {
     const response = await fetch(`${API_BASE}/csrf/`, {
       method: 'GET',
@@ -100,17 +107,16 @@ async function fetchFreshCsrfToken() {
  * 1. Tenta ler do cookie (retrocompatibilidade se HttpOnly=False)
  * 2. Se não conseguir, busca token fresco do servidor
  *
- * @param {boolean} forceRefresh - Se true, ignora cache e busca token fresco
- * @returns {Promise<string|null>} CSRF token
+ * @param forceRefresh - Se true, ignora cache e busca token fresco
  */
-export async function ensureCsrfToken(forceRefresh = false) {
+export async function ensureCsrfToken(forceRefresh: boolean = false): Promise<string | null> {
   // Se forceRefresh, buscar token fresco diretamente
   if (forceRefresh) {
     return await fetchFreshCsrfToken();
   }
 
   // Tentativa 1: Ler do cookie (retrocompatibilidade)
-  let token = getCsrfToken();
+  const token = getCsrfToken();
   if (token) {
     cachedCsrfToken = token;
     csrfTokenTimestamp = Date.now(); // Issue #258: Atualizar timestamp
@@ -132,16 +138,15 @@ export async function ensureCsrfToken(forceRefresh = false) {
  * Issue #135: Usa ensureCsrfToken() para suportar CSRF_COOKIE_HTTPONLY=True
  * Retry automático: Se receber erro CSRF (403 com "CSRF"), busca token fresco e retenta.
  *
- * @param {string} url - URL relativa (ex: '/solicitacoes/') ou absoluta
- * @param {object} options - Opções do fetch (method, body, headers, etc.)
- * @param {boolean} isRetry - Flag interna para evitar loop infinito de retry
- * @returns {Promise<object>} Response JSON
- * @throws {Error} Se request falhar ou CSRF estiver ausente
+ * @param url - URL relativa (ex: '/solicitacoes/') ou absoluta
+ * @param options - Opções do fetch (method, body, headers, etc.)
+ * @param isRetry - Flag interna para evitar loop infinito de retry
+ * @throws Error Se request falhar ou CSRF estiver ausente
  */
-export async function fetchAPI(url, options = {}, isRetry = false) {
+export async function fetchAPI<T = unknown>(url: string, options: FetchOptions = {}, isRetry: boolean = false): Promise<T> {
   const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
 
-  const headers = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...options.headers,
   };
@@ -194,7 +199,7 @@ export async function fetchAPI(url, options = {}, isRetry = false) {
     logger.error('StatusText:', response.statusText);
     logger.error('Response body:', errorBody);
 
-    let error;
+    let error: { detail?: string; message?: string };
     try {
       error = JSON.parse(errorBody);
     } catch {
@@ -214,7 +219,7 @@ export async function fetchAPI(url, options = {}, isRetry = false) {
  * antes de qualquer interação do usuário. Isso evita race conditions
  * onde o usuário tenta fazer login antes do token estar pronto.
  */
-export async function initCsrfToken() {
+export async function initCsrfToken(): Promise<void> {
   try {
     await ensureCsrfToken();
     logger.debug('CSRF token inicializado com sucesso');
@@ -230,20 +235,19 @@ initCsrfToken();
 /**
  * Helper para construir URL com query params.
  *
- * @param {string} path - Caminho relativo (ex: '/solicitacoes/')
- * @param {object} params - Objeto com query params
- * @returns {string} URL completa com params
+ * @param path - Caminho relativo (ex: '/solicitacoes/')
+ * @param params - Objeto com query params
  *
  * @example
  * buildUrl('/solicitacoes/', { status: 'pendente', q: 'sobral' })
  * // => '/api/solicitacoes/?status=pendente&q=sobral'
  */
-export function buildUrl(path, params = {}) {
+export function buildUrl(path: string, params: QueryParams = {}): string {
   const searchParams = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
     if (value !== null && value !== undefined && value !== '') {
-      searchParams.append(key, value);
+      searchParams.append(key, String(value));
     }
   });
 

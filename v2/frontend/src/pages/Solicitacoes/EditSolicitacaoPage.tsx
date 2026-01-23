@@ -9,7 +9,7 @@
  * - Não é possível editar solicitações reprovadas
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, ChangeEvent, JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 // antd - direct imports for tree-shaking (Issue #424)
 import Form from 'antd/es/form';
@@ -22,6 +22,7 @@ import Typography from 'antd/es/typography';
 import Spin from 'antd/es/spin';
 import Checkbox from 'antd/es/checkbox';
 import Result from 'antd/es/result';
+import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 // icons - direct imports for tree-shaking (Issue #425)
 import ArrowLeftOutlined from '@ant-design/icons/ArrowLeftOutlined';
 import SaveOutlined from '@ant-design/icons/SaveOutlined';
@@ -41,6 +42,7 @@ import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
 import FormadoresPicker from '../../components/FormadoresPicker';
 import logger from '../../utils/logger';
+import type { ID, Solicitacao, GCalStatus, Participation } from '../../types';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -51,18 +53,65 @@ const { Title, Text } = Typography;
 
 const RANGE_TIMEZONE = 'America/Fortaleza';
 
-export default function EditSolicitacaoPage() {
+/** ComboBox value type */
+interface ComboBoxValue {
+  id: ID;
+  label: string;
+  fluxo?: string;
+}
+
+/** Formador type */
+interface FormadorType {
+  id: ID;
+  label: string;
+  email?: string;
+}
+
+/** Form data type */
+interface FormDataType {
+  projeto: ComboBoxValue | null;
+  tipoEvento: ComboBoxValue | null;
+  municipio: ComboBoxValue | null;
+  inicio: string | null;
+  fim: string | null;
+  tipo: string;
+  encontro: string;
+  segmento: string;
+  observacoes: string;
+  local: string;
+  is_online: boolean;
+  formadores: FormadorType[];
+}
+
+/** Range value type */
+interface RangeValueType {
+  date: string;
+  start: string;
+  end: string;
+}
+
+/** API error response type */
+interface ApiErrorResponse {
+  response?: {
+    status?: number;
+    data?: {
+      non_field_errors?: string[];
+    };
+  };
+}
+
+export default function EditSolicitacaoPage(): JSX.Element {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const [form] = Form.useForm();
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [solicitacao, setSolicitacao] = useState(null);
-  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [solicitacao, setSolicitacao] = useState<Solicitacao | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Estado do formulário
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormDataType>({
     projeto: null,
     tipoEvento: null,
     municipio: null,
@@ -79,28 +128,28 @@ export default function EditSolicitacaoPage() {
 
   // Carregar dados da solicitação
   useEffect(() => {
-    const fetchSolicitacao = async () => {
+    const fetchSolicitacao = async (): Promise<void> => {
       try {
         setLoading(true);
-        const data = await getSolicitacao(id);
+        const data = await getSolicitacao(Number(id)) as Solicitacao;
         setSolicitacao(data);
 
         // Extrair formadores das participations
-        const formadores = (data.participations || [])
-          .filter(p => p.role === 'FORMADOR' && p.usuario)
-          .map(p => ({
-            id: p.usuario.id,
-            label: p.usuario.first_name && p.usuario.last_name
-              ? `${p.usuario.first_name} ${p.usuario.last_name}`.trim()
-              : p.usuario.username,
-            email: p.usuario.email,
+        const formadores: FormadorType[] = (data.participations || [])
+          .filter((p: Participation) => p.role === 'FORMADOR' && p.usuario)
+          .map((p: Participation) => ({
+            id: p.usuario!.id,
+            label: p.usuario!.first_name && p.usuario!.last_name
+              ? `${p.usuario!.first_name} ${p.usuario!.last_name}`.trim()
+              : p.usuario!.username,
+            email: p.usuario!.email,
           }));
 
         // Preencher o formData com os dados existentes
         setFormData({
-          projeto: data.projeto ? { id: data.projeto, label: data.projeto_nome } : null,
-          tipoEvento: data.tipo_evento ? { id: data.tipo_evento, label: data.tipo_evento_nome } : null,
-          municipio: data.municipio ? { id: data.municipio, label: data.municipio_nome } : null,
+          projeto: data.projeto ? { id: data.projeto, label: data.projeto_nome || '' } : null,
+          tipoEvento: data.tipo_evento ? { id: data.tipo_evento, label: data.tipo_evento_nome || '' } : null,
+          municipio: data.municipio ? { id: data.municipio, label: data.municipio_nome || '' } : null,
           inicio: data.inicio,
           fim: data.fim,
           tipo: data.tipo || '',
@@ -123,9 +172,10 @@ export default function EditSolicitacaoPage() {
         });
       } catch (err) {
         logger.error('Erro ao carregar solicitação:', err);
-        if (err.response?.status === 404) {
+        const apiErr = err as ApiErrorResponse;
+        if (apiErr.response?.status === 404) {
           setError('Solicitação não encontrada.');
-        } else if (err.response?.status === 403) {
+        } else if (apiErr.response?.status === 403) {
           setError('Você não tem permissão para editar esta solicitação.');
         } else {
           setError('Erro ao carregar solicitação. Tente novamente.');
@@ -141,7 +191,7 @@ export default function EditSolicitacaoPage() {
   }, [id, form]);
 
   // Handler para DateTimeRange (Issue #428)
-  const handleRangeChange = useCallback((range) => {
+  const handleRangeChange = useCallback((range: RangeValueType | null): void => {
     if (!range || !range.date || !range.start || !range.end) {
       setFormData(prev => ({ ...prev, inicio: null, fim: null }));
       return;
@@ -166,7 +216,7 @@ export default function EditSolicitacaoPage() {
   }, []);
 
   // Derivar rangeValue memoizado (Issue #428)
-  const rangeValue = useMemo(() => {
+  const rangeValue = useMemo((): RangeValueType => {
     if (!formData.inicio || !formData.fim) {
       return { date: '', start: '', end: '' };
     }
@@ -178,7 +228,7 @@ export default function EditSolicitacaoPage() {
   }, [formData.inicio, formData.fim]);
 
   // Submit
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<void> => {
     setSaving(true);
     try {
       // Validações
@@ -232,16 +282,17 @@ export default function EditSolicitacaoPage() {
         },
       };
 
-      await updateSolicitacao(id, payload);
+      await updateSolicitacao(Number(id), payload);
       message.success('Solicitação atualizada com sucesso!');
       navigate('/solicitacoes/minhas');
     } catch (err) {
       logger.error('Erro ao atualizar solicitação:', err);
+      const apiErr = err as ApiErrorResponse;
 
       // Tratar erros específicos do backend
-      if (err.response?.data?.non_field_errors) {
-        message.error(err.response.data.non_field_errors[0]);
-      } else if (err.response?.status === 403) {
+      if (apiErr.response?.data?.non_field_errors) {
+        message.error(apiErr.response.data.non_field_errors[0]);
+      } else if (apiErr.response?.status === 403) {
         message.error('Você não tem permissão para editar esta solicitação.');
       } else {
         message.error('Erro ao atualizar solicitação. Verifique os dados e tente novamente.');
@@ -278,7 +329,7 @@ export default function EditSolicitacaoPage() {
   }
 
   // Verificar se pode editar
-  const isPublished = solicitacao?.gcal_status === 'PUBLISHED';
+  const isPublished = solicitacao?.gcal_status === ('PUBLISHED' as GCalStatus);
   const isRejected = solicitacao?.status === 'reprovado';
   const canEdit = !isPublished && !isRejected;
 
@@ -323,7 +374,7 @@ export default function EditSolicitacaoPage() {
         <Title level={2} className="mb-2">Editar Solicitação #{id}</Title>
         <Text type="secondary">
           Status: <strong>{solicitacao?.status}</strong>
-          {solicitacao?.gcal_status && solicitacao.gcal_status !== 'NONE' && (
+          {solicitacao?.gcal_status && solicitacao.gcal_status !== ('NOT_SYNCED' as GCalStatus) && (
             <> | GCal: <strong>{solicitacao.gcal_status}</strong></>
           )}
         </Text>
@@ -342,9 +393,9 @@ export default function EditSolicitacaoPage() {
             rules={[{ required: true, message: 'Por favor selecione um projeto' }]}
           >
             <ComboBox
-              lookupFunction={lookupProjetos}
-              onChange={(value) => setFormData({ ...formData, projeto: value })}
-              value={formData.projeto}
+              lookupFunction={lookupProjetos as unknown as (query: string) => Promise<Array<{ id: ID; label: string; [key: string]: unknown }>>}
+              onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, projeto: value })}
+              value={formData.projeto as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um projeto"
             />
           </Form.Item>
@@ -354,9 +405,9 @@ export default function EditSolicitacaoPage() {
             rules={[{ required: true, message: 'Por favor selecione um tipo de evento' }]}
           >
             <ComboBox
-              lookupFunction={lookupTiposEvento}
-              onChange={(value) => setFormData({ ...formData, tipoEvento: value })}
-              value={formData.tipoEvento}
+              lookupFunction={lookupTiposEvento as unknown as (query: string) => Promise<Array<{ id: ID; label: string; [key: string]: unknown }>>}
+              onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, tipoEvento: value })}
+              value={formData.tipoEvento as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um tipo de evento"
             />
           </Form.Item>
@@ -366,9 +417,9 @@ export default function EditSolicitacaoPage() {
             rules={[{ required: true, message: 'Por favor selecione um município' }]}
           >
             <ComboBox
-              lookupFunction={lookupMunicipios}
-              onChange={(value) => setFormData({ ...formData, municipio: value })}
-              value={formData.municipio}
+              lookupFunction={lookupMunicipios as unknown as (query: string) => Promise<Array<{ id: ID; label: string; [key: string]: unknown }>>}
+              onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, municipio: value })}
+              value={formData.municipio as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um município"
             />
           </Form.Item>
@@ -378,17 +429,14 @@ export default function EditSolicitacaoPage() {
             rules={[{ required: true, message: 'Por favor selecione pelo menos um formador' }]}
           >
             <FormadoresPicker
-              value={formData.formadores}
-              onChange={(value) => setFormData({ ...formData, formadores: value })}
+              value={formData.formadores as unknown as Array<{ id: ID; email: string; label: string; name?: string }>}
+              onChange={(value: FormadorType[]) => setFormData({ ...formData, formadores: value })}
             />
           </Form.Item>
 
           <DateTimeRange
-            labelStart="Data/Hora Início"
-            labelEnd="Data/Hora Fim"
-            required
             value={rangeValue}
-            onChange={handleRangeChange}
+            onChange={handleRangeChange as unknown as (value: { date?: string | null; start?: string | null; end?: string | null }) => void}
           />
 
           <Form.Item
@@ -399,7 +447,7 @@ export default function EditSolicitacaoPage() {
             <Input
               placeholder="Ex: evento, reunião"
               value={formData.tipo}
-              onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, tipo: e.target.value })}
             />
           </Form.Item>
 
@@ -411,7 +459,7 @@ export default function EditSolicitacaoPage() {
             <Input
               placeholder="Ex: Encontro 1"
               value={formData.encontro}
-              onChange={(e) => setFormData({ ...formData, encontro: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, encontro: e.target.value })}
             />
           </Form.Item>
 
@@ -423,7 +471,7 @@ export default function EditSolicitacaoPage() {
             <Input
               placeholder="Ex: Fundamental I, Fundamental II"
               value={formData.segmento}
-              onChange={(e) => setFormData({ ...formData, segmento: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, segmento: e.target.value })}
             />
           </Form.Item>
 
@@ -435,7 +483,7 @@ export default function EditSolicitacaoPage() {
             <Input
               placeholder="Ex: Escola Municipal X, Sala 5 / Secretaria de Educação"
               value={formData.local}
-              onChange={(e) => setFormData({ ...formData, local: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, local: e.target.value })}
             />
           </Form.Item>
 
@@ -447,14 +495,14 @@ export default function EditSolicitacaoPage() {
               rows={4}
               placeholder="Observações adicionais sobre o evento"
               value={formData.observacoes}
-              onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, observacoes: e.target.value })}
             />
           </Form.Item>
 
           <Form.Item name="is_online" valuePropName="checked">
             <Checkbox
               checked={formData.is_online}
-              onChange={(e) => setFormData({ ...formData, is_online: e.target.checked })}
+              onChange={(e: CheckboxChangeEvent) => setFormData({ ...formData, is_online: e.target.checked })}
             >
               Evento online (Google Meet)
             </Checkbox>
@@ -465,7 +513,7 @@ export default function EditSolicitacaoPage() {
             description={
               formData.is_online
                 ? 'Link do Google Meet será gerado automaticamente após publicação do evento no calendário.'
-                : 'Evento presencial — nenhum link de reunião será gerado.'
+                : 'Evento presencial - nenhum link de reunião será gerado.'
             }
             type={formData.is_online ? 'info' : 'warning'}
             showIcon

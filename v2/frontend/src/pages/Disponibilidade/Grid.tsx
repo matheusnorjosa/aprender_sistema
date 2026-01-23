@@ -8,14 +8,47 @@
  * - Células: barras coloridas mostrando eventos/bloqueios
  */
 
+import type { JSX } from 'react';
 import { CODE_LABEL } from './codes';
+import type { ID } from '../../types';
+
+/** Code type for grid cells */
+type CellCode = 'E' | '2' | 'P' | 'T' | 'X' | 'D' | 'D1' | '';
+
+/** Person type in the grid */
+export interface GridPersonType {
+  id: ID;
+  name: string;
+  ch_month?: number;
+}
+
+/** Selected cell type */
+export interface SelectedCellType {
+  rowIdx: number;
+  dayIdx: number;
+}
+
+/** Details index type */
+export type DetailsIndexType = Record<string, unknown[]>;
+
+interface GridProps {
+  year: number;
+  month: number;
+  title: string;
+  days: number[];
+  people: GridPersonType[];
+  cells: CellCode[][];
+  detailsIndex: DetailsIndexType;
+  onSelect: (rowIdx: number, dayIdx: number) => void;
+  selected: SelectedCellType | null;
+}
 
 /**
  * Mapeamento de códigos para cores (barras horizontais).
  */
-const CODE_COLOR = {
+const CODE_COLOR: Record<CellCode, string> = {
   E: 'bg-green-500',      // 1 evento - verde
-  '2': 'bg-green-600',    // ≥2 eventos - verde escuro
+  '2': 'bg-green-600',    // >=2 eventos - verde escuro
   P: 'bg-cyan-500',       // Bloqueio parcial - ciano
   T: 'bg-purple-600',     // Bloqueio total - roxo
   X: 'bg-red-500',        // Evento + bloqueio - vermelho (conflito)
@@ -27,7 +60,7 @@ const CODE_COLOR = {
 /**
  * Verifica se um dia é hoje.
  */
-const isToday = (year, month, day) => {
+const isToday = (year: number, month: number, day: number): boolean => {
   const t = new Date();
   return (
     t.getFullYear() === year &&
@@ -46,7 +79,7 @@ export default function Grid({
   detailsIndex,
   onSelect,
   selected,
-}) {
+}: GridProps): JSX.Element {
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
       {/* Título da grade */}
@@ -97,7 +130,7 @@ export default function Grid({
                 {days.map((day, dayIdx) => {
                   const code = cells[rowIdx][dayIdx];
                   const key = `${rowIdx}:${dayIdx}`;
-                  const hasDetails = detailsIndex[key]?.length > 0;
+                  const hasDetails = (detailsIndex[key] as unknown[] | undefined)?.length ?? 0 > 0;
                   const sel = selected?.rowIdx === rowIdx && selected?.dayIdx === dayIdx;
                   const today = isToday(year, month, day);
                   const conflict = code === 'X';
@@ -116,7 +149,7 @@ export default function Grid({
                       {code && (
                         <button
                           type="button"
-                          title={CODE_LABEL[code] || code}
+                          title={CODE_LABEL[code as keyof typeof CODE_LABEL] || code}
                           onClick={() => hasDetails && onSelect(rowIdx, dayIdx)}
                           className={`
                             w-10 h-7 rounded flex items-center justify-center

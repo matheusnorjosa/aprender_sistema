@@ -8,7 +8,7 @@
  * - Botão para criar nova solicitação
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, ChangeEvent, JSX } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 // antd - direct imports for tree-shaking (Issue #424)
 import Table from 'antd/es/table';
@@ -22,6 +22,7 @@ import Typography from 'antd/es/typography';
 import message from 'antd/es/message';
 import Tooltip from 'antd/es/tooltip';
 import Popconfirm from 'antd/es/popconfirm';
+import type { ColumnsType } from 'antd/es/table';
 // icons - direct imports for tree-shaking (Issue #425)
 import PlusOutlined from '@ant-design/icons/PlusOutlined';
 import SearchOutlined from '@ant-design/icons/SearchOutlined';
@@ -31,42 +32,79 @@ import dayjs from 'dayjs';
 
 import { listSolicitacoes, deleteSolicitacao } from '../../api/solicitacoes';
 import { MeetLink } from '../../components/MeetLink';
+import type { ID, Solicitacao, SolicitacaoStatus, FluxoType, GCalStatus, Participation, PaginatedResponse } from '../../types';
 
 const { Title } = Typography;
 
-const STATUS_COLORS = {
+/** Status colors */
+const STATUS_COLORS: Record<SolicitacaoStatus, string> = {
   pendente: 'orange',
   aprovado: 'green',
   reprovado: 'red',
 };
 
-const STATUS_LABELS = {
+/** Status labels */
+const STATUS_LABELS: Record<SolicitacaoStatus, string> = {
   pendente: 'Pendente',
   aprovado: 'Aprovado',
   reprovado: 'Reprovado',
 };
 
-export default function MySolicitacoesPage() {
+/** Municipio nested type */
+interface MunicipioNested {
+  nome?: string;
+}
+
+/** Projeto nested type */
+interface ProjetoNested {
+  nome?: string;
+}
+
+/** TipoEvento nested type */
+interface TipoEventoNested {
+  nome?: string;
+}
+
+/** Extended solicitacao with nested objects */
+interface SolicitacaoExtended extends Omit<Solicitacao, 'municipio' | 'projeto' | 'tipo_evento'> {
+  municipio?: MunicipioNested | number | null;
+  projeto?: ProjetoNested | number | null;
+  tipo_evento?: TipoEventoNested | number | null;
+}
+
+/** API error response type */
+interface ApiErrorResponse {
+  response?: {
+    data?: {
+      detail?: string;
+    };
+  };
+  message?: string;
+}
+
+export default function MySolicitacoesPage(): JSX.Element {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [rows, setRows] = useState<SolicitacaoExtended[]>([]);
+  const [total, setTotal] = useState<number>(0);
 
-  const [statusFilter, setStatusFilter] = useState(''); // '' = Todas
-  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | ''>(''); // '' = Todas
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
-      const filters = { mine: 'true' };
+      const filters: Record<string, string> = { mine: 'true' };
       if (statusFilter) filters.status = statusFilter;
       if (searchTerm) filters.q = searchTerm;
 
-      const data = await listSolicitacoes(filters);
-      setRows(data.results || data); // Paginated or direct array
-      setTotal(data.count || data.length);
+      const data = await listSolicitacoes(filters) as PaginatedResponse<SolicitacaoExtended> | SolicitacaoExtended[];
+      const results = 'results' in data ? data.results : data;
+      const count = 'count' in data ? data.count : (data as SolicitacaoExtended[]).length;
+      setRows(results || []);
+      setTotal(count || 0);
     } catch (error) {
-      message.error('Erro ao carregar solicitações: ' + error.message);
+      message.error('Erro ao carregar solicitações: ' + (error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -76,56 +114,72 @@ export default function MySolicitacoesPage() {
     loadData();
   }, [loadData]);
 
-  const handleDelete = useCallback(async (id) => {
+  const handleDelete = useCallback(async (id: ID): Promise<void> => {
     try {
       await deleteSolicitacao(id);
       message.success('Solicitação excluída com sucesso!');
       loadData();
     } catch (error) {
-      if (error.response?.data?.detail) {
-        message.error(error.response.data.detail);
+      const apiErr = error as ApiErrorResponse;
+      if (apiErr.response?.data?.detail) {
+        message.error(apiErr.response.data.detail);
       } else {
-        message.error('Erro ao excluir solicitação: ' + error.message);
+        message.error('Erro ao excluir solicitação: ' + (error as Error).message);
       }
     }
   }, [loadData]);
 
   // Colunas memoizadas (Issue #427)
-  const columns = useMemo(() => [
+  const columns: ColumnsType<SolicitacaoExtended> = useMemo(() => [
     {
       title: 'Data/Hora',
       dataIndex: 'inicio',
       key: 'inicio',
-      render: (inicio) => dayjs(inicio).format('DD/MM/YYYY HH:mm'),
+      render: (inicio: string) => dayjs(inicio).format('DD/MM/YYYY HH:mm'),
       width: 150,
     },
     {
       title: 'Município',
       dataIndex: 'municipio',
       key: 'municipio',
-      render: (municipio) => municipio?.nome || '-',
+      render: (municipio: MunicipioNested | ID | null) => {
+        if (municipio && typeof municipio === 'object' && 'nome' in municipio) {
+          return municipio.nome || '-';
+        }
+        return '-';
+      },
     },
     {
       title: 'Projeto',
       dataIndex: 'projeto',
       key: 'projeto',
-      render: (projeto) => projeto?.nome || '-',
+      render: (projeto: ProjetoNested | ID | null) => {
+        if (projeto && typeof projeto === 'object' && 'nome' in projeto) {
+          return projeto.nome || '-';
+        }
+        return '-';
+      },
     },
     {
       title: 'Tipo',
       dataIndex: 'tipo_evento',
       key: 'tipo_evento',
-      render: (tipo) => tipo?.nome || '-',
+      render: (tipo: TipoEventoNested | ID | null) => {
+        if (tipo && typeof tipo === 'object' && 'nome' in tipo) {
+          return tipo.nome || '-';
+        }
+        return '-';
+      },
     },
     {
       title: 'Formadores',
       dataIndex: 'participations',
       key: 'formadores',
-      render: (participations) => {
+      render: (participations: Participation[] | undefined) => {
         if (!participations || !Array.isArray(participations)) return '-';
         const formadores = participations
           .filter(p => p.role === 'FORMADOR' && p.usuario)
-          .map(p => p.usuario.first_name || p.usuario.username);
+          .map(p => p.usuario!.first_name || p.usuario!.username);
         return formadores.length > 0 ? formadores.join(', ') : '-';
       },
       ellipsis: true,
@@ -134,7 +188,7 @@ export default function MySolicitacoesPage() {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => (
+      render: (status: SolicitacaoStatus) => (
         <Tag color={STATUS_COLORS[status]}>{STATUS_LABELS[status] || status}</Tag>
       ),
       width: 120,
@@ -143,7 +197,7 @@ export default function MySolicitacoesPage() {
       title: 'Reunião',
       dataIndex: 'meet_link',
       key: 'meet_link',
-      render: (meet_link) => <MeetLink href={meet_link} />,
+      render: (meet_link: string | null) => <MeetLink href={meet_link} />,
       width: 150,
     },
     {
@@ -152,12 +206,12 @@ export default function MySolicitacoesPage() {
       width: 120,
       render: (_, record) => {
         // Pode editar se não estiver publicado no GCal e não estiver reprovado
-        const canEdit = record.gcal_status !== 'PUBLISHED' && record.status !== 'reprovado';
+        const canEdit = record.gcal_status !== ('PUBLISHED' as GCalStatus) && record.status !== 'reprovado';
         // Pode excluir conforme regras por fluxo:
         // - SUPER: só se pendente E não publicado no GCal
         // - NAO_SUPER: se não publicado no GCal (independente do status)
-        const isPublished = record.gcal_status === 'PUBLISHED';
-        const isSuper = record.fluxo === 'SUPER';
+        const isPublished = record.gcal_status === ('PUBLISHED' as GCalStatus);
+        const isSuper = record.fluxo === ('SUPER' as FluxoType);
         const canDelete = !isPublished && (!isSuper || record.status === 'pendente');
 
         return (
@@ -241,7 +295,7 @@ export default function MySolicitacoesPage() {
             <Input.Search
               placeholder="Buscar por município, projeto..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
               onSearch={loadData}
               enterButton={<SearchOutlined />}
               style={{ width: 300 }}

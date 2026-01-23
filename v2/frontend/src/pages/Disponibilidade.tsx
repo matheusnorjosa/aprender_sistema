@@ -7,26 +7,27 @@
  * - Excluir bloqueios com status 'pendente'
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, JSX } from 'react';
 import { Card, Row, Col, message, Spin } from 'antd';
 import BlockForm from '../components/BlockForm';
 import MyBlocksTable from '../components/MyBlocksTable';
 import { getBlocks, createBlock as apiCreateBlock, deleteBlock as apiDeleteBlock } from '../api/availability';
+import type { ID, AvailabilityBlock, AvailabilityBlockPayload } from '../types';
 
-export default function Disponibilidade() {
-  const [blocks, setBlocks] = useState([]);
-  const [loading, setLoading] = useState(false);
+export default function Disponibilidade(): JSX.Element {
+  const [blocks, setBlocks] = useState<AvailabilityBlock[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
 
   /**
    * Carrega lista de bloqueios do usuário atual.
    */
-  const fetchBlocks = async () => {
+  const fetchBlocks = async (): Promise<void> => {
     setLoading(true);
     try {
       const data = await getBlocks({ owner: 'me' });
-      setBlocks(data);
+      setBlocks(data as AvailabilityBlock[]);
     } catch (error) {
-      message.error(`Erro ao carregar bloqueios: ${error.message}`);
+      message.error(`Erro ao carregar bloqueios: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -34,32 +35,28 @@ export default function Disponibilidade() {
 
   /**
    * Handler para criação de novo bloqueio.
-   *
-   * @param {object} data - Dados do bloqueio a criar
    */
-  const handleCreate = async (data) => {
+  const handleCreate = async (data: AvailabilityBlockPayload): Promise<void> => {
     try {
       await apiCreateBlock(data);
       message.success('Bloqueio criado com sucesso!');
       await fetchBlocks(); // Recarregar lista
     } catch (error) {
-      message.error(`Erro ao criar bloqueio: ${error.message}`);
+      message.error(`Erro ao criar bloqueio: ${(error as Error).message}`);
       throw error; // Propagar erro para o form
     }
   };
 
   /**
    * Handler para exclusão de bloqueio.
-   *
-   * @param {number} id - ID do bloqueio a excluir
    */
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: ID): Promise<void> => {
     try {
       await apiDeleteBlock(id);
       message.success('Bloqueio removido com sucesso!');
       await fetchBlocks(); // Recarregar lista
     } catch (error) {
-      message.error(`Erro ao remover bloqueio: ${error.message}`);
+      message.error(`Erro ao remover bloqueio: ${(error as Error).message}`);
     }
   };
 
@@ -79,7 +76,7 @@ export default function Disponibilidade() {
         {/* Card de Criação */}
         <Col xs={24} lg={12}>
           <Card title="Criar Bloqueio" bordered={false}>
-            <BlockForm onSubmit={handleCreate} />
+            <BlockForm onSubmit={handleCreate as unknown as (payload: { tipo: string; inicio: string; fim: string }) => Promise<void>} />
           </Card>
         </Col>
 
@@ -91,7 +88,7 @@ export default function Disponibilidade() {
                 <Spin size="large" tip="Carregando bloqueios..." />
               </div>
             ) : (
-              <MyBlocksTable blocks={blocks} onDelete={handleDelete} loading={loading} />
+              <MyBlocksTable blocks={blocks as unknown as Array<{ id: number; tipo: 'T' | 'P'; inicio: string; fim: string; status: 'pendente' | 'aprovado' | 'reprovado' }>} onDelete={handleDelete} loading={loading} />
             )}
           </Card>
         </Col>

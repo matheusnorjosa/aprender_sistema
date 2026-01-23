@@ -13,7 +13,7 @@
  * - Conformidade ISO 9241-110: Controle explícito (usuário vê apenas ações permitidas)
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, ChangeEvent, Key, JSX } from 'react';
 import {
   Table,
   Card,
@@ -30,6 +30,8 @@ import {
   List,
   Avatar,
 } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import type { TableRowSelection } from 'antd/es/table/interface';
 import {
   CalendarOutlined,
   EnvironmentOutlined,
@@ -51,49 +53,71 @@ import {
 } from '../../api/solicitacoes';
 import { getMe } from '../../api/availability';
 import logger from '../../utils/logger';
+import type { ID, Solicitacao, SolicitacaoStatus, CurrentUser, PaginatedResponse, Participation, BatchOperationResult } from '../../types';
 
 const { Title, Paragraph, Text } = Typography;
 
-const STATUS_COLORS = {
+/** Status colors */
+const STATUS_COLORS: Record<SolicitacaoStatus, string> = {
   pendente: 'orange',
   aprovado: 'green',
   reprovado: 'red',
 };
 
-const STATUS_LABELS = {
+/** Status labels */
+const STATUS_LABELS: Record<SolicitacaoStatus, string> = {
   pendente: 'Pendente',
   aprovado: 'Aprovado',
   reprovado: 'Reprovado',
 };
 
-export default function ApprovalsPage() {
-  const [loading, setLoading] = useState(false);
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
+/** Preview data type */
+interface PreviewDataType {
+  preview: {
+    payload?: {
+      summary?: string;
+      start?: { dateTime?: string };
+      end?: { dateTime?: string };
+      location?: string;
+      description?: string;
+      attendees?: Array<{ email: string }>;
+    };
+    event_id?: string;
+    payload_hash?: string;
+    meet_link?: string;
+  };
+}
 
-  const [statusFilter, setStatusFilter] = useState('pendente');
-  const [searchTerm, setSearchTerm] = useState('');
+export default function ApprovalsPage(): JSX.Element {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [rows, setRows] = useState<Solicitacao[]>([]);
+  const [total, setTotal] = useState<number>(0);
 
-  const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewData, setPreviewData] = useState(null);
+  const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | string>('pendente');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+
+  const [previewVisible, setPreviewVisible] = useState<boolean>(false);
+  const [previewData, setPreviewData] = useState<PreviewDataType | null>(null);
 
   // PA-06: Estado para verificar permissão do usuário (Superintendência, DAT, Superusuários)
-  const [canApprove, setCanApprove] = useState(false);
+  const [canApprove, setCanApprove] = useState<boolean>(false);
 
   // Estados para seleção em lote
-  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-  const [batchLoading, setBatchLoading] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
+  const [batchLoading, setBatchLoading] = useState<boolean>(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
-      const filters = { flow: 'SUPER', status: statusFilter || 'pendente', q: searchTerm };
+      const filters = { flow: 'SUPER' as const, status: statusFilter || 'pendente', q: searchTerm };
 
-      const data = await listSolicitacoes(filters);
-      setRows(data.results || data);
-      setTotal(data.count || data.length);
+      const data = await listSolicitacoes(filters as unknown as Record<string, string>) as PaginatedResponse<Solicitacao> | Solicitacao[];
+      const results = 'results' in data ? data.results : data;
+      const count = 'count' in data ? data.count : (data as Solicitacao[]).length;
+      setRows(results || []);
+      setTotal(count || 0);
     } catch (error) {
-      message.error('Erro ao carregar solicitações: ' + error.message);
+      message.error('Erro ao carregar solicitações: ' + (error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -105,9 +129,9 @@ export default function ApprovalsPage() {
 
   // PA-06: Carregar dados do usuário e verificar permissão
   useEffect(() => {
-    const loadUser = async () => {
+    const loadUser = async (): Promise<void> => {
       try {
-        const userData = await getMe();
+        const userData = await getMe() as CurrentUser & { can_approve_super?: boolean };
 
         // Usar can_approve_super da API (Gerente + Superintendência)
         // A API já calcula: is_superuser || (Gerente in funcoes && Superintendência in setores)
@@ -121,17 +145,17 @@ export default function ApprovalsPage() {
   }, []);
 
   // Issue #260: Memoizar handlers para evitar re-renderização desnecessária
-  const handlePreview = useCallback(async (id) => {
+  const handlePreview = useCallback(async (id: ID): Promise<void> => {
     try {
-      const data = await previewSolicitacao(id);
+      const data = await previewSolicitacao(id) as unknown as PreviewDataType;
       setPreviewData(data);
       setPreviewVisible(true);
     } catch (error) {
-      message.error('Erro ao visualizar payload: ' + error.message);
+      message.error('Erro ao visualizar payload: ' + (error as Error).message);
     }
   }, []);
 
-  const handleApprove = useCallback((id) => {
+  const handleApprove = useCallback((id: ID): void => {
     Modal.confirm({
       title: 'Confirmar Aprovação',
       content: 'Deseja aprovar esta solicitação?',
@@ -144,13 +168,13 @@ export default function ApprovalsPage() {
           message.success('Solicitação aprovada com sucesso!');
           loadData();
         } catch (error) {
-          message.error('Erro ao aprovar: ' + error.message);
+          message.error('Erro ao aprovar: ' + (error as Error).message);
         }
       },
     });
   }, [loadData]);
 
-  const handleReject = useCallback((id) => {
+  const handleReject = useCallback((id: ID): void => {
     Modal.confirm({
       title: 'Confirmar Reprovação',
       content: 'Deseja reprovar esta solicitação?',
@@ -163,14 +187,14 @@ export default function ApprovalsPage() {
           message.success('Solicitação reprovada.');
           loadData();
         } catch (error) {
-          message.error('Erro ao reprovar: ' + error.message);
+          message.error('Erro ao reprovar: ' + (error as Error).message);
         }
       },
     });
   }, [loadData]);
 
   // Handlers de operações em lote
-  const handleBatchApprove = () => {
+  const handleBatchApprove = (): void => {
     Modal.confirm({
       title: `Aprovar ${selectedRowKeys.length} solicitação(ões)?`,
       content: 'Esta ação não pode ser desfeita.',
@@ -180,9 +204,9 @@ export default function ApprovalsPage() {
       onOk: async () => {
         try {
           setBatchLoading(true);
-          const result = await approveSolicitacoesBatch(selectedRowKeys);
+          const result = await approveSolicitacoesBatch(selectedRowKeys as ID[]) as BatchOperationResult;
 
-          if (result.approved > 0) {
+          if (result.approved && result.approved > 0) {
             message.success(`${result.approved} solicitação(ões) aprovada(s)!`);
           }
           if (result.errors?.length > 0) {
@@ -192,7 +216,7 @@ export default function ApprovalsPage() {
           setSelectedRowKeys([]);
           loadData();
         } catch (error) {
-          message.error('Erro ao aprovar em lote: ' + error.message);
+          message.error('Erro ao aprovar em lote: ' + (error as Error).message);
         } finally {
           setBatchLoading(false);
         }
@@ -200,7 +224,7 @@ export default function ApprovalsPage() {
     });
   };
 
-  const handleBatchReject = () => {
+  const handleBatchReject = (): void => {
     Modal.confirm({
       title: `Reprovar ${selectedRowKeys.length} solicitação(ões)?`,
       content: 'Esta ação não pode ser desfeita.',
@@ -210,9 +234,9 @@ export default function ApprovalsPage() {
       onOk: async () => {
         try {
           setBatchLoading(true);
-          const result = await rejectSolicitacoesBatch(selectedRowKeys);
+          const result = await rejectSolicitacoesBatch(selectedRowKeys as ID[]) as BatchOperationResult;
 
-          if (result.rejected > 0) {
+          if (result.rejected && result.rejected > 0) {
             message.success(`${result.rejected} solicitação(ões) reprovada(s)!`);
           }
           if (result.errors?.length > 0) {
@@ -222,7 +246,7 @@ export default function ApprovalsPage() {
           setSelectedRowKeys([]);
           loadData();
         } catch (error) {
-          message.error('Erro ao reprovar em lote: ' + error.message);
+          message.error('Erro ao reprovar em lote: ' + (error as Error).message);
         } finally {
           setBatchLoading(false);
         }
@@ -231,10 +255,10 @@ export default function ApprovalsPage() {
   };
 
   // Configuração de seleção de linhas
-  const rowSelection = canApprove ? {
+  const rowSelection: TableRowSelection<Solicitacao> | undefined = canApprove ? {
     selectedRowKeys,
-    onChange: (keys) => setSelectedRowKeys(keys),
-    getCheckboxProps: (record) => ({
+    onChange: (keys: Key[]) => setSelectedRowKeys(keys),
+    getCheckboxProps: (record: Solicitacao) => ({
       disabled: record.status !== 'pendente', // Só permite selecionar pendentes
     }),
     selections: [
@@ -245,7 +269,7 @@ export default function ApprovalsPage() {
   } : undefined;
 
   // Issue #260: Memoizar columns para evitar re-renderização desnecessária da tabela
-  const columns = useMemo(() => [
+  const columns: ColumnsType<Solicitacao> = useMemo(() => [
     {
       title: 'Data/Horário',
       key: 'data_horario',
@@ -263,7 +287,7 @@ export default function ApprovalsPage() {
       title: 'Município',
       dataIndex: 'municipio_nome',
       key: 'municipio_nome',
-      render: (nome) => nome || '-',
+      render: (nome: string | null) => nome || '-',
       width: 130,
       ellipsis: true,
     },
@@ -271,7 +295,7 @@ export default function ApprovalsPage() {
       title: 'Projeto',
       dataIndex: 'projeto_nome',
       key: 'projeto_nome',
-      render: (nome) => nome || '-',
+      render: (nome: string | null) => nome || '-',
       width: 130,
       ellipsis: true,
     },
@@ -292,7 +316,7 @@ export default function ApprovalsPage() {
       title: 'Coordenador',
       dataIndex: 'coordenador_nome',
       key: 'coordenador_nome',
-      render: (nome) => nome || '-',
+      render: (nome: string | null) => nome || '-',
       width: 130,
       ellipsis: true,
     },
@@ -300,12 +324,12 @@ export default function ApprovalsPage() {
       title: 'Formadores',
       dataIndex: 'participations',
       key: 'formadores',
-      render: (participations) => {
+      render: (participations: Participation[] | undefined) => {
         if (!participations || participations.length === 0) return '-';
         const formadores = participations
-          .filter(p => p.role === 'FORMADOR')
-          .map(p => p.usuario?.first_name || p.usuario?.last_name || p.email || 'N/A')
-          .filter(name => name !== 'N/A')
+          .filter((p: Participation) => p.role === 'FORMADOR')
+          .map((p: Participation) => p.usuario?.first_name || p.usuario?.last_name || p.email || 'N/A')
+          .filter((name: string) => name !== 'N/A')
           .join(', ');
         return formadores || '-';
       },
@@ -316,7 +340,7 @@ export default function ApprovalsPage() {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => (
+      render: (status: SolicitacaoStatus) => (
         <Tag color={STATUS_COLORS[status]}>{STATUS_LABELS[status] || status}</Tag>
       ),
       width: 90,
@@ -383,7 +407,7 @@ export default function ApprovalsPage() {
             <Input.Search
               placeholder="Buscar por município, projeto, autor..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
               onSearch={loadData}
               style={{ width: 400 }}
               allowClear

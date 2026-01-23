@@ -9,18 +9,53 @@
  * Design visual atualizado: células maiores, barras coloridas, layout limpo.
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, JSX } from 'react';
 import useMonthlyQuery from './useMonthlyQuery';
 import FiltersBar from './FiltersBar';
 import Legend from './Legend';
 import Grid from './Grid';
 import DetailsDrawer from './DetailsDrawer';
 import { exportMonthlyCsv } from './exportCsv';
+import type { ID } from '../../types';
+import type { PersonType, EventDetailType } from './DetailsDrawer';
+import type { GridPersonType, DetailsIndexType } from './Grid';
 
-export default function MonthlyPage() {
+/** Filters type */
+interface FiltersType {
+  year: number;
+  month: number;
+  gerenciaId: ID | null;
+  sector: string;
+  q: string;
+}
+
+/** Selection type */
+interface SelectionType {
+  role: 'FORMADOR' | 'COORDENADOR';
+  rowIdx: number;
+  dayIdx: number;
+}
+
+/** Monthly query data type */
+interface MonthlyDataType {
+  days: number[];
+  people: GridPersonType[];
+  cells: string[][];
+  details_index: DetailsIndexType;
+  legend?: Record<string, string>;
+}
+
+/** Monthly query result type */
+interface MonthlyQueryResult {
+  data: MonthlyDataType | null;
+  loading: boolean;
+  error: string | null;
+}
+
+export default function MonthlyPage(): JSX.Element {
   // Estado de filtros compartilhados
   const now = new Date();
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<FiltersType>({
     year: now.getFullYear(),
     month: now.getMonth() + 1,
     gerenciaId: null, // null = Superintendência (default)
@@ -29,20 +64,20 @@ export default function MonthlyPage() {
   });
 
   // Queries para ambas as grades
-  const formadores = useMonthlyQuery({ ...filters, role: 'FORMADOR' });
-  const coordenadores = useMonthlyQuery({ ...filters, role: 'COORDENADOR' });
+  const formadores = useMonthlyQuery({ ...filters, role: 'FORMADOR' }) as MonthlyQueryResult;
+  const coordenadores = useMonthlyQuery({ ...filters, role: 'COORDENADOR' }) as MonthlyQueryResult;
 
   // Estado de seleção (sabe de qual grade veio)
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState<SelectionType | null>(null);
 
   /**
    * Handlers de seleção por grade.
    */
-  const onSelectFormador = (rowIdx, dayIdx) => {
+  const onSelectFormador = (rowIdx: number, dayIdx: number): void => {
     setSelected({ role: 'FORMADOR', rowIdx, dayIdx });
   };
 
-  const onSelectCoordenador = (rowIdx, dayIdx) => {
+  const onSelectCoordenador = (rowIdx: number, dayIdx: number): void => {
     setSelected({ role: 'COORDENADOR', rowIdx, dayIdx });
   };
 
@@ -53,29 +88,31 @@ export default function MonthlyPage() {
     ? coordenadores.data
     : formadores.data;
 
-  const details = useMemo(() => {
+  const details = useMemo((): EventDetailType[] => {
     if (!dataset || !selected) return [];
     const key = `${selected.rowIdx}:${selected.dayIdx}`;
-    return dataset.details_index?.[key] ?? [];
+    return (dataset.details_index?.[key] as EventDetailType[] | undefined) ?? [];
   }, [dataset, selected]);
 
   /**
    * Pessoa e dia selecionados.
    */
-  const person = selected && dataset?.people?.[selected.rowIdx];
-  const day = selected && dataset?.days?.[selected.dayIdx];
+  const person: PersonType | null = selected && dataset?.people?.[selected.rowIdx]
+    ? { ...dataset.people[selected.rowIdx] } as PersonType
+    : null;
+  const day: number | null = (selected && dataset?.days?.[selected.dayIdx]) ?? null;
 
   /**
    * Handler de mudança de filtros.
    */
-  const handleFiltersChange = (partial) => {
+  const handleFiltersChange = (partial: Partial<FiltersType>): void => {
     setFilters((prev) => ({ ...prev, ...partial }));
   };
 
   /**
    * Handlers de export CSV.
    */
-  const exportFormadores = () => {
+  const exportFormadores = (): void => {
     if (!formadores.data) return;
     exportMonthlyCsv({
       ...filters,
@@ -86,7 +123,7 @@ export default function MonthlyPage() {
     });
   };
 
-  const exportCoordenadores = () => {
+  const exportCoordenadores = (): void => {
     if (!coordenadores.data) return;
     exportMonthlyCsv({
       ...filters,
@@ -154,7 +191,7 @@ export default function MonthlyPage() {
                     {formadores.error}
                   </p>
                   <p className="text-xs text-red-600 mt-3">
-                    💡 Verifique se o backend está rodando (porta 8002) e se você está autenticado.
+                    Verifique se o backend está rodando (porta 8002) e se você está autenticado.
                   </p>
                 </div>
               ) : formadores.data ? (
@@ -164,7 +201,7 @@ export default function MonthlyPage() {
                   month={filters.month}
                   days={formadores.data.days}
                   people={formadores.data.people}
-                  cells={formadores.data.cells}
+                  cells={formadores.data.cells as ('' | 'E' | '2' | 'P' | 'T' | 'X' | 'D' | 'D1')[][]}
                   detailsIndex={formadores.data.details_index || {}}
                   onSelect={onSelectFormador}
                   selected={
@@ -210,7 +247,7 @@ export default function MonthlyPage() {
                     {coordenadores.error}
                   </p>
                   <p className="text-xs text-red-600 mt-3">
-                    💡 Verifique se o backend está rodando (porta 8002) e se você está autenticado.
+                    Verifique se o backend está rodando (porta 8002) e se você está autenticado.
                   </p>
                 </div>
               ) : coordenadores.data ? (
@@ -220,7 +257,7 @@ export default function MonthlyPage() {
                   month={filters.month}
                   days={coordenadores.data.days}
                   people={coordenadores.data.people}
-                  cells={coordenadores.data.cells}
+                  cells={coordenadores.data.cells as ('' | 'E' | '2' | 'P' | 'T' | 'X' | 'D' | 'D1')[][]}
                   detailsIndex={coordenadores.data.details_index || {}}
                   onSelect={onSelectCoordenador}
                   selected={

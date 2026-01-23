@@ -10,7 +10,7 @@
  * 4. Revisão e Confirmação
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, ChangeEvent, JSX, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 // antd - direct imports for tree-shaking (Issue #424)
 import Steps from 'antd/es/steps';
@@ -24,6 +24,7 @@ import Typography from 'antd/es/typography';
 import Descriptions from 'antd/es/descriptions';
 import Tag from 'antd/es/tag';
 import Checkbox from 'antd/es/checkbox';
+import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 // icons - direct imports for tree-shaking (Issue #425)
 import FileTextOutlined from '@ant-design/icons/FileTextOutlined';
 import TeamOutlined from '@ant-design/icons/TeamOutlined';
@@ -45,6 +46,7 @@ import ComboBox from '../../components/ComboBox';
 import FormadoresPicker from '../../components/FormadoresPicker';
 import CoordenadoresPicker from '../../components/CoordenadoresPicker';
 import logger from '../../utils/logger';
+import type { ID, FluxoType } from '../../types';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -56,15 +58,65 @@ const { Step } = Steps;
 
 const RANGE_TIMEZONE = 'America/Fortaleza';
 
-export default function NewSolicitacaoWizard() {
+/** ComboBox value type */
+interface ComboBoxValue {
+  id: ID;
+  label: string;
+  fluxo?: FluxoType;
+}
+
+/** Formador/Coordenador type */
+interface ParticipantType {
+  id: ID;
+  label?: string;
+  name?: string;
+  email?: string;
+}
+
+/** Form data type */
+interface FormDataType {
+  // Passo 1
+  projeto: ComboBoxValue | null;
+  tipoEvento: ComboBoxValue | null;
+  municipio: ComboBoxValue | null;
+  inicio: string | null;
+  fim: string | null;
+  // Passo 2
+  formadores: ParticipantType[];
+  coordenadores: ParticipantType[];
+  // Passo 3
+  tipo: string;
+  encontro: string;
+  segmento: string;
+  observacoes: string;
+  local: string;
+  // PR19: Modalidade online/presencial
+  is_online: boolean;
+}
+
+/** Range value type */
+interface RangeValueType {
+  date: string;
+  start: string;
+  end: string;
+}
+
+/** Step type */
+interface StepType {
+  title: string;
+  icon: ReactNode;
+  content: ReactNode;
+}
+
+export default function NewSolicitacaoWizard(): JSX.Element {
   const navigate = useNavigate();
   const [form] = Form.useForm();
 
-  const [currentStep, setCurrentStep] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(false);
 
   // Estado do formulário
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormDataType>({
     // Passo 1
     projeto: null,
     tipoEvento: null,
@@ -85,7 +137,7 @@ export default function NewSolicitacaoWizard() {
   });
 
   // Handler para DateTimeRange: converte {date, start, end} para ISO UTC (Issue #428)
-  const handleRangeChange = useCallback((range) => {
+  const handleRangeChange = useCallback((range: RangeValueType | null): void => {
     if (!range || !range.date || !range.start || !range.end) {
       setFormData(prev => ({ ...prev, inicio: null, fim: null }));
       return;
@@ -110,7 +162,7 @@ export default function NewSolicitacaoWizard() {
   }, []);
 
   // Derivar rangeValue memoizado (Issue #428)
-  const rangeValue = useMemo(() => {
+  const rangeValue = useMemo((): RangeValueType => {
     if (!formData.inicio || !formData.fim) {
       return { date: '', start: '', end: '' };
     }
@@ -122,7 +174,7 @@ export default function NewSolicitacaoWizard() {
   }, [formData.inicio, formData.fim]);
 
   // Navegação entre passos
-  const next = () => {
+  const next = (): void => {
     form.validateFields().then(values => {
       setFormData({ ...formData, ...values });
       setCurrentStep(currentStep + 1);
@@ -131,12 +183,12 @@ export default function NewSolicitacaoWizard() {
     });
   };
 
-  const prev = () => {
+  const prev = (): void => {
     setCurrentStep(currentStep - 1);
   };
 
   // Submit final
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<void> => {
     setLoading(true);
     try {
       // Garantir que formadores é um array
@@ -209,7 +261,7 @@ export default function NewSolicitacaoWizard() {
   };
 
   // Passos do wizard memoizados (Issue #426)
-  const steps = useMemo(() => [
+  const steps: StepType[] = useMemo(() => [
     {
       title: 'Informações Básicas',
       icon: <FileTextOutlined />,
@@ -221,9 +273,9 @@ export default function NewSolicitacaoWizard() {
             rules={[{ required: true, message: 'Por favor selecione um projeto' }]}
           >
             <ComboBox
-              lookupFunction={lookupProjetos}
-              onChange={(value) => setFormData({ ...formData, projeto: value })}
-              value={formData.projeto}
+              lookupFunction={lookupProjetos as unknown as (query: string) => Promise<Array<{ id: ID; label: string; [key: string]: unknown }>>}
+              onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, projeto: value })}
+              value={formData.projeto as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um projeto"
             />
           </Form.Item>
@@ -248,9 +300,9 @@ export default function NewSolicitacaoWizard() {
             rules={[{ required: true, message: 'Por favor selecione um tipo de evento' }]}
           >
             <ComboBox
-              lookupFunction={lookupTiposEvento}
-              onChange={(value) => setFormData({ ...formData, tipoEvento: value })}
-              value={formData.tipoEvento}
+              lookupFunction={lookupTiposEvento as unknown as (query: string) => Promise<Array<{ id: ID; label: string; [key: string]: unknown }>>}
+              onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, tipoEvento: value })}
+              value={formData.tipoEvento as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um tipo de evento"
             />
           </Form.Item>
@@ -261,19 +313,16 @@ export default function NewSolicitacaoWizard() {
             rules={[{ required: true, message: 'Por favor selecione um município' }]}
           >
             <ComboBox
-              lookupFunction={lookupMunicipios}
-              onChange={(value) => setFormData({ ...formData, municipio: value })}
-              value={formData.municipio}
+              lookupFunction={lookupMunicipios as unknown as (query: string) => Promise<Array<{ id: ID; label: string; [key: string]: unknown }>>}
+              onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, municipio: value })}
+              value={formData.municipio as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um município"
             />
           </Form.Item>
 
           <DateTimeRange
-            labelStart="Data/Hora Início"
-            labelEnd="Data/Hora Fim"
-            required
             value={rangeValue}
-            onChange={handleRangeChange}
+            onChange={handleRangeChange as unknown as (value: { date?: string | null; start?: string | null; end?: string | null }) => void}
           />
         </>
       ),
@@ -297,8 +346,8 @@ export default function NewSolicitacaoWizard() {
             rules={[{ required: true, message: 'Por favor selecione pelo menos um formador' }]}
           >
             <FormadoresPicker
-              value={formData.formadores}
-              onChange={(value) => setFormData({ ...formData, formadores: value })}
+              value={formData.formadores as unknown as Array<{ id: ID; email: string; label: string; name?: string }>}
+              onChange={(value: ParticipantType[]) => setFormData({ ...formData, formadores: value })}
             />
           </Form.Item>
 
@@ -307,8 +356,8 @@ export default function NewSolicitacaoWizard() {
             name="coordenadores"
           >
             <CoordenadoresPicker
-              value={formData.coordenadores}
-              onChange={(value) => setFormData({ ...formData, coordenadores: value })}
+              value={formData.coordenadores as unknown as Array<{ id: ID; email: string; label: string; name?: string }>}
+              onChange={(value: ParticipantType[]) => setFormData({ ...formData, coordenadores: value })}
             />
           </Form.Item>
 
@@ -340,7 +389,7 @@ export default function NewSolicitacaoWizard() {
             <Input
               placeholder="Ex: evento, reunião"
               value={formData.tipo}
-              onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, tipo: e.target.value })}
             />
           </Form.Item>
 
@@ -352,7 +401,7 @@ export default function NewSolicitacaoWizard() {
             <Input
               placeholder="Ex: Encontro 1"
               value={formData.encontro}
-              onChange={(e) => setFormData({ ...formData, encontro: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, encontro: e.target.value })}
             />
           </Form.Item>
 
@@ -364,7 +413,7 @@ export default function NewSolicitacaoWizard() {
             <Input
               placeholder="Ex: Fundamental I, Fundamental II"
               value={formData.segmento}
-              onChange={(e) => setFormData({ ...formData, segmento: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, segmento: e.target.value })}
             />
           </Form.Item>
 
@@ -376,7 +425,7 @@ export default function NewSolicitacaoWizard() {
             <Input
               placeholder="Ex: Escola Municipal X, Sala 5 / Secretaria de Educação"
               value={formData.local}
-              onChange={(e) => setFormData({ ...formData, local: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, local: e.target.value })}
             />
           </Form.Item>
 
@@ -388,7 +437,7 @@ export default function NewSolicitacaoWizard() {
               rows={4}
               placeholder="Observações adicionais sobre o evento"
               value={formData.observacoes}
-              onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, observacoes: e.target.value })}
             />
           </Form.Item>
 
@@ -396,7 +445,7 @@ export default function NewSolicitacaoWizard() {
           <Form.Item name="is_online" valuePropName="checked">
             <Checkbox
               checked={formData.is_online}
-              onChange={(e) => setFormData({ ...formData, is_online: e.target.checked })}
+              onChange={(e: CheckboxChangeEvent) => setFormData({ ...formData, is_online: e.target.checked })}
             >
               Evento online (Google Meet)
             </Checkbox>
@@ -407,7 +456,7 @@ export default function NewSolicitacaoWizard() {
             description={
               formData.is_online
                 ? 'Link do Google Meet será gerado automaticamente após publicação do evento no calendário.'
-                : 'Evento presencial — nenhum link de reunião será gerado.'
+                : 'Evento presencial - nenhum link de reunião será gerado.'
             }
             type={formData.is_online ? 'info' : 'warning'}
             showIcon

@@ -7,7 +7,7 @@
  * - Vejam detalhes completos de cada solicitação
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, ChangeEvent, JSX } from 'react';
 import {
   Table,
   Tag,
@@ -24,6 +24,7 @@ import {
   Descriptions,
   Alert,
 } from 'antd';
+import type { ColumnsType, TablePaginationConfig, FilterValue, SorterResult } from 'antd/es/table/interface';
 import {
   CheckOutlined,
   CloseOutlined,
@@ -40,61 +41,65 @@ import {
 import { getMe } from '../api/availability';
 import { MeetLink } from '../components/MeetLink';
 import logger from '../utils/logger';
+import type { ID, Solicitacao, SolicitacaoStatus, CurrentUser, PaginatedResponse } from '../types';
 
 const { TextArea } = Input;
 
-/**
- * Mapeia status para cores de tags
- */
-const STATUS_COLORS = {
+/** Status colors mapping */
+const STATUS_COLORS: Record<SolicitacaoStatus, string> = {
   pendente: 'gold',
   aprovado: 'green',
   reprovado: 'red',
 };
 
+/** Form values for rejection */
+interface RejectFormValues {
+  justificativa?: string;
+}
+
 /**
  * Formata data/hora para exibição
  */
-function formatDateTime(dateString) {
+function formatDateTime(dateString: string | null | undefined): string {
   if (!dateString) return '-';
   return dayjs(dateString).format('DD/MM/YYYY HH:mm');
 }
 
-function Solicitacoes() {
+function Solicitacoes(): JSX.Element {
   // Estado da tabela
-  const [solicitacoes, setSolicitacoes] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({
+  const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [pagination, setPagination] = useState<TablePaginationConfig>({
     current: 1,
     pageSize: 10,
     total: 0,
   });
 
   // Filtros
-  const [statusFilter, setStatusFilter] = useState('pendente');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | ''>('pendente');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Drawer de detalhes
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [selectedSolicitacao, setSelectedSolicitacao] = useState(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [drawerVisible, setDrawerVisible] = useState<boolean>(false);
+  const [selectedSolicitacao, setSelectedSolicitacao] = useState<Solicitacao | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
 
   // Modal de reprovação
-  const [rejectModalVisible, setRejectModalVisible] = useState(false);
-  const [rejectForm] = Form.useForm();
-  const [processingAction, setProcessingAction] = useState(false);
+  const [rejectModalVisible, setRejectModalVisible] = useState<boolean>(false);
+  const [rejectForm] = Form.useForm<RejectFormValues>();
+  const [processingAction, setProcessingAction] = useState<boolean>(false);
 
   // Usuário atual
-  const [isSuperintendencia, setIsSuperintendencia] = useState(false);
-  const [loadingUser, setLoadingUser] = useState(true);
+  const [isSuperintendencia, setIsSuperintendencia] = useState<boolean>(false);
+  const [loadingUser, setLoadingUser] = useState<boolean>(true);
 
   /**
    * Busca informações do usuário atual e verifica permissão PA-06
    */
   useEffect(() => {
-    async function fetchCurrentUser() {
+    async function fetchCurrentUser(): Promise<void> {
       try {
-        const user = await getMe();
+        const user = await getMe() as CurrentUser & { is_superintendencia?: boolean };
 
         // PA-06: Verificar se usuário pertence ao grupo "Superintendência" ou é superuser
         const isSuper =
@@ -116,14 +121,14 @@ function Solicitacoes() {
   /**
    * Carrega solicitações com filtros e paginação
    */
-  const fetchSolicitacoes = useCallback(async (page = 1) => {
+  const fetchSolicitacoes = useCallback(async (page = 1): Promise<void> => {
     setLoading(true);
     try {
       const data = await listSolicitacoes({
-        status: statusFilter,
+        status: statusFilter || undefined,
         page,
         search: searchTerm,
-      });
+      }) as PaginatedResponse<Solicitacao>;
 
       setSolicitacoes(data.results || []);
       setPagination({
@@ -132,7 +137,7 @@ function Solicitacoes() {
         total: data.count || 0,
       });
     } catch (error) {
-      message.error(`Erro ao carregar solicitações: ${error.message}`);
+      message.error(`Erro ao carregar solicitações: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -148,21 +153,25 @@ function Solicitacoes() {
   /**
    * Mudança de página
    */
-  const handleTableChange = (newPagination) => {
+  const handleTableChange = (
+    newPagination: TablePaginationConfig,
+    _filters: Record<string, FilterValue | null>,
+    _sorter: SorterResult<Solicitacao> | SorterResult<Solicitacao>[]
+  ): void => {
     fetchSolicitacoes(newPagination.current);
   };
 
   /**
    * Abre drawer com detalhes da solicitação
    */
-  const handleViewDetails = async (record) => {
+  const handleViewDetails = async (record: Solicitacao): Promise<void> => {
     setDrawerVisible(true);
     setLoadingDetails(true);
     try {
-      const details = await getSolicitacao(record.id);
+      const details = await getSolicitacao(record.id) as Solicitacao;
       setSelectedSolicitacao(details);
     } catch (error) {
-      message.error(`Erro ao carregar detalhes: ${error.message}`);
+      message.error(`Erro ao carregar detalhes: ${(error as Error).message}`);
       setDrawerVisible(false);
     } finally {
       setLoadingDetails(false);
@@ -172,7 +181,7 @@ function Solicitacoes() {
   /**
    * Aprova solicitação
    */
-  const handleApprove = async (id) => {
+  const handleApprove = async (id: ID): Promise<void> => {
     Modal.confirm({
       title: 'Confirmar Aprovação',
       content: 'Tem certeza que deseja aprovar esta solicitação?',
@@ -186,7 +195,7 @@ function Solicitacoes() {
           setDrawerVisible(false);
           fetchSolicitacoes(pagination.current);
         } catch (error) {
-          message.error(`Erro ao aprovar: ${error.message}`);
+          message.error(`Erro ao aprovar: ${(error as Error).message}`);
         } finally {
           setProcessingAction(false);
         }
@@ -197,27 +206,25 @@ function Solicitacoes() {
   /**
    * Abre modal de reprovação
    */
-  const handleOpenRejectModal = (id) => {
-    setSelectedSolicitacao({ ...selectedSolicitacao, id });
+  const handleOpenRejectModal = (id: ID): void => {
+    setSelectedSolicitacao({ ...selectedSolicitacao!, id });
     setRejectModalVisible(true);
   };
 
   /**
    * Reprova solicitação com justificativa (opcional)
    */
-  const handleReject = async (values) => {
+  const handleReject = async (values: RejectFormValues): Promise<void> => {
     setProcessingAction(true);
     try {
-      await rejectSolicitacao(selectedSolicitacao.id, {
-        justificativa: values.justificativa || '',
-      });
+      await rejectSolicitacao(selectedSolicitacao!.id, values.justificativa || '');
       message.success('Solicitação reprovada.');
       setRejectModalVisible(false);
       setDrawerVisible(false);
       rejectForm.resetFields();
       fetchSolicitacoes(pagination.current);
     } catch (error) {
-      message.error(`Erro ao reprovar: ${error.message}`);
+      message.error(`Erro ao reprovar: ${(error as Error).message}`);
     } finally {
       setProcessingAction(false);
     }
@@ -226,7 +233,7 @@ function Solicitacoes() {
   /**
    * Colunas da tabela
    */
-  const columns = [
+  const columns: ColumnsType<Solicitacao> = [
     {
       title: 'ID',
       dataIndex: 'id',
@@ -238,37 +245,37 @@ function Solicitacoes() {
       title: 'Usuário',
       dataIndex: 'usuario_username',
       key: 'usuario_username',
-      render: (username) => username || '-',
+      render: (username: string | null) => username || '-',
     },
     {
       title: 'Município',
       dataIndex: 'municipio_nome',
       key: 'municipio_nome',
-      render: (nome) => nome || '-',
+      render: (nome: string | null) => nome || '-',
     },
     {
       title: 'Tipo Evento',
       dataIndex: 'tipo_evento_nome',
       key: 'tipo_evento_nome',
-      render: (nome) => nome || '-',
+      render: (nome: string | null) => nome || '-',
     },
     {
       title: 'Início',
       dataIndex: 'inicio',
       key: 'inicio',
-      render: (text) => formatDateTime(text),
+      render: (text: string) => formatDateTime(text),
     },
     {
       title: 'Fim',
       dataIndex: 'fim',
       key: 'fim',
-      render: (text) => formatDateTime(text),
+      render: (text: string) => formatDateTime(text),
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => (
+      render: (status: SolicitacaoStatus) => (
         <Tag color={STATUS_COLORS[status] || 'default'}>
           {status?.toUpperCase() || 'DESCONHECIDO'}
         </Tag>
@@ -278,7 +285,7 @@ function Solicitacoes() {
         { text: 'Aprovado', value: 'aprovado' },
         { text: 'Reprovado', value: 'reprovado' },
       ],
-      filteredValue: [statusFilter],
+      filteredValue: statusFilter ? [statusFilter] : [],
     },
     {
       title: 'Ações',
@@ -347,7 +354,7 @@ function Solicitacoes() {
             placeholder="Buscar por usuário, município, tipo..."
             prefix={<SearchOutlined />}
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
             style={{ width: 300 }}
             allowClear
           />

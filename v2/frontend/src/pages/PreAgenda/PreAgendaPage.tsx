@@ -9,7 +9,7 @@
  * - Operações em lote (Reapply/Resync) via seleção múltipla
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, ChangeEvent, Key, JSX } from 'react';
 import {
   Table,
   Card,
@@ -31,6 +31,9 @@ import {
   List,
   Avatar,
 } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import type { TableRowSelection } from 'antd/es/table/interface';
+import type { Dayjs } from 'dayjs';
 import {
   EyeOutlined,
   CloudUploadOutlined,
@@ -65,40 +68,77 @@ import useGoogleGuard from '../../hooks/useGoogleGuard';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
 import logger from '../../utils/logger';
 import { ensureCsrfToken } from '../../api/config';
+import type { ID, Solicitacao, GCalStatus, CurrentUser, PaginatedResponse } from '../../types';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
-const GCAL_STATUS_COLORS = {
+/** GCAL status colors */
+const GCAL_STATUS_COLORS: Record<string, string> = {
   NONE: 'default',
   PENDING: 'processing',
   PUBLISHED: 'success',
   ERROR: 'error',
 };
 
-export default function PreAgendaPage() {
-  const [loading, setLoading] = useState(false);
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
+/** Summary type */
+interface SummaryType {
+  counts: Record<string, number>;
+  total: number;
+}
 
-  const [summary, setSummary] = useState({ counts: {}, total: 0 });
+/** Preview data type */
+interface PreviewDataType {
+  preview: {
+    payload?: {
+      summary?: string;
+      start?: { dateTime?: string };
+      end?: { dateTime?: string };
+      location?: string;
+      description?: string;
+      conferenceData?: unknown;
+      attendees?: Array<{ email: string; responseStatus?: string }>;
+    };
+    event_id?: string;
+    payload_hash?: string;
+    meet_link?: string;
+  };
+}
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sectorFilter, setSectorFilter] = useState('');
-  const [dateRange, setDateRange] = useState([null, null]);
+/** Batch response type */
+interface BatchResponseType {
+  queued: number;
+  errors?: Array<{ detail: string }>;
+}
 
-  const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewData, setPreviewData] = useState(null);
+/** Extended current user */
+interface ExtendedCurrentUser extends CurrentUser {
+  is_superintendencia?: boolean;
+}
+
+export default function PreAgendaPage(): JSX.Element {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [rows, setRows] = useState<Solicitacao[]>([]);
+  const [total, setTotal] = useState<number>(0);
+
+  const [summary, setSummary] = useState<SummaryType>({ counts: {}, total: 0 });
+
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [sectorFilter, setSectorFilter] = useState<string>('');
+  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
+
+  const [previewVisible, setPreviewVisible] = useState<boolean>(false);
+  const [previewData, setPreviewData] = useState<PreviewDataType | null>(null);
 
   // Issue #95: Batch operations - Row selection
-  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-  const [batchLoading, setBatchLoading] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
+  const [batchLoading, setBatchLoading] = useState<boolean>(false);
 
   // OAuth Phase 5: Estado do usuário e integração Google
-  const [user, setUser] = useState(null);
-  const { status: googleStatus, loading: _googleLoading, fetchStatus: _fetchStatus, disconnect: googleDisconnect } = useGoogleIntegration();
+  const [user, setUser] = useState<ExtendedCurrentUser | null>(null);
+  const { status: googleStatus, disconnect: googleDisconnect } = useGoogleIntegration();
 
-  // §4 Epic #459: Consolidated Google OAuth guard
+  // Section 4 Epic #459: Consolidated Google OAuth guard
   const { requireGoogleConnection, handleGoogleError } = useGoogleGuard({
     googleStatus,
     returnTo: '/pre-agenda',
@@ -106,9 +146,9 @@ export default function PreAgendaPage() {
 
   // Carregar dados do usuário
   useEffect(() => {
-    const loadUser = async () => {
+    const loadUser = async (): Promise<void> => {
       try {
-        const userData = await getMe();
+        const userData = await getMe() as ExtendedCurrentUser;
         setUser(userData);
       } catch (error) {
         logger.error('Erro ao carregar usuário:', error);
@@ -117,11 +157,11 @@ export default function PreAgendaPage() {
     loadUser();
   }, []);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
 
-      const filters = { status: 'approved' };
+      const filters: Record<string, string> = { status: 'approved' };
       if (searchTerm) filters.q = searchTerm;
       if (sectorFilter) filters.sector = sectorFilter;
       if (dateRange[0]) filters.date_from = dateRange[0].format('YYYY-MM-DD');
@@ -129,19 +169,21 @@ export default function PreAgendaPage() {
 
       // Carregar ambos os fluxos e resumo
       const [superData, naoSuperData, summaryData] = await Promise.all([
-        listSolicitacoes({ ...filters, flow: 'SUPER' }),
-        listSolicitacoes({ ...filters, flow: 'NAO_SUPER' }),
-        getStatusSummary(filters),
+        listSolicitacoes({ ...filters, flow: 'SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
+        listSolicitacoes({ ...filters, flow: 'NAO_SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
+        getStatusSummary(filters) as unknown as Promise<SummaryType>,
       ]);
 
-      const superRows = superData.results || superData;
-      const naoRows = naoSuperData.results || naoSuperData;
+      const superRows = 'results' in superData ? superData.results : superData;
+      const naoRows = 'results' in naoSuperData ? naoSuperData.results : naoSuperData;
+      const superCount = 'count' in superData ? superData.count : (superData as Solicitacao[]).length;
+      const naoCount = 'count' in naoSuperData ? naoSuperData.count : (naoSuperData as Solicitacao[]).length;
 
       setRows([...superRows, ...naoRows]);
-      setTotal((superData.count || superRows.length) + (naoSuperData.count || naoRows.length));
+      setTotal(superCount + naoCount);
       setSummary(summaryData);
     } catch (error) {
-      message.error('Erro ao carregar pré-agenda: ' + error.message);
+      message.error('Erro ao carregar pré-agenda: ' + (error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -152,18 +194,18 @@ export default function PreAgendaPage() {
   }, [loadData]);
 
   // Issue #260: Memoizar handlers para evitar re-renderização desnecessária
-  const handlePreview = useCallback(async (id) => {
+  const handlePreview = useCallback(async (id: ID): Promise<void> => {
     try {
-      const data = await previewSolicitacao(id);
+      const data = await previewSolicitacao(id) as unknown as PreviewDataType;
       setPreviewData(data);
       setPreviewVisible(true);
     } catch (error) {
-      message.error('Erro ao visualizar payload: ' + error.message);
+      message.error('Erro ao visualizar payload: ' + (error as Error).message);
     }
   }, []);
 
-  const handlePublish = useCallback((id) => {
-    // §4 Epic #459: Use consolidated Google guard
+  const handlePublish = useCallback((id: ID): void => {
+    // Section 4 Epic #459: Use consolidated Google guard
     if (!requireGoogleConnection('publicar eventos')) return;
 
     Modal.confirm({
@@ -178,16 +220,16 @@ export default function PreAgendaPage() {
           message.success('Evento publicado com sucesso!');
           loadData();
         } catch (error) {
-          // §4 Epic #459: Use consolidated error handler
+          // Section 4 Epic #459: Use consolidated error handler
           if (handleGoogleError(error)) return;
-          message.error('Erro ao publicar: ' + error.message);
+          message.error('Erro ao publicar: ' + (error as Error).message);
         }
       },
     });
   }, [requireGoogleConnection, handleGoogleError, loadData]);
 
-  const handleResync = useCallback((id) => {
-    // §4 Epic #459: Use consolidated Google guard
+  const handleResync = useCallback((id: ID): void => {
+    // Section 4 Epic #459: Use consolidated Google guard
     if (!requireGoogleConnection('reenviar eventos')) return;
 
     Modal.confirm({
@@ -202,7 +244,7 @@ export default function PreAgendaPage() {
         </div>
       ),
       okText: 'Reenviar',
-      okType: 'warning',
+      okType: 'default',
       cancelText: 'Cancelar',
       onOk: async () => {
         try {
@@ -210,15 +252,15 @@ export default function PreAgendaPage() {
           message.success('Reenvio solicitado! O evento será atualizado em instantes.');
           loadData();
         } catch (error) {
-          // §4 Epic #459: Use consolidated error handler
+          // Section 4 Epic #459: Use consolidated error handler
           if (handleGoogleError(error)) return;
-          message.error('Erro ao reenviar: ' + error.message);
+          message.error('Erro ao reenviar: ' + (error as Error).message);
         }
       },
     });
   }, [requireGoogleConnection, handleGoogleError, loadData]);
 
-  const handleCancel = useCallback((id) => {
+  const handleCancel = useCallback((id: ID): void => {
     Modal.confirm({
       title: 'Confirmar Cancelamento',
       icon: <StopOutlined className="text-red-500" />,
@@ -226,7 +268,7 @@ export default function PreAgendaPage() {
         <div>
           <p>Deseja cancelar este evento no Google Calendar?</p>
           <p className="text-red-500 font-bold text-xs">
-            ⚠️ ATENÇÃO: Esta ação irá deletar permanentemente o evento do Calendar e limpar todos os campos relacionados (event_id, meet_link, etc.).
+            Atenção: Esta ação irá deletar permanentemente o evento do Calendar e limpar todos os campos relacionados (event_id, meet_link, etc.).
           </p>
         </div>
       ),
@@ -239,15 +281,15 @@ export default function PreAgendaPage() {
           message.success('Cancelamento solicitado! O evento será removido em instantes.');
           loadData();
         } catch (error) {
-          message.error('Erro ao cancelar: ' + error.message);
+          message.error('Erro ao cancelar: ' + (error as Error).message);
         }
       },
     });
   }, [loadData]);
 
   // Issue #95: Batch Reapply
-  const handleBatchReapply = () => {
-    // §4 Epic #459: Use consolidated Google guard
+  const handleBatchReapply = (): void => {
+    // Section 4 Epic #459: Use consolidated Google guard
     if (!requireGoogleConnection('realizar ações em massa')) return;
 
     if (selectedRowKeys.length === 0) {
@@ -267,7 +309,7 @@ export default function PreAgendaPage() {
         </div>
       ),
       okText: 'Reenviar',
-      okType: 'warning',
+      okType: 'default',
       cancelText: 'Cancelar',
       onOk: async () => {
         try {
@@ -287,16 +329,16 @@ export default function PreAgendaPage() {
             }),
           });
 
-          const data = await response.json();
+          const data = await response.json() as BatchResponseType & { code?: string };
 
-          // §4 Epic #459: Handle Google not connected error
+          // Section 4 Epic #459: Handle Google not connected error
           if (response.status === 403 && data.code === 'google_not_connected') {
-            handleGoogleError({ response: { status: 403, data } });
+            handleGoogleError({ response: { status: 403, data } } as unknown as Error);
             return;
           }
 
           if (!response.ok) {
-            throw new Error(data.detail || 'Erro ao reenviar eventos');
+            throw new Error((data as { detail?: string }).detail || 'Erro ao reenviar eventos');
           }
 
           message.success(`${data.queued} eventos enfileirados para reapply!`);
@@ -306,7 +348,7 @@ export default function PreAgendaPage() {
           setSelectedRowKeys([]);
           loadData();
         } catch (error) {
-          message.error('Erro ao reenviar em massa: ' + error.message);
+          message.error('Erro ao reenviar em massa: ' + (error as Error).message);
         } finally {
           setBatchLoading(false);
         }
@@ -315,8 +357,8 @@ export default function PreAgendaPage() {
   };
 
   // Issue #95: Batch Resync
-  const handleBatchResync = () => {
-    // §4 Epic #459: Use consolidated Google guard
+  const handleBatchResync = (): void => {
+    // Section 4 Epic #459: Use consolidated Google guard
     if (!requireGoogleConnection('realizar ações em massa')) return;
 
     if (selectedRowKeys.length === 0) {
@@ -356,16 +398,16 @@ export default function PreAgendaPage() {
             }),
           });
 
-          const data = await response.json();
+          const data = await response.json() as BatchResponseType & { code?: string };
 
-          // §4 Epic #459: Handle Google not connected error
+          // Section 4 Epic #459: Handle Google not connected error
           if (response.status === 403 && data.code === 'google_not_connected') {
-            handleGoogleError({ response: { status: 403, data } });
+            handleGoogleError({ response: { status: 403, data } } as unknown as Error);
             return;
           }
 
           if (!response.ok) {
-            throw new Error(data.detail || 'Erro ao fazer resync de eventos');
+            throw new Error((data as { detail?: string }).detail || 'Erro ao fazer resync de eventos');
           }
 
           message.success(`${data.queued} eventos enfileirados para resync!`);
@@ -375,7 +417,7 @@ export default function PreAgendaPage() {
           setSelectedRowKeys([]);
           loadData();
         } catch (error) {
-          message.error('Erro ao resync em massa: ' + error.message);
+          message.error('Erro ao resync em massa: ' + (error as Error).message);
         } finally {
           setBatchLoading(false);
         }
@@ -384,37 +426,37 @@ export default function PreAgendaPage() {
   };
 
   // Issue #260: Memoizar columns para evitar re-renderização desnecessária da tabela
-  const columns = useMemo(() => [
+  const columns: ColumnsType<Solicitacao> = useMemo(() => [
     {
       title: 'Data/Hora',
       dataIndex: 'inicio',
       key: 'inicio',
-      render: (inicio) => dayjs(inicio).format('DD/MM/YYYY HH:mm'),
+      render: (inicio: string) => dayjs(inicio).format('DD/MM/YYYY HH:mm'),
       width: 150,
     },
     {
       title: 'Município',
       dataIndex: 'municipio_nome',
       key: 'municipio_nome',
-      render: (nome) => nome || '-',
+      render: (nome: string | null) => nome || '-',
     },
     {
       title: 'Projeto',
       dataIndex: 'projeto_nome',
       key: 'projeto_nome',
-      render: (nome) => nome || '-',
+      render: (nome: string | null) => nome || '-',
     },
     {
       title: 'Tipo',
       dataIndex: 'tipo',
       key: 'tipo',
-      render: (tipo) => tipo || '-',
+      render: (tipo: string | null) => tipo || '-',
     },
     {
       title: 'GCal Status',
       dataIndex: 'gcal_status',
       key: 'gcal_status',
-      render: (gcal_status) => (
+      render: (gcal_status: GCalStatus) => (
         <Tag color={GCAL_STATUS_COLORS[gcal_status] || 'default'}>{gcal_status || 'NONE'}</Tag>
       ),
       width: 120,
@@ -424,8 +466,8 @@ export default function PreAgendaPage() {
       key: 'actions',
       width: 200,
       render: (_, record) => {
-        const isPublished = record.gcal_status === 'PUBLISHED';
-        const hasError = record.gcal_status === 'ERROR';
+        const isPublished = record.gcal_status === ('PUBLISHED' as GCalStatus);
+        const hasError = record.gcal_status === ('ERROR' as GCalStatus);
         const hasEventId = !!record.external_event_id;
 
         // Resync: mostrar quando PUBLISHED ou ERROR
@@ -482,13 +524,13 @@ export default function PreAgendaPage() {
   const showGoogleCard = canControle || canSuper;
 
   // Handlers para o card Google
-  const handleGoogleConnect = () => {
+  const handleGoogleConnect = (): void => {
     window.location.href = `/api/oauth/google/start/?return_to=/pre-agenda`;
   };
 
-  const handleGoogleDisconnect = async () => {
+  const handleGoogleDisconnect = async (): Promise<void> => {
     try {
-      const result = await googleDisconnect();
+      const result = await googleDisconnect() as { success: boolean; error?: string };
 
       if (result.success) {
         message.success('Conta Google desconectada com sucesso');
@@ -496,8 +538,19 @@ export default function PreAgendaPage() {
         message.error(result.error || 'Erro ao desconectar conta Google');
       }
     } catch (error) {
-      message.error('Erro ao desconectar: ' + error.message);
+      message.error('Erro ao desconectar: ' + (error as Error).message);
     }
+  };
+
+  // Row selection config
+  const rowSelection: TableRowSelection<Solicitacao> = {
+    selectedRowKeys,
+    onChange: (keys: Key[]) => setSelectedRowKeys(keys),
+    selections: [
+      Table.SELECTION_ALL,
+      Table.SELECTION_INVERT,
+      Table.SELECTION_NONE,
+    ],
   };
 
   return (
@@ -556,7 +609,7 @@ export default function PreAgendaPage() {
               <Input.Search
                 placeholder="Buscar por município, projeto..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 onSearch={loadData}
                 style={{ width: 300 }}
                 allowClear
@@ -564,14 +617,14 @@ export default function PreAgendaPage() {
               <Input
                 placeholder="Filtrar por setor/projeto"
                 value={sectorFilter}
-                onChange={(e) => setSectorFilter(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setSectorFilter(e.target.value)}
                 onPressEnter={loadData}
                 style={{ width: 200 }}
                 allowClear
               />
               <RangePicker
                 value={dateRange}
-                onChange={setDateRange}
+                onChange={(dates) => setDateRange(dates || [null, null])}
                 format="DD/MM/YYYY"
                 placeholder={['Data inicial', 'Data final']}
               />
@@ -617,15 +670,7 @@ export default function PreAgendaPage() {
             dataSource={rows}
             loading={loading}
             rowKey="id"
-            rowSelection={{
-              selectedRowKeys,
-              onChange: (keys) => setSelectedRowKeys(keys),
-              selections: [
-                Table.SELECTION_ALL,
-                Table.SELECTION_INVERT,
-                Table.SELECTION_NONE,
-              ],
-            }}
+            rowSelection={rowSelection}
             pagination={{
               total,
               pageSize: 20,
@@ -738,7 +783,7 @@ export default function PreAgendaPage() {
             </Descriptions>
 
             {/* Participantes */}
-            {previewData.preview.payload?.attendees?.length > 0 && (
+            {previewData.preview.payload?.attendees && previewData.preview.payload.attendees.length > 0 && (
               <Card
                 size="small"
                 title={<><TeamOutlined /> Participantes ({previewData.preview.payload.attendees.length})</>}

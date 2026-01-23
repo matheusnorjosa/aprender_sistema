@@ -9,31 +9,50 @@
  * - Demais usuários veem apenas sua(s) gerência(s)
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, ChangeEvent, JSX } from 'react';
 import { getGerencias, getMe } from '../../api/availability';
+import type { ID, CurrentUser, Gerencia } from '../../types';
+
+/** Filters change partial type */
+interface FiltersChangeType {
+  year?: number;
+  month?: number;
+  gerenciaId?: ID | null;
+  sector?: string;
+  q?: string;
+}
+
+interface FiltersBarProps {
+  year: number;
+  month: number;
+  gerenciaId: ID | null;
+  sector: string;
+  q: string;
+  onChange: (partial: FiltersChangeType) => void;
+}
 
 /**
- * Mapeamento de grupo RBAC → nome_setor da gerência.
+ * Mapeamento de grupo RBAC para nome_setor da gerência.
  * Necessário porque alguns grupos têm nomes diferentes.
- * Ex: Grupo "Superintendência" → nome_setor "Super"
+ * Ex: Grupo "Superintendência" -> nome_setor "Super"
  */
-const GROUP_TO_NOME_SETOR = {
+const GROUP_TO_NOME_SETOR: Record<string, string> = {
   'Superintendência': 'Super',
   // Os demais têm nomes idênticos (Vidas, Fluir, ACerta, etc.)
 };
 
-export default function FiltersBar({ year, month, gerenciaId, sector, q, onChange }) {
-  const [allGerencias, setAllGerencias] = useState([]);
-  const [userInfo, setUserInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function FiltersBar({ year, month, gerenciaId, sector, q, onChange }: FiltersBarProps): JSX.Element {
+  const [allGerencias, setAllGerencias] = useState<Gerencia[]>([]);
+  const [userInfo, setUserInfo] = useState<(CurrentUser & { is_superintendencia?: boolean }) | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Carrega lista de gerências e info do usuário ao montar
   useEffect(() => {
-    async function fetchData() {
+    async function fetchData(): Promise<void> {
       try {
         const [gerenciasData, meData] = await Promise.all([
-          getGerencias(),
-          getMe(),
+          getGerencias() as Promise<Gerencia[]>,
+          getMe() as Promise<CurrentUser & { is_superintendencia?: boolean }>,
         ]);
         setAllGerencias(gerenciasData);
         setUserInfo(meData);
@@ -47,7 +66,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
             (setor) => GROUP_TO_NOME_SETOR[setor] || setor
           );
           // Encontra a primeira gerência que corresponde aos setores do usuário
-          const matchingGerencia = gerenciasData.find((g) =>
+          const matchingGerencia = gerenciasData.find((g: Gerencia) =>
             userNomeSetores.includes(g.nome_setor)
           );
           if (matchingGerencia && !gerenciaId) {
@@ -67,7 +86,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
    * Filtra gerências baseado nos setores do usuário.
    * Superintendência vê todas. Demais veem apenas suas.
    */
-  const gerencias = useMemo(() => {
+  const gerencias = useMemo((): Gerencia[] => {
     if (!userInfo || !allGerencias.length) return [];
 
     // Superintendência ou superuser vê todas as gerências
@@ -94,10 +113,8 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
 
   /**
    * Incrementa/decrementa mês.
-   *
-   * @param {number} delta - Delta de meses (-1 ou +1)
    */
-  const bump = (delta) => {
+  const bump = (delta: number): void => {
     const dt = new Date(year, month - 1, 1);
     dt.setMonth(dt.getMonth() + delta);
     onChange({ year: dt.getFullYear(), month: dt.getMonth() + 1 });
@@ -112,7 +129,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
           onClick={() => bump(-1)}
           className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded border border-gray-300"
         >
-          ←
+          &larr;
         </button>
         <div className="px-3 py-2 font-semibold text-gray-900">
           {String(month).padStart(2, '0')}/{year}
@@ -122,7 +139,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
           onClick={() => bump(1)}
           className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded border border-gray-300"
         >
-          →
+          &rarr;
         </button>
       </div>
 
@@ -133,7 +150,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
         </label>
         <select
           value={gerenciaId || ''}
-          onChange={(e) => onChange({ gerenciaId: e.target.value ? Number(e.target.value) : null })}
+          onChange={(e: ChangeEvent<HTMLSelectElement>) => onChange({ gerenciaId: e.target.value ? Number(e.target.value) : null })}
           disabled={loading}
           className="w-52 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         >
@@ -155,7 +172,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
         <input
           type="text"
           value={sector}
-          onChange={(e) => onChange({ sector: e.target.value })}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => onChange({ sector: e.target.value })}
           placeholder="Filtrar por setor"
           className="w-40 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
@@ -169,7 +186,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
         <input
           type="text"
           value={q}
-          onChange={(e) => onChange({ q: e.target.value })}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => onChange({ q: e.target.value })}
           placeholder="Buscar nome/email"
           className="w-48 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         />

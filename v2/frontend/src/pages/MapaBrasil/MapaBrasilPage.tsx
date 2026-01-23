@@ -8,7 +8,7 @@
  * - Toggle Map/List view
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, MutableRefObject, ChangeEvent, JSX } from 'react';
 import {
   Card,
   Row,
@@ -26,10 +26,12 @@ import {
   Tag,
   Alert,
   message,
-  Descriptions,
-  Divider,
   Statistic,
+  Divider,
 } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import type { RadioChangeEvent } from 'antd/es/radio';
+import type { Dayjs } from 'dayjs';
 import {
   SearchOutlined,
   FilterOutlined,
@@ -37,15 +39,101 @@ import {
   FullscreenOutlined,
 } from '@ant-design/icons';
 import { MapContainer, GeoJSON, useMap } from 'react-leaflet';
+import type { Map as LeafletMap, Layer, GeoJSON as LeafletGeoJSON, PathOptions } from 'leaflet';
+import type { Feature, Geometry, FeatureCollection } from 'geojson';
 import 'leaflet/dist/leaflet.css';
 import api from '../../api';
 import logger from '../../utils/logger';
+import type { ID } from '../../types';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
 
+/** View mode type */
+type ViewMode = 'map' | 'list';
+
+/** Projeto type */
+interface ProjetoType {
+  id: ID | null;
+  nome: string;
+}
+
+/** Municipio data type */
+interface MunicipioDataType {
+  municipio: string;
+  uf: string;
+  projetos: number;
+  eventos: number;
+  coordenadores: number;
+  coords: [number, number];
+}
+
+/** Estado agregado type */
+interface EstadoAgregadoType {
+  uf: string;
+  eventos: number;
+  projetos: number;
+  coordenadores: number;
+  municipios: string[];
+}
+
+/** Estados data type */
+type EstadosDataType = Record<string, EstadoAgregadoType>;
+
+/** Coordenador projeto type */
+interface CoordenadorProjetoType {
+  nome: string;
+  eventos: number;
+}
+
+/** Coordenador municipio type */
+interface CoordenadorMunicipioType {
+  nome: string;
+  eventos: number;
+}
+
+/** Coordenador data type */
+interface CoordenadorDataType {
+  id: ID;
+  nome: string;
+  eventos: number;
+  projetos: CoordenadorProjetoType[];
+  municipios: CoordenadorMunicipioType[];
+}
+
+/** Estado table row type */
+interface EstadoTableRowType extends EstadoAgregadoType {
+  uf: string;
+}
+
+/** GeoJSON feature properties */
+interface StateFeatureProperties {
+  name: string;
+  sigla: string;
+}
+
+/** Layer with path */
+interface LayerWithPath {
+  feature?: Feature<Geometry, StateFeatureProperties>;
+  _path?: HTMLElement & { classList: DOMTokenList };
+  setStyle: (style: PathOptions) => void;
+  bringToFront: () => void;
+  bindTooltip: (content: string, options?: Record<string, unknown>) => void;
+  on: (events: Record<string, (e: { target: LayerWithPath }) => void>) => void;
+}
+
+/** GeoJSON ref type */
+interface GeoJSONRefType {
+  eachLayer: (fn: (layer: LayerWithPath) => void) => void;
+}
+
+/** Map controller props */
+interface MapControllerProps {
+  mapRef: MutableRefObject<LeafletMap | null>;
+}
+
 // Componente para capturar a instância do mapa
-function MapController({ mapRef }) {
+function MapController({ mapRef }: MapControllerProps): null {
   const map = useMap();
   useEffect(() => {
     mapRef.current = map;
@@ -54,36 +142,36 @@ function MapController({ mapRef }) {
 }
 
 
-export default function MapaBrasilPage() {
-  const [viewMode, setViewMode] = useState('map'); // 'map' ou 'list'
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedProjeto, setSelectedProjeto] = useState(null); // null = todos
-  const [dateRange, setDateRange] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [selectedState, setSelectedState] = useState(null); // Estado selecionado (sigla)
-  const [brazilGeoJSON, setBrazilGeoJSON] = useState(null); // Lazy loaded GeoJSON
-  const [geoJsonLoading, setGeoJsonLoading] = useState(true);
+export default function MapaBrasilPage(): JSX.Element {
+  const [viewMode, setViewMode] = useState<ViewMode>('map');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedProjeto, setSelectedProjeto] = useState<ID | null>(null);
+  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedState, setSelectedState] = useState<string | null>(null);
+  const [brazilGeoJSON, setBrazilGeoJSON] = useState<FeatureCollection<Geometry, StateFeatureProperties> | null>(null);
+  const [geoJsonLoading, setGeoJsonLoading] = useState<boolean>(true);
 
   // Estados para dados da API
-  const [municipiosData, setMunicipiosData] = useState([]);
-  const [estadosData, setEstadosData] = useState({}); // Agregado por UF: { CE: { eventos: 100, projetos: 5, ... }, ... }
-  const [projetos, setProjetos] = useState([]);
-  const [coordenadoresData, setCoordenadoresData] = useState([]); // Coordenadores do estado selecionado
-  const [loadingCoordinators, setLoadingCoordinators] = useState(false);
+  const [municipiosData, setMunicipiosData] = useState<MunicipioDataType[]>([]);
+  const [estadosData, setEstadosData] = useState<EstadosDataType>({});
+  const [projetos, setProjetos] = useState<ProjetoType[]>([]);
+  const [coordenadoresData, setCoordenadoresData] = useState<CoordenadorDataType[]>([]);
+  const [loadingCoordinators, setLoadingCoordinators] = useState<boolean>(false);
 
   // Refs para usar em event handlers (evita stale closure)
-  const selectedStateRef = useRef(null);
-  const estadosDataRef = useRef({});
-  const mapRef = useRef(null);
-  const geoJsonRef = useRef(null);
-  const mapContainerRef = useRef(null);
+  const selectedStateRef = useRef<string | null>(null);
+  const estadosDataRef = useRef<EstadosDataType>({});
+  const mapRef = useRef<LeafletMap | null>(null);
+  const geoJsonRef = useRef<GeoJSONRefType | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Lazy load do GeoJSON para reduzir bundle size
   useEffect(() => {
     import('../../data/brazil-states.json')
       .then((module) => {
-        setBrazilGeoJSON(module.default);
+        setBrazilGeoJSON(module.default as FeatureCollection<Geometry, StateFeatureProperties>);
         setGeoJsonLoading(false);
       })
       .catch((err) => {
@@ -103,15 +191,15 @@ export default function MapaBrasilPage() {
 
   // Limpar seleção ao clicar fora do mapa
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = (event: MouseEvent): void => {
       if (
         selectedStateRef.current &&
         mapContainerRef.current &&
-        !mapContainerRef.current.contains(event.target)
+        !mapContainerRef.current.contains(event.target as Node)
       ) {
         // Verificar se o clique não foi no card de detalhes
         const detailCard = document.querySelector('.state-detail-card');
-        if (detailCard && detailCard.contains(event.target)) {
+        if (detailCard && detailCard.contains(event.target as Node)) {
           return;
         }
         handleResetSelection();
@@ -126,7 +214,7 @@ export default function MapaBrasilPage() {
 
   // Fetch projetos no mount
   useEffect(() => {
-    const fetchProjetos = async () => {
+    const fetchProjetos = async (): Promise<void> => {
       try {
         const response = await api.get('/projetos/', { params: { page_size: 100 } });
         setProjetos([{ id: null, nome: 'Todos os Projetos' }, ...(response.data.results || [])]);
@@ -142,13 +230,13 @@ export default function MapaBrasilPage() {
     fetchMapData();
   }, []);
 
-  const fetchMapData = async () => {
+  const fetchMapData = async (): Promise<void> => {
     setLoading(true);
     setError(null);
 
     try {
       // Construir query params
-      const params = {};
+      const params: Record<string, string | number> = {};
       if (selectedProjeto) params.projeto_id = selectedProjeto;
       if (dateRange?.[0]) params.data_inicio = dateRange[0].format('YYYY-MM-DD');
       if (dateRange?.[1]) params.data_fim = dateRange[1].format('YYYY-MM-DD');
@@ -157,17 +245,17 @@ export default function MapaBrasilPage() {
       const response = await api.get('/metrics/map/', { params });
 
       // Mapear resposta para formato esperado pelos markers
-      const municipios = response.data.by_municipio.map(item => ({
+      const municipios: MunicipioDataType[] = response.data.by_municipio.map((item: { municipio: string; uf: string; projetos: number; eventos: number; coordenadores: number; latitude: number; longitude: number }) => ({
         municipio: item.municipio,
         uf: item.uf,
         projetos: item.projetos,
         eventos: item.eventos,
         coordenadores: item.coordenadores,
-        coords: [item.latitude, item.longitude],
+        coords: [item.latitude, item.longitude] as [number, number],
       }));
 
       // Agregar dados por estado (UF)
-      const estadosAgregados = {};
+      const estadosAgregados: EstadosDataType = {};
       municipios.forEach(item => {
         if (!estadosAgregados[item.uf]) {
           estadosAgregados[item.uf] = {
@@ -198,7 +286,7 @@ export default function MapaBrasilPage() {
   };
 
   // Fetch coordenadores para um estado específico
-  const fetchCoordinators = async (uf) => {
+  const fetchCoordinators = async (uf: string): Promise<void> => {
     if (!uf) {
       setCoordenadoresData([]);
       return;
@@ -225,11 +313,11 @@ export default function MapaBrasilPage() {
     }
   }, [selectedState]);
 
-  const handleApplyFilters = () => {
+  const handleApplyFilters = (): void => {
     fetchMapData();
   };
 
-  const handleClearFilters = () => {
+  const handleClearFilters = (): void => {
     setSelectedProjeto(null);
     setDateRange(null);
     setSearchTerm('');
@@ -237,10 +325,10 @@ export default function MapaBrasilPage() {
   };
 
   // Função para obter estilo baseado se o estado tem eventos
-  const getStateStyle = (sigla) => {
+  const getStateStyle = (sigla: string): PathOptions => {
     const hasEvents = estadosData[sigla] && estadosData[sigla].eventos > 0;
     return {
-      fillColor: hasEvents ? '#2e7d32' : '#81c784', // Verde escuro para estados com eventos, verde claro sem
+      fillColor: hasEvents ? '#2e7d32' : '#81c784',
       fillOpacity: 1,
       color: '#ffffff',
       weight: 1,
@@ -248,37 +336,36 @@ export default function MapaBrasilPage() {
   };
 
   // Estilo quando hover
-  const hoverStyle = {
-    fillColor: '#1b5e20', // Verde ainda mais escuro no hover
+  const hoverStyle: PathOptions = {
+    fillColor: '#1b5e20',
     fillOpacity: 1,
     color: '#ffffff',
     weight: 2,
   };
 
   // Estilo quando selecionado (destacado "acima" do mapa - efeito de extração)
-  const selectedStyle = {
-    fillColor: '#1565c0', // Azul escuro para contraste (como na imagem de referência)
+  const selectedStyle: PathOptions = {
+    fillColor: '#1565c0',
     fillOpacity: 1,
     color: '#ffffff',
     weight: 3,
-    // className será adicionada via CSS para shadow
   };
 
   // Estilo dos estados não selecionados (levemente escurecidos)
-  const dimmedStyle = {
-    fillColor: '#a5d6a7', // Verde mais claro/desbotado
+  const dimmedStyle: PathOptions = {
+    fillColor: '#a5d6a7',
     fillOpacity: 0.6,
     color: '#ffffff',
     weight: 1,
   };
 
   // Função para resetar a seleção do estado
-  const handleResetSelection = () => {
+  const handleResetSelection = (): void => {
     setSelectedState(null);
     selectedStateRef.current = null;
     // Resetar estilos de todos os estados baseado em se têm eventos
     if (geoJsonRef.current) {
-      geoJsonRef.current.eachLayer((layer) => {
+      geoJsonRef.current.eachLayer((layer: LayerWithPath) => {
         const sigla = layer.feature?.properties?.sigla;
         if (sigla) {
           layer.setStyle(getStateStyle(sigla));
@@ -292,27 +379,28 @@ export default function MapaBrasilPage() {
     }
   };
 
-  const onEachFeature = useCallback((feature, layer) => {
+  const onEachFeature = useCallback((feature: Feature<Geometry, StateFeatureProperties>, layer: Layer): void => {
+    const typedLayer = layer as unknown as LayerWithPath;
     if (feature.properties && feature.properties.name) {
       const sigla = feature.properties.sigla;
 
       // Label permanente com a sigla do estado (em branco)
-      layer.bindTooltip(sigla, {
+      typedLayer.bindTooltip(sigla, {
         permanent: true,
         direction: 'center',
         className: 'state-label',
       });
 
       // Eventos de hover e click
-      layer.on({
-        mouseover: (e) => {
+      typedLayer.on({
+        mouseover: (e: { target: LayerWithPath }) => {
           const targetLayer = e.target;
           const currentSelected = selectedStateRef.current;
-          const layerSigla = targetLayer.feature.properties.sigla;
+          const layerSigla = targetLayer.feature?.properties?.sigla;
 
           // Se há um estado selecionado, não aplicar hover nos outros estados
           if (currentSelected && layerSigla !== currentSelected) {
-            return; // Não fazer nada - manter estilo dimmed
+            return;
           }
 
           // Aplicar hover apenas quando não há seleção ou é o estado selecionado
@@ -321,9 +409,9 @@ export default function MapaBrasilPage() {
             targetLayer.bringToFront();
           }
         },
-        mouseout: (e) => {
+        mouseout: (e: { target: LayerWithPath }) => {
           const targetLayer = e.target;
-          const layerSigla = targetLayer.feature.properties.sigla;
+          const layerSigla = targetLayer.feature?.properties?.sigla;
           const currentSelected = selectedStateRef.current;
 
           // Se há um estado selecionado, manter estilos apropriados
@@ -332,7 +420,7 @@ export default function MapaBrasilPage() {
           } else if (currentSelected) {
             // Não fazer nada - manter estilo dimmed
             return;
-          } else {
+          } else if (layerSigla) {
             // Usar estilo baseado em se tem eventos
             const hasEvents = estadosDataRef.current[layerSigla]?.eventos > 0;
             targetLayer.setStyle({
@@ -343,9 +431,11 @@ export default function MapaBrasilPage() {
             });
           }
         },
-        click: (e) => {
-          const clickedSigla = e.target.feature.properties.sigla;
+        click: (e: { target: LayerWithPath }) => {
+          const clickedSigla = e.target.feature?.properties?.sigla;
           const currentSelected = selectedStateRef.current;
+
+          if (!clickedSigla) return;
 
           // Toggle seleção
           if (currentSelected === clickedSigla) {
@@ -353,7 +443,7 @@ export default function MapaBrasilPage() {
             selectedStateRef.current = null;
             setSelectedState(null);
             if (geoJsonRef.current) {
-              geoJsonRef.current.eachLayer((l) => {
+              geoJsonRef.current.eachLayer((l: LayerWithPath) => {
                 const lSigla = l.feature?.properties?.sigla;
                 if (lSigla) {
                   const hasEvents = estadosDataRef.current[lSigla]?.eventos > 0;
@@ -378,7 +468,7 @@ export default function MapaBrasilPage() {
 
             // Atualizar estilos de todos os estados
             if (geoJsonRef.current) {
-              geoJsonRef.current.eachLayer((l) => {
+              geoJsonRef.current.eachLayer((l: LayerWithPath) => {
                 const lSigla = l.feature?.properties?.sigla;
                 if (lSigla === clickedSigla) {
                   l.setStyle(selectedStyle);
@@ -388,7 +478,7 @@ export default function MapaBrasilPage() {
                     l._path.classList.add('selected-state');
                     l._path.classList.remove('dimmed-state');
                   }
-                } else {
+                } else if (lSigla) {
                   l.setStyle(dimmedStyle);
                   // Adicionar classe dimmed e remover selected
                   if (l._path) {
@@ -404,6 +494,114 @@ export default function MapaBrasilPage() {
     }
   }, []);
 
+  // Columns for coordenadores table
+  const coordenadoresColumns: ColumnsType<CoordenadorDataType> = [
+    {
+      title: 'Coordenador',
+      dataIndex: 'nome',
+      key: 'nome',
+      render: (nome: string) => <Text strong>{nome}</Text>,
+    },
+    {
+      title: 'Eventos',
+      dataIndex: 'eventos',
+      key: 'eventos',
+      align: 'center',
+      sorter: (a, b) => a.eventos - b.eventos,
+      defaultSortOrder: 'descend',
+      render: (v: number) => <Tag color="blue">{v}</Tag>,
+    },
+    {
+      title: 'Projetos (eventos)',
+      dataIndex: 'projetos',
+      key: 'projetos',
+      render: (projetos: CoordenadorProjetoType[]) => (
+        <Space wrap size={[4, 4]}>
+          {projetos.map((p, idx) => (
+            <Tag key={idx} color="purple" style={{ margin: 0 }}>
+              {p.nome}: <strong>{p.eventos}</strong>
+            </Tag>
+          ))}
+        </Space>
+      ),
+    },
+    {
+      title: 'Municípios (eventos)',
+      dataIndex: 'municipios',
+      key: 'municipios',
+      render: (municipios: CoordenadorMunicipioType[]) => (
+        <Space wrap size={[4, 4]}>
+          {municipios.map((m, idx) => (
+            <Tag key={idx} color="green" style={{ margin: 0 }}>
+              {m.nome}: <strong>{m.eventos}</strong>
+            </Tag>
+          ))}
+        </Space>
+      ),
+    },
+  ];
+
+  // Columns for municipios table
+  const municipiosColumns: ColumnsType<MunicipioDataType> = [
+    {
+      title: 'Município',
+      dataIndex: 'municipio',
+      key: 'municipio',
+    },
+    {
+      title: 'Eventos',
+      dataIndex: 'eventos',
+      key: 'eventos',
+      align: 'center',
+      render: (v: number) => <Tag color="blue">{v}</Tag>,
+    },
+    {
+      title: 'Coordenadores',
+      dataIndex: 'coordenadores',
+      key: 'coordenadores',
+      align: 'center',
+      render: (v: number) => <Tag color="green">{v}</Tag>,
+    },
+    {
+      title: 'Projetos',
+      dataIndex: 'projetos',
+      key: 'projetos',
+      align: 'center',
+      render: (v: number) => <Tag color="purple">{v}</Tag>,
+    },
+  ];
+
+  // Columns for estados table
+  const estadosColumns: ColumnsType<EstadoTableRowType> = [
+    {
+      title: 'Estado',
+      dataIndex: 'uf',
+      key: 'uf',
+      render: (text: string) => <Text strong>{text}</Text>,
+    },
+    {
+      title: 'Municípios',
+      dataIndex: 'municipios',
+      key: 'municipios',
+      align: 'center',
+      render: (municipios: string[]) => municipios.length,
+    },
+    {
+      title: 'Eventos',
+      dataIndex: 'eventos',
+      key: 'eventos',
+      align: 'center',
+      render: (eventos: number) => <Tag color="blue">{eventos}</Tag>,
+    },
+    {
+      title: 'Coordenadores',
+      dataIndex: 'coordenadores',
+      key: 'coordenadores',
+      align: 'center',
+      render: (coord: number) => <Tag color="green">{coord}</Tag>,
+    },
+  ];
+
   return (
     <div className="p-6 bg-gray-100" style={{ minHeight: '100vh' }}>
       {/* Header */}
@@ -415,7 +613,7 @@ export default function MapaBrasilPage() {
           </Title>
           <Text type="secondary">Visualização geográfica do Brasil</Text>
         </div>
-        <Radio.Group value={viewMode} onChange={(e) => setViewMode(e.target.value)} buttonStyle="solid">
+        <Radio.Group value={viewMode} onChange={(e: RadioChangeEvent) => setViewMode(e.target.value)} buttonStyle="solid">
           <Radio.Button value="map">Mapa</Radio.Button>
           <Radio.Button value="list">Lista</Radio.Button>
         </Radio.Group>
@@ -428,7 +626,7 @@ export default function MapaBrasilPage() {
           placeholder="Buscar por localização"
           prefix={<SearchOutlined />}
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
           allowClear
         />
       </Card>
@@ -574,11 +772,11 @@ export default function MapaBrasilPage() {
                   {brazilGeoJSON && (
                     <GeoJSON
                       key={`geojson-${Object.keys(estadosData).length}`}
-                      ref={geoJsonRef}
+                      ref={geoJsonRef as unknown as React.Ref<LeafletGeoJSON>}
                       data={brazilGeoJSON}
                       onEachFeature={onEachFeature}
                       style={(feature) => {
-                        const sigla = feature.properties?.sigla;
+                        const sigla = (feature?.properties as StateFeatureProperties)?.sigla;
                         const hasEvents = estadosData[sigla]?.eventos > 0;
                         return {
                           fillColor: hasEvents ? '#2e7d32' : '#81c784',
@@ -671,51 +869,7 @@ export default function MapaBrasilPage() {
                     pagination={false}
                     dataSource={coordenadoresData}
                     rowKey="id"
-                    columns={[
-                      {
-                        title: 'Coordenador',
-                        dataIndex: 'nome',
-                        key: 'nome',
-                        render: (nome) => <Text strong>{nome}</Text>,
-                      },
-                      {
-                        title: 'Eventos',
-                        dataIndex: 'eventos',
-                        key: 'eventos',
-                        align: 'center',
-                        sorter: (a, b) => a.eventos - b.eventos,
-                        defaultSortOrder: 'descend',
-                        render: (v) => <Tag color="blue">{v}</Tag>,
-                      },
-                      {
-                        title: 'Projetos (eventos)',
-                        dataIndex: 'projetos',
-                        key: 'projetos',
-                        render: (projetos) => (
-                          <Space wrap size={[4, 4]}>
-                            {projetos.map((p, idx) => (
-                              <Tag key={idx} color="purple" style={{ margin: 0 }}>
-                                {p.nome}: <strong>{p.eventos}</strong>
-                              </Tag>
-                            ))}
-                          </Space>
-                        ),
-                      },
-                      {
-                        title: 'Municípios (eventos)',
-                        dataIndex: 'municipios',
-                        key: 'municipios',
-                        render: (municipios) => (
-                          <Space wrap size={[4, 4]}>
-                            {municipios.map((m, idx) => (
-                              <Tag key={idx} color="green" style={{ margin: 0 }}>
-                                {m.nome}: <strong>{m.eventos}</strong>
-                              </Tag>
-                            ))}
-                          </Space>
-                        ),
-                      },
-                    ]}
+                    columns={coordenadoresColumns}
                   />
                 </div>
 
@@ -745,34 +899,7 @@ export default function MapaBrasilPage() {
                     pagination={false}
                     dataSource={municipiosData.filter(m => m.uf === selectedState)}
                     rowKey={(record) => `${record.municipio}-${record.uf}`}
-                    columns={[
-                      {
-                        title: 'Município',
-                        dataIndex: 'municipio',
-                        key: 'municipio',
-                      },
-                      {
-                        title: 'Eventos',
-                        dataIndex: 'eventos',
-                        key: 'eventos',
-                        align: 'center',
-                        render: (v) => <Tag color="blue">{v}</Tag>,
-                      },
-                      {
-                        title: 'Coordenadores',
-                        dataIndex: 'coordenadores',
-                        key: 'coordenadores',
-                        align: 'center',
-                        render: (v) => <Tag color="green">{v}</Tag>,
-                      },
-                      {
-                        title: 'Projetos',
-                        dataIndex: 'projetos',
-                        key: 'projetos',
-                        align: 'center',
-                        render: (v) => <Tag color="purple">{v}</Tag>,
-                      },
-                    ]}
+                    columns={municipiosColumns}
                   />
                 </div>
               </Card>
@@ -836,35 +963,7 @@ export default function MapaBrasilPage() {
                   rowKey="uf"
                   pagination={false}
                   size="small"
-                  columns={[
-                    {
-                      title: 'Estado',
-                      dataIndex: 'uf',
-                      key: 'uf',
-                      render: (text) => <Text strong>{text}</Text>,
-                    },
-                    {
-                      title: 'Municípios',
-                      dataIndex: 'municipios',
-                      key: 'municipios',
-                      align: 'center',
-                      render: (municipios) => municipios.length,
-                    },
-                    {
-                      title: 'Eventos',
-                      dataIndex: 'eventos',
-                      key: 'eventos',
-                      align: 'center',
-                      render: (eventos) => <Tag color="blue">{eventos}</Tag>,
-                    },
-                    {
-                      title: 'Coordenadores',
-                      dataIndex: 'coordenadores',
-                      key: 'coordenadores',
-                      align: 'center',
-                      render: (coord) => <Tag color="green">{coord}</Tag>,
-                    },
-                  ]}
+                  columns={estadosColumns}
                 />
               </Card>
             </Col>

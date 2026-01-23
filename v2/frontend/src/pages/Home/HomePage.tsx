@@ -7,7 +7,7 @@
  * - Links rápidos baseados em RBAC
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode, JSX } from 'react';
 import { Link } from 'react-router-dom';
 import { Row, Col, Card, Typography, Badge, Space, Spin, Statistic } from 'antd';
 import {
@@ -23,13 +23,38 @@ import {
 import { getMe } from '../../api/availability';
 import { getHomeStats } from '../../api/stats';
 import logger from '../../utils/logger';
+import type { CurrentUser } from '../../types';
 
 const { Title, Text } = Typography;
+
+/** Stats type */
+interface StatsType {
+  pendingApprovals: number;
+  myRequests: number;
+  upcomingEvents: number;
+}
+
+/** Home stats API response */
+interface HomeStatsResponse {
+  pending_approvals?: number;
+  my_requests?: number;
+  upcoming_events?: number;
+}
+
+/** Access card props */
+interface AccessCardProps {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  link?: string;
+  badge?: number;
+  disabled?: boolean;
+}
 
 /**
  * Card de acesso rápido
  */
-function AccessCard({ icon, title, description, link, badge, disabled = false }) {
+function AccessCard({ icon, title, description, link, badge, disabled = false }: AccessCardProps): JSX.Element {
   const cardContent = (
     <Card
       hoverable={!disabled}
@@ -63,22 +88,22 @@ function AccessCard({ icon, title, description, link, badge, disabled = false })
   return <Link to={link}>{cardContent}</Link>;
 }
 
-export default function HomePage() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
+export default function HomePage(): JSX.Element {
+  const [user, setUser] = useState<(CurrentUser & { can_approve_super?: boolean }) | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [stats, setStats] = useState<StatsType>({
     pendingApprovals: 0,
     myRequests: 0,
     upcomingEvents: 0,
   });
 
   useEffect(() => {
-    const loadUserAndStats = async () => {
+    const loadUserAndStats = async (): Promise<void> => {
       try {
         // Carregar dados do usuário e estatísticas em paralelo
         const [userData, statsData] = await Promise.all([
-          getMe(),
-          getHomeStats(),
+          getMe() as Promise<CurrentUser & { can_approve_super?: boolean }>,
+          getHomeStats() as Promise<HomeStatsResponse>,
         ]);
 
         setUser(userData);

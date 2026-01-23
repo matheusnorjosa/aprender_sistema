@@ -6,16 +6,33 @@
  * - Listagem de CADASTROS com filtros
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, ChangeEvent, JSX } from 'react';
 import { importCadastros, listCadastros } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
+import type { ID } from '../../types';
 
-export default function DATPage() {
-  const [cadastros, setCadastros] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+/** Record type for cadastro entries */
+interface CadastroRecord {
+  id: ID;
+  data_registro: string;
+  municipio: string;
+  projeto: string;
+  tipo_acao: string;
+  responsavel: string;
+  observacao: string;
+}
 
-  const [filters, setFilters] = useState({
+/** Filters type */
+interface FiltersType {
+  q: string;
+}
+
+export default function DATPage(): JSX.Element {
+  const [cadastros, setCadastros] = useState<CadastroRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [filters, setFilters] = useState<FiltersType>({
     q: '',
   });
 
@@ -27,10 +44,10 @@ export default function DATPage() {
     setError(null);
 
     try {
-      const data = await listCadastros(filters);
-      setCadastros(data);
+      const data = await listCadastros(filters as unknown as Record<string, string>);
+      setCadastros(data as unknown as CadastroRecord[]);
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -39,14 +56,14 @@ export default function DATPage() {
   /**
    * Handler de mudança de filtros.
    */
-  const handleFilterChange = (key, value) => {
+  const handleFilterChange = (key: keyof FiltersType, value: string): void => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
   /**
    * Callback após apply bem-sucedido.
    */
-  const handleAfterApply = () => {
+  const handleAfterApply = (): void => {
     // Recarregar lista de cadastros
     fetchCadastros();
   };
@@ -73,12 +90,12 @@ export default function DATPage() {
         <ImportUploader
           label="Importar CADASTROS"
           description="CSV/XLSX de Cadastros DAT (Município, Projeto, Tipo de Ação, Responsável, Data, Observação)"
-          onDryRun={(file) => importCadastros(file, true)}
-          onApply={async (file) => {
+          onDryRun={((file: File) => importCadastros(file, true)) as unknown as (file: File) => Promise<{ valid: boolean; errors?: string[] }>}
+          onApply={(async (file: File) => {
             const result = await importCadastros(file, false);
             handleAfterApply();
             return result;
-          }}
+          }) as unknown as (file: File) => Promise<{ created?: number; updated?: number; errors?: string[] }>}
         />
       </div>
 
@@ -92,7 +109,7 @@ export default function DATPage() {
             type="text"
             placeholder="Buscar (município, projeto, responsável, observação)"
             value={filters.q}
-            onChange={(e) => handleFilterChange('q', e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFilterChange('q', e.target.value)}
             className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -110,7 +127,7 @@ export default function DATPage() {
           <div className="p-4 bg-red-50 border-b border-red-200">
             <p className="text-sm text-red-800">Erro: {error}</p>
             <p className="text-xs text-red-600 mt-1">
-              💡 Verifique se o backend está rodando e se você está autenticado.
+              Verifique se o backend está rodando e se você está autenticado.
             </p>
           </div>
         )}

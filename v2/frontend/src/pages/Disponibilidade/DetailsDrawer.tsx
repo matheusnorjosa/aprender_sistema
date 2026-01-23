@@ -5,7 +5,38 @@
  * Usa campos "inicio" e "fim" do backend.
  */
 
-export default function DetailsDrawer({ open, onClose, person, day, details }) {
+import type { JSX } from 'react';
+import type { ID } from '../../types';
+
+/** Person record from the monthly grid */
+export interface PersonType {
+  id: ID;
+  name: string;
+  email?: string;
+  ch_month?: number;
+  ch_year?: number;
+  position_month?: number | string;
+}
+
+/** Event detail record */
+export interface EventDetailType {
+  id?: ID;
+  municipio?: string;
+  tipo?: string;
+  data?: string;
+  inicio?: string;
+  fim?: string;
+}
+
+interface DetailsDrawerProps {
+  open: boolean;
+  onClose: () => void;
+  person: PersonType | null;
+  day: number | null;
+  details: EventDetailType[];
+}
+
+export default function DetailsDrawer({ open, onClose, person, day, details }: DetailsDrawerProps): JSX.Element | null {
   if (!open || !person) return null;
 
   return (

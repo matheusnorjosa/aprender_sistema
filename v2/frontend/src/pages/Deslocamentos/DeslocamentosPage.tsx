@@ -17,7 +17,7 @@
  * - DELETE /api/deslocamentos/{id}/ (delete)
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, ChangeEvent, JSX } from 'react';
 import {
   Table,
   Button,
@@ -35,6 +35,8 @@ import {
   Typography,
   Tooltip,
 } from 'antd';
+import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
+import type { Dayjs } from 'dayjs';
 import {
   PlusOutlined,
   EditOutlined,
@@ -45,6 +47,7 @@ import {
 import dayjs from 'dayjs';
 import { getMe } from '../../api/availability';
 import logger from '../../utils/logger';
+import type { ID, CurrentUser } from '../../types';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -53,17 +56,63 @@ const { TextArea } = Input;
 // API Base URL
 const API_BASE = '/api';
 
+/** Deslocamento record type */
+interface DeslocamentoRecord {
+  id: ID;
+  usuario: ID;
+  usuario_nome: string;
+  origem: string;
+  destino: string;
+  start_date: string;
+  end_date: string;
+  observacao?: string;
+}
+
+/** Usuario option type */
+interface UsuarioOptionType {
+  id: ID;
+  first_name: string;
+  last_name: string;
+}
+
+/** Filters type */
+interface FiltersType {
+  usuario_id?: ID;
+  data_inicio?: string;
+  data_fim?: string;
+  origem?: string;
+  destino?: string;
+  page?: number;
+}
+
+/** Form values type */
+interface FormValuesType {
+  usuario: ID;
+  origem: string;
+  destino: string;
+  start_date: Dayjs;
+  end_date: Dayjs;
+  observacao?: string;
+}
+
+/** API error type */
+interface ApiErrorType {
+  end_date?: string[];
+  destino?: string[];
+  [key: string]: string[] | undefined;
+}
+
 /**
  * Fetch deslocamentos with filters
  */
-async function fetchDeslocamentos(filters = {}) {
+async function fetchDeslocamentos(filters: FiltersType = {}): Promise<{ results: DeslocamentoRecord[]; count: number }> {
   const params = new URLSearchParams();
-  if (filters.usuario_id) params.append('usuario_id', filters.usuario_id);
+  if (filters.usuario_id) params.append('usuario_id', String(filters.usuario_id));
   if (filters.data_inicio) params.append('data_inicio', filters.data_inicio);
   if (filters.data_fim) params.append('data_fim', filters.data_fim);
   if (filters.origem) params.append('origem', filters.origem);
   if (filters.destino) params.append('destino', filters.destino);
-  if (filters.page) params.append('page', filters.page);
+  if (filters.page) params.append('page', String(filters.page));
 
   const response = await fetch(`${API_BASE}/deslocamentos/?${params.toString()}`, {
     credentials: 'include',
@@ -79,7 +128,7 @@ async function fetchDeslocamentos(filters = {}) {
 /**
  * Fetch usuarios for select
  */
-async function fetchUsuarios() {
+async function fetchUsuarios(): Promise<UsuarioOptionType[]> {
   const response = await fetch(`${API_BASE}/options/usuarios/`, {
     credentials: 'include',
   });
@@ -94,7 +143,7 @@ async function fetchUsuarios() {
 /**
  * Create deslocamento
  */
-async function createDeslocamento(data) {
+async function createDeslocamento(data: Record<string, unknown>): Promise<DeslocamentoRecord> {
   const response = await fetch(`${API_BASE}/deslocamentos/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -113,7 +162,7 @@ async function createDeslocamento(data) {
 /**
  * Update deslocamento
  */
-async function updateDeslocamento(id, data) {
+async function updateDeslocamento(id: ID, data: Record<string, unknown>): Promise<DeslocamentoRecord> {
   const response = await fetch(`${API_BASE}/deslocamentos/${id}/`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -132,7 +181,7 @@ async function updateDeslocamento(id, data) {
 /**
  * Delete deslocamento
  */
-async function deleteDeslocamento(id) {
+async function deleteDeslocamento(id: ID): Promise<void> {
   const response = await fetch(`${API_BASE}/deslocamentos/${id}/`, {
     method: 'DELETE',
     credentials: 'include',
@@ -143,29 +192,29 @@ async function deleteDeslocamento(id) {
   }
 }
 
-export default function DeslocamentosPage() {
-  const [canAccess, setCanAccess] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [deslocamentos, setDeslocamentos] = useState([]);
-  const [usuarios, setUsuarios] = useState([]);
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 50, total: 0 });
-  const [filters, setFilters] = useState({});
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalMode, setModalMode] = useState('create'); // 'create' or 'edit'
-  const [currentRecord, setCurrentRecord] = useState(null);
-  const [form] = Form.useForm();
+export default function DeslocamentosPage(): JSX.Element {
+  const [canAccess, setCanAccess] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [deslocamentos, setDeslocamentos] = useState<DeslocamentoRecord[]>([]);
+  const [usuarios, setUsuarios] = useState<UsuarioOptionType[]>([]);
+  const [pagination, setPagination] = useState<TablePaginationConfig>({ current: 1, pageSize: 50, total: 0 });
+  const [filters, setFilters] = useState<FiltersType>({});
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [currentRecord, setCurrentRecord] = useState<DeslocamentoRecord | null>(null);
+  const [form] = Form.useForm<FormValuesType>();
 
   // Load user and check permissions
   useEffect(() => {
-    async function loadUser() {
+    async function loadUser(): Promise<void> {
       try {
-        const userData = await getMe();
+        const userData = await getMe() as CurrentUser;
 
         // Check RBAC: Controle, Coordenador, or DAT
         const canControle = userData.groups?.includes('Controle');
         const canCoordenador = userData.groups?.includes('Coordenador');
         const canDAT = userData.groups?.includes('DAT');
-        const canSuper = userData.is_superuser || userData.is_superintendencia;
+        const canSuper = userData.is_superuser || (userData as CurrentUser & { is_superintendencia?: boolean }).is_superintendencia;
 
         setCanAccess(canControle || canCoordenador || canDAT || canSuper);
       } catch (error) {
@@ -180,7 +229,7 @@ export default function DeslocamentosPage() {
   }, []);
 
   // Load deslocamentos
-  const loadDeslocamentos = useCallback(async (page = 1) => {
+  const loadDeslocamentos = useCallback(async (page = 1): Promise<void> => {
     setLoading(true);
     try {
       const data = await fetchDeslocamentos({ ...filters, page });
@@ -191,14 +240,14 @@ export default function DeslocamentosPage() {
         total: data.count || 0,
       });
     } catch (error) {
-      message.error(error.message);
+      message.error((error as Error).message);
     } finally {
       setLoading(false);
     }
   }, [filters]);
 
   // Load usuarios for select
-  const loadUsuarios = useCallback(async () => {
+  const loadUsuarios = useCallback(async (): Promise<void> => {
     try {
       const data = await fetchUsuarios();
       setUsuarios(data);
@@ -215,22 +264,22 @@ export default function DeslocamentosPage() {
   }, [canAccess, filters, loadDeslocamentos, loadUsuarios]);
 
   // Handle table change (pagination)
-  const handleTableChange = (paginationConfig) => {
+  const handleTableChange = (paginationConfig: TablePaginationConfig): void => {
     loadDeslocamentos(paginationConfig.current);
   };
 
   // Handle filter change
-  const handleFilterChange = (key, value) => {
+  const handleFilterChange = (key: keyof FiltersType, value: string | ID | undefined): void => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
   // Handle date range change
-  const handleDateRangeChange = (dates) => {
-    if (dates && dates.length === 2) {
+  const handleDateRangeChange = (dates: [Dayjs | null, Dayjs | null] | null): void => {
+    if (dates && dates.length === 2 && dates[0] && dates[1]) {
       setFilters((prev) => ({
         ...prev,
-        data_inicio: dates[0].format('YYYY-MM-DD'),
-        data_fim: dates[1].format('YYYY-MM-DD'),
+        data_inicio: dates[0]!.format('YYYY-MM-DD'),
+        data_fim: dates[1]!.format('YYYY-MM-DD'),
       }));
     } else {
       setFilters((prev) => {
@@ -241,7 +290,7 @@ export default function DeslocamentosPage() {
   };
 
   // Open modal for create
-  const handleCreate = () => {
+  const handleCreate = (): void => {
     setModalMode('create');
     setCurrentRecord(null);
     form.resetFields();
@@ -249,7 +298,7 @@ export default function DeslocamentosPage() {
   };
 
   // Open modal for edit
-  const handleEdit = (record) => {
+  const handleEdit = (record: DeslocamentoRecord): void => {
     setModalMode('edit');
     setCurrentRecord(record);
     form.setFieldsValue({
@@ -264,7 +313,7 @@ export default function DeslocamentosPage() {
   };
 
   // Handle modal submit
-  const handleModalSubmit = async () => {
+  const handleModalSubmit = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
 
@@ -282,7 +331,7 @@ export default function DeslocamentosPage() {
         await createDeslocamento(data);
         message.success('Deslocamento criado com sucesso!');
       } else {
-        await updateDeslocamento(currentRecord.id, data);
+        await updateDeslocamento(currentRecord!.id, data);
         message.success('Deslocamento atualizado com sucesso!');
       }
 
@@ -290,10 +339,11 @@ export default function DeslocamentosPage() {
       form.resetFields();
       loadDeslocamentos(pagination.current);
     } catch (error) {
-      if (error.end_date) {
-        message.error(error.end_date[0]);
-      } else if (error.destino) {
-        message.error(error.destino[0]);
+      const apiError = error as ApiErrorType;
+      if (apiError.end_date) {
+        message.error(apiError.end_date[0]);
+      } else if (apiError.destino) {
+        message.error(apiError.destino[0]);
       } else {
         message.error('Erro ao salvar deslocamento');
       }
@@ -301,7 +351,7 @@ export default function DeslocamentosPage() {
   };
 
   // Handle delete
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: ID): Promise<void> => {
     try {
       await deleteDeslocamento(id);
       message.success('Deslocamento deletado com sucesso!');
@@ -312,7 +362,7 @@ export default function DeslocamentosPage() {
   };
 
   // Columns for table
-  const columns = [
+  const columns: ColumnsType<DeslocamentoRecord> = [
     {
       title: 'Formador',
       dataIndex: 'usuario_nome',
@@ -336,21 +386,21 @@ export default function DeslocamentosPage() {
       dataIndex: 'start_date',
       key: 'start_date',
       width: 120,
-      render: (date) => dayjs(date).format('DD/MM/YYYY'),
+      render: (date: string) => dayjs(date).format('DD/MM/YYYY'),
     },
     {
       title: 'Data Fim',
       dataIndex: 'end_date',
       key: 'end_date',
       width: 120,
-      render: (date) => dayjs(date).format('DD/MM/YYYY'),
+      render: (date: string) => dayjs(date).format('DD/MM/YYYY'),
     },
     {
       title: 'Observação',
       dataIndex: 'observacao',
       key: 'observacao',
       ellipsis: true,
-      render: (text) => (
+      render: (text: string | undefined) => (
         <Tooltip title={text}>
           <span>{text ? text.substring(0, 50) : '-'}</span>
         </Tooltip>
@@ -423,7 +473,7 @@ export default function DeslocamentosPage() {
               showSearch
               optionFilterProp="children"
               style={{ width: '100%' }}
-              onChange={(value) => handleFilterChange('usuario_id', value)}
+              onChange={(value: ID | undefined) => handleFilterChange('usuario_id', value)}
             >
               {usuarios.map((u) => (
                 <Select.Option key={u.id} value={u.id}>
@@ -444,14 +494,14 @@ export default function DeslocamentosPage() {
             <Input
               placeholder="Origem"
               prefix={<SearchOutlined />}
-              onChange={(e) => handleFilterChange('origem', e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => handleFilterChange('origem', e.target.value)}
             />
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Input
               placeholder="Destino"
               prefix={<SearchOutlined />}
-              onChange={(e) => handleFilterChange('destino', e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => handleFilterChange('destino', e.target.value)}
             />
           </Col>
         </Row>

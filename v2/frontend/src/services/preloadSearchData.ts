@@ -5,7 +5,7 @@
  * Called after successful login to populate the search index.
  *
  * Usage:
- * ```js
+ * ```ts
  * import { preloadSearchData } from '../services/preloadSearchData';
  *
  * // After login
@@ -16,16 +16,26 @@
 import api from '../api';
 import { searchIndex } from './searchIndex';
 
+/** Stats returned from preload operation */
+export interface PreloadStats {
+  municipios?: number;
+  projetos?: number;
+  usuarios?: number;
+  tiposEvento?: number;
+  skipped?: boolean;
+  error?: string;
+}
+
 // Cache timestamp to avoid reloading too frequently
 let lastLoadTime = 0;
 const MIN_RELOAD_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Preload search data from API endpoints.
- * @param {boolean} force - Force reload even if recently loaded
- * @returns {Promise<Object>} Stats about loaded data
+ * @param force - Force reload even if recently loaded
+ * @returns Stats about loaded data
  */
-export async function preloadSearchData(force = false) {
+export async function preloadSearchData(force: boolean = false): Promise<PreloadStats> {
   const now = Date.now();
 
   // Skip if recently loaded (unless forced)
@@ -66,7 +76,7 @@ export async function preloadSearchData(force = false) {
 
     lastLoadTime = now;
 
-    const stats = {
+    const stats: PreloadStats = {
       municipios: municipios.data.length,
       projetos: projetos.data.length,
       usuarios: usuarios.data.length,
@@ -77,14 +87,14 @@ export async function preloadSearchData(force = false) {
     return stats;
   } catch (error) {
     console.error('[SearchIndex] Preload failed:', error);
-    return { error: error.message };
+    return { error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
 /**
  * Clear search index and reset timestamp.
  */
-export function clearSearchData() {
+export function clearSearchData(): void {
   searchIndex.clear();
   lastLoadTime = 0;
 }

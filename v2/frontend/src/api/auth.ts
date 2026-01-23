@@ -8,6 +8,7 @@
  */
 
 import { fetchAPI, clearCsrfCache } from './config';
+import type { CurrentUser, LoginResponse, AuthCheckResponse } from '../types';
 
 /**
  * Realiza login com username e senha
@@ -15,8 +16,8 @@ import { fetchAPI, clearCsrfCache } from './config';
  * Nota: Django rotaciona o CSRF token após login bem-sucedido.
  * Limpamos o cache para forçar obtenção de token fresco.
  */
-export async function login(username, password) {
-  const response = await fetchAPI('/auth/login/', {
+export async function login(username: string, password: string): Promise<LoginResponse> {
+  const response = await fetchAPI<LoginResponse>('/auth/login/', {
     method: 'POST',
     body: JSON.stringify({ username, password }),
   });
@@ -28,8 +29,8 @@ export async function login(username, password) {
 /**
  * Realiza logout
  */
-export async function logout() {
-  const response = await fetchAPI('/auth/logout/', {
+export async function logout(): Promise<{ detail: string }> {
+  const response = await fetchAPI<{ detail: string }>('/auth/logout/', {
     method: 'POST',
   });
   // Limpar cache de CSRF token após logout
@@ -40,10 +41,10 @@ export async function logout() {
 /**
  * Verifica se o usuário está autenticado
  */
-export async function checkAuth() {
+export async function checkAuth(): Promise<AuthCheckResponse> {
   try {
-    const response = await fetchAPI('/me/');
-    return { authenticated: true, user: response };
+    const user = await fetchAPI<CurrentUser>('/me/');
+    return { authenticated: true, user };
   } catch {
     return { authenticated: false, user: null };
   }

@@ -6,19 +6,20 @@ POST /api/controle/import-compras/
 - Body (multipart/form-data): {file: upload}
 - Returns: Relatório com stats, pendências e IDs criados
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
+
+import os
+import tempfile
 from typing import Any
+
+from django.utils.datastructures import MultiValueDictKeyError
+from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
-
-import tempfile
-import os
-from django.utils.datastructures import MultiValueDictKeyError
 from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
 
 from apps.core.permissions import IsControleOrSuper
 from apps.core.services.controle_imports import import_compras_from_file
@@ -50,6 +51,7 @@ class ImportComprasView(APIView):
             "ts": "2025-10-21T..."
         }
     """
+
     permission_classes = [IsControleOrSuper]
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -61,10 +63,7 @@ class ImportComprasView(APIView):
         try:
             upload = request.FILES["file"]
         except (KeyError, MultiValueDictKeyError):
-            return Response(
-                {"detail": "Campo 'file' é obrigatório."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"detail": "Campo 'file' é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Salvar upload em /tmp via tempfile
         temp_file = None
@@ -84,8 +83,7 @@ class ImportComprasView(APIView):
 
         except Exception as e:
             return Response(
-                {"detail": f"Erro ao processar arquivo: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"detail": f"Erro ao processar arquivo: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         finally:
             # Sempre remover arquivo temporário

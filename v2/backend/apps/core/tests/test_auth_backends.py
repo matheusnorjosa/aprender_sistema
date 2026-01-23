@@ -13,13 +13,15 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from uuid import uuid4
+
 from django.test import RequestFactory
 
-from apps.core.models import Usuario
-from apps.core.auth_backends import CPFOrUsernameBackend
+import pytest
 
+from apps.core.auth_backends import CPFOrUsernameBackend
+from apps.core.models import Usuario
 
 pytestmark = pytest.mark.django_db
 
@@ -91,11 +93,7 @@ def test_authenticate_via_cpf_plain(backend, request_factory, usuario_com_cpf):
     - CPF "12345678901" → autentica usuário correto
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username="12345678901",
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username="12345678901", password="testpass123")
 
     assert user is not None
     assert user == usuario_com_cpf
@@ -110,11 +108,7 @@ def test_authenticate_via_cpf_with_mask(backend, request_factory, usuario_com_cp
     - CPF "123.456.789-01" → remove pontuação → autentica
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username="123.456.789-01",
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username="123.456.789-01", password="testpass123")
 
     assert user is not None
     assert user == usuario_com_cpf
@@ -129,11 +123,7 @@ def test_authenticate_via_cpf_with_spaces(backend, request_factory, usuario_com_
     - CPF "123 456 789 01" → remove espaços → autentica
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username="123 456 789 01",
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username="123 456 789 01", password="testpass123")
 
     assert user is not None
     assert user == usuario_com_cpf
@@ -150,20 +140,12 @@ def test_authenticate_via_cpf_with_leading_zeros(backend, request_factory, usuar
     request = request_factory.get("/")
 
     # Sem máscara
-    user = backend.authenticate(
-        request=request,
-        username="00123456789",
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username="00123456789", password="testpass123")
     assert user is not None
     assert user == usuario_cpf_com_zeros
 
     # Com máscara
-    user = backend.authenticate(
-        request=request,
-        username="001.234.567-89",
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username="001.234.567-89", password="testpass123")
     assert user is not None
     assert user == usuario_cpf_com_zeros
 
@@ -176,11 +158,7 @@ def test_authenticate_via_cpf_wrong_password(backend, request_factory, usuario_c
     - CPF "12345678901" + senha errada → None
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username="12345678901",
-        password="wrongpass"
-    )
+    user = backend.authenticate(request=request, username="12345678901", password="wrongpass")
 
     assert user is None
 
@@ -193,11 +171,7 @@ def test_authenticate_via_cpf_not_found(backend, request_factory):
     - CPF "99999999999" (não existe) → None
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username="99999999999",
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username="99999999999", password="testpass123")
 
     assert user is None
 
@@ -215,11 +189,7 @@ def test_authenticate_via_username(backend, request_factory, usuario_com_cpf):
     - username (não é 11 dígitos) → tenta username lookup
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username=usuario_com_cpf.username,
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username=usuario_com_cpf.username, password="testpass123")
 
     assert user is not None
     assert user == usuario_com_cpf
@@ -233,11 +203,7 @@ def test_authenticate_via_username_wrong_password(backend, request_factory, usua
     - username + senha errada → None
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username=usuario_com_cpf.username,
-        password="wrongpass"
-    )
+    user = backend.authenticate(request=request, username=usuario_com_cpf.username, password="wrongpass")
 
     assert user is None
 
@@ -250,11 +216,7 @@ def test_authenticate_via_username_not_found(backend, request_factory):
     - username "nonexistent" → None
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username="nonexistent",
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username="nonexistent", password="testpass123")
 
     assert user is None
 
@@ -273,11 +235,7 @@ def test_authenticate_empty_username(backend, request_factory):
     - username="" é diferente (processa string vazia, retorna None por não encontrar)
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username=None,
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username=None, password="testpass123")
 
     assert user is None
 
@@ -290,11 +248,7 @@ def test_authenticate_empty_password(backend, request_factory, usuario_com_cpf):
     - password=None → None
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username=usuario_com_cpf.username,
-        password=None
-    )
+    user = backend.authenticate(request=request, username=usuario_com_cpf.username, password=None)
 
     assert user is None
 
@@ -307,11 +261,7 @@ def test_authenticate_inactive_user(backend, request_factory, usuario_inativo):
     - is_active=False → None (mesmo com senha correta)
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username=usuario_inativo.username,
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username=usuario_inativo.username, password="testpass123")
 
     assert user is None
 
@@ -329,11 +279,7 @@ def test_authenticate_cpf_10_digits(backend, request_factory):
     - "1234567890" (10 dígitos) → não é CPF → tenta username
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username="1234567890",
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username="1234567890", password="testpass123")
 
     # Como não existe username "1234567890", retorna None
     assert user is None
@@ -347,11 +293,7 @@ def test_authenticate_cpf_12_digits(backend, request_factory):
     - "123456789012" (12 dígitos) → não é CPF → tenta username
     """
     request = request_factory.get("/")
-    user = backend.authenticate(
-        request=request,
-        username="123456789012",
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username="123456789012", password="testpass123")
 
     # Como não existe username "123456789012", retorna None
     assert user is None
@@ -376,11 +318,7 @@ def test_authenticate_alphanumeric_tries_username(backend, request_factory, usua
         is_active=True,
     )
 
-    user = backend.authenticate(
-        request=request,
-        username="user123",
-        password="testpass123"
-    )
+    user = backend.authenticate(request=request, username="user123", password="testpass123")
 
     assert user is not None
     assert user == user_alpha

@@ -58,9 +58,7 @@ class Command(BaseCommand):
         verbose: bool = options.get("verbose", False)
 
         if not dry_run and not apply:
-            self.stderr.write(
-                self.style.ERROR("Especifique --dry-run ou --apply")
-            )
+            self.stderr.write(self.style.ERROR("Especifique --dry-run ou --apply"))
             return
 
         self.stdout.write("=" * 70)
@@ -103,18 +101,14 @@ class Command(BaseCommand):
             # 2.2. Identificar gerente (usuário com grupo "Gerente" + mais participações)
             gerente = self._identificar_gerente(gerencia, usuarios_por_role)
             if gerente:
-                result = self._criar_equipe(
-                    gerencia, gerente, "GERENTE", dry_run, verbose
-                )
+                result = self._criar_equipe(gerencia, gerente, "GERENTE", dry_run, verbose)
                 self._update_stats(stats, result, "gerentes_criados")
 
             # 2.3. Criar coordenadores
             for usuario in usuarios_por_role["COORDENADOR"]:
                 if usuario == gerente:
                     continue  # Já é gerente
-                result = self._criar_equipe(
-                    gerencia, usuario, "COORDENADOR", dry_run, verbose
-                )
+                result = self._criar_equipe(gerencia, usuario, "COORDENADOR", dry_run, verbose)
                 self._update_stats(stats, result, "coordenadores_criados")
 
             # 2.4. Criar formadores
@@ -123,9 +117,7 @@ class Command(BaseCommand):
                     continue  # Já é gerente
                 if usuario in usuarios_por_role["COORDENADOR"]:
                     continue  # Já é coordenador
-                result = self._criar_equipe(
-                    gerencia, usuario, "FORMADOR", dry_run, verbose
-                )
+                result = self._criar_equipe(gerencia, usuario, "FORMADOR", dry_run, verbose)
                 self._update_stats(stats, result, "formadores_criados")
 
         # 3. Resumo
@@ -138,23 +130,15 @@ class Command(BaseCommand):
         self.stdout.write(f"Formadores criados: {stats['formadores_criados']}")
         self.stdout.write(f"Já existentes (skip): {stats['ja_existentes']}")
         self.stdout.write(f"Erros: {stats['erros']}")
-        total_criados = (
-            stats["gerentes_criados"]
-            + stats["coordenadores_criados"]
-            + stats["formadores_criados"]
-        )
+        total_criados = stats["gerentes_criados"] + stats["coordenadores_criados"] + stats["formadores_criados"]
         self.stdout.write(f"TOTAL CRIADOS: {total_criados}")
 
         if dry_run:
             self.stdout.write("")
-            self.stdout.write(
-                self.style.WARNING("⚠️  DRY-RUN: Nenhuma alteração foi feita no banco.")
-            )
+            self.stdout.write(self.style.WARNING("⚠️  DRY-RUN: Nenhuma alteração foi feita no banco."))
             self.stdout.write("    Execute com --apply para aplicar as alterações.")
 
-    def _get_usuarios_por_gerencia(
-        self, gerencia: Gerencia
-    ) -> dict[str, list[Usuario]]:
+    def _get_usuarios_por_gerencia(self, gerencia: Gerencia) -> dict[str, list[Usuario]]:
         """
         Busca usuários que participaram de eventos da gerência.
 
@@ -213,21 +197,14 @@ class Command(BaseCommand):
         2. Coordenador com mais participações
         """
         # Candidatos: coordenadores + formadores
-        candidatos = (
-            usuarios_por_role["COORDENADOR"] + usuarios_por_role["FORMADOR"]
-        )
+        candidatos = usuarios_por_role["COORDENADOR"] + usuarios_por_role["FORMADOR"]
 
         # Filtrar por grupo "Gerente"
-        gerentes_potenciais = [
-            u for u in candidatos
-            if u.groups.filter(name="Gerente").exists()
-        ]
+        gerentes_potenciais = [u for u in candidatos if u.groups.filter(name="Gerente").exists()]
 
         if gerentes_potenciais:
             gerente = gerentes_potenciais[0]
-            self.stdout.write(
-                f"  Gerente identificado (grupo Gerente): {gerente.get_full_name() or gerente.username}"
-            )
+            self.stdout.write(f"  Gerente identificado (grupo Gerente): {gerente.get_full_name() or gerente.username}")
             return gerente
 
         # Fallback: coordenador com mais participações
@@ -270,9 +247,7 @@ class Command(BaseCommand):
                     self.stdout.write(f"    [SKIP] {nome} já é {papel}")
                 return "exists"
             else:
-                self.stdout.write(
-                    self.style.SUCCESS(f"    [+] {nome} → {papel}")
-                )
+                self.stdout.write(self.style.SUCCESS(f"    [+] {nome} → {papel}"))
                 return "created"
 
         # APPLY mode
@@ -285,9 +260,7 @@ class Command(BaseCommand):
             )
 
             if created:
-                self.stdout.write(
-                    self.style.SUCCESS(f"    [+] {nome} → {papel}")
-                )
+                self.stdout.write(self.style.SUCCESS(f"    [+] {nome} → {papel}"))
                 return "created"
             else:
                 if verbose:
@@ -295,9 +268,7 @@ class Command(BaseCommand):
                 return "exists"
 
         except Exception as e:
-            self.stderr.write(
-                self.style.ERROR(f"    [ERRO] {nome}: {e}")
-            )
+            self.stderr.write(self.style.ERROR(f"    [ERRO] {nome}: {e}"))
             return "error"
 
     def _update_stats(

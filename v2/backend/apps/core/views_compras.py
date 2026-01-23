@@ -6,27 +6,29 @@ GET /api/controle/compras/
 - Query params: municipio, projeto, uf, from, to, q
 - Returns: Lista de compras com campos relacionados
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
+
 from typing import Any
-from django.db.models import QuerySet
+
+from django.db.models import Q, QuerySet
+from rest_framework import serializers
+from rest_framework.generics import ListAPIView
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from rest_framework.generics import ListAPIView
-from rest_framework.permissions import IsAuthenticated
-from rest_framework import serializers
-from django.db.models import Q
-
-from apps.core.permissions import IsControleOrSuper
 from apps.core.models import Compra
+from apps.core.permissions import IsControleOrSuper
 
 
 class CompraSerializer(serializers.ModelSerializer):
     """
     Serializer para Compra com campos relacionados.
     """
+
     municipio = serializers.CharField(source="municipio.nome", read_only=True)
     uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto = serializers.CharField(source="projeto.nome", read_only=True)
@@ -76,14 +78,13 @@ class ControleComprasListView(ListAPIView):
             ...
         ]
     """
+
     permission_classes = [IsAuthenticated, IsControleOrSuper]
     serializer_class = CompraSerializer
 
     def get_queryset(self) -> QuerySet:
         # Queryset base com related fields otimizados
-        qs = Compra.objects.select_related("municipio", "projeto").order_by(
-            "-data", "-created_at"
-        )
+        qs = Compra.objects.select_related("municipio", "projeto").order_by("-data", "-created_at")
 
         # Aplicar filtros opcionais
         params = self.request.query_params
@@ -105,8 +106,6 @@ class ControleComprasListView(ListAPIView):
 
         if params.get("q"):
             q_value = params["q"]
-            qs = qs.filter(
-                Q(uso__icontains=q_value) | Q(codigo__icontains=q_value)
-            )
+            qs = qs.filter(Q(uso__icontains=q_value) | Q(codigo__icontains=q_value))
 
         return qs

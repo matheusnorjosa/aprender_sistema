@@ -4,6 +4,7 @@ DATCompra Serializers - §10 Epic #459
 Purchase/inventory tracking serializers.
 Extracted from serializers/dat_module.py.
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations
@@ -17,26 +18,16 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
     """Full serializer for DATCompra (CRUD)."""
 
     # FK names
-    municipio_nome = serializers.CharField(
-        source="municipio.nome", read_only=True
-    )
-    projeto_nome = serializers.CharField(
-        source="projeto.nome", read_only=True
-    )
-    produto_nome = serializers.CharField(
-        source="produto.nome", read_only=True, allow_null=True
-    )
+    municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
+    projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    produto_nome = serializers.CharField(source="produto.nome", read_only=True, allow_null=True)
 
     # Computed
     disponivel = serializers.IntegerField(read_only=True)
-    valor_total = serializers.DecimalField(
-        max_digits=12, decimal_places=2, read_only=True
-    )
+    valor_total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     # Audit
-    created_by_nome = serializers.CharField(
-        source="created_by.get_full_name", read_only=True
-    )
+    created_by_nome = serializers.CharField(source="created_by.get_full_name", read_only=True)
 
     class Meta:
         model = DATCompra
@@ -78,13 +69,9 @@ class DATCompraListSerializer(serializers.ModelSerializer["DATCompra"]):
 
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
-    produto_nome = serializers.CharField(
-        source="produto.nome", read_only=True, allow_null=True
-    )
+    produto_nome = serializers.CharField(source="produto.nome", read_only=True, allow_null=True)
     disponivel = serializers.IntegerField(read_only=True)
-    valor_total = serializers.DecimalField(
-        max_digits=12, decimal_places=2, read_only=True
-    )
+    valor_total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
         model = DATCompra

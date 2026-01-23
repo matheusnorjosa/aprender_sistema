@@ -3,28 +3,29 @@ Options API Views
 
 Provides minimal dropdown/select options for frontend forms.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
+
 from typing import Any
+
+from django.conf import settings
+from django.core.cache import cache
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-
-from .models import Municipio, Projeto, TipoEvento, Usuario, Produto, DATArea, DATCoordenador
+from .models import DATArea, DATCoordenador, Municipio, Produto, Projeto, TipoEvento, Usuario
 from .serializers import (
     MunicipioOptionSerializer,
+    ProdutoOptionSerializer,
     ProjetoOptionSerializer,
     TipoEventoOptionSerializer,
     UsuarioOptionSerializer,
-    ProdutoOptionSerializer,
 )
 from .serializers.dat_module import DATAreaOptionSerializer, DATCoordenadorOptionSerializer
-from django.core.cache import cache
-from django.conf import settings
 
 
 @api_view(["GET"])

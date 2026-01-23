@@ -7,6 +7,6 @@ Responsável pela ingestão (ETL) de dados das planilhas Excel para PostgreSQL:
 - Serializers DRF para validação de CSV uploads
 """
 
-
 from __future__ import annotations
+
 default_app_config = "dat_ingest.apps.DatIngestConfig"

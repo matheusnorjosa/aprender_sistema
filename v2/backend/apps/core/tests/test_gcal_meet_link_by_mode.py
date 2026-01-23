@@ -12,19 +12,22 @@ Valida:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
-from unittest.mock import patch, MagicMock
-from django.contrib.auth.models import Group
-from rest_framework.test import APIClient
-from django.utils import timezone
+
 from datetime import timedelta
+from unittest.mock import MagicMock, patch
+
+from django.contrib.auth.models import Group
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import (
-    Usuario,
     Municipio,
     Projeto,
-    TipoEvento,
     Solicitacao,
+    TipoEvento,
+    Usuario,
 )
 
 
@@ -60,9 +63,7 @@ def fixtures_basicas():
 class TestGCalMeetLinkByMode:
     """Testes para geração de Meet link baseado em is_online"""
 
-    def test_preview_online_includes_meet_link(
-        self, usuario_controle, fixtures_basicas
-    ):
+    def test_preview_online_includes_meet_link(self, usuario_controle, fixtures_basicas):
         """
         PR19: Preview de solicitação online deve incluir meet_link (fake), sem persistir.
 
@@ -94,10 +95,7 @@ class TestGCalMeetLinkByMode:
         assert sol.is_online is True
 
         # POST preview
-        response = client.post(
-            f"/api/solicitacoes/{sol.id}/preview-gcal/",
-            format="json"
-        )
+        response = client.post(f"/api/solicitacoes/{sol.id}/preview-gcal/", format="json")
 
         # Verificar resposta
         assert response.status_code == 200
@@ -113,12 +111,9 @@ class TestGCalMeetLinkByMode:
         sol.refresh_from_db()
 
         # Verificar que meet_link NÃO foi persistido
-        assert sol.meet_link is None, \
-            "PREVIEW nunca deve persistir meet_link no DB"
+        assert sol.meet_link is None, "PREVIEW nunca deve persistir meet_link no DB"
 
-    def test_preview_offline_no_meet_link(
-        self, usuario_controle, fixtures_basicas
-    ):
+    def test_preview_offline_no_meet_link(self, usuario_controle, fixtures_basicas):
         """
         PR19: Preview de solicitação presencial não deve incluir meet_link.
 
@@ -150,10 +145,7 @@ class TestGCalMeetLinkByMode:
         assert sol.is_online is False
 
         # POST preview
-        response = client.post(
-            f"/api/solicitacoes/{sol.id}/preview-gcal/",
-            format="json"
-        )
+        response = client.post(f"/api/solicitacoes/{sol.id}/preview-gcal/", format="json")
 
         # Verificar resposta
         assert response.status_code == 200
@@ -163,8 +155,7 @@ class TestGCalMeetLinkByMode:
         # Preview de evento presencial não deve incluir meet_link
         # ou deve retornar meet_link=None
         if "meet_link" in preview:
-            assert preview["meet_link"] is None, \
-                "Evento presencial não deve ter meet_link no preview"
+            assert preview["meet_link"] is None, "Evento presencial não deve ter meet_link no preview"
 
         # Refresh do DB
         sol.refresh_from_db()
@@ -172,15 +163,10 @@ class TestGCalMeetLinkByMode:
         # Verificar que meet_link permanece None
         assert sol.meet_link is None
 
-    @patch('apps.core.tasks.task_publish_solicitacao_to_gcal.delay')
-    @patch('apps.core.services.gcal_google_client.GoogleCalendarClient')
+    @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+    @patch("apps.core.services.gcal_google_client.GoogleCalendarClient")
     def test_publish_online_allowed_persists_meet_link(
-        self,
-        MockGoogleClient,
-        mock_task,
-        usuario_controle,
-        fixtures_basicas,
-        settings
+        self, MockGoogleClient, mock_task, usuario_controle, fixtures_basicas, settings
     ):
         """
         PR19: Publish de solicitação online deve persistir meet_link quando APPLY real.
@@ -214,7 +200,7 @@ class TestGCalMeetLinkByMode:
         mock_client_instance = MockGoogleClient.return_value
         mock_client_instance.insert.return_value = {
             "id": "gcal-event-456",
-            "hangoutLink": "https://meet.google.com/online-xyz-abc"
+            "hangoutLink": "https://meet.google.com/online-xyz-abc",
         }
 
         # Garantir que a task retorna imediatamente (mock)
@@ -229,9 +215,7 @@ class TestGCalMeetLinkByMode:
 
         # POST publish (task é enqueuada)
         response = client.post(
-            f"/api/solicitacoes/{sol.id}/publish/",
-            {"dry_run": False, "apply_blocked": False},
-            format="json"
+            f"/api/solicitacoes/{sol.id}/publish/", {"dry_run": False, "apply_blocked": False}, format="json"
         )
 
         # Verificar que publicação foi aceita
@@ -240,9 +224,7 @@ class TestGCalMeetLinkByMode:
         # Verificar que task Celery foi enfileirada
         mock_task.assert_called_once()
 
-    def test_publish_offline_no_meet_link(
-        self, usuario_controle, fixtures_basicas, settings
-    ):
+    def test_publish_offline_no_meet_link(self, usuario_controle, fixtures_basicas, settings):
         """
         PR19: Publish de solicitação presencial não deve persistir meet_link.
 
@@ -278,9 +260,7 @@ class TestGCalMeetLinkByMode:
 
         # POST publish com dry_run
         response = client.post(
-            f"/api/solicitacoes/{sol.id}/publish/",
-            {"dry_run": True, "apply_blocked": False},
-            format="json"
+            f"/api/solicitacoes/{sol.id}/publish/", {"dry_run": True, "apply_blocked": False}, format="json"
         )
 
         # Verificar que publicação foi aceita (dry_run permitido)
@@ -290,12 +270,9 @@ class TestGCalMeetLinkByMode:
         sol.refresh_from_db()
 
         # Verificar que meet_link NÃO foi persistido
-        assert sol.meet_link is None, \
-            "Evento presencial nunca deve ter meet_link persistido"
+        assert sol.meet_link is None, "Evento presencial nunca deve ter meet_link persistido"
 
-    def test_apply_blocked_online_no_persist(
-        self, usuario_controle, fixtures_basicas, settings
-    ):
+    def test_apply_blocked_online_no_persist(self, usuario_controle, fixtures_basicas, settings):
         """
         PR19: apply_blocked (409) não deve persistir meet_link, mesmo para evento online.
 
@@ -332,9 +309,7 @@ class TestGCalMeetLinkByMode:
 
         # POST publish (deve ser bloqueado)
         response = client.post(
-            f"/api/solicitacoes/{sol.id}/publish/",
-            {"dry_run": False, "apply_blocked": False},
-            format="json"
+            f"/api/solicitacoes/{sol.id}/publish/", {"dry_run": False, "apply_blocked": False}, format="json"
         )
 
         # Verificar que publicação foi bloqueada
@@ -344,12 +319,9 @@ class TestGCalMeetLinkByMode:
         sol.refresh_from_db()
 
         # Verificar que meet_link NÃO foi persistido
-        assert sol.meet_link is None, \
-            "apply_blocked (409) nunca deve persistir meet_link, mesmo para evento online"
+        assert sol.meet_link is None, "apply_blocked (409) nunca deve persistir meet_link, mesmo para evento online"
 
-    def test_preview_payload_has_no_conference_data_when_offline(
-        self, usuario_controle, fixtures_basicas
-    ):
+    def test_preview_payload_has_no_conference_data_when_offline(self, usuario_controle, fixtures_basicas):
         """
         PR19: Preview de evento presencial não deve incluir conferenceData no payload.
 
@@ -376,10 +348,7 @@ class TestGCalMeetLinkByMode:
         client.force_authenticate(user=usuario_controle)
 
         # POST preview
-        response = client.post(
-            f"/api/solicitacoes/{sol.id}/preview-gcal/",
-            format="json"
-        )
+        response = client.post(f"/api/solicitacoes/{sol.id}/preview-gcal/", format="json")
 
         # Verificar resposta
         assert response.status_code == 200
@@ -388,12 +357,9 @@ class TestGCalMeetLinkByMode:
         payload = preview.get("payload", {})
 
         # Payload de evento presencial não deve ter conferenceData
-        assert "conferenceData" not in payload, \
-            "Evento presencial não deve ter conferenceData no payload"
+        assert "conferenceData" not in payload, "Evento presencial não deve ter conferenceData no payload"
 
-    def test_preview_payload_has_conference_data_when_online(
-        self, usuario_controle, fixtures_basicas
-    ):
+    def test_preview_payload_has_conference_data_when_online(self, usuario_controle, fixtures_basicas):
         """
         PR19: Preview de evento online deve incluir conferenceData no payload.
 
@@ -420,10 +386,7 @@ class TestGCalMeetLinkByMode:
         client.force_authenticate(user=usuario_controle)
 
         # POST preview
-        response = client.post(
-            f"/api/solicitacoes/{sol.id}/preview-gcal/",
-            format="json"
-        )
+        response = client.post(f"/api/solicitacoes/{sol.id}/preview-gcal/", format="json")
 
         # Verificar resposta
         assert response.status_code == 200
@@ -432,6 +395,5 @@ class TestGCalMeetLinkByMode:
         payload = preview.get("payload", {})
 
         # Payload de evento online deve ter conferenceData
-        assert "conferenceData" in payload, \
-            "Evento online deve ter conferenceData no payload"
+        assert "conferenceData" in payload, "Evento online deve ter conferenceData no payload"
         assert payload["conferenceData"]["createRequest"]["requestId"] is not None

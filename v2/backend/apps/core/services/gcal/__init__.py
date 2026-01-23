@@ -11,31 +11,14 @@ Modular package containing all Google Calendar sync functionality:
 
 Backwards-compatible re-exports for existing imports.
 """
+
 # pyright: reportPrivateUsage=false
 
 from __future__ import annotations
 
-# Types
-from apps.core.services.gcal.types import (
-    Action,
-    SyncOutcome,
-)
-
-# Utils
-from apps.core.services.gcal.utils import (
-    _payload_hash,
-    _retry_with_backoff,
-)
-
 # Client
 from apps.core.services.gcal.client import (
     CalendarClientAdapter,
-)
-
-# Validation
-from apps.core.services.gcal.validation import (
-    _event_id_for,
-    _validate_event_id,
 )
 
 # Payload
@@ -52,6 +35,24 @@ from apps.core.services.gcal.sync import (
     cancel_solicitacao,
     resync_solicitacao,
     upsert_one,
+)
+
+# Types
+from apps.core.services.gcal.types import (
+    Action,
+    SyncOutcome,
+)
+
+# Utils
+from apps.core.services.gcal.utils import (
+    _payload_hash,
+    _retry_with_backoff,
+)
+
+# Validation
+from apps.core.services.gcal.validation import (
+    _event_id_for,
+    _validate_event_id,
 )
 
 __all__ = [

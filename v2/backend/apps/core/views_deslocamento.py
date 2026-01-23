@@ -25,6 +25,7 @@ Ordering:
 Pagination:
 - 50 per page
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -32,12 +33,13 @@ from __future__ import annotations
 from typing import Any
 
 from django.db.models import Q, QuerySet
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.filters import OrderingFilter
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
+
+from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import AuditLog, Deslocamento
 from .permissions import IsControleOrDAT
@@ -69,8 +71,9 @@ def _get_client_ip(request: Request) -> str:
 
 class DeslocamentoPagination(PageNumberPagination):
     """Pagination for Deslocamento list (50 per page)."""
+
     page_size = 50
-    page_size_query_param = 'page_size'
+    page_size_query_param = "page_size"
     max_page_size = 100
 
 
@@ -174,7 +177,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
                 "observacao": deslocamento.observacao or "",
                 "ip_address": _get_client_ip(self.request),
                 "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
-            }
+            },
         )
 
     def perform_update(self, serializer: DeslocamentoSerializer) -> None:
@@ -225,7 +228,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
                     "new_values": new_values,
                     "ip_address": _get_client_ip(self.request),
                     "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
-                }
+                },
             )
 
     def perform_destroy(self, instance: Deslocamento) -> None:
@@ -251,7 +254,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
                 "observacao": instance.observacao or "",
                 "ip_address": _get_client_ip(self.request),
                 "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
-            }
+            },
         )
 
         # Delete instance

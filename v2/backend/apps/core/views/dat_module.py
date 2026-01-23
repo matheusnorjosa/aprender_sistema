@@ -13,6 +13,7 @@ Endpoints:
 
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -20,14 +21,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from django.db.models import Count, F, Q, Sum
-
-from django_filters import rest_framework as filters
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from django_filters import rest_framework as filters
+from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.core.models import (
     DATAcao,
@@ -118,9 +119,7 @@ class DATCoordenadorViewSet(viewsets.ModelViewSet):
         - destroy: apenas Superintendência
     """
 
-    queryset = DATCoordenador.objects.select_related(
-        "created_by", "updated_by"
-    ).order_by("nome")
+    queryset = DATCoordenador.objects.select_related("created_by", "updated_by").order_by("nome")
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = DATCoordenadorFilter
@@ -161,20 +160,18 @@ class DATCoordenadorViewSet(viewsets.ModelViewSet):
         """
         coordenador = self.get_object()
 
-        acoes = DATAcaoListSerializer(
-            coordenador.dat_acoes.filter(ativo=True)[:10], many=True
-        ).data
+        acoes = DATAcaoListSerializer(coordenador.dat_acoes.filter(ativo=True)[:10], many=True).data
 
-        formacoes = DATFormacaoListSerializer(
-            coordenador.dat_formacoes.filter(ativo=True)[:10], many=True
-        ).data
+        formacoes = DATFormacaoListSerializer(coordenador.dat_formacoes.filter(ativo=True)[:10], many=True).data
 
-        return Response({
-            "acoes": acoes,
-            "formacoes": formacoes,
-            "total_acoes": coordenador.dat_acoes.filter(ativo=True).count(),
-            "total_formacoes": coordenador.dat_formacoes.filter(ativo=True).count(),
-        })
+        return Response(
+            {
+                "acoes": acoes,
+                "formacoes": formacoes,
+                "total_acoes": coordenador.dat_acoes.filter(ativo=True).count(),
+                "total_formacoes": coordenador.dat_formacoes.filter(ativo=True).count(),
+            }
+        )
 
 
 # ============================================================
@@ -220,9 +217,9 @@ class DATAcaoViewSet(viewsets.ModelViewSet):
         - destroy: apenas Superintendência
     """
 
-    queryset = DATAcao.objects.select_related(
-        "municipio", "projeto", "coordenador", "created_by"
-    ).order_by("-prioridade", "municipio__nome")
+    queryset = DATAcao.objects.select_related("municipio", "projeto", "coordenador", "created_by").order_by(
+        "-prioridade", "municipio__nome"
+    )
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = DATAcaoFilter
@@ -274,11 +271,7 @@ class DATAcaoViewSet(viewsets.ModelViewSet):
         }
 
         # Por projeto (top 10)
-        por_projeto = list(
-            qs.values("projeto__nome")
-            .annotate(count=Count("id"))
-            .order_by("-count")[:10]
-        )
+        por_projeto = list(qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10])
 
         # Por coordenador (top 10)
         por_coordenador = list(
@@ -288,12 +281,14 @@ class DATAcaoViewSet(viewsets.ModelViewSet):
             .order_by("-count")[:10]
         )
 
-        return Response({
-            "total": total,
-            "por_etapa": por_etapa,
-            "por_projeto": por_projeto,
-            "por_coordenador": por_coordenador,
-        })
+        return Response(
+            {
+                "total": total,
+                "por_etapa": por_etapa,
+                "por_projeto": por_projeto,
+                "por_coordenador": por_coordenador,
+            }
+        )
 
 
 # ============================================================
@@ -339,9 +334,9 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         - destroy: apenas Superintendência
     """
 
-    queryset = DATCompra.objects.select_related(
-        "municipio", "projeto", "produto", "created_by"
-    ).order_by("-ano_uso", "municipio__nome")
+    queryset = DATCompra.objects.select_related("municipio", "projeto", "produto", "created_by").order_by(
+        "-ano_uso", "municipio__nome"
+    )
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = DATCompraFilter
@@ -388,34 +383,26 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         qs = self.filter_queryset(self.get_queryset())
 
         total = qs.count()
-        valor_total = qs.aggregate(
-            total=Sum(F("valor_unitario") * F("quantidade"))
-        )["total"] or 0
+        valor_total = qs.aggregate(total=Sum(F("valor_unitario") * F("quantidade")))["total"] or 0
 
         # Por status de uso
         por_status = dict(qs.values_list("status_uso").annotate(c=Count("id")))
 
         # Por ano (últimos 5)
-        por_ano = list(
-            qs.values("ano_uso")
-            .annotate(count=Count("id"))
-            .order_by("-ano_uso")[:5]
-        )
+        por_ano = list(qs.values("ano_uso").annotate(count=Count("id")).order_by("-ano_uso")[:5])
 
         # Por projeto (top 10)
-        por_projeto = list(
-            qs.values("projeto__nome")
-            .annotate(count=Count("id"))
-            .order_by("-count")[:10]
-        )
+        por_projeto = list(qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10])
 
-        return Response({
-            "total": total,
-            "valor_total": valor_total,
-            "por_status": por_status,
-            "por_ano": por_ano,
-            "por_projeto": por_projeto,
-        })
+        return Response(
+            {
+                "total": total,
+                "valor_total": valor_total,
+                "por_status": por_status,
+                "por_ano": por_ano,
+                "por_projeto": por_projeto,
+            }
+        )
 
 
 # ============================================================
@@ -465,9 +452,9 @@ class DATCadastroViewSet(viewsets.ModelViewSet):
         - destroy: apenas Superintendência
     """
 
-    queryset = DATCadastro.objects.select_related(
-        "municipio", "projeto_geral", "created_by"
-    ).order_by("plataforma", "municipio__nome")
+    queryset = DATCadastro.objects.select_related("municipio", "projeto_geral", "created_by").order_by(
+        "plataforma", "municipio__nome"
+    )
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = DATCadastroFilter
@@ -531,19 +518,17 @@ class DATCadastroViewSet(viewsets.ModelViewSet):
         ).count()
 
         # Por projeto geral (top 10)
-        por_projeto = list(
-            qs.values("projeto_geral__nome")
-            .annotate(count=Count("id"))
-            .order_by("-count")[:10]
-        )
+        por_projeto = list(qs.values("projeto_geral__nome").annotate(count=Count("id")).order_by("-count")[:10])
 
-        return Response({
-            "total": total,
-            "por_plataforma": por_plataforma,
-            "formar_completos": formar_completos,
-            "avaliar_completos": avaliar_completos,
-            "por_projeto": por_projeto,
-        })
+        return Response(
+            {
+                "total": total,
+                "por_plataforma": por_plataforma,
+                "formar_completos": formar_completos,
+                "avaliar_completos": avaliar_completos,
+                "por_projeto": por_projeto,
+            }
+        )
 
     @action(detail=True, methods=["post"], permission_classes=[IsDATOrSuper])
     def etapa(self, request: Request, pk: int | None = None) -> Response:
@@ -634,9 +619,9 @@ class DATFormacaoViewSet(viewsets.ModelViewSet):
         - destroy: apenas Superintendência
     """
 
-    queryset = DATFormacao.objects.select_related(
-        "municipio", "projeto", "coordenador", "created_by"
-    ).order_by("-data_formacao", "horario_inicio")
+    queryset = DATFormacao.objects.select_related("municipio", "projeto", "coordenador", "created_by").order_by(
+        "-data_formacao", "horario_inicio"
+    )
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = DATFormacaoFilter
@@ -688,11 +673,7 @@ class DATFormacaoViewSet(viewsets.ModelViewSet):
         por_modalidade = dict(qs.values_list("modalidade").annotate(c=Count("id")))
 
         # Por projeto (top 10)
-        por_projeto = list(
-            qs.values("projeto__nome")
-            .annotate(count=Count("id"))
-            .order_by("-count")[:10]
-        )
+        por_projeto = list(qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10])
 
         # Por coordenador (top 10)
         por_coordenador = list(
@@ -708,15 +689,17 @@ class DATFormacaoViewSet(viewsets.ModelViewSet):
             presentes=Sum("quantidade_presente"),
         )
 
-        return Response({
-            "total": total,
-            "por_status": por_status,
-            "por_modalidade": por_modalidade,
-            "por_projeto": por_projeto,
-            "por_coordenador": por_coordenador,
-            "participantes_previstos": participantes["previstos"] or 0,
-            "participantes_presentes": participantes["presentes"] or 0,
-        })
+        return Response(
+            {
+                "total": total,
+                "por_status": por_status,
+                "por_modalidade": por_modalidade,
+                "por_projeto": por_projeto,
+                "por_coordenador": por_coordenador,
+                "participantes_previstos": participantes["previstos"] or 0,
+                "participantes_presentes": participantes["presentes"] or 0,
+            }
+        )
 
     @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
     def calendario(self, request: Request) -> Response:

@@ -4,6 +4,7 @@ DATCoordenador Serializers - §10 Epic #459
 Coordinator management serializers.
 Extracted from serializers/dat_module.py.
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations
@@ -22,9 +23,7 @@ class DATCoordenadorSerializer(serializers.ModelSerializer["DATCoordenador"]):
     total_formacoes = serializers.IntegerField(read_only=True)
 
     # Audit names
-    created_by_nome = serializers.CharField(
-        source="created_by.get_full_name", read_only=True
-    )
+    created_by_nome = serializers.CharField(source="created_by.get_full_name", read_only=True)
 
     class Meta:
         model = DATCoordenador

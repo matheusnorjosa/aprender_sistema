@@ -5,14 +5,13 @@ Usage:
     python manage.py seed_produtos
 """
 
-
 from __future__ import annotations
+
 from typing import Any
 
 from django.core.management.base import BaseCommand
 
 from apps.core.models import Produto, Projeto
-
 
 # Mapeamento simplificado: código → (nome, projeto_nome)
 # Baseado em produtos.xlsx e mapeamento de compras
@@ -72,9 +71,7 @@ class Command(BaseCommand):
                     projeto = Projeto.objects.get(nome=projeto_nome)
                 except Projeto.DoesNotExist:
                     self.stdout.write(
-                        self.style.WARNING(
-                            f"  ⚠️  Projeto não encontrado: {projeto_nome} (produto: {codigo})"
-                        )
+                        self.style.WARNING(f"  ⚠️  Projeto não encontrado: {projeto_nome} (produto: {codigo})")
                     )
                     skipped_count += 1
                     continue
@@ -91,11 +88,7 @@ class Command(BaseCommand):
 
                 if created:
                     created_count += 1
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"  ✓ Created: {codigo} - {nome} ({projeto_nome})"
-                        )
-                    )
+                    self.stdout.write(self.style.SUCCESS(f"  ✓ Created: {codigo} - {nome} ({projeto_nome})"))
                 else:
                     # Update se mudou
                     updated = False
@@ -109,22 +102,12 @@ class Command(BaseCommand):
                     if updated:
                         produto.save()
                         updated_count += 1
-                        self.stdout.write(
-                            self.style.WARNING(
-                                f"  ⟳ Updated: {codigo} - {nome}"
-                            )
-                        )
+                        self.stdout.write(self.style.WARNING(f"  ⟳ Updated: {codigo} - {nome}"))
                     else:
-                        self.stdout.write(
-                            f"  - Skipped (already exists): {codigo}"
-                        )
+                        self.stdout.write(f"  - Skipped (already exists): {codigo}")
 
             except Exception as e:
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"  ❌ Error processing {codigo}: {e}"
-                    )
-                )
+                self.stdout.write(self.style.ERROR(f"  ❌ Error processing {codigo}: {e}"))
                 skipped_count += 1
 
         self.stdout.write(

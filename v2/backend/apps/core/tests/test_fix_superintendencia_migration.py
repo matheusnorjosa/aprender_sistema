@@ -14,6 +14,7 @@ Tests:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import importlib
 
 import pytest
@@ -30,9 +31,7 @@ def clean_projetos(db):
 
 
 # Import migration function dynamically (module name starts with number)
-migration_module = importlib.import_module(
-    "apps.core.migrations.0037_fix_superintendencia_fluxo"
-)
+migration_module = importlib.import_module("apps.core.migrations.0037_fix_superintendencia_fluxo")
 fix_superintendencia_fluxo = migration_module.fix_superintendencia_fluxo
 reverse_superintendencia_fluxo = migration_module.reverse_superintendencia_fluxo
 
@@ -44,12 +43,8 @@ class TestFixSuperintendenciaFluxoMigration:
     def test_migration_fixes_ler_ouvir_contar_variants(self, clean_projetos):
         """Test that both LER/OUVIR/CONTAR variants are fixed."""
         # Create both variants with NAO_SUPER
-        proj1 = Projeto.objects.create(
-            nome="LER OUVIR E CONTAR", fluxo="NAO_SUPER", ativo=True
-        )
-        proj2 = Projeto.objects.create(
-            nome="LER, OUVIR E CONTAR", fluxo="NAO_SUPER", ativo=True
-        )
+        proj1 = Projeto.objects.create(nome="LER OUVIR E CONTAR", fluxo="NAO_SUPER", ativo=True)
+        proj2 = Projeto.objects.create(nome="LER, OUVIR E CONTAR", fluxo="NAO_SUPER", ativo=True)
 
         # Run migration
         fix_superintendencia_fluxo(None, None)
@@ -64,12 +59,8 @@ class TestFixSuperintendenciaFluxoMigration:
     def test_migration_fixes_catavento_variants(self, clean_projetos):
         """Test that CATAVENTO 2 and 3 are fixed."""
         # Create CATAVENTO variants
-        proj2 = Projeto.objects.create(
-            nome="PROJETO CATAVENTO 2", fluxo="NAO_SUPER", ativo=True
-        )
-        proj3 = Projeto.objects.create(
-            nome="PROJETO CATAVENTO 3", fluxo="NAO_SUPER", ativo=True
-        )
+        proj2 = Projeto.objects.create(nome="PROJETO CATAVENTO 2", fluxo="NAO_SUPER", ativo=True)
+        proj3 = Projeto.objects.create(nome="PROJETO CATAVENTO 3", fluxo="NAO_SUPER", ativo=True)
 
         # Run migration
         fix_superintendencia_fluxo(None, None)
@@ -84,12 +75,8 @@ class TestFixSuperintendenciaFluxoMigration:
     def test_migration_preserves_other_projects(self, clean_projetos):
         """Test that migration doesn't affect other projects."""
         # Create unrelated projects
-        proj_nao_super = Projeto.objects.create(
-            nome="ACERTA MATEMÁTICA", fluxo="NAO_SUPER", ativo=True
-        )
-        proj_super = Projeto.objects.create(
-            nome="CIRANDAR", fluxo="SUPER", ativo=True
-        )
+        proj_nao_super = Projeto.objects.create(nome="ACERTA MATEMÁTICA", fluxo="NAO_SUPER", ativo=True)
+        proj_super = Projeto.objects.create(nome="CIRANDAR", fluxo="SUPER", ativo=True)
 
         # Run migration
         fix_superintendencia_fluxo(None, None)
@@ -104,9 +91,7 @@ class TestFixSuperintendenciaFluxoMigration:
     def test_migration_idempotent(self, clean_projetos):
         """Test that running migration twice doesn't cause issues."""
         # Create project
-        proj = Projeto.objects.create(
-            nome="LER OUVIR E CONTAR", fluxo="NAO_SUPER", ativo=True
-        )
+        proj = Projeto.objects.create(nome="LER OUVIR E CONTAR", fluxo="NAO_SUPER", ativo=True)
 
         # Run migration twice
         fix_superintendencia_fluxo(None, None)
@@ -119,9 +104,7 @@ class TestFixSuperintendenciaFluxoMigration:
     def test_migration_skips_already_super(self, clean_projetos):
         """Test that migration skips projects already marked SUPER."""
         # Create project already SUPER
-        proj = Projeto.objects.create(
-            nome="LER OUVIR E CONTAR", fluxo="SUPER", ativo=True
-        )
+        proj = Projeto.objects.create(nome="LER OUVIR E CONTAR", fluxo="SUPER", ativo=True)
 
         # Run migration
         fix_superintendencia_fluxo(None, None)
@@ -133,12 +116,8 @@ class TestFixSuperintendenciaFluxoMigration:
     def test_migration_reversible(self, clean_projetos):
         """Test that migration can be reversed."""
         # Create projects
-        proj1 = Projeto.objects.create(
-            nome="LER OUVIR E CONTAR", fluxo="NAO_SUPER", ativo=True
-        )
-        proj2 = Projeto.objects.create(
-            nome="PROJETO CATAVENTO 2", fluxo="NAO_SUPER", ativo=True
-        )
+        proj1 = Projeto.objects.create(nome="LER OUVIR E CONTAR", fluxo="NAO_SUPER", ativo=True)
+        proj2 = Projeto.objects.create(nome="PROJETO CATAVENTO 2", fluxo="NAO_SUPER", ativo=True)
 
         # Forward migration
         fix_superintendencia_fluxo(None, None)
@@ -159,12 +138,8 @@ class TestFixSuperintendenciaFluxoMigration:
     def test_migration_handles_missing_projects(self, clean_projetos):
         """Test that migration handles missing projects gracefully."""
         # Create only 2 of 4 projects
-        Projeto.objects.create(
-            nome="LER OUVIR E CONTAR", fluxo="NAO_SUPER", ativo=True
-        )
-        Projeto.objects.create(
-            nome="PROJETO CATAVENTO 2", fluxo="NAO_SUPER", ativo=True
-        )
+        Projeto.objects.create(nome="LER OUVIR E CONTAR", fluxo="NAO_SUPER", ativo=True)
+        Projeto.objects.create(nome="PROJETO CATAVENTO 2", fluxo="NAO_SUPER", ativo=True)
 
         # Run migration (should not crash on missing projects)
         fix_superintendencia_fluxo(None, None)

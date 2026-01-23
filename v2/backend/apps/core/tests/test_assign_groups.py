@@ -7,9 +7,11 @@ Fase 1 Iteração 3 - Plano DAT/GCal 2025-10-29
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
-import pytest
+
 from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
+
+import pytest
 
 from apps.core.models import Usuario
 
@@ -87,9 +89,7 @@ class TestAssignGroups:
             grupo2.id,
         }
 
-    def test_assign_groups_nonexistent_group(
-        self, api_client, usuario_dat, usuario_formador
-    ):
+    def test_assign_groups_nonexistent_group(self, api_client, usuario_dat, usuario_formador):
         """Deve retornar 400 quando grupo não existe."""
         grupo1, _ = Group.objects.get_or_create(name="Grupo 1")
 
@@ -149,9 +149,7 @@ class TestAssignGroups:
         assert usuario_formador.groups.count() == 1
         assert usuario_formador.groups.first().id == grupo1.id
 
-    def test_assign_groups_permission_denied(
-        self, api_client, usuario_comum, usuario_formador
-    ):
+    def test_assign_groups_permission_denied(self, api_client, usuario_comum, usuario_formador):
         """Deve retornar 403 quando usuário não tem permissão DAT."""
         grupo1, _ = Group.objects.get_or_create(name="Grupo 1")
 
@@ -166,9 +164,7 @@ class TestAssignGroups:
 
         assert response.status_code == 403
 
-    def test_assign_groups_invalid_payload(
-        self, api_client, usuario_dat, usuario_formador
-    ):
+    def test_assign_groups_invalid_payload(self, api_client, usuario_dat, usuario_formador):
         """Deve retornar 400 quando payload é inválido."""
         api_client.force_authenticate(usuario_dat)
 
@@ -192,9 +188,7 @@ class TestAssignGroups:
         assert response.status_code == 400
         assert "integers" in response.data["error"]
 
-    def test_assign_groups_replaces_existing(
-        self, api_client, usuario_dat, usuario_formador
-    ):
+    def test_assign_groups_replaces_existing(self, api_client, usuario_dat, usuario_formador):
         """Deve substituir grupos existentes (não adicionar)."""
         # Configurar grupos iniciais
         grupo1, _ = Group.objects.get_or_create(name="Grupo 1")

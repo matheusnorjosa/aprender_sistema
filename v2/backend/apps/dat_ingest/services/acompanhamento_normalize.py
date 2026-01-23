@@ -7,22 +7,24 @@ Use: from apps.core.services.normalize import norm_text, ...
 Este arquivo mantido apenas para compatibilidade com imports existentes.
 Será removido em versão futura.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false
 
 # Re-export all from core.services.normalize for backward compatibility
 
 from __future__ import annotations
+
 from apps.core.services.normalize import (
+    hash_event_v2,
     norm_text,
-    normalize_sector,
+    normalize_date_field,
+    normalize_email,
     normalize_project_alias,
-    split_municipios_super,
+    normalize_sector,
+    normalize_time_field,
     parse_date_iso,
     parse_time_iso,
-    normalize_email,
-    normalize_date_field,
-    normalize_time_field,
-    hash_event_v2,
+    split_municipios_super,
 )
 
 __all__ = [

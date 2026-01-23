@@ -5,6 +5,7 @@ Serializers para AvailabilityBlock.
 Clausulas Petreas: RD-02, RD-03.
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations
@@ -49,8 +50,6 @@ class AvailabilityBlockSerializer(serializers.ModelSerializer):
 
         if inicio is not None and fim is not None:
             if fim <= inicio:
-                raise serializers.ValidationError(
-                    {"fim": "O fim do bloqueio deve ser posterior ao início."}
-                )
+                raise serializers.ValidationError({"fim": "O fim do bloqueio deve ser posterior ao início."})
 
         return super().validate(attrs)

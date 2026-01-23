@@ -1,6 +1,7 @@
 """
 Basic Views (api_root, CurrentUser)
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
 
 from __future__ import annotations
@@ -34,19 +35,19 @@ def api_root(request: HttpRequest) -> JsonResponse:
 # Setores baseados no mapeamento de gerências (docs/MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md)
 SETOR_GROUPS = [
     # Gerências de projeto
-    'Superintendência',  # SUPERINTENDENCIA - Fluxo SUPER
-    'Vidas',             # GERENCIA 2 - Fluxo NAO_SUPER
-    'Fluir',             # GERENCIA 3 - Fluxo NAO_SUPER
-    'ACerta',            # GERENCIA 4 - Fluxo NAO_SUPER
-    'Brincando',         # GERENCIA 5 - Fluxo NAO_SUPER
-    'Sou da Paz',        # GERENCIA 6 - Fluxo NAO_SUPER
+    "Superintendência",  # SUPERINTENDENCIA - Fluxo SUPER
+    "Vidas",  # GERENCIA 2 - Fluxo NAO_SUPER
+    "Fluir",  # GERENCIA 3 - Fluxo NAO_SUPER
+    "ACerta",  # GERENCIA 4 - Fluxo NAO_SUPER
+    "Brincando",  # GERENCIA 5 - Fluxo NAO_SUPER
+    "Sou da Paz",  # GERENCIA 6 - Fluxo NAO_SUPER
     # Setores administrativos/operacionais
-    'DAT',               # Departamento de Apoio Técnico
-    'Controle',          # Setor de Controle
-    'Gerência',          # Gerência genérica
-    'Diretoria',         # Diretoria - Acesso a dashboards
+    "DAT",  # Departamento de Apoio Técnico
+    "Controle",  # Setor de Controle
+    "Gerência",  # Gerência genérica
+    "Diretoria",  # Diretoria - Acesso a dashboards
 ]
-FUNCAO_GROUPS = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente']
+FUNCAO_GROUPS = ["Formador", "Coordenador", "Apoio de Coordenação", "Gerente"]
 
 
 class CurrentUserView(APIView):
@@ -86,9 +87,7 @@ class CurrentUserView(APIView):
 
         # Pode aprovar solicitações SUPER?
         # Regra: Gerente + Superintendência (ou superuser)
-        can_approve_super = user.is_superuser or (
-            "Gerente" in funcoes and "Superintendência" in setores
-        )
+        can_approve_super = user.is_superuser or ("Gerente" in funcoes and "Superintendência" in setores)
 
         # Compute display name
         name: str = f"{user.first_name or ''} {user.last_name or ''}".strip()

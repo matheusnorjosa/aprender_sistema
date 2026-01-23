@@ -20,6 +20,7 @@ Dados removidos:
 
 Fase 2 - Testes E2E (Playwright) - Plano DAT/GCal 2025-10-29
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 from __future__ import annotations
 
@@ -39,13 +40,13 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Apenas exibe o que seria deletado, sem aplicar mudanças',
+            "--dry-run",
+            action="store_true",
+            help="Apenas exibe o que seria deletado, sem aplicar mudanças",
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
-        dry_run = options.get('dry_run', False)
+        dry_run = options.get("dry_run", False)
 
         self.stdout.write("=" * 80)
         self.stdout.write("CLEANUP E2E DATA — Limpeza de dados de teste")
@@ -111,7 +112,7 @@ class Command(BaseCommand):
 
         if user_count == 0:
             self.stdout.write("   ⏭️  Nenhum usuário E2E encontrado")
-            return {'count': 0, 'solicitacoes': 0, 'participations': 0}
+            return {"count": 0, "solicitacoes": 0, "participations": 0}
 
         # Deletar dados relacionados primeiro
         if not dry_run:
@@ -125,9 +126,9 @@ class Command(BaseCommand):
                 self.stdout.write(f"   {status}: {username}")
 
         return {
-            'count': user_count,
-            'solicitacoes': solicitacoes_count,
-            'participations': participations_count,
+            "count": user_count,
+            "solicitacoes": solicitacoes_count,
+            "participations": participations_count,
         }
 
     def _delete_municipio(self, dry_run: bool) -> bool:
@@ -139,9 +140,7 @@ class Command(BaseCommand):
             solicitacoes_count = Solicitacao.objects.filter(municipio=municipio).count()
 
             if solicitacoes_count > 0:
-                self.stdout.write(
-                    f"   ⏭️  Mantido: Salvador, BA ({solicitacoes_count} solicitações dependem)"
-                )
+                self.stdout.write(f"   ⏭️  Mantido: Salvador, BA ({solicitacoes_count} solicitações dependem)")
                 return False
 
             status = "🗑️  Seria removido" if dry_run else "✅ Removido"
@@ -165,9 +164,7 @@ class Command(BaseCommand):
             solicitacoes_count = Solicitacao.objects.filter(projeto=projeto).count()
 
             if solicitacoes_count > 0:
-                self.stdout.write(
-                    f"   ⏭️  Mantido: {projeto.nome} ({solicitacoes_count} solicitações dependem)"
-                )
+                self.stdout.write(f"   ⏭️  Mantido: {projeto.nome} ({solicitacoes_count} solicitações dependem)")
                 return False
 
             status = "🗑️  Seria removido" if dry_run else "✅ Removido"

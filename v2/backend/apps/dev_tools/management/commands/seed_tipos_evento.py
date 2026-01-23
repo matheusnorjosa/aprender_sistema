@@ -6,6 +6,7 @@ Tipos de evento comuns em contexto educacional:
 
 Idempotente: Usa get_or_create por nome
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
 from __future__ import annotations
 
@@ -48,20 +49,12 @@ class Command(BaseCommand):
 
             if created:
                 created_count += 1
-                self.stdout.write(
-                    self.style.SUCCESS(f"  ✓ Criado: {tipo.nome}")
-                )
+                self.stdout.write(self.style.SUCCESS(f"  ✓ Criado: {tipo.nome}"))
             else:
                 existing_count += 1
-                self.stdout.write(
-                    self.style.WARNING(f"  ⊙ Já existe: {tipo.nome}")
-                )
+                self.stdout.write(self.style.WARNING(f"  ⊙ Já existe: {tipo.nome}"))
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f"\n✅ Seed concluído: {created_count} criados, {existing_count} já existentes"
-            )
+            self.style.SUCCESS(f"\n✅ Seed concluído: {created_count} criados, {existing_count} já existentes")
         )
-        self.stdout.write(
-            self.style.SUCCESS(f"Total no banco: {TipoEvento.objects.count()} tipos")
-        )
+        self.stdout.write(self.style.SUCCESS(f"Total no banco: {TipoEvento.objects.count()} tipos"))

@@ -28,30 +28,33 @@ Refs:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import os
-import pytest
 import threading
 from datetime import timedelta
-from unittest.mock import patch, MagicMock
-from django.utils import timezone
+from unittest.mock import MagicMock, patch
+
 from django.contrib.auth.models import Group
-from rest_framework.test import APIClient
+from django.utils import timezone
 from rest_framework import status as http_status
+from rest_framework.test import APIClient
+
+import pytest
 from cryptography.fernet import Fernet
 
-from apps.core.models import Usuario, GoogleOAuthCredential, AuditLog
+from apps.core.models import AuditLog, GoogleOAuthCredential, Usuario
 from apps.core.services.google_oauth import (
-    _encrypt_token,
     _decrypt_token,
+    _encrypt_token,
     exchange_code_for_tokens,
     refresh_access_token_safe,
     rotate_encryption_key,
 )
 
-
 # ============================================================================
 # FIXTURES
 # ============================================================================
+
 
 @pytest.fixture(autouse=True)
 def patch_decrypt_for_memoryview(monkeypatch):
@@ -72,26 +75,26 @@ def patch_decrypt_for_memoryview(monkeypatch):
 
     def decrypt_with_memoryview_support(encrypted):
         # Converter memoryview para bytes se necessário
-        if hasattr(encrypted, 'tobytes'):
+        if hasattr(encrypted, "tobytes"):
             encrypted = encrypted.tobytes()
         elif not isinstance(encrypted, (bytes, str)):
             encrypted = bytes(encrypted)
         return original_decrypt(encrypted)
 
-    monkeypatch.setattr(oauth_module, '_decrypt_token', decrypt_with_memoryview_support)
+    monkeypatch.setattr(oauth_module, "_decrypt_token", decrypt_with_memoryview_support)
 
     # Patch 2: Fernet.decrypt (usado diretamente por rotate_encryption_key)
     original_fernet_decrypt = Fernet.decrypt
 
     def fernet_decrypt_with_memoryview_support(self, token, ttl=None):
         # Converter memoryview para bytes se necessário
-        if hasattr(token, 'tobytes'):
+        if hasattr(token, "tobytes"):
             token = token.tobytes()
         elif not isinstance(token, (bytes, str)):
             token = bytes(token)
         return original_fernet_decrypt(self, token, ttl)
 
-    monkeypatch.setattr(Fernet, 'decrypt', fernet_decrypt_with_memoryview_support)
+    monkeypatch.setattr(Fernet, "decrypt", fernet_decrypt_with_memoryview_support)
 
 
 @pytest.fixture
@@ -144,7 +147,9 @@ def google_oauth_credential(usuario_controle):
     if not isinstance(access_encrypted, bytes):
         access_encrypted = access_encrypted.encode() if isinstance(access_encrypted, str) else bytes(access_encrypted)
     if not isinstance(refresh_encrypted, bytes):
-        refresh_encrypted = refresh_encrypted.encode() if isinstance(refresh_encrypted, str) else bytes(refresh_encrypted)
+        refresh_encrypted = (
+            refresh_encrypted.encode() if isinstance(refresh_encrypted, str) else bytes(refresh_encrypted)
+        )
 
     cred = GoogleOAuthCredential.objects.create(
         user=usuario_controle,
@@ -158,9 +163,9 @@ def google_oauth_credential(usuario_controle):
 
     # CRITICAL: PostgreSQL BinaryField retorna memoryview, converter para bytes
     cred.refresh_from_db()
-    if hasattr(cred.access_token_encrypted, 'tobytes'):
+    if hasattr(cred.access_token_encrypted, "tobytes"):
         cred.access_token_encrypted = bytes(cred.access_token_encrypted)
-    if hasattr(cred.refresh_token_encrypted, 'tobytes'):
+    if hasattr(cred.refresh_token_encrypted, "tobytes"):
         cred.refresh_token_encrypted = bytes(cred.refresh_token_encrypted)
 
     return cred
@@ -169,6 +174,7 @@ def google_oauth_credential(usuario_controle):
 @pytest.fixture
 def mock_google_api():
     """Mock de respostas da Google API"""
+
     def _mock_exchange_response():
         return {
             "access_token": "new_access_token_abc123",
@@ -202,6 +208,7 @@ def mock_google_api():
 # TESTES UNITÁRIOS (4 testes)
 # ============================================================================
 
+
 @pytest.mark.django_db
 class TestGoogleOAuthServiceUnit:
     """Testes unitários do serviço OAuth (GAP-1, GAP-2)"""
@@ -226,14 +233,17 @@ class TestGoogleOAuthServiceUnit:
         decrypted = _decrypt_token(encrypted)
         assert decrypted == plaintext, "Deve retornar plaintext original"
 
-    @patch.dict('os.environ', {
-        'GCAL_OAUTH_CLIENT_ID': 'test_client_id_123',
-        'GCAL_OAUTH_CLIENT_SECRET': 'test_client_secret_456',
-        'GCAL_OAUTH_REDIRECT_URI': 'http://localhost:8002/api/oauth/google/callback/',
-        'GCAL_ALLOWED_DOMAIN': 'aprendereditora.com.br',
-    })
-    @patch('apps.core.services.google_oauth.requests.post')
-    @patch('apps.core.services.google_oauth.requests.get')
+    @patch.dict(
+        "os.environ",
+        {
+            "GCAL_OAUTH_CLIENT_ID": "test_client_id_123",
+            "GCAL_OAUTH_CLIENT_SECRET": "test_client_secret_456",
+            "GCAL_OAUTH_REDIRECT_URI": "http://localhost:8002/api/oauth/google/callback/",
+            "GCAL_ALLOWED_DOMAIN": "aprendereditora.com.br",
+        },
+    )
+    @patch("apps.core.services.google_oauth.requests.post")
+    @patch("apps.core.services.google_oauth.requests.get")
     def test_exchange_code_validates_domain(self, mock_get, mock_post, mock_google_api):
         """
         GAP-2: Validação de domínio @aprendereditora.com.br.
@@ -243,37 +253,31 @@ class TestGoogleOAuthServiceUnit:
         - Email inválido: @gmail.com → ValueError
         """
         # Mock exchange tokens
-        mock_post.return_value = MagicMock(
-            status_code=200,
-            json=mock_google_api["exchange"]
-        )
+        mock_post.return_value = MagicMock(status_code=200, json=mock_google_api["exchange"])
 
         # Caso 1: Email válido
         mock_get.return_value = MagicMock(
-            status_code=200,
-            json=lambda: {"email": "operacional1@aprendereditora.com.br"}
+            status_code=200, json=lambda: {"email": "operacional1@aprendereditora.com.br"}
         )
 
         result = exchange_code_for_tokens("fake_code_123")
         assert result["email"] == "operacional1@aprendereditora.com.br"
 
         # Caso 2: Email inválido (domínio errado)
-        mock_get.return_value = MagicMock(
-            status_code=200,
-            json=lambda: {"email": "user@gmail.com"}
-        )
+        mock_get.return_value = MagicMock(status_code=200, json=lambda: {"email": "user@gmail.com"})
 
         with pytest.raises(ValueError, match="Domínio não permitido"):
             exchange_code_for_tokens("fake_code_456")
 
-    @patch.dict('os.environ', {
-        'GCAL_OAUTH_CLIENT_ID': 'test_client_id_123',
-        'GCAL_OAUTH_CLIENT_SECRET': 'test_client_secret_456',
-    })
-    @patch('apps.core.services.google_oauth.requests.post')
-    def test_refresh_access_token_with_concurrency(
-        self, mock_post, google_oauth_credential, mock_google_api
-    ):
+    @patch.dict(
+        "os.environ",
+        {
+            "GCAL_OAUTH_CLIENT_ID": "test_client_id_123",
+            "GCAL_OAUTH_CLIENT_SECRET": "test_client_secret_456",
+        },
+    )
+    @patch("apps.core.services.google_oauth.requests.post")
+    def test_refresh_access_token_with_concurrency(self, mock_post, google_oauth_credential, mock_google_api):
         """
         GAP-1: Refresh thread-safe com select_for_update.
 
@@ -286,10 +290,7 @@ class TestGoogleOAuthServiceUnit:
         Teste completo com threading requer setup complexo (TransactionTestCase).
         """
         # Mock refresh API
-        mock_post.return_value = MagicMock(
-            status_code=200,
-            json=mock_google_api["refresh"]
-        )
+        mock_post.return_value = MagicMock(status_code=200, json=mock_google_api["refresh"])
 
         # Simular token expirado
         google_oauth_credential.token_expiry = timezone.now() - timedelta(minutes=10)
@@ -320,6 +321,7 @@ class TestGoogleOAuthServiceUnit:
         """
         # Obter chave atual (usada pela fixture para criar tokens)
         from apps.core.services.google_oauth import _get_fernet_key
+
         current_key_bytes = _get_fernet_key()
         old_key = current_key_bytes.decode() if isinstance(current_key_bytes, bytes) else current_key_bytes
 
@@ -335,8 +337,9 @@ class TestGoogleOAuthServiceUnit:
 
         # Depois: tokens criptografáveis com chave nova
         google_oauth_credential.refresh_from_db()
-        assert google_oauth_credential.access_token_encrypted != old_encrypted_access, \
-            "Token deve ter sido re-criptografado"
+        assert (
+            google_oauth_credential.access_token_encrypted != old_encrypted_access
+        ), "Token deve ter sido re-criptografado"
 
         # Validar descriptografia com chave nova
         new_fernet = Fernet(new_key.encode())
@@ -392,6 +395,7 @@ class TestGoogleOAuthServiceUnit:
 # TESTES API (6 testes)
 # ============================================================================
 
+
 @pytest.mark.django_db
 class TestGoogleOAuthEndpoints:
     """Testes dos endpoints OAuth (GAP-3, PA-05, PA-06)"""
@@ -423,11 +427,14 @@ class TestGoogleOAuthEndpoints:
         assert response.status_code == http_status.HTTP_403_FORBIDDEN
         assert "Controle" in response.data["detail"]
 
-    @patch.dict('os.environ', {
-        'GCAL_OAUTH_CLIENT_ID': 'test_client_id_123',
-        'GCAL_OAUTH_CLIENT_SECRET': 'test_client_secret_456',
-        'GCAL_OAUTH_REDIRECT_URI': 'http://localhost:8002/api/oauth/google/callback/',
-    })
+    @patch.dict(
+        "os.environ",
+        {
+            "GCAL_OAUTH_CLIENT_ID": "test_client_id_123",
+            "GCAL_OAUTH_CLIENT_SECRET": "test_client_secret_456",
+            "GCAL_OAUTH_REDIRECT_URI": "http://localhost:8002/api/oauth/google/callback/",
+        },
+    )
     def test_google_oauth_start_throttling(self, db):
         """
         GAP-3: Rate limiting 10 req/h em /oauth/google/start/.
@@ -444,6 +451,7 @@ class TestGoogleOAuthEndpoints:
         """
         # Limpar cache de throttle antes do teste
         from django.core.cache import cache
+
         cache.clear()
 
         # Criar usuário único para este teste (evitar throttle compartilhado)
@@ -460,25 +468,23 @@ class TestGoogleOAuthEndpoints:
         client.force_authenticate(user=unique_user)
 
         # Mock Google OAuth para evitar redirect real
-        with patch('apps.core.services.google_oauth.build_authorization_url') as mock_build:
+        with patch("apps.core.services.google_oauth.build_authorization_url") as mock_build:
             mock_build.return_value = "https://accounts.google.com/o/oauth2/v2/auth?..."
 
             # Fazer 10 requests (limite)
             for i in range(10):
                 response = client.get("/api/oauth/google/start/")
-                assert response.status_code == http_status.HTTP_302_FOUND, \
-                    f"Request {i+1}/10 deve ter sucesso"
+                assert response.status_code == http_status.HTTP_302_FOUND, f"Request {i+1}/10 deve ter sucesso"
 
             # 11ª request (excede limite)
             response = client.get("/api/oauth/google/start/")
-            assert response.status_code == http_status.HTTP_429_TOO_MANY_REQUESTS, \
-                "11ª request deve ser bloqueada (throttling)"
+            assert (
+                response.status_code == http_status.HTTP_429_TOO_MANY_REQUESTS
+            ), "11ª request deve ser bloqueada (throttling)"
 
-    @patch('apps.core.services.google_oauth.requests.post')
-    @patch('apps.core.services.google_oauth.requests.get')
-    def test_google_oauth_callback_validates_https(
-        self, mock_get, mock_post, usuario_controle, mock_google_api
-    ):
+    @patch("apps.core.services.google_oauth.requests.post")
+    @patch("apps.core.services.google_oauth.requests.get")
+    def test_google_oauth_callback_validates_https(self, mock_get, mock_post, usuario_controle, mock_google_api):
         """
         GAP-3: HTTPS obrigatório em produção no callback.
 
@@ -490,17 +496,11 @@ class TestGoogleOAuthEndpoints:
         client.force_authenticate(user=usuario_controle)
 
         # Mock exchange tokens
-        mock_post.return_value = MagicMock(
-            status_code=200,
-            json=mock_google_api["exchange"]
-        )
-        mock_get.return_value = MagicMock(
-            status_code=200,
-            json=lambda: {"email": "controle@aprendereditora.com.br"}
-        )
+        mock_post.return_value = MagicMock(status_code=200, json=mock_google_api["exchange"])
+        mock_get.return_value = MagicMock(status_code=200, json=lambda: {"email": "controle@aprendereditora.com.br"})
 
         # Caso 1: Produção + HTTP (request.is_secure() = False)
-        with patch('django.conf.settings.ENVIRONMENT', 'production'):
+        with patch("django.conf.settings.ENVIRONMENT", "production"):
             response = client.get(
                 "/api/oauth/google/callback/",
                 {
@@ -510,12 +510,11 @@ class TestGoogleOAuthEndpoints:
                 # Simular HTTP (não-seguro)
                 secure=False,
             )
-            assert response.status_code == http_status.HTTP_403_FORBIDDEN, \
-                "Produção + HTTP deve ser rejeitado"
+            assert response.status_code == http_status.HTTP_403_FORBIDDEN, "Produção + HTTP deve ser rejeitado"
 
         # Caso 2: Produção + HTTPS (request.is_secure() = True)
-        with patch('django.conf.settings.ENVIRONMENT', 'production'):
-            with patch('apps.core.views_oauth.settings.ENVIRONMENT', 'production'):
+        with patch("django.conf.settings.ENVIRONMENT", "production"):
+            with patch("apps.core.views_oauth.settings.ENVIRONMENT", "production"):
                 response = client.get(
                     "/api/oauth/google/callback/",
                     {
@@ -528,20 +527,21 @@ class TestGoogleOAuthEndpoints:
                 # Callback redireciona, não retorna JSON
                 assert response.status_code in [
                     http_status.HTTP_302_FOUND,
-                    http_status.HTTP_200_OK
+                    http_status.HTTP_200_OK,
                 ], "Produção + HTTPS deve funcionar"
 
-    @patch.dict('os.environ', {
-        'GCAL_OAUTH_CLIENT_ID': 'test_client_id_123',
-        'GCAL_OAUTH_CLIENT_SECRET': 'test_client_secret_456',
-        'GCAL_OAUTH_REDIRECT_URI': 'http://localhost:8002/api/oauth/google/callback/',
-        'GCAL_ALLOWED_DOMAIN': 'aprendereditora.com.br',
-    })
-    @patch('apps.core.services.google_oauth.requests.post')
-    @patch('apps.core.services.google_oauth.requests.get')
-    def test_google_oauth_callback_success(
-        self, mock_get, mock_post, usuario_controle, mock_google_api
-    ):
+    @patch.dict(
+        "os.environ",
+        {
+            "GCAL_OAUTH_CLIENT_ID": "test_client_id_123",
+            "GCAL_OAUTH_CLIENT_SECRET": "test_client_secret_456",
+            "GCAL_OAUTH_REDIRECT_URI": "http://localhost:8002/api/oauth/google/callback/",
+            "GCAL_ALLOWED_DOMAIN": "aprendereditora.com.br",
+        },
+    )
+    @patch("apps.core.services.google_oauth.requests.post")
+    @patch("apps.core.services.google_oauth.requests.get")
+    def test_google_oauth_callback_success(self, mock_get, mock_post, usuario_controle, mock_google_api):
         """
         PA-05: Callback cria credencial + AuditLog.
 
@@ -557,23 +557,21 @@ class TestGoogleOAuthEndpoints:
         client.force_authenticate(user=usuario_controle)
 
         # Mock exchange tokens
-        mock_post.return_value = MagicMock(
-            status_code=200,
-            json=mock_google_api["exchange"]
-        )
-        mock_get.return_value = MagicMock(
-            status_code=200,
-            json=lambda: {"email": "controle@aprendereditora.com.br"}
-        )
+        mock_post.return_value = MagicMock(status_code=200, json=mock_google_api["exchange"])
+        mock_get.return_value = MagicMock(status_code=200, json=lambda: {"email": "controle@aprendereditora.com.br"})
 
         # Criar state no cache (simular build_authorization_url)
         csrf_token = "test_csrf_token_valid_123"
         cache_key = f"oauth_state:{csrf_token}"
-        cache.set(cache_key, {
-            "user_id": usuario_controle.id,
-            "return_to": "/pre-agenda",
-            "created_at": timezone.now().isoformat(),
-        }, timeout=600)
+        cache.set(
+            cache_key,
+            {
+                "user_id": usuario_controle.id,
+                "return_to": "/pre-agenda",
+                "created_at": timezone.now().isoformat(),
+            },
+            timeout=600,
+        )
 
         state = f"{csrf_token}|/pre-agenda|{usuario_controle.id}"
 
@@ -583,7 +581,7 @@ class TestGoogleOAuthEndpoints:
             {
                 "code": "fake_code_123",
                 "state": state,
-            }
+            },
         )
 
         # Validar redirect
@@ -597,10 +595,7 @@ class TestGoogleOAuthEndpoints:
         assert credential.is_expired() is False, "Token deve estar válido"
 
         # Validar AuditLog (PA-05)
-        audit = AuditLog.objects.filter(
-            usuario=usuario_controle,
-            action="GOOGLE_CONNECT"
-        ).last()
+        audit = AuditLog.objects.filter(usuario=usuario_controle, action="GOOGLE_CONNECT").last()
         assert audit is not None, "Deve criar AuditLog"
         assert audit.details["google_email"] == "controle@aprendereditora.com.br"
 
@@ -630,10 +625,8 @@ class TestGoogleOAuthEndpoints:
         assert response.data["connected"] is False
         assert response.data["google_email"] is None
 
-    @patch('apps.core.services.google_oauth.requests.post')
-    def test_disconnect_removes_credential(
-        self, mock_post, usuario_controle, google_oauth_credential
-    ):
+    @patch("apps.core.services.google_oauth.requests.post")
+    def test_disconnect_removes_credential(self, mock_post, usuario_controle, google_oauth_credential):
         """
         PA-05: Endpoint /disconnect/ remove credencial + AuditLog.
 
@@ -657,18 +650,16 @@ class TestGoogleOAuthEndpoints:
 
         # Mensagem pode ser "desconectada com sucesso" ou "removida localmente"
         message = response.data["message"].lower()
-        assert any(keyword in message for keyword in ["desconectada", "removida", "sucesso"]), \
-            f"Mensagem deve indicar sucesso: {response.data['message']}"
+        assert any(
+            keyword in message for keyword in ["desconectada", "removida", "sucesso"]
+        ), f"Mensagem deve indicar sucesso: {response.data['message']}"
 
         # Validar credencial removida
         exists = GoogleOAuthCredential.objects.filter(user=usuario_controle).exists()
         assert exists is False, "Credencial deve ter sido removida"
 
         # Validar AuditLog (PA-05)
-        audit = AuditLog.objects.filter(
-            usuario=usuario_controle,
-            action="GOOGLE_DISCONNECT"
-        ).last()
+        audit = AuditLog.objects.filter(usuario=usuario_controle, action="GOOGLE_DISCONNECT").last()
         assert audit is not None, "Deve criar AuditLog"
         assert audit.details["google_email"] == "controle@aprendereditora.com.br"
         assert audit.details["reason"] == "user_requested"
@@ -681,6 +672,7 @@ class TestGoogleOAuthEndpoints:
 # ============================================================================
 # TESTES DE SEGURANÇA (SECURITY)
 # ============================================================================
+
 
 class TestOAuthSecurity:
     """
@@ -696,33 +688,41 @@ class TestOAuthSecurity:
 
         Previne: Atacante criar link malicioso /callback?code=...&state=fake|/|<victim_id>
         """
-        from apps.core.services.google_oauth import build_authorization_url
         from django.core.cache import cache
+
+        from apps.core.services.google_oauth import build_authorization_url
 
         client = APIClient()
         client.force_authenticate(user=usuario_controle)
 
         # Gerar state válido
-        with patch.dict('os.environ', {
-            'GCAL_OAUTH_CLIENT_ID': 'test_client_id',
-            'GCAL_OAUTH_CLIENT_SECRET': 'test_secret',
-            'GCAL_OAUTH_REDIRECT_URI': 'http://localhost:8002/api/oauth/google/callback/',
-        }):
+        with patch.dict(
+            "os.environ",
+            {
+                "GCAL_OAUTH_CLIENT_ID": "test_client_id",
+                "GCAL_OAUTH_CLIENT_SECRET": "test_secret",
+                "GCAL_OAUTH_REDIRECT_URI": "http://localhost:8002/api/oauth/google/callback/",
+            },
+        ):
             auth_url = build_authorization_url(usuario_controle, return_to="/pre-agenda")
 
         # Extrair state da URL
-        from urllib.parse import urlparse, parse_qs
+        from urllib.parse import parse_qs, urlparse
+
         parsed = urlparse(auth_url)
         query_params = parse_qs(parsed.query)
-        valid_state = query_params['state'][0]
+        valid_state = query_params["state"][0]
 
         # Tentar callback com state inválido (não no cache)
         fake_state = "invalid_csrf_token|/pre-agenda|" + str(usuario_controle.id)
 
-        response = client.get("/api/oauth/google/callback/", {
-            "code": "fake_code_123",
-            "state": fake_state,
-        })
+        response = client.get(
+            "/api/oauth/google/callback/",
+            {
+                "code": "fake_code_123",
+                "state": fake_state,
+            },
+        )
 
         # Deve rejeitar (redirect com erro)
         assert response.status_code == http_status.HTTP_302_FOUND
@@ -735,18 +735,22 @@ class TestOAuthSecurity:
         """
         from apps.core.services.google_oauth import build_authorization_url, validate_oauth_state
 
-        with patch.dict('os.environ', {
-            'GCAL_OAUTH_CLIENT_ID': 'test_client_id',
-            'GCAL_OAUTH_CLIENT_SECRET': 'test_secret',
-            'GCAL_OAUTH_REDIRECT_URI': 'http://localhost:8002/api/oauth/google/callback/',
-        }):
+        with patch.dict(
+            "os.environ",
+            {
+                "GCAL_OAUTH_CLIENT_ID": "test_client_id",
+                "GCAL_OAUTH_CLIENT_SECRET": "test_secret",
+                "GCAL_OAUTH_REDIRECT_URI": "http://localhost:8002/api/oauth/google/callback/",
+            },
+        ):
             auth_url = build_authorization_url(usuario_controle, return_to="/pre-agenda")
 
         # Extrair state
-        from urllib.parse import urlparse, parse_qs
+        from urllib.parse import parse_qs, urlparse
+
         parsed = urlparse(auth_url)
         query_params = parse_qs(parsed.query)
-        state = query_params['state'][0]
+        state = query_params["state"][0]
 
         # Primeira validação: sucesso
         result1 = validate_oauth_state(state, usuario_controle.id)
@@ -765,11 +769,14 @@ class TestOAuthSecurity:
         """
         from apps.core.services.google_oauth import build_authorization_url
 
-        with patch.dict('os.environ', {
-            'GCAL_OAUTH_CLIENT_ID': 'test_client_id',
-            'GCAL_OAUTH_CLIENT_SECRET': 'test_secret',
-            'GCAL_OAUTH_REDIRECT_URI': 'http://localhost:8002/api/oauth/google/callback/',
-        }):
+        with patch.dict(
+            "os.environ",
+            {
+                "GCAL_OAUTH_CLIENT_ID": "test_client_id",
+                "GCAL_OAUTH_CLIENT_SECRET": "test_secret",
+                "GCAL_OAUTH_REDIRECT_URI": "http://localhost:8002/api/oauth/google/callback/",
+            },
+        ):
             # Tentar URLs maliciosas
             malicious_urls = [
                 "https://malicioso.com",
@@ -783,13 +790,14 @@ class TestOAuthSecurity:
                 auth_url = build_authorization_url(usuario_controle, return_to=malicious_url)
 
                 # Extrair state da URL gerada
-                from urllib.parse import urlparse, parse_qs
+                from urllib.parse import parse_qs, urlparse
+
                 parsed = urlparse(auth_url)
                 query_params = parse_qs(parsed.query)
-                state = query_params['state'][0]
+                state = query_params["state"][0]
 
                 # State deve ter /pre-agenda (fallback), não a URL maliciosa
-                csrf_token, return_to, user_id = state.split('|')
+                csrf_token, return_to, user_id = state.split("|")
                 assert return_to == "/pre-agenda", f"URL maliciosa não foi bloqueada: {malicious_url}"
 
     def test_safe_internal_paths_allowed_in_return_to(self, usuario_controle):
@@ -798,11 +806,14 @@ class TestOAuthSecurity:
         """
         from apps.core.services.google_oauth import build_authorization_url
 
-        with patch.dict('os.environ', {
-            'GCAL_OAUTH_CLIENT_ID': 'test_client_id',
-            'GCAL_OAUTH_CLIENT_SECRET': 'test_secret',
-            'GCAL_OAUTH_REDIRECT_URI': 'http://localhost:8002/api/oauth/google/callback/',
-        }):
+        with patch.dict(
+            "os.environ",
+            {
+                "GCAL_OAUTH_CLIENT_ID": "test_client_id",
+                "GCAL_OAUTH_CLIENT_SECRET": "test_secret",
+                "GCAL_OAUTH_REDIRECT_URI": "http://localhost:8002/api/oauth/google/callback/",
+            },
+        ):
             safe_paths = [
                 "/pre-agenda",
                 "/dashboard",
@@ -814,21 +825,23 @@ class TestOAuthSecurity:
                 auth_url = build_authorization_url(usuario_controle, return_to=safe_path)
 
                 # Extrair state
-                from urllib.parse import urlparse, parse_qs
+                from urllib.parse import parse_qs, urlparse
+
                 parsed = urlparse(auth_url)
                 query_params = parse_qs(parsed.query)
-                state = query_params['state'][0]
+                state = query_params["state"][0]
 
                 # State deve conter o caminho seguro
-                csrf_token, return_to, user_id = state.split('|')
+                csrf_token, return_to, user_id = state.split("|")
                 assert return_to == safe_path, f"Caminho seguro foi rejeitado: {safe_path}"
 
     def test_oauth_callback_rejects_expired_state(self, usuario_controle):
         """
         Security: Callback deve rejeitar state expirado (TTL 10min).
         """
-        from django.core.cache import cache
         import time
+
+        from django.core.cache import cache
 
         client = APIClient()
         client.force_authenticate(user=usuario_controle)
@@ -836,11 +849,15 @@ class TestOAuthSecurity:
         # Criar state manualmente no cache com TTL curto
         csrf_token = "test_csrf_token_123"
         cache_key = f"oauth_state:{csrf_token}"
-        cache.set(cache_key, {
-            "user_id": usuario_controle.id,
-            "return_to": "/pre-agenda",
-            "created_at": timezone.now().isoformat(),
-        }, timeout=1)  # 1 segundo apenas
+        cache.set(
+            cache_key,
+            {
+                "user_id": usuario_controle.id,
+                "return_to": "/pre-agenda",
+                "created_at": timezone.now().isoformat(),
+            },
+            timeout=1,
+        )  # 1 segundo apenas
 
         state = f"{csrf_token}|/pre-agenda|{usuario_controle.id}"
 
@@ -848,10 +865,13 @@ class TestOAuthSecurity:
         time.sleep(2)
 
         # Tentar callback com state expirado
-        response = client.get("/api/oauth/google/callback/", {
-            "code": "fake_code_123",
-            "state": state,
-        })
+        response = client.get(
+            "/api/oauth/google/callback/",
+            {
+                "code": "fake_code_123",
+                "state": state,
+            },
+        )
 
         # Deve rejeitar
         assert response.status_code == http_status.HTTP_302_FOUND
@@ -896,6 +916,7 @@ class TestOAuthSecurity:
 # TESTES ADICIONAIS PARA COBERTURA (Issue #318)
 # ============================================================================
 
+
 @pytest.mark.django_db
 class TestViewsOAuthCoverage:
     """
@@ -936,8 +957,8 @@ class TestViewsOAuthCoverage:
         # Deve ter scheme (http:// ou https://)
         assert result.startswith("http")
 
-    @patch.dict('os.environ', {'FRONTEND_URL': ''}, clear=False)
-    @patch('django.conf.settings.CORS_ALLOWED_ORIGINS', ['http://localhost:8002'])
+    @patch.dict("os.environ", {"FRONTEND_URL": ""}, clear=False)
+    @patch("django.conf.settings.CORS_ALLOWED_ORIGINS", ["http://localhost:8002"])
     def test_build_frontend_redirect_url_fallback_no_5173(self):
         """
         Linhas 129-132: Fallback quando não há :5173 nas origens CORS.
@@ -945,13 +966,13 @@ class TestViewsOAuthCoverage:
         from apps.core.views_oauth import _build_frontend_redirect_url
 
         # Remove FRONTEND_URL do environ para forçar fallback
-        with patch.dict('os.environ', {'FRONTEND_URL': ''}, clear=False):
+        with patch.dict("os.environ", {"FRONTEND_URL": ""}, clear=False):
             result = _build_frontend_redirect_url("/test")
             # Deve usar fallback (localhost:5173 ou primeira origem não-8002)
             assert "/test" in result
 
-    @patch.dict('os.environ', {'FRONTEND_URL': ''}, clear=False)
-    @patch('django.conf.settings.CORS_ALLOWED_ORIGINS', [])
+    @patch.dict("os.environ", {"FRONTEND_URL": ""}, clear=False)
+    @patch("django.conf.settings.CORS_ALLOWED_ORIGINS", [])
     def test_build_frontend_redirect_url_fallback_empty_cors(self):
         """
         Linha 136: Fallback para localhost:5173 quando CORS_ALLOWED_ORIGINS vazio.
@@ -961,7 +982,7 @@ class TestViewsOAuthCoverage:
         result = _build_frontend_redirect_url("/test")
         assert "localhost:5173" in result or "/test" in result
 
-    @patch('apps.core.services.google_oauth.build_authorization_url')
+    @patch("apps.core.services.google_oauth.build_authorization_url")
     def test_google_oauth_start_config_error(self, mock_build, usuario_controle):
         """
         Linhas 195-197: ValueError quando config OAuth incompleta.
@@ -984,9 +1005,12 @@ class TestViewsOAuthCoverage:
         client = APIClient()
         client.force_authenticate(user=usuario_controle)
 
-        response = client.get("/api/oauth/google/callback/", {
-            "error": "access_denied",
-        })
+        response = client.get(
+            "/api/oauth/google/callback/",
+            {
+                "error": "access_denied",
+            },
+        )
 
         assert response.status_code == http_status.HTTP_302_FOUND
         assert "google=error" in response.url
@@ -999,10 +1023,13 @@ class TestViewsOAuthCoverage:
         client = APIClient()
         client.force_authenticate(user=usuario_controle)
 
-        response = client.get("/api/oauth/google/callback/", {
-            "state": "some_state",
-            # code ausente
-        })
+        response = client.get(
+            "/api/oauth/google/callback/",
+            {
+                "state": "some_state",
+                # code ausente
+            },
+        )
 
         assert response.status_code == http_status.HTTP_302_FOUND
         assert "google=error" in response.url
@@ -1015,10 +1042,13 @@ class TestViewsOAuthCoverage:
         client = APIClient()
         client.force_authenticate(user=usuario_controle)
 
-        response = client.get("/api/oauth/google/callback/", {
-            "code": "some_code",
-            # state ausente
-        })
+        response = client.get(
+            "/api/oauth/google/callback/",
+            {
+                "code": "some_code",
+                # state ausente
+            },
+        )
 
         assert response.status_code == http_status.HTTP_302_FOUND
         assert "google=error" in response.url
@@ -1036,23 +1066,21 @@ class TestViewsOAuthCoverage:
         client = APIClient()
         # NÃO autenticado - DRF retorna 403 antes de chegar na view
 
-        response = client.get("/api/oauth/google/callback/", {
-            "code": "some_code",
-            "state": "some_state",
-        })
+        response = client.get(
+            "/api/oauth/google/callback/",
+            {
+                "code": "some_code",
+                "state": "some_state",
+            },
+        )
 
         # DRF SessionAuthentication bloqueia antes de chegar na view
         # Aceitar tanto 403 (auth padrão) quanto 302 (redirect com erro)
-        assert response.status_code in [
-            http_status.HTTP_403_FORBIDDEN,
-            http_status.HTTP_302_FOUND
-        ]
+        assert response.status_code in [http_status.HTTP_403_FORBIDDEN, http_status.HTTP_302_FOUND]
 
-    @patch('apps.core.services.google_oauth.exchange_code_for_tokens')
-    @patch('apps.core.services.google_oauth.validate_oauth_state')
-    def test_google_oauth_callback_validation_error(
-        self, mock_validate, mock_exchange, usuario_controle
-    ):
+    @patch("apps.core.services.google_oauth.exchange_code_for_tokens")
+    @patch("apps.core.services.google_oauth.validate_oauth_state")
+    def test_google_oauth_callback_validation_error(self, mock_validate, mock_exchange, usuario_controle):
         """
         Linhas 319-324: ValueError durante exchange (ex: domínio inválido).
         """
@@ -1071,20 +1099,21 @@ class TestViewsOAuthCoverage:
         # Mock exchange lança ValueError
         mock_exchange.side_effect = ValueError("Domínio não permitido: gmail.com")
 
-        response = client.get("/api/oauth/google/callback/", {
-            "code": "some_code",
-            "state": f"csrf|/pre-agenda|{usuario_controle.id}",
-        })
+        response = client.get(
+            "/api/oauth/google/callback/",
+            {
+                "code": "some_code",
+                "state": f"csrf|/pre-agenda|{usuario_controle.id}",
+            },
+        )
 
         assert response.status_code == http_status.HTTP_302_FOUND
         assert "google=error" in response.url
         assert "validation" in response.url
 
-    @patch('apps.core.views_oauth.exchange_code_for_tokens')
-    @patch('apps.core.services.google_oauth.validate_oauth_state')
-    def test_google_oauth_callback_generic_exception(
-        self, mock_validate, mock_exchange, usuario_controle
-    ):
+    @patch("apps.core.views_oauth.exchange_code_for_tokens")
+    @patch("apps.core.services.google_oauth.validate_oauth_state")
+    def test_google_oauth_callback_generic_exception(self, mock_validate, mock_exchange, usuario_controle):
         """
         Linhas 326-331: Exception genérica durante exchange.
 
@@ -1105,19 +1134,20 @@ class TestViewsOAuthCoverage:
         # Mock exchange lança Exception genérica (não ValueError)
         mock_exchange.side_effect = RuntimeError("Connection timeout")
 
-        response = client.get("/api/oauth/google/callback/", {
-            "code": "some_code",
-            "state": f"csrf|/pre-agenda|{usuario_controle.id}",
-        })
+        response = client.get(
+            "/api/oauth/google/callback/",
+            {
+                "code": "some_code",
+                "state": f"csrf|/pre-agenda|{usuario_controle.id}",
+            },
+        )
 
         assert response.status_code == http_status.HTTP_302_FOUND
         assert "google=error" in response.url
         assert "server_error" in response.url
 
-    @patch('apps.core.views_oauth.revoke_token')
-    def test_google_oauth_disconnect_revoke_fails(
-        self, mock_revoke, usuario_controle, google_oauth_credential
-    ):
+    @patch("apps.core.views_oauth.revoke_token")
+    def test_google_oauth_disconnect_revoke_fails(self, mock_revoke, usuario_controle, google_oauth_credential):
         """
         Linhas 433-440: Disconnect quando revoke_token retorna False.
 
@@ -1150,10 +1180,8 @@ class TestViewsOAuthCoverage:
         assert response.status_code == http_status.HTTP_404_NOT_FOUND
         assert "Nenhuma conexão Google encontrada" in response.data["error"]
 
-    @patch('apps.core.services.gcal_oauth_client.OAuthCalendarClient')
-    def test_google_oauth_list_calendars_success(
-        self, mock_client_class, usuario_controle, google_oauth_credential
-    ):
+    @patch("apps.core.services.gcal_oauth_client.OAuthCalendarClient")
+    def test_google_oauth_list_calendars_success(self, mock_client_class, usuario_controle, google_oauth_credential):
         """
         Linhas 481-499: list_calendars retorna lista de calendários.
         """
@@ -1189,10 +1217,8 @@ class TestViewsOAuthCoverage:
         assert response.status_code == http_status.HTTP_404_NOT_FOUND
         assert "Nenhuma conexão Google encontrada" in response.data["error"]
 
-    @patch('apps.core.services.gcal_oauth_client.OAuthCalendarClient')
-    def test_google_oauth_list_calendars_api_error(
-        self, mock_client_class, usuario_controle, google_oauth_credential
-    ):
+    @patch("apps.core.services.gcal_oauth_client.OAuthCalendarClient")
+    def test_google_oauth_list_calendars_api_error(self, mock_client_class, usuario_controle, google_oauth_credential):
         """
         Linhas 506-510: list_calendars quando API Google falha.
         """
@@ -1209,9 +1235,7 @@ class TestViewsOAuthCoverage:
         assert response.status_code == http_status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "Erro ao listar calendários" in response.data["error"]
 
-    def test_google_oauth_select_calendar_success(
-        self, usuario_controle, google_oauth_credential
-    ):
+    def test_google_oauth_select_calendar_success(self, usuario_controle, google_oauth_credential):
         """
         Linhas 544-577: select_calendar salva calendário selecionado.
         """
@@ -1221,7 +1245,7 @@ class TestViewsOAuthCoverage:
         response = client.post(
             "/api/integrations/google/select-calendar/",
             {"calendar_id": "agenda-formacoes@aprendereditora.com.br"},
-            format="json"
+            format="json",
         )
 
         assert response.status_code == http_status.HTTP_200_OK
@@ -1232,27 +1256,18 @@ class TestViewsOAuthCoverage:
         assert google_oauth_credential.default_calendar_id == "agenda-formacoes@aprendereditora.com.br"
 
         # Verificar AuditLog
-        audit = AuditLog.objects.filter(
-            usuario=usuario_controle,
-            action="GOOGLE_SELECT_CALENDAR"
-        ).last()
+        audit = AuditLog.objects.filter(usuario=usuario_controle, action="GOOGLE_SELECT_CALENDAR").last()
         assert audit is not None
         assert audit.details["calendar_id"] == "agenda-formacoes@aprendereditora.com.br"
 
-    def test_google_oauth_select_calendar_missing_id(
-        self, usuario_controle, google_oauth_credential
-    ):
+    def test_google_oauth_select_calendar_missing_id(self, usuario_controle, google_oauth_credential):
         """
         Linhas 548-551: select_calendar sem calendar_id.
         """
         client = APIClient()
         client.force_authenticate(user=usuario_controle)
 
-        response = client.post(
-            "/api/integrations/google/select-calendar/",
-            {},  # Sem calendar_id
-            format="json"
-        )
+        response = client.post("/api/integrations/google/select-calendar/", {}, format="json")  # Sem calendar_id
 
         assert response.status_code == http_status.HTTP_400_BAD_REQUEST
         assert "calendar_id é obrigatório" in response.data["error"]
@@ -1268,9 +1283,7 @@ class TestViewsOAuthCoverage:
         GoogleOAuthCredential.objects.filter(user=usuario_controle).delete()
 
         response = client.post(
-            "/api/integrations/google/select-calendar/",
-            {"calendar_id": "test@example.com"},
-            format="json"
+            "/api/integrations/google/select-calendar/", {"calendar_id": "test@example.com"}, format="json"
         )
 
         assert response.status_code == http_status.HTTP_404_NOT_FOUND

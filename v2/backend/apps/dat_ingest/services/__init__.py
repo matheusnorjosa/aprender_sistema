@@ -2,8 +2,8 @@
 dat_ingest services
 """
 
-
 from __future__ import annotations
+
 from .normalizers import (
     normalize_cpf,
     normalize_email,

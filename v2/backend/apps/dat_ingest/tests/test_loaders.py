@@ -27,26 +27,36 @@ def temp_usuarios_xlsx(tmp_path):
     ws.title = "Ativos"
 
     # Header
-    ws.append([
-        "Nome", "CPF", "Telefone", "Email", "Cargo",
-        "Gerência", "Perfil", "Superintendência", "Ativo"
-    ])
+    ws.append(["Nome", "CPF", "Telefone", "Email", "Cargo", "Gerência", "Perfil", "Superintendência", "Ativo"])
 
     # Data rows
-    ws.append([
-        "João Silva", "12345678901", "(85) 99999-9999",
-        "joao.silva@example.com", "Formador", "DAT",
-        "Formador", "", "Sim"
-    ])
-    ws.append([
-        "Maria Santos", "98765432100", "(85) 88888-8888",
-        "maria.santos@example.com", "Coordenadora", "Superintendência",
-        "Coordenador", "Sim", "Sim"
-    ])
-    ws.append([
-        "Pedro Inativo", "", "", "pedro@example.com",
-        "Formador", "DAT", "Formador", "", "Não"
-    ])
+    ws.append(
+        [
+            "João Silva",
+            "12345678901",
+            "(85) 99999-9999",
+            "joao.silva@example.com",
+            "Formador",
+            "DAT",
+            "Formador",
+            "",
+            "Sim",
+        ]
+    )
+    ws.append(
+        [
+            "Maria Santos",
+            "98765432100",
+            "(85) 88888-8888",
+            "maria.santos@example.com",
+            "Coordenadora",
+            "Superintendência",
+            "Coordenador",
+            "Sim",
+            "Sim",
+        ]
+    )
+    ws.append(["Pedro Inativo", "", "", "pedro@example.com", "Formador", "DAT", "Formador", "", "Não"])
 
     wb.save(filepath)
     return filepath
@@ -63,28 +73,64 @@ def temp_agenda_xlsx(tmp_path):
     ws.title = "Super"
 
     # Header
-    ws.append([
-        "Data", "Horário Inicial", "Horário Final", "Projeto",
-        "Tipo de Evento", "Município", "Coordenador", "Formador(es)",
-        "Situação", "Observações"
-    ])
+    ws.append(
+        [
+            "Data",
+            "Horário Inicial",
+            "Horário Final",
+            "Projeto",
+            "Tipo de Evento",
+            "Município",
+            "Coordenador",
+            "Formador(es)",
+            "Situação",
+            "Observações",
+        ]
+    )
 
     # Data rows com tipos variados
-    ws.append([
-        "2025-01-15", "14:00", "17:00", "ACerta",
-        "Formação Presencial", "Fortaleza - CE", "Ellen Damares",
-        "João Silva", "Realizado", ""
-    ])
-    ws.append([
-        "2025-01-20", "09:00", "12:00", "Novo Lendo",
-        "Workshop", "Caucaia - CE", "Aurea Lucia",
-        "Maria Santos", "Agendado", ""
-    ])
-    ws.append([
-        "2025-01-25", "14:00", "16:00", "Tema",
-        "Formação Presencial", "Maracanaú - CE", "Ellen Damares",
-        "Pedro Oliveira", "Pendente", ""
-    ])
+    ws.append(
+        [
+            "2025-01-15",
+            "14:00",
+            "17:00",
+            "ACerta",
+            "Formação Presencial",
+            "Fortaleza - CE",
+            "Ellen Damares",
+            "João Silva",
+            "Realizado",
+            "",
+        ]
+    )
+    ws.append(
+        [
+            "2025-01-20",
+            "09:00",
+            "12:00",
+            "Novo Lendo",
+            "Workshop",
+            "Caucaia - CE",
+            "Aurea Lucia",
+            "Maria Santos",
+            "Agendado",
+            "",
+        ]
+    )
+    ws.append(
+        [
+            "2025-01-25",
+            "14:00",
+            "16:00",
+            "Tema",
+            "Formação Presencial",
+            "Maracanaú - CE",
+            "Ellen Damares",
+            "Pedro Oliveira",
+            "Pendente",
+            "",
+        ]
+    )
 
     wb.save(filepath)
     return filepath
@@ -307,9 +353,7 @@ class TestParseProjetos:
 class TestLoadersIntegration:
     """Testes de integração dos loaders"""
 
-    def test_all_loaders_return_lists_of_dicts(
-        self, temp_usuarios_xlsx, temp_municipios_xlsx, temp_projetos_xlsx
-    ):
+    def test_all_loaders_return_lists_of_dicts(self, temp_usuarios_xlsx, temp_municipios_xlsx, temp_projetos_xlsx):
         """Test: Todos os loaders retornam listas de dicts"""
         usuarios = parse_usuarios(temp_usuarios_xlsx)
         municipios = parse_municipios(temp_municipios_xlsx)

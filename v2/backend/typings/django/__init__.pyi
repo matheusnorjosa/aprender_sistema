@@ -1,7 +1,8 @@
 # Django Type Stubs
 # Custom type hints for Django-specific patterns in Aprender Sistema v2
 
-from typing import TypeVar, Generic
+from typing import Generic, TypeVar
+
 from django.db import models
 
 _T = TypeVar("_T", bound=models.Model)

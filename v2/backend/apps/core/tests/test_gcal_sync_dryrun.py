@@ -7,11 +7,13 @@ Cobertura completa das operações CREATE/UPDATE/ADOPT/DELETE/SKIP com idempotê
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 from datetime import timedelta
 
 from django.utils import timezone
 
 import pytest
+
 from apps.core.models import Municipio, Solicitacao, TipoEvento, Usuario
 from apps.core.services.gcal_fake_client import FakeCalendarClient
 from apps.core.services.gcal_sync_service import upsert_one
@@ -52,9 +54,7 @@ class TestGCalSyncIdempotency:
     Testes de idempotência e operações básicas.
     """
 
-    def test_create_idempotent(
-        self, usuario_test, tipo_evento_test, municipio_test, fake_client
-    ):
+    def test_create_idempotent(self, usuario_test, tipo_evento_test, municipio_test, fake_client):
         """
         create_idempotent: Primeira rodada CREATE, segunda rodada UPDATE (idempotente).
         Solicitação aprovada sem external_event_id cria evento asv2-{id}.
@@ -94,9 +94,7 @@ class TestGCalSyncIdempotency:
 
         # Verificar que DB foi atualizado
         sol.refresh_from_db()
-        assert (
-            sol.external_event_id == f"asv2-{sol.id}"
-        ), "DB deve ter external_event_id"
+        assert sol.external_event_id == f"asv2-{sol.id}", "DB deve ter external_event_id"
 
         # Segunda execução → UPDATE (idempotente)
         outcome2 = upsert_one(
@@ -115,9 +113,7 @@ class TestGCalSyncIdempotency:
         events = fake_client.list_events(calendar_id)
         assert len(events) == 1, "Ainda deve ter apenas 1 evento (não duplicado)"
 
-    def test_adopt_existing(
-        self, usuario_test, tipo_evento_test, municipio_test, fake_client
-    ):
+    def test_adopt_existing(self, usuario_test, tipo_evento_test, municipio_test, fake_client):
         """
         adopt_existing: Evento existe no Calendar com eventId determinístico,
         mas DB não tem external_event_id → ação ADOPT e preenche o campo.
@@ -164,17 +160,13 @@ class TestGCalSyncIdempotency:
 
         # Verificar que DB foi atualizado
         sol.refresh_from_db()
-        assert (
-            sol.external_event_id == event_id
-        ), "DB deve ter sido atualizado com eventId"
+        assert sol.external_event_id == event_id, "DB deve ter sido atualizado com eventId"
 
         # Verificar que ainda tem apenas 1 evento
         events = fake_client.list_events(calendar_id)
         assert len(events) == 1, "Deve ter apenas 1 evento (adotado, não duplicado)"
 
-    def test_update_on_change(
-        self, usuario_test, tipo_evento_test, municipio_test, fake_client
-    ):
+    def test_update_on_change(self, usuario_test, tipo_evento_test, municipio_test, fake_client):
         """
         update_on_change: Muda horário/título → UPDATE.
         """
@@ -229,9 +221,7 @@ class TestGCalSyncIdempotency:
 
         assert start_after != start_before, "Horário deve ter sido atualizado"
 
-    def test_delete_when_unapproved(
-        self, usuario_test, tipo_evento_test, municipio_test, fake_client
-    ):
+    def test_delete_when_unapproved(self, usuario_test, tipo_evento_test, municipio_test, fake_client):
         """
         delete_when_unapproved: Era approved com evento, agora reprovado → DELETE.
         """
@@ -288,9 +278,7 @@ class TestGCalSyncIdempotency:
         sol.refresh_from_db()
         assert sol.external_event_id is None, "DB não deve mais ter external_event_id"
 
-    def test_delete_protected_by_no_delete_flag(
-        self, usuario_test, tipo_evento_test, municipio_test, fake_client
-    ):
+    def test_delete_protected_by_no_delete_flag(self, usuario_test, tipo_evento_test, municipio_test, fake_client):
         """
         Teste adicional: --no-delete protege eventos de serem deletados.
         """
@@ -343,9 +331,7 @@ class TestGCalSyncDryRun:
     Testes de dry-run (sem side effects).
     """
 
-    def test_dry_run_no_side_effects(
-        self, usuario_test, tipo_evento_test, municipio_test, fake_client
-    ):
+    def test_dry_run_no_side_effects(self, usuario_test, tipo_evento_test, municipio_test, fake_client):
         """
         dry_run_no_side_effects: Com --dry-run, nenhuma alteração no DB ou Calendar.
         """
@@ -385,9 +371,7 @@ class TestGCalSyncDryRun:
         events = fake_client.list_events(calendar_id)
         assert len(events) == 0, "Calendar não deve ter eventos em dry-run"
 
-    def test_dry_run_reports_planned_actions(
-        self, usuario_test, tipo_evento_test, municipio_test, fake_client
-    ):
+    def test_dry_run_reports_planned_actions(self, usuario_test, tipo_evento_test, municipio_test, fake_client):
         """
         Dry-run deve reportar todas as ações planejadas sem executá-las.
         """
@@ -431,9 +415,7 @@ class TestGCalSyncFilters:
     Testes dos filtros do command (via queryset).
     """
 
-    def test_filters_by_date_range(
-        self, usuario_test, tipo_evento_test, municipio_test, fake_client
-    ):
+    def test_filters_by_date_range(self, usuario_test, tipo_evento_test, municipio_test, fake_client):
         """
         filters: --since/--until afetam o conjunto de solicitações processadas.
         """
@@ -476,9 +458,7 @@ class TestGCalSyncFilters:
         # Filtrar queryset (como o command faria)
         from django.db.models import Q
 
-        qs = Solicitacao.objects.filter(
-            Q(inicio__lte=until) & Q(fim__gte=since)
-        ).order_by("id")
+        qs = Solicitacao.objects.filter(Q(inicio__lte=until) & Q(fim__gte=since)).order_by("id")
 
         # Deve incluir apenas sol_presente
         assert qs.count() == 1, "Filtro deve retornar apenas 1 solicitação"
@@ -499,9 +479,7 @@ class TestGCalSyncFilters:
         events = fake_client.list_events(calendar_id)
         assert len(events) == 1, "Apenas solicitação filtrada deve ter evento"
 
-    def test_filters_by_ids(
-        self, usuario_test, tipo_evento_test, municipio_test, fake_client
-    ):
+    def test_filters_by_ids(self, usuario_test, tipo_evento_test, municipio_test, fake_client):
         """
         filters: --ids afeta o conjunto processado.
         """
@@ -568,9 +546,7 @@ class TestGCalSyncEdgeCases:
     Testes de casos edge.
     """
 
-    def test_skip_when_not_approved_and_no_event(
-        self, usuario_test, tipo_evento_test, municipio_test, fake_client
-    ):
+    def test_skip_when_not_approved_and_no_event(self, usuario_test, tipo_evento_test, municipio_test, fake_client):
         """
         SKIP: Solicitação pendente/reprovada sem evento → nada a fazer.
         """
@@ -600,9 +576,7 @@ class TestGCalSyncEdgeCases:
         assert len(fake_client.list_events(calendar_id)) == 0
 
     @pytest.mark.skip(reason="TEMP: Do PR19 - será corrigido após merge sequencial")
-    def test_payload_includes_all_required_fields(
-        self, usuario_test, tipo_evento_test, municipio_test, fake_client
-    ):
+    def test_payload_includes_all_required_fields(self, usuario_test, tipo_evento_test, municipio_test, fake_client):
         """
         Verificar que payload inclui todos os campos obrigatórios.
         """
@@ -636,9 +610,7 @@ class TestGCalSyncEdgeCases:
         # Verificar campos obrigatórios
         assert "summary" in event, "Deve ter summary"
         assert "description" in event, "Deve ter description"
-        assert (
-            "start" in event and "dateTime" in event["start"]
-        ), "Deve ter start.dateTime"
+        assert "start" in event and "dateTime" in event["start"], "Deve ter start.dateTime"
         assert "end" in event and "dateTime" in event["end"], "Deve ter end.dateTime"
         assert "location" in event, "Deve ter location"
         assert "attendees" in event, "Deve ter attendees"

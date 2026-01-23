@@ -4,6 +4,7 @@ AS v2 — Usuario Serializers
 Serializers para Usuario e Group.
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations
@@ -67,7 +68,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         required=False,
         allow_empty=True,
         write_only=True,
-        source='groups'  # Maps to the same field in the model
+        source="groups",  # Maps to the same field in the model
     )
 
     password = serializers.CharField(write_only=True, required=False)
@@ -104,14 +105,14 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             "password",
             "first_name",
             "last_name",
-            "cpf",               # Full CPF (write-only for create/update)
-            "cpf_masked",        # Masked CPF for display (LGPD)
+            "cpf",  # Full CPF (write-only for create/update)
+            "cpf_masked",  # Masked CPF for display (LGPD)
             "is_active",
             "is_staff",
             "is_superuser",
-            "groups",            # Read-only (nomes)
-            "group_ids",         # Write-only (IDs para criar/editar)
-            "group_ids_display", # Read-only (IDs para popular form de edição)
+            "groups",  # Read-only (nomes)
+            "group_ids",  # Write-only (IDs para criar/editar)
+            "group_ids_display",  # Read-only (IDs para popular form de edição)
             "date_joined",
             "last_login",
         ]
@@ -136,17 +137,13 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
         # Check if user is trying to modify their own groups (P1.1)
         if instance and request and instance.id == request.user.id:
-            raise serializers.ValidationError(
-                "Você não pode modificar seus próprios grupos."
-            )
+            raise serializers.ValidationError("Você não pode modificar seus próprios grupos.")
 
         # Validate groups against whitelist (P1.1)
         for group in value:
             if group.name not in self.ALLOWED_GROUPS:
                 allowed_list = ", ".join(sorted(self.ALLOWED_GROUPS))
-                raise serializers.ValidationError(
-                    f"Grupo '{group.name}' não permitido. Grupos válidos: {allowed_list}"
-                )
+                raise serializers.ValidationError(f"Grupo '{group.name}' não permitido. Grupos válidos: {allowed_list}")
 
         return value
 
@@ -192,9 +189,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         if value:
             # Minimum length check
             if len(value) < 8:
-                raise serializers.ValidationError(
-                    "A senha deve ter no mínimo 8 caracteres."
-                )
+                raise serializers.ValidationError("A senha deve ter no mínimo 8 caracteres.")
 
             # Use Django's validate_password for consistent policy
             try:

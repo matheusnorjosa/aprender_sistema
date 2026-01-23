@@ -6,23 +6,25 @@ e testes parametrizados.
 
 Issue #54: Extrair magic numbers para constantes.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 
 from __future__ import annotations
+
 from decimal import Decimal
 
 # ================================================================
 # MATCHING DE NOMES (Jaccard similarity)
 # ================================================================
 # Threshold mínimo para considerar match válido por similaridade Jaccard
-NAME_MATCH_JACCARD_MIN = Decimal('0.60')
+NAME_MATCH_JACCARD_MIN = Decimal("0.60")
 
 # Score para subset tokens (todos tokens de um estão no outro)
-NAME_MATCH_SCORE_SUBSET = Decimal('0.90')
+NAME_MATCH_SCORE_SUBSET = Decimal("0.90")
 
 # Score para first + last name match
-NAME_MATCH_SCORE_FIRST_LAST = Decimal('0.85')
+NAME_MATCH_SCORE_FIRST_LAST = Decimal("0.85")
 
 # ================================================================
 # LIMITES DE RELATÓRIOS

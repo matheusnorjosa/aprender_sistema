@@ -7,6 +7,7 @@ usadas tanto pelo ETL quanto por validações em runtime.
 Movido de dat_ingest/services/resolvers.py para desacoplar
 ETL do sistema principal (Issue: decouple-etl).
 """
+
 # pyright: reportMissingImports=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportReturnType=false
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 
 from apps.core.models import Municipio, Projeto, TipoEvento
+
 from .normalize import norm_text
 
 if TYPE_CHECKING:
@@ -70,9 +72,7 @@ def resolve_user_by_name(name: str) -> Usuario | None:
     name_norm = norm_text(name)
 
     # Tentativa 1: Match exato em first_name ou last_name
-    user = User.objects.filter(
-        Q(first_name__iexact=name_norm) | Q(last_name__iexact=name_norm)
-    ).first()
+    user = User.objects.filter(Q(first_name__iexact=name_norm) | Q(last_name__iexact=name_norm)).first()
 
     if user:
         return user
@@ -84,18 +84,13 @@ def resolve_user_by_name(name: str) -> Usuario | None:
         last_part = parts[-1]
 
         # Tenta primeiro nome + último nome
-        user = User.objects.filter(
-            first_name__icontains=first_part,
-            last_name__icontains=last_part
-        ).first()
+        user = User.objects.filter(first_name__icontains=first_part, last_name__icontains=last_part).first()
 
         if user:
             return user
 
         # Tentativa 3: Match mais relaxado (qualquer parte em qualquer nome)
-        user = User.objects.filter(
-            Q(first_name__icontains=first_part) | Q(last_name__icontains=last_part)
-        ).first()
+        user = User.objects.filter(Q(first_name__icontains=first_part) | Q(last_name__icontains=last_part)).first()
 
         if user:
             return user

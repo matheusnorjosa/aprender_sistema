@@ -13,6 +13,7 @@ Tests:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
+
 import importlib
 
 import pytest
@@ -29,9 +30,7 @@ def clean_projetos(db):
 
 
 # Import migration function dynamically (module name starts with number)
-migration_module = importlib.import_module(
-    "apps.core.migrations.0038_mark_test_projects"
-)
+migration_module = importlib.import_module("apps.core.migrations.0038_mark_test_projects")
 mark_test_projects = migration_module.mark_test_projects
 unmark_test_projects = migration_module.unmark_test_projects
 

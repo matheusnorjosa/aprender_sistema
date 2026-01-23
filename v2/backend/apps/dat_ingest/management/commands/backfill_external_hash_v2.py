@@ -11,6 +11,7 @@ SEGURANÇA:
 OUTPUTS:
 - external_hash_v2_collisions.json: relatório de colisões detectadas
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 from django.utils import timezone
 
-from apps.core.models import Solicitacao, Participation
+from apps.core.models import Participation, Solicitacao
 from apps.dat_ingest.services.acompanhamento_normalize import hash_event_v2
 
 
@@ -117,14 +118,10 @@ class Command(BaseCommand):
 
             except Exception as e:
                 stats["errors"] += 1
-                self.stdout.write(
-                    self.style.ERROR(f"❌ Erro na solicitação {sol.id}: {e}")
-                )
+                self.stdout.write(self.style.ERROR(f"❌ Erro na solicitação {sol.id}: {e}"))
 
         # Detectar colisões (hash mapeado a 2+ solicitações)
-        collisions = {
-            hash_val: ids for hash_val, ids in hash_map.items() if len(ids) > 1
-        }
+        collisions = {hash_val: ids for hash_val, ids in hash_map.items() if len(ids) > 1}
 
         # Relatório de sumário
         self.stdout.write("\n" + "-" * 80)
@@ -139,29 +136,15 @@ class Command(BaseCommand):
         # Gerar relatório de colisões (se houver)
         if collisions:
             self.generate_collisions_report(collisions)
-            self.stdout.write(
-                self.style.WARNING(
-                    f"\n⚠️  {len(collisions)} colisões detectadas!"
-                )
-            )
-            self.stdout.write(
-                "   Veja: v2/.agents/outbox/external_hash_v2_collisions.json"
-            )
+            self.stdout.write(self.style.WARNING(f"\n⚠️  {len(collisions)} colisões detectadas!"))
+            self.stdout.write("   Veja: v2/.agents/outbox/external_hash_v2_collisions.json")
         else:
-            self.stdout.write(
-                self.style.SUCCESS("\n✅ Nenhuma colisão detectada!")
-            )
+            self.stdout.write(self.style.SUCCESS("\n✅ Nenhuma colisão detectada!"))
 
         if not apply:
-            self.stdout.write(
-                self.style.WARNING("\n⚠️  DRY-RUN: Use --apply para atualizar")
-            )
+            self.stdout.write(self.style.WARNING("\n⚠️  DRY-RUN: Use --apply para atualizar"))
         else:
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"\n✅ {stats['would_update']} solicitações atualizadas!"
-                )
-            )
+            self.stdout.write(self.style.SUCCESS(f"\n✅ {stats['would_update']} solicitações atualizadas!"))
 
         self.stdout.write("\n✅ Backfill concluído!\n")
 
@@ -193,6 +176,7 @@ class Command(BaseCommand):
         # Projeto com alias IDEB
         projeto_nome = (sol.projeto.nome or "").strip() if sol.projeto_id else ""
         from apps.dat_ingest.services.acompanhamento_normalize import normalize_project_alias
+
         projeto_normalizado = normalize_project_alias(projeto_nome)
 
         # Fluxo SUPER x NAO_SUPER
@@ -216,7 +200,7 @@ class Command(BaseCommand):
 
         # Formadores: primeiro tenta M2M field, depois Participation
         formadores = []
-        if hasattr(sol, 'formadores'):
+        if hasattr(sol, "formadores"):
             # Usar M2M field (modelo antigo)
             formadores_qs = sol.formadores.all()
             for f in formadores_qs:
@@ -230,9 +214,7 @@ class Command(BaseCommand):
 
         # Se não encontrou formadores no M2M, tentar Participation
         if not formadores:
-            parts = Participation.objects.filter(
-                solicitacao=sol, role="FORMADOR"
-            ).select_related("usuario")
+            parts = Participation.objects.filter(solicitacao=sol, role="FORMADOR").select_related("usuario")
             for p in parts:
                 uemail = (getattr(p.usuario, "email", "") or "").strip().lower()
                 uname = ""
@@ -255,9 +237,9 @@ class Command(BaseCommand):
             coord_acomp_str = "sim"
         else:
             # Verificar Participation
-            parts_coord = Participation.objects.filter(
-                solicitacao=sol, role="COORD_ACOMPANHA"
-            ).select_related("usuario")
+            parts_coord = Participation.objects.filter(solicitacao=sol, role="COORD_ACOMPANHA").select_related(
+                "usuario"
+            )
             coord_acomp_list = []
             for p in parts_coord:
                 uemail = (getattr(p.usuario, "email", "") or "").strip().lower()

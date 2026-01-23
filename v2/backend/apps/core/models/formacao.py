@@ -6,6 +6,7 @@ Cada plano pode ter ate 15 formacoes numeradas.
 
 Type-checked with Pyright (strict mode).
 """
+
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
@@ -42,73 +43,42 @@ class Formacao(models.Model):
 
     # Relacionamento com plano
     plano: models.ForeignKey[PlanoFormacoes] = models.ForeignKey(  # type: ignore[assignment]
-        "core.PlanoFormacoes",
-        on_delete=models.CASCADE,
-        related_name="formacoes",
-        verbose_name="Plano de Formacoes"
+        "core.PlanoFormacoes", on_delete=models.CASCADE, related_name="formacoes", verbose_name="Plano de Formacoes"
     )
 
     # Numero da formacao (1 a 15)
     numero_formacao = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(15)],
         verbose_name="Numero da Formacao",
-        help_text="Numero sequencial da formacao (1 a 15)"
+        help_text="Numero sequencial da formacao (1 a 15)",
     )
 
     # Dados da formacao
-    data_formacao = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data da Formacao"
-    )
+    data_formacao = models.DateField(null=True, blank=True, verbose_name="Data da Formacao")
     carga_horaria = models.DecimalField(
         max_digits=4,
         decimal_places=2,
         default=Decimal("4.00"),
         verbose_name="Carga Horaria",
-        help_text="Carga horaria em horas"
+        help_text="Carga horaria em horas",
     )
     modalidade = models.CharField(
-        max_length=20,
-        choices=Modalidade.choices,
-        default=Modalidade.PRESENCIAL,
-        verbose_name="Modalidade"
+        max_length=20, choices=Modalidade.choices, default=Modalidade.PRESENCIAL, verbose_name="Modalidade"
     )
 
     # Detalhes opcionais
-    horario_inicio = models.TimeField(
-        null=True,
-        blank=True,
-        verbose_name="Horario de Inicio"
-    )
-    horario_fim = models.TimeField(
-        null=True,
-        blank=True,
-        verbose_name="Horario de Termino"
-    )
+    horario_inicio = models.TimeField(null=True, blank=True, verbose_name="Horario de Inicio")
+    horario_fim = models.TimeField(null=True, blank=True, verbose_name="Horario de Termino")
     local_formacao = models.CharField(
-        max_length=200,
-        blank=True,
-        verbose_name="Local",
-        help_text="Endereco ou link da reuniao online"
+        max_length=200, blank=True, verbose_name="Local", help_text="Endereco ou link da reuniao online"
     )
-    formador_nome = models.CharField(
-        max_length=200,
-        blank=True,
-        verbose_name="Nome do Formador"
-    )
+    formador_nome = models.CharField(max_length=200, blank=True, verbose_name="Nome do Formador")
 
     # Status
     status = models.CharField(
-        max_length=30,
-        choices=StatusFormacao.choices,
-        default=StatusFormacao.AGENDADA,
-        verbose_name="Status"
+        max_length=30, choices=StatusFormacao.choices, default=StatusFormacao.AGENDADA, verbose_name="Status"
     )
-    realizada = models.BooleanField(
-        default=False,
-        verbose_name="Realizada"
-    )
+    realizada = models.BooleanField(default=False, verbose_name="Realizada")
 
     # Timestamps
     created_at = models.DateTimeField(default=timezone.now)
@@ -125,14 +95,10 @@ class Formacao(models.Model):
             models.Index(fields=["realizada"]),
         ]
         constraints = [
-            models.UniqueConstraint(
-                fields=["plano", "numero_formacao"],
-                name="unique_formacao_plano_numero"
-            ),
+            models.UniqueConstraint(fields=["plano", "numero_formacao"], name="unique_formacao_plano_numero"),
             models.CheckConstraint(
-                check=models.Q(numero_formacao__gte=1, numero_formacao__lte=15),
-                name="formacao_numero_range"
-            )
+                check=models.Q(numero_formacao__gte=1, numero_formacao__lte=15), name="formacao_numero_range"
+            ),
         ]
 
     def __str__(self) -> str:
@@ -144,7 +110,8 @@ class Formacao(models.Model):
         """Duracao da formacao em horas (se horarios definidos)."""
         if not self.horario_inicio or not self.horario_fim:
             return None
-        from datetime import datetime, date
+        from datetime import date, datetime
+
         inicio = datetime.combine(date.today(), self.horario_inicio)
         fim = datetime.combine(date.today(), self.horario_fim)
         delta = fim - inicio

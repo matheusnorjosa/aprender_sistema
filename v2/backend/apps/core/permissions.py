@@ -26,7 +26,7 @@ class IsSuperintendencia(permissions.BasePermission):  # type: ignore[misc]
             request.user
             and request.user.is_authenticated
             and (
-                getattr(request.user, 'is_superuser', False)
+                getattr(request.user, "is_superuser", False)
                 or request.user.groups.filter(name__in=["Superintendência", "DAT"]).exists()  # type: ignore[attr-defined]
             )
         )
@@ -50,12 +50,12 @@ class IsGerenteSuperintendencia(permissions.BasePermission):  # type: ignore[mis
         if not request.user or not request.user.is_authenticated:
             return False
 
-        if getattr(request.user, 'is_superuser', False):
+        if getattr(request.user, "is_superuser", False):
             return True
 
-        user_groups = set(request.user.groups.values_list('name', flat=True))  # type: ignore[attr-defined]
-        has_gerente = 'Gerente' in user_groups
-        has_superintendencia = 'Superintendência' in user_groups
+        user_groups = set(request.user.groups.values_list("name", flat=True))  # type: ignore[attr-defined]
+        has_gerente = "Gerente" in user_groups
+        has_superintendencia = "Superintendência" in user_groups
 
         return has_gerente and has_superintendencia
 
@@ -77,7 +77,7 @@ class IsSuperintendenciaOnly(permissions.BasePermission):  # type: ignore[misc]
             request.user
             and request.user.is_authenticated
             and (
-                getattr(request.user, 'is_superuser', False)
+                getattr(request.user, "is_superuser", False)
                 or request.user.groups.filter(name="Superintendência").exists()  # type: ignore[attr-defined]
             )
         )
@@ -100,7 +100,7 @@ class IsCoordenadorOrDAT(permissions.BasePermission):  # type: ignore[misc]
             request.user
             and request.user.is_authenticated
             and (
-                getattr(request.user, 'is_superuser', False)
+                getattr(request.user, "is_superuser", False)
                 or request.user.groups.filter(name__in=["Coordenador", "Apoio de Coordenação", "DAT"]).exists()  # type: ignore[attr-defined]
             )
         )
@@ -121,7 +121,7 @@ class IsControleOrSuper(permissions.BasePermission):  # type: ignore[misc]
             request.user
             and request.user.is_authenticated
             and (
-                getattr(request.user, 'is_superuser', False)
+                getattr(request.user, "is_superuser", False)
                 or request.user.groups.filter(name__in=["Controle", "Superintendência"]).exists()  # type: ignore[attr-defined]
             )
         )
@@ -142,7 +142,7 @@ class IsDATOrSuper(permissions.BasePermission):  # type: ignore[misc]
             request.user
             and request.user.is_authenticated
             and (
-                getattr(request.user, 'is_superuser', False)
+                getattr(request.user, "is_superuser", False)
                 or request.user.groups.filter(name="DAT").exists()  # type: ignore[attr-defined]
             )
         )
@@ -163,7 +163,7 @@ class IsDAT(permissions.BasePermission):  # type: ignore[misc]
             request.user
             and request.user.is_authenticated
             and (
-                getattr(request.user, 'is_superuser', False)
+                getattr(request.user, "is_superuser", False)
                 or request.user.groups.filter(name="DAT").exists()  # type: ignore[attr-defined]
             )
         )
@@ -184,7 +184,7 @@ class IsControleOrDAT(permissions.BasePermission):  # type: ignore[misc]
             request.user
             and request.user.is_authenticated
             and (
-                getattr(request.user, 'is_superuser', False)
+                getattr(request.user, "is_superuser", False)
                 or request.user.groups.filter(name__in=["Controle", "DAT", "Superintendência"]).exists()  # type: ignore[attr-defined]
             )
         )
@@ -205,7 +205,7 @@ class IsControle(permissions.BasePermission):  # type: ignore[misc]
             request.user
             and request.user.is_authenticated
             and (
-                getattr(request.user, 'is_superuser', False)
+                getattr(request.user, "is_superuser", False)
                 or request.user.groups.filter(name="Controle").exists()  # type: ignore[attr-defined]
             )
         )
@@ -226,7 +226,7 @@ class IsGerencia(permissions.BasePermission):  # type: ignore[misc]
             request.user
             and request.user.is_authenticated
             and (
-                getattr(request.user, 'is_superuser', False)
+                getattr(request.user, "is_superuser", False)
                 or request.user.groups.filter(name="Gerência").exists()  # type: ignore[attr-defined]
             )
         )
@@ -263,7 +263,7 @@ class IsOwnerOrPrivileged(permissions.BasePermission):  # type: ignore[misc]
             return False
 
         # Superuser sempre pode
-        if getattr(request.user, 'is_superuser', False):
+        if getattr(request.user, "is_superuser", False):
             return True
 
         # Grupos privilegiados podem editar qualquer solicitação
@@ -272,7 +272,7 @@ class IsOwnerOrPrivileged(permissions.BasePermission):  # type: ignore[misc]
             return True
 
         # Owner pode editar sua própria solicitação
-        obj_usuario = getattr(obj, 'usuario', None)
+        obj_usuario = getattr(obj, "usuario", None)
         return obj_usuario == request.user
 
 
@@ -296,7 +296,7 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
             return False
 
         # Superusers sempre podem acessar tudo
-        if getattr(request.user, 'is_superuser', False):
+        if getattr(request.user, "is_superuser", False):
             return True
 
         # Grupo "Controle" não tem acesso à grade mensal
@@ -305,9 +305,9 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
             return False
 
         # Obter gerencia_id da URL (via kwargs) ou query params
-        gerencia_id = view.kwargs.get('gerencia_id')  # type: ignore[attr-defined]
+        gerencia_id = view.kwargs.get("gerencia_id")  # type: ignore[attr-defined]
         if gerencia_id is None:
-            gerencia_id = request.query_params.get('gerencia_id')
+            gerencia_id = request.query_params.get("gerencia_id")
 
         # Sem gerencia_id = comportamento SUPER (permitido para todos autenticados)
         if gerencia_id is None:

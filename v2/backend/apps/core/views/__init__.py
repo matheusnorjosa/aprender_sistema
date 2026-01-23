@@ -18,15 +18,8 @@ from apps.core.views.admin import (
     ProjetoViewSet,
     UsuarioAdminViewSet,
 )
-from apps.core.views.availability import (
-    AvailabilityBlockViewSet,
-    AvailabilityCheckManyView,
-    AvailabilityCheckView,
-)
-from apps.core.views.dat import (
-    DATRegistroViewSet,
-    ProjetoGeralViewSet,
-)
+from apps.core.views.availability import AvailabilityBlockViewSet, AvailabilityCheckManyView, AvailabilityCheckView
+from apps.core.views.dat import DATRegistroViewSet, ProjetoGeralViewSet
 from apps.core.views.dat_module import (
     DATAcaoViewSet,
     DATAreaViewSet,

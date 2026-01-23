@@ -13,11 +13,7 @@ Backwards-compatible re-exports for existing imports.
 """
 
 # Batch views
-from apps.core.views_gcal.batch import (
-    GCalBatchReapplyView,
-    GCalBatchResyncView,
-    GCalPublishBatchView,
-)
+from apps.core.views_gcal.batch import GCalBatchReapplyView, GCalBatchResyncView, GCalPublishBatchView
 
 # Detail views
 from apps.core.views_gcal.detail import (
@@ -28,31 +24,16 @@ from apps.core.views_gcal.detail import (
 )
 
 # Core GCal views (from old views_gcal.py)
-from apps.core.views_gcal.gcal import (
-    gcal_calendars,
-    gcal_health,
-)
+from apps.core.views_gcal.gcal import gcal_calendars, gcal_health
 
 # Helpers
-from apps.core.views_gcal.helpers import (
-    DashboardEventsPagination,
-    _apply_common_filters,
-    _filter_events_queryset,
-)
+from apps.core.views_gcal.helpers import DashboardEventsPagination, _apply_common_filters, _filter_events_queryset
 
 # Insights views
-from apps.core.views_gcal.insights import (
-    SuccessRateView,
-    TopInsightsView,
-)
+from apps.core.views_gcal.insights import SuccessRateView, TopInsightsView
 
 # Summary views
-from apps.core.views_gcal.summary import (
-    AlertsSummaryView,
-    DashboardMetricsView,
-    GCalListView,
-    GCalStatusSummaryView,
-)
+from apps.core.views_gcal.summary import AlertsSummaryView, DashboardMetricsView, GCalListView, GCalStatusSummaryView
 
 __all__ = [
     # Core GCal

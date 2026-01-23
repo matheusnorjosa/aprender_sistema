@@ -31,10 +31,7 @@ from django.test import TestCase
 
 import pytz
 
-from apps.dat_ingest.services.parse_acompanhamento import (
-    combine_datetime,
-    parse_acompanhamento_aba,
-)
+from apps.dat_ingest.services.parse_acompanhamento import combine_datetime, parse_acompanhamento_aba
 
 
 class TestSuperDateParsing(TestCase):

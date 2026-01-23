@@ -17,9 +17,7 @@ Backwards-compatible re-exports for existing imports.
 from __future__ import annotations
 
 # Client
-from apps.core.services.gcal.client import (
-    CalendarClientAdapter,
-)
+from apps.core.services.gcal.client import CalendarClientAdapter
 
 # Payload
 from apps.core.services.gcal.payload import (
@@ -30,30 +28,16 @@ from apps.core.services.gcal.payload import (
 )
 
 # Sync operations
-from apps.core.services.gcal.sync import (
-    apply_one_solicitacao,
-    cancel_solicitacao,
-    resync_solicitacao,
-    upsert_one,
-)
+from apps.core.services.gcal.sync import apply_one_solicitacao, cancel_solicitacao, resync_solicitacao, upsert_one
 
 # Types
-from apps.core.services.gcal.types import (
-    Action,
-    SyncOutcome,
-)
+from apps.core.services.gcal.types import Action, SyncOutcome
 
 # Utils
-from apps.core.services.gcal.utils import (
-    _payload_hash,
-    _retry_with_backoff,
-)
+from apps.core.services.gcal.utils import _payload_hash, _retry_with_backoff
 
 # Validation
-from apps.core.services.gcal.validation import (
-    _event_id_for,
-    _validate_event_id,
-)
+from apps.core.services.gcal.validation import _event_id_for, _validate_event_id
 
 __all__ = [
     # Types

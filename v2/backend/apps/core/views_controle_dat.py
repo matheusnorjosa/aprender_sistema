@@ -20,11 +20,7 @@ from rest_framework.response import Response
 
 from .models import AcaoControle, AcaoDAT
 from .permissions import IsControleOrSuper, IsDATOrSuper
-from .serializers import (
-    AcaoControleSerializer,
-    AcaoDATCreateSerializer,
-    AcaoDATSerializer,
-)
+from .serializers import AcaoControleSerializer, AcaoDATCreateSerializer, AcaoDATSerializer
 
 
 class ControleAcoesListView(generics.ListAPIView):

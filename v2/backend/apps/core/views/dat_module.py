@@ -30,14 +30,7 @@ from rest_framework.response import Response
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
 
-from apps.core.models import (
-    DATAcao,
-    DATArea,
-    DATCadastro,
-    DATCompra,
-    DATCoordenador,
-    DATFormacao,
-)
+from apps.core.models import DATAcao, DATArea, DATCadastro, DATCompra, DATCoordenador, DATFormacao
 from apps.core.permissions import IsDATOrSuper, IsSuperintendenciaOnly
 from apps.core.serializers import (
     DATAcaoListSerializer,

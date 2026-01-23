@@ -7,7 +7,6 @@
  * - Callback onChange com formato correto
  */
 
-import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { describe, test, expect, vi } from 'vitest'
 import DateTimeRange from '../DateTimeRange'

@@ -5,7 +5,7 @@
  * Automatically shows/hides based on connection status.
  *
  * Usage:
- * ```jsx
+ * ```tsx
  * <OfflineBanner />
  * ```
  */
@@ -17,7 +17,7 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 /**
  * Banner that shows when user is offline.
  */
-export function OfflineBanner() {
+export function OfflineBanner(): JSX.Element | null {
   const isOnline = useOnlineStatus();
 
   if (isOnline) {

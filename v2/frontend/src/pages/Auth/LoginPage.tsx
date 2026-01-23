@@ -15,10 +15,25 @@ import logoLogin from '../../assets/logo-login.png';
 import logger from '../../utils/logger';
 import { BRAND_COLORS } from '../../contexts/ThemeContext';
 
-export default function LoginPage({ onLoginSuccess }) {
+/**
+ * Login form values interface
+ */
+interface LoginFormValues {
+  username: string;
+  password: string;
+}
+
+/**
+ * LoginPage props interface
+ */
+export interface LoginPageProps {
+  onLoginSuccess?: () => void;
+}
+
+export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Element {
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (values) => {
+  const handleSubmit = async (values: LoginFormValues): Promise<void> => {
     setLoading(true);
     try {
       await login(values.username, values.password);

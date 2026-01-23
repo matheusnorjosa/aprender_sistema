@@ -7,49 +7,78 @@
 
 import { useState, useEffect } from 'react';
 import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Checkbox } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { TeamOutlined, ReloadOutlined, EditOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { listGroups, createGroup, updateGroup, listUsers, assignGroups } from '../../api/adminDAT';
 import { PAGE_SIZES } from '../../constants';
+import type { ID } from '../../types';
 
 const { Title } = Typography;
 const { Search } = Input;
 
-export default function GruposPage() {
-  const [grupos, setGrupos] = useState([]);
+/**
+ * Group record interface
+ */
+interface GroupRecord {
+  id: ID;
+  name: string;
+  user_count?: number;
+  permissions?: unknown[];
+}
+
+/**
+ * User record interface for members management
+ */
+interface UserRecord {
+  id: ID;
+  username: string;
+  email: string;
+  groups?: Array<{ id: ID } | ID>;
+}
+
+/**
+ * Group form values interface
+ */
+interface GroupFormValues {
+  name: string;
+}
+
+export default function GruposPage(): JSX.Element {
+  const [grupos, setGrupos] = useState<GroupRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingGroup, setEditingGroup] = useState(null);
+  const [editingGroup, setEditingGroup] = useState<GroupRecord | null>(null);
   const [membersModalVisible, setMembersModalVisible] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState(null);
-  const [usuarios, setUsuarios] = useState([]);
-  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState<GroupRecord | null>(null);
+  const [usuarios, setUsuarios] = useState<UserRecord[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<ID[]>([]);
   const [savingMembers, setSavingMembers] = useState(false);
 
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<GroupFormValues>();
 
-  const fetchGrupos = async () => {
+  const fetchGrupos = async (): Promise<void> => {
     setLoading(true);
     try {
       const data = await listGroups({
         search: searchText,
         ordering: 'name',
       });
-      setGrupos(data.results || data);
+      setGrupos(data.results as GroupRecord[]);
     } catch (error) {
-      message.error(`Erro ao carregar grupos: ${error.message}`);
+      message.error(`Erro ao carregar grupos: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchUsuarios = async () => {
+  const fetchUsuarios = async (): Promise<void> => {
     try {
       const data = await listUsers({ ordering: 'username', page_size: PAGE_SIZES.ALL });
-      setUsuarios(data.results || data);
+      setUsuarios(data.results as UserRecord[]);
     } catch (error) {
-      message.error(`Erro ao carregar usuários: ${error.message}`);
+      message.error(`Erro ao carregar usuários: ${(error as Error).message}`);
     }
   };
 
@@ -61,19 +90,19 @@ export default function GruposPage() {
     fetchUsuarios();
   }, []);
 
-  const handleCreate = () => {
+  const handleCreate = (): void => {
     setEditingGroup(null);
     form.resetFields();
     setModalVisible(true);
   };
 
-  const handleEdit = (group) => {
+  const handleEdit = (group: GroupRecord): void => {
     setEditingGroup(group);
     form.setFieldsValue(group);
     setModalVisible(true);
   };
 
-  const handleSave = async (values) => {
+  const handleSave = async (values: GroupFormValues): Promise<void> => {
     try {
       if (editingGroup) {
         await updateGroup(editingGroup.id, values);
@@ -86,30 +115,34 @@ export default function GruposPage() {
       form.resetFields();
       fetchGrupos();
     } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      message.error(`Erro: ${(error as Error).message}`);
     }
   };
 
-  const handleManageMembers = async (group) => {
+  const handleManageMembers = async (group: GroupRecord): Promise<void> => {
     setSelectedGroup(group);
     setMembersModalVisible(true);
 
     // Carregar usuários que já estão no grupo
     const usersInGroup = usuarios.filter((u) =>
-      u.groups && u.groups.some((g) => g.id === group.id || g === group.id)
+      u.groups && u.groups.some((g) => {
+        const gId = typeof g === 'object' ? g.id : g;
+        return gId === group.id;
+      })
     );
     setSelectedUsers(usersInGroup.map((u) => u.id));
   };
 
-  const handleSaveMembers = async () => {
+  const handleSaveMembers = async (): Promise<void> => {
+    if (!selectedGroup) return;
+
     setSavingMembers(true);
     try {
-      // Para cada usuário selecionado, atribuir o grupo
-      // Para cada usuário não-selecionado que estava no grupo, remover o grupo
-
       const promises = usuarios.map(async (usuario) => {
         const isSelected = selectedUsers.includes(usuario.id);
-        const currentGroups = usuario.groups ? usuario.groups.map((g) => (typeof g === 'object' ? g.id : g)) : [];
+        const currentGroups = usuario.groups
+          ? usuario.groups.map((g) => (typeof g === 'object' ? g.id : g))
+          : [];
         const hasGroup = currentGroups.includes(selectedGroup.id);
 
         if (isSelected && !hasGroup) {
@@ -130,13 +163,13 @@ export default function GruposPage() {
       fetchGrupos();
       fetchUsuarios();
     } catch (error) {
-      message.error(`Erro ao atualizar membros: ${error.message}`);
+      message.error(`Erro ao atualizar membros: ${(error as Error).message}`);
     } finally {
       setSavingMembers(false);
     }
   };
 
-  const columns = [
+  const columns: ColumnsType<GroupRecord> = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
     { title: 'Nome', dataIndex: 'name', key: 'name', width: 250 },
     {
@@ -144,14 +177,14 @@ export default function GruposPage() {
       dataIndex: 'user_count',
       key: 'user_count',
       width: 100,
-      render: (count) => <Tag color="blue">{count || 0} usuário(s)</Tag>,
+      render: (count: number | undefined) => <Tag color="blue">{count || 0} usuário(s)</Tag>,
     },
     {
       title: 'Permissões',
       dataIndex: 'permissions',
       key: 'permissions',
       width: 120,
-      render: (perms) => <Tag color="purple">{perms?.length || 0} perm(s)</Tag>,
+      render: (perms: unknown[] | undefined) => <Tag color="purple">{perms?.length || 0} perm(s)</Tag>,
     },
     {
       title: 'Ações',
@@ -262,10 +295,10 @@ export default function GruposPage() {
         <Checkbox.Group
           className="w-full flex flex-col gap-2"
           value={selectedUsers}
-          onChange={setSelectedUsers}
+          onChange={(values) => setSelectedUsers(values as ID[])}
         >
           {usuarios.map((usuario) => (
-            <Checkbox key={usuario.id} value={usuario.id}>
+            <Checkbox key={String(usuario.id)} value={usuario.id}>
               {usuario.username} ({usuario.email})
             </Checkbox>
           ))}

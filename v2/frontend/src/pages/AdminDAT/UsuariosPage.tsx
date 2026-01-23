@@ -10,11 +10,14 @@
 
 import { useState, useEffect } from 'react';
 import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Select, Divider } from 'antd';
-import { UserAddOutlined, ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
+import type { FilterValue, SorterResult } from 'antd/es/table/interface';
+import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { listUsers, createUser, updateUser, deleteUser, listGroups } from '../../api/adminDAT';
 import logger from '../../utils/logger';
 import { PAGE_SIZES } from '../../constants';
+import type { ID } from '../../types';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -26,28 +29,83 @@ const SETOR_GROUPS = [
 ];
 const FUNCAO_GROUPS = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente'];
 
-export default function UsuariosPage() {
-  const [usuarios, setUsuarios] = useState([]);
+/**
+ * User record interface
+ */
+interface UserRecord {
+  id: ID;
+  username: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  cpf?: string;
+  is_active: boolean;
+  groups?: string[];
+  group_ids_display?: ID[];
+}
+
+/**
+ * Group record interface
+ */
+interface GroupRecord {
+  id: ID;
+  name: string;
+}
+
+/**
+ * User form values interface
+ */
+interface UserFormValues {
+  username: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  cpf?: string;
+  setor_ids: ID[];
+  funcao_ids: ID[];
+  password?: string;
+}
+
+/**
+ * Pagination state interface
+ */
+interface PaginationState {
+  current: number;
+  pageSize: number;
+  total: number;
+}
+
+/**
+ * Fetch params interface
+ */
+interface FetchParams {
+  current?: number;
+  pageSize?: number;
+  ordering?: string;
+}
+
+export default function UsuariosPage(): JSX.Element {
+  const [usuarios, setUsuarios] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [pagination, setPagination] = useState({
+  const [pagination, setPagination] = useState<PaginationState>({
     current: 1,
     pageSize: PAGE_SIZES.SMALL,
     total: 0,
   });
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
-  const [grupos, setGrupos] = useState([]);
+  const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  const [grupos, setGrupos] = useState<GroupRecord[]>([]);
 
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<UserFormValues>();
 
   /**
    * Fetch users from API
    */
-  const fetchUsuarios = async (params = {}) => {
+  const fetchUsuarios = async (params: FetchParams = {}): Promise<void> => {
     setLoading(true);
     try {
-      const apiParams = {};
+      const apiParams: Record<string, unknown> = {};
 
       // Only add non-empty search
       if (searchText) {
@@ -68,14 +126,16 @@ export default function UsuariosPage() {
       const data = await listUsers(apiParams);
 
       // DRF pagination response structure
-      setUsuarios(data.results || data);
+      // Note: API returns AdminUser with Group[], component uses string[]
+      // This is acceptable during migration - will be unified in strict mode phase
+      setUsuarios(data.results as unknown as UserRecord[]);
       setPagination({
         current: params.current || pagination.current,
         pageSize: params.pageSize || pagination.pageSize,
-        total: data.count || (data.results || data).length,
+        total: data.count || data.results.length,
       });
     } catch (error) {
-      message.error(`Erro ao carregar usuários: ${error.message}`);
+      message.error(`Erro ao carregar usuários: ${(error as Error).message}`);
       logger.error('Erro ao carregar usuários:', error);
     } finally {
       setLoading(false);
@@ -83,10 +143,10 @@ export default function UsuariosPage() {
   };
 
   // Fetch groups on mount
-  const fetchGrupos = async () => {
+  const fetchGrupos = async (): Promise<void> => {
     try {
       const data = await listGroups();
-      setGrupos(data.results || data);
+      setGrupos(data.results as GroupRecord[]);
     } catch (error) {
       logger.error('Erro ao carregar grupos:', error);
     }
@@ -102,27 +162,32 @@ export default function UsuariosPage() {
     fetchUsuarios({ current: 1 });
   }, [searchText]);
 
-  const handleTableChange = (newPagination, filters, sorter) => {
-    const params = {
+  const handleTableChange = (
+    newPagination: TablePaginationConfig,
+    _filters: Record<string, FilterValue | null>,
+    sorter: SorterResult<UserRecord> | SorterResult<UserRecord>[]
+  ): void => {
+    const params: FetchParams = {
       current: newPagination.current,
       pageSize: newPagination.pageSize,
     };
 
-    // Only add ordering if it exists
-    if (sorter && sorter.field) {
-      params.ordering = `${sorter.order === 'descend' ? '-' : ''}${sorter.field}`;
+    // Handle single sorter
+    const singleSorter = Array.isArray(sorter) ? sorter[0] : sorter;
+    if (singleSorter && singleSorter.field) {
+      params.ordering = `${singleSorter.order === 'descend' ? '-' : ''}${String(singleSorter.field)}`;
     }
 
     fetchUsuarios(params);
   };
 
-  const handleCreate = () => {
+  const handleCreate = (): void => {
     setEditingUser(null);
     form.resetFields();
     setModalVisible(true);
   };
 
-  const handleEdit = (user) => {
+  const handleEdit = (user: UserRecord): void => {
     setEditingUser(user);
     // Separar IDs de grupos por tipo
     const userGroupIds = user.group_ids_display || [];
@@ -145,7 +210,7 @@ export default function UsuariosPage() {
     setModalVisible(true);
   };
 
-  const handleDelete = (user) => {
+  const handleDelete = (user: UserRecord): void => {
     Modal.confirm({
       title: 'Confirmar exclusão',
       content: `Tem certeza que deseja excluir o usuário "${user.username}"? Esta ação não pode ser desfeita.`,
@@ -158,13 +223,13 @@ export default function UsuariosPage() {
           message.success('Usuário excluído com sucesso');
           fetchUsuarios();
         } catch (error) {
-          message.error(`Erro ao excluir: ${error.message}`);
+          message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
       },
     });
   };
 
-  const handleSave = async (values) => {
+  const handleSave = async (values: UserFormValues): Promise<void> => {
     try {
       // Combinar setor_ids e funcao_ids em group_ids
       const { setor_ids = [], funcao_ids = [], ...rest } = values;
@@ -184,11 +249,11 @@ export default function UsuariosPage() {
       form.resetFields();
       fetchUsuarios();
     } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      message.error(`Erro: ${(error as Error).message}`);
     }
   };
 
-  const columns = [
+  const columns: ColumnsType<UserRecord> = [
     {
       title: 'ID',
       dataIndex: 'id',
@@ -221,7 +286,7 @@ export default function UsuariosPage() {
       dataIndex: 'cpf',
       key: 'cpf',
       width: 150,
-      render: (cpf) => cpf || <Tag color="orange">Sem CPF</Tag>,
+      render: (cpf: string | undefined) => cpf || <Tag color="orange">Sem CPF</Tag>,
     },
     {
       title: 'Setor',
@@ -258,7 +323,7 @@ export default function UsuariosPage() {
       dataIndex: 'is_active',
       key: 'is_active',
       width: 100,
-      render: (is_active) => (
+      render: (is_active: boolean) => (
         <Tag color={is_active ? 'green' : 'red'}>{is_active ? 'Ativo' : 'Inativo'}</Tag>
       ),
     },

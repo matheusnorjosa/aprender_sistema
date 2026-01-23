@@ -11,16 +11,29 @@
  * Fase 1 - Plano DAT/GCal 2025-10-29
  */
 
+import type { ReactNode } from 'react';
 import { Card, Row, Col, Typography } from 'antd';
 import { UserOutlined, EnvironmentOutlined, TeamOutlined, ProjectOutlined, SettingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 
-export default function AdminDATHomePage() {
+/**
+ * Module configuration interface
+ */
+interface ModuleConfig {
+  key: string;
+  title: string;
+  description: string;
+  icon: ReactNode;
+  path: string;
+  status: 'Disponível' | 'Em breve';
+}
+
+export default function AdminDATHomePage(): JSX.Element {
   const navigate = useNavigate();
 
-  const modules = [
+  const modules: ModuleConfig[] = [
     {
       key: 'usuarios',
       title: 'Usuários',

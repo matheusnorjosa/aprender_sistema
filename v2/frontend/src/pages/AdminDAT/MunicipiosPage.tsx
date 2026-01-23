@@ -7,25 +7,48 @@
 
 import { useState, useEffect } from 'react';
 import { Table, Button, Input, Space, Tag, Typography, Card, message, Select, Modal, Form, Checkbox } from 'antd';
-import { EnvironmentOutlined, ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { listMunicipios, createMunicipio, updateMunicipio, deleteMunicipio } from '../../api/adminDAT';
 import { UF_NORDESTE_OPTIONS } from '../../constants';
+import type { ID } from '../../types';
 
 const { Title } = Typography;
 const { Search } = Input;
 
-export default function MunicipiosPage() {
-  const [municipios, setMunicipios] = useState([]);
+/**
+ * Municipio record interface
+ */
+interface MunicipioRecord {
+  id: ID;
+  nome: string;
+  uf: string;
+  ibge_code: string;
+  ativo: boolean;
+}
+
+/**
+ * Municipio form values interface
+ */
+interface MunicipioFormValues {
+  nome: string;
+  uf: string;
+  ibge_code: string;
+  ativo: boolean;
+}
+
+export default function MunicipiosPage(): JSX.Element {
+  const [municipios, setMunicipios] = useState<MunicipioRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [ufFilter, setUfFilter] = useState(undefined);
+  const [ufFilter, setUfFilter] = useState<string | undefined>(undefined);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingMunicipio, setEditingMunicipio] = useState(null);
+  const [editingMunicipio, setEditingMunicipio] = useState<MunicipioRecord | null>(null);
 
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<MunicipioFormValues>();
 
-  const fetchMunicipios = async () => {
+  const fetchMunicipios = async (): Promise<void> => {
     setLoading(true);
     try {
       const data = await listMunicipios({
@@ -33,9 +56,9 @@ export default function MunicipiosPage() {
         uf: ufFilter,
         ordering: 'nome',
       });
-      setMunicipios(data.results || data);
+      setMunicipios(data.results as MunicipioRecord[]);
     } catch (error) {
-      message.error(`Erro ao carregar municípios: ${error.message}`);
+      message.error(`Erro ao carregar municípios: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -45,13 +68,13 @@ export default function MunicipiosPage() {
     fetchMunicipios();
   }, [searchText, ufFilter]);
 
-  const handleCreate = () => {
+  const handleCreate = (): void => {
     setEditingMunicipio(null);
     form.resetFields();
     setModalVisible(true);
   };
 
-  const handleEdit = (municipio) => {
+  const handleEdit = (municipio: MunicipioRecord): void => {
     setEditingMunicipio(municipio);
     form.setFieldsValue({
       nome: municipio.nome,
@@ -62,7 +85,7 @@ export default function MunicipiosPage() {
     setModalVisible(true);
   };
 
-  const handleSave = async (values) => {
+  const handleSave = async (values: MunicipioFormValues): Promise<void> => {
     try {
       if (editingMunicipio) {
         await updateMunicipio(editingMunicipio.id, values);
@@ -75,11 +98,11 @@ export default function MunicipiosPage() {
       form.resetFields();
       fetchMunicipios();
     } catch (error) {
-      message.error(`Erro: ${error.message}`);
+      message.error(`Erro: ${(error as Error).message}`);
     }
   };
 
-  const handleDelete = (municipio) => {
+  const handleDelete = (municipio: MunicipioRecord): void => {
     Modal.confirm({
       title: 'Confirmar exclusão',
       content: `Tem certeza que deseja excluir o município "${municipio.nome}"?`,
@@ -92,23 +115,23 @@ export default function MunicipiosPage() {
           message.success('Município excluído com sucesso');
           fetchMunicipios();
         } catch (error) {
-          message.error(`Erro ao excluir: ${error.message}`);
+          message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
       },
     });
   };
 
-  const columns = [
+  const columns: ColumnsType<MunicipioRecord> = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
     { title: 'Nome', dataIndex: 'nome', key: 'nome', width: 300 },
-    { title: 'UF', dataIndex: 'uf', key: 'uf', width: 80, render: (uf) => <Tag color="blue">{uf}</Tag> },
+    { title: 'UF', dataIndex: 'uf', key: 'uf', width: 80, render: (uf: string) => <Tag color="blue">{uf}</Tag> },
     { title: 'IBGE', dataIndex: 'ibge_code', key: 'ibge_code', width: 120 },
     {
       title: 'Ativo',
       dataIndex: 'ativo',
       key: 'ativo',
       width: 100,
-      render: (ativo) => <Tag color={ativo ? 'green' : 'red'}>{ativo ? 'Sim' : 'Não'}</Tag>,
+      render: (ativo: boolean) => <Tag color={ativo ? 'green' : 'red'}>{ativo ? 'Sim' : 'Não'}</Tag>,
     },
     {
       title: 'Ações',

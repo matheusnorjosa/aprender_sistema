@@ -26,6 +26,7 @@ import {
   Alert,
   Divider
 } from 'antd';
+import type { TabsProps } from 'antd';
 import {
   SaveOutlined,
   ReloadOutlined,
@@ -40,26 +41,49 @@ import logger from '../../utils/logger';
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-export default function ConfiguracoesPage() {
+/**
+ * Config form values interface
+ */
+interface ConfigFormValues {
+  // Disponibilidade
+  TRAVEL_BUFFER_MINUTES: number;
+  AVAILABILITY_DAILY_LIMIT_HOURS: number;
+  ALLOW_ADJACENT_EVENTS: boolean;
+  BLOCK_AUTO_APPROVE: boolean;
+  // Google Calendar
+  BATCH_SIZE: number;
+  LOCK_TTL_SECONDS: number;
+  AUTO_RETRY_ON_ERROR: boolean;
+  MAX_RETRIES: number;
+  SEND_UPDATES: 'none' | 'all' | 'externalOnly';
+  // Sessions
+  SESSION_COOKIE_AGE: number;
+  SESSION_WARNING_THRESHOLD: number;
+  AUTOCOMPLETE_DEBOUNCE_MS: number;
+  // Feature Flags
+  ENABLE_MULTI_CALENDAR: boolean;
+  ENABLE_BATCH_ACTIONS: boolean;
+  ENABLE_ADVANCED_FILTERS: boolean;
+}
+
+export default function ConfiguracoesPage(): JSX.Element {
   const { config, loading, saveConfig, reload } = useConfig();
   const [saving, setSaving] = useState(false);
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<ConfigFormValues>();
 
   // Update form when config loads
   useEffect(() => {
     if (config) {
-      form.setFieldsValue(config);
+      form.setFieldsValue(config as unknown as ConfigFormValues);
     }
   }, [config, form]);
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
       setSaving(true);
-      const success = await saveConfig(values);
-      if (success) {
-        // Success message is shown by useConfig hook
-      }
+      await saveConfig(values as unknown as Record<string, unknown>);
+      // Success message is shown by useConfig hook
     } catch (error) {
       logger.error('Form validation error:', error);
     } finally {
@@ -67,9 +91,9 @@ export default function ConfiguracoesPage() {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = (): void => {
     if (config) {
-      form.setFieldsValue(config);
+      form.setFieldsValue(config as unknown as ConfigFormValues);
     }
   };
 
@@ -81,7 +105,7 @@ export default function ConfiguracoesPage() {
     );
   }
 
-  const tabItems = [
+  const tabItems: TabsProps['items'] = [
     {
       key: '1',
       label: (
@@ -384,7 +408,7 @@ export default function ConfiguracoesPage() {
         <Form
           form={form}
           layout="vertical"
-          initialValues={config || {}}
+          initialValues={(config as unknown as ConfigFormValues) || {}}
         >
           <Tabs items={tabItems} />
 

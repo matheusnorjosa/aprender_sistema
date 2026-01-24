@@ -70,7 +70,7 @@ import {
   DEFAULT_FILTERS,
   VIEW_MODES,
 } from './Coordenadores/constants';
-import { getColumns } from './Coordenadores/columns';
+import { getColumns, type CoordenadorRecord } from './Coordenadores/columns';
 import { getAreaColor, getInitials, groupByArea } from './Coordenadores/helpers';
 
 const { Title, Text } = Typography;
@@ -78,22 +78,6 @@ const { Title, Text } = Typography;
 // ============================================================
 // TYPE DEFINITIONS
 // ============================================================
-
-interface CoordenadorRecord {
-  id: number;
-  nome: string;
-  area: string | null;
-  cargo: string | null;
-  email: string | null;
-  telefone: string | null;
-  foto_url: string | null;
-  data_admissao: string | null;
-  ativo: boolean;
-  total_municipios: number;
-  total_projetos: number;
-  total_formacoes: number;
-  [key: string]: any;
-}
 
 interface CoordenadoresFilters {
   search: string;
@@ -168,7 +152,7 @@ export default function CoordenadoresPage(): JSX.Element {
     const loadOptions = async () => {
       try {
         const [areasData, projData, munData] = await Promise.all([
-          getAreasOptions().catch(() => []),
+          getAreasOptions().catch((): AreaOption[] => []),
           getProjetosOptions(),
           getMunicipiosOptions(),
         ]);
@@ -1004,7 +988,7 @@ export default function CoordenadoresPage(): JSX.Element {
             {/* Observações */}
             {viewingCoordenador.observacoes && (
               <Card size="small" title="Observações" className="mt-4">
-                <Text>{viewingCoordenador.observacoes}</Text>
+                <Text>{String(viewingCoordenador.observacoes)}</Text>
               </Card>
             )}
           </div>

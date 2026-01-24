@@ -320,8 +320,7 @@ function AppContent(): JSX.Element {
 
   // Permissões compostas (Setor + Função)
   // canApproveSuper = pode aprovar solicitações SUPER (Gerente + Superintendência)
-  // Note: can_approve_super may be added by backend but not in strict types yet
-  const canApproveSuper = (user as unknown as { can_approve_super?: boolean })?.can_approve_super || false;
+  const canApproveSuper = user?.can_approve_super || false;
   // canCoordenador = pode criar solicitações
   const canCoordenador = user?.is_superuser || isCoordenador || inDAT;
   // canControle = acesso a funcionalidades de Controle
@@ -521,7 +520,7 @@ function AppContent(): JSX.Element {
                 */}
                 <div className="flex items-center gap-2">
                   <UserOutlined />
-                  <Text strong>{(user as unknown as { name?: string })?.name || user?.username || 'Usuário'}</Text>
+                  <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
                 </div>
                 <Button
                   type="primary"

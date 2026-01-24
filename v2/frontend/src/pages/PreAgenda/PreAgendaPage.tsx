@@ -319,7 +319,7 @@ export default function PreAgendaPage(): JSX.Element {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-CSRFToken': csrfToken,
+              'X-CSRFToken': csrfToken || '',
             },
             credentials: 'include',
             body: JSON.stringify({
@@ -388,7 +388,7 @@ export default function PreAgendaPage(): JSX.Element {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-CSRFToken': csrfToken,
+              'X-CSRFToken': csrfToken || '',
             },
             credentials: 'include',
             body: JSON.stringify({

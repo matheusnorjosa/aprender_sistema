@@ -53,7 +53,9 @@ import {
   getMunicipiosOptions,
   getProjetosOptions,
   getProdutosOptions,
+  type GenericRecord,
 } from '../../api/datModule';
+import type { PaginatedResponse } from '../../types';
 import { useCrudOperations } from '../../hooks/useCrudOperations';
 import dayjs, { Dayjs } from 'dayjs';
 import { UF_OPTIONS } from '../../constants';
@@ -140,7 +142,7 @@ const ANO_OPTIONS = [currentYear - 1, currentYear, currentYear + 1].map(
 export default function ComprasPage(): JSX.Element {
   // Issue #302: Use useCrudOperations hook for standardized CRUD
   const crud = useCrudOperations({
-    listFn: listCompras,
+    listFn: listCompras as unknown as (params: { page?: number; pageSize?: number; [key: string]: unknown }) => Promise<PaginatedResponse<GenericRecord>>,
     createFn: createCompra,
     updateFn: updateCompra,
     deleteFn: deleteCompra,
@@ -210,7 +212,7 @@ export default function ComprasPage(): JSX.Element {
     // Fetch data and stats in parallel
     const [, statsData] = await Promise.all([
       crud.fetchData(params),
-      getComprasStats(params).catch(() => null),
+      getComprasStats(params).catch((): null => null),
     ]);
 
     setStats(statsData as unknown as ComprasStats);
@@ -305,7 +307,7 @@ export default function ComprasPage(): JSX.Element {
       key: 'projeto',
       width: 120,
       fixed: 'left' as const,
-      render: (nome) => <Tag color="blue">{nome}</Tag>,
+      render: (nome: string) => <Tag color="blue">{nome}</Tag>,
     },
     {
       title: 'Produto',
@@ -313,7 +315,7 @@ export default function ComprasPage(): JSX.Element {
       key: 'produto',
       width: 200,
       fixed: 'left' as const,
-      render: (nome, record) => (
+      render: (nome: string, record: CompraRecord) => (
         <div>
           <Text strong>{nome}</Text>
           {record.codigo_produto && (
@@ -331,7 +333,7 @@ export default function ComprasPage(): JSX.Element {
       dataIndex: 'uf',
       key: 'uf',
       width: 60,
-      render: (uf) => <Tag>{uf}</Tag>,
+      render: (uf: string) => <Tag>{uf}</Tag>,
     },
     {
       title: 'Município',
@@ -346,7 +348,7 @@ export default function ComprasPage(): JSX.Element {
       key: 'quantidade',
       width: 100,
       align: 'right' as const,
-      render: (val) => (
+      render: (val: number | null) => (
         <Text strong style={{ color: '#1890ff' }}>
           {val?.toLocaleString('pt-BR') || 0}
         </Text>
@@ -358,14 +360,14 @@ export default function ComprasPage(): JSX.Element {
       key: 'utilizado',
       width: 100,
       align: 'right' as const,
-      render: (val) => val?.toLocaleString('pt-BR') || 0,
+      render: (val: number | null) => val?.toLocaleString('pt-BR') || 0,
     },
     {
       title: 'Disponível',
       key: 'disponivel',
       width: 120,
       align: 'right' as const,
-      render: (_, record) => {
+      render: (_: unknown, record: CompraRecord) => {
         const disponivel = calcularDisponivel(record.quantidade, record.quantidade_utilizada);
         const percent = record.quantidade > 0 ? Math.round((disponivel / record.quantidade) * 100) : 0;
 
@@ -391,13 +393,13 @@ export default function ComprasPage(): JSX.Element {
       key: 'ano_uso',
       width: 90,
       align: 'center' as const,
-      render: (ano) => ano ? <Tag>{ano}</Tag> : '-',
+      render: (ano: number | null) => ano ? <Tag>{ano}</Tag> : '-',
     },
     {
       title: 'Status',
       key: 'status',
       width: 120,
-      render: (_, record) => {
+      render: (_: unknown, record: CompraRecord) => {
         const disponivel = calcularDisponivel(record.quantidade, record.quantidade_utilizada);
         return renderStatusTag(record.status_uso, disponivel, record.quantidade);
       },
@@ -408,7 +410,7 @@ export default function ComprasPage(): JSX.Element {
       key: 'valor_unitario',
       width: 100,
       align: 'right' as const,
-      render: (val) =>
+      render: (val: number | null) =>
         val ? (
           <Text type="secondary">
             R$ {val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -422,7 +424,7 @@ export default function ComprasPage(): JSX.Element {
       key: 'valor_total',
       width: 120,
       align: 'right' as const,
-      render: (_, record) => {
+      render: (_: unknown, record: CompraRecord) => {
         const total = (record.quantidade || 0) * (record.valor_unitario || 0);
         return total > 0 ? (
           <Text strong>
@@ -438,7 +440,7 @@ export default function ComprasPage(): JSX.Element {
       key: 'acoes',
       width: 100,
       fixed: 'right' as const,
-      render: (_, record) => (
+      render: (_: unknown, record: CompraRecord) => (
         <Space size="small">
           <Tooltip title="Editar">
             <Button

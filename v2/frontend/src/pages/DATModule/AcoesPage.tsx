@@ -338,7 +338,7 @@ export default function AcoesPage(): JSX.Element {
       key: 'municipio_uf',
       width: 180,
       fixed: 'left' as const,
-      render: (_, record) => (
+      render: (_: unknown, record: AcaoRecord) => (
         <Text strong>
           {record.municipio_nome} - {record.municipio_uf}
         </Text>
@@ -349,7 +349,7 @@ export default function AcoesPage(): JSX.Element {
       dataIndex: 'projeto_nome',
       key: 'projeto',
       width: 150,
-      render: (nome) => <Tag color="blue">{nome}</Tag>,
+      render: (nome: string) => <Tag color="blue">{nome}</Tag>,
     },
     {
       title: 'Coordenador',
@@ -376,7 +376,7 @@ export default function AcoesPage(): JSX.Element {
       key: 'carta',
       width: 100,
       align: 'center' as const,
-      render: (_, record) => (
+      render: (_: unknown, record: AcaoRecord) => (
         <Space direction="vertical" size={0} align="center">
           {renderStatusIcon(record.status_carta)}
           <Text type="secondary" style={{ fontSize: 11 }}>
@@ -397,7 +397,7 @@ export default function AcoesPage(): JSX.Element {
       key: 'contato',
       width: 100,
       align: 'center' as const,
-      render: (_, record) => (
+      render: (_: unknown, record: AcaoRecord) => (
         <Space direction="vertical" size={0} align="center">
           {renderStatusIcon(record.status_contato)}
           <Text type="secondary" style={{ fontSize: 11 }}>
@@ -418,7 +418,7 @@ export default function AcoesPage(): JSX.Element {
       key: 'reuniao',
       width: 100,
       align: 'center' as const,
-      render: (_, record) => (
+      render: (_: unknown, record: AcaoRecord) => (
         <Space direction="vertical" size={0} align="center">
           {renderStatusIcon(record.status_reuniao)}
           <Text type="secondary" style={{ fontSize: 11 }}>
@@ -439,7 +439,7 @@ export default function AcoesPage(): JSX.Element {
       key: 'entrega',
       width: 100,
       align: 'center' as const,
-      render: (_, record) => (
+      render: (_: unknown, record: AcaoRecord) => (
         <Space direction="vertical" size={0} align="center">
           {renderStatusIcon(record.status_entrega)}
           <Text type="secondary" style={{ fontSize: 11 }}>
@@ -452,7 +452,7 @@ export default function AcoesPage(): JSX.Element {
       title: 'Progresso',
       key: 'progresso',
       width: 120,
-      render: (_, record) => {
+      render: (_: unknown, record: AcaoRecord) => {
         const progress = calculateProgress(record);
         return (
           <Progress
@@ -470,7 +470,7 @@ export default function AcoesPage(): JSX.Element {
       key: 'observacoes',
       width: 200,
       ellipsis: { showTitle: false },
-      render: (val) => (
+      render: (val: string | null) => (
         <Tooltip title={val}>
           <Text type="secondary">{val || '-'}</Text>
         </Tooltip>
@@ -481,7 +481,7 @@ export default function AcoesPage(): JSX.Element {
       key: 'acoes',
       width: 100,
       fixed: 'right' as const,
-      render: (_, record) => (
+      render: (_: unknown, record: AcaoRecord) => (
         <Space size="small">
           <Tooltip title="Editar">
             <Button

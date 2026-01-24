@@ -60,25 +60,13 @@ import {
   REGIAO_OPTIONS,
   DEFAULT_FILTERS,
 } from './DATRegistros/constants';
-import { getColumns } from './DATRegistros/columns';
+import { getColumns, type DATRegistroRecord } from './DATRegistros/columns';
 
 const { Title, Text } = Typography;
 
 // ============================================================
 // TYPE DEFINITIONS
 // ============================================================
-
-interface DATRegistroRecord {
-  id: number;
-  municipio: number;
-  municipio_nome: string;
-  municipio_uf: string;
-  projeto_geral: number;
-  projeto_geral_nome: string;
-  projeto: number;
-  projeto_nome: string;
-  [key: string]: any;
-}
 
 interface DATRegistrosFilters {
   regiao: string | undefined;

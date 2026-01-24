@@ -480,7 +480,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
       key: 'municipio',
       width: 150,
       fixed: 'left' as const,
-      render: (nome, record) => (
+      render: (nome: string, record: PlanoFormacaoRecord) => (
         <div>
           <Text strong>{nome}</Text>
           <div style={{ fontSize: 11, color: '#888' }}>{record.municipio_uf}</div>
@@ -494,7 +494,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
       width: 100,
       fixed: 'left' as const,
       ellipsis: true,
-      render: (nome) => nome || <Text type="secondary">-</Text>,
+      render: (nome: string | null) => nome || <Text type="secondary">-</Text>,
     },
     {
       title: 'Projeto',
@@ -510,7 +510,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
       key: `f${i + 1}`,
       width: 70,
       align: 'center' as const,
-      render: (_, record) => {
+      render: (_: unknown, record: PlanoFormacaoRecord) => {
         const formacao = record.formacoes_list?.find((f) => f.numero === i + 1);
         return renderFormacaoCell(record, formacao);
       },
@@ -521,49 +521,49 @@ export default function PlanoFormacoesPage(): JSX.Element {
       key: 'ch_anual',
       width: 60,
       align: 'center' as const,
-      render: (ch) => <Text strong>{ch}h</Text>,
+      render: (ch: number) => <Text strong>{ch}h</Text>,
     },
     {
       title: 'A1',
       key: 'a1',
       width: 50,
       align: 'center' as const,
-      render: (_, record) => renderAcompanhamentoCell(record, 0),
+      render: (_: unknown, record: PlanoFormacaoRecord) => renderAcompanhamentoCell(record, 0),
     },
     {
       title: 'A2',
       key: 'a2',
       width: 50,
       align: 'center' as const,
-      render: (_, record) => renderAcompanhamentoCell(record, 1),
+      render: (_: unknown, record: PlanoFormacaoRecord) => renderAcompanhamentoCell(record, 1),
     },
     {
       title: 'P1',
       key: 'p1',
       width: 50,
       align: 'center' as const,
-      render: (_, record) => renderProvaCell(record, 0),
+      render: (_: unknown, record: PlanoFormacaoRecord) => renderProvaCell(record, 0),
     },
     {
       title: 'P2',
       key: 'p2',
       width: 50,
       align: 'center' as const,
-      render: (_, record) => renderProvaCell(record, 1),
+      render: (_: unknown, record: PlanoFormacaoRecord) => renderProvaCell(record, 1),
     },
     {
       title: 'P3',
       key: 'p3',
       width: 50,
       align: 'center' as const,
-      render: (_, record) => renderProvaCell(record, 2),
+      render: (_: unknown, record: PlanoFormacaoRecord) => renderProvaCell(record, 2),
     },
     {
       title: 'Acoes',
       key: 'acoes',
       width: 100,
       fixed: 'right' as const,
-      render: (_, record) => (
+      render: (_: unknown, record: PlanoFormacaoRecord) => (
         <Space size="small">
           <Tooltip title="Ver detalhes">
             <Button

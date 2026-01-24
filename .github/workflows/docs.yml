@@ -53,5 +53,8 @@ jobs:
       - name: Build documentation
         run: mkdocs build --strict
 
+      - name: Validate API badges
+        run: python scripts/validate_api_badges.py
+
       - name: Report success
         run: echo "✅ Documentation builds successfully"

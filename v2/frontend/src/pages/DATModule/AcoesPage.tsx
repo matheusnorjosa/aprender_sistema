@@ -57,7 +57,7 @@ import {
   getProjetosOptions,
   getCoordenadoresOptions,
 } from '../../api/datModule';
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import { UF_OPTIONS } from '../../constants';
 
 const { Title, Text } = Typography;
@@ -76,15 +76,6 @@ interface AcaoRecord {
   coordenador: number | null;
   coordenador_nome: string | null;
   [key: string]: any;
-}
-
-interface AcoesFilters {
-  search: string;
-  uf: string | undefined;
-  municipio: number | undefined;
-  projeto: number | undefined;
-  coordenador: number | undefined;
-  status_geral: string | undefined;
 }
 
 interface AcaoFormValues {
@@ -131,14 +122,6 @@ const STATUS_OPTIONS = [
   { label: 'Concluído', value: 'concluido' },
   { label: 'N/A', value: 'na' },
 ];
-
-// Cores de status
-const STATUS_COLORS = {
-  pendente: 'orange',
-  em_andamento: 'blue',
-  concluido: 'green',
-  na: 'default',
-};
 
 export default function AcoesPage(): JSX.Element {
   const [acoes, setAcoes] = useState<AcaoRecord[]>([]);

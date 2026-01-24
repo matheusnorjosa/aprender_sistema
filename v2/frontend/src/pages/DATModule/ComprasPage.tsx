@@ -41,7 +41,6 @@ import {
   ShoppingCartOutlined,
   InboxOutlined,
   CheckCircleOutlined,
-  WarningOutlined,
   DollarOutlined,
 } from '@ant-design/icons';
 import {
@@ -57,7 +56,7 @@ import {
 } from '../../api/datModule';
 import type { PaginatedResponse } from '../../types';
 import { useCrudOperations } from '../../hooks/useCrudOperations';
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import { UF_OPTIONS } from '../../constants';
 
 const { Title, Text } = Typography;
@@ -80,16 +79,6 @@ interface CompraRecord {
   quantidade_utilizada: number | null;
   valor_unitario: number | null;
   [key: string]: any;
-}
-
-interface ComprasFilters {
-  search: string;
-  uf: string | undefined;
-  municipio: number | undefined;
-  projeto: number | undefined;
-  produto: number | undefined;
-  status: string | undefined;
-  ano_uso: number | undefined;
 }
 
 interface CompraFormValues {

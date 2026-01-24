@@ -959,7 +959,7 @@ export default function MapaBrasilPage(): JSX.Element {
             <Col xs={24} lg={12}>
               <Card title="Detalhes por Estado" bordered={false} loading={loading}>
                 <Table
-                  dataSource={Object.entries(estadosData).map(([uf, data]) => ({ uf, ...data }))}
+                  dataSource={Object.values(estadosData)}
                   rowKey="uf"
                   pagination={false}
                   size="small"

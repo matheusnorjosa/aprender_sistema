@@ -11,7 +11,7 @@ import { STATUS_OPTIONS, MODALIDADE_OPTIONS } from './constants';
  * @param status - Status value
  * @returns Tag component
  */
-export function renderStatusTag(status: string | undefined): JSX.Element {
+export function renderStatusTag(status: string | null | undefined): JSX.Element {
   const statusConfig = STATUS_OPTIONS.find((s) => s.value === status);
   return <Tag color={statusConfig?.color || 'default'}>{statusConfig?.label || status}</Tag>;
 }
@@ -21,7 +21,7 @@ export function renderStatusTag(status: string | undefined): JSX.Element {
  * @param modalidade - Modalidade value
  * @returns Tag component
  */
-export function renderModalidadeTag(modalidade: string | undefined): JSX.Element {
+export function renderModalidadeTag(modalidade: string | null | undefined): JSX.Element {
   const modalidadeConfig = MODALIDADE_OPTIONS.find((m) => m.value === modalidade);
   return (
     <Tag icon={modalidadeConfig?.icon}>

@@ -18,9 +18,12 @@ const { Text } = Typography;
  */
 export interface DATRegistroRecord {
   id: ID;
+  municipio?: number;
   municipio_nome: string;
   municipio_uf: string;
+  projeto_geral?: number;
   projeto_geral_nome?: string;
+  projeto?: number;
   projeto_nome?: string;
   aluno_qtde?: number;
   professor_qtde?: number;
@@ -35,6 +38,7 @@ export interface DATRegistroRecord {
   alunos_validados_status?: string;
   alunos_importados_status?: string;
   obs_avaliar?: string;
+  [key: string]: unknown;
 }
 
 /**

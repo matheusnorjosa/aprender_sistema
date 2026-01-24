@@ -50,6 +50,10 @@ export interface CurrentUser {
   setores: string[];
   funcoes: string[];
   permissions: string[];
+  // Optional computed properties from backend
+  name?: string;
+  can_approve_super?: boolean;
+  is_superintendencia?: boolean;
 }
 
 /**

@@ -87,6 +87,7 @@ export interface ListParams {
   uf?: string;
   ordering?: string;
   page?: number;
+  page_size?: number;
 }
 
 /**

@@ -159,6 +159,26 @@ docker compose exec web python manage.py createsuperuser
 
 ---
 
+## Pre-commit Hooks (Opcional)
+
+Para formatar código automaticamente antes de cada commit:
+
+```bash
+cd v2/backend
+pip install pre-commit
+pre-commit install
+```
+
+Rodar manualmente em todos os arquivos:
+
+```bash
+pre-commit run --all-files
+```
+
+**Hooks instalados**: Black, isort, Flake8, trailing-whitespace, end-of-file-fixer
+
+---
+
 ## Contribuindo
 
 1. Branch: `git checkout -b feat/minha-feature`

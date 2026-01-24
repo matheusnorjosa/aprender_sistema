@@ -5,19 +5,46 @@
  */
 
 /**
+ * Person data for CSV export
+ * Using a generic type to accept any object with a name property
+ */
+interface PersonData {
+  name: string;
+}
+
+/**
+ * Parameters for monthly CSV export
+ */
+interface ExportMonthlyCsvParams {
+  year: number;
+  month: number;
+  role: string;
+  days: number[];
+  people: PersonData[];
+  cells: string[][];
+}
+
+/**
  * Exporta grade mensal para CSV.
  *
- * @param {object} params - Parâmetros da exportação
- * @param {number} params.year - Ano
- * @param {number} params.month - Mês
- * @param {string} params.role - Role (FORMADOR | COORDENADOR)
- * @param {number[]} params.days - Lista de dias do mês
- * @param {Array} params.people - Lista de pessoas
- * @param {string[][]} params.cells - Matriz de códigos
+ * @param params - Parâmetros da exportação
+ * @param params.year - Ano
+ * @param params.month - Mês
+ * @param params.role - Role (FORMADOR | COORDENADOR)
+ * @param params.days - Lista de dias do mês
+ * @param params.people - Lista de pessoas
+ * @param params.cells - Matriz de códigos
  */
-export function exportMonthlyCsv({ year, month, role, days, people, cells }) {
+export function exportMonthlyCsv({
+  year,
+  month,
+  role,
+  days,
+  people,
+  cells,
+}: ExportMonthlyCsvParams): void {
   // Construir CSV
-  const rows = [];
+  const rows: string[] = [];
 
   // Header row
   const header = ['Pessoa', ...days.map((d) => `Dia ${d}`)];

@@ -12,9 +12,14 @@
  */
 
 /**
+ * Available code types for availability grid
+ */
+export type AvailabilityCode = 'E' | '2' | 'P' | 'T' | 'X' | 'D' | 'D1' | '';
+
+/**
  * Labels dos códigos (fallback quando backend não retorna legend).
  */
-export const CODE_LABEL = {
+export const CODE_LABEL: Record<AvailabilityCode, string> = {
   E: '1 evento',
   '2': '≥2 eventos',
   P: 'Bloqueio parcial',
@@ -28,7 +33,7 @@ export const CODE_LABEL = {
 /**
  * Classes CSS por código (Tailwind).
  */
-export const CODE_CLASS = {
+export const CODE_CLASS: Record<AvailabilityCode, string> = {
   E: 'bg-green-100 text-green-800 hover:bg-green-200',
   '2': 'bg-green-500 text-white hover:bg-green-600',
   P: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',

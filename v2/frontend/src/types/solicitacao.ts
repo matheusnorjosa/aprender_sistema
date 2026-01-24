@@ -87,22 +87,31 @@ export interface Solicitacao {
 }
 
 /**
+ * Extra participants payload for solicitacao creation/update
+ */
+export interface ExtraParticipantsPayload {
+  formador_ids?: ID[];
+  coord_acompanha_ids?: ID[];
+}
+
+/**
  * Solicitacao create/update payload
  */
 export interface SolicitacaoPayload {
   municipio?: ID;
   projeto?: ID;
   tipo_evento?: ID;
-  tipo?: string;
-  encontro?: string;
-  segmento?: string;
+  tipo?: string | null;
+  encontro?: string | null;
+  segmento?: string | null;
   coordenador_acompanha?: boolean;
-  coordenador?: ID;
+  coordenador?: ID | null;
   inicio?: string;
   fim?: string;
-  observacoes?: string;
-  local?: string;
+  observacoes?: string | null;
+  local?: string | null;
   is_online?: boolean;
+  extra_participants?: ExtraParticipantsPayload;
 }
 
 /**

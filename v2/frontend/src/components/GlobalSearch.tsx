@@ -101,7 +101,7 @@ function SearchResultItemComponent({ item, config, onClick }: SearchResultItemPr
         <span style={{ color: '#1890ff' }}>{config.icon}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <Text ellipsis style={{ display: 'block' }}>{String(displayValue ?? '')}</Text>
-          {secondaryValue && (
+          {secondaryValue != null && (
             <Text type="secondary" style={{ fontSize: 12 }}>{String(secondaryValue)}</Text>
           )}
         </div>

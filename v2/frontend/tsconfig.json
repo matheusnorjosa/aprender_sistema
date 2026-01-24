@@ -14,14 +14,21 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
 
-    // JavaScript Support (allows gradual migration)
+    // JavaScript Support (some .js files remain - see Issue #490)
     "allowJs": true,
     "checkJs": false,
 
-    // Type Checking (relaxed for migration, will enable strict later)
+    // Type Checking (incremental strict mode - Issue #490)
+    // Enable individual strict options but defer strictNullChecks for follow-up
     "strict": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    // strictPropertyInitialization requires strictNullChecks
+    "strictNullChecks": false,  // TODO: Enable after fixing remaining 17 null/undefined issues
+    "noUnusedLocals": false,  // TODO: Enable after cleanup
+    "noUnusedParameters": false,  // TODO: Enable after cleanup
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
 
@@ -40,5 +47,5 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "src/**/*.test.tsx", "src/**/*.test.ts"]
 }

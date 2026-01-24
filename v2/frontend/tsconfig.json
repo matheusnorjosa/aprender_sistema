@@ -14,21 +14,10 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
 
-    // JavaScript Support (some .js files remain - see Issue #490)
-    "allowJs": true,
-    "checkJs": false,
-
-    // Type Checking (incremental strict mode - Issue #490)
-    // Enable individual strict options but defer strictNullChecks for follow-up
-    "strict": false,
-    "noImplicitAny": true,
-    "noImplicitThis": true,
-    "strictFunctionTypes": true,
-    "strictBindCallApply": true,
-    // strictPropertyInitialization requires strictNullChecks
-    "strictNullChecks": false,  // TODO: Enable after fixing remaining 17 null/undefined issues
-    "noUnusedLocals": false,  // TODO: Enable after cleanup
-    "noUnusedParameters": false,  // TODO: Enable after cleanup
+    // Type Checking - Full Strict Mode (Issue #477 completed)
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
 

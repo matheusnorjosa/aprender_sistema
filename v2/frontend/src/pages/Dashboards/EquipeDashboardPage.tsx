@@ -33,7 +33,6 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   ClockCircleOutlined,
-  TeamOutlined,
   DownloadOutlined,
   TrophyOutlined,
   SyncOutlined,

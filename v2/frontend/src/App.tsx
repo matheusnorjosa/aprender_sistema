@@ -7,26 +7,20 @@
  */
 
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge, Switch, Tooltip } from 'antd';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge } from 'antd';
 import logger from './utils/logger';
 import {
   CalendarOutlined,
   CheckCircleOutlined,
   TableOutlined,
-  DatabaseOutlined,
   FileTextOutlined,
   SafetyOutlined,
-  CloudUploadOutlined,
   UserOutlined,
   BarChartOutlined,
-  GlobalOutlined,
   HomeOutlined,
   LogoutOutlined,
-  SyncOutlined,
   SolutionOutlined,
-  SunOutlined,
-  MoonOutlined,
 } from '@ant-design/icons';
 import { ThemeProvider, useTheme, useBrandColors } from './contexts/ThemeContext';
 import ptBR from 'antd/locale/pt_BR';

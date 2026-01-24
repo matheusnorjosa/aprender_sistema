@@ -52,7 +52,7 @@ import {
   getMunicipiosOptions,
   getProjetosOptions,
 } from '../../api/datModule';
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import {
   STATUS_OPTIONS,
   UF_OPTIONS,

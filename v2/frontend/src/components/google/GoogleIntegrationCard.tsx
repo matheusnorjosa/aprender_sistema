@@ -45,11 +45,11 @@ interface CalendarItem {
  */
 export interface GoogleIntegrationStatus {
   connected: boolean;
-  googleEmail?: string;
-  tokenExpiry?: string;
+  googleEmail?: string | null;
+  tokenExpiry?: string | null;
   expiresInDays?: number | null;
   isExpired?: boolean;
-  defaultCalendarId?: string;
+  defaultCalendarId?: string | null;
 }
 
 /**

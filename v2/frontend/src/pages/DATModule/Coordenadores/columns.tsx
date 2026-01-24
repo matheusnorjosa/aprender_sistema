@@ -27,14 +27,17 @@ const { Text } = Typography;
 export interface CoordenadorRecord {
   id: ID;
   nome: string;
-  cargo?: string;
-  area?: string;
-  email?: string;
-  telefone?: string;
-  foto_url?: string;
+  cargo?: string | null;
+  area?: string | null;
+  email?: string | null;
+  telefone?: string | null;
+  foto_url?: string | null;
+  data_admissao?: string | null;
   total_municipios?: number;
   total_projetos?: number;
+  total_formacoes?: number;
   ativo?: boolean;
+  [key: string]: unknown;
 }
 
 /**

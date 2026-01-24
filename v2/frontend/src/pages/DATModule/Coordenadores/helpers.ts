@@ -23,7 +23,7 @@ export type GroupedCoordenadores = Record<string, CoordenadorForGroup[]>;
  * @param area - Area name
  * @returns Ant Design color name
  */
-export function getAreaColor(area: string | undefined): string {
+export function getAreaColor(area: string | null | undefined): string {
   if (!area) return 'default';
   return AREA_COLORS[area] || 'default';
 }
@@ -33,7 +33,7 @@ export function getAreaColor(area: string | undefined): string {
  * @param nome - Full name
  * @returns Initials (1-2 characters)
  */
-export function getInitials(nome: string | undefined): string {
+export function getInitials(nome: string | null | undefined): string {
   if (!nome) return '?';
   const parts = nome.split(' ');
   if (parts.length === 1) return parts[0].charAt(0).toUpperCase();

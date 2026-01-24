@@ -44,6 +44,8 @@ export interface CadastroRecord {
   quantidade_importados?: number;
   link_planilha?: string;
   link_plataforma?: string;
+  // Index signature for dynamic property access
+  [key: string]: unknown;
 }
 
 /**
@@ -350,7 +352,7 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
       width: 300,
       render: (_, record) => {
         const etapas = PLATAFORMAS.AVALIAR.etapas;
-        const current = getCurrentStep(record as unknown as Record<string, unknown>, etapas);
+        const current = getCurrentStep(record, etapas);
 
         return (
           <Steps

@@ -114,14 +114,6 @@ interface PlanoFormacaoRecord {
   provas_list: ProvaItem[];
 }
 
-interface PlanoFormacoesFilters {
-  search: string;
-  uf: string | undefined;
-  municipio: number | undefined;
-  projeto: number | undefined;
-  coordenador: number | undefined;
-}
-
 interface PlanoFormacaoFormValues {
   municipio: number;
   projeto: number;
@@ -143,12 +135,6 @@ interface PlanoFormacoesStats {
   total_realizadas: number;
   taxa_realizacao: string;
   ch_total: number;
-}
-
-interface PaginationState {
-  current: number;
-  pageSize: number;
-  total: number;
 }
 
 interface MunicipioOption {
@@ -179,13 +165,6 @@ interface EditingFormacaoState {
 const MODALIDADE_OPTIONS = [
   { label: 'Presencial', value: 'presencial', icon: <EnvironmentOutlined />, color: 'green' },
   { label: 'Online', value: 'online', icon: <VideoCameraOutlined />, color: 'blue' },
-];
-
-const STATUS_OPTIONS = [
-  { label: 'Agendada', value: 'agendada', color: 'blue' },
-  { label: 'Realizada', value: 'realizada', color: 'green' },
-  { label: 'Cancelada', value: 'cancelada', color: 'red' },
-  { label: 'Reagendada', value: 'reagendada', color: 'purple' },
 ];
 
 // ============================================================
@@ -382,6 +361,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
   };
 
   const handleFormacaoSave = async (values: FormacaoInlineFormValues) => {
+    if (!editingFormacao) return;
     try {
       const payload = {
         ...values,

@@ -10,6 +10,7 @@ import {
   MinusCircleFilled,
 } from '@ant-design/icons';
 import type { Etapa } from './constants';
+import type { CadastroRecord } from './columns';
 
 /**
  * Status type for workflow steps
@@ -20,13 +21,6 @@ export type WorkflowStatus = 'concluido' | 'em_andamento' | 'pendente' | 'na';
  * Ant Design Steps status type
  */
 export type StepsStatus = 'finish' | 'process' | 'wait' | 'error';
-
-/**
- * Cadastro record interface (partial, for helper functions)
- */
-export interface CadastroRecord {
-  [key: string]: unknown;
-}
 
 /**
  * Renders status icon based on status value

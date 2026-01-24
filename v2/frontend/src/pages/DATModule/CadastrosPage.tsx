@@ -61,7 +61,7 @@ import {
   DEFAULT_FILTERS,
 } from './Cadastros/constants';
 import { getColumnsFormar, getColumnsAvaliar } from './Cadastros/columns';
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
 
@@ -103,12 +103,6 @@ interface CadastrosStats {
   pendentes: number;
   em_andamento: number;
   concluidos: number;
-}
-
-interface PaginationState {
-  current: number;
-  pageSize: number;
-  total: number;
 }
 
 interface MunicipioOption {

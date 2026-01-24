@@ -216,7 +216,7 @@ export default function DeslocamentosPage(): JSX.Element {
         const canDAT = userData.groups?.includes('DAT');
         const canSuper = userData.is_superuser || (userData as CurrentUser & { is_superintendencia?: boolean }).is_superintendencia;
 
-        setCanAccess(canControle || canCoordenador || canDAT || canSuper);
+        setCanAccess(!!(canControle || canCoordenador || canDAT || canSuper));
       } catch (error) {
         logger.error('Erro ao carregar usuário:', error);
         setCanAccess(false);

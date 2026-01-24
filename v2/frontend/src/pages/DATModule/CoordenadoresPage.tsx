@@ -40,7 +40,6 @@ import {
   DownloadOutlined,
   FilterOutlined,
   ClearOutlined,
-  UserOutlined,
   TeamOutlined,
   AppstoreOutlined,
   TableOutlined,
@@ -62,7 +61,7 @@ import {
   getProjetosOptions,
   getMunicipiosOptions,
 } from '../../api/datModule';
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import logger from '../../utils/logger';
 import {
   AREAS_DEFAULT,
@@ -291,7 +290,7 @@ export default function CoordenadoresPage(): JSX.Element {
       content: (
         <div>
           <p>Excluir coordenador <strong>"{record.nome}"</strong>?</p>
-          {(record.total_municipios > 0 || record.total_projetos > 0) && (
+          {((record.total_municipios ?? 0) > 0 || (record.total_projetos ?? 0) > 0) && (
             <Text type="danger">
               Atenção: Este coordenador possui alocações ativas.
             </Text>
@@ -351,7 +350,7 @@ export default function CoordenadoresPage(): JSX.Element {
             hoverable
             style={{
               opacity: coord.ativo === false ? 0.6 : 1,
-              borderLeft: `4px solid ${AREA_COLORS[coord.area] ? `var(--ant-${AREA_COLORS[coord.area]}-color)` : '#d9d9d9'}`,
+              borderLeft: `4px solid ${coord.area && AREA_COLORS[coord.area] ? `var(--ant-${AREA_COLORS[coord.area]}-color)` : '#d9d9d9'}`,
             }}
             actions={[
               <Tooltip key="view" title="Ver detalhes">
@@ -850,7 +849,9 @@ export default function CoordenadoresPage(): JSX.Element {
               icon={<EditOutlined />}
               onClick={() => {
                 setDetailModalVisible(false);
-                handleEdit(viewingCoordenador);
+                if (viewingCoordenador) {
+                  handleEdit(viewingCoordenador);
+                }
               }}
             >
               Editar

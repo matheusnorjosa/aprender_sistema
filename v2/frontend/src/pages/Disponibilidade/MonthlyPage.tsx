@@ -18,7 +18,6 @@ import DetailsDrawer from './DetailsDrawer';
 import { exportMonthlyCsv } from './exportCsv';
 import type { ID } from '../../types';
 import type { PersonType, EventDetailType } from './DetailsDrawer';
-import type { GridPersonType, DetailsIndexType } from './Grid';
 
 /** Filters type */
 interface FiltersType {
@@ -36,22 +35,6 @@ interface SelectionType {
   dayIdx: number;
 }
 
-/** Monthly query data type */
-interface MonthlyDataType {
-  days: number[];
-  people: GridPersonType[];
-  cells: string[][];
-  details_index: DetailsIndexType;
-  legend?: Record<string, string>;
-}
-
-/** Monthly query result type */
-interface MonthlyQueryResult {
-  data: MonthlyDataType | null;
-  loading: boolean;
-  error: string | null;
-}
-
 export default function MonthlyPage(): JSX.Element {
   // Estado de filtros compartilhados
   const now = new Date();
@@ -64,8 +47,8 @@ export default function MonthlyPage(): JSX.Element {
   });
 
   // Queries para ambas as grades
-  const formadores = useMonthlyQuery({ ...filters, role: 'FORMADOR' }) as MonthlyQueryResult;
-  const coordenadores = useMonthlyQuery({ ...filters, role: 'COORDENADOR' }) as MonthlyQueryResult;
+  const formadores = useMonthlyQuery({ ...filters, role: 'FORMADOR' });
+  const coordenadores = useMonthlyQuery({ ...filters, role: 'COORDENADOR' });
 
   // Estado de seleção (sabe de qual grade veio)
   const [selected, setSelected] = useState<SelectionType | null>(null);

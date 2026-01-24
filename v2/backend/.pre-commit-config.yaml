@@ -1,0 +1,38 @@
+# Pre-commit hooks for Aprender Sistema v2 Backend
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Black - Code Formatter
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        language_version: python3.12
+        args: [--line-length=120]
+
+  # isort - Import Sorter
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: [--profile=black, --line-length=120]
+
+  # Flake8 - Style Checker
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: [--config=.flake8]
+
+  # Trailing whitespace and EOF
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: migrations/
+      - id: end-of-file-fixer
+        exclude: migrations/
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=500]

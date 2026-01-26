@@ -95,13 +95,16 @@ class ImportPendencias:
     linhas_invalidas: list[dict[str, Any]] = field(default_factory=list)
 
 
-def import_compras_from_file(*, path: str, dry_run: bool = True) -> dict[str, Any]:
+def import_compras_from_file(
+    *, path: str, dry_run: bool = True, auto_create_municipios: bool = False
+) -> dict[str, Any]:
     """
     Importa Compras de CSV/XLSX.
 
     Args:
         path: Caminho para arquivo CSV/XLSX
         dry_run: Se True, não persiste (apenas simula)
+        auto_create_municipios: Se True, cria municípios que não existem
 
     Returns:
         Relatório com stats, pendências e IDs criados
@@ -122,7 +125,18 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> dict[str, An
         from openpyxl import load_workbook
 
         wb = load_workbook(p, data_only=True, read_only=True)
-        ws = wb.active
+
+        # Encontrar aba COMPRAS (pode ter emoji ou variações)
+        ws = None
+        for sheet_name in wb.sheetnames:
+            if "COMPRAS" in sheet_name.upper():
+                ws = wb[sheet_name]
+                break
+
+        if ws is None:
+            # Fallback para aba ativa se não encontrar COMPRAS
+            ws = wb.active
+
         headers: list[str] = [
             str(c.value).strip() if c.value is not None else "" for c in next(ws.iter_rows(min_row=1, max_row=1))
         ]
@@ -139,7 +153,7 @@ def import_compras_from_file(*, path: str, dry_run: bool = True) -> dict[str, An
 
     def normalize_row(r: dict[str, Any]) -> dict[str, Any]:
         """Normaliza uma linha do arquivo."""
-        codigo: str = str(r.get("CÓD") or r.get("COD") or r.get("Cód") or "").strip()
+        codigo: str = str(r.get("CÓD") or r.get("COD") or r.get("Cód") or r.get("id") or r.get("ID") or "").strip()
         produto: str = str(r.get("Produto") or "").strip()
         produto_norm: str = norm_text(produto)
         quant_raw: Any = r.get("Quant.") or r.get("Quant") or r.get("Quantidade")
@@ -286,21 +300,55 @@ def _infer_projeto_from_produto(produto_norm: str) -> Projeto | None:
     """
     Infere projeto a partir do nome do produto normalizado.
 
-    Heurísticas:
-    - "NOVO LENDO" → resolve_projeto("Novo Lendo")
-    - "GESTAO ESCOLAR" | "GESTÃO ESCOLAR" → resolve_projeto("Gestão Escolar")
+    Mapeamento completo de produtos → projetos baseado na Planilha de Controle.
+    A ordem das verificações é importante (mais específico primeiro).
     """
     if not produto_norm:
         return None
 
     key: str = produto_norm.upper()
 
-    try:
-        if "NOVO LENDO" in key:
-            return resolve_projeto("Novo Lendo")
-        if "GESTAO ESCOLAR" in key or "GESTÃO ESCOLAR" in key:
-            return resolve_projeto("Gestão Escolar")
-    except Exception:
-        return None
+    # Mapeamento de padrões → nomes de projeto no banco
+    # Ordem: mais específico primeiro
+    mappings: list[tuple[list[str], str]] = [
+        # Projetos com nomes compostos (verificar primeiro)
+        (["KIT COMBO NOVO LENDO E AMMA"], "Novo Lendo"),
+        (["VIDA E CIENCIA", "VIDA E CIÊNCIA"], "Vida & Ciências"),
+        (["VIDA E LINGUAGEM"], "Vida & Linguagem"),
+        (["VIDA E MATEMATICA", "VIDA E MATEMÁTICA"], "Vida & Matemática"),
+        (["LER OUVIR E CONTAR"], "LER OUVIR E CONTAR"),
+        (["LENDO E ESCREVENDO"], "LER OUVIR E CONTAR"),  # Mesma família
+        (["ESCREVER COMUNICAR E SER"], "LER OUVIR E CONTAR"),  # Mesma família
+        (["A COR DA GENTE"], "A COR DA GENTE"),
+        (["BRINCANDO E APRENDENDO"], "Brincando e Aprendendo"),
+        (["SOU DA PAZ"], "SOU DA PAZ"),
+        (["UNI DUNI T"], "UNI DUNI TÊ"),  # Sem acento para match flexível
+        (["EDUCACAO FINANCEIRA", "EDUCAÇÃO FINANCEIRA"], "ED FINANCEIRA"),
+        (["AVANCANDO JUNTOS", "AVANÇANDO JUNTOS"], "Avançando Juntos Matemática"),
+        (["APRENDER MAIS"], "Projeto AMMA"),
+        (["SUPER ATIVAR", "SUPERATIVAR"], "Superativar"),
+        (
+            ["GESTAO ESCOLAR", "GESTÃO ESCOLAR", "FORTALECIMENTO DA GESTAO", "FORTALECIMENTO DA GESTÃO"],
+            "GESTÃO ESCOLAR",
+        ),
+        # Projetos com nomes simples
+        (["NOVO LENDO"], "Novo Lendo"),
+        (["ACERTA"], "ACerta"),
+        (["FLUIR"], "Fluir"),  # Pode não existir no banco ainda
+        (["CATAVENTOS"], "Cataventos"),
+        (["MIUDEZAS"], "Miudezas"),
+        (["AVALIAR"], "ACerta"),  # Avaliar é do projeto ACerta
+        (["TEMA"], "Superativar"),  # TEMA é do Superativar
+    ]
+
+    for patterns, projeto_nome in mappings:
+        for pattern in patterns:
+            if pattern in key:
+                try:
+                    projeto = resolve_projeto(projeto_nome)
+                    if projeto:
+                        return projeto
+                except Exception:
+                    pass
 
     return None

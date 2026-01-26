@@ -38,7 +38,6 @@ import {
   SyncOutlined,
   BarChartOutlined,
   SafetyOutlined,
-  WarningOutlined,
 } from '@ant-design/icons';
 import logger from '../../utils/logger';
 
@@ -287,7 +286,7 @@ export default function EquipeDashboardPage(): JSX.Element {
           </Title>
 
           <Row gutter={[16, 16]} className="mb-8">
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={24} sm={12} md={8}>
               <Card bordered={false} style={{ background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)' }}>
                 <Statistic
                   title={<span style={{ color: 'white' }}>Eventos Criados</span>}
@@ -298,24 +297,7 @@ export default function EquipeDashboardPage(): JSX.Element {
               </Card>
             </Col>
 
-            <Col xs={24} sm={12} md={6}>
-              <Card bordered={false} style={{
-                background: productivityData && productivityData.approval_rate >= 80
-                  ? 'linear-gradient(135deg, #52c41a 0%, #237804 100%)'
-                  : 'linear-gradient(135deg, #faad14 0%, #d46b08 100%)'
-              }}>
-                <Statistic
-                  title={<span style={{ color: 'white' }}>Taxa de Aprovação</span>}
-                  value={productivityData?.approval_rate || 0}
-                  suffix="%"
-                  prefix={productivityData && productivityData.approval_rate >= 80 ? <CheckCircleOutlined /> : <WarningOutlined />}
-                  valueStyle={{ color: 'white' }}
-                />
-                <Text style={{ color: 'white', fontSize: '12px' }}>Meta: ≥ 80%</Text>
-              </Card>
-            </Col>
-
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={24} sm={12} md={8}>
               <Card bordered={false} style={{ background: 'linear-gradient(135deg, #722ed1 0%, #531dab 100%)' }}>
                 <Statistic
                   title={<span style={{ color: 'white' }}>Tempo Médio de Aprovação</span>}
@@ -328,7 +310,7 @@ export default function EquipeDashboardPage(): JSX.Element {
               </Card>
             </Col>
 
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={24} sm={12} md={8}>
               <Card bordered={false} style={{
                 background: productivityData && productivityData.gcal_error_rate <= 5
                   ? 'linear-gradient(135deg, #52c41a 0%, #237804 100%)'

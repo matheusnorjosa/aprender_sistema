@@ -126,15 +126,16 @@ async function fetchDeslocamentos(filters: FiltersType = {}): Promise<{ results:
 }
 
 /**
- * Fetch usuarios for select
+ * Fetch formadores do setor do usuário logado para select.
+ * Usa endpoint que filtra automaticamente pela gerencia do usuário.
  */
-async function fetchUsuarios(): Promise<UsuarioOptionType[]> {
-  const response = await fetch(`${API_BASE}/options/usuarios/`, {
+async function fetchFormadoresDoSetor(): Promise<UsuarioOptionType[]> {
+  const response = await fetch(`${API_BASE}/options/formadores-do-setor/`, {
     credentials: 'include',
   });
 
   if (!response.ok) {
-    throw new Error('Erro ao buscar usuários');
+    throw new Error('Erro ao buscar formadores');
   }
 
   return response.json();
@@ -246,22 +247,22 @@ export default function DeslocamentosPage(): JSX.Element {
     }
   }, [filters]);
 
-  // Load usuarios for select
-  const loadUsuarios = useCallback(async (): Promise<void> => {
+  // Load formadores do setor do usuário logado
+  const loadFormadores = useCallback(async (): Promise<void> => {
     try {
-      const data = await fetchUsuarios();
+      const data = await fetchFormadoresDoSetor();
       setUsuarios(data);
     } catch (error) {
-      logger.error('Erro ao carregar usuários:', error);
+      logger.error('Erro ao carregar formadores:', error);
     }
   }, []);
 
   useEffect(() => {
     if (canAccess) {
       loadDeslocamentos();
-      loadUsuarios();
+      loadFormadores();
     }
-  }, [canAccess, filters, loadDeslocamentos, loadUsuarios]);
+  }, [canAccess, filters, loadDeslocamentos, loadFormadores]);
 
   // Handle table change (pagination)
   const handleTableChange = (paginationConfig: TablePaginationConfig): void => {

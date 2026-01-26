@@ -4,7 +4,6 @@
  * Renderiza duas grades empilhadas: Formadores e Coordenadores.
  * Filtros compartilhados (ano, mês, setor, q).
  * Drawer compartilhado (sabe de qual grade veio a seleção).
- * Export CSV por grade.
  *
  * Design visual atualizado: células maiores, barras coloridas, layout limpo.
  */
@@ -15,7 +14,6 @@ import FiltersBar from './FiltersBar';
 import Legend from './Legend';
 import Grid from './Grid';
 import DetailsDrawer from './DetailsDrawer';
-import { exportMonthlyCsv } from './exportCsv';
 import type { ID } from '../../types';
 import type { PersonType, EventDetailType } from './DetailsDrawer';
 
@@ -92,31 +90,6 @@ export default function MonthlyPage(): JSX.Element {
     setFilters((prev) => ({ ...prev, ...partial }));
   };
 
-  /**
-   * Handlers de export CSV.
-   */
-  const exportFormadores = (): void => {
-    if (!formadores.data) return;
-    exportMonthlyCsv({
-      ...filters,
-      role: 'FORMADOR',
-      days: formadores.data.days,
-      people: formadores.data.people,
-      cells: formadores.data.cells,
-    });
-  };
-
-  const exportCoordenadores = (): void => {
-    if (!coordenadores.data) return;
-    exportMonthlyCsv({
-      ...filters,
-      role: 'COORDENADOR',
-      days: coordenadores.data.days,
-      people: coordenadores.data.people,
-      cells: coordenadores.data.cells,
-    });
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="p-6 md:p-10 space-y-6">
@@ -148,17 +121,8 @@ export default function MonthlyPage(): JSX.Element {
         <div className="space-y-6">
             {/* Grade de Formadores */}
             <div>
-              <div className="flex items-center justify-between mb-4">
+              <div className="mb-4">
                 <h2 className="text-xl font-semibold text-gray-900">Formadores</h2>
-                {formadores.data && (
-                  <button
-                    type="button"
-                    onClick={exportFormadores}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                  >
-                    Exportar CSV
-                  </button>
-                )}
               </div>
 
               {formadores.loading ? (
@@ -204,17 +168,8 @@ export default function MonthlyPage(): JSX.Element {
 
             {/* Grade de Coordenadores */}
             <div>
-              <div className="flex items-center justify-between mb-4">
+              <div className="mb-4">
                 <h2 className="text-xl font-semibold text-gray-900">Coordenadores</h2>
-                {coordenadores.data && (
-                  <button
-                    type="button"
-                    onClick={exportCoordenadores}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
-                  >
-                    Exportar CSV
-                  </button>
-                )}
               </div>
 
               {coordenadores.loading ? (

@@ -205,11 +205,14 @@ export default function ComprasPage(): JSX.Element {
     ]);
 
     setStats(statsData as unknown as ComprasStats);
-  }, [filters, crud]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
+  // Initial load only
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Clear all filters
   const handleClearFilters = () => {

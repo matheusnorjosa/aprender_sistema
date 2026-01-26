@@ -6,8 +6,8 @@
  * Issue #207: Code-splitting com React.lazy() para reduzir bundle size
  */
 
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense, useMemo } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge } from 'antd';
 import logger from './utils/logger';
 import {
@@ -107,6 +107,116 @@ function useMenuOpenKeys(): UseMenuOpenKeysReturn {
   };
 
   return { openKeys, onOpenChange, closeAllSubmenus };
+}
+
+// Mapeamento de rotas para keys do menu
+const ROUTE_TO_MENU_KEY: Record<string, string> = {
+  '/': 'home',
+  '/home': 'home',
+  '/aprovacoes': 'aprovacoes',
+  '/bloqueios': 'bloqueios',
+  // Controle module
+  '/controle': 'controle-ops',
+  '/controle/acoes': 'controle-acoes',
+  '/controle/compras': 'controle-compras',
+  '/controle/formacoes': 'controle-formacoes',
+  '/controle/plano-formacoes': 'controle-plano-formacoes',
+  '/controle/pre-agenda': 'controle-pre-agenda',
+  '/dat/etl-reports': 'dat-etl-reports',
+  // Item único
+  '/deslocamentos': 'deslocamentos',
+  // Dashboards
+  '/dashboards': 'dashboard-geral',
+  '/dashboards/equipe': 'dashboard-equipe',
+  '/dashboards/gcal': 'gcal-dashboard',
+  '/mapa-brasil': 'mapa-brasil',
+  // DAT module
+  '/dat/admin': 'dat-admin',
+  '/dat/cadastros': 'dat-cadastros',
+  '/dat/coordenadores': 'dat-coordenadores',
+  '/dat/importacao': 'dat-importacao',
+  '/dat/registros': 'dat-registros',
+  // Outros
+  '/disponibilidade': 'grade-mensal',
+  '/solicitacoes/minhas': 'minhas-solicitacoes',
+  '/solicitacoes/nova': 'nova-solicitacao',
+};
+
+// Mapeamento de menu keys para seus submenus pais
+const MENU_KEY_TO_PARENT: Record<string, string> = {
+  // Controle submenu
+  'controle-ops': 'controle-submenu',
+  'controle-acoes': 'controle-submenu',
+  'controle-compras': 'controle-submenu',
+  'controle-formacoes': 'controle-submenu',
+  'controle-plano-formacoes': 'controle-submenu',
+  'controle-pre-agenda': 'controle-submenu',
+  // Dashboards submenu
+  'dashboard-geral': 'dashboards-submenu',
+  'dashboard-equipe': 'dashboards-submenu',
+  'gcal-dashboard': 'dashboards-submenu',
+  'mapa-brasil': 'dashboards-submenu',
+  // DAT submenu
+  'dat-admin': 'dat-submenu',
+  'dat-cadastros': 'dat-submenu',
+  'dat-coordenadores': 'dat-submenu',
+  'dat-etl-reports': 'dat-submenu',
+  'dat-importacao': 'dat-submenu',
+  'dat-registros': 'dat-submenu',
+  // Solicitações submenu
+  'minhas-solicitacoes': 'solicitacoes-submenu',
+  'nova-solicitacao': 'solicitacoes-submenu',
+};
+
+// Hook para obter a key do menu baseada na rota atual
+function useSelectedMenuKey(): string {
+  const location = useLocation();
+  return useMemo(() => {
+    // Tenta match exato primeiro
+    if (ROUTE_TO_MENU_KEY[location.pathname]) {
+      return ROUTE_TO_MENU_KEY[location.pathname];
+    }
+    // Tenta match parcial para rotas com parâmetros (ex: /solicitacoes/:id/editar)
+    for (const [route, key] of Object.entries(ROUTE_TO_MENU_KEY)) {
+      if (location.pathname.startsWith(route) && route !== '/') {
+        return key;
+      }
+    }
+    return 'home';
+  }, [location.pathname]);
+}
+
+// Props do SidebarMenu
+interface SidebarMenuProps {
+  openKeys: string[];
+  onOpenChange: (keys: string[]) => void;
+  children: React.ReactNode;
+}
+
+// Componente que usa useLocation para seleção dinâmica do menu
+function SidebarMenu({ openKeys, onOpenChange, children }: SidebarMenuProps): JSX.Element {
+  const selectedKey = useSelectedMenuKey();
+
+  // Auto-abrir submenu pai quando navegar diretamente para uma rota interna
+  useEffect(() => {
+    const parentKey = MENU_KEY_TO_PARENT[selectedKey];
+    if (parentKey && !openKeys.includes(parentKey)) {
+      onOpenChange([parentKey]);
+    }
+  }, [selectedKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <Menu
+      theme="dark"
+      mode="inline"
+      selectedKeys={[selectedKey]}
+      openKeys={openKeys}
+      onOpenChange={onOpenChange}
+      style={{ borderRight: 0 }}
+    >
+      {children}
+    </Menu>
+  );
 }
 
 // Componente de loading para Suspense
@@ -359,13 +469,9 @@ function AppContent(): JSX.Element {
             </div>
 
             {/* Menu vertical - Ordem alfabética (exceto Página Inicial) */}
-            <Menu
-              theme="dark"
-              mode="inline"
-              defaultSelectedKeys={['home']}
+            <SidebarMenu
               openKeys={openKeys}
               onOpenChange={onOpenChange}
-              style={{ borderRight: 0 }}
             >
               {/* 1. Página Inicial (sempre primeiro) */}
               <Menu.Item key="home" icon={<HomeOutlined />} onClick={closeAllSubmenus}>
@@ -389,82 +495,76 @@ function AppContent(): JSX.Element {
               {/* 4. Controle */}
               {canControle && (
                 <SubMenu key="controle-submenu" icon={<CheckCircleOutlined />} title="Controle">
-                  <Menu.Item key="deslocamentos">
-                    <Link to="/deslocamentos">Deslocamentos</Link>
+                  <Menu.Item key="controle-acoes">
+                    <Link to="/controle/acoes">Ações</Link>
+                  </Menu.Item>
+                  <Menu.Item key="controle-compras">
+                    <Link to="/controle/compras">Compras</Link>
+                  </Menu.Item>
+                  <Menu.Item key="controle-formacoes">
+                    <Link to="/controle/formacoes">Formações</Link>
                   </Menu.Item>
                   <Menu.Item key="controle-ops">
                     <Link to="/controle">Painel de Controle</Link>
                   </Menu.Item>
-                  <Menu.Item key="pre-agenda">
-                    <Link to="/pre-agenda">Pré-agenda</Link>
+                  <Menu.Item key="controle-plano-formacoes">
+                    <Link to="/controle/plano-formacoes">Plano Anual</Link>
+                  </Menu.Item>
+                  <Menu.Item key="controle-pre-agenda">
+                    <Link to="/controle/pre-agenda">Pré-agenda</Link>
                   </Menu.Item>
                 </SubMenu>
               )}
 
+              {/* 5. Deslocamentos (item único) */}
+              {(canControle || canCoordenador || canDAT) && (
+                <Menu.Item key="deslocamentos" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
+                  <Link to="/deslocamentos">Deslocamentos</Link>
+                </Menu.Item>
+              )}
+
               {/* 5. Dashboards */}
-              {(canDashboards || canControle) && (
+              {canDashboards && (
                 <SubMenu key="dashboards-submenu" icon={<BarChartOutlined />} title="Dashboards">
-                  {canDashboards && (
-                    <Menu.Item key="dashboard-geral">
-                      <Link to="/dashboards">Dashboard Geral</Link>
-                    </Menu.Item>
-                  )}
-                  {canDashboards && (
-                    <Menu.Item key="dashboard-equipe">
-                      <Link to="/dashboards/equipe">Dashboard Equipe</Link>
-                    </Menu.Item>
-                  )}
-                  {canDashboards && (
-                    <Menu.Item key="gcal-dashboard">
-                      <Link to="/dashboard/gcal">
-                        <Badge count={alerts.errors} offset={[10, 0]} size="small">
-                          Dashboard GCal
-                        </Badge>
-                      </Link>
-                    </Menu.Item>
-                  )}
-                  {canDashboards && (
-                    <Menu.Item key="mapa-brasil">
-                      <Link to="/mapa-brasil">Mapa do Brasil</Link>
-                    </Menu.Item>
-                  )}
-                  {canControle && (
-                    <Menu.Item key="etl-reports">
-                      <Link to="/controle/etl-reports">Relatórios ETL</Link>
-                    </Menu.Item>
-                  )}
+                  <Menu.Item key="dashboard-geral">
+                    <Link to="/dashboards">Dashboard Geral</Link>
+                  </Menu.Item>
+                  <Menu.Item key="dashboard-equipe">
+                    <Link to="/dashboards/equipe">Dashboard Equipe</Link>
+                  </Menu.Item>
+                  <Menu.Item key="gcal-dashboard">
+                    <Link to="/dashboards/gcal">
+                      <Badge count={alerts.errors} offset={[10, 0]} size="small">
+                        Dashboard GCal
+                      </Badge>
+                    </Link>
+                  </Menu.Item>
+                  <Menu.Item key="mapa-brasil">
+                    <Link to="/mapa-brasil">Mapa do Brasil</Link>
+                  </Menu.Item>
                 </SubMenu>
               )}
 
               {/* 6. DAT */}
               {canDAT && (
-                <SubMenu key="dat-module-submenu" icon={<SolutionOutlined />} title="DAT">
-                  <Menu.Item key="admin-dat">
-                    <Link to="/admin-dat">Administração</Link>
-                  </Menu.Item>
-                  <Menu.Item key="importacao">
-                    <Link to="/importacao">Importação</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-registros">
-                    <Link to="/dat-module/registros">Registros de Turmas</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-acoes">
-                    <Link to="/dat-module/acoes">Ações</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-compras">
-                    <Link to="/dat-module/compras">Compras</Link>
+                <SubMenu key="dat-submenu" icon={<SolutionOutlined />} title="DAT">
+                  <Menu.Item key="dat-admin">
+                    <Link to="/dat/admin">Administração</Link>
                   </Menu.Item>
                   <Menu.Item key="dat-cadastros">
-                    <Link to="/dat-module/cadastros">Cadastros</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-formacoes">
-                    <Link to="/dat-module/formacoes">Formações</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-plano-formacoes">
-                    <Link to="/dat-module/plano-formacoes">Plano Anual</Link>
+                    <Link to="/dat/cadastros">Cadastros</Link>
                   </Menu.Item>
                   <Menu.Item key="dat-coordenadores">
-                    <Link to="/dat-module/coordenadores">Coordenadores</Link>
+                    <Link to="/dat/coordenadores">Coordenadores</Link>
+                  </Menu.Item>
+                  <Menu.Item key="dat-importacao">
+                    <Link to="/dat/importacao">Importação</Link>
+                  </Menu.Item>
+                  <Menu.Item key="dat-registros">
+                    <Link to="/dat/registros">Registros de Turmas</Link>
+                  </Menu.Item>
+                  <Menu.Item key="dat-etl-reports">
+                    <Link to="/dat/etl-reports">Relatórios ETL</Link>
                   </Menu.Item>
                 </SubMenu>
               )}
@@ -487,7 +587,7 @@ function AppContent(): JSX.Element {
                   </Menu.Item>
                 </SubMenu>
               )}
-            </Menu>
+            </SidebarMenu>
           </Sider>
 
           {/* Layout com margem para compensar Sider fixo */}
@@ -548,7 +648,7 @@ function AppContent(): JSX.Element {
 
                   {/* GCal Dashboard (Diretoria, DAT, superuser) */}
                   <Route
-                    path="/dashboard/gcal"
+                    path="/dashboards/gcal"
                     element={canDashboards ? <GCalDashboardPage /> : <Forbidden />}
                   />
 
@@ -584,83 +684,79 @@ function AppContent(): JSX.Element {
                     element={canApproveSuper ? <ApprovalsPage /> : <Forbidden />}
                   />
 
-                  {/* PR15: Rota de pré-agenda */}
+                  {/* ========== CONTROLE MODULE ========== */}
+                  <Route path="/controle" element={canControle ? <ControlePage /> : <Forbidden />} />
                   <Route
-                    path="/pre-agenda"
-                    element={canControle ? <PreAgendaPage /> : <Forbidden />}
+                    path="/controle/acoes"
+                    element={canControle ? <AcoesPage /> : <Forbidden />}
                   />
-
-                  {/* Issue #188: Deslocamentos (Controle/Coordenador/DAT) */}
+                  <Route
+                    path="/controle/compras"
+                    element={canControle ? <ComprasPage /> : <Forbidden />}
+                  />
+                  {/* Deslocamentos (item único no menu) */}
                   <Route
                     path="/deslocamentos"
                     element={(canControle || canCoordenador || canDAT) ? <DeslocamentosPage /> : <Forbidden />}
                   />
-
-                  {/* Admin DAT (Fase 1 - Plano DAT/GCal) */}
                   <Route
-                    path="/admin-dat"
+                    path="/controle/formacoes"
+                    element={canControle ? <FormacoesPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/controle/plano-formacoes"
+                    element={canControle ? <PlanoFormacoesPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/controle/pre-agenda"
+                    element={canControle ? <PreAgendaPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/dat/etl-reports"
+                    element={canDAT ? <EtlReportsPage /> : <Forbidden />}
+                  />
+
+                  {/* ========== DAT MODULE ========== */}
+                  <Route
+                    path="/dat/admin"
                     element={canDAT ? <AdminDATHomePage /> : <Forbidden />}
                   />
                   <Route
-                    path="/admin-dat/usuarios"
+                    path="/dat/admin/usuarios"
                     element={canDAT ? <UsuariosPage /> : <Forbidden />}
                   />
                   <Route
-                    path="/admin-dat/municipios"
+                    path="/dat/admin/municipios"
                     element={canDAT ? <MunicipiosPage /> : <Forbidden />}
                   />
                   <Route
-                    path="/admin-dat/projetos"
+                    path="/dat/admin/projetos"
                     element={canDAT ? <ProjetosPage /> : <Forbidden />}
                   />
                   <Route
-                    path="/admin-dat/grupos"
+                    path="/dat/admin/grupos"
                     element={canDAT ? <GruposPage /> : <Forbidden />}
                   />
                   <Route
-                    path="/admin-dat/configuracoes"
+                    path="/dat/admin/configuracoes"
                     element={canDAT ? <ConfiguracoesPage /> : <Forbidden />}
                   />
-
-                  {/* DAT Module - Acompanhamento de Turmas (SPEC_DAT_REGISTROS.md) */}
                   <Route
-                    path="/dat-module/registros"
-                    element={canDAT ? <DATRegistrosPage /> : <Forbidden />}
-                  />
-
-                  {/* DAT Module - Novas páginas de gestão */}
-                  <Route
-                    path="/dat-module/acoes"
-                    element={canDAT ? <AcoesPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat-module/compras"
-                    element={canDAT ? <ComprasPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat-module/cadastros"
+                    path="/dat/cadastros"
                     element={canDAT ? <CadastrosPage /> : <Forbidden />}
                   />
                   <Route
-                    path="/dat-module/formacoes"
-                    element={canDAT ? <FormacoesPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat-module/plano-formacoes"
-                    element={canDAT ? <PlanoFormacoesPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat-module/coordenadores"
+                    path="/dat/coordenadores"
                     element={canDAT ? <CoordenadoresPage /> : <Forbidden />}
                   />
-
-                  {/* Antigas rotas (manter compatibilidade) */}
-                  <Route path="/controle" element={<ControlePage />} />
                   <Route
-                    path="/controle/etl-reports"
-                    element={canControle ? <EtlReportsPage /> : <Forbidden />}
+                    path="/dat/importacao"
+                    element={canDAT ? <DATPage /> : <Forbidden />}
                   />
-                  <Route path="/importacao" element={canDAT ? <DATPage /> : <Forbidden />} />
+                  <Route
+                    path="/dat/registros"
+                    element={canDAT ? <DATRegistrosPage /> : <Forbidden />}
+                  />
                 </Routes>
               </Suspense>
             </Content>

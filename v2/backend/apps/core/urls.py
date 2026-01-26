@@ -81,6 +81,7 @@ from .views_oauth import (
 from .views_options import (
     areas_options,
     coordenadores_options,
+    formadores_do_setor_options,
     municipios_options,
     produtos_options,
     projetos_options,
@@ -250,6 +251,7 @@ urlpatterns = [
     path("options/produtos/", produtos_options, name="options-produtos"),
     path("options/coordenadores/", coordenadores_options, name="options-coordenadores"),
     path("options/areas/", areas_options, name="options-areas"),
+    path("options/formadores-do-setor/", formadores_do_setor_options, name="options-formadores-do-setor"),
     # PR16: Lookup (Autocomplete) API
     path("lookup/municipios/", MunicipioLookup.as_view(), name="lookup-municipios"),
     path("lookup/projetos/", ProjetoLookup.as_view(), name="lookup-projetos"),

@@ -377,12 +377,13 @@ class Command(BaseCommand):
             self.pendencias["municipios"].append(municipio_nome)
             return
 
-        sector = normalize_sector(evento.get("source_sheet", ""), evento.get("projeto", ""))
-        projeto = resolve_projeto(sector)
+        # PR20 Fix: Usar nome do projeto direto do CSV, não o setor normalizado
+        projeto_nome = evento.get("projeto", "").strip()
+        projeto = resolve_projeto(projeto_nome)
         if not projeto:
-            self.stdout.write(f"   ⚠️  Projeto não resolvido: {sector}")
+            self.stdout.write(f"   ⚠️  Projeto não resolvido: {projeto_nome}")
             self.stats["skipped"]["fk"] += 1
-            self.pendencias["projetos"].append(sector)
+            self.pendencias["projetos"].append(projeto_nome)
             return
 
         tipo = evento.get("tipo", "").strip()

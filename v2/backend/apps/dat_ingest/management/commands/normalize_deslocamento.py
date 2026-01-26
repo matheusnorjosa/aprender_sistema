@@ -60,7 +60,7 @@ class Command(BaseCommand):
             out_dir.mkdir(exist_ok=True)
             self.output_path = out_dir / "deslocamento_normalizado.csv"
 
-        self.stdout.write(f"🚀 Normalize DESLOCAMENTO")
+        self.stdout.write("🚀 Normalize DESLOCAMENTO")
         self.stdout.write(f"   Input: {self.file_path}")
         self.stdout.write(f"   Sheet: {self.sheet_name}")
         self.stdout.write(f"   Output: {self.output_path}")
@@ -236,7 +236,7 @@ class Command(BaseCommand):
                             "destino": viagem["destino"],
                             "start": viagem["data"].isoformat(),
                             "end": viagem["data"].isoformat(),
-                            "obs": f"Retorno sem ida pareada",
+                            "obs": "Retorno sem ida pareada",
                         }
                     )
                     processed_indices.add(i)

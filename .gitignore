@@ -532,3 +532,8 @@ v2/docs/OBSERVABILITY.md
 # Continuous Claude cache (local only)
 .claude/cache/
 tmpclaude-*
+
+# Data import files (sensitive)
+v2/backend/data/csv-import/*.xlsx
+v2/backend/data/csv-import/*.csv
+v2/backend/data/csv-import/*.py

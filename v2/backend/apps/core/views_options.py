@@ -267,3 +267,70 @@ def areas_options(request: Request) -> Response:
 
     cache.set(cache_key, data, timeout=settings.CACHE_DEFAULT_TIMEOUT)
     return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def formadores_do_setor_options(request: Request) -> Response:
+    """
+    GET /api/options/formadores-do-setor/
+
+    Retorna lista de formadores do mesmo setor do usuário logado.
+
+    Lógica:
+    - Superusers: veem todos os formadores
+    - Coordenadores/outros: veem apenas formadores das suas gerencias
+
+    Response:
+    [
+        {"id": 1, "first_name": "João", "last_name": "Silva", "email": "joao@example.com"},
+        ...
+    ]
+
+    Permissions: IsAuthenticated
+    Cache: Não aplicável (resultado varia por usuário)
+    """
+    from .models import EquipeGerencia
+
+    user = request.user
+
+    # Superusers veem todos os formadores e coordenadores
+    if user.is_superuser:
+        user_ids = EquipeGerencia.objects.filter(
+            papel__in=["FORMADOR", "COORDENADOR"],
+            ativo=True
+        ).values_list("usuario_id", flat=True).distinct()
+
+        usuarios = Usuario.objects.filter(
+            id__in=user_ids,
+            is_active=True
+        ).order_by("first_name", "last_name")
+
+        serializer = UsuarioOptionSerializer(usuarios, many=True)
+        return Response(serializer.data)
+
+    # Buscar as gerencias do usuário logado
+    user_gerencias = EquipeGerencia.objects.filter(
+        usuario=user,
+        ativo=True
+    ).values_list("gerencia_id", flat=True)
+
+    if not user_gerencias:
+        # Se usuário não tem gerencias, retorna lista vazia
+        return Response([])
+
+    # Buscar formadores das mesmas gerencias
+    formador_ids = EquipeGerencia.objects.filter(
+        gerencia_id__in=user_gerencias,
+        papel="FORMADOR",
+        ativo=True
+    ).values_list("usuario_id", flat=True).distinct()
+
+    # Buscar usuarios formadores ativos
+    usuarios = Usuario.objects.filter(
+        id__in=formador_ids,
+        is_active=True
+    ).order_by("first_name", "last_name")
+
+    serializer = UsuarioOptionSerializer(usuarios, many=True)
+    return Response(serializer.data)

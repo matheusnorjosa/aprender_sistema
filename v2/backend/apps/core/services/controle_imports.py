@@ -327,7 +327,10 @@ def _infer_projeto_from_produto(produto_norm: str) -> Projeto | None:
         (["AVANCANDO JUNTOS", "AVANÇANDO JUNTOS"], "Avançando Juntos Matemática"),
         (["APRENDER MAIS"], "Projeto AMMA"),
         (["SUPER ATIVAR", "SUPERATIVAR"], "Superativar"),
-        (["GESTAO ESCOLAR", "GESTÃO ESCOLAR", "FORTALECIMENTO DA GESTAO", "FORTALECIMENTO DA GESTÃO"], "GESTÃO ESCOLAR"),
+        (
+            ["GESTAO ESCOLAR", "GESTÃO ESCOLAR", "FORTALECIMENTO DA GESTAO", "FORTALECIMENTO DA GESTÃO"],
+            "GESTÃO ESCOLAR",
+        ),
         # Projetos com nomes simples
         (["NOVO LENDO"], "Novo Lendo"),
         (["ACERTA"], "ACerta"),

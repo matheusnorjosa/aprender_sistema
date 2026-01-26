@@ -172,12 +172,14 @@ class Command(BaseCommand):
                 if pessoa not in deslocamentos_por_pessoa:
                     deslocamentos_por_pessoa[pessoa] = []
 
-                deslocamentos_por_pessoa[pessoa].append({
-                    "origem": origem,
-                    "tipo": tipo,
-                    "destino": destino,
-                    "data": data,
-                })
+                deslocamentos_por_pessoa[pessoa].append(
+                    {
+                        "origem": origem,
+                        "tipo": tipo,
+                        "destino": destino,
+                        "data": data,
+                    }
+                )
 
         # Processar cada pessoa
         for pessoa, viagens in deslocamentos_por_pessoa.items():
@@ -200,10 +202,7 @@ class Command(BaseCommand):
                         candidate = viagens_sorted[j]
                         if "retorno" in candidate["tipo"]:
                             # Verificar se destino do retorno é origem do deslocamento
-                            if (
-                                candidate["origem"] == viagem["destino"]
-                                or candidate["destino"] == viagem["origem"]
-                            ):
+                            if candidate["origem"] == viagem["destino"] or candidate["destino"] == viagem["origem"]:
                                 retorno = candidate
                                 processed_indices.add(j)
                                 break
@@ -215,27 +214,31 @@ class Command(BaseCommand):
                         # Sem retorno: usar mesma data
                         end_date = start_date
 
-                    normalized.append({
-                        "name": pessoa,
-                        "origem": viagem["origem"],
-                        "destino": viagem["destino"],
-                        "start": start_date.isoformat(),
-                        "end": end_date.isoformat(),
-                        "obs": f"Tipo: {viagem['tipo']}",
-                    })
+                    normalized.append(
+                        {
+                            "name": pessoa,
+                            "origem": viagem["origem"],
+                            "destino": viagem["destino"],
+                            "start": start_date.isoformat(),
+                            "end": end_date.isoformat(),
+                            "obs": f"Tipo: {viagem['tipo']}",
+                        }
+                    )
 
                     processed_indices.add(i)
 
                 elif "retorno" in viagem["tipo"] and i not in processed_indices:
                     # Retorno sem ida: registrar como viagem de um dia
-                    normalized.append({
-                        "name": pessoa,
-                        "origem": viagem["origem"],
-                        "destino": viagem["destino"],
-                        "start": viagem["data"].isoformat(),
-                        "end": viagem["data"].isoformat(),
-                        "obs": f"Retorno sem ida pareada",
-                    })
+                    normalized.append(
+                        {
+                            "name": pessoa,
+                            "origem": viagem["origem"],
+                            "destino": viagem["destino"],
+                            "start": viagem["data"].isoformat(),
+                            "end": viagem["data"].isoformat(),
+                            "obs": f"Retorno sem ida pareada",
+                        }
+                    )
                     processed_indices.add(i)
 
         return normalized

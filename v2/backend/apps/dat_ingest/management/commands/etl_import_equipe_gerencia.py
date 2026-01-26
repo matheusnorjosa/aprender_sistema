@@ -25,7 +25,6 @@ from django.db import transaction
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
 from apps.core.services.resolvers import resolve_user_by_name
 
-
 # Mapeamento de nomes de aba → nome_setor canônico
 SETOR_MAPPING = {
     "Superintendência": "Superintendência",
@@ -157,11 +156,13 @@ class Command(BaseCommand):
                 for valor in df[col].dropna():
                     nome = str(valor).strip()
                     if nome and nome != "nan":
-                        equipes.append({
-                            "setor": nome_setor,
-                            "papel": papel,
-                            "usuario_nome": nome,
-                        })
+                        equipes.append(
+                            {
+                                "setor": nome_setor,
+                                "papel": papel,
+                                "usuario_nome": nome,
+                            }
+                        )
 
         return equipes
 
@@ -185,11 +186,13 @@ class Command(BaseCommand):
         # 3. Resolver usuário
         usuario = resolve_user_by_name(usuario_nome)
         if not usuario:
-            self.pending_usuarios.append({
-                "setor": setor,
-                "papel": papel,
-                "usuario_nome": usuario_nome,
-            })
+            self.pending_usuarios.append(
+                {
+                    "setor": setor,
+                    "papel": papel,
+                    "usuario_nome": usuario_nome,
+                }
+            )
             self.stats["skipped"] += 1
             return
 
@@ -244,7 +247,7 @@ class Command(BaseCommand):
                 defaults={
                     "nome_setor": nome_setor,
                     "ativo": True,
-                }
+                },
             )
             if created:
                 self.stdout.write(f"   🆕 Gerência criada: {nome_gerencia} ({nome_setor})")

@@ -114,12 +114,14 @@ class Command(BaseCommand):
                 descricao_parts.append(f"Tipo: {tipo_produto}")
             descricao = " | ".join(descricao_parts) if descricao_parts else ""
 
-            produtos.append({
-                "codigo": codigo,
-                "nome": nome if nome != "nan" else codigo,
-                "descricao": descricao,
-                "projeto_nome": projeto_nome if projeto_nome != "nan" else "",
-            })
+            produtos.append(
+                {
+                    "codigo": codigo,
+                    "nome": nome if nome != "nan" else codigo,
+                    "descricao": descricao,
+                    "projeto_nome": projeto_nome if projeto_nome != "nan" else "",
+                }
+            )
 
         return produtos
 
@@ -143,11 +145,13 @@ class Command(BaseCommand):
                 projeto = self._infer_projeto_from_nome(nome)
 
             if not projeto:
-                self.pending_projetos.append({
-                    "codigo": codigo,
-                    "nome": nome,
-                    "projeto_nome": projeto_nome,
-                })
+                self.pending_projetos.append(
+                    {
+                        "codigo": codigo,
+                        "nome": nome,
+                        "projeto_nome": projeto_nome,
+                    }
+                )
                 self.stats["skipped"] += 1
                 return
 
@@ -191,11 +195,13 @@ class Command(BaseCommand):
             self.stats["created"] += 1
         else:
             self.stats["skipped"] += 1
-            self.pending_projetos.append({
-                "codigo": codigo,
-                "nome": nome,
-                "projeto_nome": projeto_nome or "(não informado)",
-            })
+            self.pending_projetos.append(
+                {
+                    "codigo": codigo,
+                    "nome": nome,
+                    "projeto_nome": projeto_nome or "(não informado)",
+                }
+            )
 
     def _infer_projeto_from_nome(self, nome: str) -> Projeto | None:
         """Infere projeto a partir do nome do produto."""
@@ -220,7 +226,10 @@ class Command(BaseCommand):
             (["AVANCANDO JUNTOS", "AVANÇANDO JUNTOS"], "Avançando Juntos Matemática"),
             (["APRENDER MAIS"], "Projeto AMMA"),
             (["SUPER ATIVAR", "SUPERATIVAR"], "Superativar"),
-            (["GESTAO ESCOLAR", "GESTÃO ESCOLAR", "FORTALECIMENTO DA GESTAO", "FORTALECIMENTO DA GESTÃO"], "GESTÃO ESCOLAR"),
+            (
+                ["GESTAO ESCOLAR", "GESTÃO ESCOLAR", "FORTALECIMENTO DA GESTAO", "FORTALECIMENTO DA GESTÃO"],
+                "GESTÃO ESCOLAR",
+            ),
             (["NOVO LENDO"], "Novo Lendo"),
             (["ACERTA"], "ACerta"),
             (["FLUIR"], "Fluir"),

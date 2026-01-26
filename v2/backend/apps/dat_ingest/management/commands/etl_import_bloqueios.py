@@ -314,9 +314,7 @@ class Command(BaseCommand):
                 self.stdout.write(f"   ✅ Linha {linha_num}: Bloqueio criado ({nome})")
         else:
             self.stats["created"] += 1
-            self.stdout.write(
-                f"   [DRY-RUN] Linha {linha_num}: {nome} ({tipo}) {inicio.date()} - {fim.date()}"
-            )
+            self.stdout.write(f"   [DRY-RUN] Linha {linha_num}: {nome} ({tipo}) {inicio.date()} - {fim.date()}")
 
     def compute_hash(self, usuario_id: int, inicio: datetime, fim: datetime, tipo: str) -> str:
         """Gera hash SHA1 para referência."""

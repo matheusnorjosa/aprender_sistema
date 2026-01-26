@@ -50,13 +50,13 @@ class Command(BaseCommand):
         self.stdout.write(f"   File: {self.file_path}")
 
         # Stats
-        self.stats = {
+        self.stats: dict[str, int] = {
             "created": 0,
             "already_exists": 0,
             "updated": 0,
             "skipped": 0,
-            "errors": [],
         }
+        self.errors: list[str] = []
 
         # Pendências de projetos não encontrados
         self.pending_projetos: list[dict[str, Any]] = []

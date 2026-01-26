@@ -46,11 +46,12 @@ export async function preloadSearchData(force: boolean = false): Promise<Preload
 
   try {
     // Load data in parallel for performance
+    // Note: api instance already has baseURL '/api', so we use relative paths
     const [municipios, projetos, usuarios, tiposEvento] = await Promise.all([
-      api.get('/api/v1/options/municipios/').catch(() => ({ data: [] as unknown[] })),
-      api.get('/api/v1/options/projetos/').catch(() => ({ data: [] as unknown[] })),
-      api.get('/api/v1/options/usuarios/').catch(() => ({ data: [] as unknown[] })),
-      api.get('/api/v1/options/tipos-evento/').catch(() => ({ data: [] as unknown[] })),
+      api.get('/options/municipios/').catch(() => ({ data: [] as unknown[] })),
+      api.get('/options/projetos/').catch(() => ({ data: [] as unknown[] })),
+      api.get('/options/usuarios/').catch(() => ({ data: [] as unknown[] })),
+      api.get('/options/tipos-evento/').catch(() => ({ data: [] as unknown[] })),
     ]);
 
     // Index for instant search

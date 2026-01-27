@@ -69,10 +69,8 @@ export default function useMonthlyQuery(
         role: role as 'FORMADOR' | 'COORDENADOR',
         sector,
         q,
+        gerencia_id: gerenciaId,
       };
-      // Nota: gerenciaId é ignorado aqui pois não faz parte de MonthlyAvailabilityParams
-      // Se necessário, adicionar ao tipo no api/availability.ts
-      void gerenciaId; // Evita warning de unused
       const result = await getMonthlyAvailability(queryParams);
       setData(result);
     } catch (err) {

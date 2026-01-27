@@ -41,6 +41,7 @@ export interface MonthlyAvailabilityParams {
   role?: 'FORMADOR' | 'COORDENADOR';
   sector?: string;
   q?: string;
+  gerencia_id?: number | null;
 }
 
 /**

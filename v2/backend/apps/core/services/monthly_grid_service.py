@@ -26,7 +26,7 @@ from typing import Any
 from django.db.models import Prefetch, Q
 from django.utils import timezone
 
-from apps.core.models import AvailabilityBlock, Deslocamento, Participation, Solicitacao, Usuario
+from apps.core.models import AvailabilityBlock, Deslocamento, EquipeGerencia, Participation, Solicitacao, Usuario
 from apps.core.types import UserId
 
 
@@ -86,26 +86,42 @@ def build_monthly_grid(
     year_start_dt = timezone.make_aware(datetime.combine(year_start, datetime.min.time()), tz)
     year_end_dt = timezone.make_aware(datetime.combine(year_end, datetime.max.time()), tz)
 
-    # 1. Pessoas (via Participation) - filtrar por gerência quando especificado
-    participations_qs = Participation.objects.filter(role=role)
-
+    # 1. Pessoas - estratégia depende de gerencia_id
     if gerencia_id is not None:
-        # Filtrar por gerência específica
-        participations_qs = participations_qs.filter(solicitacao__projeto__gerencia_id=gerencia_id)
-    else:
-        # Fallback para comportamento anterior (apenas SUPER)
-        participations_qs = participations_qs.filter(solicitacao__projeto__fluxo="SUPER")
+        # Quando gerencia_id especificado: buscar membros da equipe via EquipeGerencia
+        # Mapear role para papel no EquipeGerencia
+        papel_map = {"FORMADOR": "FORMADOR", "COORDENADOR": "COORDENADOR"}
+        papel = papel_map.get(role, role)
 
-    if q and q.strip():
-        q_lower = q.strip().lower()
-        participations_qs = participations_qs.filter(
-            Q(usuario__first_name__icontains=q_lower)
-            | Q(usuario__last_name__icontains=q_lower)
-            | Q(usuario__email__icontains=q_lower)
+        equipe_qs = EquipeGerencia.objects.filter(
+            gerencia_id=gerencia_id,
+            papel=papel,
+            ativo=True,
         )
 
-    # Get distinct user IDs
-    user_ids = list(set(participations_qs.values_list("usuario_id", flat=True)))
+        if q and q.strip():
+            q_lower = q.strip().lower()
+            equipe_qs = equipe_qs.filter(
+                Q(usuario__first_name__icontains=q_lower)
+                | Q(usuario__last_name__icontains=q_lower)
+                | Q(usuario__email__icontains=q_lower)
+            )
+
+        user_ids = list(set(equipe_qs.values_list("usuario_id", flat=True)))
+    else:
+        # Fallback para comportamento anterior (via Participation, apenas fluxo SUPER)
+        participations_qs = Participation.objects.filter(role=role)
+        participations_qs = participations_qs.filter(solicitacao__projeto__fluxo="SUPER")
+
+        if q and q.strip():
+            q_lower = q.strip().lower()
+            participations_qs = participations_qs.filter(
+                Q(usuario__first_name__icontains=q_lower)
+                | Q(usuario__last_name__icontains=q_lower)
+                | Q(usuario__email__icontains=q_lower)
+            )
+
+        user_ids = list(set(participations_qs.values_list("usuario_id", flat=True)))
 
     # Filtrar por IDs permitidos (se fornecido)
     if allowed_user_ids is not None:
@@ -135,9 +151,10 @@ def build_monthly_grid(
     if sector and sector.strip():
         events_q = events_q.filter(projeto__nome__iexact=sector.strip())
 
-    # Filtrar eventos por gerência quando especificado
-    if gerencia_id is not None:
-        events_q = events_q.filter(projeto__gerencia_id=gerencia_id)
+    # Nota: NÃO filtrar eventos por gerência aqui.
+    # Quando gerencia_id é especificado, mostramos os MEMBROS daquela gerência,
+    # mas exibimos TODOS os seus eventos (de qualquer projeto) para ter visão
+    # completa da disponibilidade.
 
     # Prefetch participations do role específico
     events_q = events_q.prefetch_related(

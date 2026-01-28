@@ -3,10 +3,6 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "Version tag (e.g., v2025.10.08)"
-        required: true
-        default: "v2025.10.08"
       environment:
         description: "Environment to deploy"
         required: true
@@ -33,6 +29,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Generate version
+        id: version
+        run: |
+          VERSION="v$(date -u +%Y.%m.%d)"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Generated version: $VERSION"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -57,8 +60,8 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git tag -a "${{ github.event.inputs.version }}" -m "Release ${{ github.event.inputs.version }}"
-          git push origin "${{ github.event.inputs.version }}"
+          git tag -a "${{ steps.version.outputs.version }}" -m "Release ${{ steps.version.outputs.version }}"
+          git push origin "${{ steps.version.outputs.version }}"
 
       # =========================================================================
       # Docker Hub Authentication & Build
@@ -79,14 +82,14 @@ jobs:
           file: ./v2/infra/Dockerfile
           push: true
           tags: |
-            ${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.version }}
+            ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}
             ${{ env.BACKEND_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           labels: |
             org.opencontainers.image.title=Aprender Sistema Backend
             org.opencontainers.image.description=Django backend for Aprender Sistema
-            org.opencontainers.image.version=${{ github.event.inputs.version }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
 
@@ -97,14 +100,14 @@ jobs:
           file: ./v2/frontend/Dockerfile.prod
           push: true
           tags: |
-            ${{ env.FRONTEND_IMAGE }}:${{ github.event.inputs.version }}
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.version }}
             ${{ env.FRONTEND_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           labels: |
             org.opencontainers.image.title=Aprender Sistema Frontend
             org.opencontainers.image.description=React frontend for Aprender Sistema
-            org.opencontainers.image.version=${{ github.event.inputs.version }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
 
@@ -115,38 +118,38 @@ jobs:
         uses: docker/scout-action@v1
         with:
           command: cves,recommendations
-          image: ${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.version }}
+          image: ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}
+          organization: aprender
           only-severities: critical,high
-        continue-on-error: true
 
       - name: Docker Scout - Update production environment
         uses: docker/scout-action@v1
         with:
           command: environment
-          image: ${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.version }}
+          image: ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}
+          organization: aprender
           environment: production
-        continue-on-error: true
 
       # =========================================================================
       # Release Notes
       # =========================================================================
       - name: Generate release notes
         run: |
-          echo "# Release ${{ github.event.inputs.version }}" > release_notes.md
+          echo "# Release ${{ steps.version.outputs.version }}" > release_notes.md
           echo "" >> release_notes.md
           echo "**Environment:** ${{ github.event.inputs.environment }}" >> release_notes.md
           echo "**Date:** $(date -u +%Y-%m-%d)" >> release_notes.md
           echo "" >> release_notes.md
           echo "## Docker Images" >> release_notes.md
           echo "" >> release_notes.md
-          echo "- Backend: \`${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.version }}\`" >> release_notes.md
-          echo "- Frontend: \`${{ env.FRONTEND_IMAGE }}:${{ github.event.inputs.version }}\`" >> release_notes.md
+          echo "- Backend: \`${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}\`" >> release_notes.md
+          echo "- Frontend: \`${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.version }}\`" >> release_notes.md
           echo "" >> release_notes.md
           echo "## Pull Commands" >> release_notes.md
           echo "" >> release_notes.md
           echo "\`\`\`bash" >> release_notes.md
-          echo "docker pull ${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.version }}" >> release_notes.md
-          echo "docker pull ${{ env.FRONTEND_IMAGE }}:${{ github.event.inputs.version }}" >> release_notes.md
+          echo "docker pull ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}" >> release_notes.md
+          echo "docker pull ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.version }}" >> release_notes.md
           echo "\`\`\`" >> release_notes.md
           echo "" >> release_notes.md
           echo "## Changes" >> release_notes.md
@@ -158,8 +161,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.event.inputs.version }}
-          release_name: Release ${{ github.event.inputs.version }}
+          tag_name: ${{ steps.version.outputs.version }}
+          release_name: Release ${{ steps.version.outputs.version }}
           body_path: release_notes.md
           draft: false
           prerelease: false
@@ -173,11 +176,11 @@ jobs:
           echo "Docker images published to Docker Hub!"
           echo "========================================"
           echo ""
-          echo "Backend:  ${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.version }}"
-          echo "Frontend: ${{ env.FRONTEND_IMAGE }}:${{ github.event.inputs.version }}"
+          echo "Backend:  ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}"
+          echo "Frontend: ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.version }}"
           echo ""
           echo "To deploy, run:"
-          echo "  IMAGE_TAG=${{ github.event.inputs.version }} docker compose -f docker-compose.prod.yml up -d"
+          echo "  IMAGE_TAG=${{ steps.version.outputs.version }} docker compose -f docker-compose.prod.yml up -d"
 
       - name: Deploy to staging
         if: github.event.inputs.environment == 'staging'

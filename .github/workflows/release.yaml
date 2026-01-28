@@ -109,6 +109,37 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
 
       # =========================================================================
+      # Docker Scout Security Scan
+      # =========================================================================
+      - name: Docker Scout - Analyze Backend
+        uses: docker/scout-action@v1
+        with:
+          command: cves,recommendations
+          image: ${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.version }}
+          only-severities: critical,high
+          sarif-file: scout-backend.sarif
+        continue-on-error: true
+
+      - name: Docker Scout - Analyze Frontend
+        uses: docker/scout-action@v1
+        with:
+          command: cves,recommendations
+          image: ${{ env.FRONTEND_IMAGE }}:${{ github.event.inputs.version }}
+          only-severities: critical,high
+          sarif-file: scout-frontend.sarif
+        continue-on-error: true
+
+      - name: Docker Scout - Update production environment
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          image: |
+            ${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.version }}
+            ${{ env.FRONTEND_IMAGE }}:${{ github.event.inputs.version }}
+          environment: production
+        continue-on-error: true
+
+      # =========================================================================
       # Release Notes
       # =========================================================================
       - name: Generate release notes

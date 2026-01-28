@@ -25,6 +25,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -105,6 +107,25 @@ jobs:
             org.opencontainers.image.version=${{ github.event.inputs.version }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+
+      # =========================================================================
+      # Docker Scout Security Scan (Backend only - free tier limit)
+      # =========================================================================
+      - name: Docker Scout - Analyze Backend
+        uses: docker/scout-action@v1
+        with:
+          command: cves,recommendations
+          image: ${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.version }}
+          only-severities: critical,high
+        continue-on-error: true
+
+      - name: Docker Scout - Update production environment
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          image: ${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.version }}
+          environment: production
+        continue-on-error: true
 
       # =========================================================================
       # Release Notes

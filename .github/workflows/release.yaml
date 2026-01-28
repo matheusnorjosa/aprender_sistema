@@ -119,7 +119,7 @@ jobs:
         with:
           command: cves,recommendations
           image: ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}
-          organization: aprender
+          organization: norjosamatheus
           only-severities: critical,high
 
       - name: Docker Scout - Update production environment
@@ -127,7 +127,7 @@ jobs:
         with:
           command: environment
           image: ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}
-          organization: aprender
+          organization: norjosamatheus
           environment: production
 
       # =========================================================================

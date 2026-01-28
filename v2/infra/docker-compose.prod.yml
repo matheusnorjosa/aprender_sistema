@@ -1,0 +1,130 @@
+# =============================================================================
+# Docker Compose - Production Configuration
+# =============================================================================
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Or pull from Docker Hub:
+#   IMAGE_TAG=v1.0.0 docker compose -f docker-compose.prod.yml up -d
+# =============================================================================
+
+name: aprender_v2_prod
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  web:
+    image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
+    command: gunicorn config.wsgi:application --config /app/infra/gunicorn.conf.py
+    env_file: .env
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "False"
+      REQUIRE_DOCKER: 1
+      SERVICE_NAME: web
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - backup_data:/backups
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/readyz/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  worker:
+    image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
+    command: celery -A config worker -l info
+    env_file: .env
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "False"
+      REQUIRE_DOCKER: 1
+      SERVICE_NAME: worker
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  beat:
+    image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
+    command: celery -A config beat -l info
+    env_file: .env
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "False"
+      REQUIRE_DOCKER: 1
+      SERVICE_NAME: beat
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import celery; print(celery.__version__)' || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    image: norjosamatheus/aprender-frontend:${IMAGE_TAG:-latest}
+    ports:
+      - "80:80"
+    depends_on:
+      - web
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:80/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  redis_data:
+  backup_data:

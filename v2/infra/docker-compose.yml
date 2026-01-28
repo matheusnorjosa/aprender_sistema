@@ -32,6 +32,7 @@ services:
     volumes:
       - redis_data:/data
   web:
+    image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: infra/Dockerfile
@@ -89,8 +90,8 @@ services:
       - "8002:8000"
     volumes:
       - ../data/csv-import:/app/data/csv-import:ro
-      - backup_data:/backups  # MP5: Database backups storage
-      - ./scripts:/app/infra/scripts:ro  # MP5: Backup scripts
+      - backup_data:/backups # MP5: Database backups storage
+      - ./scripts:/app/infra/scripts:ro # MP5: Backup scripts
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/readyz/"]
       interval: 30s
@@ -99,6 +100,7 @@ services:
       start_period: 40s
 
   worker:
+    image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: infra/Dockerfile
@@ -121,13 +123,18 @@ services:
     volumes:
       - ../data/csv-import:/app/data/csv-import:ro
     healthcheck:
-      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A config inspect ping -d celery@$$HOSTNAME || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
 
   beat:
+    image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: infra/Dockerfile
@@ -149,22 +156,27 @@ services:
     volumes:
       - ../data/csv-import:/app/data/csv-import:ro
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import celery; print(celery.__version__)' || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "python -c 'import celery; print(celery.__version__)' || exit 1",
+        ]
       interval: 60s
       timeout: 10s
       retries: 3
       start_period: 30s
 
   frontend:
+    image: norjosamatheus/aprender-frontend:${IMAGE_TAG:-latest}
     build:
       context: ../frontend
       dockerfile: Dockerfile
     environment:
-      PROXY_TARGET: http://web:8000  # Proxy server-side para o backend interno
+      PROXY_TARGET: http://web:8000 # Proxy server-side para o backend interno
     ports:
       - "5173:5173"
     volumes:
-      - ../frontend/src:/app/src:ro  # Hot reload do código fonte
+      - ../frontend/src:/app/src:ro # Hot reload do código fonte
       - ../frontend/public:/app/public:ro
     depends_on:
       - web
@@ -191,5 +203,5 @@ services:
 
 volumes:
   db_data:
-  redis_data:  # CP2: Persistência Redis (sessões)
-  backup_data:  # MP5: PostgreSQL backups storage
+  redis_data: # CP2: Persistência Redis (sessões)
+  backup_data: # MP5: PostgreSQL backups storage

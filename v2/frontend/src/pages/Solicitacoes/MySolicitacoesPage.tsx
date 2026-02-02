@@ -263,12 +263,12 @@ export default function MySolicitacoesPage(): JSX.Element {
   ], [handleDelete, navigate]);
 
   return (
-    <div className="p-6">
+    <section className="p-6" aria-labelledby="minhas-solicitacoes-title">
       <Card>
         <Space direction="vertical" style={{ width: '100%' }} size="large">
-          {/* Header */}
-          <div className="flex justify-between items-center">
-            <Title level={2} className="m-0">
+          {/* Header semantico */}
+          <header className="flex justify-between items-center">
+            <Title level={2} className="m-0" id="minhas-solicitacoes-title">
               Minhas Solicitações
             </Title>
             <Link to="/solicitacoes/nova">
@@ -276,47 +276,53 @@ export default function MySolicitacoesPage(): JSX.Element {
                 Nova Solicitação
               </Button>
             </Link>
-          </div>
+          </header>
 
           {/* Filtros */}
-          <Space>
-            <Select
-              value={statusFilter}
-              onChange={setStatusFilter}
-              style={{ width: 200 }}
-              placeholder="Status"
-            >
-              <Select.Option value="">Todas</Select.Option>
-              <Select.Option value="pendente">Pendentes</Select.Option>
-              <Select.Option value="aprovado">Aprovadas</Select.Option>
-              <Select.Option value="reprovado">Reprovadas</Select.Option>
-            </Select>
+          <nav aria-label="Filtros de busca">
+            <Space>
+              <Select
+                value={statusFilter}
+                onChange={setStatusFilter}
+                style={{ width: 200 }}
+                placeholder="Status"
+                aria-label="Filtrar por status"
+              >
+                <Select.Option value="">Todas</Select.Option>
+                <Select.Option value="pendente">Pendentes</Select.Option>
+                <Select.Option value="aprovado">Aprovadas</Select.Option>
+                <Select.Option value="reprovado">Reprovadas</Select.Option>
+              </Select>
 
-            <Input.Search
-              placeholder="Buscar por município, projeto..."
-              value={searchTerm}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-              onSearch={loadData}
-              enterButton={<SearchOutlined />}
-              style={{ width: 300 }}
-              allowClear
-            />
-          </Space>
+              <Input.Search
+                placeholder="Buscar por município, projeto..."
+                value={searchTerm}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                onSearch={loadData}
+                enterButton={<SearchOutlined />}
+                style={{ width: 300 }}
+                allowClear
+                aria-label="Buscar solicitacoes"
+              />
+            </Space>
+          </nav>
 
           {/* Tabela */}
-          <Table
-            columns={columns}
-            dataSource={rows}
-            loading={loading}
-            rowKey="id"
-            pagination={{
-              total,
-              pageSize: 20,
-              showTotal: (total) => `Total: ${total} solicitações`,
-            }}
-          />
+          <section aria-label="Lista de solicitacoes">
+            <Table
+              columns={columns}
+              dataSource={rows}
+              loading={loading}
+              rowKey="id"
+              pagination={{
+                total,
+                pageSize: 20,
+                showTotal: (total) => `Total: ${total} solicitações`,
+              }}
+            />
+          </section>
         </Space>
       </Card>
-    </div>
+    </section>
   );
 }

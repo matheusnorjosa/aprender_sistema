@@ -442,10 +442,11 @@ function AppContent(): JSX.Element {
         {/* Issue #416: Offline warning banner */}
         <OfflineBanner />
         <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
-          {/* Sider lateral fixo - envolvido em nav para semântica HTML5 */}
-          <nav aria-label="Navegacao principal">
+          {/* Sider lateral fixo - role navigation para semantica HTML5 */}
           <Sider
             width={LAYOUT.SIDEBAR_WIDTH}
+            role="navigation"
+            aria-label="Navegacao principal"
             style={{
               overflow: 'auto',
               height: '100vh',
@@ -591,7 +592,6 @@ function AppContent(): JSX.Element {
               )}
             </SidebarMenu>
           </Sider>
-          </nav>
 
           {/* Layout com margem para compensar Sider fixo */}
           <Layout style={{ marginLeft: LAYOUT.SIDEBAR_WIDTH, minHeight: '100vh', background: colors.pageBackground }}>
@@ -631,9 +631,11 @@ function AppContent(): JSX.Element {
               </div>
             </Header>
 
-            {/* Conteúdo principal com Suspense para lazy loading - main semântico */}
-            <main role="main">
-            <Content style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: colors.pageBackground }}>
+            {/* Conteúdo principal com Suspense para lazy loading - role main para semantica */}
+            <Content
+              role="main"
+              style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: colors.pageBackground }}
+            >
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   <Route path="/" element={<HomePage />} />
@@ -765,7 +767,6 @@ function AppContent(): JSX.Element {
                 </Routes>
               </Suspense>
             </Content>
-            </main>
           </Layout>
         </Layout>
       </Router>

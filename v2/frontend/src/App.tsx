@@ -442,7 +442,8 @@ function AppContent(): JSX.Element {
         {/* Issue #416: Offline warning banner */}
         <OfflineBanner />
         <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
-          {/* Sider lateral fixo */}
+          {/* Sider lateral fixo - envolvido em nav para semântica HTML5 */}
+          <nav aria-label="Navegacao principal">
           <Sider
             width={LAYOUT.SIDEBAR_WIDTH}
             style={{
@@ -455,8 +456,9 @@ function AppContent(): JSX.Element {
               background: colors.sidebarBackground,
             }}
           >
-            {/* Logo/Título */}
-            <div
+            {/* Logo/Título - header semântico para branding */}
+            <header
+              role="banner"
               className="flex items-center justify-center font-bold"
               style={{
                 height: '64px',
@@ -466,7 +468,7 @@ function AppContent(): JSX.Element {
               }}
             >
               Aprender Sistema
-            </div>
+            </header>
 
             {/* Menu vertical - Ordem alfabética (exceto Página Inicial) */}
             <SidebarMenu
@@ -589,12 +591,14 @@ function AppContent(): JSX.Element {
               )}
             </SidebarMenu>
           </Sider>
+          </nav>
 
           {/* Layout com margem para compensar Sider fixo */}
           <Layout style={{ marginLeft: LAYOUT.SIDEBAR_WIDTH, minHeight: '100vh', background: colors.pageBackground }}>
-            {/* Header com info do usuário */}
+            {/* Header com info do usuário - aria-label para acessibilidade */}
             <Header
               className="flex items-center justify-end w-full"
+              aria-label="Perfil do usuario e acoes"
               style={{
                 background: colors.cardBackground,
                 padding: '0 24px',
@@ -627,7 +631,8 @@ function AppContent(): JSX.Element {
               </div>
             </Header>
 
-            {/* Conteúdo principal com Suspense para lazy loading */}
+            {/* Conteúdo principal com Suspense para lazy loading - main semântico */}
+            <main role="main">
             <Content style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: colors.pageBackground }}>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
@@ -760,6 +765,7 @@ function AppContent(): JSX.Element {
                 </Routes>
               </Suspense>
             </Content>
+            </main>
           </Layout>
         </Layout>
       </Router>

@@ -583,11 +583,11 @@ export default function PlanoFormacoesPage(): JSX.Element {
   // ============================================================
 
   return (
-    <div className="p-6">
+    <section className="p-6" aria-labelledby="plano-formacoes-title">
       {/* Header */}
-      <div className="mb-6 flex justify-between items-center">
+      <header className="mb-6 flex justify-between items-center">
         <div>
-          <Title level={3} className="m-0">Plano de Formacoes</Title>
+          <Title level={3} className="m-0" id="plano-formacoes-title">Plano de Formacoes</Title>
           <Text type="secondary">Gestao do plano anual de formacoes por municipio e projeto</Text>
         </div>
         <Space>
@@ -618,7 +618,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
             Novo Plano
           </Button>
         </Space>
-      </div>
+      </header>
 
       {/* Stats Cards */}
       {stats && (
@@ -666,6 +666,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
       )}
 
       {/* Filters */}
+      <nav aria-label="Filtros de busca">
       <Card className="mb-4" bodyStyle={{ paddingBottom: 12 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={6} lg={4}>
@@ -733,8 +734,10 @@ export default function PlanoFormacoesPage(): JSX.Element {
           <Button type="primary" icon={<FilterOutlined />} onClick={() => fetchData(1)}>Filtrar</Button>
         </div>
       </Card>
+      </nav>
 
       {/* Main Content */}
+      <section aria-label="Conteudo principal">
       {viewMode === 'table' && (
         <Card>
           <Table
@@ -768,6 +771,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
           <Text type="secondary">Resumo por projeto em desenvolvimento...</Text>
         </Card>
       )}
+      </section>
 
       {/* Create/Edit Modal */}
       <Modal
@@ -938,6 +942,6 @@ export default function PlanoFormacoesPage(): JSX.Element {
           />
         )}
       </Modal>
-    </div>
+    </section>
   );
 }

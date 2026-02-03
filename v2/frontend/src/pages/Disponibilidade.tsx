@@ -66,33 +66,40 @@ export default function Disponibilidade(): JSX.Element {
   }, []);
 
   return (
-    <div style={{ padding: '24px' }}>
-      <h1>Gerenciar Disponibilidade</h1>
-      <p style={{ color: '#666', marginBottom: '24px' }}>
-        Crie bloqueios de disponibilidade (Total ou Parcial) para indicar períodos em que você não estará disponível.
-      </p>
+    <section style={{ padding: '24px' }} aria-labelledby="disponibilidade-title">
+      {/* Header semantico */}
+      <header>
+        <h1 id="disponibilidade-title">Gerenciar Disponibilidade</h1>
+        <p style={{ color: '#666', marginBottom: '24px' }}>
+          Crie bloqueios de disponibilidade (Total ou Parcial) para indicar períodos em que você não estará disponível.
+        </p>
+      </header>
 
       <Row gutter={[16, 16]}>
         {/* Card de Criação */}
         <Col xs={24} lg={12}>
-          <Card title="Criar Bloqueio" bordered={false}>
-            <BlockForm onSubmit={handleCreate as unknown as (payload: { tipo: string; inicio: string; fim: string }) => Promise<void>} />
-          </Card>
+          <article aria-label="Criar novo bloqueio">
+            <Card title="Criar Bloqueio" bordered={false}>
+              <BlockForm onSubmit={handleCreate as unknown as (payload: { tipo: string; inicio: string; fim: string }) => Promise<void>} />
+            </Card>
+          </article>
         </Col>
 
         {/* Card de Listagem */}
         <Col xs={24} lg={12}>
-          <Card title="Meus Bloqueios" bordered={false}>
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <Spin size="large" tip="Carregando bloqueios..." />
-              </div>
-            ) : (
-              <MyBlocksTable blocks={blocks as unknown as Array<{ id: number; tipo: 'T' | 'P'; inicio: string; fim: string; status: 'pendente' | 'aprovado' | 'reprovado' }>} onDelete={handleDelete} loading={loading} />
-            )}
-          </Card>
+          <article aria-label="Lista de meus bloqueios">
+            <Card title="Meus Bloqueios" bordered={false}>
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: '40px 0' }} role="status" aria-live="polite">
+                  <Spin size="large" tip="Carregando bloqueios..." />
+                </div>
+              ) : (
+                <MyBlocksTable blocks={blocks as unknown as Array<{ id: number; tipo: 'T' | 'P'; inicio: string; fim: string; status: 'pendente' | 'aprovado' | 'reprovado' }>} onDelete={handleDelete} loading={loading} />
+              )}
+            </Card>
+          </article>
         </Col>
       </Row>
-    </div>
+    </section>
   );
 }

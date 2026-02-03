@@ -86,13 +86,16 @@ export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }: Se
       centered
       maskClosable={false}
       width={400}
+      aria-labelledby="session-expiry-title"
+      aria-describedby="session-expiry-description"
     >
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <Space direction="vertical" size="large" style={{ width: '100%' }} role="alertdialog">
         <div style={{ textAlign: 'center' }}>
           <ClockCircleOutlined
             style={{ fontSize: 48, color: '#faad14' }}
+            aria-hidden="true"
           />
-          <Title level={4} className="mt-4">
+          <Title level={4} className="mt-4" id="session-expiry-title">
             Sua sessão está prestes a expirar
           </Title>
         </div>
@@ -111,7 +114,7 @@ export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }: Se
           </div>
         </div>
 
-        <div style={{ textAlign: 'center' }}>
+        <div style={{ textAlign: 'center' }} id="session-expiry-description">
           <Text type="secondary">
             Deseja continuar conectado?
           </Text>

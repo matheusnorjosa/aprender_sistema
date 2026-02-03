@@ -84,41 +84,53 @@ export default function DateTimeRange({ value = {}, onChange }: DateTimeRangePro
   };
 
   return (
-    <Space direction="vertical" style={{ width: '100%' }}>
-      <div>
-        <Text strong>Data:</Text>
-        <DatePicker
-          value={date}
-          onChange={handleDateChange}
-          format="DD/MM/YYYY"
-          placeholder="Selecione a data"
-          className="w-full mt-2"
-        />
-      </div>
-      <Space direction="horizontal" style={{ width: '100%' }}>
-        <div style={{ flex: 1 }}>
-          <Text strong>Início:</Text>
-          <TimePicker
-            value={start}
-            onChange={handleStartChange}
-            format="HH:mm"
-            placeholder="HH:mm"
+    <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+      <legend className="sr-only">Data e horário do evento</legend>
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <div>
+          <label htmlFor="date-picker">
+            <Text strong>Data:</Text>
+          </label>
+          <DatePicker
+            id="date-picker"
+            value={date}
+            onChange={handleDateChange}
+            format="DD/MM/YYYY"
+            placeholder="Selecione a data"
             className="w-full mt-2"
-            minuteStep={15}
           />
         </div>
-        <div style={{ flex: 1 }}>
-          <Text strong>Fim:</Text>
-          <TimePicker
-            value={end}
-            onChange={handleEndChange}
-            format="HH:mm"
-            placeholder="HH:mm"
-            className="w-full mt-2"
-            minuteStep={15}
-          />
-        </div>
+        <Space direction="horizontal" style={{ width: '100%' }}>
+          <div style={{ flex: 1 }}>
+            <label htmlFor="time-start">
+              <Text strong>Início:</Text>
+            </label>
+            <TimePicker
+              id="time-start"
+              value={start}
+              onChange={handleStartChange}
+              format="HH:mm"
+              placeholder="HH:mm"
+              className="w-full mt-2"
+              minuteStep={15}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label htmlFor="time-end">
+              <Text strong>Fim:</Text>
+            </label>
+            <TimePicker
+              id="time-end"
+              value={end}
+              onChange={handleEndChange}
+              format="HH:mm"
+              placeholder="HH:mm"
+              className="w-full mt-2"
+              minuteStep={15}
+            />
+          </div>
+        </Space>
       </Space>
-    </Space>
+    </fieldset>
   );
 }

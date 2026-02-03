@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { Space, Tag, AutoComplete, Spin } from 'antd';
+import { Tag, AutoComplete, Spin } from 'antd';
 import { lookupUsuarios } from '../api/lookup';
 import logger from '../utils/logger';
 import type { ID } from '../types';
@@ -105,18 +105,19 @@ export default function CoordenadoresPicker({ value = [], onChange }: Coordenado
     <div>
       {/* Tags dos coordenadores selecionados */}
       {value.length > 0 && (
-        <Space wrap className="mb-2">
+        <ul style={{ display: 'flex', flexWrap: 'wrap', gap: 8, listStyle: 'none', padding: 0, margin: '0 0 8px 0' }} aria-label="Coordenadores selecionados">
           {value.map((coord) => (
-            <Tag
-              key={coord.id}
-              closable
-              onClose={() => handleRemove(coord.id)}
-              color="green"
-            >
-              {coord.label || coord.name}
-            </Tag>
+            <li key={coord.id}>
+              <Tag
+                closable
+                onClose={() => handleRemove(coord.id)}
+                color="green"
+              >
+                {coord.label || coord.name}
+              </Tag>
+            </li>
           ))}
-        </Space>
+        </ul>
       )}
 
       {/* Autocomplete para adicionar coordenadores */}

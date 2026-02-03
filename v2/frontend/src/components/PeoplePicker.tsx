@@ -192,20 +192,21 @@ export default function PeoplePicker({
     <Card title="Participantes" size="small">
       <Space direction="vertical" style={{ width: '100%' }} size="middle">
         {/* Formadores */}
-        <div>
-          <div className="mb-2 font-medium">Formadores:</div>
-          <Space wrap>
+        <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+          <legend className="mb-2 font-medium">Formadores:</legend>
+          <ul style={{ display: 'flex', flexWrap: 'wrap', gap: 8, listStyle: 'none', padding: 0, margin: 0 }} aria-label="Formadores selecionados">
             {value.formadores.map((formador) => (
-              <Tag
-                key={formador.id}
-                closable
-                onClose={() => handleRemoveFormador(formador.id)}
-                color="blue"
-              >
-                {formador.label || formador.email}
-              </Tag>
+              <li key={formador.id}>
+                <Tag
+                  closable
+                  onClose={() => handleRemoveFormador(formador.id)}
+                  color="blue"
+                >
+                  {formador.label || formador.email}
+                </Tag>
+              </li>
             ))}
-          </Space>
+          </ul>
           <div className="mt-2">
             <AutoComplete
               value={formadorSearch}
@@ -224,23 +225,24 @@ export default function PeoplePicker({
               notFoundContent={loadingFormadores ? <Spin size="small" /> : null}
             />
           </div>
-        </div>
+        </fieldset>
 
         {/* Coordenadores Acompanhantes */}
-        <div>
-          <div className="mb-2 font-medium">Coordenadores Acompanhantes:</div>
-          <Space wrap>
+        <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+          <legend className="mb-2 font-medium">Coordenadores Acompanhantes:</legend>
+          <ul style={{ display: 'flex', flexWrap: 'wrap', gap: 8, listStyle: 'none', padding: 0, margin: 0 }} aria-label="Coordenadores selecionados">
             {value.coordAcompanha.map((coord) => (
-              <Tag
-                key={coord.id}
-                closable
-                onClose={() => handleRemoveCoord(coord.id)}
-                color="green"
-              >
-                {coord.label || coord.email}
-              </Tag>
+              <li key={coord.id}>
+                <Tag
+                  closable
+                  onClose={() => handleRemoveCoord(coord.id)}
+                  color="green"
+                >
+                  {coord.label || coord.email}
+                </Tag>
+              </li>
             ))}
-          </Space>
+          </ul>
           <div className="mt-2">
             <AutoComplete
               value={coordSearch}
@@ -259,7 +261,7 @@ export default function PeoplePicker({
               notFoundContent={loadingCoord ? <Spin size="small" /> : null}
             />
           </div>
-        </div>
+        </fieldset>
       </Space>
     </Card>
   );

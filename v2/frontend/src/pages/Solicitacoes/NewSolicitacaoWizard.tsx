@@ -542,39 +542,48 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   ], [formData, rangeValue, handleRangeChange]);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <section className="p-6 max-w-4xl mx-auto" aria-labelledby="nova-solicitacao-title">
       <Card>
-        <Button
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/solicitacoes/minhas')}
-          className="mb-4"
-        >
-          Voltar
-        </Button>
+        {/* Header semantico com navegacao e titulo */}
+        <header>
+          <Button
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate('/solicitacoes/minhas')}
+            className="mb-4"
+            aria-label="Voltar para minhas solicitacoes"
+          >
+            Voltar
+          </Button>
 
-        <Title level={2} className="mb-2">Nova Solicitação</Title>
-        <Text type="secondary">Passo {currentStep + 1} de {steps.length}</Text>
+          <Title level={2} className="mb-2" id="nova-solicitacao-title">Nova Solicitação</Title>
+          <Text type="secondary" aria-live="polite">Passo {currentStep + 1} de {steps.length}</Text>
+        </header>
 
-        <Steps current={currentStep} className="mt-6 mb-8">
-          {steps.map((step, index) => (
-            <Step key={index} title={step.title} icon={step.icon} />
-          ))}
-        </Steps>
+        {/* Navegacao do wizard */}
+        <nav aria-label="Passos do wizard" className="mt-6 mb-8">
+          <Steps current={currentStep}>
+            {steps.map((step, index) => (
+              <Step key={index} title={step.title} icon={step.icon} />
+            ))}
+          </Steps>
+        </nav>
 
+        {/* Conteudo do passo atual */}
         <Form form={form} layout="vertical">
-          <div style={{ minHeight: '400px' }}>
+          <section aria-label={`Passo ${currentStep + 1}: ${steps[currentStep].title}`} style={{ minHeight: '400px' }}>
             {steps[currentStep].content}
-          </div>
+          </section>
         </Form>
 
-        <div className="mt-6 flex gap-2 justify-end">
+        {/* Footer com botoes de navegacao */}
+        <footer className="mt-6 flex gap-2 justify-end" role="navigation" aria-label="Navegacao do wizard">
           {currentStep > 0 && (
-            <Button onClick={prev}>
+            <Button onClick={prev} aria-label="Voltar para passo anterior">
               Anterior
             </Button>
           )}
           {currentStep < steps.length - 1 && (
-            <Button type="primary" onClick={next}>
+            <Button type="primary" onClick={next} aria-label="Ir para proximo passo">
               Próximo
             </Button>
           )}
@@ -583,8 +592,8 @@ export default function NewSolicitacaoWizard(): JSX.Element {
               Confirmar Solicitação
             </Button>
           )}
-        </div>
+        </footer>
       </Card>
-    </div>
+    </section>
   );
 }

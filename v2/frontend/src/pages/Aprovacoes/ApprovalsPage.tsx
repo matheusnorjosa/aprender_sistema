@@ -385,47 +385,55 @@ export default function ApprovalsPage(): JSX.Element {
   ], [handlePreview, handleApprove, handleReject, canApprove]);
 
   return (
-    <div className="p-6">
+    <section className="p-6" aria-labelledby="aprovacoes-title">
       <Card>
         <Space direction="vertical" style={{ width: '100%' }} size="large">
-          {/* Header */}
-          <Title level={2}>Aprovações</Title>
+          {/* Header semantico */}
+          <header>
+            <Title level={2} id="aprovacoes-title">Aprovações</Title>
+          </header>
 
           {/* Filtros */}
-          <Space>
-            <Select
-              value={statusFilter}
-              onChange={setStatusFilter}
-              style={{ width: 200 }}
-              placeholder="Status"
-            >
-              <Select.Option value="pendente">Pendentes</Select.Option>
-              <Select.Option value="aprovado">Aprovadas</Select.Option>
-              <Select.Option value="reprovado">Reprovadas</Select.Option>
-            </Select>
+          <nav aria-label="Filtros de busca">
+            <Space>
+              <Select
+                value={statusFilter}
+                onChange={setStatusFilter}
+                style={{ width: 200 }}
+                placeholder="Status"
+                aria-label="Filtrar por status"
+              >
+                <Select.Option value="pendente">Pendentes</Select.Option>
+                <Select.Option value="aprovado">Aprovadas</Select.Option>
+                <Select.Option value="reprovado">Reprovadas</Select.Option>
+              </Select>
 
-            <Input.Search
-              placeholder="Buscar por município, projeto, autor..."
-              value={searchTerm}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-              onSearch={loadData}
-              style={{ width: 400 }}
-              allowClear
-            />
-          </Space>
+              <Input.Search
+                placeholder="Buscar por município, projeto, autor..."
+                value={searchTerm}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                onSearch={loadData}
+                style={{ width: 400 }}
+                allowClear
+                aria-label="Buscar solicitacoes"
+              />
+            </Space>
+          </nav>
 
           {/* Contagem de pendentes */}
           {statusFilter === 'pendente' && total > 0 && (
-            <Paragraph>
-              <Tag color="orange">{total}</Tag> solicitações aguardando aprovação
-            </Paragraph>
+            <aside aria-label="Contador de pendentes">
+              <Paragraph>
+                <Tag color="orange">{total}</Tag> solicitações aguardando aprovação
+              </Paragraph>
+            </aside>
           )}
 
           {/* Toolbar de ações em lote (PA-06: apenas para usuários com permissão) */}
           {selectedRowKeys.length > 0 && canApprove && (
-            <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+            <nav aria-label="Acoes em lote" className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
               <Space>
-                <Text strong>
+                <Text strong aria-live="polite">
                   {selectedRowKeys.length} solicitação(ões) selecionada(s)
                 </Text>
                 <Button
@@ -448,23 +456,25 @@ export default function ApprovalsPage(): JSX.Element {
                   Limpar Seleção
                 </Button>
               </Space>
-            </div>
+            </nav>
           )}
 
           {/* Tabela */}
-          <Table
-            rowSelection={rowSelection}
-            columns={columns}
-            dataSource={rows}
-            loading={loading}
-            rowKey="id"
-            scroll={{ x: 1090 }}
-            pagination={{
-              total,
-              pageSize: 20,
-              showTotal: (total) => `Total: ${total} solicitações`,
-            }}
-          />
+          <section aria-label="Lista de solicitacoes para aprovacao">
+            <Table
+              rowSelection={rowSelection}
+              columns={columns}
+              dataSource={rows}
+              loading={loading}
+              rowKey="id"
+              scroll={{ x: 1090 }}
+              pagination={{
+                total,
+                pageSize: 20,
+                showTotal: (total) => `Total: ${total} solicitações`,
+              }}
+            />
+          </section>
         </Space>
       </Card>
 
@@ -593,6 +603,6 @@ export default function ApprovalsPage(): JSX.Element {
         )}
       </Modal>
 
-    </div>
+    </section>
   );
 }

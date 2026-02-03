@@ -77,16 +77,17 @@ export default function AdminDATHomePage(): JSX.Element {
   ];
 
   return (
-    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
+    <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="admin-dat-title">
       {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <Title level={2}>Admin DAT</Title>
+      <header style={{ marginBottom: '24px' }}>
+        <Title level={2} id="admin-dat-title">Admin DAT</Title>
         <Text type="secondary">
           Gestão interna de cadastros do DAT - substitui uso cotidiano do Django Admin
         </Text>
-      </div>
+      </header>
 
       {/* Cards de módulos */}
+      <nav aria-label="Módulos de administração">
       <Row gutter={[16, 16]}>
         {modules.map((module) => (
           <Col xs={24} sm={12} md={8} lg={6} key={module.key}>
@@ -122,6 +123,7 @@ export default function AdminDATHomePage(): JSX.Element {
           </Col>
         ))}
       </Row>
-    </div>
+      </nav>
+    </section>
   );
 }

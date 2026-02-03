@@ -6,9 +6,11 @@
  * - Filtros por projeto e intervalo de datas
  * - Estatísticas: Projetos por Município e Eventos + Coordenadores
  * - Toggle Map/List view
+ *
+ * Estilo: SimpleMaps (flat, clean, hover escurece preenchimento, bordas fixas)
  */
 
-import { useState, useEffect, useRef, useCallback, MutableRefObject, ChangeEvent, JSX } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, MutableRefObject, ChangeEvent, JSX } from 'react';
 import {
   Card,
   Row,
@@ -39,7 +41,7 @@ import {
   FullscreenOutlined,
 } from '@ant-design/icons';
 import { MapContainer, GeoJSON, useMap } from 'react-leaflet';
-import type { Map as LeafletMap, Layer, GeoJSON as LeafletGeoJSON, PathOptions } from 'leaflet';
+import type { Map as LeafletMap, Layer, GeoJSON as LeafletGeoJSON, PathOptions, LatLngBounds } from 'leaflet';
 import type { Feature, Geometry, FeatureCollection } from 'geojson';
 import 'leaflet/dist/leaflet.css';
 import api from '../../api';
@@ -112,14 +114,22 @@ interface StateFeatureProperties {
   sigla: string;
 }
 
+/** Layer event types */
+interface LayerMouseEvent {
+  target: LayerWithPath;
+  originalEvent?: MouseEvent;
+}
+
 /** Layer with path */
 interface LayerWithPath {
   feature?: Feature<Geometry, StateFeatureProperties>;
-  _path?: HTMLElement & { classList: DOMTokenList };
+  _path?: HTMLElement & { classList: DOMTokenList; getBoundingClientRect: () => DOMRect };
   setStyle: (style: PathOptions) => void;
   bringToFront: () => void;
   bindTooltip: (content: string, options?: Record<string, unknown>) => void;
-  on: (events: Record<string, (e: { target: LayerWithPath }) => void>) => void;
+  getTooltip: () => { getElement: () => HTMLElement | null } | null;
+  on: (events: Record<string, (e: LayerMouseEvent) => void>) => void;
+  getBounds: () => LatLngBounds;
 }
 
 /** GeoJSON ref type */
@@ -141,6 +151,16 @@ function MapController({ mapRef }: MapControllerProps): null {
   return null;
 }
 
+// Cores do mapa - Estilo SimpleMaps (flat, clean)
+const COLORS = {
+  withEvents: '#4CAF50',      // Verde médio - estados com eventos
+  withoutEvents: '#A5D6A7',   // Verde claro - estados sem eventos
+  hover: '#66BB6A',           // Verde hover (mais claro que withEvents)
+  selected: '#2196F3',        // Azul - selecionado
+  dimmed: '#E8F5E9',          // Verde muito claro - não selecionados
+  border: '#ffffff',          // Branco - bordas
+  borderHover: '#388E3C',     // Verde escuro - borda no hover
+};
 
 export default function MapaBrasilPage(): JSX.Element {
   const [viewMode, setViewMode] = useState<ViewMode>('map');
@@ -150,6 +170,7 @@ export default function MapaBrasilPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedState, setSelectedState] = useState<string | null>(null);
+  // Removido hoveredState - hover controlado apenas por CSS (estilo SimpleMaps)
   const [brazilGeoJSON, setBrazilGeoJSON] = useState<FeatureCollection<Geometry, StateFeatureProperties> | null>(null);
   const [geoJsonLoading, setGeoJsonLoading] = useState<boolean>(true);
 
@@ -160,12 +181,18 @@ export default function MapaBrasilPage(): JSX.Element {
   const [coordenadoresData, setCoordenadoresData] = useState<CoordenadorDataType[]>([]);
   const [loadingCoordinators, setLoadingCoordinators] = useState<boolean>(false);
 
-  // Refs para usar em event handlers (evita stale closure)
-  const selectedStateRef = useRef<string | null>(null);
-  const estadosDataRef = useRef<EstadosDataType>({});
+  // Refs
   const mapRef = useRef<LeafletMap | null>(null);
   const geoJsonRef = useRef<GeoJSONRefType | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Tooltip state for hover popup (estilo SimpleMaps)
+  const [hoverTooltip, setHoverTooltip] = useState<{
+    visible: boolean;
+    name: string;
+    x: number;
+    y: number;
+  }>({ visible: false, name: '', x: 0, y: 0 });
 
   // Lazy load do GeoJSON para reduzir bundle size
   useEffect(() => {
@@ -180,20 +207,11 @@ export default function MapaBrasilPage(): JSX.Element {
       });
   }, []);
 
-  // Manter refs sincronizados com state
-  useEffect(() => {
-    selectedStateRef.current = selectedState;
-  }, [selectedState]);
-
-  useEffect(() => {
-    estadosDataRef.current = estadosData;
-  }, [estadosData]);
-
   // Limpar seleção ao clicar fora do mapa
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent): void => {
       if (
-        selectedStateRef.current &&
+        selectedState &&
         mapContainerRef.current &&
         !mapContainerRef.current.contains(event.target as Node)
       ) {
@@ -210,7 +228,7 @@ export default function MapaBrasilPage(): JSX.Element {
     return () => {
       document.removeEventListener('click', handleClickOutside);
     };
-  }, []);
+  }, [selectedState]);
 
   // Fetch projetos no mount
   useEffect(() => {
@@ -235,16 +253,13 @@ export default function MapaBrasilPage(): JSX.Element {
     setError(null);
 
     try {
-      // Construir query params
       const params: Record<string, string | number> = {};
       if (selectedProjeto) params.projeto_id = selectedProjeto;
       if (dateRange?.[0]) params.data_inicio = dateRange[0].format('YYYY-MM-DD');
       if (dateRange?.[1]) params.data_fim = dateRange[1].format('YYYY-MM-DD');
 
-      // Chamada à API
       const response = await api.get('/metrics/map/', { params });
 
-      // Mapear resposta para formato esperado pelos markers
       const municipios: MunicipioDataType[] = response.data.by_municipio.map((item: { municipio: string; uf: string; projetos: number; eventos: number; coordenadores: number; latitude: number; longitude: number }) => ({
         municipio: item.municipio,
         uf: item.uf,
@@ -254,7 +269,6 @@ export default function MapaBrasilPage(): JSX.Element {
         coords: [item.latitude, item.longitude] as [number, number],
       }));
 
-      // Agregar dados por estado (UF)
       const estadosAgregados: EstadosDataType = {};
       municipios.forEach(item => {
         if (!estadosAgregados[item.uf]) {
@@ -324,175 +338,150 @@ export default function MapaBrasilPage(): JSX.Element {
     fetchMapData();
   };
 
-  // Função para obter estilo baseado se o estado tem eventos
-  const getStateStyle = (sigla: string): PathOptions => {
-    const hasEvents = estadosData[sigla] && estadosData[sigla].eventos > 0;
-    return {
-      fillColor: hasEvents ? '#2e7d32' : '#81c784',
-      fillOpacity: 1,
-      color: '#ffffff',
-      weight: 1,
-    };
-  };
-
-  // Estilo quando hover
-  const hoverStyle: PathOptions = {
-    fillColor: '#1b5e20',
-    fillOpacity: 1,
-    color: '#ffffff',
-    weight: 2,
-  };
-
-  // Estilo quando selecionado (destacado "acima" do mapa - efeito de extração)
-  const selectedStyle: PathOptions = {
-    fillColor: '#1565c0',
-    fillOpacity: 1,
-    color: '#ffffff',
-    weight: 3,
-  };
-
-  // Estilo dos estados não selecionados (levemente escurecidos)
-  const dimmedStyle: PathOptions = {
-    fillColor: '#a5d6a7',
-    fillOpacity: 0.6,
-    color: '#ffffff',
-    weight: 1,
-  };
-
-  // Função para resetar a seleção do estado
+  // Função para resetar a seleção do estado com zoom de volta
   const handleResetSelection = (): void => {
     setSelectedState(null);
-    selectedStateRef.current = null;
-    // Resetar estilos de todos os estados baseado em se têm eventos
+    if (mapRef.current) {
+      mapRef.current.flyTo([-15.5, -54.0], 4, {
+        duration: 0.8,
+      });
+    }
+  };
+
+  // Calcular estilo do estado - estilo SimpleMaps (flat, clean)
+  // Hover é controlado apenas por CSS, não por React state
+  const getStateStyle = useCallback((sigla: string): PathOptions => {
+    const hasEvents = estadosData[sigla]?.eventos > 0;
+
+    // Estado selecionado - borda branca mantida, só cor de preenchimento muda
+    if (selectedState === sigla) {
+      return {
+        fillColor: COLORS.selected,
+        fillOpacity: 0.9,
+        color: COLORS.border,  // Borda branca fixa
+        weight: 2,
+      };
+    }
+
+    // Quando há um estado selecionado, outros ficam dimmed
+    if (selectedState && selectedState !== sigla) {
+      return {
+        fillColor: hasEvents ? COLORS.withEvents : COLORS.withoutEvents,
+        fillOpacity: 0.5,
+        color: COLORS.border,  // Borda branca fixa
+        weight: 2,
+      };
+    }
+
+    // Estado normal - hover será via CSS
+    return {
+      fillColor: hasEvents ? COLORS.withEvents : COLORS.withoutEvents,
+      fillOpacity: 1,
+      color: COLORS.border,
+      weight: 2,  // Borda mais grossa para separação visual
+    };
+  }, [estadosData, selectedState]);
+
+  // Atualizar estilos quando seleção muda (não no hover - hover é CSS puro)
+  useEffect(() => {
     if (geoJsonRef.current) {
       geoJsonRef.current.eachLayer((layer: LayerWithPath) => {
         const sigla = layer.feature?.properties?.sigla;
         if (sigla) {
           layer.setStyle(getStateStyle(sigla));
-          // Remover classes de seleção e dimmed
+
+          // Gerenciar classes CSS para animações
           if (layer._path) {
-            layer._path.classList.remove('selected-state');
-            layer._path.classList.remove('dimmed-state');
+            if (selectedState === sigla) {
+              layer._path.classList.add('selected-state');
+              layer._path.classList.remove('dimmed-state');
+              layer.bringToFront();
+            } else if (selectedState) {
+              layer._path.classList.remove('selected-state');
+              layer._path.classList.add('dimmed-state');
+            } else {
+              layer._path.classList.remove('selected-state');
+              layer._path.classList.remove('dimmed-state');
+            }
           }
         }
       });
     }
-  };
+  }, [selectedState, getStateStyle]);
 
   const onEachFeature = useCallback((feature: Feature<Geometry, StateFeatureProperties>, layer: Layer): void => {
     const typedLayer = layer as unknown as LayerWithPath;
     if (feature.properties && feature.properties.name) {
       const sigla = feature.properties.sigla;
+      const stateName = feature.properties.name;
 
-      // Label permanente com a sigla do estado (em branco)
+      // Label permanente com a sigla do estado
       typedLayer.bindTooltip(sigla, {
         permanent: true,
         direction: 'center',
         className: 'state-label',
       });
 
-      // Eventos de hover e click
+      // Eventos de interação (estilo SimpleMaps)
       typedLayer.on({
+        // Hover: mostra tooltip com nome completo do estado
         mouseover: (e: { target: LayerWithPath }) => {
-          const targetLayer = e.target;
-          const currentSelected = selectedStateRef.current;
-          const layerSigla = targetLayer.feature?.properties?.sigla;
-
-          // Se há um estado selecionado, não aplicar hover nos outros estados
-          if (currentSelected && layerSigla !== currentSelected) {
-            return;
-          }
-
-          // Aplicar hover apenas quando não há seleção ou é o estado selecionado
-          if (!currentSelected) {
-            targetLayer.setStyle(hoverStyle);
-            targetLayer.bringToFront();
-          }
-        },
-        mouseout: (e: { target: LayerWithPath }) => {
-          const targetLayer = e.target;
-          const layerSigla = targetLayer.feature?.properties?.sigla;
-          const currentSelected = selectedStateRef.current;
-
-          // Se há um estado selecionado, manter estilos apropriados
-          if (layerSigla === currentSelected) {
-            targetLayer.setStyle(selectedStyle);
-          } else if (currentSelected) {
-            // Não fazer nada - manter estilo dimmed
-            return;
-          } else if (layerSigla) {
-            // Usar estilo baseado em se tem eventos
-            const hasEvents = estadosDataRef.current[layerSigla]?.eventos > 0;
-            targetLayer.setStyle({
-              fillColor: hasEvents ? '#2e7d32' : '#81c784',
-              fillOpacity: 1,
-              color: '#ffffff',
-              weight: 1,
+          const layerElement = e.target._path;
+          if (layerElement) {
+            const rect = layerElement.getBoundingClientRect();
+            setHoverTooltip({
+              visible: true,
+              name: stateName,
+              x: rect.left + rect.width / 2,
+              y: rect.top - 10,
             });
           }
         },
-        click: (e: { target: LayerWithPath }) => {
-          const clickedSigla = e.target.feature?.properties?.sigla;
-          const currentSelected = selectedStateRef.current;
-
-          if (!clickedSigla) return;
-
-          // Toggle seleção
-          if (currentSelected === clickedSigla) {
-            // Desselecionar
-            selectedStateRef.current = null;
+        mousemove: (e: { originalEvent?: MouseEvent }) => {
+          if (e.originalEvent) {
+            setHoverTooltip(prev => ({
+              ...prev,
+              x: e.originalEvent!.clientX,
+              y: e.originalEvent!.clientY - 35,
+            }));
+          }
+        },
+        mouseout: () => {
+          setHoverTooltip(prev => ({ ...prev, visible: false }));
+        },
+        // Click: zoom animado para o estado
+        click: () => {
+          if (selectedState === sigla) {
+            // Desselecionar e voltar para view inicial
             setSelectedState(null);
-            if (geoJsonRef.current) {
-              geoJsonRef.current.eachLayer((l: LayerWithPath) => {
-                const lSigla = l.feature?.properties?.sigla;
-                if (lSigla) {
-                  const hasEvents = estadosDataRef.current[lSigla]?.eventos > 0;
-                  l.setStyle({
-                    fillColor: hasEvents ? '#2e7d32' : '#81c784',
-                    fillOpacity: 1,
-                    color: '#ffffff',
-                    weight: 1,
-                  });
-                  // Remover classes de seleção e dimmed
-                  if (l._path) {
-                    l._path.classList.remove('selected-state');
-                    l._path.classList.remove('dimmed-state');
-                  }
-                }
+            if (mapRef.current) {
+              mapRef.current.flyTo([-15.5, -54.0], 4, {
+                duration: 0.8,
               });
             }
           } else {
-            // Selecionar novo estado
-            selectedStateRef.current = clickedSigla;
-            setSelectedState(clickedSigla);
-
-            // Atualizar estilos de todos os estados
-            if (geoJsonRef.current) {
-              geoJsonRef.current.eachLayer((l: LayerWithPath) => {
-                const lSigla = l.feature?.properties?.sigla;
-                if (lSigla === clickedSigla) {
-                  l.setStyle(selectedStyle);
-                  l.bringToFront();
-                  // Adicionar classe para efeito de elevação
-                  if (l._path) {
-                    l._path.classList.add('selected-state');
-                    l._path.classList.remove('dimmed-state');
-                  }
-                } else if (lSigla) {
-                  l.setStyle(dimmedStyle);
-                  // Adicionar classe dimmed e remover selected
-                  if (l._path) {
-                    l._path.classList.remove('selected-state');
-                    l._path.classList.add('dimmed-state');
-                  }
-                }
+            // Selecionar e fazer zoom para o estado
+            setSelectedState(sigla);
+            const bounds = typedLayer.getBounds();
+            if (mapRef.current && bounds && bounds.isValid()) {
+              mapRef.current.flyToBounds(bounds, {
+                padding: [80, 80],
+                maxZoom: 6,
+                duration: 0.8,
               });
             }
           }
         },
       });
     }
-  }, []);
+  }, [selectedState]);
+
+  // Key única para forçar re-render do GeoJSON quando dados mudam
+  // NÃO incluir selectedState aqui - atualização de seleção é via setStyle(), não re-render
+  const geoJsonKey = useMemo(() =>
+    `geojson-${Object.keys(estadosData).length}`,
+    [estadosData]
+  );
 
   // Columns for coordenadores table
   const coordenadoresColumns: ColumnsType<CoordenadorDataType> = [
@@ -700,42 +689,113 @@ export default function MapaBrasilPage(): JSX.Element {
           {viewMode === 'map' ? (
             <>
             <Card style={{ marginBottom: 16 }} loading={loading || geoJsonLoading}>
-              {/* Mapa Leaflet com GeoJSON (sem tiles de fundo) */}
+              {/* Mapa Leaflet com GeoJSON - Estilo SimpleMaps */}
               <div
                 ref={mapContainerRef}
-                style={{ height: '550px', borderRadius: '8px', overflow: 'hidden', background: '#e8f5e9', position: 'relative' }}
+                style={{
+                  height: '550px',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  background: '#f5f5f5',
+                  position: 'relative',
+                  border: '1px solid #e0e0e0',
+                }}
               >
-                {/* CSS para labels dos estados e efeito de seleção */}
+                {/* CSS estilo SimpleMaps - flat, clean, animações suaves */}
                 <style>{`
+                  /* Labels dos estados - estilo SimpleMaps */
                   .state-label {
                     background: transparent !important;
                     border: none !important;
                     box-shadow: none !important;
-                    color: white !important;
-                    font-weight: bold !important;
-                    font-size: 11px !important;
-                    text-shadow: 1px 1px 2px rgba(0,0,0,0.8) !important;
+                    color: #444 !important;
+                    font-weight: 600 !important;
+                    font-size: 10px !important;
+                    text-shadow:
+                      1px 1px 0 #fff,
+                      -1px -1px 0 #fff,
+                      1px -1px 0 #fff,
+                      -1px 1px 0 #fff !important;
+                    letter-spacing: 0.5px !important;
+                    pointer-events: none !important;
                   }
                   .state-label::before {
                     display: none !important;
                   }
-                  /* Efeito de elevação/extração para estado selecionado */
-                  .leaflet-interactive.selected-state {
-                    filter: drop-shadow(0 8px 16px rgba(0,0,0,0.4)) drop-shadow(0 4px 8px rgba(0,0,0,0.3));
-                    transform: scale(1.05);
-                    transform-origin: center;
-                    transition: all 0.3s ease-out;
+
+                  /* Container do mapa */
+                  .leaflet-container {
+                    background: #f8f9fa !important;
+                    border-radius: 8px;
                   }
-                  /* Estados não selecionados ficam mais "afundados" */
-                  .leaflet-interactive.dimmed-state {
-                    filter: brightness(0.85);
-                    transition: all 0.3s ease-out;
-                  }
-                  /* Animação suave para todos os estados */
+
+                  /* Estados - estilo SimpleMaps com transição suave */
                   .leaflet-interactive {
-                    transition: filter 0.3s ease-out, transform 0.3s ease-out;
+                    transition: filter 0.3s ease, stroke 0.3s ease, stroke-width 0.3s ease !important;
+                    cursor: pointer !important;
+                    stroke-linecap: round !important;
+                    stroke-linejoin: round !important;
+                  }
+
+                  /* Hover - apenas escurece o preenchimento, bordas ficam fixas (estilo SimpleMaps) */
+                  .leaflet-interactive:hover:not(.selected-state):not(.dimmed-state) {
+                    filter: brightness(0.85) !important;
+                    /* Bordas NÃO mudam no hover - ficam brancas e fixas */
+                  }
+
+                  /* Estado selecionado - bordas brancas fixas */
+                  .leaflet-interactive.selected-state {
+                    filter: brightness(1) !important;
+                    /* Bordas brancas mantidas - não mudam */
+                  }
+
+                  /* Estados não selecionados quando há seleção - ficam "apagados" */
+                  .leaflet-interactive.dimmed-state {
+                    filter: brightness(0.7) saturate(0.5) !important;
+                  }
+
+                  /* Tooltip de hover - estilo SimpleMaps */
+                  .state-hover-tooltip {
+                    position: fixed;
+                    background: #333;
+                    color: #fff;
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    pointer-events: none;
+                    z-index: 9999;
+                    white-space: nowrap;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+                    transform: translateX(-50%);
+                    opacity: 0;
+                    transition: opacity 0.15s ease;
+                  }
+                  .state-hover-tooltip.visible {
+                    opacity: 1;
+                  }
+                  .state-hover-tooltip::after {
+                    content: '';
+                    position: absolute;
+                    top: 100%;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    border-width: 5px;
+                    border-style: solid;
+                    border-color: #333 transparent transparent transparent;
                   }
                 `}</style>
+
+                {/* Tooltip de hover com nome do estado - estilo SimpleMaps */}
+                <div
+                  className={`state-hover-tooltip ${hoverTooltip.visible ? 'visible' : ''}`}
+                  style={{
+                    left: hoverTooltip.x,
+                    top: hoverTooltip.y,
+                  }}
+                >
+                  {hoverTooltip.name}
+                </div>
 
                 {/* Botão para limpar seleção */}
                 {selectedState && (
@@ -748,6 +808,8 @@ export default function MapaBrasilPage(): JSX.Element {
                       top: 10,
                       right: 10,
                       zIndex: 1000,
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     }}
                   >
                     Limpar Seleção
@@ -757,8 +819,8 @@ export default function MapaBrasilPage(): JSX.Element {
                   center={[-15.5, -54.0]}
                   zoom={4}
                   minZoom={4}
-                  maxZoom={4}
-                  style={{ height: '100%', width: '100%', background: '#e8f5e9' }}
+                  maxZoom={7}
+                  style={{ height: '100%', width: '100%', background: '#f8f9fa' }}
                   scrollWheelZoom={false}
                   zoomControl={false}
                   dragging={false}
@@ -768,22 +830,16 @@ export default function MapaBrasilPage(): JSX.Element {
                   {/* Controller para capturar referência do mapa */}
                   <MapController mapRef={mapRef} />
 
-                  {/* GeoJSON layer for states - cores baseadas em eventos */}
+                  {/* GeoJSON layer for states */}
                   {brazilGeoJSON && (
                     <GeoJSON
-                      key={`geojson-${Object.keys(estadosData).length}`}
+                      key={geoJsonKey}
                       ref={geoJsonRef as unknown as React.Ref<LeafletGeoJSON>}
                       data={brazilGeoJSON}
                       onEachFeature={onEachFeature}
                       style={(feature) => {
                         const sigla = (feature?.properties as StateFeatureProperties)?.sigla;
-                        const hasEvents = estadosData[sigla]?.eventos > 0;
-                        return {
-                          fillColor: hasEvents ? '#2e7d32' : '#81c784',
-                          fillOpacity: 1,
-                          color: '#ffffff',
-                          weight: 1,
-                        };
+                        return getStateStyle(sigla);
                       }}
                     />
                   )}
@@ -792,23 +848,50 @@ export default function MapaBrasilPage(): JSX.Element {
               </div>
               <div style={{ textAlign: 'center', marginTop: 16 }}>
                 <Space direction="vertical" size="small">
-                  {/* Legenda do mapa */}
-                  <Space split="|">
+                  {/* Legenda do mapa - estilo SimpleMaps */}
+                  <Space split="|" size="middle">
                     <Text type="secondary">
-                      <span style={{ display: 'inline-block', width: 12, height: 12, background: '#2e7d32', marginRight: 4 }}></span>
-                      Estados com eventos
+                      <span style={{
+                        display: 'inline-block',
+                        width: 14,
+                        height: 14,
+                        background: COLORS.withEvents,
+                        marginRight: 6,
+                        borderRadius: '2px',
+                        border: '1px solid #388E3C',
+                        verticalAlign: 'middle',
+                      }}></span>
+                      Com eventos
                     </Text>
                     <Text type="secondary">
-                      <span style={{ display: 'inline-block', width: 12, height: 12, background: '#81c784', marginRight: 4 }}></span>
-                      Estados sem eventos
+                      <span style={{
+                        display: 'inline-block',
+                        width: 14,
+                        height: 14,
+                        background: COLORS.withoutEvents,
+                        marginRight: 6,
+                        borderRadius: '2px',
+                        border: '1px solid #81C784',
+                        verticalAlign: 'middle',
+                      }}></span>
+                      Sem eventos
                     </Text>
                     <Text type="secondary">
-                      <span style={{ display: 'inline-block', width: 12, height: 12, background: '#1565c0', marginRight: 4 }}></span>
-                      Estado selecionado
+                      <span style={{
+                        display: 'inline-block',
+                        width: 14,
+                        height: 14,
+                        background: COLORS.selected,
+                        marginRight: 6,
+                        borderRadius: '2px',
+                        border: '1px solid #1565C0',
+                        verticalAlign: 'middle',
+                      }}></span>
+                      Selecionado
                     </Text>
                   </Space>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    Clique em um estado para ver detalhes.
+                    Clique em um estado para ver detalhes
                   </Text>
                 </Space>
               </div>
@@ -824,7 +907,7 @@ export default function MapaBrasilPage(): JSX.Element {
                     <span>Detalhes: {selectedState}</span>
                   </Space>
                 }
-                style={{ marginBottom: 16 }}
+                style={{ marginBottom: 16, borderRadius: '12px' }}
                 extra={
                   <Button size="small" onClick={handleResetSelection}>
                     Fechar
@@ -906,7 +989,7 @@ export default function MapaBrasilPage(): JSX.Element {
             )}
             </>
           ) : (
-            <Card title="Lista de Municípios" style={{ marginBottom: 16 }} loading={loading}>
+            <Card title="Lista de Municípios" style={{ marginBottom: 16, borderRadius: '12px' }} loading={loading}>
               <List
                 dataSource={municipiosData}
                 renderItem={(item) => (
@@ -933,7 +1016,7 @@ export default function MapaBrasilPage(): JSX.Element {
           <Row gutter={[16, 16]}>
             {/* Eventos por Estado */}
             <Col xs={24} lg={12}>
-              <Card title="Eventos por Estado" bordered={false} loading={loading}>
+              <Card title="Eventos por Estado" bordered={false} loading={loading} style={{ borderRadius: '12px' }}>
                 <List
                   dataSource={Object.entries(estadosData).sort((a, b) => b[1].eventos - a[1].eventos)}
                   renderItem={([uf, data]) => (
@@ -957,7 +1040,7 @@ export default function MapaBrasilPage(): JSX.Element {
 
             {/* Detalhes por Estado */}
             <Col xs={24} lg={12}>
-              <Card title="Detalhes por Estado" bordered={false} loading={loading}>
+              <Card title="Detalhes por Estado" bordered={false} loading={loading} style={{ borderRadius: '12px' }}>
                 <Table
                   dataSource={Object.values(estadosData)}
                   rowKey="uf"

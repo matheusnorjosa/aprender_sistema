@@ -288,12 +288,12 @@ export default function DATRegistrosPage(): JSX.Element {
   });
 
   return (
-    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
+    <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="dat-registros-title">
       {/* Header */}
-      <div className="mb-6">
+      <header className="mb-6">
         <div className="flex justify-between items-start mb-2">
           <div>
-            <Title level={3} className="m-0">
+            <Title level={3} className="m-0" id="dat-registros-title">
               Listagem de Registros DAT
             </Title>
             <Text type="secondary">
@@ -309,9 +309,10 @@ export default function DATRegistrosPage(): JSX.Element {
             </Button>
           </Space>
         </div>
-      </div>
+      </header>
 
       {/* Filters Card */}
+      <nav aria-label="Filtros de busca">
       <Card className="mb-4" bodyStyle={{ paddingBottom: 12 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={8} lg={4}>
@@ -427,8 +428,10 @@ export default function DATRegistrosPage(): JSX.Element {
           </Button>
         </div>
       </Card>
+      </nav>
 
       {/* Table Card */}
+      <section aria-label="Resultados da busca">
       <Card
         bodyStyle={{ padding: 0 }}
         title={
@@ -482,8 +485,10 @@ export default function DATRegistrosPage(): JSX.Element {
           size="middle"
         />
       </Card>
+      </section>
 
       {/* Legend */}
+      <aside aria-label="Legenda de icones">
       <Card className="mt-4" size="small">
         <Space size="large" wrap>
           <Text strong style={{ textTransform: 'uppercase', fontSize: 12 }}>
@@ -514,6 +519,7 @@ export default function DATRegistrosPage(): JSX.Element {
           </Space>
         </Space>
       </Card>
+      </aside>
 
       {/* Create/Edit Modal */}
       <Modal
@@ -808,6 +814,6 @@ export default function DATRegistrosPage(): JSX.Element {
           </Row>
         </Form>
       </Modal>
-    </div>
+    </section>
   );
 }

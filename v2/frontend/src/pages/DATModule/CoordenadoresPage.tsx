@@ -476,12 +476,12 @@ export default function CoordenadoresPage(): JSX.Element {
   );
 
   return (
-    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
+    <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="coordenadores-title">
       {/* Header */}
-      <div className="mb-6">
+      <header className="mb-6">
         <div className="flex justify-between items-start mb-2">
           <div>
-            <Title level={3} className="m-0">
+            <Title level={3} className="m-0" id="coordenadores-title">
               <TeamOutlined className="mr-2" />
               Gestão de Coordenadores
             </Title>
@@ -522,7 +522,7 @@ export default function CoordenadoresPage(): JSX.Element {
             </Button>
           </Space>
         </div>
-      </div>
+      </header>
 
       {/* Stats Cards */}
       {stats && (
@@ -575,6 +575,7 @@ export default function CoordenadoresPage(): JSX.Element {
       )}
 
       {/* Filters Card */}
+      <nav aria-label="Filtros de busca">
       <Card style={{ marginBottom: 16 }} bodyStyle={{ paddingBottom: 12 }}>
         <Row gutter={[16, 16]} align="bottom">
           <Col xs={24} sm={12} md={8} lg={6}>
@@ -643,8 +644,10 @@ export default function CoordenadoresPage(): JSX.Element {
           </Col>
         </Row>
       </Card>
+      </nav>
 
       {/* Content - Cards, Table or Area View */}
+      <section aria-label="Lista de coordenadores">
       {viewMode === 'table' ? (
         <Card
           bodyStyle={{ padding: 0 }}
@@ -701,6 +704,7 @@ export default function CoordenadoresPage(): JSX.Element {
           )}
         </Card>
       )}
+      </section>
 
       {/* Create/Edit Modal */}
       <Modal
@@ -995,6 +999,6 @@ export default function CoordenadoresPage(): JSX.Element {
           </div>
         )}
       </Modal>
-    </div>
+    </section>
   );
 }

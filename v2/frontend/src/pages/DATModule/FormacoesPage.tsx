@@ -347,12 +347,12 @@ export default function FormacoesPage(): JSX.Element {
   );
 
   return (
-    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
+    <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="formacoes-title">
       {/* Header */}
-      <div className="mb-6">
+      <header className="mb-6">
         <div className="flex justify-between items-start mb-2">
           <div>
-            <Title level={3} className="m-0">
+            <Title level={3} className="m-0" id="formacoes-title">
               <CalendarOutlined className="mr-2" />
               Gestão de Formações
             </Title>
@@ -383,7 +383,7 @@ export default function FormacoesPage(): JSX.Element {
             </Button>
           </Space>
         </div>
-      </div>
+      </header>
 
       {/* Stats Cards */}
       {stats && (
@@ -431,6 +431,7 @@ export default function FormacoesPage(): JSX.Element {
       )}
 
       {/* Filters Card */}
+      <nav aria-label="Filtros de busca">
       <Card className="mb-4" bodyStyle={{ paddingBottom: 12 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={6} lg={4}>
@@ -560,8 +561,10 @@ export default function FormacoesPage(): JSX.Element {
           </Button>
         </div>
       </Card>
+      </nav>
 
       {/* Content - Table or Calendar */}
+      <section aria-label="Lista de formacoes">
       {viewMode === VIEW_MODES.TABLE ? (
         <Card
           bodyStyle={{ padding: 0 }}
@@ -641,8 +644,10 @@ export default function FormacoesPage(): JSX.Element {
           />
         </Card>
       )}
+      </section>
 
       {/* Legend */}
+      <aside aria-label="Legenda de status">
       <Card className="mt-4" size="small">
         <Space size="large" wrap>
           <Text strong style={{ textTransform: 'uppercase', fontSize: 12 }}>
@@ -653,6 +658,7 @@ export default function FormacoesPage(): JSX.Element {
           ))}
         </Space>
       </Card>
+      </aside>
 
       {/* Create/Edit Modal */}
       <Modal
@@ -880,6 +886,6 @@ export default function FormacoesPage(): JSX.Element {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </section>
   );
 }

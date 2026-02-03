@@ -650,17 +650,18 @@ export default function GCalDashboardPage(): JSX.Element {
   ], []);
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex justify-between items-center">
+    <section className="p-6" aria-labelledby="gcal-dashboard-title">
+      <header className="mb-6 flex justify-between items-center">
         <div>
-          <Title level={2}>Dashboard Google Calendar</Title>
+          <Title level={2} id="gcal-dashboard-title">Dashboard Google Calendar</Title>
           <Text type="secondary">
             Monitore métricas de publicação e sincronização de eventos
           </Text>
         </div>
-      </div>
+      </header>
 
       {/* Filtros */}
+      <nav aria-label="Filtros de busca">
       <Card
         className="mb-6"
         styles={{ body: { padding: '16px' } }}
@@ -709,8 +710,10 @@ export default function GCalDashboardPage(): JSX.Element {
           </Dropdown>
         </Space>
       </Card>
+      </nav>
 
       {/* Cards de Contagem */}
+      <section aria-label="Contagem por status">
       {loading ? (
         <Skeleton active paragraph={{ rows: 2 }} />
       ) : (
@@ -784,8 +787,10 @@ export default function GCalDashboardPage(): JSX.Element {
           )}
         </>
       )}
+      </section>
 
       {/* Insights - Success Rate + Top 5 (Issue #99) */}
+      <section aria-label="Insights e taxa de sucesso">
       {insightsLoading ? (
         <Skeleton active paragraph={{ rows: 3 }} className="mb-6" />
       ) : (
@@ -868,8 +873,10 @@ export default function GCalDashboardPage(): JSX.Element {
           </Card>
         </>
       )}
+      </section>
 
       {/* Tabela de Eventos */}
+      <section aria-label="Lista de eventos">
       <Card title="Eventos" bordered={false}>
         <Table
           dataSource={events}
@@ -885,8 +892,10 @@ export default function GCalDashboardPage(): JSX.Element {
           })}
         />
       </Card>
+      </section>
 
       {/* Drawer de Detalhes do Evento (Issue #98) */}
+      <aside aria-label="Detalhes do evento">
       <Drawer
         title={`Detalhes do Evento #${selectedEventId}`}
         placement="right"
@@ -1020,6 +1029,7 @@ export default function GCalDashboardPage(): JSX.Element {
           <Alert message="Nenhum dado disponível" type="warning" />
         )}
       </Drawer>
-    </div>
+      </aside>
+    </section>
   );
 }

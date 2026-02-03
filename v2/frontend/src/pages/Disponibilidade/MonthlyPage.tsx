@@ -91,39 +91,43 @@ export default function MonthlyPage(): JSX.Element {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <section className="min-h-screen bg-gray-50" aria-labelledby="grade-mensal-title">
       <div className="p-6 md:p-10 space-y-6">
-        {/* Título */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+        {/* Header semantico */}
+        <header>
+          <h1 id="grade-mensal-title" className="text-3xl font-bold text-gray-900">
             Grade Mensal de Disponibilidade
           </h1>
           <p className="text-sm text-gray-600 mt-1">
             Visualize a disponibilidade mensal de formadores e coordenadores.
             Clique em uma célula para ver detalhes dos eventos.
           </p>
-        </div>
+        </header>
 
         {/* Filtros compartilhados */}
-        <FiltersBar
-          year={filters.year}
-          month={filters.month}
-          gerenciaId={filters.gerenciaId}
-          sector={filters.sector}
-          q={filters.q}
-          onChange={handleFiltersChange}
-        />
+        <nav aria-label="Filtros da grade">
+          <FiltersBar
+            year={filters.year}
+            month={filters.month}
+            gerenciaId={filters.gerenciaId}
+            sector={filters.sector}
+            q={filters.q}
+            onChange={handleFiltersChange}
+          />
+        </nav>
 
         {/* Legenda */}
-        <Legend legend={formadores.data?.legend || coordenadores.data?.legend} />
+        <aside aria-label="Legenda de cores">
+          <Legend legend={formadores.data?.legend || coordenadores.data?.legend} />
+        </aside>
 
         {/* Grades */}
         <div className="space-y-6">
             {/* Grade de Formadores */}
-            <div>
-              <div className="mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">Formadores</h2>
-              </div>
+            <article aria-labelledby="formadores-heading">
+              <header className="mb-4">
+                <h2 id="formadores-heading" className="text-xl font-semibold text-gray-900">Formadores</h2>
+              </header>
 
               {formadores.loading ? (
                 <div className="bg-white rounded-lg shadow-sm p-8 text-center">
@@ -164,13 +168,13 @@ export default function MonthlyPage(): JSX.Element {
                   </p>
                 </div>
               )}
-            </div>
+            </article>
 
             {/* Grade de Coordenadores */}
-            <div>
-              <div className="mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">Coordenadores</h2>
-              </div>
+            <article aria-labelledby="coordenadores-heading">
+              <header className="mb-4">
+                <h2 id="coordenadores-heading" className="text-xl font-semibold text-gray-900">Coordenadores</h2>
+              </header>
 
               {coordenadores.loading ? (
                 <div className="bg-white rounded-lg shadow-sm p-8 text-center">
@@ -211,7 +215,7 @@ export default function MonthlyPage(): JSX.Element {
                   </p>
                 </div>
               )}
-            </div>
+            </article>
         </div>
       </div>
 
@@ -223,6 +227,6 @@ export default function MonthlyPage(): JSX.Element {
         day={day}
         details={details}
       />
-    </div>
+    </section>
   );
 }

@@ -162,14 +162,14 @@ export default function MunicipiosPage(): JSX.Element {
   ];
 
   return (
-    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
-      <div className="mb-4">
+    <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="municipios-title">
+      <nav className="mb-4" aria-label="Navegação">
         <Link to="/admin-dat">← Voltar para Admin DAT</Link>
-      </div>
+      </nav>
 
       <Card>
-        <div className="flex justify-between items-center mb-4">
-          <Title level={3} className="m-0">
+        <header className="flex justify-between items-center mb-4">
+          <Title level={3} className="m-0" id="municipios-title">
             Municípios ({municipios.length})
           </Title>
           <Space>
@@ -194,7 +194,7 @@ export default function MunicipiosPage(): JSX.Element {
               Novo Município
             </Button>
           </Space>
-        </div>
+        </header>
 
         <Table
           columns={columns}
@@ -263,6 +263,6 @@ export default function MunicipiosPage(): JSX.Element {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </section>
   );
 }

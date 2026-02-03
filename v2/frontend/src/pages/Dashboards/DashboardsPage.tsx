@@ -212,10 +212,10 @@ export default function DashboardsPage(): JSX.Element {
   ];
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex justify-between items-center">
+    <section className="p-6" aria-labelledby="dashboards-title">
+      <header className="mb-6 flex justify-between items-center">
         <div>
-          <Title level={2}>Dashboards e Analises</Title>
+          <Title level={2} id="dashboards-title">Dashboards e Analises</Title>
           <Text type="secondary">
             Visualize metricas detalhadas e relatorios do sistema
           </Text>
@@ -232,9 +232,10 @@ export default function DashboardsPage(): JSX.Element {
             Exportar para CSV
           </Button>
         </Space>
-      </div>
+      </header>
 
       {/* KPI Cards */}
+      <section aria-label="Indicadores principais">
       <Row gutter={[16, 16]} className="mb-6">
         <Col xs={24} sm={12} md={6}>
           <Card
@@ -300,8 +301,10 @@ export default function DashboardsPage(): JSX.Element {
           </Card>
         </Col>
       </Row>
+      </section>
 
       {/* Graficos */}
+      <section aria-label="Graficos de analise">
       <Row gutter={[16, 16]} className="mb-6">
         {/* Eventos por Fluxo */}
         <Col xs={24} md={12}>
@@ -373,8 +376,10 @@ export default function DashboardsPage(): JSX.Element {
           </Card>
         </Col>
       </Row>
+      </section>
 
       {/* Top Coordenadores */}
+      <section aria-label="Ranking de coordenadores">
       <Row gutter={[16, 16]}>
         <Col xs={24}>
           <Card
@@ -394,6 +399,7 @@ export default function DashboardsPage(): JSX.Element {
           </Card>
         </Col>
       </Row>
-    </div>
+      </section>
+    </section>
   );
 }

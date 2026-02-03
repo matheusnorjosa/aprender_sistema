@@ -233,11 +233,11 @@ export default function EquipeDashboardPage(): JSX.Element {
   }
 
   return (
-    <div className="p-6">
+    <section className="p-6" aria-labelledby="equipe-dashboard-title">
       {/* Header com filtro e export */}
-      <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
+      <header className="mb-6 flex justify-between items-center flex-wrap gap-4">
         <div>
-          <Title level={2}>Dashboard da Equipe</Title>
+          <Title level={2} id="equipe-dashboard-title">Dashboard da Equipe</Title>
           <Text type="secondary">
             Métricas de desempenho e produtividade
           </Text>
@@ -272,7 +272,7 @@ export default function EquipeDashboardPage(): JSX.Element {
             Atualizar
           </Button>
         </Space>
-      </div>
+      </header>
 
       {loading ? (
         <div className="text-center py-16">
@@ -281,6 +281,7 @@ export default function EquipeDashboardPage(): JSX.Element {
       ) : (
         <>
           {/* SEÇÃO 1: PRODUTIVIDADE */}
+          <section aria-label="Produtividade">
           <Title level={4} className="mt-6 mb-4">
             <BarChartOutlined /> Produtividade ({productivityData?.period || '7d'})
           </Title>
@@ -328,8 +329,10 @@ export default function EquipeDashboardPage(): JSX.Element {
               </Card>
             </Col>
           </Row>
+          </section>
 
           {/* SEÇÃO 2: RANKING DE FORMADORES */}
+          <section aria-label="Ranking de formadores">
           <Title level={4} className="mt-6 mb-4">
             <TrophyOutlined /> Top 10 Formadores ({formadoresData?.period || '30d'})
           </Title>
@@ -381,8 +384,10 @@ export default function EquipeDashboardPage(): JSX.Element {
               </Card>
             </Col>
           </Row>
+          </section>
 
           {/* SEÇÃO 3: QUALIDADE */}
+          <section aria-label="Qualidade do processo">
           <Title level={4} className="mt-6 mb-4">
             <SafetyOutlined /> Qualidade do Processo ({qualityData?.period || '30d'})
           </Title>
@@ -471,6 +476,8 @@ export default function EquipeDashboardPage(): JSX.Element {
             </Col>
           </Row>
 
+          </section>
+
           {/* Footer com timestamp */}
           <Divider />
           <Text type="secondary" style={{ fontSize: '12px' }}>
@@ -478,6 +485,6 @@ export default function EquipeDashboardPage(): JSX.Element {
           </Text>
         </>
       )}
-    </div>
+    </section>
   );
 }

@@ -95,17 +95,17 @@ export default function ControlePage(): JSX.Element {
   }, [fetchCompras]);
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+    <main className="p-6 space-y-6 bg-gray-50 min-h-screen" aria-labelledby="controle-title">
       {/* Título */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Controle</h1>
+      <header>
+        <h1 id="controle-title" className="text-3xl font-bold text-gray-900">Controle</h1>
         <p className="text-sm text-gray-600 mt-1">
           Gestão de compras e ações de controle
         </p>
-      </div>
+      </header>
 
       {/* Cards de Upload */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <section aria-label="Importação de dados" className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Upload COMPRAS */}
         <ImportUploader
           label="Importar COMPRAS"
@@ -125,13 +125,13 @@ export default function ControlePage(): JSX.Element {
           onDryRun={async (file: File) => toValidationResult(await importAcoes(file, true))}
           onApply={async (file: File) => toApplyResult(await importAcoes(file, false))}
         />
-      </div>
+      </section>
 
       {/* Filtros de COMPRAS */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">
+      <section aria-label="Filtros de compras" className="bg-white rounded-lg shadow p-4">
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">
           Filtros de COMPRAS
-        </h3>
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
             type="text"
@@ -176,15 +176,15 @@ export default function ControlePage(): JSX.Element {
             className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-      </div>
+      </section>
 
       {/* Tabela de COMPRAS */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-4 py-3 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">
+      <section aria-label="Tabela de compras" className="bg-white rounded-lg shadow overflow-hidden">
+        <header className="px-4 py-3 border-b">
+          <h2 className="text-lg font-semibold text-gray-900">
             COMPRAS ({compras.length})
-          </h3>
-        </div>
+          </h2>
+        </header>
 
         {error && (
           <div className="p-4 bg-red-50 border-b border-red-200">
@@ -233,7 +233,7 @@ export default function ControlePage(): JSX.Element {
             </table>
           </div>
         )}
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

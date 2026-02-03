@@ -50,24 +50,25 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
   };
 
   return (
-    <div
+    <main
       className="flex flex-col items-center justify-start"
       style={{ minHeight: '100vh', paddingTop: '60px', background: BRAND_COLORS.primaryDark }}
+      aria-labelledby="login-title"
     >
       {/* Logo */}
-      <div style={{ marginBottom: '40px' }}>
+      <header style={{ marginBottom: '40px' }}>
         <img
           src={logoLogin}
-          alt="Aprender"
+          alt="Aprender Sistema"
           style={{
             width: '140px',
             height: 'auto',
           }}
         />
-      </div>
+      </header>
 
       {/* Card de Login */}
-      <div
+      <article
         style={{
           width: '100%',
           maxWidth: '420px',
@@ -77,7 +78,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
           boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
         }}
       >
-        <h2 style={{
+        <h1 id="login-title" style={{
           color: BRAND_COLORS.primaryDark,
           fontSize: '24px',
           fontWeight: '500',
@@ -85,7 +86,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
           textAlign: 'center',
         }}>
           Login
-        </h2>
+        </h1>
 
         <Form
           name="login"
@@ -135,7 +136,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
             </Button>
           </Form.Item>
         </Form>
-      </div>
-    </div>
+      </article>
+    </main>
   );
 }

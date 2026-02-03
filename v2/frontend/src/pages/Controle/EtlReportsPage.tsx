@@ -216,17 +216,17 @@ export default function EtlReportsPage(): JSX.Element {
   ];
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+    <main className="p-6 space-y-6 bg-gray-50 min-h-screen" aria-labelledby="etl-reports-title">
       {/* Título */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Relatórios ETL</h1>
+      <header>
+        <h1 id="etl-reports-title" className="text-3xl font-bold text-gray-900">Relatórios ETL</h1>
         <p className="text-sm text-gray-600 mt-1">
           Visualize e baixe relatórios gerados pelas importações de dados (acompanhamento, deslocamento, ações, etc.)
         </p>
-      </div>
+      </header>
 
       {/* Filtros */}
-      <div className="bg-white p-4 rounded-lg shadow space-y-4">
+      <section aria-label="Filtros" className="bg-white p-4 rounded-lg shadow space-y-4">
         <h2 className="text-lg font-semibold text-gray-800">Filtros</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -277,7 +277,7 @@ export default function EtlReportsPage(): JSX.Element {
             </Button>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Erro */}
       {error && (
@@ -300,7 +300,7 @@ export default function EtlReportsPage(): JSX.Element {
       )}
 
       {/* Tabela */}
-      <div className="bg-white rounded-lg shadow">
+      <section aria-label="Tabela de relatórios" className="bg-white rounded-lg shadow">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Spin size="large" />
@@ -322,9 +322,10 @@ export default function EtlReportsPage(): JSX.Element {
             }}
           />
         )}
-      </div>
+      </section>
 
       {/* Ajuda */}
+      <aside aria-label="Como usar esta página">
       <Alert
         message="Como usar esta página"
         description={
@@ -340,6 +341,7 @@ export default function EtlReportsPage(): JSX.Element {
         showIcon
         className="mt-4"
       />
-    </div>
+      </aside>
+    </main>
   );
 }

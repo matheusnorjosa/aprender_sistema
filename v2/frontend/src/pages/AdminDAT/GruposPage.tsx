@@ -214,15 +214,15 @@ export default function GruposPage(): JSX.Element {
   ];
 
   return (
-    <div className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }}>
-      <div className="mb-4">
+    <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="grupos-title">
+      <nav className="mb-4" aria-label="Navegação">
         <Link to="/admin-dat">← Voltar para Admin DAT</Link>
-      </div>
+      </nav>
 
       <Card>
-        <div className="flex justify-between items-center mb-4">
-          <Title level={3} className="m-0">
-            <TeamOutlined /> Grupos ({grupos.length})
+        <header className="flex justify-between items-center mb-4">
+          <Title level={3} className="m-0" id="grupos-title">
+            <TeamOutlined aria-hidden="true" /> Grupos ({grupos.length})
           </Title>
           <Space>
             <Search
@@ -239,7 +239,7 @@ export default function GruposPage(): JSX.Element {
               Novo Grupo
             </Button>
           </Space>
-        </div>
+        </header>
 
         <Table
           columns={columns}
@@ -304,6 +304,6 @@ export default function GruposPage(): JSX.Element {
           ))}
         </Checkbox.Group>
       </Modal>
-    </div>
+    </section>
   );
 }

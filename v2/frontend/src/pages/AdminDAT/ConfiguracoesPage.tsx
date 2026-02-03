@@ -392,16 +392,16 @@ export default function ConfiguracoesPage(): JSX.Element {
   ];
 
   return (
-    <div className="p-6">
+    <section className="p-6" aria-labelledby="configuracoes-title">
       <Card>
-        <div className="mb-6">
-          <Title level={2}>
-            <SettingOutlined /> Configurações do Sistema
+        <header className="mb-6">
+          <Title level={2} id="configuracoes-title">
+            <SettingOutlined aria-hidden="true" /> Configurações do Sistema
           </Title>
           <Text type="secondary">
             Ajuste parâmetros operacionais sem necessidade de deploy. Mudanças são aplicadas imediatamente.
           </Text>
-        </div>
+        </header>
 
         <Divider />
 
@@ -445,6 +445,6 @@ export default function ConfiguracoesPage(): JSX.Element {
           </Space>
         </Form>
       </Card>
-    </div>
+    </section>
   );
 }

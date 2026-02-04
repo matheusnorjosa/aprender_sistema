@@ -155,6 +155,18 @@ export async function importCadastros(file: File, dryRun: boolean = true): Promi
 }
 
 /**
+ * Importa BLOQUEIOS (AvailabilityBlock) de CSV/XLSX.
+ *
+ * Colunas esperadas: usuario, inicio, fim, tipo (T/P), motivo
+ *
+ * @param file - Arquivo a enviar
+ * @param dryRun - Se true, apenas preview
+ */
+export async function importBloqueios(file: File, dryRun: boolean = true): Promise<ImportResult> {
+  return await postMultipart('/disponibilidade/import-bloqueios/', file, dryRun);
+}
+
+/**
  * Lista COMPRAS com filtros opcionais.
  */
 export async function listCompras(filters: ComprasFilters = {}): Promise<Compra[]> {

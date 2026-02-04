@@ -11,8 +11,55 @@ import { useState, useEffect, JSX } from 'react';
 import { Card, Row, Col, message, Spin } from 'antd';
 import BlockForm from '../components/BlockForm';
 import MyBlocksTable from '../components/MyBlocksTable';
+import ImportUploader, { ValidationResult, ApplyResult } from '../components/ImportUploader';
 import { getBlocks, createBlock as apiCreateBlock, deleteBlock as apiDeleteBlock } from '../api/availability';
+import { importBloqueios } from '../api/ops';
 import type { ID, AvailabilityBlock, AvailabilityBlockPayload } from '../types';
+
+/**
+ * Converte resposta do backend para formato do ImportUploader.
+ */
+function toValidationResult(response: Record<string, unknown>): ValidationResult {
+  const stats = response.stats as Record<string, unknown> | undefined;
+  const pendencias = response.pendencias as Record<string, unknown[]> | undefined;
+
+  // Converter pendencias em erros se houver usuarios ou dates nao resolvidos
+  const errors: string[] = [];
+  if (pendencias?.usuarios) {
+    (pendencias.usuarios as Array<{ linha: number; nome: string }>).forEach((p) => {
+      errors.push(`Linha ${p.linha}: Usuario nao encontrado (${p.nome})`);
+    });
+  }
+  if (pendencias?.dates) {
+    (pendencias.dates as Array<{ linha: number; erro?: string }>).forEach((p) => {
+      errors.push(`Linha ${p.linha}: Data invalida${p.erro ? ` - ${p.erro}` : ''}`);
+    });
+  }
+
+  return {
+    stats: {
+      created: (stats?.created as number) || 0,
+      updated: (stats?.updated as number) || 0,
+      unchanged: (stats?.unchanged as number) || 0,
+    },
+    errors: errors.length > 0 ? errors : undefined,
+    pendencias,
+  };
+}
+
+/**
+ * Converte resposta do backend para ApplyResult.
+ */
+function toApplyResult(response: Record<string, unknown>): ApplyResult {
+  const stats = response.stats as Record<string, unknown> | undefined;
+  return {
+    stats: {
+      created: (stats?.created as number) || 0,
+      updated: (stats?.updated as number) || 0,
+      unchanged: (stats?.unchanged as number) || 0,
+    },
+  };
+}
 
 export default function Disponibilidade(): JSX.Element {
   const [blocks, setBlocks] = useState<AvailabilityBlock[]>([]);
@@ -76,8 +123,8 @@ export default function Disponibilidade(): JSX.Element {
       </header>
 
       <Row gutter={[16, 16]}>
-        {/* Card de Criação */}
-        <Col xs={24} lg={12}>
+        {/* Card de Criacao */}
+        <Col xs={24} lg={8}>
           <article aria-label="Criar novo bloqueio">
             <Card title="Criar Bloqueio" bordered={false}>
               <BlockForm onSubmit={handleCreate as unknown as (payload: { tipo: string; inicio: string; fim: string }) => Promise<void>} />
@@ -86,7 +133,7 @@ export default function Disponibilidade(): JSX.Element {
         </Col>
 
         {/* Card de Listagem */}
-        <Col xs={24} lg={12}>
+        <Col xs={24} lg={8}>
           <article aria-label="Lista de meus bloqueios">
             <Card title="Meus Bloqueios" bordered={false}>
               {loading ? (
@@ -97,6 +144,22 @@ export default function Disponibilidade(): JSX.Element {
                 <MyBlocksTable blocks={blocks as unknown as Array<{ id: number; tipo: 'T' | 'P'; inicio: string; fim: string; status: 'pendente' | 'aprovado' | 'reprovado' }>} onDelete={handleDelete} loading={loading} />
               )}
             </Card>
+          </article>
+        </Col>
+
+        {/* Card de Importacao em Massa */}
+        <Col xs={24} lg={8}>
+          <article aria-label="Importar bloqueios em massa">
+            <ImportUploader
+              label="Importar Bloqueios"
+              description="CSV/XLSX com colunas: usuario, inicio, fim, tipo (T/P), motivo"
+              onDryRun={async (file: File) => toValidationResult(await importBloqueios(file, true) as unknown as Record<string, unknown>)}
+              onApply={async (file: File) => {
+                const result = await importBloqueios(file, false);
+                await fetchBlocks();
+                return toApplyResult(result as unknown as Record<string, unknown>);
+              }}
+            />
           </article>
         </Col>
       </Row>

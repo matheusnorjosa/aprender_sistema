@@ -30,21 +30,34 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
 
     Formadores podem criar bloqueios para si mesmos.
     Usuario é preenchido automaticamente com request.user.
+
+    Security (Issue #560 C-03):
+    - Users can only update/delete their own blocks
+    - Controle, Superintendência, and superusers can manage any block
     """
 
     queryset = AvailabilityBlock.objects.select_related("usuario").all()
     serializer_class = AvailabilityBlockSerializer
     permission_classes = [IsAuthenticated]
 
+    def _is_privileged_user(self) -> bool:
+        """
+        Check if current user has privileged access (can manage any block).
+
+        Security (C-03): Define who can edit/delete blocks of other users.
+        """
+        user = self.request.user
+        return user.is_superuser or user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
+
     def get_queryset(self) -> QuerySet:
         """
-        Filtrar bloqueios por usuário (exceto Superintendência/superuser que vê todos).
+        Filtrar bloqueios por usuário (exceto Superintendência/Controle/superuser que vê todos).
         """
         base_qs = AvailabilityBlock.objects.select_related("usuario")
         owner = self.request.query_params.get("owner")
         if owner == "me":
             return base_qs.filter(usuario=self.request.user)
-        if self.request.user.is_superuser or self.request.user.groups.filter(name="Superintendência").exists():
+        if self._is_privileged_user():
             return base_qs.all()
         return base_qs.filter(usuario=self.request.user)
 
@@ -53,6 +66,42 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         Preenche usuario automaticamente com request.user ao criar bloqueio.
         """
         serializer.save(usuario=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Security (C-03): Only allow update if user owns the block or is privileged.
+        """
+        instance = self.get_object()
+        if not self._is_privileged_user() and instance.usuario_id != request.user.id:
+            return Response(
+                {"detail": "Você não tem permissão para editar este bloqueio."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        """
+        Security (C-03): Only allow partial update if user owns the block or is privileged.
+        """
+        instance = self.get_object()
+        if not self._is_privileged_user() and instance.usuario_id != request.user.id:
+            return Response(
+                {"detail": "Você não tem permissão para editar este bloqueio."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Security (C-03): Only allow delete if user owns the block or is privileged.
+        """
+        instance = self.get_object()
+        if not self._is_privileged_user() and instance.usuario_id != request.user.id:
+            return Response(
+                {"detail": "Você não tem permissão para excluir este bloqueio."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class AvailabilityCheckView(APIView):

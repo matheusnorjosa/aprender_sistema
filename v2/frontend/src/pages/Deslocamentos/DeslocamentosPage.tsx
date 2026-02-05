@@ -34,8 +34,10 @@ import {
   Card,
   Typography,
   Tooltip,
+  Radio,
 } from 'antd';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
+import type { RadioChangeEvent } from 'antd/es/radio';
 import type { Dayjs } from 'dayjs';
 import {
   PlusOutlined,
@@ -43,9 +45,12 @@ import {
   DeleteOutlined,
   SearchOutlined,
   CarOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getMe } from '../../api/availability';
+import { importDeslocamentos } from '../../api/ops';
+import ImportUploader, { ValidationResult, ApplyResult } from '../../components/ImportUploader';
 import logger from '../../utils/logger';
 import type { ID, CurrentUser } from '../../types';
 
@@ -100,6 +105,53 @@ interface ApiErrorType {
   end_date?: string[];
   destino?: string[];
   [key: string]: string[] | undefined;
+}
+
+/** View mode type */
+type ViewMode = 'lista' | 'importar';
+
+/**
+ * Converte resposta do backend para formato do ImportUploader.
+ */
+function toValidationResult(response: Record<string, unknown>): ValidationResult {
+  const stats = response.stats as Record<string, unknown> | undefined;
+  const pendencias = response.pendencias as Record<string, unknown[]> | undefined;
+
+  const errors: string[] = [];
+  if (pendencias?.usuarios) {
+    (pendencias.usuarios as Array<{ linha: number; nome?: string; email?: string }>).forEach((p) => {
+      errors.push(`Linha ${p.linha}: Usuario nao encontrado (${p.email || p.nome})`);
+    });
+  }
+  if (pendencias?.dates) {
+    (pendencias.dates as Array<{ linha: number; erro?: string }>).forEach((p) => {
+      errors.push(`Linha ${p.linha}: Data invalida${p.erro ? ` - ${p.erro}` : ''}`);
+    });
+  }
+
+  return {
+    stats: {
+      created: (stats?.created as number) || 0,
+      updated: (stats?.updated as number) || 0,
+      unchanged: (stats?.unchanged as number) || 0,
+    },
+    errors: errors.length > 0 ? errors : undefined,
+    pendencias,
+  };
+}
+
+/**
+ * Converte resposta do backend para ApplyResult.
+ */
+function toApplyResult(response: Record<string, unknown>): ApplyResult {
+  const stats = response.stats as Record<string, unknown> | undefined;
+  return {
+    stats: {
+      created: (stats?.created as number) || 0,
+      updated: (stats?.updated as number) || 0,
+      unchanged: (stats?.unchanged as number) || 0,
+    },
+  };
 }
 
 /**
@@ -194,6 +246,7 @@ async function deleteDeslocamento(id: ID): Promise<void> {
 }
 
 export default function DeslocamentosPage(): JSX.Element {
+  const [viewMode, setViewMode] = useState<ViewMode>('lista');
   const [canAccess, setCanAccess] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [deslocamentos, setDeslocamentos] = useState<DeslocamentoRecord[]>([]);
@@ -457,13 +510,31 @@ export default function DeslocamentosPage(): JSX.Element {
           <Title level={2}>
             <CarOutlined /> Deslocamentos
           </Title>
-          <Text type="secondary">Gestão de deslocamentos entre municípios</Text>
+          <Text type="secondary">
+            {viewMode === 'lista'
+              ? 'Gestão de deslocamentos entre municípios'
+              : 'Importe deslocamentos em massa via arquivo CSV/XLSX'}
+          </Text>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          Novo Deslocamento
-        </Button>
+        <Space>
+          <Radio.Group
+            value={viewMode}
+            onChange={(e: RadioChangeEvent) => setViewMode(e.target.value)}
+            buttonStyle="solid"
+          >
+            <Radio.Button value="lista">Lista</Radio.Button>
+            <Radio.Button value="importar">Importar</Radio.Button>
+          </Radio.Group>
+          {viewMode === 'lista' && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              Novo Deslocamento
+            </Button>
+          )}
+        </Space>
       </div>
 
+      {viewMode === 'lista' ? (
+        <>
       {/* Filters */}
       <Card title="Filtros" size="small">
         <Row gutter={[16, 16]}>
@@ -520,6 +591,55 @@ export default function DeslocamentosPage(): JSX.Element {
           scroll={{ x: 1000 }}
         />
       </Card>
+        </>
+      ) : (
+        /* View: Importar em Massa */
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={16}>
+            <Card
+              title={
+                <span>
+                  <UploadOutlined style={{ marginRight: 8 }} />
+                  Importar Deslocamentos em Massa
+                </span>
+              }
+              bordered={false}
+            >
+              <ImportUploader
+                label="Selecione o arquivo"
+                description="CSV/XLSX com colunas: usuario, origem, destino, data_inicio, data_fim, observacao"
+                onDryRun={async (file: File) => toValidationResult(await importDeslocamentos(file, true) as unknown as Record<string, unknown>)}
+                onApply={async (file: File) => {
+                  const result = await importDeslocamentos(file, false);
+                  await loadDeslocamentos();
+                  return toApplyResult(result as unknown as Record<string, unknown>);
+                }}
+              />
+            </Card>
+          </Col>
+
+          {/* Card de Instrucoes */}
+          <Col xs={24} lg={8}>
+            <Card title="Formato do Arquivo" bordered={false}>
+              <Text strong>Colunas obrigatorias:</Text>
+              <ul style={{ marginTop: 8, paddingLeft: 20 }}>
+                <li><code>usuario</code> - Email ou nome do formador</li>
+                <li><code>origem</code> - Local de origem</li>
+                <li><code>destino</code> - Local de destino</li>
+                <li><code>data_inicio</code> - Data de inicio</li>
+                <li><code>data_fim</code> - Data de fim</li>
+              </ul>
+              <Text strong style={{ marginTop: 16, display: 'block' }}>Coluna opcional:</Text>
+              <ul style={{ marginTop: 8, paddingLeft: 20 }}>
+                <li><code>observacao</code> - Observacao</li>
+              </ul>
+              <Text type="secondary" style={{ marginTop: 16, display: 'block', fontSize: 12 }}>
+                Formatos de data aceitos: YYYY-MM-DD, DD/MM/YYYY, ISO 8601
+              </Text>
+            </Card>
+          </Col>
+        </Row>
+      )}
 
       {/* Modal */}
       <Modal

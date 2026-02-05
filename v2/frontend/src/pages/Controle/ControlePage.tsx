@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import { importCompras, importAcoes, listCompras } from '../../api/ops';
+import { importCompras, importAcoes, importEventos, listCompras } from '../../api/ops';
 import type { Compra, ComprasFilters, ImportResult } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
 import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
@@ -105,7 +105,7 @@ export default function ControlePage(): JSX.Element {
       </header>
 
       {/* Cards de Upload */}
-      <section aria-label="Importação de dados" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <section aria-label="Importação de dados" className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Upload COMPRAS */}
         <ImportUploader
           label="Importar COMPRAS"
@@ -124,6 +124,14 @@ export default function ControlePage(): JSX.Element {
           description="CSV/XLSX de Ações de Controle (Município, Projeto, Coordenador, Datas, Observação)"
           onDryRun={async (file: File) => toValidationResult(await importAcoes(file, true))}
           onApply={async (file: File) => toApplyResult(await importAcoes(file, false))}
+        />
+
+        {/* Upload EVENTOS */}
+        <ImportUploader
+          label="Importar EVENTOS"
+          description="CSV/XLSX: municipio, projeto, tipo_evento, data, hora_inicio, hora_fim, coordenador, formador1-5"
+          onDryRun={async (file: File) => toValidationResult(await importEventos(file, true))}
+          onApply={async (file: File) => toApplyResult(await importEventos(file, false))}
         />
       </section>
 

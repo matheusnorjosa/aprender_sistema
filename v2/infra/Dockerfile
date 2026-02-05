@@ -9,8 +9,10 @@ COPY backend/requirements-dev.txt /app/requirements-dev.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # === Dev tools sempre instaladas (modo único) ===
+# postgresql-client: Required for backup script (pg_dump) - Issue #562 (C-05)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl jq httpie vim nano tree less tzdata ca-certificates libpq5 \
+    postgresql-client \
  && rm -rf /var/lib/apt/lists/*
 
 # === Python pacotes de dados/cli (modo único) ===
@@ -31,6 +33,11 @@ COPY backend /app
 # Copy gunicorn config (used by web service)
 RUN mkdir -p /app/infra
 COPY infra/gunicorn.conf.py /app/infra/gunicorn.conf.py
+
+# Copy backup scripts (MP5, Issue #562 C-05)
+# Scripts are used by Celery tasks for automated backups
+COPY infra/scripts /app/infra/scripts
+RUN chmod +x /app/infra/scripts/*.sh
 
 # === BUILD INFO ===
 ARG GIT_SHA=unknown

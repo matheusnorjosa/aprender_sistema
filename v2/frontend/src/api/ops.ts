@@ -167,6 +167,18 @@ export async function importBloqueios(file: File, dryRun: boolean = true): Promi
 }
 
 /**
+ * Importa Deslocamentos de CSV/XLSX.
+ *
+ * Colunas esperadas: usuario, origem, destino, data_inicio, data_fim, observacao
+ *
+ * @param file - Arquivo a enviar
+ * @param dryRun - Se true, apenas preview
+ */
+export async function importDeslocamentos(file: File, dryRun: boolean = true): Promise<ImportResult> {
+  return await postMultipart('/deslocamentos/import/', file, dryRun);
+}
+
+/**
  * Lista COMPRAS com filtros opcionais.
  */
 export async function listCompras(filters: ComprasFilters = {}): Promise<Compra[]> {

@@ -228,11 +228,25 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
         Endpoint: POST /api/usuarios-admin/{id}/assign_groups/
         Payload: {"group_ids": [1, 2, 3]}
 
+        Security (Issue #561 C-04):
+        - Users cannot modify their own groups (self-modification blocked)
+        - Only groups in ALLOWED_USER_GROUPS whitelist can be assigned
+        - Reuses validation logic from UsuarioAdminSerializer (P1.1)
+
         GAP-003 (resolvido): Endpoint para vincular usuários a grupos.
         Iteração 3 - Fase 1 Plano DAT/GCal.
         """
+        from django.conf import settings as django_settings
+
         usuario = self.get_object()
         group_ids = request.data.get("group_ids", [])
+
+        # Security (C-04): Block self-modification of groups
+        if usuario.id == request.user.id:
+            return Response(
+                {"error": "Você não pode modificar seus próprios grupos."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # Validar tipo de dados
         if not isinstance(group_ids, list):
@@ -262,6 +276,16 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
                 {"error": f"Groups not found with IDs: {sorted(missing_ids)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Security (C-04): Validate groups against whitelist (P1.1)
+        allowed_groups: set[str] = getattr(django_settings, "ALLOWED_USER_GROUPS", set())
+        for group in groups:
+            if group.name not in allowed_groups:
+                allowed_list = ", ".join(sorted(allowed_groups))
+                return Response(
+                    {"error": f"Grupo '{group.name}' não permitido. Grupos válidos: {allowed_list}"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         # Atribuir grupos (substitui grupos existentes)
         usuario.groups.set(groups)

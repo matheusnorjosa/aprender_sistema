@@ -64,6 +64,8 @@ from .views_health import features, readyz
 from .views_import_bloqueios import ImportBloqueiosView
 from .views_import_deslocamentos import ImportDeslocamentosView
 from .views_import_eventos import ImportEventosView
+from .views_import_produtos import ImportProdutosView
+from .views_import_usuarios import ImportUsuariosView
 from .views_imports import ControleImportAcoesView, DATImportCadastrosView
 from .views_lookup import MunicipioLookup, ProjetoLookup, TipoEventoLookup, UsuarioLookup
 from .views_metrics import (
@@ -219,6 +221,16 @@ urlpatterns = [
         "solicitacoes/import/",
         ImportEventosView.as_view(),
         name="import-eventos",
+    ),
+    path(
+        "usuarios/import/",
+        ImportUsuariosView.as_view(),
+        name="import-usuarios",
+    ),
+    path(
+        "produtos/import/",
+        ImportProdutosView.as_view(),
+        name="import-produtos",
     ),
     path(
         "dat/acoes/",

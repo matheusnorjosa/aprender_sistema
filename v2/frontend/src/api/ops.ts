@@ -196,6 +196,35 @@ export async function importEventos(file: File, dryRun: boolean = true): Promise
 }
 
 /**
+ * Importa USUARIOS de CSV/XLSX.
+ *
+ * Colunas esperadas:
+ * - cpf, nome (obrigatorios)
+ * - email, telefone, cargo (opcionais)
+ * - grupos (opcional, separados por virgula)
+ *
+ * @param file - Arquivo a enviar
+ * @param dryRun - Se true, apenas preview
+ */
+export async function importUsuarios(file: File, dryRun: boolean = true): Promise<ImportResult> {
+  return await postMultipart('/usuarios/import/', file, dryRun);
+}
+
+/**
+ * Importa PRODUTOS de CSV/XLSX.
+ *
+ * Colunas esperadas:
+ * - codigo, nome, projeto (obrigatorios)
+ * - descricao (opcional)
+ *
+ * @param file - Arquivo a enviar
+ * @param dryRun - Se true, apenas preview
+ */
+export async function importProdutos(file: File, dryRun: boolean = true): Promise<ImportResult> {
+  return await postMultipart('/produtos/import/', file, dryRun);
+}
+
+/**
  * Lista COMPRAS com filtros opcionais.
  */
 export async function listCompras(filters: ComprasFilters = {}): Promise<Compra[]> {

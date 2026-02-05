@@ -39,7 +39,7 @@ export default function AdminDATHomePage(): JSX.Element {
       title: 'Usuários',
       description: 'Gerenciar usuários, CPF, grupos e perfis',
       icon: <UserOutlined className="text-5xl text-blue-500" />,
-      path: '/admin-dat/usuarios',
+      path: '/dat/admin/usuarios',
       status: 'Disponível',
     },
     {
@@ -47,7 +47,7 @@ export default function AdminDATHomePage(): JSX.Element {
       title: 'Municípios',
       description: 'CRUD de municípios com indicadores (UF, ativo)',
       icon: <EnvironmentOutlined className="text-5xl text-green-500" />,
-      path: '/admin-dat/municipios',
+      path: '/dat/admin/municipios',
       status: 'Disponível',
     },
     {
@@ -55,7 +55,7 @@ export default function AdminDATHomePage(): JSX.Element {
       title: 'Grupos/Setores',
       description: 'Gerenciar grupos e vínculos usuário↔setor',
       icon: <TeamOutlined className="text-5xl text-yellow-500" />,
-      path: '/admin-dat/grupos',
+      path: '/dat/admin/grupos',
       status: 'Disponível',
     },
     {
@@ -63,7 +63,7 @@ export default function AdminDATHomePage(): JSX.Element {
       title: 'Projetos',
       description: 'CRUD de projetos, fluxo (SUPER/NAO_SUPER) e municípios',
       icon: <ProjectOutlined className="text-5xl text-purple-600" />,
-      path: '/admin-dat/projetos',
+      path: '/dat/admin/projetos',
       status: 'Disponível',
     },
     {
@@ -71,7 +71,7 @@ export default function AdminDATHomePage(): JSX.Element {
       title: 'Configurações',
       description: 'Configurações do sistema (disponibilidade, GCal, sessões, features)',
       icon: <SettingOutlined className="text-5xl text-cyan-500" />,
-      path: '/admin-dat/configuracoes',
+      path: '/dat/admin/configuracoes',
       status: 'Disponível',
     },
   ];

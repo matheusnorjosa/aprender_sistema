@@ -1,10 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const authFile = join(__dirname, 'e2e/.auth/user.json');
+const isDocker = process.env.E2E_DOCKER === '1' || existsSync('/.dockerenv');
+const defaultBaseURL = process.env.SKIP_WEBSERVER && isDocker ? 'http://frontend:5173' : 'http://localhost:5173';
+const baseURL = process.env.BASE_URL || defaultBaseURL;
+const proxyTarget = process.env.PROXY_TARGET || (isDocker ? 'http://web:8000' : 'http://localhost:8002');
 
 export default defineConfig({
   testDir: './e2e',
@@ -15,7 +20,7 @@ export default defineConfig({
   reporter: 'list',
   timeout: 30000,
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -44,9 +49,15 @@ export default defineConfig({
       // Sem dependência de setup - não precisa de auth
     },
   ],
-  webServer: {
+  webServer: process.env.SKIP_WEBSERVER ? undefined : {
     command: 'npm run dev',
-    url: 'http://localhost:5173',
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
+    env: {
+      ...process.env,
+      PROXY_TARGET: proxyTarget,
+      // For E2E, force relative API base to use Vite proxy (avoid localhost:8002 in Docker)
+      VITE_API_URL: '/api',
+    },
   },
 });

@@ -122,6 +122,8 @@ services:
     restart: unless-stopped
     volumes:
       - ../data/csv-import:/app/data/csv-import:ro
+      - backup_data:/backups # MP5: Database backups storage (C-05)
+      - ./scripts:/app/infra/scripts:ro # MP5: Backup scripts (C-05)
     healthcheck:
       test:
         [
@@ -155,6 +157,8 @@ services:
     restart: unless-stopped
     volumes:
       - ../data/csv-import:/app/data/csv-import:ro
+      - backup_data:/backups # MP5: Database backups storage (C-05)
+      - ./scripts:/app/infra/scripts:ro # MP5: Backup scripts (C-05)
     healthcheck:
       test:
         [

@@ -123,9 +123,7 @@ class TestAvailabilityBlockIDOR:
     # Tests for regular users (should be blocked)
     # =========================================================================
 
-    def test_usuario_comum_cannot_update_other_users_block(
-        self, api_client, usuario_comum, bloqueio_outro_usuario
-    ):
+    def test_usuario_comum_cannot_update_other_users_block(self, api_client, usuario_comum, bloqueio_outro_usuario):
         """
         C-03: Regular user should NOT be able to update another user's block.
         """
@@ -140,17 +138,13 @@ class TestAvailabilityBlockIDOR:
         assert response.status_code == 403
         assert "permissão" in response.data["detail"].lower()
 
-    def test_usuario_comum_cannot_delete_other_users_block(
-        self, api_client, usuario_comum, bloqueio_outro_usuario
-    ):
+    def test_usuario_comum_cannot_delete_other_users_block(self, api_client, usuario_comum, bloqueio_outro_usuario):
         """
         C-03: Regular user should NOT be able to delete another user's block.
         """
         api_client.force_authenticate(usuario_comum)
 
-        response = api_client.delete(
-            f"/api/disponibilidade/{bloqueio_outro_usuario.id}/"
-        )
+        response = api_client.delete(f"/api/disponibilidade/{bloqueio_outro_usuario.id}/")
 
         assert response.status_code == 403
         assert "permissão" in response.data["detail"].lower()
@@ -209,9 +203,7 @@ class TestAvailabilityBlockIDOR:
     # Tests for privileged users (should be allowed)
     # =========================================================================
 
-    def test_controle_can_update_other_users_block(
-        self, api_client, usuario_controle, bloqueio_outro_usuario
-    ):
+    def test_controle_can_update_other_users_block(self, api_client, usuario_controle, bloqueio_outro_usuario):
         """
         C-03: Controle CAN update another user's block.
         """
@@ -227,9 +219,7 @@ class TestAvailabilityBlockIDOR:
         bloqueio_outro_usuario.refresh_from_db()
         assert bloqueio_outro_usuario.motivo == "Atualizado pelo Controle"
 
-    def test_controle_can_delete_other_users_block(
-        self, api_client, usuario_controle, bloqueio_outro_usuario
-    ):
+    def test_controle_can_delete_other_users_block(self, api_client, usuario_controle, bloqueio_outro_usuario):
         """
         C-03: Controle CAN delete another user's block.
         """
@@ -241,9 +231,7 @@ class TestAvailabilityBlockIDOR:
         assert response.status_code == 204
         assert not AvailabilityBlock.objects.filter(id=block_id).exists()
 
-    def test_superintendencia_can_update_other_users_block(
-        self, api_client, usuario_super, bloqueio_outro_usuario
-    ):
+    def test_superintendencia_can_update_other_users_block(self, api_client, usuario_super, bloqueio_outro_usuario):
         """
         C-03: Superintendência CAN update another user's block.
         """
@@ -257,9 +245,7 @@ class TestAvailabilityBlockIDOR:
 
         assert response.status_code == 200
 
-    def test_superuser_can_update_other_users_block(
-        self, api_client, superuser, bloqueio_outro_usuario
-    ):
+    def test_superuser_can_update_other_users_block(self, api_client, superuser, bloqueio_outro_usuario):
         """
         C-03: Superuser CAN update any block.
         """
@@ -273,9 +259,7 @@ class TestAvailabilityBlockIDOR:
 
         assert response.status_code == 200
 
-    def test_superuser_can_delete_other_users_block(
-        self, api_client, superuser, bloqueio_outro_usuario
-    ):
+    def test_superuser_can_delete_other_users_block(self, api_client, superuser, bloqueio_outro_usuario):
         """
         C-03: Superuser CAN delete any block.
         """

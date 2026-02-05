@@ -4,6 +4,8 @@ Tests for database backup tasks.
 Refs: Issue #562 (C-05), Issue #563 (C-06), MP5
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false, reportFunctionMemberAccess=false
+
 from __future__ import annotations
 
 import os
@@ -60,9 +62,7 @@ exit 1
             with pytest.raises(FileNotFoundError, match="Backup script not found"):
                 perform_database_backup.__wrapped__(task, "full")
 
-    def test_backup_passes_correct_environment_variables(
-        self, mock_script_exists: Path
-    ) -> None:
+    def test_backup_passes_correct_environment_variables(self, mock_script_exists: Path) -> None:
         """Test that backup task passes correct environment variables to script."""
         captured_env: dict[str, str] = {}
 
@@ -95,9 +95,7 @@ exit 1
             assert "BACKUP_DIR" in captured_env
             assert "BACKUP_RETENTION_DAYS" in captured_env
 
-    def test_backup_uses_settings_for_db_connection(
-        self, mock_script_exists: Path
-    ) -> None:
+    def test_backup_uses_settings_for_db_connection(self, mock_script_exists: Path) -> None:
         """Test that backup task uses Django settings for database connection."""
         captured_env: dict[str, str] = {}
 
@@ -122,9 +120,7 @@ exit 1
 
             # Verify values match Django settings
             assert captured_env["DB_HOST"] == settings.DATABASES["default"]["HOST"]
-            assert captured_env["DB_PORT"] == str(
-                settings.DATABASES["default"]["PORT"]
-            )
+            assert captured_env["DB_PORT"] == str(settings.DATABASES["default"]["PORT"])
             assert captured_env["DB_USER"] == settings.DATABASES["default"]["USER"]
             assert captured_env["DB_NAME"] == settings.DATABASES["default"]["NAME"]
 
@@ -140,9 +136,7 @@ class TestVerifyBackupHealth:
             assert result["status"] == "degraded"
             assert "No backups found" in str(result["warnings"])
 
-    def test_health_check_with_recent_backup_returns_healthy(
-        self, tmp_path: Path
-    ) -> None:
+    def test_health_check_with_recent_backup_returns_healthy(self, tmp_path: Path) -> None:
         """Test that health check returns healthy when recent backup exists."""
         # Create a recent backup file
         backup_file = tmp_path / "backup_full_20260205_120000.sql.gz"
@@ -154,9 +148,7 @@ class TestVerifyBackupHealth:
             assert result["status"] == "healthy"
             assert result["checks_passed"] >= 2  # dir writable + recent backup
 
-    def test_health_check_with_old_backup_returns_warning(
-        self, tmp_path: Path
-    ) -> None:
+    def test_health_check_with_old_backup_returns_warning(self, tmp_path: Path) -> None:
         """Test that health check warns when backup is too old."""
         # Create an old backup file (modify mtime to simulate old backup)
         backup_file = tmp_path / "backup_full_20260101_120000.sql.gz"
@@ -180,9 +172,7 @@ class TestVerifyBackupHealth:
             assert result["status"] == "degraded"
             assert any("does not exist" in w for w in result["warnings"])
 
-    def test_health_check_glob_pattern_matches_expected_naming(
-        self, tmp_path: Path
-    ) -> None:
+    def test_health_check_glob_pattern_matches_expected_naming(self, tmp_path: Path) -> None:
         """Test that health check looks for backup_full_*.sql.gz pattern."""
         # Create a backup with wrong naming (should not be found)
         wrong_name = tmp_path / "aprender_db_20260205_120000.sql.gz"

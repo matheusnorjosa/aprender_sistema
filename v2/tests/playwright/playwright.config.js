@@ -8,6 +8,14 @@
  */
 
 import { defineConfig, devices } from '@playwright/test';
+import { existsSync } from 'fs';
+
+const isDocker = process.env.E2E_DOCKER === '1' || existsSync('/.dockerenv');
+const defaultBaseURL = process.env.SKIP_WEBSERVER
+  ? (isDocker ? 'http://frontend:5173' : 'http://localhost:5173')
+  : 'http://localhost:5173';
+const baseURL = process.env.BASE_URL || defaultBaseURL;
+const proxyTarget = process.env.PROXY_TARGET || (isDocker ? 'http://web:8000' : 'http://localhost:8002');
 
 /**
  * See https://playwright.dev/docs/test-configuration
@@ -29,7 +37,7 @@ export default defineConfig({
 
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
-    ['html', { outputFolder: './test-results/html' }],
+    ['html', { outputFolder: './playwright-report', open: 'never' }],
     ['list'],
     ['json', { outputFile: './test-results/results.json' }],
   ],
@@ -37,7 +45,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.BASE_URL || 'http://localhost:5173',
+    baseURL,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -76,11 +84,17 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: process.env.SKIP_WEBSERVER ? undefined : {
     command: 'cd ../../frontend && npm run dev',
-    url: 'http://localhost:5173',
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120000, // 2 minutes for npm run dev to start
     stdout: 'pipe',
     stderr: 'pipe',
+    env: {
+      ...process.env,
+      PROXY_TARGET: proxyTarget,
+      // For E2E, force relative API base to use Vite proxy (avoid localhost:8002 in Docker)
+      VITE_API_URL: '/api',
+    },
   },
 
   /* Global timeout for each test */

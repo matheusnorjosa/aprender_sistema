@@ -12,7 +12,7 @@ Colunas esperadas:
 - observacao (opcional): texto livre
 """
 
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
 

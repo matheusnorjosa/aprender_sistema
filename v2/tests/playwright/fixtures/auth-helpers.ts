@@ -33,11 +33,11 @@ export async function loginAs(page: Page, username: string, password: string): P
   const submitButton = page.locator('button[type="submit"], button:has-text("Entrar")').first();
   await submitButton.click();
 
-  // Validar sucesso: aguardar navegação ou elemento da home
-  await page.waitForURL(/\/(home|disponibilidade|admin-dat)/, { timeout: 15000 });
+  // Validar sucesso: aguardar elementos de layout pós-login (sidebar/nav)
+  await expect(page.locator('nav[role="navigation"], .ant-layout-sider').first()).toBeVisible({ timeout: 15000 });
 
   // Validar que logo/header do sistema está visível
-  await expect(page.locator('text=AS v2, text=Aprender Sistema')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('text=Aprender Sistema')).toBeVisible({ timeout: 5000 });
 
   console.log(`✅ Login bem-sucedido: ${username}`);
 }

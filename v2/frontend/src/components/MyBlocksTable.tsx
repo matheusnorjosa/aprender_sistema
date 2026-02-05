@@ -124,8 +124,8 @@ export default function MyBlocksTable({ blocks, onDelete, loading }: MyBlocksTab
       fixed: 'right',
       width: 100,
       render: (_, record) => {
-        // Apenas bloqueios pendentes podem ser excluídos
-        const canDelete = record.status === 'pendente';
+        // Bloqueios são auto-aprovados; usuário pode excluir os próprios bloqueios
+        const canDelete = true;
 
         if (!canDelete) {
           return (

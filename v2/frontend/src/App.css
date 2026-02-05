@@ -7,6 +7,24 @@
   padding: 0;
 }
 
+/* Skip link (acessibilidade) */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translateY(-120%);
+  background: #000000;
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 0 0 4px 0;
+  z-index: 10000;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 /* Fix: Links dentro do Menu dark - tema escuro (branco) */
 html.dark .ant-menu-dark .ant-menu-item a,
 html.dark .ant-menu-dark .ant-menu-submenu-title a {
@@ -384,4 +402,94 @@ html.dark .ant-alert-error {
 
 html.dark .ant-alert-success {
   background-color: rgba(82, 196, 26, 0.15);
+}
+
+/* ============================================
+   RESPONSIVIDADE MOBILE
+   ============================================ */
+
+/* Mobile sidebar styles */
+.mobile-sidebar-open {
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Header adjustments for mobile */
+@media screen and (max-width: 768px) {
+  /* Header: ajustar padding e espaçamento */
+  .ant-layout-header {
+    padding: 0 12px !important;
+  }
+
+  /* Esconder texto do nome do usuário em telas muito pequenas */
+  .ant-layout-header .ant-typography {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Botão de logout: apenas ícone em mobile */
+  .ant-layout-header .ant-btn-dangerous {
+    padding: 4px 8px;
+  }
+
+  /* Cards: padding menor */
+  .ant-card-body {
+    padding: 12px !important;
+  }
+
+  /* Tabelas: scroll horizontal */
+  .ant-table-wrapper {
+    overflow-x: auto;
+  }
+
+  /* Forms: campos em coluna */
+  .ant-form-item {
+    margin-bottom: 12px;
+  }
+
+  /* Typography: ajustar tamanhos */
+  .ant-typography h1,
+  h1.ant-typography {
+    font-size: 24px !important;
+  }
+
+  .ant-typography h2,
+  h2.ant-typography {
+    font-size: 20px !important;
+  }
+
+  /* Row/Col: espaçamento menor */
+  .ant-row {
+    margin-left: -8px !important;
+    margin-right: -8px !important;
+  }
+
+  .ant-col {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  /* Sidebar title: menor em mobile */
+  .ant-layout-sider header[role="banner"] {
+    font-size: 18px !important;
+  }
+}
+
+/* Esconder popups de submenu quando sidebar está colapsado em mobile */
+@media screen and (max-width: 768px) {
+  .ant-menu-submenu-popup {
+    display: none !important;
+  }
+}
+
+/* Telas muito pequenas (< 480px) */
+@media screen and (max-width: 480px) {
+  .ant-layout-header .ant-typography {
+    display: none !important;
+  }
+
+  /* Apenas ícone do usuário */
+  .ant-layout-header .anticon-user {
+    font-size: 18px;
+  }
 }

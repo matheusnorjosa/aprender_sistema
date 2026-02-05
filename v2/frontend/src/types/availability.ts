@@ -4,16 +4,14 @@
  * Business rules: RD-01 to RD-08 (Availability Rules)
  */
 
-import type { ID, ISODateTime, ISODate } from './common';
+import type { ID, ISODateTime } from './common';
 
 /**
  * Availability block type
  * T = Total block (full day unavailable)
  * P = Partial block (time range unavailable)
- * D = Deslocamento (travel time buffer)
- * M = Maximum hours reached
  */
-export type BlockType = 'T' | 'P' | 'D' | 'M';
+export type BlockType = 'T' | 'P';
 
 /**
  * Availability block status
@@ -29,9 +27,8 @@ export interface AvailabilityBlock {
   usuario_username?: string;
   usuario_nome?: string;
   tipo: BlockType;
-  data: ISODate;
-  hora_inicio: string | null;
-  hora_fim: string | null;
+  inicio: ISODateTime;
+  fim: ISODateTime;
   motivo: string | null;
   status: BlockStatus;
   created_at: ISODateTime;
@@ -43,9 +40,8 @@ export interface AvailabilityBlock {
  */
 export interface AvailabilityBlockPayload {
   tipo: BlockType;
-  data: string;
-  hora_inicio?: string;
-  hora_fim?: string;
+  inicio: string;
+  fim: string;
   motivo?: string;
 }
 
@@ -53,10 +49,9 @@ export interface AvailabilityBlockPayload {
  * Availability check request
  */
 export interface AvailabilityCheckRequest {
-  formador_id: ID;
-  data: string;
-  hora_inicio: string;
-  hora_fim: string;
+  usuario_id: ID;
+  inicio: string;
+  fim: string;
   municipio_id?: ID;
 }
 
@@ -64,48 +59,38 @@ export interface AvailabilityCheckRequest {
  * Conflict detail in availability check response
  */
 export interface ConflictDetail {
-  tipo: BlockType | 'CONFLITO';
-  descricao: string;
-  evento?: string;
-  horario?: string;
+  code: 'X' | 'T' | 'P' | 'D' | 'M';
+  title: string;
+  detail: string;
+  ref_id?: ID | null;
 }
 
 /**
  * Availability check response
  */
 export interface AvailabilityCheckResponse {
-  disponivel: boolean;
-  conflitos: ConflictDetail[];
-  mensagem?: string;
+  ok: boolean;
+  conflicts: ConflictDetail[];
 }
 
 /**
- * Monthly grid cell data
+ * Monthly availability grid response
  */
-export interface MonthlyGridCell {
-  data: ISODate;
-  bloqueios: AvailabilityBlock[];
-  eventos: Array<{
-    id: ID;
-    titulo: string;
-    inicio: string;
-    fim: string;
-    status: string;
-  }>;
-  horas_usadas: number;
-  horas_limite: number;
+export type AvailabilityCode = 'E' | '2' | 'P' | 'T' | 'X' | 'D' | 'D1' | '';
+
+export interface MonthlyGridPerson {
+  id: ID;
+  name: string;
+  email?: string;
+  ch_month?: number;
+  ch_year?: number;
+  position_month?: number;
 }
 
-/**
- * Monthly grid response
- */
 export interface MonthlyGridResponse {
-  formador: {
-    id: ID;
-    nome: string;
-    username: string;
-  };
-  mes: string;
-  ano: number;
-  dias: MonthlyGridCell[];
+  days: number[];
+  legend: Record<string, string>;
+  people: MonthlyGridPerson[];
+  cells: AvailabilityCode[][];
+  details_index: Record<string, unknown>;
 }

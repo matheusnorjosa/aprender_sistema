@@ -12,8 +12,9 @@ import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from django.conf import settings
+
+import pytest
 
 from apps.core.tasks_backup import perform_database_backup, verify_backup_health
 

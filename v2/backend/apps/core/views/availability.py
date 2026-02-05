@@ -47,10 +47,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         Security (C-03): Define who can edit/delete blocks of other users.
         """
         user = self.request.user
-        return (
-            user.is_superuser
-            or user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
-        )
+        return user.is_superuser or user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
 
     def get_queryset(self) -> QuerySet:
         """

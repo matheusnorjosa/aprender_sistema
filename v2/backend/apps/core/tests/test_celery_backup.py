@@ -25,14 +25,12 @@ class TestPerformDatabaseBackup:
     def mock_script_exists(self, tmp_path: Path) -> Path:
         """Create a mock backup script that succeeds."""
         script = tmp_path / "backup_db.sh"
-        script.write_text(
-            """#!/bin/bash
+        script.write_text("""#!/bin/bash
 echo "[$(date)] Starting backup..."
 echo "[$(date)] backup_full_20260205_120000.sql.gz (/backups/backup_full_20260205_120000.sql.gz)"
 echo "[$(date)] Backup complete."
 exit 0
-"""
-        )
+""")
         script.chmod(0o755)
         return script
 
@@ -40,12 +38,10 @@ exit 0
     def mock_script_fails(self, tmp_path: Path) -> Path:
         """Create a mock backup script that fails."""
         script = tmp_path / "backup_db.sh"
-        script.write_text(
-            """#!/bin/bash
+        script.write_text("""#!/bin/bash
 echo "[$(date)] ERROR: Backup failed!"
 exit 1
-"""
-        )
+""")
         script.chmod(0o755)
         return script
 

@@ -306,7 +306,7 @@ class TestProdutosImportService:
 
     def test_resolve_projeto_by_codigo(self, db, projeto_acerta):
         """Resolve projeto por codigo."""
-        content = f"""codigo,nome,projeto
+        content = """codigo,nome,projeto
 PROD-ACERTA,Kit ACERTA,ACERTA
 """
         temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")

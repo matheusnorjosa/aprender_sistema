@@ -47,8 +47,6 @@ def dat_user(db):
     return user
 
 
-
-
 @pytest.fixture
 def formador_user(db):
     """Usuario do grupo Formador (sem permissao de import)."""

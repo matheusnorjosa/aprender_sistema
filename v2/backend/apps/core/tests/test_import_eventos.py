@@ -272,6 +272,7 @@ class TestEventosImportService:
 
         # Verificar status
         solicitacao = Solicitacao.objects.first()
+        assert solicitacao is not None
         assert solicitacao.status == "aprovado"
 
     def test_invalid_municipio_adds_pendencia(self, sample_csv_invalid_municipio):

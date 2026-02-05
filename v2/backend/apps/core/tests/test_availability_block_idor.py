@@ -126,28 +126,39 @@ class TestAvailabilityBlockIDOR:
     def test_usuario_comum_cannot_update_other_users_block(self, api_client, usuario_comum, bloqueio_outro_usuario):
         """
         C-03: Regular user should NOT be able to update another user's block.
+
+        Note: Returns 404 (not 403) because get_queryset() filters to only show
+        user's own blocks. This is more secure as it doesn't reveal object existence.
         """
         api_client.force_authenticate(usuario_comum)
 
         response = api_client.patch(
-            f"/api/disponibilidade/{bloqueio_outro_usuario.id}/",
+            f"/api/availability-blocks/{bloqueio_outro_usuario.id}/",
             {"motivo": "Tentativa de alteração maliciosa"},
             format="json",
         )
 
-        assert response.status_code == 403
-        assert "permissão" in response.data["detail"].lower()
+        # 404 - block not visible in user's queryset (more secure than 403)
+        assert response.status_code == 404
+
+        # Verify block still exists unchanged
+        assert AvailabilityBlock.objects.filter(id=bloqueio_outro_usuario.id).exists()
+        bloqueio_outro_usuario.refresh_from_db()
+        assert bloqueio_outro_usuario.motivo == "Bloqueio de outro usuário"
 
     def test_usuario_comum_cannot_delete_other_users_block(self, api_client, usuario_comum, bloqueio_outro_usuario):
         """
         C-03: Regular user should NOT be able to delete another user's block.
+
+        Note: Returns 404 (not 403) because get_queryset() filters to only show
+        user's own blocks. This is more secure as it doesn't reveal object existence.
         """
         api_client.force_authenticate(usuario_comum)
 
-        response = api_client.delete(f"/api/disponibilidade/{bloqueio_outro_usuario.id}/")
+        response = api_client.delete(f"/api/availability-blocks/{bloqueio_outro_usuario.id}/")
 
-        assert response.status_code == 403
-        assert "permissão" in response.data["detail"].lower()
+        # 404 - block not visible in user's queryset (more secure than 403)
+        assert response.status_code == 404
 
         # Verify block still exists
         assert AvailabilityBlock.objects.filter(id=bloqueio_outro_usuario.id).exists()
@@ -169,7 +180,7 @@ class TestAvailabilityBlockIDOR:
         api_client.force_authenticate(usuario_comum)
 
         response = api_client.patch(
-            f"/api/disponibilidade/{meu_bloqueio.id}/",
+            f"/api/availability-blocks/{meu_bloqueio.id}/",
             {"motivo": "Motivo atualizado"},
             format="json",
         )
@@ -194,7 +205,7 @@ class TestAvailabilityBlockIDOR:
 
         api_client.force_authenticate(usuario_comum)
 
-        response = api_client.delete(f"/api/disponibilidade/{block_id}/")
+        response = api_client.delete(f"/api/availability-blocks/{block_id}/")
 
         assert response.status_code == 204
         assert not AvailabilityBlock.objects.filter(id=block_id).exists()
@@ -210,7 +221,7 @@ class TestAvailabilityBlockIDOR:
         api_client.force_authenticate(usuario_controle)
 
         response = api_client.patch(
-            f"/api/disponibilidade/{bloqueio_outro_usuario.id}/",
+            f"/api/availability-blocks/{bloqueio_outro_usuario.id}/",
             {"motivo": "Atualizado pelo Controle"},
             format="json",
         )
@@ -226,7 +237,7 @@ class TestAvailabilityBlockIDOR:
         block_id = bloqueio_outro_usuario.id
         api_client.force_authenticate(usuario_controle)
 
-        response = api_client.delete(f"/api/disponibilidade/{block_id}/")
+        response = api_client.delete(f"/api/availability-blocks/{block_id}/")
 
         assert response.status_code == 204
         assert not AvailabilityBlock.objects.filter(id=block_id).exists()
@@ -238,7 +249,7 @@ class TestAvailabilityBlockIDOR:
         api_client.force_authenticate(usuario_super)
 
         response = api_client.patch(
-            f"/api/disponibilidade/{bloqueio_outro_usuario.id}/",
+            f"/api/availability-blocks/{bloqueio_outro_usuario.id}/",
             {"motivo": "Atualizado pela Superintendência"},
             format="json",
         )
@@ -252,7 +263,7 @@ class TestAvailabilityBlockIDOR:
         api_client.force_authenticate(superuser)
 
         response = api_client.patch(
-            f"/api/disponibilidade/{bloqueio_outro_usuario.id}/",
+            f"/api/availability-blocks/{bloqueio_outro_usuario.id}/",
             {"motivo": "Atualizado pelo admin"},
             format="json",
         )
@@ -266,7 +277,7 @@ class TestAvailabilityBlockIDOR:
         block_id = bloqueio_outro_usuario.id
         api_client.force_authenticate(superuser)
 
-        response = api_client.delete(f"/api/disponibilidade/{block_id}/")
+        response = api_client.delete(f"/api/availability-blocks/{block_id}/")
 
         assert response.status_code == 204
         assert not AvailabilityBlock.objects.filter(id=block_id).exists()

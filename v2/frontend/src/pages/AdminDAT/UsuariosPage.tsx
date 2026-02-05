@@ -9,15 +9,50 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Select, Divider } from 'antd';
+import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Select, Divider, Radio } from 'antd';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 import type { FilterValue, SorterResult } from 'antd/es/table/interface';
+import type { RadioChangeEvent } from 'antd/es/radio';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { listUsers, createUser, updateUser, deleteUser, listGroups } from '../../api/adminDAT';
+import { importUsuarios } from '../../api/ops';
+import type { ImportResult } from '../../api/ops';
+import ImportUploader from '../../components/ImportUploader';
+import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
 import logger from '../../utils/logger';
 import { PAGE_SIZES } from '../../constants';
 import type { ID } from '../../types';
+
+/** View mode type */
+type ViewMode = 'lista' | 'importar';
+
+/**
+ * Helper to convert ImportResult to ValidationResult format
+ */
+function toValidationResult(result: ImportResult): ValidationResult {
+  return {
+    stats: {
+      created: result.created,
+      updated: result.updated,
+      unchanged: result.skipped,
+    },
+    errors: result.errors.map((e) => `Linha ${e.row}: ${e.message}`),
+  };
+}
+
+/**
+ * Helper to convert ImportResult to ApplyResult format
+ */
+function toApplyResult(result: ImportResult): ApplyResult {
+  return {
+    stats: {
+      created: result.created,
+      updated: result.updated,
+      unchanged: result.skipped,
+    },
+  };
+}
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -96,6 +131,7 @@ export default function UsuariosPage(): JSX.Element {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [grupos, setGrupos] = useState<GroupRecord[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('lista');
 
   const [form] = Form.useForm<UserFormValues>();
 
@@ -365,41 +401,68 @@ export default function UsuariosPage(): JSX.Element {
       <Card>
         <header className="flex justify-between items-center mb-4">
           <Title level={3} className="m-0" id="usuarios-title">
-            Usuários ({pagination.total})
+            {viewMode === 'lista'
+              ? `Usuários (${pagination.total})`
+              : 'Importar Usuários'}
           </Title>
-          <Space>
-            <Search
-              placeholder="Buscar por username, email, nome, CPF"
-              allowClear
-              style={{ width: 300 }}
-              onSearch={(value) => setSearchText(value)}
-              onChange={(e) => {
-                if (!e.target.value) setSearchText('');
-              }}
-            />
-            <Button icon={<ReloadOutlined />} onClick={() => fetchUsuarios()} loading={loading}>
-              Atualizar
-            </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              Novo Usuário
-            </Button>
-          </Space>
+          <Radio.Group
+            value={viewMode}
+            onChange={(e: RadioChangeEvent) => setViewMode(e.target.value)}
+            buttonStyle="solid"
+          >
+            <Radio.Button value="lista">Lista</Radio.Button>
+            <Radio.Button value="importar">Importar</Radio.Button>
+          </Radio.Group>
+          {viewMode === 'lista' && (
+            <Space>
+              <Search
+                placeholder="Buscar por username, email, nome, CPF"
+                allowClear
+                style={{ width: 300 }}
+                onSearch={(value) => setSearchText(value)}
+                onChange={(e) => {
+                  if (!e.target.value) setSearchText('');
+                }}
+              />
+              <Button icon={<ReloadOutlined />} onClick={() => fetchUsuarios()} loading={loading}>
+                Atualizar
+              </Button>
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                Novo Usuário
+              </Button>
+            </Space>
+          )}
         </header>
 
-        {/* Tabela */}
-        <Table
-          columns={columns}
-          dataSource={usuarios}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            ...pagination,
-            showSizeChanger: true,
-            showTotal: (total) => `Total: ${total} usuários`,
-          }}
-          onChange={handleTableChange}
-          scroll={{ x: 1200 }}
-        />
+        {viewMode === 'lista' ? (
+          /* Tabela */
+          <Table
+            columns={columns}
+            dataSource={usuarios}
+            rowKey="id"
+            loading={loading}
+            pagination={{
+              ...pagination,
+              showSizeChanger: true,
+              showTotal: (total) => `Total: ${total} usuários`,
+            }}
+            onChange={handleTableChange}
+            scroll={{ x: 1200 }}
+          />
+        ) : (
+          /* Importação */
+          <ImportUploader
+            label="Importar Usuários de CSV/XLSX"
+            description="Colunas obrigatórias: cpf, nome. Opcionais: email, telefone, cargo, grupos (separados por vírgula). O CPF é a chave de idempotência."
+            onDryRun={async (file: File) => toValidationResult(await importUsuarios(file, true) as unknown as ImportResult)}
+            onApply={async (file: File) => {
+              const result = await importUsuarios(file, false);
+              // Recarregar lista após importação
+              fetchUsuarios();
+              return toApplyResult(result as unknown as ImportResult);
+            }}
+          />
+        )}
       </Card>
 
       {/* Modal Criar/Editar Usuário */}

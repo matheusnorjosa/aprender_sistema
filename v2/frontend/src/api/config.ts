@@ -194,10 +194,13 @@ export async function fetchAPI<T = unknown>(url: string, options: FetchOptions =
       clearCsrfCache();
     }
 
-    logger.error('=== fetchAPI ERROR ===');
-    logger.error('Status:', response.status);
-    logger.error('StatusText:', response.statusText);
-    logger.error('Response body:', errorBody);
+    const isAuthError = response.status === 401 || response.status === 403;
+    const log = isAuthError ? logger.warn : logger.error;
+
+    log('=== fetchAPI ERROR ===');
+    log('Status:', response.status);
+    log('StatusText:', response.statusText);
+    log('Response body:', errorBody);
 
     let error: { detail?: string; message?: string };
     try {
@@ -206,7 +209,9 @@ export async function fetchAPI<T = unknown>(url: string, options: FetchOptions =
       error = { detail: `HTTP ${response.status}: ${response.statusText}` };
     }
 
-    throw new Error(error.detail || error.message || `Erro ${response.status}`);
+    const err = new Error(error.detail || error.message || `Erro ${response.status}`) as Error & { status?: number };
+    err.status = response.status;
+    throw err;
   }
 
   return response.json();

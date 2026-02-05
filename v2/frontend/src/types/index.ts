@@ -70,7 +70,6 @@ export type {
   AvailabilityCheckRequest,
   ConflictDetail,
   AvailabilityCheckResponse,
-  MonthlyGridCell,
   MonthlyGridResponse,
 } from './availability';
 

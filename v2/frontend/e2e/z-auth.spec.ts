@@ -6,10 +6,10 @@
 
 import { test, expect } from '@playwright/test';
 
-// Credenciais de teste
+// Credenciais de teste (usuários E2E)
 const ADMIN_USER = {
-  username: 'admin',
-  password: 'admin123',
+  username: 'coord_e2e@test.com',
+  password: 'testpass123',
 };
 
 test.describe('Fluxo de Autenticação', () => {
@@ -20,8 +20,8 @@ test.describe('Fluxo de Autenticação', () => {
     test('1. Página de login carrega corretamente', async ({ page }) => {
       await page.goto('/');
 
-      // Deve mostrar formulário de login
-      await expect(page.locator('h2:has-text("Login")')).toBeVisible();
+      // Deve mostrar formulário de login (h1, não h2)
+      await expect(page.locator('h1:has-text("Login")')).toBeVisible();
       await expect(page.locator('input[id="login_username"]')).toBeVisible();
       await expect(page.locator('input[id="login_password"]')).toBeVisible();
       await expect(page.locator('button[type="submit"]')).toBeVisible();
@@ -68,8 +68,8 @@ test.describe('Fluxo de Autenticação', () => {
       // Clicar no botão de logout
       await page.click('button:has-text("Sair")');
 
-      // Deve voltar para tela de login
-      await expect(page.locator('h2:has-text("Login")')).toBeVisible({ timeout: 10000 });
+      // Deve voltar para tela de login (h1, não h2)
+      await expect(page.locator('h1:has-text("Login")')).toBeVisible({ timeout: 10000 });
     });
   });
 });

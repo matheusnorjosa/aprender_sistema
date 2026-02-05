@@ -21,6 +21,8 @@ import {
   HomeOutlined,
   LogoutOutlined,
   SolutionOutlined,
+  MenuOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import { ThemeProvider, useTheme, useBrandColors } from './contexts/ThemeContext';
 import ptBR from 'antd/locale/pt_BR';
@@ -190,11 +192,12 @@ function useSelectedMenuKey(): string {
 interface SidebarMenuProps {
   openKeys: string[];
   onOpenChange: (keys: string[]) => void;
+  onItemClick?: () => void;
   children: React.ReactNode;
 }
 
 // Componente que usa useLocation para seleção dinâmica do menu
-function SidebarMenu({ openKeys, onOpenChange, children }: SidebarMenuProps): JSX.Element {
+function SidebarMenu({ openKeys, onOpenChange, onItemClick, children }: SidebarMenuProps): JSX.Element {
   const selectedKey = useSelectedMenuKey();
 
   // Auto-abrir submenu pai quando navegar diretamente para uma rota interna
@@ -212,6 +215,7 @@ function SidebarMenu({ openKeys, onOpenChange, children }: SidebarMenuProps): JS
       selectedKeys={[selectedKey]}
       openKeys={openKeys}
       onOpenChange={onOpenChange}
+      onClick={onItemClick}
       style={{ borderRight: 0 }}
     >
       {children}
@@ -248,8 +252,44 @@ function AppContent(): JSX.Element {
   // Issue #255: Ref para evitar memory leak (atualizações após unmount)
   const isMountedRef = useRef<boolean>(true);
 
+  // Mobile responsiveness: sidebar colapsável
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    return window.innerWidth < LAYOUT.MOBILE_BREAKPOINT;
+  });
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    return window.innerWidth < LAYOUT.MOBILE_BREAKPOINT;
+  });
+
+  // Detectar mudanças de tamanho da tela
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < LAYOUT.MOBILE_BREAKPOINT;
+      setIsMobile(mobile);
+      // Auto-colapsar em mobile, expandir em desktop
+      if (mobile) {
+        setSidebarCollapsed(true);
+      } else {
+        setSidebarCollapsed(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Controle de submenus (apenas um aberto por vez)
   const { openKeys, onOpenChange, closeAllSubmenus } = useMenuOpenKeys();
+
+  // Toggle do sidebar (para mobile)
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed(prev => {
+      // Se vai colapsar, fechar submenus também
+      if (!prev) {
+        closeAllSubmenus();
+      }
+      return !prev;
+    });
+  }, [closeAllSubmenus]);
 
   // Carregar dados do usuário - useCallback para poder passar como prop
   const loadUser = useCallback(async () => {
@@ -262,7 +302,10 @@ function AppContent(): JSX.Element {
       }
     } catch (error) {
       if (isMountedRef.current) {
-        logger.error('Erro ao carregar usuário:', error);
+        const status = (error as { status?: number }).status;
+        const isAuthError = status === 401 || status === 403;
+        const log = isAuthError ? logger.warn : logger.error;
+        log('Erro ao carregar usuário:', error);
         setUser(null);
       }
     } finally {
@@ -442,11 +485,33 @@ function AppContent(): JSX.Element {
         {/* Issue #416: Offline warning banner */}
         <OfflineBanner />
         <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
-          {/* Sider lateral fixo - role navigation para semantica HTML5 */}
+          {/* Overlay para fechar sidebar em mobile */}
+          {isMobile && !sidebarCollapsed && (
+            <div
+              className="mobile-sidebar-overlay"
+              onClick={toggleSidebar}
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.45)',
+                zIndex: 999,
+              }}
+            />
+          )}
+          {/* Sider lateral - colapsável em mobile */}
           <Sider
             width={LAYOUT.SIDEBAR_WIDTH}
+            collapsedWidth={isMobile ? 0 : LAYOUT.SIDEBAR_COLLAPSED_WIDTH}
+            collapsed={sidebarCollapsed}
+            collapsible
+            trigger={null}
             role="navigation"
             aria-label="Navegacao principal"
+            className={isMobile && !sidebarCollapsed ? 'mobile-sidebar-open' : ''}
             style={{
               overflow: 'auto',
               height: '100vh',
@@ -455,6 +520,8 @@ function AppContent(): JSX.Element {
               top: 0,
               bottom: 0,
               background: colors.sidebarBackground,
+              zIndex: isMobile ? 1000 : 1,
+              transition: 'all 0.2s ease',
             }}
           >
             {/* Logo/Título - header semântico para branding */}
@@ -472,9 +539,17 @@ function AppContent(): JSX.Element {
             </header>
 
             {/* Menu vertical - Ordem alfabética (exceto Página Inicial) */}
+            {/* Não renderizar menu quando colapsado em mobile para evitar popups */}
+            {!(isMobile && sidebarCollapsed) && (
             <SidebarMenu
               openKeys={openKeys}
               onOpenChange={onOpenChange}
+              onItemClick={() => {
+                if (isMobile) {
+                  setSidebarCollapsed(true);
+                  closeAllSubmenus(); // Fechar submenus também
+                }
+              }}
             >
               {/* 1. Página Inicial (sempre primeiro) */}
               <Menu.Item key="home" icon={<HomeOutlined />} onClick={closeAllSubmenus}>
@@ -591,13 +666,19 @@ function AppContent(): JSX.Element {
                 </SubMenu>
               )}
             </SidebarMenu>
+            )}
           </Sider>
 
           {/* Layout com margem para compensar Sider fixo */}
-          <Layout style={{ marginLeft: LAYOUT.SIDEBAR_WIDTH, minHeight: '100vh', background: colors.pageBackground }}>
+          <Layout style={{
+            marginLeft: isMobile ? 0 : (sidebarCollapsed ? LAYOUT.SIDEBAR_COLLAPSED_WIDTH : LAYOUT.SIDEBAR_WIDTH),
+            minHeight: '100vh',
+            background: colors.pageBackground,
+            transition: 'margin-left 0.2s ease',
+          }}>
             {/* Header com info do usuário - aria-label para acessibilidade */}
             <Header
-              className="flex items-center justify-end w-full"
+              className="flex items-center justify-between w-full"
               aria-label="Perfil do usuario e acoes"
               style={{
                 background: colors.cardBackground,
@@ -605,7 +686,21 @@ function AppContent(): JSX.Element {
                 borderBottom: `1px solid ${colors.borderDefault}`,
               }}
             >
-              <div className="flex items-center gap-4" style={{ whiteSpace: 'nowrap' }}>
+              {/* Botão hambúrguer para mobile */}
+              <Button
+                type="text"
+                icon={sidebarCollapsed ? <MenuOutlined /> : <CloseOutlined />}
+                onClick={toggleSidebar}
+                aria-label={sidebarCollapsed ? 'Abrir menu' : 'Fechar menu'}
+                className="mobile-menu-toggle"
+                style={{
+                  fontSize: '18px',
+                  display: isMobile ? 'flex' : 'none',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              />
+              <div className="flex items-center gap-4" style={{ whiteSpace: 'nowrap', marginLeft: 'auto' }}>
                 {/* Toggle de tema - ocultado temporariamente
                 <Tooltip title={isDark ? 'Modo claro' : 'Modo escuro'}>
                   <Button
@@ -633,6 +728,7 @@ function AppContent(): JSX.Element {
 
             {/* Conteúdo principal com Suspense para lazy loading - role main para semantica */}
             <Content
+              id="main"
               role="main"
               style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: colors.pageBackground }}
             >

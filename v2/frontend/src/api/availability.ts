@@ -11,6 +11,7 @@ import type {
   AvailabilityBlock,
   AvailabilityBlockPayload,
   AvailabilityCheckResponse,
+  MonthlyGridResponse,
   Gerencia,
 } from '../types';
 
@@ -42,17 +43,6 @@ export interface MonthlyAvailabilityParams {
   sector?: string;
   q?: string;
   gerencia_id?: number | null;
-}
-
-/**
- * Monthly grid response
- */
-export interface MonthlyGridResponse {
-  days: string[];
-  legend: Record<string, string>;
-  people: Array<{ id: ID; nome: string; email: string }>;
-  cells: Record<string, Record<string, string>>;
-  details_index: Record<string, unknown>;
 }
 
 /**
@@ -99,8 +89,6 @@ export async function createBlock(data: AvailabilityBlockPayload): Promise<Avail
 
 /**
  * Remove bloqueio de disponibilidade.
- *
- * Apenas bloqueios com status='pendente' podem ser removidos.
  *
  * @param id - ID do bloqueio
  */

@@ -229,7 +229,7 @@ make seed-e2e
 ## 📊 Relatórios
 
 Playwright gera relatórios automáticos em:
-- **HTML Report**: `v2/tests/playwright/test-results/html/index.html`
+- **HTML Report**: `v2/tests/playwright/playwright-report/index.html`
 - **JSON Report**: `v2/tests/playwright/test-results/results.json`
 
 **Ver relatório**:

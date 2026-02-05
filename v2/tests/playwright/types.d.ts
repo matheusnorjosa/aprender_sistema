@@ -65,6 +65,8 @@ export interface Solicitacao {
   formadores: number[]; // M2M
 
   // Campos Google Calendar
+  external_event_id?: string | null;
+  gcal_status?: string | null;
   gcal_event_id?: string | null;
   gcal_payload_hash?: string | null;
   meet_link?: string | null;

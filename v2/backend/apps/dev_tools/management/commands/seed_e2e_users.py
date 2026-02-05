@@ -47,7 +47,7 @@ class Command(BaseCommand):
             # 1. Criar grupos
             self.stdout.write("\n1. Criando grupos necessários...")
             grupos = {}
-            for nome_grupo in ["Coordenador", "Superintendência", "Controle"]:
+            for nome_grupo in ["Coordenador", "Superintendência", "Controle", "Formador", "Gerente"]:
                 grupo, created = Group.objects.get_or_create(name=nome_grupo)
                 grupos[nome_grupo] = grupo
                 status = "✅ Criado" if created else "⏭️  Já existe"
@@ -102,7 +102,7 @@ class Command(BaseCommand):
                 "last_name": "E2E",
                 "cpf": "00000000002",
                 "password": "testpass123",
-                "groups": [grupos["Superintendência"]],
+                "groups": [grupos["Superintendência"], grupos["Gerente"]],
                 "is_superuser": False,
             },
             {
@@ -122,7 +122,7 @@ class Command(BaseCommand):
                 "last_name": "E2E",
                 "cpf": "00000000004",
                 "password": "testpass123",
-                "groups": [],  # Formador não precisa de grupo específico
+                "groups": [grupos["Formador"]],
                 "is_superuser": False,
             },
         ]

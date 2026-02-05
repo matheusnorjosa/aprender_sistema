@@ -2,10 +2,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
+import { existsSync } from 'fs'
 
 // Backend URL para proxy (servidor-side apenas)
 // PROXY_TARGET é usado apenas pelo servidor Vite, não pelo browser
-const API_URL: string = process.env.PROXY_TARGET || 'http://localhost:8002'
+const isDocker = existsSync('/.dockerenv')
+const API_URL: string = process.env.PROXY_TARGET || (isDocker ? 'http://web:8000' : 'http://localhost:8002')
 
 // Gap 8 - PLAN_maturity_gaps.md: Bundle analysis
 const ANALYZE: boolean = process.env.ANALYZE === 'true'

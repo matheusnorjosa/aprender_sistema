@@ -152,6 +152,9 @@ def check_conflicts(
     )
 
     conflicts: list[Conflict] = []
+    events_qs = Solicitacao.objects.filter(status="aprovado").filter(
+        Q(usuario=usuario) | Q(participations__usuario=usuario)
+    )
 
     # ================================================================
     # RD-02, RD-03: BLOQUEIOS aprovados
@@ -186,9 +189,7 @@ def check_conflicts(
     # ================================================================
     # RD-01: SOBREPOSIÇÃO com eventos aprovados
     # ================================================================
-    events = Solicitacao.objects.filter(usuario=usuario, status="aprovado").filter(
-        Q(inicio__lt=fim) & Q(fim__gt=inicio)  # Interseção
-    )
+    events = events_qs.filter(Q(inicio__lt=fim) & Q(fim__gt=inicio)).distinct()
 
     for ev in events:
         interval: str = _fmt_interval_local(ev.inicio, ev.fim)
@@ -206,14 +207,10 @@ def check_conflicts(
     # ================================================================
     # RD-04 sempre verifica buffer. Se municipio=None, trata como cidade diferente.
     # Evento imediatamente anterior
-    prev_ev: Solicitacao | None = (
-        Solicitacao.objects.filter(usuario=usuario, status="aprovado", fim__lte=inicio).order_by("-fim").first()
-    )
+    prev_ev: Solicitacao | None = events_qs.filter(fim__lte=inicio).order_by("-fim").distinct().first()
 
     # Evento imediatamente posterior
-    next_ev: Solicitacao | None = (
-        Solicitacao.objects.filter(usuario=usuario, status="aprovado", inicio__gte=fim).order_by("inicio").first()
-    )
+    next_ev: Solicitacao | None = events_qs.filter(inicio__gte=fim).order_by("inicio").distinct().first()
 
     # Verificar buffer anterior
     if prev_ev:
@@ -279,16 +276,15 @@ def check_conflicts(
     day_end: datetime = local_tz.localize(datetime.combine(inicio_date, time.max))
 
     # Seleção ampla: eventos que tocam o dia do início (usando ranges UTC)
-    same_day_events = Solicitacao.objects.filter(usuario=usuario, status="aprovado").filter(
-        Q(inicio__range=(day_start, day_end)) | Q(fim__range=(day_start, day_end))
-    )
+    same_day_events = events_qs.filter(inicio__lt=day_end, fim__gt=day_start).distinct()
 
     # Somar duração dos eventos existentes no dia
     total_minutes: int = 0
     for ev in same_day_events:
-        if same_day_local(ev.inicio, inicio) or same_day_local(ev.fim, inicio):
-            dur: int = int((ev.fim - ev.inicio).total_seconds() // 60)
-            total_minutes += max(dur, 0)
+        overlap_start = max(ev.inicio, day_start)
+        overlap_end = min(ev.fim, day_end)
+        dur: int = int((overlap_end - overlap_start).total_seconds() // 60)
+        total_minutes += max(dur, 0)
 
     # Somar duração do novo intervalo
     new_duration: int = int((fim - inicio).total_seconds() // 60)

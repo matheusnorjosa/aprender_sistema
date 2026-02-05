@@ -164,7 +164,7 @@ export default function MunicipiosPage(): JSX.Element {
   return (
     <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="municipios-title">
       <nav className="mb-4" aria-label="Navegação">
-        <Link to="/admin-dat">← Voltar para Admin DAT</Link>
+        <Link to="/dat/admin">← Voltar para Admin DAT</Link>
       </nav>
 
       <Card>

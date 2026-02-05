@@ -7,6 +7,10 @@
 export const LAYOUT = {
   // Sidebar
   SIDEBAR_WIDTH: 250,
+  SIDEBAR_COLLAPSED_WIDTH: 80,
+
+  // Mobile breakpoint
+  MOBILE_BREAKPOINT: 768,
 
   // Input widths
   INPUT_WIDTH_SMALL: 200,

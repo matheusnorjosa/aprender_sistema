@@ -305,12 +305,19 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
             return False
 
         # Obter gerencia_id da URL (via kwargs) ou query params
-        gerencia_id = view.kwargs.get("gerencia_id")  # type: ignore[attr-defined]
-        if gerencia_id is None:
-            gerencia_id = request.query_params.get("gerencia_id")
+        gerencia_id_raw = view.kwargs.get("gerencia_id")  # type: ignore[attr-defined]
+        if gerencia_id_raw is None:
+            gerencia_id_raw = request.query_params.get("gerencia_id")
 
         # Sem gerencia_id = comportamento SUPER (permitido para todos autenticados)
-        if gerencia_id is None:
+        if gerencia_id_raw is None:
+            return True
+
+        # Hardening: evitar ValueError em query params inválidos
+        try:
+            gerencia_id = int(gerencia_id_raw)
+        except (TypeError, ValueError):
+            # Deixar o view validar e retornar 400 quando aplicável
             return True
 
         # Com gerencia_id = verificar se usuário pertence à gerência

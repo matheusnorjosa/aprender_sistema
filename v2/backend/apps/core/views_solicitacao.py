@@ -302,7 +302,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         # Sempre criar participação do coordenador (request.user)
         Participation.objects.get_or_create(
-            solicitacao=solicitacao, usuario=self.request.user, defaults={"role": "COORDENADOR"}
+            solicitacao=solicitacao, usuario=self.request.user, role="COORDENADOR"
         )
 
         # Formadores por ID
@@ -311,7 +311,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 try:
                     usuario = Usuario.objects.get(id=formador_id)
                     Participation.objects.get_or_create(
-                        solicitacao=solicitacao, usuario=usuario, defaults={"role": "FORMADOR"}
+                        solicitacao=solicitacao, usuario=usuario, role="FORMADOR"
                     )
                 except Usuario.DoesNotExist:
                     pass
@@ -323,12 +323,12 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 try:
                     usuario = Usuario.objects.get(email__iexact=email.strip())
                     Participation.objects.get_or_create(
-                        solicitacao=solicitacao, usuario=usuario, defaults={"role": "FORMADOR"}
+                        solicitacao=solicitacao, usuario=usuario, role="FORMADOR"
                     )
                 except Usuario.DoesNotExist:
                     # Criar como guest_email mantendo role=FORMADOR para GCal
                     Participation.objects.get_or_create(
-                        solicitacao=solicitacao, guest_email=email.strip().lower(), defaults={"role": "FORMADOR"}
+                        solicitacao=solicitacao, guest_email=email.strip().lower(), role="FORMADOR"
                     )
 
         # Coordenadores acompanhantes por ID
@@ -337,7 +337,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 try:
                     usuario = Usuario.objects.get(id=coord_id)
                     Participation.objects.get_or_create(
-                        solicitacao=solicitacao, usuario=usuario, defaults={"role": "COORD_ACOMPANHA"}
+                        solicitacao=solicitacao, usuario=usuario, role="COORD_ACOMPANHA"
                     )
                 except Usuario.DoesNotExist:
                     pass
@@ -348,12 +348,12 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 try:
                     usuario = Usuario.objects.get(email__iexact=email.strip())
                     Participation.objects.get_or_create(
-                        solicitacao=solicitacao, usuario=usuario, defaults={"role": "COORD_ACOMPANHA"}
+                        solicitacao=solicitacao, usuario=usuario, role="COORD_ACOMPANHA"
                     )
                 except Usuario.DoesNotExist:
                     # Criar como guest_email mantendo role=COORD_ACOMPANHA para GCal
                     Participation.objects.get_or_create(
-                        solicitacao=solicitacao, guest_email=email.strip().lower(), defaults={"role": "COORD_ACOMPANHA"}
+                        solicitacao=solicitacao, guest_email=email.strip().lower(), role="COORD_ACOMPANHA"
                     )
 
     def perform_update(self, serializer):

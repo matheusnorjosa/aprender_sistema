@@ -94,8 +94,6 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             # gcal_payload_hash removed: internal implementation detail
             # PR19/RF06: Google Meet link
             "meet_link",
-            # Modalidade online/presencial
-            "is_online",
         ]
         read_only_fields = [
             "id",

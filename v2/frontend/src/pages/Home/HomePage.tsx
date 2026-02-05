@@ -168,7 +168,7 @@ export default function HomePage(): JSX.Element {
                   icon={<UserOutlined />}
                   title="Gerenciamento de Usuários"
                   description="Gerenciar usuários, grupos e permissões."
-                  link="/admin-dat/usuarios"
+                  link="/dat/admin/usuarios"
                 />
               </Col>
             )}

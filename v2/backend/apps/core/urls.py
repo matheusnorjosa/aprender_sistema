@@ -62,6 +62,7 @@ from .views_gcal import (  # Core GCal; Dashboard views
 )
 from .views_health import features, readyz
 from .views_import_bloqueios import ImportBloqueiosView
+from .views_import_deslocamentos import ImportDeslocamentosView
 from .views_imports import ControleImportAcoesView, DATImportCadastrosView
 from .views_lookup import MunicipioLookup, ProjetoLookup, TipoEventoLookup, UsuarioLookup
 from .views_metrics import (
@@ -207,6 +208,11 @@ urlpatterns = [
         "disponibilidade/import-bloqueios/",
         ImportBloqueiosView.as_view(),
         name="import-bloqueios",
+    ),
+    path(
+        "deslocamentos/import/",
+        ImportDeslocamentosView.as_view(),
+        name="import-deslocamentos",
     ),
     path(
         "dat/acoes/",

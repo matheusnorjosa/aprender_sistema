@@ -50,11 +50,13 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
   };
 
   return (
-    <main
-      className="flex flex-col items-center justify-start"
-      style={{ minHeight: '100vh', paddingTop: '60px', background: BRAND_COLORS.primaryDark }}
-      aria-labelledby="login-title"
-    >
+    <>
+      <main
+        id="main"
+        className="flex flex-col items-center justify-start"
+        style={{ minHeight: '100vh', paddingTop: '60px', background: BRAND_COLORS.primaryDark }}
+        aria-labelledby="login-title"
+      >
       {/* Logo */}
       <header style={{ marginBottom: '40px' }}>
         <img
@@ -137,6 +139,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
           </Form.Item>
         </Form>
       </article>
-    </main>
+      </main>
+    </>
   );
 }

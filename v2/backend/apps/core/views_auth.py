@@ -126,6 +126,8 @@ class LoginThrottle(AnonRateThrottle):
     """
 
     rate = "10/minute"
+    # Usar escopo dedicado para evitar colisão com throttle anon global
+    scope = "login"
 
 
 @api_view(["POST"])

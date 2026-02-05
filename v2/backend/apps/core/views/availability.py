@@ -41,6 +41,9 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         Filtrar bloqueios por usuário (exceto Superintendência/superuser que vê todos).
         """
         base_qs = AvailabilityBlock.objects.select_related("usuario")
+        owner = self.request.query_params.get("owner")
+        if owner == "me":
+            return base_qs.filter(usuario=self.request.user)
         if self.request.user.is_superuser or self.request.user.groups.filter(name="Superintendência").exists():
             return base_qs.all()
         return base_qs.filter(usuario=self.request.user)

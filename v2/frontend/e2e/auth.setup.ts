@@ -13,29 +13,39 @@ const __dirname = dirname(__filename);
 const authFile = join(__dirname, '.auth/user.json');
 
 const ADMIN_USER = {
-  username: 'admin',
-  password: 'admin123',
+  username: 'coord_e2e@test.com',
+  password: 'testpass123',
 };
 
 setup('authenticate', async ({ page }) => {
-  // Navegar para login
-  await page.goto('/');
+  // Obter CSRF token no contexto do browser
+  await page.goto('/api/csrf/');
+  const csrfBody = await page.textContent('body');
+  const csrfData = csrfBody ? JSON.parse(csrfBody) : null;
+  const csrfToken = csrfData?.csrfToken;
+  expect(csrfToken).toBeTruthy();
 
-  // Verificar que está na página de login
-  await expect(page.locator('h2:has-text("Login")')).toBeVisible({ timeout: 10000 });
+  // Login via fetch no browser (cookies ficam no contexto do page)
+  const loginOk = await page.evaluate(async ({ username, password, token }) => {
+    const resp = await fetch('/api/auth/login/', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': token,
+      },
+      body: JSON.stringify({ username, password }),
+    });
+    return resp.ok;
+  }, { username: ADMIN_USER.username, password: ADMIN_USER.password, token: csrfToken });
+  expect(loginOk).toBeTruthy();
 
-  // Preencher formulário
-  await page.fill('input[id="login_username"]', ADMIN_USER.username);
-  await page.fill('input[id="login_password"]', ADMIN_USER.password);
-
-  // Submeter
-  await page.click('button[type="submit"]');
-
-  // Aguardar que não esteja mais na página de login (login heading desaparece)
-  await expect(page.locator('h2:has-text("Login")')).not.toBeVisible({ timeout: 20000 });
-
-  // Verificar que está logado (sidebar visível)
-  await expect(page.locator('.ant-layout-sider')).toBeVisible({ timeout: 5000 });
+  // Validar sessão via API no contexto do browser
+  const meOk = await page.evaluate(async () => {
+    const resp = await fetch('/api/me/', { credentials: 'include' });
+    return resp.ok;
+  });
+  expect(meOk).toBeTruthy();
 
   // Salvar estado de autenticação
   await page.context().storageState({ path: authFile });

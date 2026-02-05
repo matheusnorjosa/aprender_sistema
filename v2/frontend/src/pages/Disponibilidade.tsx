@@ -4,7 +4,7 @@
  * Permite ao usuário:
  * - Criar bloqueios de disponibilidade (Total ou Parcial)
  * - Listar seus bloqueios existentes
- * - Excluir bloqueios com status 'pendente'
+ * - Excluir bloqueios
  * - Importar bloqueios em massa via CSV/XLSX
  */
 

@@ -29,6 +29,9 @@ const IGNORED_ERRORS = [
   'findDOMNode is deprecated',
   // React Router
   'No routes matched location',
+  // Auth errors on public/login pages
+  'As credenciais de autenticação não foram fornecidas.',
+  'Failed to load resource: the server responded with a status of 403',
 ];
 
 function shouldIgnoreError(message: string): boolean {

@@ -80,6 +80,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - backup_data:/backups # MP5: Database backups storage (C-05)
     healthcheck:
       test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME || exit 1"]
       interval: 30s
@@ -102,6 +104,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - backup_data:/backups # MP5: Database backups storage (C-05)
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import celery; print(celery.__version__)' || exit 1"]
       interval: 60s

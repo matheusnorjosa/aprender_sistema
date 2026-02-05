@@ -179,6 +179,23 @@ export async function importDeslocamentos(file: File, dryRun: boolean = true): P
 }
 
 /**
+ * Importa EVENTOS (Solicitacao + Participation) de CSV/XLSX.
+ *
+ * Colunas esperadas:
+ * - municipio, projeto, tipo_evento (obrigatorios)
+ * - data, hora_inicio, hora_fim (obrigatorios)
+ * - coordenador (obrigatorio)
+ * - formador1-5 (opcionais)
+ * - encontro, segmento, local (opcionais)
+ *
+ * @param file - Arquivo a enviar
+ * @param dryRun - Se true, apenas preview
+ */
+export async function importEventos(file: File, dryRun: boolean = true): Promise<ImportResult> {
+  return await postMultipart('/solicitacoes/import/', file, dryRun);
+}
+
+/**
  * Lista COMPRAS com filtros opcionais.
  */
 export async function listCompras(filters: ComprasFilters = {}): Promise<Compra[]> {

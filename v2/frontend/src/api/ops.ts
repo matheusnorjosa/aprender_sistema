@@ -224,6 +224,31 @@ export async function importMunicipios(file: File, dryRun: boolean = true): Prom
   return await postMultipart('/municipios/import/', file, dryRun);
 }
 
+/**
+ * Importa COLECOES de CSV/XLSX.
+ *
+ * Colunas esperadas:
+ * - codigo, nome, projeto (obrigatorios)
+ *
+ * @param file - Arquivo a enviar
+ * @param dryRun - Se true, apenas preview
+ */
+export async function importColecoes(file: File, dryRun: boolean = true): Promise<ImportResult> {
+  return await postMultipart('/colecoes/import/', file, dryRun);
+}
+
+/**
+ * Importa EQUIPE GERENCIA (vinculos usuario-gerencia) de CSV/XLSX.
+ *
+ * Colunas esperadas:
+ * - usuario (cpf ou email), gerencia, funcao (obrigatorios)
+ *
+ * @param file - Arquivo a enviar
+ * @param dryRun - Se true, apenas preview
+ */
+export async function importEquipeGerencia(file: File, dryRun: boolean = true): Promise<ImportResult> {
+  return await postMultipart('/equipe-gerencia/import/', file, dryRun);
+}
 
 /**
  * Importa PRODUTOS de CSV/XLSX.

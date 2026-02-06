@@ -783,7 +783,7 @@ function AppContent(): JSX.Element {
 {/* Dashboard Compras (Diretoria, DAT, superuser) */}
                   <Route
                     path="/dashboards/compras"
-                    element={canDashboardOverview ? <ComprasDashboardPage /> : <Forbidden />}
+                    element={canDashboardCompras ? <ComprasDashboardPage /> : <Forbidden />}
                   />
 
                   {/* Dashboard Equipe */}

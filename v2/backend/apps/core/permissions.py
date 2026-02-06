@@ -227,9 +227,7 @@ class IsGerencia(permissions.BasePermission):  # type: ignore[misc]
             and request.user.is_authenticated
             and (
                 getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(
-                    name__in=["Gerência", "Superintendência", "Diretoria"]
-                ).exists()  # type: ignore[attr-defined]
+                or request.user.groups.filter(name__in=["Gerência", "Superintendência", "Diretoria"]).exists()  # type: ignore[union-attr]
             )
         )
 
@@ -250,9 +248,7 @@ class IsDashboardOverview(permissions.BasePermission):  # type: ignore[misc]
             and request.user.is_authenticated
             and (
                 getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(
-                    name__in=["Superintendência", "Gerência", "Diretoria"]
-                ).exists()  # type: ignore[attr-defined]
+                or request.user.groups.filter(name__in=["Superintendência", "Gerência", "Diretoria"]).exists()  # type: ignore[union-attr]
             )
         )
 
@@ -273,9 +269,7 @@ class IsMapMetrics(permissions.BasePermission):  # type: ignore[misc]
             and request.user.is_authenticated
             and (
                 getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(
-                    name__in=["Controle", "DAT", "Superintendência", "Gerência", "Diretoria"]
-                ).exists()  # type: ignore[attr-defined]
+                or request.user.groups.filter(name__in=["Controle", "DAT", "Superintendência", "Gerência", "Diretoria"]).exists()  # type: ignore[union-attr]
             )
         )
 

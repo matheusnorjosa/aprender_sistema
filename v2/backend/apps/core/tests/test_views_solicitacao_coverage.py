@@ -61,7 +61,7 @@ def usuario_coordenador(grupos):
 
 @pytest.fixture
 def usuario_gerente_superintendencia(grupos):
-    """User with Gerente + Superintendência roles (can batch approve/reject)."""
+    """User with Superintendência role (also Gerente) for batch approve/reject tests."""
     uid = uuid4().hex[:8]
     user = Usuario.objects.create_user(
         username=f"gerente_super_{uid}",
@@ -696,6 +696,61 @@ class TestApproveRejectEdgeCases:
         assert response.status_code == 400
         assert "já está reprovada" in response.json()["detail"]
 
+    def test_approve_rejected_returns_400(
+        self,
+        api_client,
+        usuario_superintendencia,
+        usuario_coordenador,
+        municipio,
+        projeto_super,
+        tipo_evento,
+    ):
+        """Approving rejected solicitation returns 400 (status must be pendente)."""
+        sol = Solicitacao.objects.create(
+            usuario=usuario_coordenador,
+            municipio=municipio,
+            projeto=projeto_super,
+            tipo_evento=tipo_evento,
+            inicio=timezone.now() + timedelta(days=1),
+            fim=timezone.now() + timedelta(days=1, hours=2),
+            status="reprovado",
+        )
+
+        api_client.force_authenticate(user=usuario_superintendencia)
+        response = api_client.patch(f"/api/solicitacoes/{sol.id}/approve/")
+
+        assert response.status_code == 400
+        assert "já está reprovada" in response.json()["detail"]
+
+    def test_reject_approved_returns_400(
+        self,
+        api_client,
+        usuario_superintendencia,
+        usuario_coordenador,
+        municipio,
+        projeto_super,
+        tipo_evento,
+    ):
+        """Rejecting approved solicitation returns 400 (status must be pendente)."""
+        sol = Solicitacao.objects.create(
+            usuario=usuario_coordenador,
+            municipio=municipio,
+            projeto=projeto_super,
+            tipo_evento=tipo_evento,
+            inicio=timezone.now() + timedelta(days=1),
+            fim=timezone.now() + timedelta(days=1, hours=2),
+            status="aprovado",
+        )
+
+        api_client.force_authenticate(user=usuario_superintendencia)
+        response = api_client.patch(
+            f"/api/solicitacoes/{sol.id}/reject/",
+            {"justificativa": "Teste"},
+        )
+
+        assert response.status_code == 400
+        assert "já está aprovada" in response.json()["detail"]
+
 
 # ============================================================
 # Tests for batch_approve (lines 777-843)
@@ -1057,7 +1112,7 @@ class TestBatchReject:
         api_client,
         usuario_coordenador,
     ):
-        """Batch reject requires Gerente + Superintendência permission."""
+        """Batch reject requires Superintendência/DAT permission."""
         api_client.force_authenticate(user=usuario_coordenador)
 
         response = api_client.post(

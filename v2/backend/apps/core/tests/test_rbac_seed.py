@@ -62,8 +62,17 @@ def dados_basicos():
 
 
 def test_seed_rbac_creates_all_groups(run_seed_rbac):
-    """seed_rbac cria os 5 grupos esperados."""
-    expected_groups = ["DAT", "Controle", "Superintendência", "Coordenador", "Formador"]
+    """seed_rbac cria todos os grupos esperados."""
+    expected_groups = [
+        "DAT",
+        "Controle",
+        "Superintendência",
+        "Coordenador",
+        "Formador",
+        "Apoio de Coordenação",
+        "Gerência",
+        "Diretoria",
+    ]
 
     for group_name in expected_groups:
         assert Group.objects.filter(name=group_name).exists(), f"Grupo '{group_name}' não foi criado"

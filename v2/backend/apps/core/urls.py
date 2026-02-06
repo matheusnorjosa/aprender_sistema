@@ -62,11 +62,10 @@ from .views_gcal import (  # Core GCal; Dashboard views
 )
 from .views_health import features, readyz
 from .views_import_bloqueios import ImportBloqueiosView
-from .views_import_deslocamentos import ImportDeslocamentosView
-from .views_import_eventos import ImportEventosView
-from .views_import_municipios import ImportMunicipiosView
 from .views_import_colecoes import ImportColecoesView
+from .views_import_deslocamentos import ImportDeslocamentosView
 from .views_import_equipe_gerencia import ImportEquipeGerenciaView
+from .views_import_eventos import ImportEventosView
 from .views_import_municipios import ImportMunicipiosView
 from .views_import_produtos import ImportProdutosView
 from .views_import_usuarios import ImportUsuariosView

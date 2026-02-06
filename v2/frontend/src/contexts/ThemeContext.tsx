@@ -111,10 +111,6 @@ export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
   const getInitialTheme = (): ThemeMode => {
     const saved = localStorage.getItem('theme') as ThemeMode | null;
     if (saved) return saved;
-    // Verificar preferência do sistema
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
     return 'light';
   };
 

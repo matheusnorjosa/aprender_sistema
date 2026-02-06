@@ -35,7 +35,6 @@ from .models import AuditLog, Solicitacao
 from .permissions import (
     IsControleOrSuper,
     IsCoordenadorOrDAT,
-    IsGerenteSuperintendencia,
     IsOwnerOrPrivileged,
     IsSuperintendencia,
 )
@@ -271,7 +270,21 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         PR15: Suporta extra_participants para criar Participation automaticamente.
         """
-        from .models import Participation
+        from .exceptions import ValidationAPIError
+        from .services.availability_service import check_conflicts
+
+        inicio = serializer.validated_data.get("inicio")
+        fim = serializer.validated_data.get("fim")
+        municipio = serializer.validated_data.get("municipio")
+
+        if inicio is not None and fim is not None:
+            result = check_conflicts(usuario=self.request.user, inicio=inicio, fim=fim, municipio=municipio)
+            if not result.ok:
+                raise ValidationAPIError(
+                    message="Conflito de disponibilidade detectado.",
+                    code="availability_conflict",
+                    extra={"conflicts": [c.__dict__ for c in result.conflicts]},
+                )
 
         # PR15: Salvar instance - o model.save() gerencia auto-aprovação baseado em projeto.fluxo
         instance = serializer.save(usuario=self.request.user)
@@ -753,7 +766,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=["post"],
-        permission_classes=[IsGerenteSuperintendencia],
+        permission_classes=[IsSuperintendencia],
         url_path="batch-approve",
     )
     def batch_approve(self, request):
@@ -765,7 +778,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Response 200: { "approved": 2, "errors": [{"id": 3, "detail": "..."}] }
 
-        Permissão: Apenas Gerentes da Superintendência ou superusers.
+        Permissão: Superintendência, DAT ou superusers (PA-02 Adaptada).
         PA-05: Cada solicitação gera um AuditLog individual com batch=true.
         Limite: máximo 100 solicitações por requisição.
         """
@@ -789,7 +802,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=["post"],
-        permission_classes=[IsGerenteSuperintendencia],
+        permission_classes=[IsSuperintendencia],
         url_path="batch-reject",
     )
     def batch_reject(self, request):
@@ -801,7 +814,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Response 200: { "rejected": 2, "errors": [{"id": 3, "detail": "..."}] }
 
-        Permissão: Apenas Gerentes da Superintendência ou superusers.
+        Permissão: Superintendência, DAT ou superusers (PA-02 Adaptada).
         PA-05: Cada solicitação gera um AuditLog individual com batch=true.
         Limite: máximo 100 solicitações por requisição.
         """

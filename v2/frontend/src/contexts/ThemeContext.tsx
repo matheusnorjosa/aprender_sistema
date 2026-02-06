@@ -107,10 +107,14 @@ const lightThemeTokens = {
 };
 
 export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
-  // Verificar preferência salva ou preferência do sistema
+  // Issue #XXX: Forçar tema claro como padrão
+  // Ignora preferência salva no localStorage e sempre inicia com 'light'
   const getInitialTheme = (): ThemeMode => {
+    // Limpa qualquer preferência anterior de tema escuro
     const saved = localStorage.getItem('theme') as ThemeMode | null;
-    if (saved) return saved;
+    if (saved === 'dark') {
+      localStorage.setItem('theme', 'light');
+    }
     return 'light';
   };
 

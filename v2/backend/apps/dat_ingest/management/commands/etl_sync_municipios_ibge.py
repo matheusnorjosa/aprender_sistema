@@ -207,9 +207,7 @@ class Command(BaseCommand):
         StgMunicipioReferencia.objects.bulk_create(objs, batch_size=1000)
         return len(objs)
 
-    def _upsert_core(
-        self, errors: list[ETLError], warnings: list[str]
-    ) -> tuple[int, int, int]:
+    def _upsert_core(self, errors: list[ETLError], warnings: list[str]) -> tuple[int, int, int]:
         """Upsert seguro em core.Municipio respeitando unicidade de nome."""
         created = 0
         updated = 0

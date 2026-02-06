@@ -444,9 +444,7 @@ class DATCompraViewSet(viewsets.ModelViewSet):
             else 0
         )
         produtos_diferentes = qs.values("produto_id").distinct().count()
-        colecoes_diferentes = (
-            qs.exclude(produto__colecao__isnull=True).values("produto__colecao_id").distinct().count()
-        )
+        colecoes_diferentes = qs.exclude(produto__colecao__isnull=True).values("produto__colecao_id").distinct().count()
         valor_total = qs.aggregate(total=Sum(F("valor_unitario") * F("quantidade")))["total"] or 0
 
         colecao_raw = (
@@ -514,9 +512,7 @@ class DATCompraViewSet(viewsets.ModelViewSet):
             for item in frequencia_raw[:10]
         ]
 
-        por_ano = list(
-            qs.values("ano_uso").annotate(quantidade=Sum("quantidade")).order_by("-ano_uso")[:6]
-        )
+        por_ano = list(qs.values("ano_uso").annotate(quantidade=Sum("quantidade")).order_by("-ano_uso")[:6])
 
         tipo_labels = {
             "primeira": "Primeira compra",
@@ -525,11 +521,7 @@ class DATCompraViewSet(viewsets.ModelViewSet):
             "adicional_3": "Compra adicional 3",
             None: "Não informado",
         }
-        tipo_raw = (
-            qs.values("tipo_compra")
-            .annotate(quantidade=Sum("quantidade"))
-            .order_by("-quantidade")
-        )
+        tipo_raw = qs.values("tipo_compra").annotate(quantidade=Sum("quantidade")).order_by("-quantidade")
         por_tipo_compra = [
             {
                 "tipo_compra": tipo_labels.get(item["tipo_compra"], item["tipo_compra"] or "Não informado"),

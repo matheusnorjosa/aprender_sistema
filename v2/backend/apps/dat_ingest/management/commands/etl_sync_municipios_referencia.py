@@ -185,13 +185,7 @@ class Command(BaseCommand):
         records: list[dict[str, Any]] = []
 
         for idx, row in enumerate(raw_rows, start=1):
-            nome_raw = (
-                row.get("nome_completo")
-                or row.get("municipio")
-                or row.get("nome")
-                or row.get("Município")
-                or ""
-            )
+            nome_raw = row.get("nome_completo") or row.get("municipio") or row.get("nome") or row.get("Município") or ""
             uf_raw = row.get("uf") or row.get("UF")
             codigo_raw = row.get("codigo_ibge") or row.get("codigo") or row.get("id") or ""
 
@@ -232,9 +226,7 @@ class Command(BaseCommand):
         StgMunicipioReferencia.objects.bulk_create(objs, batch_size=1000)
         return len(objs)
 
-    def _upsert_core(
-        self, errors: list[ETLError], warnings: list[str]
-    ) -> tuple[int, int, int, int]:
+    def _upsert_core(self, errors: list[ETLError], warnings: list[str]) -> tuple[int, int, int, int]:
         """Upsert em core.MunicipioReferencia."""
         created = 0
         updated = 0

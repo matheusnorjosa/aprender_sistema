@@ -25,6 +25,9 @@ DB_USER="${DB_USER:-postgres}"
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 DATE=$(date +%Y%m%d_%H%M%S)
+S3_BUCKET="${S3_BUCKET:-}"
+# Normalize bucket name if provided with scheme
+S3_BUCKET="${S3_BUCKET#s3://}"
 
 # Naming convention: backup_full_YYYYMMDD_HHMMSS.sql.gz
 # This matches what tasks_backup.py and verify_backup_health() expect

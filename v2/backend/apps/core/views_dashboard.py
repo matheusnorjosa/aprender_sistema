@@ -14,13 +14,14 @@ from datetime import timedelta
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from apps.core.permissions import IsDashboardOverview
+
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDashboardOverview])
 def dashboard_overview(request: Request) -> Response:
     """
     GET /api/dashboard/overview/
@@ -49,7 +50,7 @@ def dashboard_overview(request: Request) -> Response:
         ]
     }
 
-    Permissions: IsAuthenticated
+    Permissions: IsDashboardOverview
     """
     from .models import Participation, Solicitacao
 

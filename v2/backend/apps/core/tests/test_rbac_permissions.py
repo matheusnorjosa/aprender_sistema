@@ -112,7 +112,7 @@ class TestCanApproveSuperLogic(TestCase):
         self.assertTrue(response.data["is_superuser"])
 
     def test_gerente_superintendencia_can_approve_super(self):
-        """Gerente + Superintendência pode aprovar SUPER."""
+        """Superintendência pode aprovar SUPER (independente de função)."""
         user = self._create_user_with_groups(
             "gerente_super",
             setores=["Superintendência"],
@@ -126,8 +126,8 @@ class TestCanApproveSuperLogic(TestCase):
         self.assertIn("Gerente", response.data["funcoes"])
         self.assertIn("Superintendência", response.data["setores"])
 
-    def test_gerente_dat_cannot_approve_super(self):
-        """Gerente de DAT NÃO pode aprovar SUPER."""
+    def test_dat_can_approve_super(self):
+        """DAT pode aprovar SUPER (PA-02 Adaptada)."""
         user = self._create_user_with_groups(
             "gerente_dat",
             setores=["DAT"],
@@ -137,7 +137,7 @@ class TestCanApproveSuperLogic(TestCase):
         response = self.client.get("/api/me/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.data["can_approve_super"])
+        self.assertTrue(response.data["can_approve_super"])
         self.assertIn("Gerente", response.data["funcoes"])
         self.assertIn("DAT", response.data["setores"])
 
@@ -154,8 +154,8 @@ class TestCanApproveSuperLogic(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["can_approve_super"])
 
-    def test_formador_superintendencia_cannot_approve_super(self):
-        """Formador da Superintendência NÃO pode aprovar SUPER (não é Gerente)."""
+    def test_formador_superintendencia_can_approve_super(self):
+        """Superintendência pode aprovar SUPER mesmo como Formador."""
         user = self._create_user_with_groups(
             "formador_super",
             setores=["Superintendência"],
@@ -165,12 +165,12 @@ class TestCanApproveSuperLogic(TestCase):
         response = self.client.get("/api/me/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.data["can_approve_super"])
+        self.assertTrue(response.data["can_approve_super"])
         self.assertIn("Superintendência", response.data["setores"])
         self.assertIn("Formador", response.data["funcoes"])
 
-    def test_coordenador_superintendencia_cannot_approve_super(self):
-        """Coordenador da Superintendência NÃO pode aprovar SUPER."""
+    def test_coordenador_superintendencia_can_approve_super(self):
+        """Superintendência pode aprovar SUPER mesmo como Coordenador."""
         user = self._create_user_with_groups(
             "coord_super",
             setores=["Superintendência"],
@@ -180,10 +180,10 @@ class TestCanApproveSuperLogic(TestCase):
         response = self.client.get("/api/me/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.data["can_approve_super"])
+        self.assertTrue(response.data["can_approve_super"])
 
-    def test_apoio_superintendencia_cannot_approve_super(self):
-        """Apoio de Coordenação da Superintendência NÃO pode aprovar SUPER."""
+    def test_apoio_superintendencia_can_approve_super(self):
+        """Superintendência pode aprovar SUPER mesmo como Apoio."""
         user = self._create_user_with_groups(
             "apoio_super",
             setores=["Superintendência"],
@@ -193,7 +193,7 @@ class TestCanApproveSuperLogic(TestCase):
         response = self.client.get("/api/me/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.data["can_approve_super"])
+        self.assertTrue(response.data["can_approve_super"])
 
     def test_gerente_vidas_cannot_approve_super(self):
         """Gerente da gerência Vidas NÃO pode aprovar SUPER (não é Superintendência)."""

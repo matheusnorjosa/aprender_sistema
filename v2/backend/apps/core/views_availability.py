@@ -64,6 +64,10 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         if is_privileged_user(user):
             return AvailabilityBlock.objects.select_related("usuario").all()
 
+        # Segurança (C-03): para update/delete, usuários comuns só veem seus próprios bloqueios
+        if self.action in {"update", "partial_update", "destroy"}:
+            return AvailabilityBlock.objects.select_related("usuario").filter(usuario=user)
+
         # Outros: bloqueios de usuários das suas gerências
         gerencias_ids = get_user_gerencias_ids(user)
         if not gerencias_ids:

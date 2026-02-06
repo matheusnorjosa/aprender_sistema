@@ -610,6 +610,14 @@ ETL_DATA_DIR = os.getenv("ETL_DATA_DIR", str(BASE_DIR / "data" / "csv-import"))
 DATA_IMPORT_DIR = os.getenv("DATA_IMPORT_DIR", "/app/data/csv-import")
 
 # ================================================================
+# BACKUP (MP5)
+# ================================================================
+BACKUP_DIR = os.getenv("BACKUP_DIR", "/backups")
+BACKUP_RETENTION_DAYS = int(os.getenv("BACKUP_RETENTION_DAYS", "7"))
+# S3 bucket name (without s3://). Use empty string to disable uploads.
+BACKUP_S3_BUCKET = os.getenv("BACKUP_S3_BUCKET", "")
+
+# ================================================================
 # PR21: external_hash v2 + Data Quality Gates
 # ================================================================
 # Feature flag: usa hash v2 (17 campos) ao invés de v1 (8 campos)

@@ -71,12 +71,23 @@ def approve_solicitacao(
         ApprovalResult with operation details
 
     Raises:
-        ValidationAPIError: If solicitacao is already approved
+        ValidationAPIError: If solicitacao is not pending
     """
-    if solicitacao.status == "aprovado":
+    if solicitacao.status != "pendente":
+        if solicitacao.status == "aprovado":
+            raise ValidationAPIError(
+                message="Solicitação já está aprovada.",
+                code="already_approved",
+            )
+        if solicitacao.status == "reprovado":
+            raise ValidationAPIError(
+                message="Solicitação já está reprovada.",
+                code="already_rejected",
+            )
         raise ValidationAPIError(
-            message="Solicitação já está aprovada.",
-            code="already_approved",
+            message="Solicitação não está pendente.",
+            code="invalid_status",
+            extra={"status": solicitacao.status},
         )
 
     prev_status = solicitacao.status
@@ -141,12 +152,23 @@ def reject_solicitacao(
         ApprovalResult with operation details
 
     Raises:
-        ValidationAPIError: If solicitacao is already rejected
+        ValidationAPIError: If solicitacao is not pending
     """
-    if solicitacao.status == "reprovado":
+    if solicitacao.status != "pendente":
+        if solicitacao.status == "aprovado":
+            raise ValidationAPIError(
+                message="Solicitação já está aprovada.",
+                code="already_approved",
+            )
+        if solicitacao.status == "reprovado":
+            raise ValidationAPIError(
+                message="Solicitação já está reprovada.",
+                code="already_rejected",
+            )
         raise ValidationAPIError(
-            message="Solicitação já está reprovada.",
-            code="already_rejected",
+            message="Solicitação não está pendente.",
+            code="invalid_status",
+            extra={"status": solicitacao.status},
         )
 
     prev_status = solicitacao.status

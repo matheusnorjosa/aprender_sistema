@@ -252,3 +252,40 @@ class TestAPICreateSolicitacaoPendente:
             http_status.HTTP_401_UNAUTHORIZED,
             http_status.HTTP_403_FORBIDDEN,
         ], "Usuário não autenticado não deve poder criar solicitação"
+
+    def test_create_solicitacao_blocks_on_conflict(self, user_test, tipo_evento_test, municipio_test):
+        """
+        Test: Criar solicitação com conflito de disponibilidade deve falhar.
+        """
+        client = APIClient()
+        client.force_authenticate(user=user_test)
+
+        now = timezone.now()
+        inicio_existente = now + timedelta(days=1, hours=9)
+        fim_existente = inicio_existente + timedelta(hours=2)
+
+        Solicitacao.objects.create(
+            usuario=user_test,
+            tipo_evento=tipo_evento_test,
+            municipio=municipio_test,
+            inicio=inicio_existente,
+            fim=fim_existente,
+            status="aprovado",
+        )
+
+        payload = {
+            "usuario": user_test.pk,
+            "tipo_evento": tipo_evento_test.pk,
+            "municipio": municipio_test.pk,
+            "inicio": (inicio_existente + timedelta(minutes=30)).isoformat(),
+            "fim": (fim_existente + timedelta(minutes=30)).isoformat(),
+            "observacoes": "Conflito de agenda",
+        }
+
+        response = client.post("/api/solicitacoes/", payload, format="json")
+
+        assert response.status_code == http_status.HTTP_400_BAD_REQUEST
+        assert response.data.get("code") == "availability_conflict"
+        errors = response.data.get("errors", {})
+        assert "conflicts" in errors
+        assert len(errors["conflicts"]) > 0

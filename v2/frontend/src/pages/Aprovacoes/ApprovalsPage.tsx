@@ -133,8 +133,8 @@ export default function ApprovalsPage(): JSX.Element {
       try {
         const userData = await getMe() as CurrentUser & { can_approve_super?: boolean };
 
-        // Usar can_approve_super da API (Gerente + Superintendência)
-        // A API já calcula: is_superuser || (Gerente in funcoes && Superintendência in setores)
+        // Usar can_approve_super da API (Superintendência/DAT ou superuser)
+        // A API já calcula: is_superuser || Superintendência || DAT
         setCanApprove(userData?.can_approve_super || false);
       } catch (error) {
         logger.error('Erro ao carregar usuário:', error);

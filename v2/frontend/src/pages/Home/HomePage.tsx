@@ -136,7 +136,7 @@ export default function HomePage(): JSX.Element {
 
   // isAdmin = apenas superusers (acesso administrativo completo)
   const isAdmin = user?.is_superuser;
-  // canApproveSuper = pode aprovar solicitações SUPER (Gerente + Superintendência)
+  // canApproveSuper = pode aprovar/reprovar solicitações (Superintendência/DAT)
   const canApproveSuper = user?.can_approve_super || false;
   // isManager = Gerente de qualquer setor (dashboards, métricas)
   const isGerente = user?.is_superuser || funcoes.includes('Gerente');
@@ -184,7 +184,7 @@ export default function HomePage(): JSX.Element {
         </>
       )}
 
-      {/* Aprovações (Gerente + Superintendência) */}
+      {/* Aprovações (Superintendência/DAT) */}
       {canApproveSuper && (
         <>
           <Title level={4} className="mt-6 mb-4">

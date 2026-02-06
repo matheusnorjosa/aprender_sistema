@@ -18,11 +18,11 @@ from rest_framework.throttling import ScopedRateThrottle
 
 from apps.core.exceptions import ValidationAPIError
 from apps.core.models import Participation, Solicitacao
-from apps.core.permissions import IsControleOrDAT
+from apps.core.permissions import IsMapMetrics
 
 
 @api_view(["GET"])
-@permission_classes([IsControleOrDAT])
+@permission_classes([IsMapMetrics])
 @throttle_classes([ScopedRateThrottle])
 def metrics_map(request: Request) -> Response:
     """
@@ -49,7 +49,7 @@ def metrics_map(request: Request) -> Response:
         "top_projetos": [{"nome": "Projeto A", "count": 5}, ...]
     }
 
-    Permissions: IsControleOrDAT (Controle, DAT ou Superintendência)
+    Permissions: IsMapMetrics (Controle, DAT, Superintendência, Gerência, Diretoria)
     """
     queryset = Solicitacao.objects.all()
 
@@ -176,7 +176,7 @@ metrics_map.throttle_scope = "metrics"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
-@permission_classes([IsControleOrDAT])
+@permission_classes([IsMapMetrics])
 @throttle_classes([ScopedRateThrottle])
 def metrics_map_coordinators(request: Request) -> Response:
     """
@@ -202,7 +202,7 @@ def metrics_map_coordinators(request: Request) -> Response:
         ]
     }
 
-    Permissions: IsControleOrDAT (Controle, DAT ou Superintendência)
+    Permissions: IsMapMetrics (Controle, DAT, Superintendência, Gerência, Diretoria)
     """
     uf = request.query_params.get("uf")
     if not uf:

@@ -213,13 +213,13 @@ class IsControle(permissions.BasePermission):  # type: ignore[misc]
 
 class IsGerencia(permissions.BasePermission):  # type: ignore[misc]
     """
-    Permissão: apenas usuários do grupo 'Gerência' ou superusers podem executar.
+    Permissão: usuários dos grupos 'Gerência', 'Superintendência' ou 'Diretoria' podem executar.
 
     Usado para operações de gerenciamento e métricas executivas.
     Nota: Superusers sempre têm acesso completo.
     """
 
-    message = "Apenas usuários do grupo Gerência podem realizar esta ação."
+    message = "Apenas usuários de Gerência, Superintendência ou Diretoria podem realizar esta ação."
 
     def has_permission(self, request: Request, view: APIView) -> bool:
         return (
@@ -227,7 +227,55 @@ class IsGerencia(permissions.BasePermission):  # type: ignore[misc]
             and request.user.is_authenticated
             and (
                 getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name="Gerência").exists()  # type: ignore[attr-defined]
+                or request.user.groups.filter(
+                    name__in=["Gerência", "Superintendência", "Diretoria"]
+                ).exists()  # type: ignore[attr-defined]
+            )
+        )
+
+
+class IsDashboardOverview(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Permissão: apenas usuários com acesso ao dashboard geral.
+
+    Grupos permitidos: Superintendência, Gerência, Diretoria.
+    Nota: Superusers sempre têm acesso completo.
+    """
+
+    message = "Apenas usuários de Superintendência, Gerência ou Diretoria podem acessar o dashboard geral."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                getattr(request.user, "is_superuser", False)
+                or request.user.groups.filter(
+                    name__in=["Superintendência", "Gerência", "Diretoria"]
+                ).exists()  # type: ignore[attr-defined]
+            )
+        )
+
+
+class IsMapMetrics(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Permissão: usuários com acesso ao Mapa Brasil (métricas geográficas).
+
+    Grupos permitidos: Controle, DAT, Superintendência, Gerência, Diretoria.
+    Nota: Superusers sempre têm acesso completo.
+    """
+
+    message = "Apenas usuários autorizados podem acessar métricas do mapa."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                getattr(request.user, "is_superuser", False)
+                or request.user.groups.filter(
+                    name__in=["Controle", "DAT", "Superintendência", "Gerência", "Diretoria"]
+                ).exists()  # type: ignore[attr-defined]
             )
         )
 

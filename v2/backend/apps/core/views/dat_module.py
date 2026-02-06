@@ -20,7 +20,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, F, Q, Sum, Value
+from django.db.models.functions import Coalesce
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
@@ -30,7 +31,15 @@ from rest_framework.response import Response
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
 
-from apps.core.models import DATAcao, DATArea, DATCadastro, DATCompra, DATCoordenador, DATFormacao
+from apps.core.models import (
+    DATAcao,
+    DATArea,
+    DATCadastro,
+    DATCompra,
+    DATCoordenador,
+    DATFormacao,
+    MunicipioReferencia,
+)
 from apps.core.permissions import IsDATOrSuper, IsSuperintendenciaOnly
 from apps.core.serializers import (
     DATAcaoListSerializer,
@@ -295,6 +304,9 @@ class DATCompraFilter(filters.FilterSet):
     uf = filters.CharFilter(field_name="municipio__uf", lookup_expr="iexact")
     ano_min = filters.NumberFilter(field_name="ano_uso", lookup_expr="gte")
     ano_max = filters.NumberFilter(field_name="ano_uso", lookup_expr="lte")
+    municipio_id = filters.NumberFilter(field_name="municipio_id")
+    projeto_id = filters.NumberFilter(field_name="projeto_id")
+    produto_id = filters.NumberFilter(field_name="produto_id")
 
     class Meta:
         model = DATCompra
@@ -304,6 +316,7 @@ class DATCompraFilter(filters.FilterSet):
             "produto",
             "ano_uso",
             "status_uso",
+            "tipo_compra",
             "ativo",
             "uf",
         ]
@@ -394,6 +407,156 @@ class DATCompraViewSet(viewsets.ModelViewSet):
                 "por_status": por_status,
                 "por_ano": por_ano,
                 "por_projeto": por_projeto,
+            }
+        )
+
+    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    def dashboard(self, request: Request) -> Response:
+        """
+        Dashboard de compras com métricas agregadas.
+
+        GET /api/dat/compras-materiais/dashboard/
+
+        Returns:
+            {
+                "kpis": {...},
+                "por_colecao": [...],
+                "top_produtos": [...],
+                "top_municipios": [...],
+                "top_frequencia": [...],
+                "por_ano": [...],
+                "por_tipo_compra": [...]
+            }
+        """
+        qs = self.filter_queryset(self.get_queryset())
+
+        total_itens = qs.aggregate(total=Sum("quantidade"))["total"] or 0
+        total_entregue = qs.aggregate(total=Sum("quantidade_utilizada"))["total"] or 0
+        total_disponivel = (
+            qs.aggregate(total=Sum(F("quantidade") - Coalesce(F("quantidade_utilizada"), 0)))["total"] or 0
+        )
+
+        municipios_atendidos = qs.values("municipio_id").distinct().count()
+        total_municipios_referencia = MunicipioReferencia.objects.filter(ativo=True).count()
+        cobertura_percentual = (
+            round((municipios_atendidos / total_municipios_referencia) * 100, 1)
+            if total_municipios_referencia > 0
+            else 0
+        )
+        produtos_diferentes = qs.values("produto_id").distinct().count()
+        colecoes_diferentes = (
+            qs.exclude(produto__colecao__isnull=True).values("produto__colecao_id").distinct().count()
+        )
+        valor_total = qs.aggregate(total=Sum(F("valor_unitario") * F("quantidade")))["total"] or 0
+
+        colecao_raw = (
+            qs.annotate(colecao_nome=Coalesce("produto__colecao__nome", Value("Sem coleção")))
+            .values("colecao_nome")
+            .annotate(quantidade=Sum("quantidade"))
+            .order_by("-quantidade")
+        )
+        por_colecao = []
+        for item in colecao_raw[:10]:
+            quantidade = item["quantidade"] or 0
+            por_colecao.append(
+                {
+                    "colecao": item["colecao_nome"],
+                    "quantidade": quantidade,
+                    "percentual": round((quantidade / total_itens * 100) if total_itens > 0 else 0, 1),
+                }
+            )
+
+        produtos_raw = (
+            qs.annotate(produto_nome=Coalesce("produto__nome", "descricao_produto", Value("Sem produto")))
+            .values("produto_nome")
+            .annotate(quantidade=Sum("quantidade"))
+            .order_by("-quantidade")
+        )
+        top_produtos = []
+        for item in produtos_raw[:10]:
+            quantidade = item["quantidade"] or 0
+            top_produtos.append(
+                {
+                    "produto": item["produto_nome"],
+                    "quantidade": quantidade,
+                    "percentual": round((quantidade / total_itens * 100) if total_itens > 0 else 0, 1),
+                }
+            )
+
+        municipios_raw = (
+            qs.values("municipio__nome", "municipio__uf")
+            .annotate(quantidade=Sum("quantidade"), compras=Count("id"), entregues=Sum("quantidade_utilizada"))
+            .order_by("-quantidade", "-compras")
+        )
+        top_municipios = [
+            {
+                "municipio": item["municipio__nome"],
+                "uf": item["municipio__uf"],
+                "quantidade": item["quantidade"] or 0,
+                "compras": item["compras"],
+                "entregues": item["entregues"] or 0,
+            }
+            for item in municipios_raw[:10]
+        ]
+
+        frequencia_raw = (
+            qs.values("municipio__nome", "municipio__uf")
+            .annotate(compras=Count("id"), quantidade=Sum("quantidade"))
+            .order_by("-compras", "-quantidade")
+        )
+        top_frequencia = [
+            {
+                "municipio": item["municipio__nome"],
+                "uf": item["municipio__uf"],
+                "compras": item["compras"],
+                "quantidade": item["quantidade"] or 0,
+            }
+            for item in frequencia_raw[:10]
+        ]
+
+        por_ano = list(
+            qs.values("ano_uso").annotate(quantidade=Sum("quantidade")).order_by("-ano_uso")[:6]
+        )
+
+        tipo_labels = {
+            "primeira": "Primeira compra",
+            "adicional_1": "Compra adicional 1",
+            "adicional_2": "Compra adicional 2",
+            "adicional_3": "Compra adicional 3",
+            None: "Não informado",
+        }
+        tipo_raw = (
+            qs.values("tipo_compra")
+            .annotate(quantidade=Sum("quantidade"))
+            .order_by("-quantidade")
+        )
+        por_tipo_compra = [
+            {
+                "tipo_compra": tipo_labels.get(item["tipo_compra"], item["tipo_compra"] or "Não informado"),
+                "quantidade": item["quantidade"] or 0,
+            }
+            for item in tipo_raw
+        ]
+
+        return Response(
+            {
+                "kpis": {
+                    "municipios_atendidos": municipios_atendidos,
+                    "total_municipios_referencia": total_municipios_referencia,
+                    "cobertura_percentual": cobertura_percentual,
+                    "total_itens": total_itens,
+                    "total_entregue": total_entregue,
+                    "total_disponivel": total_disponivel,
+                    "produtos_diferentes": produtos_diferentes,
+                    "colecoes_diferentes": colecoes_diferentes,
+                    "valor_total": valor_total,
+                },
+                "por_colecao": por_colecao,
+                "top_produtos": top_produtos,
+                "top_municipios": top_municipios,
+                "top_frequencia": top_frequencia,
+                "por_ano": por_ano,
+                "por_tipo_compra": por_tipo_compra,
             }
         )
 

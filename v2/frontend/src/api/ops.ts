@@ -211,6 +211,21 @@ export async function importUsuarios(file: File, dryRun: boolean = true): Promis
 }
 
 /**
+ * Importa MUNICIPIOS de CSV/XLSX.
+ *
+ * Colunas esperadas:
+ * - nome, uf (obrigatorios)
+ * - ibge_code, ativo (opcionais)
+ *
+ * @param file - Arquivo a enviar
+ * @param dryRun - Se true, apenas preview
+ */
+export async function importMunicipios(file: File, dryRun: boolean = true): Promise<ImportResult> {
+  return await postMultipart('/municipios/import/', file, dryRun);
+}
+
+
+/**
  * Importa PRODUTOS de CSV/XLSX.
  *
  * Colunas esperadas:

@@ -195,13 +195,18 @@ def resolve_municipio(nome: str) -> Municipio | None:
 
 def normalize_projeto_name(nome: str) -> str:
     """
-    Normaliza nome de projeto aplicando aliases (PR20 Task 3).
+    Normaliza nome de projeto aplicando aliases.
 
     ALIASES:
-    - "IDEB" → "GESTÃO ESCOLAR"
-    - "IDEB10" → "GESTÃO ESCOLAR"
-    - "IDEB/IDEB10" → "GESTÃO ESCOLAR"
-    - "IDEB 10" → "GESTÃO ESCOLAR"
+    - "IDEB" / "IDEB10" → "GESTÃO ESCOLAR"
+    - "Vida & Ciências" → "VIDA E CIÊNCIAS"
+    - "Vida & Linguagem" → "VIDA E LINGUAGEM"
+    - "Vida & Matemática" → "VIDA E MATEMÁTICA"
+    - "Cataventos" → "PROJETO CATAVENTO 2"
+    - "Miudezas" → "PROJETO MIUDEZAS E DESCOBERTAS"
+    - "ACerta" → "ACERTA MATEMATICA"
+    - "Superativar" → "SUPERATIVAR - LINGUAGENS"
+    - "Avançando Juntos Língua Portuguesa" → "AVANÇANDO JUNTOS PORTUGUÊS"
 
     Args:
         nome: Nome bruto do projeto
@@ -215,10 +220,34 @@ def normalize_projeto_name(nome: str) -> str:
     # Normalizar: lowercase, sem acentos, trim
     nome_norm = norm_text(nome)
 
-    # Mapear aliases IDEB → GESTÃO ESCOLAR
-    ideb_patterns = ["ideb", "ideb10", "ideb/ideb10", "ideb 10", "ideb-10"]
-    if nome_norm in ideb_patterns:
-        return "GESTÃO ESCOLAR"
+    # Mapeamento de aliases para nomes canônicos
+    alias_map: dict[str, str] = {
+        # IDEB → GESTÃO ESCOLAR
+        "ideb": "GESTÃO ESCOLAR",
+        "ideb10": "GESTÃO ESCOLAR",
+        "ideb/ideb10": "GESTÃO ESCOLAR",
+        "ideb 10": "GESTÃO ESCOLAR",
+        "ideb-10": "GESTÃO ESCOLAR",
+        # Vida & → VIDA E
+        "vida & ciencias": "VIDA E CIÊNCIAS",
+        "vida e ciencias": "VIDA E CIÊNCIAS",
+        "vida & linguagem": "VIDA E LINGUAGEM",
+        "vida e linguagem": "VIDA E LINGUAGEM",
+        "vida & matematica": "VIDA E MATEMÁTICA",
+        "vida e matematica": "VIDA E MATEMÁTICA",
+        # Variações de projetos
+        "cataventos": "PROJETO CATAVENTO 2",
+        "catavento": "PROJETO CATAVENTO 2",
+        "miudezas": "PROJETO MIUDEZAS E DESCOBERTAS",
+        "acerta": "ACERTA MATEMATICA",
+        "superativar": "SUPERATIVAR - LINGUAGENS",
+        # Avançando Juntos
+        "avancando juntos lingua portuguesa": "AVANÇANDO JUNTOS PORTUGUÊS",
+        "avancando juntos portugues": "AVANÇANDO JUNTOS PORTUGUÊS",
+    }
+
+    if nome_norm in alias_map:
+        return alias_map[nome_norm]
 
     # Retornar nome original (não normalizado) para manter case
     return nome

@@ -64,6 +64,10 @@ from .views_health import features, readyz
 from .views_import_bloqueios import ImportBloqueiosView
 from .views_import_deslocamentos import ImportDeslocamentosView
 from .views_import_eventos import ImportEventosView
+from .views_import_municipios import ImportMunicipiosView
+from .views_import_colecoes import ImportColecoesView
+from .views_import_equipe_gerencia import ImportEquipeGerenciaView
+from .views_import_municipios import ImportMunicipiosView
 from .views_import_produtos import ImportProdutosView
 from .views_import_usuarios import ImportUsuariosView
 from .views_imports import ControleImportAcoesView, DATImportCadastrosView
@@ -231,6 +235,21 @@ urlpatterns = [
         "produtos/import/",
         ImportProdutosView.as_view(),
         name="import-produtos",
+    ),
+    path(
+        "municipios/import/",
+        ImportMunicipiosView.as_view(),
+        name="import-municipios",
+    ),
+    path(
+        "colecoes/import/",
+        ImportColecoesView.as_view(),
+        name="import-colecoes",
+    ),
+    path(
+        "equipe-gerencia/import/",
+        ImportEquipeGerenciaView.as_view(),
+        name="import-equipe-gerencia",
     ),
     path(
         "dat/acoes/",

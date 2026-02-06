@@ -20,7 +20,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, Usuario
+from apps.core.models import AvailabilityBlock, EquipeGerencia, Gerencia, Usuario
 
 
 @pytest.fixture
@@ -61,6 +61,20 @@ def outro_usuario(db):
         password="testpass123",
         cpf="22222222222",
     )
+
+
+@pytest.fixture
+def gerencia_vidas(db):
+    """Gerência para testes de mesma gerência."""
+    return Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")
+
+
+@pytest.fixture
+def usuarios_mesma_gerencia(db, gerencia_vidas, usuario_comum, outro_usuario):
+    """Coloca dois usuários comuns na mesma gerência."""
+    EquipeGerencia.objects.create(gerencia=gerencia_vidas, usuario=usuario_comum, papel="FORMADOR")
+    EquipeGerencia.objects.create(gerencia=gerencia_vidas, usuario=outro_usuario, papel="FORMADOR")
+    return (usuario_comum, outro_usuario)
 
 
 @pytest.fixture
@@ -161,6 +175,39 @@ class TestAvailabilityBlockIDOR:
         assert response.status_code == 404
 
         # Verify block still exists
+        assert AvailabilityBlock.objects.filter(id=bloqueio_outro_usuario.id).exists()
+
+    def test_usuario_comum_mesma_gerencia_cannot_update_other_users_block(
+        self, api_client, usuarios_mesma_gerencia, bloqueio_outro_usuario
+    ):
+        """
+        C-03: Mesmo na mesma gerência, usuário comum não pode editar bloqueio de terceiro.
+        """
+        usuario_comum, _ = usuarios_mesma_gerencia
+        api_client.force_authenticate(usuario_comum)
+
+        response = api_client.patch(
+            f"/api/availability-blocks/{bloqueio_outro_usuario.id}/",
+            {"motivo": "Tentativa indevida"},
+            format="json",
+        )
+
+        assert response.status_code == 404
+        bloqueio_outro_usuario.refresh_from_db()
+        assert bloqueio_outro_usuario.motivo == "Bloqueio de outro usuário"
+
+    def test_usuario_comum_mesma_gerencia_cannot_delete_other_users_block(
+        self, api_client, usuarios_mesma_gerencia, bloqueio_outro_usuario
+    ):
+        """
+        C-03: Mesmo na mesma gerência, usuário comum não pode deletar bloqueio de terceiro.
+        """
+        usuario_comum, _ = usuarios_mesma_gerencia
+        api_client.force_authenticate(usuario_comum)
+
+        response = api_client.delete(f"/api/availability-blocks/{bloqueio_outro_usuario.id}/")
+
+        assert response.status_code == 404
         assert AvailabilityBlock.objects.filter(id=bloqueio_outro_usuario.id).exists()
 
     def test_usuario_comum_can_update_own_block(self, api_client, usuario_comum, db):

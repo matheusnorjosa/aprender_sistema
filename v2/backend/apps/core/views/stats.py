@@ -47,14 +47,13 @@ class HomeStatsView(APIView):
 
         is_superuser = user.is_superuser
         is_superintendencia = "Superintendência" in user_groups
-        is_gerente = "Gerente" in user_groups
         is_dat = "DAT" in user_groups
         is_coordenador = "Coordenador" in user_groups
         is_apoio = "Apoio de Coordenação" in user_groups
         is_formador = "Formador" in user_groups
 
         # Pode aprovar? (PA-02: Superintendência, DAT ou superuser)
-        can_approve = is_superuser or is_dat or (is_superintendencia and is_gerente)
+        can_approve = is_superuser or is_dat or is_superintendencia
 
         # Pode criar solicitações? (Coordenador, Apoio de Coordenação, DAT)
         can_create = is_superuser or is_dat or is_coordenador or is_apoio

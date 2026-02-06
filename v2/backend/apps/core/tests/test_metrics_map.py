@@ -2,7 +2,7 @@
 Testes para endpoint de métricas do mapa (PR 11/N).
 
 Cobertura:
-- Permissões (IsControleOrDAT)
+- Permissões (IsMapMetrics)
 - Validação de parâmetros
 - Agregação correta por UF
 - Filtros (status + projeto_id)

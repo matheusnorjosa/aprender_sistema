@@ -68,7 +68,7 @@ class CurrentUserView(APIView):
             "funcoes": list[str],       # Grupos de FUNÇÃO (o que pode fazer)
             "is_superuser": bool,
             "is_superintendencia": bool,
-            "can_approve_super": bool   # Pode aprovar solicitações SUPER
+            "can_approve_super": bool   # Pode aprovar/reprovar (Superintendência/DAT)
         }
     """
 
@@ -85,9 +85,9 @@ class CurrentUserView(APIView):
         # Superusers sempre têm acesso completo
         is_superintendencia: bool = user.is_superuser or ("Superintendência" in setores)
 
-        # Pode aprovar solicitações SUPER?
-        # Regra: Gerente + Superintendência (ou superuser)
-        can_approve_super = user.is_superuser or ("Gerente" in funcoes and "Superintendência" in setores)
+        # Pode aprovar/reprovar solicitações?
+        # Regra: Superintendência, DAT ou superuser (PA-02 Adaptada)
+        can_approve_super = user.is_superuser or ("Superintendência" in setores) or ("DAT" in setores)
 
         # Compute display name
         name: str = f"{user.first_name or ''} {user.last_name or ''}".strip()

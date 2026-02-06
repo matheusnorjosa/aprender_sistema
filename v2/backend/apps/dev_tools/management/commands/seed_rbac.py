@@ -9,6 +9,7 @@ Grupos criados:
 - Controle
 - DAT
 - Gerência
+- Diretoria
 
 Permissões atribuídas por grupo conforme PR 12/N.
 Atualizado em 2025-12-01: Adicionado grupo "Apoio de Coordenação".
@@ -33,6 +34,7 @@ GROUPS = [
     "Controle",
     "DAT",
     "Gerência",
+    "Diretoria",
 ]
 
 PERMS_BY_GROUP = {
@@ -93,6 +95,8 @@ PERMS_BY_GROUP = {
     ],
     # Gerência: view solicitações (legacy)
     "Gerência": [("view", Solicitacao)],
+    # Diretoria: view solicitações (dashboards)
+    "Diretoria": [("view", Solicitacao)],
 }
 
 

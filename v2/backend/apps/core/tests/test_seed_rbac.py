@@ -30,6 +30,7 @@ def test_seed_rbac_creates_groups():
         "Controle",
         "DAT",
         "Gerência",
+        "Diretoria",
     ]
 
     for group_name in expected_groups:

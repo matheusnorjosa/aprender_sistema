@@ -461,12 +461,14 @@ function AppContent(): JSX.Element {
   const isCoordenador = funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação');
 
   // Permissões baseadas em SETOR
+  const inSuperintendencia = setores.includes('Superintendência');
+  const inGerencia = setores.includes('Gerência');
   const inDAT = setores.includes('DAT');
   const inControle = setores.includes('Controle');
   const inDiretoria = setores.includes('Diretoria');
 
   // Permissões compostas (Setor + Função)
-  // canApproveSuper = pode aprovar solicitações SUPER (Gerente + Superintendência)
+  // canApproveSuper = pode aprovar/reprovar solicitações (Superintendência/DAT)
   const canApproveSuper = user?.can_approve_super || false;
   // canCoordenador = pode criar solicitações
   const canCoordenador = user?.is_superuser || isCoordenador || inDAT;
@@ -474,8 +476,12 @@ function AppContent(): JSX.Element {
   const canControle = user?.is_superuser || inControle;
   // canDAT = acesso a Admin DAT
   const canDAT = user?.is_superuser || inDAT;
-  // canDashboards = acesso aos dashboards (Diretoria, DAT, superuser)
-  const canDashboards = user?.is_superuser || inDiretoria || inDAT;
+  // Acesso por página de dashboard
+  const canDashboardOverview = user?.is_superuser || inSuperintendencia || inGerencia || inDiretoria;
+  const canDashboardEquipe = user?.is_superuser || inControle || inGerencia || inSuperintendencia || inDiretoria;
+  const canDashboardGcal = user?.is_superuser || inControle || inSuperintendencia;
+  const canMapaBrasil = user?.is_superuser || inControle || inDAT || inSuperintendencia || inGerencia || inDiretoria;
+  const canDashboardsMenu = canDashboardOverview || canDashboardEquipe || canDashboardGcal || canMapaBrasil;
   // canDisponibilidade = acesso à grade mensal (todos exceto Controle)
   const canDisponibilidade = user?.is_superuser || !inControle;
 
@@ -602,24 +608,32 @@ function AppContent(): JSX.Element {
               )}
 
               {/* 5. Dashboards */}
-              {canDashboards && (
+              {canDashboardsMenu && (
                 <SubMenu key="dashboards-submenu" icon={<BarChartOutlined />} title="Dashboards">
-                  <Menu.Item key="dashboard-geral">
-                    <Link to="/dashboards">Dashboard Geral</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dashboard-equipe">
-                    <Link to="/dashboards/equipe">Dashboard Equipe</Link>
-                  </Menu.Item>
-                  <Menu.Item key="gcal-dashboard">
-                    <Link to="/dashboards/gcal">
-                      <Badge count={alerts.errors} offset={[10, 0]} size="small">
-                        Dashboard GCal
-                      </Badge>
-                    </Link>
-                  </Menu.Item>
-                  <Menu.Item key="mapa-brasil">
-                    <Link to="/mapa-brasil">Mapa do Brasil</Link>
-                  </Menu.Item>
+                  {canDashboardOverview && (
+                    <Menu.Item key="dashboard-geral">
+                      <Link to="/dashboards">Dashboard Geral</Link>
+                    </Menu.Item>
+                  )}
+                  {canDashboardEquipe && (
+                    <Menu.Item key="dashboard-equipe">
+                      <Link to="/dashboards/equipe">Dashboard Equipe</Link>
+                    </Menu.Item>
+                  )}
+                  {canDashboardGcal && (
+                    <Menu.Item key="gcal-dashboard">
+                      <Link to="/dashboards/gcal">
+                        <Badge count={alerts.errors} offset={[10, 0]} size="small">
+                          Dashboard GCal
+                        </Badge>
+                      </Link>
+                    </Menu.Item>
+                  )}
+                  {canMapaBrasil && (
+                    <Menu.Item key="mapa-brasil">
+                      <Link to="/mapa-brasil">Mapa do Brasil</Link>
+                    </Menu.Item>
+                  )}
                 </SubMenu>
               )}
 
@@ -737,28 +751,28 @@ function AppContent(): JSX.Element {
                   <Route path="/" element={<HomePage />} />
                   <Route path="/home" element={<HomePage />} />
 
-                  {/* Dashboards (Diretoria, DAT, superuser) */}
+                  {/* Dashboard Geral */}
                   <Route
                     path="/dashboards"
-                    element={canDashboards ? <DashboardsPage /> : <Forbidden />}
+                    element={canDashboardOverview ? <DashboardsPage /> : <Forbidden />}
                   />
 
-                  {/* Dashboard Equipe (Diretoria, DAT, superuser) */}
+                  {/* Dashboard Equipe */}
                   <Route
                     path="/dashboards/equipe"
-                    element={canDashboards ? <EquipeDashboardPage /> : <Forbidden />}
+                    element={canDashboardEquipe ? <EquipeDashboardPage /> : <Forbidden />}
                   />
 
-                  {/* GCal Dashboard (Diretoria, DAT, superuser) */}
+                  {/* GCal Dashboard */}
                   <Route
                     path="/dashboards/gcal"
-                    element={canDashboards ? <GCalDashboardPage /> : <Forbidden />}
+                    element={canDashboardGcal ? <GCalDashboardPage /> : <Forbidden />}
                   />
 
-                  {/* Mapa do Brasil (Diretoria, DAT, superuser) */}
+                  {/* Mapa do Brasil */}
                   <Route
                     path="/mapa-brasil"
-                    element={canDashboards ? <MapaBrasilPage /> : <Forbidden />}
+                    element={canMapaBrasil ? <MapaBrasilPage /> : <Forbidden />}
                   />
 
                   <Route
@@ -781,7 +795,7 @@ function AppContent(): JSX.Element {
                     element={user ? <EditSolicitacaoPage /> : <Forbidden />}
                   />
 
-                  {/* PR15: Rota de aprovações (Gerente + Superintendência) */}
+                  {/* PR15: Rota de aprovações (Superintendência/DAT) */}
                   <Route
                     path="/aprovacoes"
                     element={canApproveSuper ? <ApprovalsPage /> : <Forbidden />}

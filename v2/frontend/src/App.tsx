@@ -490,8 +490,10 @@ function AppContent(): JSX.Element {
   const canDashboardOverview = user?.is_superuser || inSuperintendencia || inGerencia || inDiretoria;
   const canDashboardEquipe = user?.is_superuser || inControle || inGerencia || inSuperintendencia || inDiretoria;
   const canDashboardGcal = user?.is_superuser || inControle || inSuperintendencia;
+  const canDashboardCompras = user?.is_superuser || inDiretoria || inDAT; // dados sensíveis de compras
   const canMapaBrasil = user?.is_superuser || inControle || inDAT || inSuperintendencia || inGerencia || inDiretoria;
-  const canDashboardsMenu = canDashboardOverview || canDashboardEquipe || canDashboardGcal || canMapaBrasil;
+  const canDashboardsMenu =
+    canDashboardOverview || canDashboardCompras || canDashboardEquipe || canDashboardGcal || canMapaBrasil;
   // canDisponibilidade = acesso à grade mensal (todos exceto Controle)
   const canDisponibilidade = user?.is_superuser || !inControle;
 
@@ -620,12 +622,12 @@ function AppContent(): JSX.Element {
               {/* 5. Dashboards */}
               {canDashboardsMenu && (
                 <SubMenu key="dashboards-submenu" icon={<BarChartOutlined />} title="Dashboards">
-{canDashboardOverview && (
+                  {canDashboardOverview && (
                     <Menu.Item key="dashboard-geral">
                       <Link to="/dashboards">Dashboard Geral</Link>
                     </Menu.Item>
                   )}
-                  {canDashboards && (
+                  {canDashboardCompras && (
                     <Menu.Item key="dashboard-compras">
                       <Link to="/dashboards/compras">Dashboard Compras</Link>
                     </Menu.Item>
@@ -781,7 +783,7 @@ function AppContent(): JSX.Element {
 {/* Dashboard Compras (Diretoria, DAT, superuser) */}
                   <Route
                     path="/dashboards/compras"
-                    element={canDashboards ? <ComprasDashboardPage /> : <Forbidden />}
+                    element={canDashboardOverview ? <ComprasDashboardPage /> : <Forbidden />}
                   />
 
                   {/* Dashboard Equipe */}

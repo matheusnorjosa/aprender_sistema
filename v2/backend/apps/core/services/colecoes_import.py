@@ -190,9 +190,7 @@ def _process_row(
 
     if not projeto_nome:
         stats["skipped"]["projeto_missing"] += 1
-        pendencias["projeto_missing"].append(
-            {"linha": linha_num, "erro": "Projeto ausente", "colecao": nome}
-        )
+        pendencias["projeto_missing"].append({"linha": linha_num, "erro": "Projeto ausente", "colecao": nome})
         return
 
     projeto = _resolve_projeto_cached(projeto_nome, projeto_cache)

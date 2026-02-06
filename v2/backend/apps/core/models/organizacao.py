@@ -449,7 +449,12 @@ class Produto(models.Model):
         "core.Projeto", on_delete=models.PROTECT, related_name="produtos", help_text="Projeto vinculado"
     )
     colecao: models.ForeignKey["Colecao"] | None = models.ForeignKey(  # type: ignore[assignment]
-        "core.Colecao", on_delete=models.SET_NULL, null=True, blank=True, related_name="produtos", help_text="Colecao do produto"
+        "core.Colecao",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="produtos",
+        help_text="Colecao do produto",
     )
     ativo = models.BooleanField(default=True, help_text="Produto disponivel")
 

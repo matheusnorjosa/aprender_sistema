@@ -370,9 +370,7 @@ def _process_row(
     gerencia = _get_or_create_gerencia(setor, stats)
     if not gerencia:
         stats["skipped"]["setor_missing"] += 1
-        pendencias["setor_missing"].append(
-            {"linha": linha_num, "erro": "Gerencia nao encontrada", "setor": setor}
-        )
+        pendencias["setor_missing"].append({"linha": linha_num, "erro": "Gerencia nao encontrada", "setor": setor})
         return
 
     usuario = _resolve_usuario(

@@ -25,7 +25,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Compra, Municipio, Participation, Produto, Projeto, Solicitacao, TipoEvento, Usuario
 
 pytestmark = pytest.mark.django_db
 
@@ -246,7 +246,7 @@ def test_map_metrics_superuser_allowed():
 
 
 def test_map_metrics_response_structure(user_controle, solicitacoes_variedade):
-    """Resposta tem estrutura esperada com by_municipio."""
+    """Resposta tem estrutura esperada com by_municipio e by_uf."""
     client = APIClient()
     client.force_authenticate(user=user_controle)
 
@@ -265,6 +265,19 @@ def test_map_metrics_response_structure(user_controle, solicitacoes_variedade):
     assert "totals" in data
     assert "all" in data["totals"]
     assert "by_status" in data["totals"]
+    assert "compras" in data["totals"]
+
+    # Verificar by_uf
+    assert "by_uf" in data
+    assert isinstance(data["by_uf"], list)
+    if len(data["by_uf"]) > 0:
+        uf_item = data["by_uf"][0]
+        assert "uf" in uf_item
+        assert "eventos" in uf_item
+        assert "projetos" in uf_item
+        assert "municipios" in uf_item
+        assert "coordenadores" in uf_item
+        assert "compras" in uf_item
 
     # Verificar by_municipio (não mais by_uf)
     assert "by_municipio" in data
@@ -280,6 +293,7 @@ def test_map_metrics_response_structure(user_controle, solicitacoes_variedade):
         assert "projetos" in mun
         assert "eventos" in mun
         assert "coordenadores" in mun
+        assert "compras" in mun
 
     # Verificar top_projetos
     assert "top_projetos" in data
@@ -338,6 +352,145 @@ def test_map_metrics_by_municipio_ordered_descending(user_controle, solicitacoes
     # Eventos devem estar em ordem decrescente
     for i in range(len(by_municipio) - 1):
         assert by_municipio[i]["eventos"] >= by_municipio[i + 1]["eventos"]
+
+
+def test_map_metrics_coordenadores_homonimos_nao_colidem_por_nome(user_controle):
+    """Municípios homônimos em UFs diferentes não devem compartilhar contagem de coordenadores."""
+    client = APIClient()
+    client.force_authenticate(user=user_controle)
+
+    projeto = Projeto.objects.create(nome="Projeto Homônimos", codigo="PH01", fluxo="SUPER")
+    tipo = TipoEvento.objects.create(nome="Tipo Homônimos")
+
+    municipio_ce = Municipio.objects.create(
+        nome="Santa Maria",
+        uf="CE",
+        ibge_code="2300001",
+        latitude=-3.12,
+        longitude=-39.10,
+    )
+    municipio_sp = Municipio.objects.create(
+        nome="Santa Maria",
+        uf="SP",
+        ibge_code="3500001",
+        latitude=-22.10,
+        longitude=-47.10,
+    )
+
+    criador = Usuario.objects.create_user(
+        username="criador_homonimo",
+        email="criador_homonimo@test.com",
+        password="x",
+        cpf="10101010101",
+    )
+    coord_ce = Usuario.objects.create_user(
+        username="coord_ce", email="coord_ce@test.com", password="x", cpf="20202020202"
+    )
+    coord_sp = Usuario.objects.create_user(
+        username="coord_sp", email="coord_sp@test.com", password="x", cpf="30303030303"
+    )
+
+    now = timezone.now()
+    sol_ce = Solicitacao.objects.create(
+        usuario=criador,
+        status="aprovado",
+        inicio=now,
+        fim=now + timedelta(hours=2),
+        municipio=municipio_ce,
+        projeto=projeto,
+        tipo_evento=tipo,
+    )
+    sol_sp = Solicitacao.objects.create(
+        usuario=criador,
+        status="aprovado",
+        inicio=now + timedelta(days=1),
+        fim=now + timedelta(days=1, hours=2),
+        municipio=municipio_sp,
+        projeto=projeto,
+        tipo_evento=tipo,
+    )
+
+    Participation.objects.create(solicitacao=sol_ce, usuario=coord_ce, role=Participation.Role.COORDENADOR)
+    Participation.objects.create(solicitacao=sol_sp, usuario=coord_sp, role=Participation.Role.COORDENADOR)
+
+    url = reverse("core:metrics-map")
+    res = client.get(url)
+
+    assert res.status_code == 200
+    data = res.json()
+    by_mun = {f"{m['municipio']}-{m['uf']}": m for m in data["by_municipio"]}
+
+    assert by_mun["Santa Maria-CE"]["coordenadores"] == 1
+    assert by_mun["Santa Maria-SP"]["coordenadores"] == 1
+
+
+def test_map_metrics_eventos_e_compras_separados_no_payload(user_controle):
+    """Métrica de eventos não deve ser contaminada por compras."""
+    client = APIClient()
+    client.force_authenticate(user=user_controle)
+
+    projeto = Projeto.objects.create(nome="Projeto Compras", codigo="PC01", fluxo="SUPER")
+    tipo = TipoEvento.objects.create(nome="Tipo Compras")
+    municipio = Municipio.objects.create(
+        nome="Maracanaú",
+        uf="CE",
+        ibge_code="2307650",
+        latitude=-3.88,
+        longitude=-38.62,
+    )
+
+    criador = Usuario.objects.create_user(
+        username="criador_compra", email="criador_compra@test.com", password="x", cpf="40404040404"
+    )
+    now = timezone.now()
+    Solicitacao.objects.create(
+        usuario=criador,
+        status="aprovado",
+        inicio=now,
+        fim=now + timedelta(hours=2),
+        municipio=municipio,
+        projeto=projeto,
+        tipo_evento=tipo,
+    )
+
+    produto_model = Produto.objects.create(nome="Kit Didático", codigo="KIT01", projeto=projeto)
+    Compra.objects.create(
+        codigo="COMP-001",
+        produto=produto_model,
+        projeto=projeto,
+        municipio=municipio,
+        quantidade=10,
+        data=timezone.localdate(),
+        uso="Uso 1",
+        external_hash="hash_compra_001",
+    )
+    Compra.objects.create(
+        codigo="COMP-002",
+        produto=produto_model,
+        projeto=projeto,
+        municipio=municipio,
+        quantidade=20,
+        data=timezone.localdate(),
+        uso="Uso 2",
+        external_hash="hash_compra_002",
+    )
+
+    url = reverse("core:metrics-map")
+    res = client.get(url)
+
+    assert res.status_code == 200
+    data = res.json()
+
+    assert data["totals"]["all"] == 1
+    assert data["totals"]["compras"] == 2
+
+    by_uf = next(item for item in data["by_uf"] if item["uf"] == "CE")
+    assert by_uf["eventos"] == 1
+    assert by_uf["compras"] == 2
+
+    by_mun = next(item for item in data["by_municipio"] if item["municipio"] == "Maracanaú")
+    assert by_mun["eventos"] == 1
+    assert by_mun["compras"] == 2
 
 
 # ============================================================================
@@ -421,6 +574,34 @@ def test_map_metrics_filter_combined(user_controle, solicitacoes_variedade, dado
     assert data["by_municipio"][0]["eventos"] == 3
 
 
+def test_map_metrics_filter_by_date_range(user_controle, solicitacoes_variedade):
+    """Filtro por data_inicio/data_fim deve alterar resultado de forma verificável."""
+    client = APIClient()
+    client.force_authenticate(user=user_controle)
+
+    url = reverse("core:metrics-map")
+    today = timezone.localdate()
+
+    # Janela que deve capturar somente as 2 solicitações de São Paulo (+10 e +11 dias).
+    res = client.get(
+        url,
+        {
+            "data_inicio": (today + timedelta(days=9)).isoformat(),
+            "data_fim": (today + timedelta(days=11)).isoformat(),
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+
+    assert data["meta"]["filters"]["data_inicio"] == (today + timedelta(days=9)).isoformat()
+    assert data["meta"]["filters"]["data_fim"] == (today + timedelta(days=11)).isoformat()
+    assert data["totals"]["all"] == 2
+    assert len(data["by_municipio"]) == 1
+    assert data["by_municipio"][0]["municipio"] == "São Paulo"
+    assert data["by_municipio"][0]["uf"] == "SP"
+    assert data["by_municipio"][0]["eventos"] == 2
+
+
 # ============================================================================
 # TESTES DE VALIDAÇÃO
 # ============================================================================
@@ -450,6 +631,42 @@ def test_map_metrics_invalid_projeto_id(user_controle):
     assert "detail" in res.json()
 
 
+def test_map_metrics_invalid_data_inicio(user_controle):
+    """data_inicio inválida retorna 400."""
+    client = APIClient()
+    client.force_authenticate(user=user_controle)
+
+    url = reverse("core:metrics-map")
+    res = client.get(url, {"data_inicio": "2026/01/01"})
+
+    assert res.status_code == 400
+    assert "detail" in res.json()
+
+
+def test_map_metrics_invalid_date_range(user_controle):
+    """data_inicio > data_fim retorna 400."""
+    client = APIClient()
+    client.force_authenticate(user=user_controle)
+
+    url = reverse("core:metrics-map")
+    res = client.get(url, {"data_inicio": "2026-02-10", "data_fim": "2026-02-01"})
+
+    assert res.status_code == 400
+    assert "detail" in res.json()
+
+
+def test_map_metrics_invalid_limit(user_controle):
+    """limit inválido retorna 400."""
+    client = APIClient()
+    client.force_authenticate(user=user_controle)
+
+    url = reverse("core:metrics-map")
+    res = client.get(url, {"limit": "invalido"})
+
+    assert res.status_code == 400
+    assert "detail" in res.json()
+
+
 # ============================================================================
 # TESTES DE CASO ZERO-STATE
 # ============================================================================
@@ -467,6 +684,8 @@ def test_map_metrics_empty_database(user_controle):
     data = res.json()
 
     assert data["totals"]["all"] == 0
+    assert data["totals"]["compras"] == 0
+    assert data["by_uf"] == []
     assert data["by_municipio"] == []
     assert data["top_projetos"] == []
 

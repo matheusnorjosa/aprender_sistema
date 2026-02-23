@@ -152,7 +152,7 @@ def _payload_hash(payload: JsonDict) -> PayloadHash:
         str: Hash SHA1 hex (40 chars)
     """
     serialized: str = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha1(serialized.encode("utf-8")).hexdigest()
+    return hashlib.sha1(serialized.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def _retry_with_circuit_breaker(

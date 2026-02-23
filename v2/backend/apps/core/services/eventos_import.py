@@ -367,7 +367,7 @@ def _compute_external_hash(
         hora_fim.strftime("%H:%M"),
     ]
     content = "|".join(parts)
-    return hashlib.sha1(content.encode("utf-8")).hexdigest()
+    return hashlib.sha1(content.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def _determine_status(projeto: Any, data_evento: date, today: date) -> str:

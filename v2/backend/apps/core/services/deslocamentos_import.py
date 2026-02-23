@@ -265,7 +265,7 @@ def _compute_external_hash(usuario_id: int, origem: str, destino: str, start: da
         end.isoformat(),
     ]
     content = "|".join(parts)
-    return hashlib.sha1(content.encode("utf-8")).hexdigest()
+    return hashlib.sha1(content.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def _process_row(

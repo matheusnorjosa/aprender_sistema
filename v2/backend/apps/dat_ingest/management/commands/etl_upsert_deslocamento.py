@@ -440,7 +440,7 @@ class Command(BaseCommand):
             end.isoformat(),
         ]
         content = "|".join(parts)
-        return hashlib.sha1(content.encode("utf-8")).hexdigest()
+        return hashlib.sha1(content.encode("utf-8"), usedforsecurity=False).hexdigest()
 
     def generate_report(self):
         """Gera relatório JSON de pendências."""

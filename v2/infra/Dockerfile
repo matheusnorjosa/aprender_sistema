@@ -1,5 +1,6 @@
 FROM python:3.12-slim
 WORKDIR /app
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Copy requirements first (better layer caching)
 COPY backend/requirements.txt /app/requirements.txt
@@ -10,7 +11,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # === Dev tools sempre instaladas (modo único) ===
 # postgresql-client: Required for backup script (pg_dump) - Issue #562 (C-05)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     curl jq httpie vim nano tree less tzdata ca-certificates libpq5 \
     postgresql-client \
  && rm -rf /var/lib/apt/lists/*
@@ -23,7 +24,7 @@ RUN pip install --no-cache-dir \
     openpyxl==3.1.5 \
     pyarrow==15.0.2 \
     rapidfuzz==3.6.1 \
-    requests==2.32.3 \
+    requests==2.32.5 \
     tqdm==4.66.4 \
     csvkit==1.3.0 \
     pytest-watch==4.2.0

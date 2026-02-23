@@ -34,7 +34,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def sha1_str(s: str) -> str:
     """Gera SHA1 hex digest de uma string."""
-    return hashlib.sha1(s.encode("utf-8")).hexdigest()
+    return hashlib.sha1(s.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def parse_date_flexible(v: str | None) -> date | None:

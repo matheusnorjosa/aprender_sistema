@@ -23,7 +23,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from apps.core.models import Compra, Municipio, Projeto
+from apps.core.models import Compra, Municipio, Produto, Projeto
 from apps.core.services.normalize import norm_text
 from apps.core.services.resolvers import resolve_municipio, resolve_projeto
 from apps.core.types import ExternalHash
@@ -307,6 +307,12 @@ def _infer_projeto_from_produto(produto_norm: str) -> Projeto | None:
         return None
 
     key: str = produto_norm.upper()
+
+    # Fallback: match exato com produtos cadastrados (normalizando nome)
+    norm_key = norm_text(produto_norm)
+    for p in Produto.objects.all():
+        if norm_text(p.nome) == norm_key:
+            return p.projeto
 
     # Mapeamento de padrões → nomes de projeto no banco
     # Ordem: mais específico primeiro

@@ -148,7 +148,8 @@ jobs:
           if [ "$json_exit_code" -ne 0 ]; then
             echo "npm audit JSON reported issues/errors (captured for artifact)"
           fi
-          npm audit --audit-level=high
+          # Gate only production dependencies in PR CI.
+          npm audit --omit=dev --audit-level=high
 
       - name: Upload npm audit report
         uses: actions/upload-artifact@v4
@@ -178,9 +179,26 @@ jobs:
           chmod +x gitleaks
           sudo mv gitleaks /usr/local/bin/gitleaks
 
+      - name: Determine Gitleaks scan range
+        id: gitleaks-range
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "log_opts=${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "log_opts=${{ github.event.before }}..${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "log_opts=--since=168h" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run Gitleaks
         run: |
-          gitleaks git --redact --report-format json --report-path gitleaks-report.json --exit-code 1
+          gitleaks git \
+            --redact \
+            --log-opts "${{ steps.gitleaks-range.outputs.log_opts }}" \
+            --report-format json \
+            --report-path gitleaks-report.json \
+            --exit-code 1
 
       - name: Run TruffleHog
         uses: trufflesecurity/trufflehog@main

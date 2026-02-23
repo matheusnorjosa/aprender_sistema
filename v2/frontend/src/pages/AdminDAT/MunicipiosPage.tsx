@@ -11,6 +11,9 @@ import type { ColumnsType } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { listMunicipios, createMunicipio, updateMunicipio, deleteMunicipio } from '../../api/adminDAT';
+import { importMunicipios } from '../../api/ops';
+import ImportUploader from '../../components/ImportUploader';
+import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
 import { UF_NORDESTE_OPTIONS } from '../../constants';
 import type { ID } from '../../types';
 
@@ -36,6 +39,30 @@ interface MunicipioFormValues {
   uf: string;
   ibge_code: string;
   ativo: boolean;
+}
+
+function toValidationResult(report: Record<string, unknown>): ValidationResult {
+  const stats = (report.stats as Record<string, number | undefined>) || {};
+  return {
+    stats: {
+      created: stats.created || 0,
+      updated: stats.updated || 0,
+      unchanged: stats.unchanged || 0,
+    },
+    errors: [],
+    pendencias: (report.pendencias as Record<string, unknown>) || {},
+  };
+}
+
+function toApplyResult(report: Record<string, unknown>): ApplyResult {
+  const stats = (report.stats as Record<string, number | undefined>) || {};
+  return {
+    stats: {
+      created: stats.created || 0,
+      updated: stats.updated || 0,
+      unchanged: stats.unchanged || 0,
+    },
+  };
 }
 
 export default function MunicipiosPage(): JSX.Element {
@@ -203,6 +230,18 @@ export default function MunicipiosPage(): JSX.Element {
           loading={loading}
           pagination={{ pageSize: 15, showTotal: (total) => `Total: ${total}` }}
           scroll={{ x: 1000 }}
+        />
+      </Card>
+
+      <Card className="mt-6">
+        <header className="flex justify-between items-center mb-4">
+          <Title level={4} className="m-0">Importação de Municípios</Title>
+        </header>
+        <ImportUploader
+          label="Importar Municípios"
+          description="CSV/XLSX com colunas: nome, uf (obrigatórios), ibge_code e ativo (opcionais)"
+          onDryRun={async (file: File) => toValidationResult(await importMunicipios(file, true) as unknown as Record<string, unknown>)}
+          onApply={async (file: File) => toApplyResult(await importMunicipios(file, false) as unknown as Record<string, unknown>)}
         />
       </Card>
 

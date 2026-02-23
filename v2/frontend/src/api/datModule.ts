@@ -312,6 +312,37 @@ export async function getComprasStats(params: FilterParams = {}): Promise<Generi
   return apiRequest(() => api.get('/dat/compras-materiais/stats/', { params }));
 }
 
+// Dashboard de Compras
+export interface ComprasDashboardKpis {
+  municipios_atendidos: number;
+  total_municipios_referencia: number;
+  cobertura_percentual: number;
+  total_itens: number;
+  total_entregue: number;
+  total_disponivel: number;
+  produtos_diferentes: number;
+  colecoes_diferentes: number;
+  valor_total: number;
+}
+
+export interface ComprasDashboardItem {
+  [key: string]: string | number;
+}
+
+export interface ComprasDashboardData {
+  kpis: ComprasDashboardKpis;
+  por_colecao: ComprasDashboardItem[];
+  top_produtos: ComprasDashboardItem[];
+  top_municipios: ComprasDashboardItem[];
+  top_frequencia: ComprasDashboardItem[];
+  por_ano: ComprasDashboardItem[];
+  por_tipo_compra: ComprasDashboardItem[];
+}
+
+export async function getComprasDashboard(params: FilterParams = {}): Promise<ComprasDashboardData> {
+  return apiRequest(() => api.get('/dat/compras-materiais/dashboard/', { params }));
+}
+
 // ========== CADASTROS (Workflow FORMAR/AVALIAR) ==========
 
 /**

@@ -424,6 +424,22 @@ class TestMetricsMapCoordinators:
         assert "coordenadores" in data
         assert len(data["coordenadores"]) >= 1
 
+    def test_coordinators_respect_date_filters(self, user_controle, solicitacoes_ce):
+        """
+        Test: Endpoint aplica filtros data_inicio/data_fim junto com UF.
+        """
+        client = APIClient()
+        client.force_authenticate(user=user_controle)
+
+        url = reverse("core:metrics-map-coordinators")
+        future_start = (timezone.localdate() + timedelta(days=365)).isoformat()
+        response = client.get(url, {"uf": "CE", "data_inicio": future_start})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["uf"] == "CE"
+        assert data["coordenadores"] == []
+
     def test_coordinator_has_expected_structure(self, user_controle, solicitacoes_ce, coordenador_user):
         """
         Test: Each coordinator has id, nome, eventos, projetos, municipios.

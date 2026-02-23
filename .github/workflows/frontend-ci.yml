@@ -11,6 +11,9 @@ on:
     # Removed path filters for pull_request to ensure required check always runs
     # This is needed because the ruleset requires "frontend-ci" as a status check
 
+permissions:
+  contents: read
+
 jobs:
   build-lint-frontend:
     name: build/lint do frontend

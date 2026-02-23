@@ -74,7 +74,7 @@ def test_import_acoes_requires_controle():
     csv_data = b"Municipio,Projeto,Coordenador,Data da Entrega,Data Reuniao Alinhamento,Observacao\nAcarape,Gestao Escolar,coord@test.com,2025-01-10,2025-01-20,ok\n"
 
     with patch("apps.core.views_imports.import_acoes_controle") as mock_import:
-        mock_import.return_value = {"stats": {}, "pendencias": {}, "dry_run": True, "file": "/tmp/mock.csv"}
+        mock_import.return_value = {"stats": {}, "pendencias": {}, "dry_run": True, "file": "mock.csv"}
 
         r = client.post(
             "/api/controle/import-acoes/?dry_run=true",
@@ -99,7 +99,7 @@ def test_import_cadastros_requires_dat():
     csv_data = b"Municipio,Projeto,Tipo de acao,Responsavel,Observacao,Data\nAcarape,Gestao Escolar,Criar curso,dat@test.com,ok,2025-04-01\n"
 
     with patch("apps.core.views_imports.import_dat_cadastros") as mock_import:
-        mock_import.return_value = {"stats": {}, "pendencias": {}, "dry_run": True, "file": "/tmp/mock.csv"}
+        mock_import.return_value = {"stats": {}, "pendencias": {}, "dry_run": True, "file": "mock.csv"}
 
         r = client.post(
             "/api/dat/import-cadastros/?dry_run=true",

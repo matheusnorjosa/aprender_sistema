@@ -45,7 +45,7 @@ def cache_availability_check(timeout: int = 300) -> Callable[[F], F]:
                 "municipio_id": municipio.id if municipio else None,
             }
             key_str = json.dumps(key_data, sort_keys=True)
-            key_hash = hashlib.md5(key_str.encode()).hexdigest()
+            key_hash = hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
             cache_key = f"availability_check:{key_hash}"
 
             # Tentar buscar do cache

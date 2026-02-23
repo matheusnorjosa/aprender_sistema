@@ -15,12 +15,16 @@ on:
   pull_request:
     branches:
       - main
-      - feat/dashboard-compras-etl
     paths:
       - 'v2/**'
+      - '.github/workflows/security-scan.yml'
   schedule:
     # Run weekly on Sundays at 00:00 UTC
     - cron: '0 0 * * 0'
+
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
   # ================================================================
@@ -43,25 +47,19 @@ jobs:
           pip install safety bandit pip-audit
 
       - name: Run Safety (CVE check)
-        continue-on-error: true
         run: |
           cd v2/backend
-          safety check -r requirements.txt --output json > safety-report.json || true
-          safety check -r requirements.txt
+          safety check -r requirements.txt --output json > safety-report.json
 
       - name: Run pip-audit (PyPI Advisory Database)
-        continue-on-error: true
         run: |
           cd v2/backend
-          pip-audit -r requirements.txt --format json > pip-audit-report.json || true
-          pip-audit -r requirements.txt
+          pip-audit -r requirements.txt --format json > pip-audit-report.json
 
       - name: Run Bandit (SAST)
-        continue-on-error: true
         run: |
           cd v2/backend
-          bandit -r apps/ -f json -o bandit-report.json --skip B101,B601 || true
-          bandit -r apps/ --skip B101,B601 -ll
+          bandit -r apps/ -f json -o bandit-report.json --skip B101,B601 -ll
 
       - name: Upload security reports
         uses: actions/upload-artifact@v4
@@ -88,16 +86,6 @@ jobs:
           cd v2
           docker build -f infra/Dockerfile -t aprender-backend:scan .
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'aprender-backend:scan'
-          format: 'table'
-          exit-code: '0'  # Don't fail on vulnerabilities (just report)
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-
       - name: Run Trivy (JSON report)
         uses: aquasecurity/trivy-action@master
         with:
@@ -107,6 +95,16 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Run Trivy vulnerability scanner (blocking HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'aprender-backend:scan'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy report
         uses: actions/upload-artifact@v4
@@ -136,11 +134,22 @@ jobs:
           npm ci
 
       - name: Run npm audit
-        continue-on-error: true
         run: |
+          set -euo pipefail
           cd v2/frontend
-          npm audit --json > npm-audit-report.json || true
-          npm audit --audit-level=high
+          set +e
+          npm audit --json > npm-audit-report.json
+          json_exit_code=$?
+          set -e
+          if [ ! -s npm-audit-report.json ]; then
+            echo "npm-audit-report.json not generated" >&2
+            exit 1
+          fi
+          if [ "$json_exit_code" -ne 0 ]; then
+            echo "npm audit JSON reported issues/errors (captured for artifact)"
+          fi
+          # Gate only production dependencies in PR CI.
+          npm audit --omit=dev --audit-level=high
 
       - name: Upload npm audit report
         uses: actions/upload-artifact@v4
@@ -161,14 +170,45 @@ jobs:
         with:
           fetch-depth: 0  # Full history for secret scanning
 
+      - name: Install Gitleaks CLI
+        run: |
+          set -euo pipefail
+          GITLEAKS_VERSION=8.24.3
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          chmod +x gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+
+      - name: Determine Gitleaks scan range
+        id: gitleaks-range
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "log_opts=${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "log_opts=${{ github.event.before }}..${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "log_opts=--since=168h" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+        run: |
+          gitleaks git \
+            --redact \
+            --log-opts "${{ steps.gitleaks-range.outputs.log_opts }}" \
+            --report-format json \
+            --report-path gitleaks-report.json \
+            --exit-code 1
 
       - name: Run TruffleHog
         uses: trufflesecurity/trufflehog@main
-        continue-on-error: true
         with:
           extra_args: --only-verified
+
+      - name: Upload secret scan reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: secret-scan-reports
+          path: |
+            gitleaks-report.json

@@ -347,7 +347,7 @@ class Command(BaseCommand):
                 # Generate external_hash for idempotency (Issue #XXX: Fix duplicate imports)
                 # Hash based on: municipio + projeto + inicio + fim + tipo + encontro
                 hash_string = f"{municipio.id}-{projeto.id}-{s['inicio']}-{s['fim']}-{s['tipo']}-{s['encontro']}"
-                external_hash = hashlib.sha1(hash_string.encode()).hexdigest()
+                external_hash = hashlib.sha1(hash_string.encode(), usedforsecurity=False).hexdigest()
 
                 # Check if already exists (idempotency by external_hash)
                 solicitacao = Solicitacao.objects.filter(external_hash=external_hash).first()

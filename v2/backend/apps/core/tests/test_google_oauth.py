@@ -32,6 +32,7 @@ from __future__ import annotations
 import os
 import threading
 from datetime import timedelta
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import Group
@@ -1084,7 +1085,7 @@ class TestViewsOAuthCoverage:
         """
         from apps.core.views_oauth import google_oauth_callback
 
-        callback_handler = google_oauth_callback.cls.get.__closure__[0].cell_contents
+        callback_handler = cast(Any, google_oauth_callback).cls.get.__closure__[0].cell_contents
 
         with patch("apps.core.services.google_oauth.validate_oauth_state") as mock_validate:
             # Mock state válido

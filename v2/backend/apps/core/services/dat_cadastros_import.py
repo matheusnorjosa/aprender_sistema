@@ -255,7 +255,7 @@ def _process_row(
     # Dados variáveis (data_registro/obs) atualizam o mesmo registro.
     resp_id: int | str = getattr(responsavel, "id", "NA")
     hash_key: str = f"{municipio.id}|{projeto.id}|{tipo_norm}|{resp_id}"
-    external_hash: ExternalHash = hashlib.sha1(hash_key.encode()).hexdigest()
+    external_hash: ExternalHash = hashlib.sha1(hash_key.encode(), usedforsecurity=False).hexdigest()
 
     # Verificar se já existe registro com este external_hash
     existing: AcaoDAT | None = AcaoDAT.objects.filter(external_hash=external_hash).first()

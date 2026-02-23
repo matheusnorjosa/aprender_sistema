@@ -163,15 +163,16 @@ class TestMetricsMapLimit(TestCase):
             )
 
     def test_metrics_map_default_limit(self) -> None:
-        """metrics_map should have default limit of 50."""
+        """metrics_map should not truncate by default."""
         response = self.client.get("/api/metrics/map/")
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
 
         self.assertIn("meta", data)
-        self.assertEqual(data["meta"]["limit"], 50)
-        self.assertEqual(data["meta"]["max_limit"], 100)
+        self.assertIsNone(data["meta"]["limit"])
+        self.assertEqual(data["meta"]["max_limit"], 1000)
+        self.assertEqual(len(data["by_municipio"]), 20)
 
     def test_metrics_map_respects_limit_parameter(self) -> None:
         """metrics_map should respect limit parameter."""
@@ -183,24 +184,21 @@ class TestMetricsMapLimit(TestCase):
         self.assertEqual(data["meta"]["limit"], 10)
         self.assertLessEqual(len(data["by_municipio"]), 10)
 
-    def test_metrics_map_limit_capped_at_100(self) -> None:
-        """limit should be capped at max_limit (100)."""
-        response = self.client.get("/api/metrics/map/?limit=500")
+    def test_metrics_map_limit_capped_at_1000(self) -> None:
+        """limit should be capped at max_limit (1000)."""
+        response = self.client.get("/api/metrics/map/?limit=5000")
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
 
-        self.assertEqual(data["meta"]["limit"], 100)
-        self.assertEqual(data["meta"]["max_limit"], 100)
+        self.assertEqual(data["meta"]["limit"], 1000)
+        self.assertEqual(data["meta"]["max_limit"], 1000)
 
-    def test_metrics_map_invalid_limit_uses_default(self) -> None:
-        """Invalid limit value should fall back to default."""
+    def test_metrics_map_invalid_limit_returns_400(self) -> None:
+        """Invalid limit value should return 400."""
         response = self.client.get("/api/metrics/map/?limit=invalid")
 
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-
-        self.assertEqual(data["meta"]["limit"], 50)
+        self.assertEqual(response.status_code, 400)
 
 
 class TestPaginationClasses(TestCase):

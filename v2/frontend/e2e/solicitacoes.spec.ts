@@ -36,7 +36,7 @@ test.describe('Controle e Operações', () => {
   });
 
   test('6. Relatórios ETL carrega', async ({ page }) => {
-    await page.goto('/controle/etl-reports');
+    await page.goto('/dat/etl-reports');
     await expect(page.locator('.ant-layout-content')).toBeVisible();
   });
 

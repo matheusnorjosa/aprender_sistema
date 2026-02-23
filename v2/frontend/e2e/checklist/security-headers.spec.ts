@@ -15,8 +15,10 @@
  */
 import { test, expect } from '@playwright/test';
 
-// Flag para indicar se estamos em CI/produção (headers devem existir)
-const STRICT_MODE = process.env.CI || process.env.STRICT_SECURITY_HEADERS;
+// Modo estrito só deve ser ativado explicitamente para ambientes com headers de produção.
+const STRICT_MODE = ['1', 'true', 'yes'].includes(
+  (process.env.STRICT_SECURITY_HEADERS || '').toLowerCase()
+);
 
 test.describe('Checklist: Security Headers', () => {
   test.describe('Headers Obrigatórios (🔴)', () => {

@@ -155,9 +155,7 @@ class TestModelsBackwardsCompatibility:
         assert len(exports) == len(exports_set)
 
         # Exports essenciais para retrocompatibilidade
-        assert {"Usuario", "Projeto", "Solicitacao", "Participation", "Colecao", "EquipeGerencia"}.issubset(
-            exports_set
-        )
+        assert {"Usuario", "Projeto", "Solicitacao", "Participation", "Colecao", "EquipeGerencia"}.issubset(exports_set)
 
     def test_solicitacao_gcal_status_enum(self) -> None:
         """Verifica que GCalStatus enum esta acessivel."""

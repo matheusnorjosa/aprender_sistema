@@ -403,5 +403,5 @@ def hash_event_v2(row: dict[str, str]) -> str:
     content = "|".join(parts)
 
     # SHA1 hash
-    hash_obj = hashlib.sha1(content.encode("utf-8"))
+    hash_obj = hashlib.sha1(content.encode("utf-8"), usedforsecurity=False)
     return hash_obj.hexdigest()

@@ -53,7 +53,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
     <>
       <main
         id="main"
-        className="flex flex-col items-center justify-start"
+        className="login-page flex flex-col items-center justify-start"
         style={{ minHeight: '100vh', paddingTop: '60px', background: BRAND_COLORS.primaryDark }}
         aria-labelledby="login-title"
       >
@@ -71,6 +71,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
 
       {/* Card de Login */}
       <article
+        className="login-card"
         style={{
           width: '100%',
           maxWidth: '420px',
@@ -128,6 +129,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
               htmlType="submit"
               loading={loading}
               block
+              className="login-submit"
               style={{
                 height: '48px',
                 fontSize: '16px',

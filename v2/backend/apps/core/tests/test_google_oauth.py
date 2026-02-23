@@ -37,7 +37,7 @@ from unittest.mock import MagicMock, patch
 from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status as http_status
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APIRequestFactory
 
 import pytest
 from cryptography.fernet import Fernet
@@ -982,7 +982,7 @@ class TestViewsOAuthCoverage:
         result = _build_frontend_redirect_url("/test")
         assert "localhost:5173" in result or "/test" in result
 
-    @patch("apps.core.services.google_oauth.build_authorization_url")
+    @patch("apps.core.views_oauth.build_authorization_url")
     def test_google_oauth_start_config_error(self, mock_build, usuario_controle):
         """
         Linhas 195-197: ValueError quando config OAuth incompleta.
@@ -1078,34 +1078,37 @@ class TestViewsOAuthCoverage:
         # Aceitar tanto 403 (auth padrão) quanto 302 (redirect com erro)
         assert response.status_code in [http_status.HTTP_403_FORBIDDEN, http_status.HTTP_302_FOUND]
 
-    @patch("apps.core.services.google_oauth.exchange_code_for_tokens")
-    @patch("apps.core.services.google_oauth.validate_oauth_state")
-    def test_google_oauth_callback_validation_error(self, mock_validate, mock_exchange, usuario_controle):
+    def test_google_oauth_callback_validation_error(self, usuario_controle):
         """
         Linhas 319-324: ValueError durante exchange (ex: domínio inválido).
         """
-        from django.core.cache import cache
+        from apps.core.views_oauth import google_oauth_callback
 
-        client = APIClient()
-        client.force_authenticate(user=usuario_controle)
+        callback_handler = google_oauth_callback.cls.get.__closure__[0].cell_contents
 
-        # Mock state válido
-        mock_validate.return_value = {
-            "valid": True,
-            "return_to": "/pre-agenda",
-            "user_id": usuario_controle.id,
-        }
+        with patch("apps.core.services.google_oauth.validate_oauth_state") as mock_validate:
+            # Mock state válido
+            mock_validate.return_value = {
+                "valid": True,
+                "return_to": "/pre-agenda",
+                "user_id": usuario_controle.id,
+            }
 
-        # Mock exchange lança ValueError
-        mock_exchange.side_effect = ValueError("Domínio não permitido: gmail.com")
+            # Patch direto no namespace global da função original do callback
+            # para garantir execução do ramo de ValueError.
+            mock_exchange = MagicMock(side_effect=ValueError("Domínio não permitido: gmail.com"))
 
-        response = client.get(
-            "/api/oauth/google/callback/",
-            {
-                "code": "some_code",
-                "state": f"csrf|/pre-agenda|{usuario_controle.id}",
-            },
-        )
+            factory = APIRequestFactory()
+            request = factory.get(
+                "/api/oauth/google/callback/",
+                {
+                    "code": "some_code",
+                    "state": f"csrf|/pre-agenda|{usuario_controle.id}",
+                },
+            )
+            request.user = usuario_controle
+            with patch.dict(callback_handler.__globals__, {"exchange_code_for_tokens": mock_exchange}):
+                response = callback_handler(request)
 
         assert response.status_code == http_status.HTTP_302_FOUND
         assert "google=error" in response.url

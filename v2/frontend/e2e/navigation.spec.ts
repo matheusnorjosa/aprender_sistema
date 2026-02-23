@@ -60,7 +60,7 @@ test.describe('Navegação Principal', () => {
   });
 
   test('11. Dashboard GCal carrega', async ({ page }) => {
-    await page.goto('/dashboard/gcal');
+    await page.goto('/dashboards/gcal');
     await expect(page.locator('.ant-layout-content')).toBeVisible();
   });
 
@@ -75,7 +75,7 @@ test.describe('Navegação Principal', () => {
   });
 
   test('14. Relatórios ETL carrega', async ({ page }) => {
-    await page.goto('/controle/etl-reports');
+    await page.goto('/dat/etl-reports');
     await expect(page.locator('.ant-layout-content')).toBeVisible();
   });
 });

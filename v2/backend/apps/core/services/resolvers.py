@@ -255,12 +255,15 @@ def normalize_projeto_name(nome: str) -> str:
 
 def resolve_projeto(nome: str) -> Projeto | None:
     """
-    Resolve projeto por nome (setor canonizado).
+    Resolve projeto por nome ou codigo.
 
-    Aplica aliases (IDEB → GESTÃO ESCOLAR) antes de resolver.
+    Estrategia:
+    1. Tenta codigo exato (case-insensitive).
+    2. Tenta nome bruto informado (exato e normalizado).
+    3. Aplica aliases (IDEB -> GESTAO ESCOLAR, etc.) e tenta novamente.
 
     Args:
-        nome: Nome do projeto (setor normalizado)
+        nome: Nome/codigo do projeto
 
     Returns:
         Projeto ou None se não encontrado
@@ -268,21 +271,46 @@ def resolve_projeto(nome: str) -> Projeto | None:
     if not nome:
         return None
 
-    # PR20: Aplicar aliases antes de resolver
-    nome_mapped = normalize_projeto_name(nome)
-    nome_norm = norm_text(nome_mapped)
-
-    try:
-        return Projeto.objects.get(nome__iexact=nome_mapped)
-    except Projeto.DoesNotExist:
-        # Tenta com nome normalizado
-        projetos = Projeto.objects.all()
-        for p in projetos:
-            if norm_text(p.nome) == nome_norm:
-                return p
+    nome_raw = nome.strip()
+    if not nome_raw:
         return None
-    except Projeto.MultipleObjectsReturned:
-        return Projeto.objects.filter(nome__iexact=nome_mapped).first()
+
+    # 1) Codigo exato
+    projeto = Projeto.objects.filter(codigo__iexact=nome_raw).first()
+    if projeto:
+        return projeto
+
+    # 2) Nome bruto (exato)
+    projeto = Projeto.objects.filter(nome__iexact=nome_raw).first()
+    if projeto:
+        return projeto
+
+    # 2b) Nome bruto (normalizado)
+    nome_raw_norm = norm_text(nome_raw)
+    projetos = list(Projeto.objects.all())
+    for p in projetos:
+        if norm_text(p.nome) == nome_raw_norm:
+            return p
+
+    # 3) Alias/canonizacao
+    nome_mapped = normalize_projeto_name(nome_raw)
+    if nome_mapped == nome_raw:
+        return None
+
+    projeto = Projeto.objects.filter(codigo__iexact=nome_mapped).first()
+    if projeto:
+        return projeto
+
+    projeto = Projeto.objects.filter(nome__iexact=nome_mapped).first()
+    if projeto:
+        return projeto
+
+    nome_mapped_norm = norm_text(nome_mapped)
+    for p in projetos:
+        if norm_text(p.nome) == nome_mapped_norm:
+            return p
+
+    return None
 
 
 def resolve_tipo_evento(nome: str) -> TipoEvento | None:

@@ -107,7 +107,7 @@ class ControleImportAcoesView(APIView):
             temp_file.close()
 
             # Executar import
-            report = import_acoes_controle(path=temp_file.name, dry_run=dry_run)
+            report = import_acoes_controle(file_path=temp_file.name, dry_run=dry_run)
 
             return Response(report, status=status.HTTP_200_OK)
 
@@ -188,7 +188,7 @@ class DATImportCadastrosView(APIView):
             temp_file.close()
 
             # Executar import
-            report = import_dat_cadastros(path=temp_file.name, dry_run=dry_run)
+            report = import_dat_cadastros(file_path=temp_file.name, dry_run=dry_run)
 
             return Response(report, status=status.HTTP_200_OK)
 

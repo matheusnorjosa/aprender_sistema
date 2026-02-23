@@ -1,0 +1,169 @@
+{
+  "usuarios": {
+    "stats": {
+      "created": 0,
+      "updated": 111,
+      "unchanged": 3,
+      "skipped": {
+        "cpf_invalid": 2,
+        "nome_missing": 0,
+        "other": 0
+      }
+    },
+    "pendencias_total": 2
+  },
+  "equipe_gerencia": {
+    "stats": {
+      "created": 0,
+      "updated": 0,
+      "unchanged": 108,
+      "skipped": {
+        "setor_missing": 0,
+        "papel_missing": 0,
+        "usuario_not_found": 34,
+        "apoio_supervisor_missing": 3,
+        "other": 0
+      },
+      "gerencias_created": 0,
+      "gerencias_existing": 145
+    },
+    "pendencias_total": 37
+  },
+  "colecoes": {
+    "stats": {
+      "created": 0,
+      "updated": 0,
+      "unchanged": 79,
+      "skipped": {
+        "nome_missing": 0,
+        "projeto_missing": 0,
+        "projeto_not_found": 0,
+        "other": 0
+      }
+    },
+    "pendencias_total": 0
+  },
+  "produtos": {
+    "stats": {
+      "created": 0,
+      "updated": 138,
+      "unchanged": 0,
+      "skipped": {
+        "codigo_missing": 0,
+        "nome_missing": 0,
+        "projeto_not_found": 0,
+        "other": 0
+      }
+    },
+    "pendencias_total": 0
+  },
+  "acoes": {
+    "stats": {
+      "created": 0,
+      "updated": 0,
+      "unchanged": 0,
+      "skipped": {
+        "municipio": 214,
+        "projeto": 0,
+        "coordenador": 0,
+        "dates": 0,
+        "other": 0
+      }
+    },
+    "pendencias_total": 214
+  },
+  "cadastros_dat": {
+    "stats": {
+      "created": 0,
+      "updated": 0,
+      "unchanged": 0,
+      "skipped": {
+        "municipio": 579,
+        "projeto": 0,
+        "responsavel": 0,
+        "tipo_acao": 0,
+        "other": 0
+      }
+    },
+    "pendencias_total": 579
+  },
+  "compras": {
+    "stats": {
+      "created": 0,
+      "updated": 0,
+      "skipped": 1029,
+      "errors": 0
+    },
+    "pendencias_total": 1029
+  },
+  "bloqueios": {
+    "stats": {
+      "created": 2,
+      "updated": 0,
+      "unchanged": 0,
+      "skipped": {
+        "usuario": 0,
+        "dates": 0,
+        "other": 0
+      }
+    },
+    "pendencias_total": 0
+  },
+  "deslocamentos": {
+    "stats": {
+      "created": 79,
+      "updated": 0,
+      "unchanged": 0,
+      "skipped": {
+        "usuario": 9,
+        "dates": 0,
+        "other": 0
+      }
+    },
+    "pendencias_total": 9
+  },
+  "eventos_prontos": {
+    "stats": {
+      "solicitacoes": {
+        "created": 0,
+        "updated": 0,
+        "unchanged": 0
+      },
+      "participations": {
+        "created": 0,
+        "updated": 0
+      },
+      "skipped": {
+        "municipio": 281,
+        "projeto": 0,
+        "tipo_evento": 0,
+        "coordenador": 0,
+        "dates": 0,
+        "other": 0
+      }
+    },
+    "pendencias_total": 281
+  },
+  "eventos_agenda2026": {
+    "stats": {
+      "solicitacoes": {
+        "created": 0,
+        "updated": 0,
+        "unchanged": 0
+      },
+      "participations": {
+        "created": 0,
+        "updated": 0
+      },
+      "skipped": {
+        "municipio": 345,
+        "projeto": 0,
+        "tipo_evento": 0,
+        "coordenador": 0,
+        "dates": 0,
+        "other": 0
+      }
+    },
+    "pendencias_total": 281
+  }
+}

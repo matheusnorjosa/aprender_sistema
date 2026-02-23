@@ -161,7 +161,7 @@ def parse_fluir_eventos(filepath: Path) -> list[dict[str, Any]]:
 
             # Gerar external_hash para idempotência
             hash_input = f"{municipio_raw}|{inicio_aware.isoformat()}|{formador_raw}|{turma}|{encontro}"
-            evento["external_hash"] = hashlib.sha1(hash_input.encode()).hexdigest()
+            evento["external_hash"] = hashlib.sha1(hash_input.encode(), usedforsecurity=False).hexdigest()
 
             eventos.append(evento)
 

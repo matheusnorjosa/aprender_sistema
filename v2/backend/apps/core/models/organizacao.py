@@ -80,7 +80,7 @@ class ProjetoGeral(models.Model):
 class Municipio(models.Model):
     """SSOT: Substitui IMPORTRANGE de Municipios"""
 
-    nome = models.CharField(max_length=100, unique=True, db_index=True)
+    nome = models.CharField(max_length=100, db_index=True)
     uf = models.CharField(max_length=2)
     ibge_code = models.CharField(
         max_length=7,
@@ -107,6 +107,7 @@ class Municipio(models.Model):
         verbose_name_plural = "Municipios"
         ordering = ["nome"]
         constraints = [
+            models.UniqueConstraint(fields=["nome", "uf"], name="unique_municipio_nome_uf"),
             models.CheckConstraint(
                 check=models.Q(latitude__gte=-90, latitude__lte=90) | models.Q(latitude__isnull=True),
                 name="latitude_range",
@@ -119,6 +120,49 @@ class Municipio(models.Model):
 
     def __str__(self) -> str:
         return f"{self.nome}-{self.uf}"
+
+
+class MunicipioReferencia(models.Model):
+    """
+    Lista de referência de municípios (fonte externa).
+
+    Usado para métricas de cobertura nacional e validações de consistência.
+    """
+
+    codigo_externo = models.CharField(
+        max_length=20,
+        db_index=True,
+        help_text="ID do município na fonte externa (não confundir com IBGE)",
+    )
+    nome = models.CharField(max_length=100)
+    uf = models.CharField(max_length=2)
+    fonte = models.CharField(max_length=50, default="sistemasaprender", db_index=True)
+    ativo = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:  # type: ignore[misc]
+        db_table = "core_municipio_referencia"
+        verbose_name = "Municipio Referencia"
+        verbose_name_plural = "Municipios Referencia"
+        ordering = ["uf", "nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["fonte", "codigo_externo"],
+                name="unique_municipio_ref_codigo_fonte",
+            ),
+            models.UniqueConstraint(
+                fields=["fonte", "nome", "uf"],
+                name="unique_municipio_ref_nome_uf_fonte",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["nome", "uf"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.nome}-{self.uf} ({self.fonte})"
 
 
 class Gerencia(models.Model):
@@ -351,6 +395,37 @@ class TipoEvento(models.Model):
         return self.nome
 
 
+class Colecao(models.Model):
+    """
+    Colecao de produtos (ex: A COR DA GENTE 1, BRINCANDO E APRENDENDO 2).
+
+    Uma colecao agrupa produtos de um mesmo projeto.
+    Exemplo: Projeto "Novo Lendo" tem colecoes "Colecao 1", "Colecao 2", etc.
+    """
+
+    nome = models.CharField(max_length=200, help_text="Nome da colecao (ex: A COR DA GENTE 1)")
+    projeto: models.ForeignKey[Projeto] = models.ForeignKey(  # type: ignore[assignment]
+        "core.Projeto", on_delete=models.PROTECT, related_name="colecoes", help_text="Projeto vinculado"
+    )
+    descricao = models.TextField(blank=True, help_text="Descricao da colecao")
+    ativo = models.BooleanField(default=True, help_text="Colecao ativa")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:  # type: ignore[misc]
+        db_table = "core_colecao"
+        verbose_name = "Colecao"
+        verbose_name_plural = "Colecoes"
+        ordering = ["projeto", "nome"]
+        constraints = [
+            models.UniqueConstraint(fields=["nome", "projeto"], name="unique_colecao_nome_projeto"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.nome} ({self.projeto.nome})"
+
+
 class Produto(models.Model):
     """
     SSOT: Produtos disponiveis (substitui produtos.xlsx).
@@ -360,6 +435,7 @@ class Produto(models.Model):
 
     Relacionamentos:
         - Produto -> Projeto (many-to-one, obrigatorio)
+        - Produto -> Colecao (many-to-one, opcional)
         - Compra -> Produto (many-to-one, obrigatorio apos migration)
 
     Exemplo:
@@ -371,6 +447,14 @@ class Produto(models.Model):
     descricao = models.TextField(blank=True, help_text="Descricao detalhada")
     projeto: models.ForeignKey[Projeto] = models.ForeignKey(  # type: ignore[assignment]
         "core.Projeto", on_delete=models.PROTECT, related_name="produtos", help_text="Projeto vinculado"
+    )
+    colecao: models.ForeignKey["Colecao"] | None = models.ForeignKey(  # type: ignore[assignment]
+        "core.Colecao",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="produtos",
+        help_text="Colecao do produto",
     )
     ativo = models.BooleanField(default=True, help_text="Produto disponivel")
 

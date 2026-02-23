@@ -56,6 +56,29 @@ class StgMunicipio(models.Model):
         return f"{self.nome}-{self.uf} - {self.src}:{self.rownum}"
 
 
+class StgMunicipioReferencia(models.Model):
+    """Staging: Municípios de referência (fontes externas)"""
+
+    codigo_externo = models.CharField(max_length=20, blank=True, default="")
+    nome = models.CharField(max_length=100)
+    uf = models.CharField(max_length=2)
+    fonte = models.CharField(max_length=50, default="sistemasaprender")
+    src = models.CharField(max_length=100)
+    rownum = models.IntegerField()
+
+    class Meta:  # type: ignore[misc]
+        db_table = "stg_municipio_ref"
+        verbose_name = "Staging Municipio Referencia"
+        verbose_name_plural = "Staging Municipios Referencia"
+        indexes = [
+            models.Index(fields=["fonte", "codigo_externo"]),
+            models.Index(fields=["nome", "uf"]),
+        ]
+
+    def __str__(self):
+        return f"{self.nome}-{self.uf} ({self.fonte}) - {self.src}:{self.rownum}"
+
+
 class StgProjeto(models.Model):
     """Staging: Projetos importados de planilhas"""
 

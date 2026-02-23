@@ -1,0 +1,236 @@
+.compras-dashboard {
+  --dash-bg: #f3f9ef;
+  --dash-text: #0f172a;
+  --dash-muted: #64748b;
+  --dash-card: #ffffff;
+  --dash-border: rgba(15, 23, 42, 0.08);
+  --bar-track: #e6f4ea;
+  --bar-track-strong: #e6f4ff;
+  background: linear-gradient(180deg, #f6fbf2 0%, #f5f7fb 100%);
+  border-radius: 18px;
+}
+
+.compras-dashboard .kpi-card {
+  color: #ffffff;
+  border-radius: 14px;
+  overflow: hidden;
+  border: none;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
+}
+
+.compras-dashboard .kpi-card .ant-card-body {
+  padding: 18px 20px;
+}
+
+.compras-dashboard .kpi-card .kpi-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.9;
+}
+
+.compras-dashboard .kpi-card .kpi-value {
+  font-size: 26px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.compras-dashboard .kpi-card .kpi-subtitle {
+  font-size: 12px;
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
+.compras-dashboard .kpi-card .kpi-icon {
+  font-size: 24px;
+  opacity: 0.9;
+}
+
+.compras-dashboard .dashboard-title {
+  color: #7cb342;
+  border-bottom: 4px solid #7cb342;
+  display: inline-block;
+  padding-bottom: 4px;
+}
+
+.compras-dashboard .kpi-card.kpi-1 {
+  background: linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%);
+}
+
+.compras-dashboard .kpi-card.kpi-2 {
+  background: linear-gradient(135deg, #339af0 0%, #1c7ed6 100%);
+}
+
+.compras-dashboard .kpi-card.kpi-3 {
+  background: linear-gradient(135deg, #51cf66 0%, #2f9e44 100%);
+}
+
+.compras-dashboard .kpi-card.kpi-4 {
+  background: linear-gradient(135deg, #ffa94d 0%, #f76707 100%);
+}
+
+.compras-dashboard .kpi-card.kpi-5 {
+  background: linear-gradient(135deg, #20c997 0%, #0ca678 100%);
+}
+
+.compras-dashboard .kpi-card.kpi-6 {
+  background: linear-gradient(135deg, #f06595 0%, #d6336c 100%);
+}
+
+.compras-dashboard .chart-card {
+  border-radius: 14px;
+  border: 1px solid var(--dash-border);
+  background: var(--dash-card);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.compras-dashboard .chart-title {
+  font-weight: 600;
+  color: var(--dash-text);
+}
+
+.compras-dashboard .bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.compras-dashboard .bar-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1.4fr) 3fr minmax(80px, 0.9fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.compras-dashboard .bar-label {
+  font-size: 13px;
+  color: var(--dash-text);
+  font-weight: 600;
+}
+
+.compras-dashboard .bar-track {
+  width: 100%;
+  height: 10px;
+  background: var(--bar-track);
+  border-radius: 999px;
+  position: relative;
+  overflow: hidden;
+}
+
+.compras-dashboard .bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.compras-dashboard .bar-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dash-text);
+  text-align: right;
+}
+
+.compras-dashboard .mini-bars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+  align-items: end;
+  gap: 14px;
+  height: 180px;
+  padding: 8px 4px 0;
+}
+
+.compras-dashboard .mini-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.compras-dashboard .mini-bar-fill {
+  width: 100%;
+  border-radius: 10px 10px 4px 4px;
+  background: linear-gradient(180deg, #339af0 0%, #1c7ed6 100%);
+  min-height: 12px;
+  transition: height 0.3s ease;
+}
+
+.compras-dashboard .mini-bar-label {
+  font-size: 12px;
+  color: var(--dash-muted);
+}
+
+.compras-dashboard .chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
+.compras-dashboard .legend-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--dash-muted);
+}
+
+.compras-dashboard .legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #20c997;
+}
+
+.compras-dashboard .percent-legend {
+  margin-top: 18px;
+}
+
+.compras-dashboard .percent-legend-label {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.compras-dashboard .percent-legend-bar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(60px, 1fr));
+  gap: 6px;
+}
+
+.compras-dashboard .percent-legend-segment {
+  height: 16px;
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.compras-dashboard .percent-legend-segment span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .compras-dashboard .bar-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .compras-dashboard .bar-value {
+    text-align: left;
+  }
+
+  .compras-dashboard .mini-bars {
+    height: 140px;
+  }
+}

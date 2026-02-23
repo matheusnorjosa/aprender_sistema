@@ -40,6 +40,12 @@ class DATCompra(models.Model):
         ESGOTADO = "esgotado", "Esgotado"
         DEVOLVIDO = "devolvido", "Devolvido"
 
+    class TipoCompra(models.TextChoices):
+        PRIMEIRA = "primeira", "Primeira compra"
+        ADICIONAL_1 = "adicional_1", "Compra adicional 1"
+        ADICIONAL_2 = "adicional_2", "Compra adicional 2"
+        ADICIONAL_3 = "adicional_3", "Compra adicional 3"
+
     # Relacionamentos principais
     municipio: models.ForeignKey[Municipio] = models.ForeignKey(  # type: ignore[assignment]
         "core.Municipio", on_delete=models.PROTECT, related_name="dat_compras", verbose_name="Município"
@@ -82,6 +88,14 @@ class DATCompra(models.Model):
     # Status
     status_uso = models.CharField(
         max_length=20, choices=StatusUso.choices, default=StatusUso.DISPONIVEL, verbose_name="Status de Uso"
+    )
+    tipo_compra = models.CharField(
+        max_length=20,
+        choices=TipoCompra.choices,
+        null=True,
+        blank=True,
+        verbose_name="Tipo de Compra",
+        help_text="Primeira compra ou compras adicionais",
     )
     ativo = models.BooleanField(default=True)
 

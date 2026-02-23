@@ -52,6 +52,7 @@ const HomePage = lazy(() => import('./pages/Home/HomePage'));
 const DashboardsPage = lazy(() => import('./pages/Dashboards/DashboardsPage'));
 const EquipeDashboardPage = lazy(() => import('./pages/Dashboards/EquipeDashboardPage'));
 const GCalDashboardPage = lazy(() => import('./pages/Dashboards/GCalDashboardPage'));
+const ComprasDashboardPage = lazy(() => import('./pages/Dashboards/ComprasDashboardPage'));
 const MapaBrasilPage = lazy(() => import('./pages/MapaBrasil/MapaBrasilPage'));
 const AdminDATHomePage = lazy(() => import('./pages/AdminDAT/AdminDATHomePage'));
 const UsuariosPage = lazy(() => import('./pages/AdminDAT/UsuariosPage'));
@@ -59,6 +60,8 @@ const MunicipiosPage = lazy(() => import('./pages/AdminDAT/MunicipiosPage'));
 const ProjetosPage = lazy(() => import('./pages/AdminDAT/ProjetosPage'));
 const GruposPage = lazy(() => import('./pages/AdminDAT/GruposPage'));
 const ConfiguracoesPage = lazy(() => import('./pages/AdminDAT/ConfiguracoesPage'));
+const ColecoesImportPage = lazy(() => import('./pages/AdminDAT/ColecoesImportPage'));
+const EquipeGerenciaImportPage = lazy(() => import('./pages/AdminDAT/EquipeGerenciaImportPage'));
 const DeslocamentosPage = lazy(() => import('./pages/Deslocamentos/DeslocamentosPage'));
 // DAT Module - Acompanhamento de Turmas (SPEC_DAT_REGISTROS.md)
 const DATRegistrosPage = lazy(() => import('./pages/DATModule/DATRegistrosPage'));
@@ -124,16 +127,20 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/controle/formacoes': 'controle-formacoes',
   '/controle/plano-formacoes': 'controle-plano-formacoes',
   '/controle/pre-agenda': 'controle-pre-agenda',
+  '/pre-agenda': 'controle-pre-agenda',
   '/dat/etl-reports': 'dat-etl-reports',
   // Item único
   '/deslocamentos': 'deslocamentos',
   // Dashboards
   '/dashboards': 'dashboard-geral',
+  '/dashboards/compras': 'dashboard-compras',
   '/dashboards/equipe': 'dashboard-equipe',
   '/dashboards/gcal': 'gcal-dashboard',
   '/mapa-brasil': 'mapa-brasil',
   // DAT module
   '/dat/admin': 'dat-admin',
+  '/dat/admin/colecoes': 'dat-admin-colecoes',
+  '/dat/admin/equipe-gerencia': 'dat-admin-equipe-gerencia',
   '/dat/cadastros': 'dat-cadastros',
   '/dat/coordenadores': 'dat-coordenadores',
   '/dat/importacao': 'dat-importacao',
@@ -155,11 +162,14 @@ const MENU_KEY_TO_PARENT: Record<string, string> = {
   'controle-pre-agenda': 'controle-submenu',
   // Dashboards submenu
   'dashboard-geral': 'dashboards-submenu',
+  'dashboard-compras': 'dashboards-submenu',
   'dashboard-equipe': 'dashboards-submenu',
   'gcal-dashboard': 'dashboards-submenu',
   'mapa-brasil': 'dashboards-submenu',
   // DAT submenu
   'dat-admin': 'dat-submenu',
+  'dat-admin-colecoes': 'dat-submenu',
+  'dat-admin-equipe-gerencia': 'dat-submenu',
   'dat-cadastros': 'dat-submenu',
   'dat-coordenadores': 'dat-submenu',
   'dat-etl-reports': 'dat-submenu',
@@ -480,8 +490,10 @@ function AppContent(): JSX.Element {
   const canDashboardOverview = user?.is_superuser || inSuperintendencia || inGerencia || inDiretoria;
   const canDashboardEquipe = user?.is_superuser || inControle || inGerencia || inSuperintendencia || inDiretoria;
   const canDashboardGcal = user?.is_superuser || inControle || inSuperintendencia;
+  const canDashboardCompras = user?.is_superuser || inDiretoria || inDAT; // dados sensíveis de compras
   const canMapaBrasil = user?.is_superuser || inControle || inDAT || inSuperintendencia || inGerencia || inDiretoria;
-  const canDashboardsMenu = canDashboardOverview || canDashboardEquipe || canDashboardGcal || canMapaBrasil;
+  const canDashboardsMenu =
+    canDashboardOverview || canDashboardCompras || canDashboardEquipe || canDashboardGcal || canMapaBrasil;
   // canDisponibilidade = acesso à grade mensal (todos exceto Controle)
   const canDisponibilidade = user?.is_superuser || !inControle;
 
@@ -615,6 +627,11 @@ function AppContent(): JSX.Element {
                       <Link to="/dashboards">Dashboard Geral</Link>
                     </Menu.Item>
                   )}
+                  {canDashboardCompras && (
+                    <Menu.Item key="dashboard-compras">
+                      <Link to="/dashboards/compras">Dashboard Compras</Link>
+                    </Menu.Item>
+                  )}
                   {canDashboardEquipe && (
                     <Menu.Item key="dashboard-equipe">
                       <Link to="/dashboards/equipe">Dashboard Equipe</Link>
@@ -642,6 +659,12 @@ function AppContent(): JSX.Element {
                 <SubMenu key="dat-submenu" icon={<SolutionOutlined />} title="DAT">
                   <Menu.Item key="dat-admin">
                     <Link to="/dat/admin">Administração</Link>
+                  </Menu.Item>
+                  <Menu.Item key="dat-admin-colecoes">
+                    <Link to="/dat/admin/colecoes">Importar Coleções</Link>
+                  </Menu.Item>
+                  <Menu.Item key="dat-admin-equipe-gerencia">
+                    <Link to="/dat/admin/equipe-gerencia">Importar Vínculos</Link>
                   </Menu.Item>
                   <Menu.Item key="dat-cadastros">
                     <Link to="/dat/cadastros">Cadastros</Link>
@@ -757,6 +780,12 @@ function AppContent(): JSX.Element {
                     element={canDashboardOverview ? <DashboardsPage /> : <Forbidden />}
                   />
 
+{/* Dashboard Compras (Diretoria, DAT, superuser) */}
+                  <Route
+                    path="/dashboards/compras"
+                    element={canDashboardCompras ? <ComprasDashboardPage /> : <Forbidden />}
+                  />
+
                   {/* Dashboard Equipe */}
                   <Route
                     path="/dashboards/equipe"
@@ -829,6 +858,10 @@ function AppContent(): JSX.Element {
                     element={canControle ? <PreAgendaPage /> : <Forbidden />}
                   />
                   <Route
+                    path="/pre-agenda"
+                    element={canControle ? <PreAgendaPage /> : <Forbidden />}
+                  />
+                  <Route
                     path="/dat/etl-reports"
                     element={canDAT ? <EtlReportsPage /> : <Forbidden />}
                   />
@@ -857,6 +890,14 @@ function AppContent(): JSX.Element {
                   <Route
                     path="/dat/admin/configuracoes"
                     element={canDAT ? <ConfiguracoesPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/dat/admin/colecoes"
+                    element={canDAT ? <ColecoesImportPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/dat/admin/equipe-gerencia"
+                    element={canDAT ? <EquipeGerenciaImportPage /> : <Forbidden />}
                   />
                   <Route
                     path="/dat/cadastros"

@@ -72,6 +72,7 @@ interface CompraRecord {
   produto: number;
   produto_nome: string;
   codigo_produto: string | null;
+  tipo_compra?: string | null;
   uf: string;
   municipio: number;
   municipio_nome: string;
@@ -84,6 +85,7 @@ interface CompraRecord {
 interface CompraFormValues {
   projeto: number;
   produto: number;
+  tipo_compra?: string | null;
   uf: string;
   municipio: number;
   quantidade: number;
@@ -122,6 +124,13 @@ const STATUS_OPTIONS = [
   { label: 'Esgotado', value: 'esgotado', color: 'red' },
 ];
 
+const TIPO_COMPRA_OPTIONS = [
+  { label: 'Primeira compra', value: 'primeira', color: 'blue' },
+  { label: 'Compra adicional 1', value: 'adicional_1', color: 'green' },
+  { label: 'Compra adicional 2', value: 'adicional_2', color: 'orange' },
+  { label: 'Compra adicional 3', value: 'adicional_3', color: 'magenta' },
+];
+
 // Ano de uso options (dinâmico: ano atual ± 1)
 const currentYear = new Date().getFullYear();
 const ANO_OPTIONS = [currentYear - 1, currentYear, currentYear + 1].map(
@@ -150,6 +159,7 @@ export default function ComprasPage(): JSX.Element {
     produto: undefined,
     status: undefined,
     ano_uso: undefined,
+    tipo_compra: undefined,
   });
 
   // Options for dropdowns
@@ -197,6 +207,7 @@ export default function ComprasPage(): JSX.Element {
     if (filters.produto) params.produto_id = filters.produto;
     if (filters.status) params.status = filters.status;
     if (filters.ano_uso) params.ano_uso = filters.ano_uso;
+    if (filters.tipo_compra) params.tipo_compra = filters.tipo_compra;
 
     // Fetch data and stats in parallel
     const [, statsData] = await Promise.all([
@@ -224,6 +235,7 @@ export default function ComprasPage(): JSX.Element {
       produto: undefined,
       status: undefined,
       ano_uso: undefined,
+      tipo_compra: undefined,
     });
   };
 
@@ -289,6 +301,12 @@ export default function ComprasPage(): JSX.Element {
 
     const statusConfig = STATUS_OPTIONS.find((s) => s.value === status);
     return <Tag color={statusConfig?.color || 'default'}>{statusConfig?.label || status}</Tag>;
+  };
+
+  const renderTipoCompraTag = (tipo: string | null | undefined): JSX.Element => {
+    if (!tipo) return <Tag color="default">Não informado</Tag>;
+    const config = TIPO_COMPRA_OPTIONS.find((t) => t.value === tipo);
+    return <Tag color={config?.color || 'default'}>{config?.label || tipo}</Tag>;
   };
 
   // Table columns (memoized §16 Epic #459)
@@ -386,6 +404,13 @@ export default function ComprasPage(): JSX.Element {
       width: 90,
       align: 'center' as const,
       render: (ano: number | null) => ano ? <Tag>{ano}</Tag> : '-',
+    },
+    {
+      title: 'Tipo Compra',
+      dataIndex: 'tipo_compra',
+      key: 'tipo_compra',
+      width: 140,
+      render: (tipo: string | null) => renderTipoCompraTag(tipo),
     },
     {
       title: 'Status',
@@ -643,6 +668,21 @@ export default function ComprasPage(): JSX.Element {
               value={filters.status}
               onChange={(val) => setFilters((prev: any) => ({ ...prev, status: val }))}
               options={STATUS_OPTIONS}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={8} lg={4}>
+            <div className="mb-1">
+              <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+                Tipo Compra
+              </Text>
+            </div>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="Todos"
+              allowClear
+              value={filters.tipo_compra}
+              onChange={(val) => setFilters((prev: any) => ({ ...prev, tipo_compra: val }))}
+              options={TIPO_COMPRA_OPTIONS}
             />
           </Col>
         </Row>
@@ -909,6 +949,15 @@ export default function ComprasPage(): JSX.Element {
               <Col xs={12} sm={6}>
                 <Form.Item name="data_compra" label="Data Compra">
                   <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+                </Form.Item>
+              </Col>
+              <Col xs={12} sm={6}>
+                <Form.Item
+                  name="tipo_compra"
+                  label="Tipo de Compra"
+                  rules={[{ required: true, message: 'Selecione o tipo de compra' }]}
+                >
+                  <Select placeholder="Selecione..." options={TIPO_COMPRA_OPTIONS} />
                 </Form.Item>
               </Col>
               <Col xs={12} sm={6}>

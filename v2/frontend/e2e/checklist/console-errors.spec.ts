@@ -38,7 +38,34 @@ function shouldIgnoreError(message: string): boolean {
   return IGNORED_ERRORS.some((ignored) => message.includes(ignored));
 }
 
+async function mockAnonymousSession(page: Page): Promise<void> {
+  // Keep console tests focused on frontend errors; auth state can be mocked.
+  await page.route('**/api/me', async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        detail: 'As credenciais de autenticação não foram fornecidas.',
+      }),
+    });
+  });
+
+  await page.route('**/api/me/', async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        detail: 'As credenciais de autenticação não foram fornecidas.',
+      }),
+    });
+  });
+}
+
 test.describe('Checklist: Console Errors', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAnonymousSession(page);
+  });
+
   test('🔴 página inicial não deve ter erros no console', async ({ page }) => {
     const errors: string[] = [];
 

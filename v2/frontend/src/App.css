@@ -7,6 +7,62 @@
   padding: 0;
 }
 
+/* Login - labels legiveis no card claro */
+.login-page .login-card .ant-form-item-label > label {
+  color: #004B3D;
+}
+
+/* Login - inputs/placeholder coerentes com card claro */
+.login-page .login-card .ant-input,
+.login-page .login-card .ant-input-affix-wrapper {
+  background-color: #ffffff;
+  border-color: #cdd9cd;
+  color: #004B3D;
+}
+
+.login-page .login-card .ant-input-affix-wrapper input {
+  color: #004B3D;
+}
+
+.login-page .login-card .ant-input::placeholder,
+.login-page .login-card .ant-input-affix-wrapper input::placeholder {
+  color: rgba(0, 75, 61, 0.45);
+}
+
+.login-page .login-card .ant-input:hover,
+.login-page .login-card .ant-input-affix-wrapper:hover {
+  border-color: #006B52;
+}
+
+.login-page .login-card .ant-input:focus,
+.login-page .login-card .ant-input-affix-wrapper-focused {
+  border-color: #006B52;
+  box-shadow: 0 0 0 2px rgba(0, 107, 82, 0.15);
+}
+
+.login-page .login-card .ant-input-password-icon {
+  color: rgba(0, 75, 61, 0.45);
+}
+
+.login-page .login-card .ant-input-password-icon:hover {
+  color: #004B3D;
+}
+
+/* Login - botão consistente com a marca (independente do tema) */
+.login-page .login-card .login-submit.ant-btn-primary {
+  background: #006B52 !important;
+  border-color: #006B52 !important;
+  color: #ffffff !important;
+}
+
+.login-page .login-card .login-submit.ant-btn-primary:hover,
+.login-page .login-card .login-submit.ant-btn-primary:focus,
+.login-page .login-card .login-submit.ant-btn-primary:active {
+  background: #005a45 !important;
+  border-color: #005a45 !important;
+  color: #ffffff !important;
+}
+
 /* Skip link (acessibilidade) */
 .skip-link {
   position: absolute;

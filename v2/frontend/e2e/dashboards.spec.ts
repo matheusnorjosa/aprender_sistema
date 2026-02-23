@@ -19,7 +19,7 @@ test.describe('Dashboards', () => {
   });
 
   test('3. Dashboard GCal carrega', async ({ page }) => {
-    await page.goto('/dashboard/gcal');
+    await page.goto('/dashboards/gcal');
     await expect(page.locator('.ant-layout-content')).toBeVisible();
   });
 

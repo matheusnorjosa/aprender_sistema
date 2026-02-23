@@ -48,7 +48,17 @@ from apps.core.models.dat_formacao import DATFormacao
 from apps.core.models.dat_registro import DATRegistro
 from apps.core.models.formacao import Formacao
 from apps.core.models.integracao import GoogleOAuthCredential
-from apps.core.models.organizacao import EquipeGerencia, Gerencia, Municipio, Produto, Projeto, ProjetoGeral, TipoEvento
+from apps.core.models.organizacao import (
+    Colecao,
+    EquipeGerencia,
+    Gerencia,
+    Municipio,
+    MunicipioReferencia,
+    Produto,
+    Projeto,
+    ProjetoGeral,
+    TipoEvento,
+)
 from apps.core.models.plano_formacoes import PlanoFormacoes
 from apps.core.models.prova import Prova
 from apps.core.models.solicitacao import Participation, Solicitacao
@@ -60,11 +70,13 @@ __all__ = [
     "Usuario",
     # Organizacao
     "Municipio",
+    "MunicipioReferencia",
     "Gerencia",
     "EquipeGerencia",
     "ProjetoGeral",
     "Projeto",
     "TipoEvento",
+    "Colecao",
     "Produto",
     # Solicitacao
     "Solicitacao",

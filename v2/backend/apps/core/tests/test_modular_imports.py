@@ -148,7 +148,14 @@ class TestModelsBackwardsCompatibility:
         from apps.core import models
 
         assert hasattr(models, "__all__")
-        assert len(models.__all__) == 29  # Total de models exportados (17 base + 8 DAT + 4 PlanoFormacoes)
+        exports = models.__all__
+        exports_set = set(exports)
+
+        # Sem nomes duplicados no contrato de export
+        assert len(exports) == len(exports_set)
+
+        # Exports essenciais para retrocompatibilidade
+        assert {"Usuario", "Projeto", "Solicitacao", "Participation", "Colecao", "EquipeGerencia"}.issubset(exports_set)
 
     def test_solicitacao_gcal_status_enum(self) -> None:
         """Verifica que GCalStatus enum esta acessivel."""

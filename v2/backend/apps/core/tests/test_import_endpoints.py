@@ -15,6 +15,7 @@ Valida:
 from __future__ import annotations
 
 import io
+from unittest.mock import patch
 
 from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
@@ -64,7 +65,6 @@ def test_import_compras_requires_controle():
     assert r.json()["dry_run"] is True
 
 
-@pytest.mark.skip(reason="TEMP: Do PR18 - será corrigido após merge sequencial")
 def test_import_acoes_requires_controle():
     """Import de AÇÕES requer grupo Controle."""
     user = _user_in_group("Controle")
@@ -73,17 +73,23 @@ def test_import_acoes_requires_controle():
 
     csv_data = b"Municipio,Projeto,Coordenador,Data da Entrega,Data Reuniao Alinhamento,Observacao\nAcarape,Gestao Escolar,coord@test.com,2025-01-10,2025-01-20,ok\n"
 
-    r = client.post(
-        "/api/controle/import-acoes/?dry_run=true",
-        {"file": _file(csv_data)},
-        format="multipart",
-    )
+    with patch("apps.core.views_imports.import_acoes_controle") as mock_import:
+        mock_import.return_value = {"stats": {}, "pendencias": {}, "dry_run": True, "file": "/tmp/mock.csv"}
+
+        r = client.post(
+            "/api/controle/import-acoes/?dry_run=true",
+            {"file": _file(csv_data)},
+            format="multipart",
+        )
 
     assert r.status_code == 200
     assert r.json()["dry_run"] is True
+    assert mock_import.call_count == 1
+    assert "file_path" in mock_import.call_args.kwargs
+    assert "path" not in mock_import.call_args.kwargs
+    assert mock_import.call_args.kwargs["dry_run"] is True
 
 
-@pytest.mark.skip(reason="TEMP: Do PR18 - será corrigido após merge sequencial")
 def test_import_cadastros_requires_dat():
     """Import de CADASTROS requer grupo DAT."""
     user = _user_in_group("DAT")
@@ -92,14 +98,21 @@ def test_import_cadastros_requires_dat():
 
     csv_data = b"Municipio,Projeto,Tipo de acao,Responsavel,Observacao,Data\nAcarape,Gestao Escolar,Criar curso,dat@test.com,ok,2025-04-01\n"
 
-    r = client.post(
-        "/api/dat/import-cadastros/?dry_run=true",
-        {"file": _file(csv_data)},
-        format="multipart",
-    )
+    with patch("apps.core.views_imports.import_dat_cadastros") as mock_import:
+        mock_import.return_value = {"stats": {}, "pendencias": {}, "dry_run": True, "file": "/tmp/mock.csv"}
+
+        r = client.post(
+            "/api/dat/import-cadastros/?dry_run=true",
+            {"file": _file(csv_data)},
+            format="multipart",
+        )
 
     assert r.status_code == 200
     assert r.json()["dry_run"] is True
+    assert mock_import.call_count == 1
+    assert "file_path" in mock_import.call_args.kwargs
+    assert "path" not in mock_import.call_args.kwargs
+    assert mock_import.call_args.kwargs["dry_run"] is True
 
 
 def test_import_unauthorized_returns_403():

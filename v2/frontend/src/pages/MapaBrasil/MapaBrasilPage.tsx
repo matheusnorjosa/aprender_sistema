@@ -47,6 +47,14 @@ import 'leaflet/dist/leaflet.css';
 import api from '../../api';
 import logger from '../../utils/logger';
 import type { ID } from '../../types';
+import {
+  normalizeMapMetricsResponse,
+  type EstadoAgregadoType,
+  type EstadosDataType,
+  type MapMetricsResponse,
+  type MapQueryParams,
+  type MunicipioDataType,
+} from './mapMetrics';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -59,28 +67,6 @@ interface ProjetoType {
   id: ID | null;
   nome: string;
 }
-
-/** Municipio data type */
-interface MunicipioDataType {
-  municipio: string;
-  uf: string;
-  projetos: number;
-  eventos: number;
-  coordenadores: number;
-  coords: [number, number];
-}
-
-/** Estado agregado type */
-interface EstadoAgregadoType {
-  uf: string;
-  eventos: number;
-  projetos: number;
-  coordenadores: number;
-  municipios: string[];
-}
-
-/** Estados data type */
-type EstadosDataType = Record<string, EstadoAgregadoType>;
 
 /** Coordenador projeto type */
 interface CoordenadorProjetoType {
@@ -180,6 +166,7 @@ export default function MapaBrasilPage(): JSX.Element {
   const [projetos, setProjetos] = useState<ProjetoType[]>([]);
   const [coordenadoresData, setCoordenadoresData] = useState<CoordenadorDataType[]>([]);
   const [loadingCoordinators, setLoadingCoordinators] = useState<boolean>(false);
+  const [appliedMapFilters, setAppliedMapFilters] = useState<MapQueryParams>({});
 
   // Refs
   const mapRef = useRef<LeafletMap | null>(null);
@@ -248,59 +235,41 @@ export default function MapaBrasilPage(): JSX.Element {
     fetchMapData();
   }, []);
 
-  const fetchMapData = async (): Promise<void> => {
+  const buildCurrentMapParams = (): MapQueryParams => {
+    const params: MapQueryParams = {};
+    if (selectedProjeto) params.projeto_id = selectedProjeto;
+    if (dateRange?.[0]) params.data_inicio = dateRange[0].format('YYYY-MM-DD');
+    if (dateRange?.[1]) params.data_fim = dateRange[1].format('YYYY-MM-DD');
+    return params;
+  };
+
+  const fetchMapData = async (forcedParams?: MapQueryParams): Promise<void> => {
     setLoading(true);
     setError(null);
 
     try {
-      const params: Record<string, string | number> = {};
-      if (selectedProjeto) params.projeto_id = selectedProjeto;
-      if (dateRange?.[0]) params.data_inicio = dateRange[0].format('YYYY-MM-DD');
-      if (dateRange?.[1]) params.data_fim = dateRange[1].format('YYYY-MM-DD');
+      const params = forcedParams ?? buildCurrentMapParams();
 
       const response = await api.get('/metrics/map/', { params });
+      const normalized = normalizeMapMetricsResponse(response.data as MapMetricsResponse);
 
-      const municipios: MunicipioDataType[] = response.data.by_municipio.map((item: { municipio: string; uf: string; projetos: number; eventos: number; coordenadores: number; latitude: number; longitude: number }) => ({
-        municipio: item.municipio,
-        uf: item.uf,
-        projetos: item.projetos,
-        eventos: item.eventos,
-        coordenadores: item.coordenadores,
-        coords: [item.latitude, item.longitude] as [number, number],
-      }));
-
-      const estadosAgregados: EstadosDataType = {};
-      municipios.forEach(item => {
-        if (!estadosAgregados[item.uf]) {
-          estadosAgregados[item.uf] = {
-            uf: item.uf,
-            eventos: 0,
-            projetos: 0,
-            coordenadores: 0,
-            municipios: [],
-          };
-        }
-        estadosAgregados[item.uf].eventos += item.eventos;
-        estadosAgregados[item.uf].projetos += item.projetos;
-        estadosAgregados[item.uf].coordenadores += item.coordenadores;
-        estadosAgregados[item.uf].municipios.push(item.municipio);
-      });
-
-      setMunicipiosData(municipios);
-      setEstadosData(estadosAgregados);
+      setAppliedMapFilters(params);
+      setMunicipiosData(normalized.municipios);
+      setEstadosData(normalized.estados);
 
     } catch (err) {
       logger.error('Erro ao buscar dados do mapa:', err);
       setError('Erro ao carregar dados. Tente novamente.');
       message.error('Erro ao carregar dados do mapa');
       setMunicipiosData([]);
+      setEstadosData({});
     } finally {
       setLoading(false);
     }
   };
 
   // Fetch coordenadores para um estado específico
-  const fetchCoordinators = async (uf: string): Promise<void> => {
+  const fetchCoordinators = async (uf: string, filters: MapQueryParams): Promise<void> => {
     if (!uf) {
       setCoordenadoresData([]);
       return;
@@ -308,7 +277,7 @@ export default function MapaBrasilPage(): JSX.Element {
 
     setLoadingCoordinators(true);
     try {
-      const response = await api.get('/metrics/map/coordinators/', { params: { uf } });
+      const response = await api.get('/metrics/map/coordinators/', { params: { uf, ...filters } });
       setCoordenadoresData(response.data.coordenadores || []);
     } catch (err) {
       logger.error('Erro ao buscar coordenadores:', err);
@@ -321,11 +290,11 @@ export default function MapaBrasilPage(): JSX.Element {
   // Quando selectedState muda, buscar coordenadores
   useEffect(() => {
     if (selectedState) {
-      fetchCoordinators(selectedState);
+      fetchCoordinators(selectedState, appliedMapFilters);
     } else {
       setCoordenadoresData([]);
     }
-  }, [selectedState]);
+  }, [selectedState, appliedMapFilters]);
 
   const handleApplyFilters = (): void => {
     fetchMapData();
@@ -335,7 +304,7 @@ export default function MapaBrasilPage(): JSX.Element {
     setSelectedProjeto(null);
     setDateRange(null);
     setSearchTerm('');
-    fetchMapData();
+    fetchMapData({});
   };
 
   // Função para resetar a seleção do estado com zoom de volta
@@ -558,6 +527,13 @@ export default function MapaBrasilPage(): JSX.Element {
       align: 'center',
       render: (v: number) => <Tag color="purple">{v}</Tag>,
     },
+    {
+      title: 'Compras',
+      dataIndex: 'compras',
+      key: 'compras',
+      align: 'center',
+      render: (v: number) => <Tag color="orange">{v}</Tag>,
+    },
   ];
 
   // Columns for estados table
@@ -570,10 +546,10 @@ export default function MapaBrasilPage(): JSX.Element {
     },
     {
       title: 'Municípios',
-      dataIndex: 'municipios',
-      key: 'municipios',
+      dataIndex: 'municipiosTotal',
+      key: 'municipiosTotal',
       align: 'center',
-      render: (municipios: string[]) => municipios.length,
+      render: (total: number) => total,
     },
     {
       title: 'Eventos',
@@ -588,6 +564,13 @@ export default function MapaBrasilPage(): JSX.Element {
       key: 'coordenadores',
       align: 'center',
       render: (coord: number) => <Tag color="green">{coord}</Tag>,
+    },
+    {
+      title: 'Compras',
+      dataIndex: 'compras',
+      key: 'compras',
+      align: 'center',
+      render: (compras: number) => <Tag color="orange">{compras}</Tag>,
     },
   ];
 
@@ -916,25 +899,32 @@ export default function MapaBrasilPage(): JSX.Element {
               >
                 <Row gutter={[16, 16]}>
                   {/* Estatísticas em destaque */}
-                  <Col xs={8}>
+                  <Col xs={12} md={6}>
                     <Statistic
                       title="Total de Eventos"
                       value={estadosData[selectedState].eventos}
                       valueStyle={{ color: '#1890ff' }}
                     />
                   </Col>
-                  <Col xs={8}>
+                  <Col xs={12} md={6}>
                     <Statistic
                       title="Total de Projetos"
                       value={estadosData[selectedState].projetos}
                       valueStyle={{ color: '#722ed1' }}
                     />
                   </Col>
-                  <Col xs={8}>
+                  <Col xs={12} md={6}>
                     <Statistic
                       title="Coordenadores"
-                      value={coordenadoresData.length}
+                      value={estadosData[selectedState].coordenadores}
                       valueStyle={{ color: '#52c41a' }}
+                    />
+                  </Col>
+                  <Col xs={12} md={6}>
+                    <Statistic
+                      title="Compras"
+                      value={estadosData[selectedState].compras}
+                      valueStyle={{ color: '#fa8c16' }}
                     />
                   </Col>
                 </Row>
@@ -961,7 +951,7 @@ export default function MapaBrasilPage(): JSX.Element {
                 {/* Lista de municípios com eventos */}
                 <div style={{ marginBottom: 16 }}>
                   <Title level={5} style={{ marginBottom: 12 }}>
-                    Municípios com eventos ({estadosData[selectedState].municipios.length})
+                    Municípios com eventos ({estadosData[selectedState].municipiosTotal})
                   </Title>
                   <Space wrap>
                     {estadosData[selectedState].municipios.map((municipio, idx) => (
@@ -998,6 +988,7 @@ export default function MapaBrasilPage(): JSX.Element {
                       <Space>
                         <Tag color="purple">{item.projetos} projetos</Tag>
                         <Tag color="blue">{item.eventos} eventos</Tag>
+                        <Tag color="orange">{item.compras} compras</Tag>
                       </Space>
                     }
                   >
@@ -1025,11 +1016,12 @@ export default function MapaBrasilPage(): JSX.Element {
                         <div>
                           <Text strong>{uf}</Text>
                           <br />
-                          <Text type="secondary" style={{ fontSize: 12 }}>{data.municipios.length} municípios</Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>{data.municipiosTotal} municípios</Text>
                         </div>
                         <Space>
                           <Tag color="blue">{data.eventos} Eventos</Tag>
                           <Tag color="purple">{data.projetos} Projetos</Tag>
+                          <Tag color="orange">{data.compras} Compras</Tag>
                         </Space>
                       </div>
                     </List.Item>

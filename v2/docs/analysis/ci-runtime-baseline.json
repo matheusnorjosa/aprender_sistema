@@ -1,0 +1,96 @@
+{
+  "generated_at_utc": "2026-02-24T20:09:58.022512+00:00",
+  "metrics": {
+    "CI \u2013 Continuous Integration::[required] backend tests (runner)": {
+      "max_seconds": 634.0,
+      "median_seconds": 588.0,
+      "min_seconds": 233.0,
+      "p95_seconds": 632.0,
+      "samples": 21
+    },
+    "CI \u2013 Continuous Integration::[required] backend typecheck (pyright)": {
+      "max_seconds": 78.0,
+      "median_seconds": 72.0,
+      "min_seconds": 62.0,
+      "p95_seconds": 78.0,
+      "samples": 12
+    },
+    "CI \u2013 Continuous Integration::[required] docker parity (backend)": {
+      "max_seconds": 149.0,
+      "median_seconds": 128.0,
+      "min_seconds": 118.0,
+      "p95_seconds": 135.0,
+      "samples": 21
+    },
+    "CI \u2013 Continuous Integration::[required] lint": {
+      "max_seconds": 34.0,
+      "median_seconds": 25.0,
+      "min_seconds": 20.0,
+      "p95_seconds": 28.0,
+      "samples": 21
+    },
+    "CI \u2013 Continuous Integration::[required] tests": {
+      "max_seconds": 4.0,
+      "median_seconds": 3.0,
+      "min_seconds": 2.0,
+      "p95_seconds": 4.0,
+      "samples": 21
+    },
+    "Security Scan::[required] Container Scan": {
+      "max_seconds": 167.0,
+      "median_seconds": 134.0,
+      "min_seconds": 116.0,
+      "p95_seconds": 166.0,
+      "samples": 22
+    },
+    "Security Scan::[required] Frontend Dependencies": {
+      "max_seconds": 32.0,
+      "median_seconds": 22.0,
+      "min_seconds": 19.0,
+      "p95_seconds": 25.0,
+      "samples": 22
+    },
+    "Security Scan::[required] Python Dependencies": {
+      "max_seconds": 53.0,
+      "median_seconds": 45.0,
+      "min_seconds": 39.0,
+      "p95_seconds": 53.0,
+      "samples": 22
+    },
+    "Security Scan::[required] Secret Detection": {
+      "max_seconds": 89.0,
+      "median_seconds": 17.0,
+      "min_seconds": 15.0,
+      "p95_seconds": 49.0,
+      "samples": 22
+    },
+    "frontend-ci::[required] build/lint do frontend": {
+      "max_seconds": 68.0,
+      "median_seconds": 55.0,
+      "min_seconds": 47.0,
+      "p95_seconds": 59.0,
+      "samples": 20
+    },
+    "frontend-ci::[required] checklist tests (meta, a11y, security)": {
+      "max_seconds": 488.0,
+      "median_seconds": 90.0,
+      "min_seconds": 72.0,
+      "p95_seconds": 162.0,
+      "samples": 20
+    },
+    "frontend-ci::[required] react doctor quality gate": {
+      "max_seconds": 38.0,
+      "median_seconds": 33.0,
+      "min_seconds": 28.0,
+      "p95_seconds": 36.0,
+      "samples": 20
+    }
+  },
+  "repo": "matheusnorjosa/aprender_sistema",
+  "runs_per_workflow": 30,
+  "workflows": [
+    "CI \u2013 Continuous Integration",
+    "frontend-ci",
+    "Security Scan"
+  ]
+}

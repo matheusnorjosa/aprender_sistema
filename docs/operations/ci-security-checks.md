@@ -1,10 +1,11 @@
 # CI Security Checks
 
 Este guia explica os checks de segurança adicionados para PRs em `main`.
+Para a política completa de `required` vs `info`, veja [CI Check Policy](ci-check-policy.md).
 
 ## Dependency Review (bloqueante)
 
-Check: `dependency review`
+Check: `[required] dependency review`
 
 Objetivo:
 - Bloquear introdução de dependências com vulnerabilidades **HIGH/CRITICAL** no momento do PR.
@@ -22,7 +23,7 @@ Ação esperada quando falhar:
 
 ## OpenSSF Scorecard (informativo inicial)
 
-Check: `openssf scorecard (informativo)`
+Check: `[info] openssf scorecard`
 
 Objetivo:
 - Medir postura de segurança do repositório sem bloquear merge nesta fase inicial.

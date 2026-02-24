@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   dependency-review:
-    name: dependency review
+    name: "[required] dependency review"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -104,7 +104,7 @@ jobs:
           fi
 
   scorecard:
-    name: openssf scorecard (informativo)
+    name: "[info] openssf scorecard"
     runs-on: ubuntu-latest
     continue-on-error: true
     permissions:

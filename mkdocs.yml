@@ -92,6 +92,7 @@ nav:
     - Views: api/views.md
   - Operações:
     - Deploy: operations/deploy.md
+    - CI Check Policy: operations/ci-check-policy.md
     - CI Security Checks: operations/ci-security-checks.md
     - Backup: operations/backup.md
     - Go-Live Checklist: operations/go-live.md

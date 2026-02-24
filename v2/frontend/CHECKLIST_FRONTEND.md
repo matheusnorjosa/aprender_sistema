@@ -145,6 +145,7 @@
 ### Qualidade
 
 - [ ] 🔴 **ESLint sem erros**: Zero warnings críticos
+- [ ] 🔴 **React Doctor >= 75**: `npx -y react-doctor@latest . --score --yes`
 - [ ] 🔴 **TypeScript strict**: Sem `any` implícito
 - [ ] 🟡 **React DevTools**: Sem warnings em dev
 - [ ] 🟢 **Error boundaries**: Capturar erros de componentes

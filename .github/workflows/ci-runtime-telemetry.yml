@@ -1,0 +1,57 @@
+name: CI Runtime Telemetry
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - ".github/workflows/ci-runtime-telemetry.yml"
+      - "v2/scripts/ci_runtime_telemetry.py"
+      - "v2/docs/analysis/ci-runtime-baseline.json"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  telemetry:
+    name: "[monitoring] ci runtime baseline (median/p95)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate runtime telemetry report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python v2/scripts/ci_runtime_telemetry.py \
+            --repo "${{ github.repository }}" \
+            --workflows "CI – Continuous Integration" "frontend-ci" "Security Scan" \
+            --runs-per-workflow 30 \
+            --required-only \
+            --baseline-json "v2/docs/analysis/ci-runtime-baseline.json" \
+            --regression-threshold-pct 35 \
+            --output-json "ci-runtime-report.json" \
+            --output-md "ci-runtime-report.md"
+
+      - name: Upload telemetry artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-runtime-telemetry
+          path: |
+            ci-runtime-report.json
+            ci-runtime-report.md
+          retention-days: 30
+
+      - name: Publish summary
+        if: always()
+        run: cat ci-runtime-report.md >> "$GITHUB_STEP_SUMMARY"

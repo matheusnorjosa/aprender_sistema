@@ -41,3 +41,19 @@
 
 ### Validation target
 - Reduce checklist duration without increasing retries/flaky failures.
+
+## F3.1 - CI runtime baseline and continuous telemetry (Issue #651)
+
+### Baseline published
+- Baseline markdown: `v2/docs/analysis/ci-runtime-baseline.md`
+- Baseline data: `v2/docs/analysis/ci-runtime-baseline.json`
+- Metrics: median and p95 by required job (window: last 30 completed runs per workflow)
+
+### Continuous process
+- Script: `v2/scripts/ci_runtime_telemetry.py`
+- Workflow: `.github/workflows/ci-runtime-telemetry.yml`
+- Schedule: daily (`0 9 * * *`) + manual dispatch
+
+### Objective regression criterion
+- Compare current p95 vs baseline p95 per monitored job
+- Alert/fail threshold: `+35%` (configurable via workflow argument)

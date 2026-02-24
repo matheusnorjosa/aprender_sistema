@@ -18,6 +18,6 @@
 
 ## Validacoes
 
-- [ ] Frontend CI verde (incluindo React Doctor >= 75)
-- [ ] Backend CI verde (quando afetado)
+- [ ] Checks `[required]` verdes (somente gates bloqueantes)
+- [ ] Checks `[info]` revisados quando falharem (sem bloquear merge)
 - [ ] Sem alteracoes fora do escopo combinado

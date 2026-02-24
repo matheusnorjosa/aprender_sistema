@@ -28,3 +28,16 @@
 
 ### Next technical step
 - Isolate and fix stateful/non-parallel-safe tests first, then re-run the experiment.
+
+## F2.2 - Controlled Playwright checklist workers experiment (Issue #650)
+
+### Experiment setup
+- Scope: checklist-only CI job (`[required] checklist tests (meta, a11y, security)`)
+- Change: run checklist with `--workers=2`
+- Control point: `CHECKLIST_PLAYWRIGHT_WORKERS` in `.github/workflows/frontend-ci.yml`
+
+### Rollback
+- Fast rollback: set `CHECKLIST_PLAYWRIGHT_WORKERS=1`
+
+### Validation target
+- Reduce checklist duration without increasing retries/flaky failures.

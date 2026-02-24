@@ -11,12 +11,14 @@ on:
       - main
     paths:
       - 'v2/**'
+      - '.github/workflows/**'
       - '.github/workflows/security-scan.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'v2/**'
+      - '.github/workflows/**'
       - '.github/workflows/security-scan.yml'
   schedule:
     # Run weekly on Sundays at 00:00 UTC

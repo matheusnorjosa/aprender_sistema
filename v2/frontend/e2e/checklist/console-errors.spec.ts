@@ -6,7 +6,8 @@
  *
  * Navega pelas principais páginas e verifica se há erros no console.
  */
-import { test, expect, Page, ConsoleMessage } from '@playwright/test';
+import { test, expect, ConsoleMessage } from '@playwright/test';
+import './checklist-network-mocks.setup';
 
 // Páginas principais para testar
 const PAGES_TO_CHECK = [
@@ -49,33 +50,7 @@ function shouldIgnoreError(message: string): boolean {
   return IGNORED_ERRORS.some((ignored) => message.includes(ignored));
 }
 
-async function mockAnonymousSession(page: Page): Promise<void> {
-  // Keep console tests focused on frontend runtime behavior.
-  // Explicitly mock auth/bootstrap endpoints with robust matchers.
-  await page.route(/\/api\/csrf\/?(\?.*)?$/, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ csrfToken: 'checklist-test-csrf-token' }),
-    });
-  });
-
-  await page.route(/\/api\/me\/?(\?.*)?$/, async (route) => {
-    await route.fulfill({
-      status: 401,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        detail: 'As credenciais de autenticação não foram fornecidas.',
-      }),
-    });
-  });
-}
-
 test.describe('Checklist: Console Errors', () => {
-  test.beforeEach(async ({ page }) => {
-    await mockAnonymousSession(page);
-  });
-
   test('🔴 página inicial não deve ter erros no console', async ({ page }) => {
     const errors: string[] = [];
 

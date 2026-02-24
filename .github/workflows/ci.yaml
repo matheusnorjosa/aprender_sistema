@@ -58,6 +58,13 @@ jobs:
     name: "[required] backend tests (runner)"
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      # Controlled experiment (Issue #649): keep disabled by default after
+      # instability observed with full parallel run. Re-enable when targeted
+      # test groups are proven xdist-safe.
+      PYTEST_XDIST_ENABLED: '0'
+      PYTEST_XDIST_WORKERS: 'auto'
+      PYTEST_XDIST_DIST: 'loadscope'
 
     services:
       postgres:
@@ -152,10 +159,38 @@ jobs:
     - name: Run tests with coverage
       run: |
         cd v2/backend
-        # Full test suite for both PRs and main branch
-        # This ensures no regressions slip through to main
-        echo "🧪 Running full test suite"
-        pytest -q --tb=short --cov=apps --cov-report=xml --cov-report=term --cov-fail-under=80
+        # Full test suite for both PRs and main branch.
+        # Controlled xdist experiment can be disabled quickly via PYTEST_XDIST_ENABLED=0.
+        MODE="serial"
+        PYTEST_EXTRA_ARGS=""
+        if [ "${PYTEST_XDIST_ENABLED}" = "1" ]; then
+          MODE="xdist"
+          PYTEST_EXTRA_ARGS="-n ${PYTEST_XDIST_WORKERS} --dist ${PYTEST_XDIST_DIST}"
+        fi
+
+        echo "🧪 Running full test suite (mode=${MODE})"
+        START_TS=$(date +%s)
+
+        set +e
+        pytest -q --tb=short ${PYTEST_EXTRA_ARGS} --cov=apps --cov-report=xml --cov-report=term --cov-fail-under=80
+        TEST_EXIT=$?
+        set -e
+
+        END_TS=$(date +%s)
+        DURATION_SEC=$((END_TS - START_TS))
+        {
+          echo "### Backend Tests Runtime"
+          echo "- Mode: ${MODE}"
+          if [ "${MODE}" = "xdist" ]; then
+            echo "- Workers: ${PYTEST_XDIST_WORKERS}"
+            echo "- Dist strategy: ${PYTEST_XDIST_DIST}"
+          fi
+          echo "- Duration (seconds): ${DURATION_SEC}"
+          echo "- Rollback: set \`PYTEST_XDIST_ENABLED=0\` in \`.github/workflows/ci.yaml\`"
+          echo "- Exit code: ${TEST_EXIT}"
+        } >> "${GITHUB_STEP_SUMMARY}"
+
+        exit ${TEST_EXIT}
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

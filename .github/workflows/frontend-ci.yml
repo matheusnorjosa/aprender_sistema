@@ -27,7 +27,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        # React Doctor gate here runs full score mode (no git diff analysis),
+        # so shallow checkout is enough and faster.
+        # If diff-based React Doctor mode is introduced, switch to fetch-depth: 0.
+        fetch-depth: 1
 
     - name: Setup Node.js 20.x
       uses: actions/setup-node@v4

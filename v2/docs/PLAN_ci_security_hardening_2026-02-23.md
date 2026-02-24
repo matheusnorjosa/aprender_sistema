@@ -103,6 +103,27 @@ Validação:
 
 ---
 
+### Padrão mínimo de confiabilidade de CI (Issue #633)
+
+Escopo:
+- Definir `concurrency` em workflows críticos para cancelar runs antigos de PR automaticamente.
+- Definir `timeout-minutes` explícito por job crítico para evitar execução indefinida.
+
+Padrão adotado:
+- `concurrency.group`: `${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}`
+- `cancel-in-progress`: `true` para PR (`github.event_name == 'pull_request'`)
+- `timeout-minutes` obrigatório em jobs críticos de:
+  - `.github/workflows/ci.yaml`
+  - `.github/workflows/frontend-ci.yml`
+  - `.github/workflows/security-scan.yml`
+  - `.github/workflows/docs.yml`
+
+Critério de aceite:
+- Novo push no mesmo PR cancela run anterior automaticamente.
+- Jobs críticos falham por timeout quando excedem limite definido.
+
+---
+
 ## 3) Ordem de execução (issues)
 
 1. **#627** Hardening `security-scan.yml` + trigger de PR para workflow file.
@@ -123,8 +144,10 @@ Validação:
 ## 5) Referências
 
 - Epic atual: `#620`
-- Issues deste ciclo: `#627`, `#628`, `#629`, `#630`
+- Issues deste ciclo: `#627`, `#628`, `#629`, `#630`, `#633`
 - Workflow alvo: `.github/workflows/security-scan.yml`
 - Workflow alvo: `.github/workflows/frontend-ci.yml`
+- Workflow alvo: `.github/workflows/ci.yaml`
+- Workflow alvo: `.github/workflows/docs.yml`
 - Workflow alvo: `.github/workflows/release.yaml`
 - Ruleset alvo: `Protect main` (`id: 9793909`)

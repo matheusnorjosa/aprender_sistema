@@ -14,10 +14,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   react-doctor:
     name: react doctor quality gate
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    timeout-minutes: 12
 
     steps:
     - uses: actions/checkout@v4
@@ -44,6 +49,7 @@ jobs:
     name: build/lint do frontend
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
     needs: react-doctor
+    timeout-minutes: 20
 
     defaults:
       run:
@@ -85,6 +91,7 @@ jobs:
     name: checklist tests (meta, a11y, security)
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
     needs: build-lint-frontend
+    timeout-minutes: 25
 
     defaults:
       run:
@@ -126,6 +133,7 @@ jobs:
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
     needs: build-lint-frontend
     if: github.event_name == 'pull_request'
+    timeout-minutes: 12
 
     defaults:
       run:

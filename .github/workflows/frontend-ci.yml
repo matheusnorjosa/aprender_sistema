@@ -101,6 +101,10 @@ jobs:
     # Runs in parallel with build/lint to reduce critical path.
     # Checklist does not consume build artifacts from build-lint-frontend.
     timeout-minutes: 25
+    env:
+      # Controlled experiment (Issue #650): increase checklist concurrency.
+      # Fast rollback: set to 1 if retries/flakiness increase.
+      CHECKLIST_PLAYWRIGHT_WORKERS: '2'
 
     defaults:
       run:
@@ -123,7 +127,7 @@ jobs:
       run: npx playwright install chromium --with-deps
 
     - name: Run checklist tests
-      run: npm run test:checklist
+      run: npm run test:checklist -- --workers=${CHECKLIST_PLAYWRIGHT_WORKERS}
       env:
         # PR CI does not run behind production-grade reverse proxy headers.
         # Keep strict header assertions opt-in via STRICT_SECURITY_HEADERS=1.

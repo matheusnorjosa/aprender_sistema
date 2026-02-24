@@ -100,7 +100,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r v2/backend/requirements.txt
         pip install -r v2/backend/requirements-dev.txt
-        pip install pytest pytest-django pytest-cov pytest-xdist
 
     - name: Set up environment variables
       run: |
@@ -123,12 +122,6 @@ jobs:
         echo "ETL_OUTPUT_DIR=${{ github.workspace }}/v2/backend/out_etl" >> $GITHUB_ENV
         echo "ETL_DATA_DIR=${{ github.workspace }}/v2/backend/data/csv-import" >> $GITHUB_ENV
         echo "PYTHONDONTWRITEBYTECODE=1" >> $GITHUB_ENV
-
-    - name: Type check with Pyright
-      run: |
-        cd v2/backend
-        pyright apps/core apps/dat_ingest config
-      continue-on-error: false
 
     - name: Validate test paths (no /app hardcoded)
       run: |
@@ -175,7 +168,38 @@ jobs:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # ----------------------------------------------------------------
-  # Job 3: Docker parity (backend)
+  # Job 3: Backend typecheck with Pyright
+  # Runs in parallel to keep typecheck out of backend test critical path.
+  # ----------------------------------------------------------------
+  backend-typecheck:
+    name: "[required] backend typecheck (pyright)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+        cache-dependency-path: |
+          v2/backend/requirements.txt
+          v2/backend/requirements-dev.txt
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r v2/backend/requirements.txt
+        pip install -r v2/backend/requirements-dev.txt
+
+    - name: Type check with Pyright
+      run: |
+        cd v2/backend
+        pyright apps/core apps/dat_ingest config
+
+  # ----------------------------------------------------------------
+  # Job 4: Docker parity (backend)
   #
   # Trade-off:
   # - Adds a complementary gate to catch "passes on runner, fails in container".
@@ -269,15 +293,16 @@ jobs:
           '
 
   # ----------------------------------------------------------------
-  # Job 4: Required backend gate
+  # Job 5: Required backend gate
   # Keeps the required "tests" check in ruleset while aggregating
-  # runner tests + docker parity.
+  # runner tests + docker parity + typecheck.
   # ----------------------------------------------------------------
   tests:
     name: "[required] tests"
     runs-on: ubuntu-latest
     needs:
       - backend-tests
+      - backend-typecheck
       - docker-parity-backend
     if: always()
     timeout-minutes: 5
@@ -288,8 +313,12 @@ jobs:
           echo "backend-tests failed with result=${{ needs.backend-tests.result }}" >&2
           exit 1
         fi
+        if [ "${{ needs.backend-typecheck.result }}" != "success" ]; then
+          echo "backend-typecheck failed with result=${{ needs.backend-typecheck.result }}" >&2
+          exit 1
+        fi
         if [ "${{ needs.docker-parity-backend.result }}" != "success" ]; then
           echo "docker-parity-backend failed with result=${{ needs.docker-parity-backend.result }}" >&2
           exit 1
         fi
-        echo "Backend runner tests + Docker parity passed."
+        echo "Backend runner tests + typecheck + Docker parity passed."

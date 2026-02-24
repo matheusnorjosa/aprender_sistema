@@ -11,7 +11,10 @@ Objetivo:
 
 Comportamento:
 - Se o PR introduzir vulnerabilidade alta/crítica em dependências, o check falha.
-- O workflow publica um resumo no PR com o resultado da análise.
+- Repositório público: usa `actions/dependency-review-action` com threshold `high`.
+- Repositório privado sem GHAS: usa fallback bloqueante:
+  - Python: Trivy (`library`, `HIGH/CRITICAL`)
+  - Frontend: `npm audit --omit=dev --audit-level=high`
 
 Ação esperada quando falhar:
 - Atualizar/remover dependência vulnerável no próprio PR.

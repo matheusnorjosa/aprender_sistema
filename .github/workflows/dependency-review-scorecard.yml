@@ -22,12 +22,86 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
-      - name: Dependency Review (block HIGH/CRITICAL)
+      - name: Detect dependency manifest changes
+        id: deps-changes
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          git fetch --no-tags --prune --depth=1 origin "$BASE_SHA" "$HEAD_SHA"
+          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          echo "$CHANGED_FILES"
+
+          PYTHON_CHANGED=false
+          FRONTEND_CHANGED=false
+
+          if echo "$CHANGED_FILES" | grep -Eq '^v2/backend/requirements.*\.txt$'; then
+            PYTHON_CHANGED=true
+          fi
+          if echo "$CHANGED_FILES" | grep -Eq '^v2/frontend/(package\.json|package-lock\.json)$'; then
+            FRONTEND_CHANGED=true
+          fi
+
+          if [ "$PYTHON_CHANGED" = true ] || [ "$FRONTEND_CHANGED" = true ]; then
+            ANY_CHANGED=true
+          else
+            ANY_CHANGED=false
+          fi
+
+          echo "python_changed=$PYTHON_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "frontend_changed=$FRONTEND_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "any_changed=$ANY_CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Dependency Review (public repos, block HIGH/CRITICAL)
+        if: github.event.repository.private == false && steps.deps-changes.outputs.any_changed == 'true'
         uses: actions/dependency-review-action@56339e523c0409420f6c2c9a2f4292bbb3c07dd3 # v4.8.0
         with:
           fail-on-severity: high
-          comment-summary-in-pr: always
+
+      # Private repositories without GHAS can not use dependency-review-action.
+      # Fallback keeps a blocking dependency gate for changed dependency manifests.
+      - name: Fallback Python dependency scan (private repos)
+        if: github.event.repository.private == true && steps.deps-changes.outputs.python_changed == 'true'
+        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        with:
+          scan-type: fs
+          scan-ref: v2/backend
+          scanners: vuln
+          vuln-type: library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Setup Node.js (fallback frontend scan)
+        if: github.event.repository.private == true && steps.deps-changes.outputs.frontend_changed == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: v2/frontend/package-lock.json
+
+      - name: Fallback Frontend dependency scan (private repos)
+        if: github.event.repository.private == true && steps.deps-changes.outputs.frontend_changed == 'true'
+        run: |
+          set -euo pipefail
+          cd v2/frontend
+          npm ci
+          npm audit --omit=dev --audit-level=high
+
+      - name: Dependency gate summary
+        if: always()
+        run: |
+          echo "dependency manifests changed: ${{ steps.deps-changes.outputs.any_changed }}"
+          echo "python changed: ${{ steps.deps-changes.outputs.python_changed }}"
+          echo "frontend changed: ${{ steps.deps-changes.outputs.frontend_changed }}"
+          if [ "${{ github.event.repository.private }}" = "true" ]; then
+            echo "Private repository: fallback dependency gate applied."
+          else
+            echo "Public repository: dependency-review-action applied."
+          fi
 
   scorecard:
     name: openssf scorecard (informativo)

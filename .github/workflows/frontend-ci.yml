@@ -126,6 +126,8 @@ jobs:
       with:
         name: checklist-test-results
         path: v2/frontend/test-results
+        # Checklist can pass without generating this directory (reporter=list).
+        if-no-files-found: ignore
         retention-days: 7
 
   lighthouse-ci:

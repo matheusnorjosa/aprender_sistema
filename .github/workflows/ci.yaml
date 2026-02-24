@@ -20,7 +20,7 @@ jobs:
   # ----------------------------------------------------------------
   lint:
     name: lint
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -51,12 +51,12 @@ jobs:
           flake8 apps/ config/
 
   # ----------------------------------------------------------------
-  # Job 2: Tests (~10min)
+  # Job 2: Backend tests on runner (~10min)
   # Runs in parallel with lint (no dependency)
   # ----------------------------------------------------------------
-  tests:
-    name: tests
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+  backend-tests:
+    name: backend tests (runner)
+    runs-on: ubuntu-latest
     timeout-minutes: 35
 
     services:
@@ -173,3 +173,123 @@ jobs:
         fail_ci_if_error: false
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # ----------------------------------------------------------------
+  # Job 3: Docker parity (backend)
+  #
+  # Trade-off:
+  # - Adds a complementary gate to catch "passes on runner, fails in container".
+  # - Increases CI duration by a few minutes.
+  #
+  # Optimizations:
+  # - Uses only smoke checks (lint subset + critical tests subset).
+  # - Reuses Actions service containers (Postgres/Redis) instead of full compose stack.
+  # ----------------------------------------------------------------
+  docker-parity-backend:
+    name: docker parity (backend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_aprender
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build backend image (official Dockerfile)
+      run: |
+        docker build -f v2/infra/Dockerfile -t aprender-backend:ci-parity-${{ github.sha }} v2
+
+    - name: Run smoke checks inside container
+      env:
+        DJANGO_SETTINGS_MODULE: config.settings
+        ENVIRONMENT: testing
+        DEBUG: "0"
+        SECRET_KEY: test-secret-key-for-ci-only
+        DB_HOST: host.docker.internal
+        DB_PORT: "5432"
+        DB_NAME: test_aprender
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        REDIS_HOST: host.docker.internal
+        REDIS_PORT: "6379"
+        TZ: America/Fortaleza
+        REQUIRE_DOCKER: "1"
+        GCAL_CLIENT: fake
+        GCAL_SEND_UPDATES: none
+      run: |
+        docker run --rm --add-host host.docker.internal:host-gateway \
+          -e DJANGO_SETTINGS_MODULE \
+          -e ENVIRONMENT \
+          -e DEBUG \
+          -e SECRET_KEY \
+          -e DB_HOST \
+          -e DB_PORT \
+          -e DB_NAME \
+          -e DB_USER \
+          -e DB_PASSWORD \
+          -e REDIS_HOST \
+          -e REDIS_PORT \
+          -e TZ \
+          -e REQUIRE_DOCKER \
+          -e GCAL_CLIENT \
+          -e GCAL_SEND_UPDATES \
+          aprender-backend:ci-parity-${{ github.sha }} \
+          bash -lc '
+            set -euo pipefail
+            pip install --no-cache-dir pytest pytest-django black isort flake8
+            black --check apps/core/auth_backends.py apps/core/models/__init__.py
+            isort --check-only apps/core/auth_backends.py
+            flake8 apps/core/auth_backends.py
+            python manage.py migrate --noinput
+            pytest -q --tb=short \
+              apps/core/tests/test_modular_imports.py \
+              apps/core/tests/test_auth_backends.py
+          '
+
+  # ----------------------------------------------------------------
+  # Job 4: Required backend gate
+  # Keeps the required "tests" check in ruleset while aggregating
+  # runner tests + docker parity.
+  # ----------------------------------------------------------------
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    needs:
+      - backend-tests
+      - docker-parity-backend
+    if: always()
+    timeout-minutes: 5
+    steps:
+    - name: Assert backend gates passed
+      run: |
+        if [ "${{ needs.backend-tests.result }}" != "success" ]; then
+          echo "backend-tests failed with result=${{ needs.backend-tests.result }}" >&2
+          exit 1
+        fi
+        if [ "${{ needs.docker-parity-backend.result }}" != "success" ]; then
+          echo "docker-parity-backend failed with result=${{ needs.docker-parity-backend.result }}" >&2
+          exit 1
+        fi
+        echo "Backend runner tests + Docker parity passed."

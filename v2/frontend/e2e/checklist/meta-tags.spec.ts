@@ -9,6 +9,7 @@
  * - 🟢 Theme color
  */
 import { test, expect, Page } from '@playwright/test';
+import './checklist-network-mocks.setup';
 
 // Helper para extrair meta tags
 async function getMetaContent(page: Page, selector: string): Promise<string | null> {

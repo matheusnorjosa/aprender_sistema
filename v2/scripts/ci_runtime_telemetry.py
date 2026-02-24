@@ -230,14 +230,18 @@ def detect_regressions(
 
 
 def write_json(path: str, payload: dict) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     with open(path, "w", encoding="utf-8") as file:
         json.dump(payload, file, indent=2, sort_keys=True)
         file.write("\n")
 
 
 def write_markdown(path: str, payload: dict, regressions: List[Tuple[str, float, float]]) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     lines: List[str] = []
     lines.append("# CI Runtime Telemetry")
     lines.append("")

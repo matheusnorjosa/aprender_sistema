@@ -14,6 +14,7 @@
  */
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import './checklist-network-mocks.setup';
 
 // Páginas para testar acessibilidade
 const PAGES_TO_TEST = [

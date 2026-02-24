@@ -14,6 +14,7 @@
  * Este teste é mais útil em staging/produção.
  */
 import { test, expect } from '@playwright/test';
+import { mockChecklistAuthBootstrap } from './checklist-network-mocks';
 
 // Modo estrito só deve ser ativado explicitamente para ambientes com headers de produção.
 const STRICT_MODE = ['1', 'true', 'yes'].includes(
@@ -153,6 +154,10 @@ test.describe('Checklist: HTTPS', () => {
 });
 
 test.describe('Checklist: Cookies Security', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockChecklistAuthBootstrap(page);
+  });
+
   test('🔴 cookies de sessão devem ter flags de segurança', async ({ page }) => {
     await page.goto('/');
 

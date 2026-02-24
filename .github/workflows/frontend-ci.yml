@@ -169,4 +169,5 @@ jobs:
       with:
         name: lighthouse-results
         path: v2/frontend/.lighthouseci
+        if-no-files-found: ignore
         retention-days: 7

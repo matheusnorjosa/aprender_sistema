@@ -48,7 +48,6 @@ jobs:
   build-lint-frontend:
     name: "[required] build/lint do frontend"
     runs-on: ubuntu-latest
-    needs: react-doctor
     timeout-minutes: 20
 
     defaults:
@@ -90,7 +89,8 @@ jobs:
   checklist-tests:
     name: "[required] checklist tests (meta, a11y, security)"
     runs-on: ubuntu-latest
-    needs: build-lint-frontend
+    # Runs in parallel with build/lint to reduce critical path.
+    # Checklist does not consume build artifacts from build-lint-frontend.
     timeout-minutes: 25
 
     defaults:

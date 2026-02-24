@@ -2,7 +2,7 @@
 
 **Versão:** 1.0
 **Projeto Docker:** `aprender_v2`
-**Última atualização:** 2025-10-20
+**Última atualização:** 2026-02-24
 
 ---
 
@@ -14,8 +14,58 @@
 4. [ETL: Importação de Ações (Controle e DAT)](#etl-importação-de-ações-controle-e-dat)
 5. [APIs REST: Ações (Controle e DAT)](#apis-rest-ações-controle-e-dat)
 6. [Troubleshooting Comum](#troubleshooting-comum)
+7. [Release Workflow Hardening](#release-workflow-hardening)
 
 ---
+
+## 🚀 Release Workflow Hardening
+
+O workflow `.github/workflows/release.yaml` agora inclui evidências de supply chain e validação pós-deploy bloqueante.
+
+### **1. Variáveis obrigatórias por ambiente**
+
+Configure como **secret** ou **variable** (secret tem prioridade):
+
+- `STAGING_DEPLOY_COMMAND` / `PRODUCTION_DEPLOY_COMMAND`
+- `STAGING_HEALTHCHECK_URL` / `PRODUCTION_HEALTHCHECK_URL`
+- `STAGING_VERSIONCHECK_URL` / `PRODUCTION_VERSIONCHECK_URL`
+
+### **2. Fluxo operacional**
+
+```bash
+# A execução é manual (workflow_dispatch):
+# GitHub -> Actions -> Release -> Run workflow
+# Environment: staging ou production
+```
+
+Ordem crítica no pipeline:
+
+1. Build e push de imagens backend/frontend.
+2. Geração de SBOM (`backend-sbom.spdx.json`, `frontend-sbom.spdx.json`).
+3. Geração de provenance attestation (imagens + SBOM).
+4. Deploy via comando configurado.
+5. Verificação pós-deploy:
+   - health endpoint deve retornar HTTP 200
+   - version endpoint deve conter a release (`vYYYY.MM.DD-<sha>`)
+6. Criação da GitHub Release + upload dos assets de evidência.
+
+### **3. Evidências geradas**
+
+- `deploy-evidence.txt` (contexto do deploy, digests, outcome de verificação)
+- `supply-chain/*.spdx.json` (SBOM)
+- `supply-chain/attestations/*.bundle.jsonl` (attestation bundle)
+- `supply-chain/verification/post-deploy-*.txt` (respostas health/version)
+
+### **4. Critério de falha**
+
+O workflow falha quando qualquer item crítico falha:
+
+- comando de deploy
+- health check pós-deploy
+- version check pós-deploy
+- geração de SBOM/attestation
+
+Isso evita sinal verde operacional sem confirmação real de deploy íntegro.
 
 ## 🔄 Recarregar Variáveis de Ambiente (.env)
 
@@ -1431,4 +1481,3 @@ docker compose exec -T web python manage.py backfill_external_hash_v2 --apply
 **Observação:** Dry-run **nunca** é bloqueado por quality gates. Use para diagnóstico sem risco.
 
 ---
-

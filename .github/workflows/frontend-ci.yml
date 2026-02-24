@@ -170,4 +170,5 @@ jobs:
         name: lighthouse-results
         path: v2/frontend/.lighthouseci
         if-no-files-found: ignore
+        include-hidden-files: true
         retention-days: 7

@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   react-doctor:
-    name: react doctor quality gate
+    name: "[required] react doctor quality gate"
     runs-on: ubuntu-latest
     timeout-minutes: 12
 
@@ -46,7 +46,7 @@ jobs:
         REACT_DOCTOR_MIN_SCORE: '75'
 
   build-lint-frontend:
-    name: build/lint do frontend
+    name: "[required] build/lint do frontend"
     runs-on: ubuntu-latest
     needs: react-doctor
     timeout-minutes: 20
@@ -88,7 +88,7 @@ jobs:
         retention-days: 1
 
   checklist-tests:
-    name: checklist tests (meta, a11y, security)
+    name: "[required] checklist tests (meta, a11y, security)"
     runs-on: ubuntu-latest
     needs: build-lint-frontend
     timeout-minutes: 25
@@ -129,7 +129,7 @@ jobs:
         retention-days: 7
 
   lighthouse-ci:
-    name: lighthouse CI
+    name: "[info] lighthouse CI"
     runs-on: ubuntu-latest
     needs: build-lint-frontend
     if: github.event_name == 'pull_request'
@@ -169,4 +169,6 @@ jobs:
       with:
         name: lighthouse-results
         path: v2/frontend/.lighthouseci
+        if-no-files-found: ignore
+        include-hidden-files: true
         retention-days: 7

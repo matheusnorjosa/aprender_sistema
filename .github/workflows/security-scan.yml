@@ -16,10 +16,8 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - 'v2/**'
-      - '.github/workflows/**'
-      - '.github/workflows/security-scan.yml'
+    # No path filters on PR: required security checks must always run
+    # to avoid "Expected check missing" in branch protection.
   schedule:
     # Run weekly on Sundays at 00:00 UTC
     - cron: '0 0 * * 0'
@@ -37,7 +35,7 @@ jobs:
   # Job 1: Python Dependency Vulnerability Scan
   # ================================================================
   python-security:
-    name: Python Dependencies
+    name: "[required] Python Dependencies"
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
@@ -82,7 +80,7 @@ jobs:
   # Job 2: Container Image Vulnerability Scan (Trivy)
   # ================================================================
   container-security:
-    name: Container Scan
+    name: "[required] Container Scan"
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -125,7 +123,7 @@ jobs:
   # Job 3: Frontend Dependency Scan
   # ================================================================
   frontend-security:
-    name: Frontend Dependencies
+    name: "[required] Frontend Dependencies"
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -171,7 +169,7 @@ jobs:
   # Job 4: Secret Scanning
   # ================================================================
   secrets-scan:
-    name: Secret Detection
+    name: "[required] Secret Detection"
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

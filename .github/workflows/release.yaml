@@ -174,7 +174,7 @@ jobs:
       # =========================================================================
       # Deployment
       # =========================================================================
-      - name: Deploy notification
+      - name: Release summary
         run: |
           echo "========================================"
           echo "Docker images published to Docker Hub!"
@@ -183,17 +183,94 @@ jobs:
           echo "Backend:  ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}"
           echo "Frontend: ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.version }}"
           echo ""
-          echo "To deploy, run:"
-          echo "  IMAGE_TAG=${{ steps.version.outputs.version }} docker compose -f docker-compose.prod.yml up -d"
+          echo "Deployment will now run from a configured command for '${{ github.event.inputs.environment }}'."
 
-      - name: Deploy to staging
-        if: github.event.inputs.environment == 'staging'
+      - name: Resolve deploy command (required)
+        id: resolve-deploy-command
+        env:
+          TARGET_ENV: ${{ github.event.inputs.environment }}
+          STAGING_DEPLOY_COMMAND_SECRET: ${{ secrets.STAGING_DEPLOY_COMMAND || '' }}
+          STAGING_DEPLOY_COMMAND_VAR: ${{ vars.STAGING_DEPLOY_COMMAND || '' }}
+          PRODUCTION_DEPLOY_COMMAND_SECRET: ${{ secrets.PRODUCTION_DEPLOY_COMMAND || '' }}
+          PRODUCTION_DEPLOY_COMMAND_VAR: ${{ vars.PRODUCTION_DEPLOY_COMMAND || '' }}
         run: |
-          echo "Deploying to staging environment..."
-          # Add staging deployment commands here (e.g., SSH to server, kubectl apply, etc.)
+          set -euo pipefail
 
-      - name: Deploy to production
-        if: github.event.inputs.environment == 'production'
+          DEPLOY_COMMAND=""
+          case "$TARGET_ENV" in
+            staging)
+              DEPLOY_COMMAND="$STAGING_DEPLOY_COMMAND_SECRET"
+              if [ -z "$DEPLOY_COMMAND" ]; then
+                DEPLOY_COMMAND="$STAGING_DEPLOY_COMMAND_VAR"
+              fi
+              ;;
+            production)
+              DEPLOY_COMMAND="$PRODUCTION_DEPLOY_COMMAND_SECRET"
+              if [ -z "$DEPLOY_COMMAND" ]; then
+                DEPLOY_COMMAND="$PRODUCTION_DEPLOY_COMMAND_VAR"
+              fi
+              ;;
+            *)
+              echo "Invalid environment: $TARGET_ENV" >&2
+              exit 1
+              ;;
+          esac
+
+          if [ -z "$DEPLOY_COMMAND" ]; then
+            echo "Deploy command for '$TARGET_ENV' is not configured." >&2
+            echo "Configure secret or variable: STAGING_DEPLOY_COMMAND / PRODUCTION_DEPLOY_COMMAND." >&2
+            exit 1
+          fi
+
+          echo "::add-mask::$DEPLOY_COMMAND"
+          COMMAND_HASH="$(printf '%s' "$DEPLOY_COMMAND" | sha256sum | awk '{print $1}')"
+          echo "command_hash=$COMMAND_HASH" >> "$GITHUB_OUTPUT"
+
+          delimiter="EOF_$(date +%s%N)"
+          {
+            echo "DEPLOY_COMMAND<<$delimiter"
+            echo "$DEPLOY_COMMAND"
+            echo "$delimiter"
+          } >> "$GITHUB_ENV"
+
+      - name: Execute deploy command
+        id: deploy-command
+        env:
+          TARGET_ENV: ${{ github.event.inputs.environment }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          IMAGE_TAG: ${{ steps.version.outputs.version }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
         run: |
-          echo "Deploying to production environment..."
-          # Add production deployment commands here (e.g., SSH to server, kubectl apply, etc.)
+          set -euo pipefail
+          echo "Executing deploy for '$TARGET_ENV' with release '$RELEASE_VERSION'."
+          bash -lc "$DEPLOY_COMMAND"
+
+      - name: Generate deploy evidence
+        if: always()
+        env:
+          TARGET_ENV: ${{ github.event.inputs.environment }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          DEPLOY_OUTCOME: ${{ steps.deploy-command.outcome }}
+          COMMAND_HASH: ${{ steps.resolve-deploy-command.outputs.command_hash }}
+        run: |
+          set -euo pipefail
+          {
+            echo "workflow=${{ github.workflow }}"
+            echo "run_id=${{ github.run_id }}"
+            echo "run_attempt=${{ github.run_attempt }}"
+            echo "repository=${{ github.repository }}"
+            echo "environment=$TARGET_ENV"
+            echo "release_version=$RELEASE_VERSION"
+            echo "deploy_outcome=$DEPLOY_OUTCOME"
+            echo "deploy_command_sha256=$COMMAND_HASH"
+            echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > deploy-evidence.txt
+
+      - name: Upload deploy evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: deploy-evidence-${{ github.run_id }}
+          path: deploy-evidence.txt
+          retention-days: 30

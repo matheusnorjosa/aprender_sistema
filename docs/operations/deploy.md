@@ -10,6 +10,26 @@ Guia de deploy do Aprender Sistema v2.
 - 4GB RAM mínimo
 - 20GB disco
 
+## Release via GitHub Actions
+
+Workflow: `.github/workflows/release.yaml`
+
+Comportamento atual:
+- Publica imagens Docker e executa deploy real por comando configurado para o ambiente selecionado.
+- Se não houver comando configurado, o workflow falha explicitamente (não há falso sinal de deploy concluído).
+- Gera artefato `deploy-evidence-<run_id>` com evidências da execução.
+
+Configuração obrigatória por ambiente:
+- `STAGING_DEPLOY_COMMAND` (secret ou variável de repositório)
+- `PRODUCTION_DEPLOY_COMMAND` (secret ou variável de repositório)
+
+Variáveis disponíveis para o comando:
+- `TARGET_ENV`
+- `RELEASE_VERSION`
+- `IMAGE_TAG`
+- `BACKEND_IMAGE`
+- `FRONTEND_IMAGE`
+
 ## Deploy Local (Development)
 
 ```bash

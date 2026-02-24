@@ -38,7 +38,7 @@ jobs:
   # ================================================================
   python-security:
     name: Python Dependencies
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
       - name: Checkout code
@@ -83,7 +83,7 @@ jobs:
   # ================================================================
   container-security:
     name: Container Scan
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - name: Checkout code
@@ -126,7 +126,7 @@ jobs:
   # ================================================================
   frontend-security:
     name: Frontend Dependencies
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - name: Checkout code
@@ -172,7 +172,7 @@ jobs:
   # ================================================================
   secrets-scan:
     name: Secret Detection
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - name: Checkout code

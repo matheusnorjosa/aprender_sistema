@@ -11,6 +11,7 @@
  * - Scripts e CSS (href/src)
  */
 import { test, expect, Page } from '@playwright/test';
+import './checklist-network-mocks.setup';
 
 interface LinkResult {
   url: string;

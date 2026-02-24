@@ -54,4 +54,9 @@ jobs:
 
       - name: Publish summary
         if: always()
-        run: cat ci-runtime-report.md >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          if [ -f ci-runtime-report.md ]; then
+            cat ci-runtime-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ci-runtime-report.md not found (telemetry step failed before report generation)." >> "$GITHUB_STEP_SUMMARY"
+          fi

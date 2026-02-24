@@ -29,7 +29,7 @@ from django.db import transaction
 
 from apps.core.models import AcaoDAT, Municipio, Projeto, Usuario
 from apps.core.services.normalize import norm_text
-from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
+from apps.core.services.resolvers import resolve_municipio, resolve_user_by_email, resolve_user_by_name
 from apps.core.types import ExternalHash
 
 OUT_DIR: Path = Path(settings.BASE_DIR) / "out_etl"
@@ -204,7 +204,8 @@ def _process_row(
         pendencias["municipios"].append({"linha": idx, "nome": None})
         return "skip"
 
-    municipio: Municipio | None = Municipio.objects.filter(nome__iexact=norm_text(municipio_nome)).first()
+    # Resolver município com tolerância a acentos/UF
+    municipio: Municipio | None = resolve_municipio(municipio_nome)
     if not municipio:
         stats["skipped"]["municipio"] += 1
         pendencias["municipios"].append({"linha": idx, "nome": municipio_nome})

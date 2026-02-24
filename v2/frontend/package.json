@@ -18,7 +18,7 @@
     "test:checklist": "playwright test --project=checklist",
     "test:a11y": "playwright test e2e/checklist/accessibility.spec.ts",
     "lighthouse": "lhci autorun --config=lighthouserc.cjs",
-    "lighthouse:ci": "lhci autorun --config=lighthouserc.cjs --collect.startServerCommand='npm run preview'",
+    "lighthouse:ci": "lhci autorun --config=lighthouserc.cjs",
     "size": "size-limit",
     "size:check": "npm run build && size-limit"
   },

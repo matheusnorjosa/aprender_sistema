@@ -59,8 +59,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      # Controlled experiment (Issue #649): enable xdist with a fast rollback flag.
-      PYTEST_XDIST_ENABLED: '1'
+      # Controlled experiment (Issue #649): keep disabled by default after
+      # instability observed with full parallel run. Re-enable when targeted
+      # test groups are proven xdist-safe.
+      PYTEST_XDIST_ENABLED: '0'
       PYTEST_XDIST_WORKERS: 'auto'
       PYTEST_XDIST_DIST: 'loadscope'
 

@@ -17,7 +17,7 @@ module.exports = {
       numberOfRuns: 3,
 
       // URLs para testar
-      url: ['http://localhost:5173/'],
+      url: ['http://localhost:4173/'],
 
       // Configurações do Lighthouse
       settings: {
@@ -41,8 +41,8 @@ module.exports = {
       },
 
       // Comando para iniciar o servidor
-      startServerCommand: 'npm run preview',
-      startServerReadyPattern: 'Local:',
+      startServerCommand: 'npm run preview -- --host 127.0.0.1 --port 4173',
+      startServerReadyPattern: 'http://127.0.0.1:4173/',
       startServerReadyTimeout: 30000,
     },
 

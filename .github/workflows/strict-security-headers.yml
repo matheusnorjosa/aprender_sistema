@@ -1,0 +1,85 @@
+name: Strict Security Headers
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'URL alvo (opcional). Se vazio, usa vars/secrets STRICT_SECURITY_HEADERS_BASE_URL.'
+        required: false
+        type: string
+  schedule:
+    # Run daily at 03:00 UTC
+    - cron: '0 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  strict-security-headers:
+    name: strict security headers (staging/prod)
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    timeout-minutes: 25
+
+    defaults:
+      run:
+        working-directory: v2/frontend
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Resolve target URL
+      id: target
+      env:
+        INPUT_BASE_URL: ${{ github.event.inputs.base_url || '' }}
+        VAR_BASE_URL: ${{ vars.STRICT_SECURITY_HEADERS_BASE_URL || '' }}
+        SECRET_BASE_URL: ${{ secrets.STRICT_SECURITY_HEADERS_BASE_URL || '' }}
+      run: |
+        set -euo pipefail
+        TARGET_URL="$INPUT_BASE_URL"
+        if [ -z "$TARGET_URL" ]; then
+          TARGET_URL="$VAR_BASE_URL"
+        fi
+        if [ -z "$TARGET_URL" ]; then
+          TARGET_URL="$SECRET_BASE_URL"
+        fi
+        if [ -z "$TARGET_URL" ]; then
+          echo "Missing target URL. Set workflow_dispatch input 'base_url' or configure STRICT_SECURITY_HEADERS_BASE_URL (vars/secrets)." >&2
+          exit 1
+        fi
+        echo "::add-mask::$TARGET_URL"
+        echo "target_url=$TARGET_URL" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: 'v2/frontend/package-lock.json'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Playwright browsers
+      run: npx playwright install chromium --with-deps
+
+    - name: Run strict security headers spec
+      run: npx playwright test e2e/checklist/security-headers.spec.ts --project=checklist
+      env:
+        SKIP_WEBSERVER: '1'
+        BASE_URL: ${{ steps.target.outputs.target_url }}
+        PRODUCTION_URL: ${{ steps.target.outputs.target_url }}
+        STRICT_SECURITY_HEADERS: '1'
+
+    - name: Upload strict security headers artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: strict-security-headers-results
+        path: |
+          v2/frontend/test-results
+          v2/frontend/playwright-report
+        retention-days: 14

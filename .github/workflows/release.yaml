@@ -20,12 +20,18 @@ env:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -80,6 +86,7 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
       - name: Build and push Backend image
+        id: build-backend
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./v2
@@ -98,6 +105,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Build and push Frontend image
+        id: build-frontend
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./v2/frontend
@@ -116,6 +124,63 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
 
       # =========================================================================
+      # Supply Chain Hardening (SBOM + Provenance Attestation)
+      # =========================================================================
+      - name: Prepare supply chain artifact directory
+        run: mkdir -p supply-chain/attestations supply-chain/verification
+
+      - name: Generate Backend SBOM (SPDX JSON)
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: ${{ env.BACKEND_IMAGE }}@${{ steps.build-backend.outputs.digest }}
+          format: spdx-json
+          output-file: supply-chain/backend-sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Generate Frontend SBOM (SPDX JSON)
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: ${{ env.FRONTEND_IMAGE }}@${{ steps.build-frontend.outputs.digest }}
+          format: spdx-json
+          output-file: supply-chain/frontend-sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Attest Backend image provenance
+        id: attest-backend-image
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-name: ${{ env.BACKEND_IMAGE }}
+          subject-digest: ${{ steps.build-backend.outputs.digest }}
+
+      - name: Attest Frontend image provenance
+        id: attest-frontend-image
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-name: ${{ env.FRONTEND_IMAGE }}
+          subject-digest: ${{ steps.build-frontend.outputs.digest }}
+
+      - name: Attest SBOM files provenance
+        id: attest-sbom-files
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: supply-chain/*.spdx.json
+
+      - name: Collect attestation bundles
+        run: |
+          cp "${{ steps.attest-backend-image.outputs.bundle-path }}" supply-chain/attestations/backend-image-provenance.bundle.jsonl
+          cp "${{ steps.attest-frontend-image.outputs.bundle-path }}" supply-chain/attestations/frontend-image-provenance.bundle.jsonl
+          cp "${{ steps.attest-sbom-files.outputs.bundle-path }}" supply-chain/attestations/sbom-files-provenance.bundle.jsonl
+
+      - name: Upload supply chain artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: supply-chain-${{ steps.version.outputs.version }}
+          path: supply-chain/
+          retention-days: 30
+
+      # =========================================================================
       # Docker Scout Security Scan (Backend only - free tier limit)
       # =========================================================================
       - name: Docker Scout - Analyze Backend
@@ -132,7 +197,7 @@ jobs:
           command: environment
           image: ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}
           organization: norjosamatheus
-          environment: production
+          environment: ${{ github.event.inputs.environment }}
 
       # =========================================================================
       # Release Notes
@@ -147,7 +212,14 @@ jobs:
           echo "## Docker Images" >> release_notes.md
           echo "" >> release_notes.md
           echo "- Backend: \`${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}\`" >> release_notes.md
+          echo "  - Digest: \`${{ steps.build-backend.outputs.digest }}\`" >> release_notes.md
           echo "- Frontend: \`${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.version }}\`" >> release_notes.md
+          echo "  - Digest: \`${{ steps.build-frontend.outputs.digest }}\`" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Supply Chain Artifacts" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "- SBOM (SPDX): \`backend-sbom.spdx.json\`, \`frontend-sbom.spdx.json\`" >> release_notes.md
+          echo "- Provenance bundles: backend/frontend images + SBOM files" >> release_notes.md
           echo "" >> release_notes.md
           echo "## Pull Commands" >> release_notes.md
           echo "" >> release_notes.md
@@ -159,17 +231,6 @@ jobs:
           echo "## Changes" >> release_notes.md
           echo "" >> release_notes.md
           git log --oneline --since="$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo '1970-01-01')" >> release_notes.md || echo "First release" >> release_notes.md
-
-      - name: Create GitHub Release
-        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.version.outputs.version }}
-          release_name: Release ${{ steps.version.outputs.version }}
-          body_path: release_notes.md
-          draft: false
-          prerelease: false
 
       # =========================================================================
       # Deployment
@@ -246,13 +307,150 @@ jobs:
           echo "Executing deploy for '$TARGET_ENV' with release '$RELEASE_VERSION'."
           bash -lc "$DEPLOY_COMMAND"
 
+      - name: Resolve post-deploy verification endpoints (required)
+        id: resolve-post-deploy-verification
+        env:
+          TARGET_ENV: ${{ github.event.inputs.environment }}
+          STAGING_HEALTHCHECK_URL_SECRET: ${{ secrets.STAGING_HEALTHCHECK_URL || '' }}
+          STAGING_HEALTHCHECK_URL_VAR: ${{ vars.STAGING_HEALTHCHECK_URL || '' }}
+          PRODUCTION_HEALTHCHECK_URL_SECRET: ${{ secrets.PRODUCTION_HEALTHCHECK_URL || '' }}
+          PRODUCTION_HEALTHCHECK_URL_VAR: ${{ vars.PRODUCTION_HEALTHCHECK_URL || '' }}
+          STAGING_VERSIONCHECK_URL_SECRET: ${{ secrets.STAGING_VERSIONCHECK_URL || '' }}
+          STAGING_VERSIONCHECK_URL_VAR: ${{ vars.STAGING_VERSIONCHECK_URL || '' }}
+          PRODUCTION_VERSIONCHECK_URL_SECRET: ${{ secrets.PRODUCTION_VERSIONCHECK_URL || '' }}
+          PRODUCTION_VERSIONCHECK_URL_VAR: ${{ vars.PRODUCTION_VERSIONCHECK_URL || '' }}
+        run: |
+          set -euo pipefail
+
+          HEALTHCHECK_URL=""
+          VERSIONCHECK_URL=""
+          case "$TARGET_ENV" in
+            staging)
+              HEALTHCHECK_URL="$STAGING_HEALTHCHECK_URL_SECRET"
+              if [ -z "$HEALTHCHECK_URL" ]; then
+                HEALTHCHECK_URL="$STAGING_HEALTHCHECK_URL_VAR"
+              fi
+              VERSIONCHECK_URL="$STAGING_VERSIONCHECK_URL_SECRET"
+              if [ -z "$VERSIONCHECK_URL" ]; then
+                VERSIONCHECK_URL="$STAGING_VERSIONCHECK_URL_VAR"
+              fi
+              ;;
+            production)
+              HEALTHCHECK_URL="$PRODUCTION_HEALTHCHECK_URL_SECRET"
+              if [ -z "$HEALTHCHECK_URL" ]; then
+                HEALTHCHECK_URL="$PRODUCTION_HEALTHCHECK_URL_VAR"
+              fi
+              VERSIONCHECK_URL="$PRODUCTION_VERSIONCHECK_URL_SECRET"
+              if [ -z "$VERSIONCHECK_URL" ]; then
+                VERSIONCHECK_URL="$PRODUCTION_VERSIONCHECK_URL_VAR"
+              fi
+              ;;
+            *)
+              echo "Invalid environment: $TARGET_ENV" >&2
+              exit 1
+              ;;
+          esac
+
+          if [ -z "$HEALTHCHECK_URL" ]; then
+            echo "Healthcheck URL for '$TARGET_ENV' is not configured." >&2
+            echo "Configure secret or variable: STAGING_HEALTHCHECK_URL / PRODUCTION_HEALTHCHECK_URL." >&2
+            exit 1
+          fi
+
+          if [ -z "$VERSIONCHECK_URL" ]; then
+            echo "Versioncheck URL for '$TARGET_ENV' is not configured." >&2
+            echo "Configure secret or variable: STAGING_VERSIONCHECK_URL / PRODUCTION_VERSIONCHECK_URL." >&2
+            exit 1
+          fi
+
+          echo "::add-mask::$HEALTHCHECK_URL"
+          echo "::add-mask::$VERSIONCHECK_URL"
+          echo "healthcheck_url=$HEALTHCHECK_URL" >> "$GITHUB_OUTPUT"
+          echo "versioncheck_url=$VERSIONCHECK_URL" >> "$GITHUB_OUTPUT"
+          echo "HEALTHCHECK_URL=$HEALTHCHECK_URL" >> "$GITHUB_ENV"
+          echo "VERSIONCHECK_URL=$VERSIONCHECK_URL" >> "$GITHUB_ENV"
+
+      - name: Post-deploy verification (health + version)
+        id: post-deploy-verification
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          fetch_with_retry() {
+            local url="$1"
+            local label="$2"
+            local attempts=12
+            local sleep_seconds=10
+            local response_file
+            response_file="$(mktemp)"
+
+            for attempt in $(seq 1 "$attempts"); do
+              local http_code
+              http_code="$(curl --silent --show-error --location --max-time 20 -o "$response_file" -w '%{http_code}' "$url" || true)"
+              if [ "$http_code" = "200" ]; then
+                cat "$response_file"
+                rm -f "$response_file"
+                return 0
+              fi
+              echo "Attempt ${attempt}/${attempts} failed for ${label} (HTTP=${http_code:-curl_error}). Retrying in ${sleep_seconds}s..."
+              sleep "$sleep_seconds"
+            done
+
+            echo "Post-deploy ${label} check failed after ${attempts} attempts." >&2
+            if [ -s "$response_file" ]; then
+              echo "Last ${label} response:" >&2
+              cat "$response_file" >&2
+            fi
+            rm -f "$response_file"
+            return 1
+          }
+
+          echo "Running post-deploy health check..."
+          HEALTH_RESPONSE="$(fetch_with_retry "$HEALTHCHECK_URL" "health")"
+          printf '%s\n' "$HEALTH_RESPONSE" > supply-chain/verification/post-deploy-health-response.txt
+
+          echo "Running post-deploy version check..."
+          VERSION_RESPONSE="$(fetch_with_retry "$VERSIONCHECK_URL" "version")"
+          printf '%s\n' "$VERSION_RESPONSE" > supply-chain/verification/post-deploy-version-response.txt
+
+          if ! printf '%s' "$VERSION_RESPONSE" | grep -Fq "$RELEASE_VERSION"; then
+            echo "Version endpoint response does not contain release version '$RELEASE_VERSION'." >&2
+            exit 1
+          fi
+
+          echo "verification=passed" >> "$GITHUB_OUTPUT"
+
+      - name: Append deployment verification to release notes
+        env:
+          TARGET_ENV: ${{ github.event.inputs.environment }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          HEALTHCHECK_URL: ${{ steps.resolve-post-deploy-verification.outputs.healthcheck_url }}
+          VERSIONCHECK_URL: ${{ steps.resolve-post-deploy-verification.outputs.versioncheck_url }}
+        run: |
+          {
+            echo ""
+            echo "## Deployment Verification"
+            echo ""
+            echo "- Environment: \`$TARGET_ENV\`"
+            echo "- Release version validated: \`$RELEASE_VERSION\`"
+            echo "- Healthcheck URL: \`$HEALTHCHECK_URL\`"
+            echo "- Versioncheck URL: \`$VERSIONCHECK_URL\`"
+            echo "- Status: \`passed\`"
+          } >> release_notes.md
+
       - name: Generate deploy evidence
         if: always()
         env:
           TARGET_ENV: ${{ github.event.inputs.environment }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           DEPLOY_OUTCOME: ${{ steps.deploy-command.outcome }}
+          VERIFICATION_OUTCOME: ${{ steps.post-deploy-verification.outcome }}
+          HEALTHCHECK_URL: ${{ steps.resolve-post-deploy-verification.outputs.healthcheck_url }}
+          VERSIONCHECK_URL: ${{ steps.resolve-post-deploy-verification.outputs.versioncheck_url }}
           COMMAND_HASH: ${{ steps.resolve-deploy-command.outputs.command_hash }}
+          BACKEND_DIGEST: ${{ steps.build-backend.outputs.digest }}
+          FRONTEND_DIGEST: ${{ steps.build-frontend.outputs.digest }}
         run: |
           set -euo pipefail
           {
@@ -263,6 +461,13 @@ jobs:
             echo "environment=$TARGET_ENV"
             echo "release_version=$RELEASE_VERSION"
             echo "deploy_outcome=$DEPLOY_OUTCOME"
+            echo "verification_outcome=$VERIFICATION_OUTCOME"
+            echo "healthcheck_url=$HEALTHCHECK_URL"
+            echo "versioncheck_url=$VERSIONCHECK_URL"
+            echo "backend_image=${{ env.BACKEND_IMAGE }}"
+            echo "backend_digest=$BACKEND_DIGEST"
+            echo "frontend_image=${{ env.FRONTEND_IMAGE }}"
+            echo "frontend_digest=$FRONTEND_DIGEST"
             echo "deploy_command_sha256=$COMMAND_HASH"
             echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } > deploy-evidence.txt
@@ -274,3 +479,30 @@ jobs:
           name: deploy-evidence-${{ github.run_id }}
           path: deploy-evidence.txt
           retention-days: 30
+
+      - name: Create GitHub Release
+        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          release_name: Release ${{ steps.version.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+
+      - name: Upload release assets (SBOM + provenance + evidence)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release upload "${{ steps.version.outputs.version }}" \
+            supply-chain/backend-sbom.spdx.json \
+            supply-chain/frontend-sbom.spdx.json \
+            supply-chain/attestations/backend-image-provenance.bundle.jsonl \
+            supply-chain/attestations/frontend-image-provenance.bundle.jsonl \
+            supply-chain/attestations/sbom-files-provenance.bundle.jsonl \
+            supply-chain/verification/post-deploy-health-response.txt \
+            supply-chain/verification/post-deploy-version-response.txt \
+            deploy-evidence.txt \
+            --clobber

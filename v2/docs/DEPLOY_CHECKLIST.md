@@ -57,6 +57,19 @@ Checklist de variáveis de ambiente para deploy em produção.
 | `REDIS_PORT` | `6379` | Porta do Redis |
 | `CELERY_BROKER_URL` | `redis://<host>:6379/0` | URL do broker Celery |
 
+### GitHub Release Workflow (Deploy + Verificação)
+
+Use **secrets** ou **variables** com os mesmos nomes (secrets têm prioridade):
+
+| Variável | Escopo | Obrigatória | Descrição |
+|----------|--------|-------------|-----------|
+| `STAGING_DEPLOY_COMMAND` | staging | Sim (staging) | Comando real de deploy executado no workflow `Release` |
+| `PRODUCTION_DEPLOY_COMMAND` | production | Sim (production) | Comando real de deploy executado no workflow `Release` |
+| `STAGING_HEALTHCHECK_URL` | staging | Sim (staging) | Endpoint HTTP 200 para validar saúde pós-deploy |
+| `PRODUCTION_HEALTHCHECK_URL` | production | Sim (production) | Endpoint HTTP 200 para validar saúde pós-deploy |
+| `STAGING_VERSIONCHECK_URL` | staging | Sim (staging) | Endpoint que retorna a versão release implantada |
+| `PRODUCTION_VERSIONCHECK_URL` | production | Sim (production) | Endpoint que retorna a versão release implantada |
+
 ---
 
 ## Exemplo de .env para Produção
@@ -133,7 +146,13 @@ curl https://aprender.com.br/healthz/
 ## Pós-Deploy
 
 - [ ] Verificar `/healthz/` retorna `{"status": "ok"}`
+- [ ] Verificar endpoint de versão contém a release atual (`vYYYY.MM.DD-<sha>`)
 - [ ] Verificar logs sem erros
 - [ ] Testar login de usuário
 - [ ] Verificar integração Google Calendar (se `GCAL_CLIENT=google`)
 - [ ] Verificar Prometheus metrics (`/metrics/`)
+- [ ] Confirmar artifacts de supply chain na release:
+  - [ ] `backend-sbom.spdx.json`
+  - [ ] `frontend-sbom.spdx.json`
+  - [ ] bundles de provenance (`*.bundle.jsonl`)
+  - [ ] `deploy-evidence.txt`

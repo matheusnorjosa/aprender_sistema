@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   strict-security-headers:
-    name: strict security headers (staging/prod)
+    name: "[ops] strict security headers (staging/prod)"
     runs-on: ubuntu-latest
     timeout-minutes: 25
 

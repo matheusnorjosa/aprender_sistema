@@ -21,7 +21,7 @@ concurrency:
 jobs:
   react-doctor:
     name: react doctor quality gate
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 12
 
     steps:
@@ -47,7 +47,7 @@ jobs:
 
   build-lint-frontend:
     name: build/lint do frontend
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     needs: react-doctor
     timeout-minutes: 20
 
@@ -89,7 +89,7 @@ jobs:
 
   checklist-tests:
     name: checklist tests (meta, a11y, security)
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     needs: build-lint-frontend
     timeout-minutes: 25
 
@@ -130,7 +130,7 @@ jobs:
 
   lighthouse-ci:
     name: lighthouse CI
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     needs: build-lint-frontend
     if: github.event_name == 'pull_request'
     timeout-minutes: 12

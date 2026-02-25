@@ -11,7 +11,7 @@ Valida:
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 import pytest
@@ -78,13 +78,13 @@ def test_participation_unique_constraint(factory_solicitacao):
         role=Participation.Role.COORDENADOR,
     )
 
-    # Tentar criar duplicata deve falhar
-    with pytest.raises(IntegrityError):
-        Participation.objects.create(
-            solicitacao=solicitacao,
-            usuario=user,
-            role=Participation.Role.COORDENADOR,
-        )
+    duplicate = Participation(
+        solicitacao=solicitacao,
+        usuario=user,
+        role=Participation.Role.COORDENADOR,
+    )
+    with pytest.raises(ValidationError):
+        duplicate.full_clean()
 
 
 def test_participation_allows_different_roles_same_user(factory_solicitacao):

@@ -144,26 +144,67 @@ jobs:
         run: |
           set -euo pipefail
           cd v2/frontend
-          set +e
-          npm audit --json > npm-audit-report.json
-          json_exit_code=$?
-          set -e
-          if [ ! -s npm-audit-report.json ]; then
-            echo "npm-audit-report.json not generated" >&2
+          max_attempts=3
+          attempt=1
+
+          while [ "$attempt" -le "$max_attempts" ]; do
+            echo "Running npm audit (prod-only) attempt ${attempt}/${max_attempts}"
+            rm -f npm-audit-report.json npm-audit-stderr.log
+
+            set +e
+            npm audit --omit=dev --json > npm-audit-report.json 2>npm-audit-stderr.log
+            audit_exit=$?
+            set -e
+
+            if [ ! -s npm-audit-report.json ]; then
+              parse_exit=2
+            else
+              set +e
+              node -e 'const fs=require("fs"); let report; try {report=JSON.parse(fs.readFileSync("npm-audit-report.json","utf8"));} catch {process.exit(2);} if (report?.metadata?.vulnerabilities) {const high=Number(report.metadata.vulnerabilities.high||0); const critical=Number(report.metadata.vulnerabilities.critical||0); console.log(`npm audit (prod) high=${high} critical=${critical}`); process.exit(high+critical>0?10:0);} if (report?.error){console.log(`npm audit reported API error: ${report.error.summary || report.error.message || "unknown"}`); process.exit(3);} process.exit(2);'
+              parse_exit=$?
+              set -e
+            fi
+
+            if [ "$parse_exit" -eq 0 ]; then
+              echo "Production dependency audit gate passed."
+              exit 0
+            fi
+
+            if [ "$parse_exit" -eq 10 ]; then
+              echo "Production dependency audit gate failed: HIGH/CRITICAL vulnerability found." >&2
+              exit 1
+            fi
+
+            # Retry only on known transient npm audit endpoint/tree errors.
+            if grep -qiE "Invalid package tree|audit endpoint returned an error|Bad Request|EAI_AGAIN|ETIMEDOUT|ECONNRESET|ENOTFOUND|5[0-9]{2}" npm-audit-stderr.log; then
+              if [ "$attempt" -lt "$max_attempts" ]; then
+                echo "Transient npm audit endpoint/tree error detected; retrying..."
+                sleep $((attempt * 5))
+                attempt=$((attempt + 1))
+                continue
+              fi
+
+              echo "npm audit failed after ${max_attempts} attempts due endpoint/tree errors." >&2
+              cat npm-audit-stderr.log >&2 || true
+              exit 1
+            fi
+
+            echo "npm audit failed with non-retryable error (audit_exit=${audit_exit}, parse_exit=${parse_exit})." >&2
+            cat npm-audit-stderr.log >&2 || true
+            if [ -s npm-audit-report.json ]; then
+              cat npm-audit-report.json >&2 || true
+            fi
             exit 1
-          fi
-          if [ "$json_exit_code" -ne 0 ]; then
-            echo "npm audit JSON reported issues/errors (captured for artifact)"
-          fi
-          # Gate only production dependencies in PR CI.
-          npm audit --omit=dev --audit-level=high
+          done
 
       - name: Upload npm audit report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: npm-audit-report
-          path: v2/frontend/npm-audit-report.json
+          path: |
+            v2/frontend/npm-audit-report.json
+            v2/frontend/npm-audit-stderr.log
 
   # ================================================================
   # Job 4: Secret Scanning

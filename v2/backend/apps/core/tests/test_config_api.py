@@ -21,9 +21,9 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.urls import reverse
+from rest_framework.test import APIClient
 
 import pytest
-from rest_framework.test import APIClient
 
 from apps.core.models import AuditLog, Config
 

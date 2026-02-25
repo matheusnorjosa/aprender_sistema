@@ -41,6 +41,15 @@ O relatorio consolidado inclui:
 
 Regra de triagem:
 - teste/assinatura com reincidencia em `2+` execucoes precisa ter issue de estabilizacao vinculada ao epic da fase (`#677`).
+- backlog com owner/status: [CI Backend xdist Stabilization Backlog](ci-backend-xdist-stabilization-backlog.md)
+
+## Trilha de evidencia (14 dias)
+
+- O job `[ops] backend xdist canary summary` publica:
+  - artifact consolidado (`xdist-canary-report`)
+  - resumo no `GITHUB_STEP_SUMMARY`
+  - snapshot em comentario na issue `#677`
+- Esses snapshots formam a trilha objetiva para o criterio de 14 dias antes de qualquer promocao para gate obrigatorio.
 
 ## Criterio formal para promocao ao caminho obrigatorio
 

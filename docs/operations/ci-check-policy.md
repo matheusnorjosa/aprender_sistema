@@ -40,6 +40,7 @@ Executados por `schedule` ou `workflow_dispatch`:
 ## Trilha Canary Backend xdist
 
 - Documento operacional: [CI Backend xdist Canary](ci-backend-xdist-canary.md)
+- Backlog de estabilizacao: [CI Backend xdist Stabilization Backlog](ci-backend-xdist-stabilization-backlog.md)
 - Finalidade: experimentação de paralelismo (`pytest-xdist`) sem alterar o gate obrigatório.
 - Regra: findings recorrentes da trilha canary viram issues de estabilização antes de qualquer promoção para o caminho obrigatório.
 

@@ -15,6 +15,95 @@ concurrency:
 
 jobs:
   # ----------------------------------------------------------------
+  # Job 0: Backend impact detector
+  #
+  # Goal:
+  # - Avoid full backend suite on PRs that do not touch backend-critical files.
+  # - Keep non-PR events in safe full mode.
+  # ----------------------------------------------------------------
+  backend-impact:
+    name: "[required] backend impact"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend_changed: ${{ steps.detect.outputs.backend_changed }}
+      changed_files_count: ${{ steps.detect.outputs.changed_files_count }}
+      backend_changed_count: ${{ steps.detect.outputs.backend_changed_count }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Detect backend impact
+      id: detect
+      run: |
+        set -euo pipefail
+
+        # Safety-first policy:
+        # - PR: allow skip of backend-heavy jobs when no backend impact is detected.
+        # - push/workflow_dispatch/other events: keep full backend gates enabled.
+        if [ "${{ github.event_name }}" != "pull_request" ]; then
+          echo "backend_changed=true" >> "$GITHUB_OUTPUT"
+          echo "changed_files_count=0" >> "$GITHUB_OUTPUT"
+          echo "backend_changed_count=0" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Backend Impact Detection"
+            echo "- Event: ${{ github.event_name }}"
+            echo "- Decision: backend_changed=true"
+            echo "- Reason: non-PR event (safe full mode)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+
+        BASE_SHA="${{ github.event.pull_request.base.sha }}"
+        HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+        if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+          echo "backend_changed=true" >> "$GITHUB_OUTPUT"
+          echo "changed_files_count=0" >> "$GITHUB_OUTPUT"
+          echo "backend_changed_count=0" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Backend Impact Detection"
+            echo "- Event: pull_request"
+            echo "- Decision: backend_changed=true"
+            echo "- Reason: missing PR base/head SHA (safe fallback)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+
+        CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)"
+        CHANGED_COUNT="$(printf '%s\n' "$CHANGED_FILES" | sed '/^$/d' | wc -l | tr -d ' ')"
+
+        # Conservative impact patterns to prevent false green:
+        # includes backend app, backend runtime infra, backend tests and this CI workflow itself.
+        BACKEND_IMPACT_REGEX='^(v2/backend/|v2/infra/|v2/tests/|v2/.dockerignore$|\.github/workflows/ci\.yaml$)'
+        BACKEND_MATCHED_FILES="$(printf '%s\n' "$CHANGED_FILES" | grep -E "$BACKEND_IMPACT_REGEX" || true)"
+        BACKEND_MATCHED_COUNT="$(printf '%s\n' "$BACKEND_MATCHED_FILES" | sed '/^$/d' | wc -l | tr -d ' ')"
+
+        BACKEND_CHANGED="false"
+        if [ "$BACKEND_MATCHED_COUNT" -gt 0 ]; then
+          BACKEND_CHANGED="true"
+        fi
+
+        echo "backend_changed=$BACKEND_CHANGED" >> "$GITHUB_OUTPUT"
+        echo "changed_files_count=$CHANGED_COUNT" >> "$GITHUB_OUTPUT"
+        echo "backend_changed_count=$BACKEND_MATCHED_COUNT" >> "$GITHUB_OUTPUT"
+
+        {
+          echo "### Backend Impact Detection"
+          echo "- Event: pull_request"
+          echo "- Base SHA: $BASE_SHA"
+          echo "- Head SHA: $HEAD_SHA"
+          echo "- Changed files: $CHANGED_COUNT"
+          echo "- Backend impact files: $BACKEND_MATCHED_COUNT"
+          echo "- Decision: backend_changed=$BACKEND_CHANGED"
+          if [ -n "$BACKEND_MATCHED_FILES" ]; then
+            echo "- Matched files:"
+            printf '%s\n' "$BACKEND_MATCHED_FILES" | sed 's/^/  - /'
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+  # ----------------------------------------------------------------
   # Job 1: Lint (rápido, ~1min)
   # Migrado de v2-ci.yml após remoção
   # ----------------------------------------------------------------
@@ -58,6 +147,9 @@ jobs:
     name: "[required] backend tests (runner)"
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    needs:
+      - backend-impact
+    if: needs.backend-impact.outputs.backend_changed == 'true'
     env:
       # Controlled experiment (Issue #649): keep disabled by default after
       # instability observed with full parallel run. Re-enable when targeted
@@ -210,6 +302,9 @@ jobs:
     name: "[required] backend typecheck (pyright)"
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs:
+      - backend-impact
+    if: needs.backend-impact.outputs.backend_changed == 'true'
     steps:
     - uses: actions/checkout@v4
 
@@ -248,6 +343,9 @@ jobs:
     name: "[required] docker parity (backend)"
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs:
+      - backend-impact
+    if: needs.backend-impact.outputs.backend_changed == 'true'
 
     services:
       postgres:
@@ -336,6 +434,7 @@ jobs:
     name: "[required] tests"
     runs-on: ubuntu-latest
     needs:
+      - backend-impact
       - backend-tests
       - backend-typecheck
       - docker-parity-backend
@@ -344,16 +443,41 @@ jobs:
     steps:
     - name: Assert backend gates passed
       run: |
-        if [ "${{ needs.backend-tests.result }}" != "success" ]; then
-          echo "backend-tests failed with result=${{ needs.backend-tests.result }}" >&2
+        if [ "${{ needs.backend-impact.result }}" != "success" ]; then
+          echo "backend-impact failed with result=${{ needs.backend-impact.result }}" >&2
           exit 1
         fi
-        if [ "${{ needs.backend-typecheck.result }}" != "success" ]; then
-          echo "backend-typecheck failed with result=${{ needs.backend-typecheck.result }}" >&2
+
+        BACKEND_CHANGED="${{ needs.backend-impact.outputs.backend_changed }}"
+        echo "backend_changed=${BACKEND_CHANGED}"
+
+        if [ "${BACKEND_CHANGED}" = "true" ]; then
+          if [ "${{ needs.backend-tests.result }}" != "success" ]; then
+            echo "backend-tests failed with result=${{ needs.backend-tests.result }}" >&2
+            exit 1
+          fi
+          if [ "${{ needs.backend-typecheck.result }}" != "success" ]; then
+            echo "backend-typecheck failed with result=${{ needs.backend-typecheck.result }}" >&2
+            exit 1
+          fi
+          if [ "${{ needs.docker-parity-backend.result }}" != "success" ]; then
+            echo "docker-parity-backend failed with result=${{ needs.docker-parity-backend.result }}" >&2
+            exit 1
+          fi
+          echo "Backend impact detected: required backend jobs passed."
+          exit 0
+        fi
+
+        if [ "${{ needs.backend-tests.result }}" != "skipped" ]; then
+          echo "Expected backend-tests=skipped when backend_changed=false, got result=${{ needs.backend-tests.result }}" >&2
           exit 1
         fi
-        if [ "${{ needs.docker-parity-backend.result }}" != "success" ]; then
-          echo "docker-parity-backend failed with result=${{ needs.docker-parity-backend.result }}" >&2
+        if [ "${{ needs.backend-typecheck.result }}" != "skipped" ]; then
+          echo "Expected backend-typecheck=skipped when backend_changed=false, got result=${{ needs.backend-typecheck.result }}" >&2
           exit 1
         fi
-        echo "Backend runner tests + typecheck + Docker parity passed."
+        if [ "${{ needs.docker-parity-backend.result }}" != "skipped" ]; then
+          echo "Expected docker-parity-backend=skipped when backend_changed=false, got result=${{ needs.docker-parity-backend.result }}" >&2
+          exit 1
+        fi
+        echo "No backend impact detected: backend-heavy jobs skipped as expected."

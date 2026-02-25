@@ -411,7 +411,7 @@ temp_*
 *_dev.*
 *_development.*
 
-# Arquivos de configuração local (exceto .claude/ que é compartilhado no projeto)
+# Arquivos de configuração local
 .serena/
 .config/
 .cursor/
@@ -518,6 +518,22 @@ backup_*.json
 
 # MCP config (local only)
 .mcp.json
+
+# Codex local workspace (local only)
+.codex/
+
+# Claude local workspace (local only)
+.claude/
+
+# Session/handoff notes (local only)
+thoughts/
+
+# Agents outbox artifacts (keep folder with .gitkeep)
+v2/.agents/outbox/*
+!v2/.agents/outbox/.gitkeep
+
+# Local validation artifacts
+v2/frontend/validate-*.json
 
 # Playwright
 v2/frontend/playwright-report/

@@ -29,9 +29,12 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Agents/outputs
-.agents/
-!/.agents/outbox/.gitkeep
+# Agents/outputs (keep folder marker only)
+.agents/*
+!.agents/outbox/
+.agents/outbox/*
+!.agents/outbox/.gitkeep
+backend/.agents/
 
 # Windows artefacts
 nul/

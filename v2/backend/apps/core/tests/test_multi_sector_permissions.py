@@ -283,6 +283,19 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
             papel="FORMADOR",
         )
 
+        # Usuário par na mesma gerência (usado para validar IDOR em update/delete)
+        self.user_vidas_peer = Usuario.objects.create_user(
+            username=f"vidas_peer_{unique_suffix}",
+            email=f"vidas_peer_{unique_suffix}@test.com",
+            password="test123",
+            cpf=f"55{unique_suffix[:9]}",
+        )
+        EquipeGerencia.objects.create(
+            gerencia=self.gerencia_vidas,
+            usuario=self.user_vidas_peer,
+            papel="FORMADOR",
+        )
+
         self.user_fluir = Usuario.objects.create_user(
             username=f"fluir_block_{unique_suffix}",
             email=f"fluir_block_{unique_suffix}@test.com",
@@ -309,6 +322,13 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
             inicio="2025-01-15T09:00:00Z",
             fim="2025-01-15T18:00:00Z",
             tipo="T",
+            status="aprovado",
+        )
+        self.block_vidas_peer = AvailabilityBlock.objects.create(
+            usuario=self.user_vidas_peer,
+            inicio="2025-01-15T10:00:00Z",
+            fim="2025-01-15T12:00:00Z",
+            tipo="P",
             status="aprovado",
         )
         self.block_fluir = AvailabilityBlock.objects.create(
@@ -370,3 +390,46 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["usuario"], self.user_vidas.id)
         self.assertEqual(response.data["status"], "aprovado")
+
+    def test_user_cannot_update_peer_block_same_gerencia(self):
+        """
+        Usuário comum não pode editar bloqueio de terceiro (mesma gerência).
+
+        Regressão C-03 (IDOR): update deve ficar restrito ao próprio usuário,
+        exceto perfis privilegiados.
+        """
+        self.client.force_authenticate(user=self.user_vidas)
+        response = self.client.patch(
+            f"/api/availability-blocks/{self.block_vidas_peer.id}/",
+            {"motivo": "Tentativa indevida"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+
+        self.block_vidas_peer.refresh_from_db()
+        self.assertNotEqual(self.block_vidas_peer.motivo, "Tentativa indevida")
+
+    def test_user_cannot_delete_peer_block_same_gerencia(self):
+        """
+        Usuário comum não pode excluir bloqueio de terceiro (mesma gerência).
+
+        Regressão C-03 (IDOR): delete deve ficar restrito ao próprio usuário,
+        exceto perfis privilegiados.
+        """
+        self.client.force_authenticate(user=self.user_vidas)
+        response = self.client.delete(f"/api/availability-blocks/{self.block_vidas_peer.id}/")
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(AvailabilityBlock.objects.filter(id=self.block_vidas_peer.id).exists())
+
+    def test_controle_can_update_peer_block(self):
+        """Perfil Controle continua podendo editar bloqueio de terceiros."""
+        self.client.force_authenticate(user=self.user_controle)
+        response = self.client.patch(
+            f"/api/availability-blocks/{self.block_vidas_peer.id}/",
+            {"motivo": "Ajuste Controle"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.block_vidas_peer.refresh_from_db()
+        self.assertEqual(self.block_vidas_peer.motivo, "Ajuste Controle")

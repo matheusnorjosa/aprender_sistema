@@ -244,13 +244,11 @@ jobs:
         START_TS=$(date +%s)
 
         set +e
+        COVERAGE_FILE=".coverage.core" \
         pytest -q --tb=short apps/core/tests --cov=apps --cov-report=term
         TEST_EXIT=$?
         set -e
-
-        if [ -f ".coverage" ]; then
-          mv .coverage .coverage.core
-        fi
+        ls -la .coverage* || true
 
         END_TS=$(date +%s)
         DURATION_SEC=$((END_TS - START_TS))
@@ -268,7 +266,7 @@ jobs:
       with:
         name: backend-coverage-core
         path: v2/backend/.coverage.core
-        if-no-files-found: warn
+        if-no-files-found: error
         retention-days: 7
 
   # ----------------------------------------------------------------
@@ -367,13 +365,11 @@ jobs:
         START_TS=$(date +%s)
 
         set +e
+        COVERAGE_FILE=".coverage.ingest_devtools" \
         pytest -q --tb=short apps/dat_ingest/tests apps/dev_tools/tests --cov=apps --cov-report=term
         TEST_EXIT=$?
         set -e
-
-        if [ -f ".coverage" ]; then
-          mv .coverage .coverage.ingest_devtools
-        fi
+        ls -la .coverage* || true
 
         END_TS=$(date +%s)
         DURATION_SEC=$((END_TS - START_TS))
@@ -391,7 +387,7 @@ jobs:
       with:
         name: backend-coverage-ingest-devtools
         path: v2/backend/.coverage.ingest_devtools
-        if-no-files-found: warn
+        if-no-files-found: error
         retention-days: 7
 
   # ----------------------------------------------------------------

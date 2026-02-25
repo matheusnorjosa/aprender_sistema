@@ -20,10 +20,10 @@ from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.test import Client
 from django.urls import reverse
 
 import pytest
+from rest_framework.test import APIClient
 
 from apps.core.models import AuditLog, Config
 
@@ -31,9 +31,9 @@ User = get_user_model()
 
 
 @pytest.fixture
-def client() -> Client:
-    """Return Django test client."""
-    return Client()
+def client() -> APIClient:
+    """Return DRF API client without session dependency for xdist safety."""
+    return APIClient()
 
 
 @pytest.fixture
@@ -64,7 +64,7 @@ def coordenador_user(db: Any) -> Any:
 
 
 @pytest.mark.django_db
-def test_config_get_endpoint(client: Client, dat_user: Any) -> None:
+def test_config_get_endpoint(client: APIClient, dat_user: Any) -> None:
     """
     Test 1: GET /api/config/ returns defaults correctly.
 
@@ -72,7 +72,7 @@ def test_config_get_endpoint(client: Client, dat_user: Any) -> None:
     When: DAT user calls GET /api/config/
     Then: Response is 200 with default values
     """
-    client.force_login(dat_user)
+    client.force_authenticate(user=dat_user)
 
     url = reverse("core:config")
     response = client.get(url)
@@ -99,7 +99,7 @@ def test_config_get_endpoint(client: Client, dat_user: Any) -> None:
 
 
 @pytest.mark.django_db
-def test_config_put_endpoint(client: Client, dat_user: Any) -> None:
+def test_config_put_endpoint(client: APIClient, dat_user: Any) -> None:
     """
     Test 2: PUT /api/config/ saves + returns 200.
 
@@ -108,7 +108,7 @@ def test_config_put_endpoint(client: Client, dat_user: Any) -> None:
     Then: Response is 200 with updated values
     And: Config entries are created in DB
     """
-    client.force_login(dat_user)
+    client.force_authenticate(user=dat_user)
 
     url = reverse("core:config")
     payload = {
@@ -129,7 +129,7 @@ def test_config_put_endpoint(client: Client, dat_user: Any) -> None:
         "ENABLE_ADVANCED_FILTERS": True,
     }
 
-    response = client.put(url, data=payload, content_type="application/json")
+    response = client.put(url, data=payload, format="json")
 
     assert response.status_code == 200
     data = response.json()
@@ -172,7 +172,7 @@ def test_config_put_endpoint(client: Client, dat_user: Any) -> None:
 
 
 @pytest.mark.django_db
-def test_config_rbac(client: Client, coordenador_user: Any) -> None:
+def test_config_rbac(client: APIClient, coordenador_user: Any) -> None:
     """
     Test 3: 403 for non-DAT/Super users.
 
@@ -180,7 +180,7 @@ def test_config_rbac(client: Client, coordenador_user: Any) -> None:
     When: GET /api/config/
     Then: Response is 403 Forbidden
     """
-    client.force_login(coordenador_user)
+    client.force_authenticate(user=coordenador_user)
 
     url = reverse("core:config")
     response = client.get(url)
@@ -189,7 +189,7 @@ def test_config_rbac(client: Client, coordenador_user: Any) -> None:
 
 
 @pytest.mark.django_db
-def test_config_rbac_super(client: Client, super_user: Any) -> None:
+def test_config_rbac_super(client: APIClient, super_user: Any) -> None:
     """
     Test 3b: Superintendência user can access config.
 
@@ -197,7 +197,7 @@ def test_config_rbac_super(client: Client, super_user: Any) -> None:
     When: GET /api/config/
     Then: Response is 200 OK
     """
-    client.force_login(super_user)
+    client.force_authenticate(user=super_user)
 
     url = reverse("core:config")
     response = client.get(url)
@@ -206,7 +206,7 @@ def test_config_rbac_super(client: Client, super_user: Any) -> None:
 
 
 @pytest.mark.django_db
-def test_config_validation(client: Client, dat_user: Any) -> None:
+def test_config_validation(client: APIClient, dat_user: Any) -> None:
     """
     Test 4: 400 for invalid values.
 
@@ -214,7 +214,7 @@ def test_config_validation(client: Client, dat_user: Any) -> None:
     When: PUT /api/config/ with invalid values
     Then: Response is 400 Bad Request with error details
     """
-    client.force_login(dat_user)
+    client.force_authenticate(user=dat_user)
 
     url = reverse("core:config")
 
@@ -237,7 +237,7 @@ def test_config_validation(client: Client, dat_user: Any) -> None:
         "ENABLE_ADVANCED_FILTERS": False,
     }
 
-    response = client.put(url, data=payload, content_type="application/json")
+    response = client.put(url, data=payload, format="json")
 
     assert response.status_code == 400
     errors = response.json()
@@ -247,7 +247,7 @@ def test_config_validation(client: Client, dat_user: Any) -> None:
     payload["TRAVEL_BUFFER_MINUTES"] = 120
     payload["AVAILABILITY_DAILY_LIMIT_HOURS"] = 15  # Invalid: max_value=12
 
-    response = client.put(url, data=payload, content_type="application/json")
+    response = client.put(url, data=payload, format="json")
 
     assert response.status_code == 400
     errors = response.json()
@@ -257,7 +257,7 @@ def test_config_validation(client: Client, dat_user: Any) -> None:
     payload["AVAILABILITY_DAILY_LIMIT_HOURS"] = 8
     payload["BATCH_SIZE"] = 10  # Invalid: min_value=50
 
-    response = client.put(url, data=payload, content_type="application/json")
+    response = client.put(url, data=payload, format="json")
 
     assert response.status_code == 400
     errors = response.json()
@@ -267,7 +267,7 @@ def test_config_validation(client: Client, dat_user: Any) -> None:
     payload["BATCH_SIZE"] = 200
     payload["SEND_UPDATES"] = "invalid_choice"  # Invalid: must be none/all/externalOnly
 
-    response = client.put(url, data=payload, content_type="application/json")
+    response = client.put(url, data=payload, format="json")
 
     assert response.status_code == 400
     errors = response.json()
@@ -275,7 +275,7 @@ def test_config_validation(client: Client, dat_user: Any) -> None:
 
 
 @pytest.mark.django_db
-def test_config_audit_log(client: Client, dat_user: Any) -> None:
+def test_config_audit_log(client: APIClient, dat_user: Any) -> None:
     """
     Test 5: AuditLog created on save.
 
@@ -284,7 +284,7 @@ def test_config_audit_log(client: Client, dat_user: Any) -> None:
     Then: AuditLog entry is created with action="UPDATE_CONFIG"
     And: AuditLog.details contains changed_fields list
     """
-    client.force_login(dat_user)
+    client.force_authenticate(user=dat_user)
 
     # Clear existing audit logs
     AuditLog.objects.all().delete()
@@ -308,7 +308,7 @@ def test_config_audit_log(client: Client, dat_user: Any) -> None:
         "ENABLE_ADVANCED_FILTERS": False,
     }
 
-    response = client.put(url, data=payload, content_type="application/json")
+    response = client.put(url, data=payload, format="json")
 
     assert response.status_code == 200
 

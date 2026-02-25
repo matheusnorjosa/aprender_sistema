@@ -28,12 +28,20 @@ Estes checks não bloqueiam merge:
 
 - `[info] lighthouse CI`
 - `[info] openssf scorecard`
+- `[info] backend xdist canary (w=...,dist=...)`
 
 ## Checks operacionais
 
 Executados por `schedule` ou `workflow_dispatch`:
 
 - `[ops] strict security headers (staging/prod)`
+- `[ops] backend xdist canary summary`
+
+## Trilha Canary Backend xdist
+
+- Documento operacional: [CI Backend xdist Canary](ci-backend-xdist-canary.md)
+- Finalidade: experimentação de paralelismo (`pytest-xdist`) sem alterar o gate obrigatório.
+- Regra: findings recorrentes da trilha canary viram issues de estabilização antes de qualquer promoção para o caminho obrigatório.
 
 ## Regras de governança
 

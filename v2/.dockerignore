@@ -1,0 +1,43 @@
+# ================================================================
+# Backend image build context (v2/infra/Dockerfile)
+# ================================================================
+# Keep the context focused on runtime/parity requirements.
+
+# Not required by backend image build
+.agents/
+frontend/
+docs/
+tests/
+templates_importacao/
+data/
+scripts/
+
+# Local/env metadata
+.env
+.env.*
+!.env.example
+.gitignore
+README.md
+OAUTH_ENV_VARIABLES.md
+Makefile
+
+# Backend local artifacts
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/.coverage
+backend/.coverage.*
+backend/htmlcov/
+backend/out_etl/
+backend/.agents/
+backend/tmpclaude-*
+backend/celerybeat-schedule
+backend/__pycache__/
+
+# Infra local artifacts
+infra/tmpclaude-*
+
+# Generic caches
+**/__pycache__/
+**/*.py[cod]
+**/.DS_Store

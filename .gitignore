@@ -112,7 +112,7 @@ dados/raw/planilhas/*.json
 dados/processed/*.json
 
 # Backups
-backup_*
+/backup_*
 *.backup
 *.old
 *.bak
@@ -145,7 +145,8 @@ profile_default/
 ipython_config.py
 
 # pyenv
-.python-version
+# Keep tracked at repository root when intentionally committed.
+!.python-version
 
 # pipenv
 #   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
@@ -366,7 +367,7 @@ tools/
 
 # Backup directories
 backups/
-backup_*
+/backup_*
 
 # AI exports
 ai_export/
@@ -382,17 +383,17 @@ dados/
 # Arquivos experimentais/temporários
 *_unificado.py
 *_unificado.yml
-*_backup.py
+/*_backup.py
 docker-compose.unificado.yml
 config_unificado.env
 sincronizar_configuracoes.py
-GUIA_*.md
-PLANO_*.md
-PRE_COMMIT_*.md
-QUALITY_*.md
-README_REFATORACAO.md
-REFACTORING_*.md
-RELATORIO_COMPLETO_*.md
+/GUIA_*.md
+/PLANO_*.md
+/PRE_COMMIT_*.md
+/QUALITY_*.md
+/README_REFATORACAO.md
+/REFACTORING_*.md
+/RELATORIO_COMPLETO_*.md
 acessar_planilhas_*
 analisar_*
 gerar_planilha_*.py
@@ -454,7 +455,7 @@ Videos/
 *_backup_*
 *.tmp
 *.temp
-backup_*
+/backup_*
 temp_*
 
 # Credenciais locais
@@ -467,6 +468,12 @@ creds/
 *token*
 # Exception for code files
 !**/token_manager.py
+!.secrets.baseline
+
+# Keep required tracked runtime/support files
+!v2/backend/data/municipios_coordenadas.csv
+!v2/backend/media/
+!v2/backend/media/.gitkeep
 
 # Data directories
 data/private/
@@ -507,6 +514,9 @@ debug_*
 .DS_Store
 Thumbs.db
 v2/docs/issues/
+v2/docs/PLANO_MELHORIAS.md
+v2/docs/_archive/reports/PLANO_CORRECOES_CODIGO.md
+v2/docs/_archive/reports/PLANO_REFATORACAO_MODULAR.md
 
 # Session-specific scripts and analysis (2025-11-28+)
 v2/backend/scripts/session-*/
@@ -514,7 +524,7 @@ v2/docs/sessions/
 
 # Additional temporary files
 v2/docs/memoria/
-backup_*.json
+/backup_*.json
 
 # MCP config (local only)
 .mcp.json

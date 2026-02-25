@@ -15,10 +15,12 @@ on:
       - ".github/workflows/backend-xdist-canary.yml"
       - "v2/scripts/xdist_canary_report.py"
       - "docs/operations/ci-backend-xdist-canary.md"
+      - "docs/operations/ci-backend-xdist-stabilization-backlog.md"
       - "docs/operations/ci-check-policy.md"
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -219,3 +221,59 @@ jobs:
           else
             echo "xdist-canary-report.md not found." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: Publish evidence snapshot to issue #677
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f xdist-canary-report.json ]; then
+            echo "xdist-canary-report.json not found; skipping issue comment."
+            exit 0
+          fi
+
+          python - <<'PY' > /tmp/xdist_issue_677_comment.md
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          run_id = os.environ.get("GITHUB_RUN_ID", "")
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          run_url = f"https://github.com/{repo}/actions/runs/{run_id}" if repo and run_id else ""
+          now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+          with open("xdist-canary-report.json", "r", encoding="utf-8") as f:
+              report = json.load(f)
+
+          def _top(items, key, limit=5):
+              result = []
+              for item in items[:limit]:
+                  label = item.get(key, "unknown")
+                  count = item.get("count", 0)
+                  result.append(f"- `{label}`: {count} run(s)")
+              if not result:
+                  result.append("- none")
+              return result
+
+          lines = []
+          lines.append("### xdist canary evidence snapshot")
+          lines.append("")
+          lines.append(f"- Timestamp: `{now_utc}`")
+          if run_url:
+              lines.append(f"- Workflow run: {run_url}")
+          lines.append(f"- Matrix runs: `{report.get('runs_total', 0)}`")
+          lines.append(f"- Runs with failures: `{report.get('runs_with_failures', 0)}`")
+          lines.append(f"- Runs without failures: `{report.get('runs_without_failures', 0)}`")
+          lines.append("- Backlog tracking: `docs/operations/ci-backend-xdist-stabilization-backlog.md`")
+          lines.append("")
+          lines.append("Top recurrent failed tests:")
+          lines.extend(_top(report.get("recurrent_failed_tests", []), "test_id"))
+          lines.append("")
+          lines.append("Top failure signatures:")
+          lines.extend(_top(report.get("recurrent_failure_signatures", []), "signature"))
+
+          print("\n".join(lines))
+          PY
+
+          gh issue comment 677 --repo "${GITHUB_REPOSITORY}" --body-file /tmp/xdist_issue_677_comment.md

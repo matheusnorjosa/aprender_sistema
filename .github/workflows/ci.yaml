@@ -267,6 +267,7 @@ jobs:
         name: backend-coverage-core
         path: v2/backend/.coverage.core
         if-no-files-found: error
+        include-hidden-files: true
         retention-days: 7
 
   # ----------------------------------------------------------------
@@ -388,6 +389,7 @@ jobs:
         name: backend-coverage-ingest-devtools
         path: v2/backend/.coverage.ingest_devtools
         if-no-files-found: error
+        include-hidden-files: true
         retention-days: 7
 
   # ----------------------------------------------------------------

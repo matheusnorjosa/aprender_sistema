@@ -21,7 +21,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.db import IntegrityError
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -62,8 +62,9 @@ class DATAreaModelTests(TestCase):
     def test_unique_nome(self):
         """DATArea nome should be unique."""
         DATArea.objects.create(nome="DAT")
-        with self.assertRaises(IntegrityError):
-            DATArea.objects.create(nome="DAT")
+        duplicate = DATArea(nome="DAT")
+        with self.assertRaises(ValidationError):
+            duplicate.full_clean()
 
 
 class DATCoordenadorModelTests(TestCase):
@@ -172,8 +173,9 @@ class DATAcaoModelTests(TestCase):
     def test_unique_municipio_projeto(self):
         """DATAcao should be unique per municipio+projeto."""
         DATAcao.objects.create(municipio=self.municipio, projeto=self.projeto, created_by=self.user)
-        with self.assertRaises(IntegrityError):
-            DATAcao.objects.create(municipio=self.municipio, projeto=self.projeto, created_by=self.user)
+        duplicate = DATAcao(municipio=self.municipio, projeto=self.projeto, created_by=self.user)
+        with self.assertRaises(ValidationError):
+            duplicate.full_clean()
 
 
 class DATCompraModelTests(TestCase):
@@ -322,10 +324,11 @@ class DATCadastroModelTests(TestCase):
         DATCadastro.objects.create(
             municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="FORMAR", created_by=self.user
         )
-        with self.assertRaises(IntegrityError):
-            DATCadastro.objects.create(
-                municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="FORMAR", created_by=self.user
-            )
+        duplicate = DATCadastro(
+            municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="FORMAR", created_by=self.user
+        )
+        with self.assertRaises(ValidationError):
+            duplicate.full_clean()
 
 
 class DATFormacaoModelTests(TestCase):

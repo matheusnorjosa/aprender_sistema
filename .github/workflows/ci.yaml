@@ -140,23 +140,15 @@ jobs:
           flake8 apps/ config/
 
   # ----------------------------------------------------------------
-  # Job 2: Backend tests on runner (~10min)
-  # Runs in parallel with lint (no dependency)
+  # Job 2a: Backend tests - core suite (serial)
   # ----------------------------------------------------------------
-  backend-tests:
-    name: "[required] backend tests (runner)"
+  backend-tests-core:
+    name: "[info] backend tests core (runner)"
     runs-on: ubuntu-latest
     timeout-minutes: 35
     needs:
       - backend-impact
     if: needs.backend-impact.outputs.backend_changed == 'true'
-    env:
-      # Controlled experiment (Issue #649): keep disabled by default after
-      # instability observed with full parallel run. Re-enable when targeted
-      # test groups are proven xdist-safe.
-      PYTEST_XDIST_ENABLED: '0'
-      PYTEST_XDIST_WORKERS: 'auto'
-      PYTEST_XDIST_DIST: 'loadscope'
 
     services:
       postgres:
@@ -239,50 +231,244 @@ jobs:
     - name: Prepare runtime dirs and symlinks
       run: |
         sudo mkdir -p /app
-        # garantir diretórios no workspace
         mkdir -p "$GITHUB_WORKSPACE/v2/backend/.agents/outbox"
-        # apontar /app/.agents -> workspace/.agents
         sudo rm -rf /app/.agents || true
         sudo ln -s "$GITHUB_WORKSPACE/v2/backend/.agents" /app/.agents
-        # opcional: ETL dirs também
         mkdir -p "$GITHUB_WORKSPACE/v2/backend/out_etl"
         mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
 
-    - name: Run tests with coverage
+    - name: Run core tests with coverage
       run: |
         cd v2/backend
-        # Full test suite for both PRs and main branch.
-        # Controlled xdist experiment can be disabled quickly via PYTEST_XDIST_ENABLED=0.
-        MODE="serial"
-        PYTEST_EXTRA_ARGS=""
-        if [ "${PYTEST_XDIST_ENABLED}" = "1" ]; then
-          MODE="xdist"
-          PYTEST_EXTRA_ARGS="-n ${PYTEST_XDIST_WORKERS} --dist ${PYTEST_XDIST_DIST}"
-        fi
-
-        echo "🧪 Running full test suite (mode=${MODE})"
+        echo "🧪 Running backend core suite (serial)"
         START_TS=$(date +%s)
 
         set +e
-        pytest -q --tb=short ${PYTEST_EXTRA_ARGS} --cov=apps --cov-report=xml --cov-report=term --cov-fail-under=80
+        pytest -q --tb=short apps/core/tests --cov=apps --cov-report=term
         TEST_EXIT=$?
         set -e
+
+        if [ -f ".coverage" ]; then
+          mv .coverage .coverage.core
+        fi
 
         END_TS=$(date +%s)
         DURATION_SEC=$((END_TS - START_TS))
         {
-          echo "### Backend Tests Runtime"
-          echo "- Mode: ${MODE}"
-          if [ "${MODE}" = "xdist" ]; then
-            echo "- Workers: ${PYTEST_XDIST_WORKERS}"
-            echo "- Dist strategy: ${PYTEST_XDIST_DIST}"
-          fi
+          echo "### Backend Core Tests Runtime"
           echo "- Duration (seconds): ${DURATION_SEC}"
-          echo "- Rollback: set \`PYTEST_XDIST_ENABLED=0\` in \`.github/workflows/ci.yaml\`"
           echo "- Exit code: ${TEST_EXIT}"
         } >> "${GITHUB_STEP_SUMMARY}"
 
         exit ${TEST_EXIT}
+
+    - name: Upload core coverage artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-coverage-core
+        path: v2/backend/.coverage.core
+        if-no-files-found: warn
+        retention-days: 7
+
+  # ----------------------------------------------------------------
+  # Job 2b: Backend tests - ingest/devtools suite (serial)
+  # ----------------------------------------------------------------
+  backend-tests-ingest-devtools:
+    name: "[info] backend tests ingest/devtools (runner)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - backend-impact
+    if: needs.backend-impact.outputs.backend_changed == 'true'
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_aprender
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+        cache-dependency-path: |
+          v2/backend/requirements.txt
+          v2/backend/requirements-dev.txt
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r v2/backend/requirements.txt
+        pip install -r v2/backend/requirements-dev.txt
+
+    - name: Set up environment variables
+      run: |
+        echo "DJANGO_SETTINGS_MODULE=config.settings" >> $GITHUB_ENV
+        echo "ENVIRONMENT=testing" >> $GITHUB_ENV
+        echo "DEBUG=0" >> $GITHUB_ENV
+        echo "SECRET_KEY=test-secret-key-for-ci-only" >> $GITHUB_ENV
+        echo "DB_HOST=localhost" >> $GITHUB_ENV
+        echo "DB_PORT=5432" >> $GITHUB_ENV
+        echo "DB_NAME=test_aprender" >> $GITHUB_ENV
+        echo "DB_USER=postgres" >> $GITHUB_ENV
+        echo "DB_PASSWORD=postgres" >> $GITHUB_ENV
+        echo "REDIS_HOST=localhost" >> $GITHUB_ENV
+        echo "REDIS_PORT=6379" >> $GITHUB_ENV
+        echo "TZ=America/Fortaleza" >> $GITHUB_ENV
+        echo "REQUIRE_DOCKER=0" >> $GITHUB_ENV
+        echo "GCAL_CLIENT=fake" >> $GITHUB_ENV
+        echo "GCAL_SEND_UPDATES=none" >> $GITHUB_ENV
+        echo "FEATURE_AUTO_APPLY_ENABLED=false" >> $GITHUB_ENV
+        echo "ETL_OUTPUT_DIR=${{ github.workspace }}/v2/backend/out_etl" >> $GITHUB_ENV
+        echo "ETL_DATA_DIR=${{ github.workspace }}/v2/backend/data/csv-import" >> $GITHUB_ENV
+        echo "PYTHONDONTWRITEBYTECODE=1" >> $GITHUB_ENV
+
+    - name: Run migrations
+      run: |
+        cd v2/backend
+        python manage.py migrate --noinput
+
+    - name: Prepare runtime dirs and symlinks
+      run: |
+        sudo mkdir -p /app
+        mkdir -p "$GITHUB_WORKSPACE/v2/backend/.agents/outbox"
+        sudo rm -rf /app/.agents || true
+        sudo ln -s "$GITHUB_WORKSPACE/v2/backend/.agents" /app/.agents
+        mkdir -p "$GITHUB_WORKSPACE/v2/backend/out_etl"
+        mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
+
+    - name: Run ingest/devtools tests with coverage
+      run: |
+        cd v2/backend
+        echo "🧪 Running backend ingest/devtools suite (serial)"
+        START_TS=$(date +%s)
+
+        set +e
+        pytest -q --tb=short apps/dat_ingest/tests apps/dev_tools/tests --cov=apps --cov-report=term
+        TEST_EXIT=$?
+        set -e
+
+        if [ -f ".coverage" ]; then
+          mv .coverage .coverage.ingest_devtools
+        fi
+
+        END_TS=$(date +%s)
+        DURATION_SEC=$((END_TS - START_TS))
+        {
+          echo "### Backend Ingest/DevTools Tests Runtime"
+          echo "- Duration (seconds): ${DURATION_SEC}"
+          echo "- Exit code: ${TEST_EXIT}"
+        } >> "${GITHUB_STEP_SUMMARY}"
+
+        exit ${TEST_EXIT}
+
+    - name: Upload ingest/devtools coverage artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-coverage-ingest-devtools
+        path: v2/backend/.coverage.ingest_devtools
+        if-no-files-found: warn
+        retention-days: 7
+
+  # ----------------------------------------------------------------
+  # Job 2c: Backend coverage combine + required backend tests gate
+  # ----------------------------------------------------------------
+  backend-tests:
+    name: "[required] backend tests (runner)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - backend-impact
+      - backend-tests-core
+      - backend-tests-ingest-devtools
+    if: always() && needs.backend-impact.outputs.backend_changed == 'true'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+        cache-dependency-path: |
+          v2/backend/requirements.txt
+          v2/backend/requirements-dev.txt
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r v2/backend/requirements.txt
+        pip install -r v2/backend/requirements-dev.txt
+
+    - name: Assert split backend test jobs passed
+      run: |
+        if [ "${{ needs.backend-tests-core.result }}" != "success" ]; then
+          echo "backend-tests-core failed with result=${{ needs.backend-tests-core.result }}" >&2
+          exit 1
+        fi
+        if [ "${{ needs.backend-tests-ingest-devtools.result }}" != "success" ]; then
+          echo "backend-tests-ingest-devtools failed with result=${{ needs.backend-tests-ingest-devtools.result }}" >&2
+          exit 1
+        fi
+        echo "Split backend test jobs passed."
+
+    - name: Download backend coverage artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: backend-coverage-*
+        path: /tmp/backend-coverage
+
+    - name: Combine coverage and enforce threshold
+      run: |
+        set -euo pipefail
+        cd v2/backend
+
+        CORE_COV="/tmp/backend-coverage/backend-coverage-core/.coverage.core"
+        INGEST_COV="/tmp/backend-coverage/backend-coverage-ingest-devtools/.coverage.ingest_devtools"
+
+        if [ ! -f "$CORE_COV" ] || [ ! -f "$INGEST_COV" ]; then
+          echo "Missing coverage artifact(s) for combination." >&2
+          ls -R /tmp/backend-coverage || true
+          exit 1
+        fi
+
+        cp "$CORE_COV" .coverage.core
+        cp "$INGEST_COV" .coverage.ingest_devtools
+
+        coverage combine .coverage.core .coverage.ingest_devtools
+        coverage report --fail-under=80
+        coverage xml -o coverage.xml
+
+        {
+          echo "### Backend Coverage Combine"
+          echo "- Source artifacts: core + ingest/devtools"
+          echo "- Threshold enforced: 80%"
+          echo "- Output XML: v2/backend/coverage.xml"
+        } >> "${GITHUB_STEP_SUMMARY}"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

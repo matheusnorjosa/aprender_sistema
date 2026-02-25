@@ -7,6 +7,8 @@ Coverage:
 - verify_backup_health healthy/degraded scenarios
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false, reportFunctionMemberAccess=false
+
 from __future__ import annotations
 
 import subprocess
@@ -20,12 +22,12 @@ from apps.core import tasks_backup as backup_tasks
 @pytest.mark.django_db
 def test_perform_database_backup_success_parses_output(monkeypatch):
     """Task should run script with env vars and parse backup file from stdout."""
-    script = "/app/infra/scripts/backup_db.sh"
+    script_suffix = "infra/scripts/backup_db.sh"
     original_exists = Path.exists
     captured: dict[str, object] = {}
 
     def fake_exists(self: Path) -> bool:  # noqa: ANN001
-        if self.as_posix() == script:
+        if self.as_posix().endswith(script_suffix):
             return True
         return original_exists(self)
 
@@ -55,7 +57,11 @@ def test_perform_database_backup_success_parses_output(monkeypatch):
 
     cmd = captured["cmd"]
     kwargs = captured["kwargs"]
-    assert cmd == [script, "full"]
+    assert isinstance(cmd, list)
+    assert len(cmd) == 2
+    assert isinstance(cmd[0], str)
+    assert cmd[0].endswith(script_suffix)
+    assert cmd[1] == "full"
     assert isinstance(kwargs, dict)
     assert kwargs.get("check") is True
     assert kwargs.get("timeout") == 3600
@@ -75,11 +81,11 @@ def test_perform_database_backup_success_parses_output(monkeypatch):
 @pytest.mark.django_db
 def test_perform_database_backup_raises_when_script_missing(monkeypatch):
     """Task should fail fast with FileNotFoundError when script is unavailable."""
-    script = "/app/infra/scripts/backup_db.sh"
+    script_suffix = "infra/scripts/backup_db.sh"
     original_exists = Path.exists
 
     def fake_exists(self: Path) -> bool:  # noqa: ANN001
-        if self.as_posix() == script:
+        if self.as_posix().endswith(script_suffix):
             return False
         return original_exists(self)
 

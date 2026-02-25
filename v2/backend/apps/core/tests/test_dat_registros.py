@@ -13,6 +13,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -232,18 +233,16 @@ class DATRegistroModelTests(TestCase):
             professor_qtde=10,
             created_by=self.user,
         )
-        # Try to create duplicate
-        from django.db import IntegrityError
-
-        with self.assertRaises(IntegrityError):
-            DATRegistro.objects.create(
-                municipio=self.municipio,
-                projeto_geral=self.projeto_geral_professor,
-                projeto=self.projeto,
-                aluno_qtde=200,
-                professor_qtde=20,
-                created_by=self.user,
-            )
+        duplicate = DATRegistro(
+            municipio=self.municipio,
+            projeto_geral=self.projeto_geral_professor,
+            projeto=self.projeto,
+            aluno_qtde=200,
+            professor_qtde=20,
+            created_by=self.user,
+        )
+        with self.assertRaises(ValidationError):
+            duplicate.full_clean()
 
 
 class DATRegistroAPITests(APITestCase):

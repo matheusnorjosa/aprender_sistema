@@ -17,6 +17,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 import pytest
 
@@ -92,12 +93,13 @@ class TestPlanoFormacoesModel:
 
     def test_unique_constraint(self, plano, municipio, projeto, user):
         """Test unique constraint on municipio + projeto."""
-        with pytest.raises(Exception):
-            PlanoFormacoes.objects.create(
-                municipio=municipio,
-                projeto=projeto,
-                created_by=user,
-            )
+        duplicate = PlanoFormacoes(
+            municipio=municipio,
+            projeto=projeto,
+            created_by=user,
+        )
+        with pytest.raises(ValidationError):
+            duplicate.full_clean()
 
     def test_recalcular_ch(self, plano):
         """Test recalcular_ch method."""
@@ -164,8 +166,9 @@ class TestFormacaoModel:
     def test_unique_constraint(self, plano):
         """Test unique constraint on plano + numero_formacao."""
         Formacao.objects.create(plano=plano, numero_formacao=1)
-        with pytest.raises(Exception):
-            Formacao.objects.create(plano=plano, numero_formacao=1)
+        duplicate = Formacao(plano=plano, numero_formacao=1)
+        with pytest.raises(ValidationError):
+            duplicate.full_clean()
 
     def test_numero_range_constraint(self, plano):
         """Test numero_formacao range constraint (1-15)."""
@@ -219,8 +222,9 @@ class TestAcompanhamentoModel:
     def test_unique_constraint(self, plano):
         """Test unique constraint on plano + tipo."""
         Acompanhamento.objects.create(plano=plano, tipo="primeiro")
-        with pytest.raises(Exception):
-            Acompanhamento.objects.create(plano=plano, tipo="primeiro")
+        duplicate = Acompanhamento(plano=plano, tipo="primeiro")
+        with pytest.raises(ValidationError):
+            duplicate.full_clean()
 
     def test_tipo_choices(self, plano):
         """Test tipo must be valid choice."""
@@ -297,8 +301,9 @@ class TestProvaModel:
     def test_unique_constraint(self, plano):
         """Test unique constraint on plano + numero_prova."""
         Prova.objects.create(plano=plano, numero_prova=1)
-        with pytest.raises(Exception):
-            Prova.objects.create(plano=plano, numero_prova=1)
+        duplicate = Prova(plano=plano, numero_prova=1)
+        with pytest.raises(ValidationError):
+            duplicate.full_clean()
 
     def test_numero_prova_validators(self, plano):
         """Test numero_prova validators (1-3 range)."""

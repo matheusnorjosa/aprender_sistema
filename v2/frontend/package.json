@@ -17,8 +17,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:checklist": "playwright test --project=checklist",
     "test:a11y": "playwright test e2e/checklist/accessibility.spec.ts",
-    "lighthouse": "lhci autorun --config=lighthouserc.cjs",
-    "lighthouse:ci": "lhci autorun --config=lighthouserc.cjs",
+    "lighthouse": "node scripts/lighthouse-ci.mjs",
+    "lighthouse:ci": "node scripts/lighthouse-ci.mjs",
     "size": "size-limit",
     "size:check": "npm run build && size-limit"
   },
@@ -38,7 +38,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",
     "@eslint/js": "^9.36.0",
-    "@lhci/cli": "^0.14.0",
+    "lighthouse": "^12.6.1",
     "@playwright/test": "^1.57.0",
     "@size-limit/preset-app": "^11.2.0",
     "@testing-library/jest-dom": "^6.9.1",
@@ -52,6 +52,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "@vitest/coverage-v8": "^4.0.7",
     "autoprefixer": "^10.4.21",
+    "chrome-launcher": "^1.2.0",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.22",

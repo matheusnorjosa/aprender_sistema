@@ -96,6 +96,84 @@ class TestOpenAPISchema(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def _get_response_schema(self, schema: dict[str, Any], path: str, method: str, status_code: str) -> dict[str, Any]:
+        path_data = schema.get("paths", {}).get(path, {})
+        method_data = path_data.get(method, {})
+        response_data = method_data.get("responses", {}).get(status_code, {})
+        content = response_data.get("content", {}).get("application/json", {})
+        return content.get("schema", {})
+
+    def _resolve_schema_properties(self, schema: dict[str, Any], schema_ref: dict[str, Any]) -> dict[str, Any]:
+        if "$ref" not in schema_ref:
+            return schema_ref.get("properties", {})
+
+        ref = schema_ref["$ref"]
+        component_name = ref.split("/")[-1]
+        component_schema = schema.get("components", {}).get("schemas", {}).get(component_name, {})
+        return component_schema.get("properties", {})
+
+    def test_schema_has_typed_response_for_current_user(self) -> None:
+        """Schema must define explicit response fields for /api/me/."""
+        response = self.client.get("/api/schema/?format=json")
+        self.assertEqual(response.status_code, 200)
+        schema = response.json()
+
+        response_schema = self._get_response_schema(schema, "/api/me/", "get", "200")
+        self.assertTrue(response_schema, "Expected typed 200 response schema for /api/me/")
+
+        properties = self._resolve_schema_properties(schema, response_schema)
+        for field in [
+            "id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "name",
+            "groups",
+            "setores",
+            "funcoes",
+            "is_superuser",
+            "is_superintendencia",
+            "can_approve_super",
+        ]:
+            self.assertIn(field, properties, f"Missing field '{field}' in /api/me/ OpenAPI response schema")
+
+    def test_schema_has_typed_response_for_config_get_and_put(self) -> None:
+        """Schema must define explicit response fields for /api/config/ GET and PUT."""
+        response = self.client.get("/api/schema/?format=json")
+        self.assertEqual(response.status_code, 200)
+        schema = response.json()
+
+        expected_fields = [
+            "TRAVEL_BUFFER_MINUTES",
+            "AVAILABILITY_DAILY_LIMIT_HOURS",
+            "ALLOW_ADJACENT_EVENTS",
+            "BLOCK_AUTO_APPROVE",
+            "BATCH_SIZE",
+            "LOCK_TTL_SECONDS",
+            "AUTO_RETRY_ON_ERROR",
+            "MAX_RETRIES",
+            "SEND_UPDATES",
+            "SESSION_COOKIE_AGE",
+            "SESSION_WARNING_THRESHOLD",
+            "AUTOCOMPLETE_DEBOUNCE_MS",
+            "ENABLE_MULTI_CALENDAR",
+            "ENABLE_BATCH_ACTIONS",
+            "ENABLE_ADVANCED_FILTERS",
+        ]
+
+        for method in ["get", "put"]:
+            response_schema = self._get_response_schema(schema, "/api/config/", method, "200")
+            self.assertTrue(response_schema, f"Expected typed 200 response schema for /api/config/ {method.upper()}")
+            properties = self._resolve_schema_properties(schema, response_schema)
+
+            for field in expected_fields:
+                self.assertIn(
+                    field,
+                    properties,
+                    f"Missing field '{field}' in /api/config/ {method.upper()} OpenAPI response schema",
+                )
+
 
 class TestSchemaErrors(TestCase):
     """Tests for error response schemas."""

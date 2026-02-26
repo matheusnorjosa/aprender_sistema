@@ -28,6 +28,7 @@ class TestSerializersBackwardsCompatibility:
             AvailabilityBlockSerializer,
             CompraSerializer,
             ConfigSerializer,
+            CurrentUserSerializer,
             DeslocamentoSerializer,
             EventDetailSerializer,
             GerenciaSerializer,
@@ -46,6 +47,7 @@ class TestSerializersBackwardsCompatibility:
         )
 
         # Usuario
+        assert CurrentUserSerializer is not None
         assert UserSlimSerializer is not None
         assert UsuarioOptionSerializer is not None
         assert UsuarioAdminSerializer is not None
@@ -80,12 +82,14 @@ class TestSerializersBackwardsCompatibility:
     def test_direct_import_usuario(self) -> None:
         """Import direto: from apps.core.serializers.usuario import X"""
         from apps.core.serializers.usuario import (
+            CurrentUserSerializer,
             GroupSerializer,
             UserSlimSerializer,
             UsuarioAdminSerializer,
             UsuarioOptionSerializer,
         )
 
+        assert CurrentUserSerializer is not None
         assert UserSlimSerializer is not None
         assert UsuarioOptionSerializer is not None
         assert UsuarioAdminSerializer is not None
@@ -185,4 +189,4 @@ class TestSerializersBackwardsCompatibility:
         from apps.core import serializers
 
         assert hasattr(serializers, "__all__")
-        assert len(serializers.__all__) == 53  # Total de serializers exportados (25 base + 19 DAT + 9 PlanoFormacoes)
+        assert len(serializers.__all__) == 54  # Total com CurrentUserSerializer adicionado aos exports.

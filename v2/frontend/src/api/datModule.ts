@@ -441,23 +441,23 @@ export async function getCoordenadorAlocacoes(id: ID): Promise<GenericRecord[]> 
 // ========== PRODUTOS ==========
 
 export async function listProdutosDAT(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
-  return apiRequest(() => api.get('/dat/produtos/', { params }));
+  return apiRequest(() => api.get('/produtos/', { params }));
 }
 
 export async function getProdutoDAT(id: ID): Promise<GenericRecord> {
-  return apiRequest(() => api.get(`/dat/produtos/${id}/`));
+  return apiRequest(() => api.get(`/produtos/${id}/`));
 }
 
 export async function createProdutoDAT(data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.post('/dat/produtos/', data));
+  return apiRequest(() => api.post('/produtos/', data));
 }
 
 export async function updateProdutoDAT(id: ID, data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.patch(`/dat/produtos/${id}/`, data));
+  return apiRequest(() => api.patch(`/produtos/${id}/`, data));
 }
 
 export async function deleteProdutoDAT(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/dat/produtos/${id}/`));
+  return apiRequest(() => api.delete(`/produtos/${id}/`));
 }
 
 // ========== ÁREAS ==========

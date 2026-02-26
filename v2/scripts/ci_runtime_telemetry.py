@@ -7,16 +7,22 @@ import argparse
 import json
 import math
 import os
+import random
 import statistics
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Tuple
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
 API_BASE = "https://api.github.com"
+RETRYABLE_HTTP_CODES = {429, 500, 502, 503, 504}
+DEFAULT_MAX_RETRIES = 5
+MAX_BACKOFF_SECONDS = 30.0
 
 
 @dataclass(frozen=True)
@@ -62,14 +68,69 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _parse_retry_after(value: str | None) -> float | None:
+    if not value:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _compute_retry_delay(attempt: int, retry_after_header: str | None = None) -> float:
+    retry_after = _parse_retry_after(retry_after_header)
+    if retry_after is not None:
+        return min(retry_after, MAX_BACKOFF_SECONDS)
+    base = min(float(2**attempt), MAX_BACKOFF_SECONDS)
+    # Small jitter to avoid synchronized retries across runners.
+    return base + random.uniform(0.0, 0.5)
+
+
 def github_get(path: str, token: str, params: Dict[str, str] | None = None) -> dict:
     query = f"?{urlencode(params)}" if params else ""
     req = Request(f"{API_BASE}{path}{query}")
     req.add_header("Accept", "application/vnd.github+json")
     req.add_header("Authorization", f"Bearer {token}")
     req.add_header("X-GitHub-Api-Version", "2022-11-28")
-    with urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    max_retries_raw = os.getenv("GITHUB_API_MAX_RETRIES", str(DEFAULT_MAX_RETRIES))
+    try:
+        max_retries = max(1, int(max_retries_raw))
+    except ValueError:
+        max_retries = DEFAULT_MAX_RETRIES
+
+    for attempt in range(max_retries):
+        try:
+            with urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except HTTPError as exc:
+            should_retry = exc.code in RETRYABLE_HTTP_CODES and attempt < (max_retries - 1)
+            if not should_retry:
+                raise
+            delay = _compute_retry_delay(attempt, exc.headers.get("Retry-After"))
+            print(
+                (
+                    f"[warn] github_get retryable HTTP {exc.code} "
+                    f"for {path}{query} (attempt {attempt + 1}/{max_retries - 1}, "
+                    f"sleep={delay:.2f}s)"
+                ),
+                file=sys.stderr,
+            )
+            time.sleep(delay)
+        except URLError as exc:
+            if attempt >= (max_retries - 1):
+                raise
+            delay = _compute_retry_delay(attempt)
+            print(
+                (
+                    f"[warn] github_get network error for {path}{query}: {exc.reason} "
+                    f"(attempt {attempt + 1}/{max_retries - 1}, sleep={delay:.2f}s)"
+                ),
+                file=sys.stderr,
+            )
+            time.sleep(delay)
+
+    raise RuntimeError("github_get exhausted retries unexpectedly")
 
 
 def parse_ts(value: str) -> datetime:

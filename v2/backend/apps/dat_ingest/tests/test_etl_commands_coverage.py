@@ -19,6 +19,7 @@ Test patterns:
 
 from __future__ import annotations
 
+import json
 from io import StringIO
 from unittest.mock import patch
 
@@ -680,6 +681,58 @@ class TestEtlUpsertDeslocamento:
         second_count = Deslocamento.objects.count()
 
         assert first_count == second_count, "Should not duplicate records"
+
+    def test_counts_updated_and_report_when_data_changes(self, tmp_path, usuario_formador):
+        """Test: Changed payload increments updated and report json reflects counters."""
+        from apps.core.models import Deslocamento
+
+        initial_csv = tmp_path / "deslocamento_initial.csv"
+        initial_csv.write_text(
+            f"""email,start,end,origem,destino,obs
+{usuario_formador.email},2025-01-10,2025-01-12,Fortaleza,Caucaia,Obs 1
+""",
+            encoding="utf-8",
+        )
+        updated_csv = tmp_path / "deslocamento_updated.csv"
+        updated_csv.write_text(
+            f"""email,start,end,origem,destino,obs
+{usuario_formador.email},2025-01-10,2025-01-12,Fortaleza,Caucaia,Obs 2
+""",
+            encoding="utf-8",
+        )
+
+        with patch("apps.dat_ingest.management.commands.etl_upsert_deslocamento.settings.BASE_DIR", tmp_path):
+            call_command("etl_upsert_deslocamento", f"--file={initial_csv}")
+
+            out = StringIO()
+            call_command("etl_upsert_deslocamento", f"--file={updated_csv}", stdout=out)
+
+            report_path = tmp_path / "out_etl" / "etl_deslocamento_report.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+
+        deslocamentos = Deslocamento.objects.filter(usuario=usuario_formador)
+        assert deslocamentos.count() == 1
+        assert deslocamentos.first().observacao == "Obs 2"
+        assert "Updated: 1" in out.getvalue()
+        assert "Unchanged: 0" in out.getvalue()
+        assert report["stats"]["updated"] == 1
+        assert report["stats"]["unchanged"] == 0
+
+    def test_counts_unchanged_and_report_when_data_is_identical(self, temp_csv_deslocamento, tmp_path):
+        """Test: Same payload increments unchanged and report json reflects counters."""
+        with patch("apps.dat_ingest.management.commands.etl_upsert_deslocamento.settings.BASE_DIR", tmp_path):
+            call_command("etl_upsert_deslocamento", f"--file={temp_csv_deslocamento}")
+
+            out = StringIO()
+            call_command("etl_upsert_deslocamento", f"--file={temp_csv_deslocamento}", stdout=out)
+
+            report_path = tmp_path / "out_etl" / "etl_deslocamento_report.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+
+        assert "Updated: 0" in out.getvalue()
+        assert "Unchanged: 1" in out.getvalue()
+        assert report["stats"]["updated"] == 0
+        assert report["stats"]["unchanged"] == 1
 
     def test_skips_invalid_usuario(self, tmp_path):
         """Test: Skips rows with invalid/unknown usuario."""

@@ -383,37 +383,32 @@ class Command(BaseCommand):
 
         # Observação
         observacao = row.get("obs", "").strip()
+        observacao_value = observacao if observacao else None
 
         # Gerar external_hash
         external_hash = self.compute_external_hash(usuario.id, origem, destino, start_date, end_date)
 
         # Upsert Deslocamento
         if not self.dry_run:
-            deslocamento, created = Deslocamento.objects.update_or_create(
-                external_hash=external_hash,
-                defaults={
-                    "usuario": usuario,
-                    "origem": origem,
-                    "destino": destino,
-                    "start_date": start_date,
-                    "end_date": end_date,
-                    "observacao": observacao if observacao else None,
-                },
+            defaults = {
+                "usuario": usuario,
+                "origem": origem,
+                "destino": destino,
+                "start_date": start_date,
+                "end_date": end_date,
+                "observacao": observacao_value,
+            }
+            existing_deslocamento = Deslocamento.objects.filter(external_hash=external_hash).first()
+            changed = existing_deslocamento is not None and any(
+                getattr(existing_deslocamento, field) != value for field, value in defaults.items()
             )
+
+            _, created = Deslocamento.objects.update_or_create(external_hash=external_hash, defaults=defaults)
 
             if created:
                 self.stats["created"] += 1
                 self.stdout.write(f"   ✅ Linha {linha_num}: Deslocamento criado ({external_hash[:8]}...)")
             else:
-                # Verificar se houve mudança
-                changed = False
-                if deslocamento.origem != origem or deslocamento.destino != destino:
-                    changed = True
-                if deslocamento.start_date != start_date or deslocamento.end_date != end_date:
-                    changed = True
-                if deslocamento.observacao != (observacao if observacao else None):
-                    changed = True
-
                 if changed:
                     self.stats["updated"] += 1
                     self.stdout.write(f"   🔄 Linha {linha_num}: Deslocamento atualizado ({external_hash[:8]}...)")

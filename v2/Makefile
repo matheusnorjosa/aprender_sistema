@@ -36,7 +36,7 @@ seed:
 	$(WEB) python manage.py seed_rbac --verbose
 
 seed-demo:
-	$(WEB) python manage.py seed_demo_users --verbose
+	$(WEB) python manage.py seed_e2e_users
 
 seed-rbac:
 	$(WEB) python manage.py seed_rbac
@@ -242,15 +242,15 @@ seed-e2e:
 
 test-e2e:
 	@echo "🎭 Executando testes E2E (Playwright headless)..."
-	@cd ../tests/playwright && npm run test
+	@cd tests/playwright && npm run test
 
 test-e2e-ui:
 	@echo "🎭 Executando testes E2E com UI interativa (Playwright)..."
-	@cd ../tests/playwright && npm run test:ui
+	@cd tests/playwright && npm run test:ui
 
 test-e2e-headed:
 	@echo "🎭 Executando testes E2E (headed mode - ver browser)..."
-	@cd ../tests/playwright && npm run test:headed
+	@cd tests/playwright && npm run test:headed
 
 # ════════════════════════════════════════════════════════════════════════════
 # Help
@@ -309,7 +309,7 @@ help:
 	@echo "  make test-e2e              Run E2E tests (headless)"
 	@echo "  make test-e2e-ui           Run E2E tests with interactive UI"
 	@echo "  make test-e2e-headed       Run E2E tests (headed mode - visible browser)"
-	@echo "  Nota: Requer npm install em ../tests/playwright/"
+	@echo "  Nota: Requer npm install em tests/playwright/"
 	@echo ""
 	@echo "Health Checks:"
 	@echo "  make readyz                Check /api/readyz/ (db + redis)"

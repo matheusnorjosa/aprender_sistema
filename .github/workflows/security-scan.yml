@@ -228,6 +228,16 @@ jobs:
           chmod +x gitleaks
           sudo mv gitleaks /usr/local/bin/gitleaks
 
+      - name: Install TruffleHog CLI
+        run: |
+          set -euo pipefail
+          TRUFFLEHOG_VERSION=3.93.4
+          url="https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/trufflehog_${TRUFFLEHOG_VERSION}_linux_amd64.tar.gz"
+          curl -sSL --retry 5 --retry-delay 2 --retry-all-errors "$url" -o trufflehog.tar.gz
+          tar -xzf trufflehog.tar.gz trufflehog
+          chmod +x trufflehog
+          sudo mv trufflehog /usr/local/bin/trufflehog
+
       - name: Determine Gitleaks scan range
         id: gitleaks-range
         run: |
@@ -240,6 +250,24 @@ jobs:
             echo "log_opts=--since=168h" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Determine TruffleHog scan range
+        id: trufflehog-range
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "mode=range" >> "$GITHUB_OUTPUT"
+            echo "since=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "mode=range" >> "$GITHUB_OUTPUT"
+            echo "since=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            # Scheduled runs: bounded scan depth to keep runtime predictable.
+            echo "mode=depth" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run Gitleaks
         run: |
           gitleaks git \
@@ -250,9 +278,25 @@ jobs:
             --exit-code 1
 
       - name: Run TruffleHog
-        uses: trufflesecurity/trufflehog@7c0734f987ad0bb30ee8da210773b800ee2016d3 # v3.93.4
-        with:
-          extra_args: --only-verified
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.trufflehog-range.outputs.mode }}" = "range" ]; then
+            trufflehog git "file://." \
+              --since-commit "${{ steps.trufflehog-range.outputs.since }}" \
+              --branch "${{ steps.trufflehog-range.outputs.head }}" \
+              --results=verified \
+              --fail \
+              --no-update \
+              --json > trufflehog-report.json
+          else
+            trufflehog git "file://." \
+              --branch "${{ steps.trufflehog-range.outputs.head }}" \
+              --max-depth 400 \
+              --results=verified \
+              --fail \
+              --no-update \
+              --json > trufflehog-report.json
+          fi
 
       - name: Upload secret scan reports
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -261,3 +305,4 @@ jobs:
           name: secret-scan-reports
           path: |
             gitleaks-report.json
+            trufflehog-report.json

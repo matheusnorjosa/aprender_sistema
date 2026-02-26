@@ -7,6 +7,8 @@ Garante que executar o ETL 2x com os mesmos dados produz 0 inserts/updates na 2�
 
 from __future__ import annotations
 
+from io import StringIO
+
 from django.core.management import call_command
 
 import pytest
@@ -334,3 +336,75 @@ class TestETLIdempotency:
         assert usuario.first_name == "João", "First name deve ter sido atualizado"
         assert usuario.last_name == "Pedro Silva", "Last name deve ter sido atualizado"
         assert Usuario.objects.count() == initial_count + 2, "Não deve ter criado novos usuários"
+
+    def test_upsert_core_counts_updated_for_changed_usuarios(self, temp_xlsx_usuarios):
+        """Test: summary contabiliza updated quando staging de usuário muda."""
+        directory = temp_xlsx_usuarios.parent
+
+        call_command("etl_load_xlsx", dir=str(directory), only="usuarios")
+        call_command("etl_upsert_core", only="usuarios")
+
+        stg = StgUsuario.objects.get(email="joao@example.com")
+        stg.nome = "João Pedro Silva"
+        stg.save()
+
+        out = StringIO()
+        call_command("etl_upsert_core", only="usuarios", stdout=out)
+
+        usuario = Usuario.objects.get(email="joao@example.com")
+        assert usuario.last_name == "Pedro Silva"
+        assert "Created: 0, Updated: 1, Unchanged: 1" in out.getvalue()
+
+    def test_upsert_core_counts_updated_for_changed_municipios(self, temp_xlsx_municipios):
+        """Test: summary contabiliza updated quando staging de município muda."""
+        directory = temp_xlsx_municipios.parent
+
+        call_command("etl_load_xlsx", dir=str(directory), only="municipios")
+        call_command("etl_upsert_core", only="municipios")
+
+        stg = StgMunicipio.objects.get(nome="Fortaleza", uf="CE")
+        stg.ativo = False
+        stg.save()
+
+        out = StringIO()
+        call_command("etl_upsert_core", only="municipios", stdout=out)
+
+        municipio = Municipio.objects.get(nome="Fortaleza", uf="CE")
+        assert municipio.ativo is False
+        assert "Created: 0, Updated: 1, Unchanged: 1" in out.getvalue()
+
+    def test_upsert_core_counts_updated_for_changed_projetos(self, temp_xlsx_projetos):
+        """Test: summary contabiliza updated quando staging de projeto muda."""
+        directory = temp_xlsx_projetos.parent
+
+        call_command("etl_load_xlsx", dir=str(directory), only="projetos")
+        call_command("etl_upsert_core", only="projetos")
+
+        stg = StgProjeto.objects.get(nome="Alfabetização")
+        stg.descricao = "Projeto atualizado"
+        stg.save()
+
+        out = StringIO()
+        call_command("etl_upsert_core", only="projetos", stdout=out)
+
+        projeto = Projeto.objects.get(nome="Alfabetização")
+        assert projeto.descricao == "Projeto atualizado"
+        assert "Created: 0, Updated: 1, Unchanged: 1" in out.getvalue()
+
+    def test_upsert_core_counts_updated_for_changed_tipos_evento(self, temp_xlsx_tipos):
+        """Test: summary contabiliza updated quando staging de tipo de evento muda."""
+        directory = temp_xlsx_tipos.parent
+
+        call_command("etl_load_xlsx", dir=str(directory), only="tipos")
+        call_command("etl_upsert_core", only="tipos")
+
+        stg = StgTipoEvento.objects.get(nome="Formação")
+        stg.cor = "#111111"
+        stg.save()
+
+        out = StringIO()
+        call_command("etl_upsert_core", only="tipos", stdout=out)
+
+        tipo = TipoEvento.objects.get(nome="Formação")
+        assert tipo.cor == "#111111"
+        assert "Created: 0, Updated: 1, Unchanged: 1" in out.getvalue()

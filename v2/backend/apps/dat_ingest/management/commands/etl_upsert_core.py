@@ -105,28 +105,26 @@ class Command(BaseCommand):
 
             # Generate username from email if needed
             username = email.split("@")[0]
+            upsert_defaults = {
+                "username": username,
+                "email": email,
+                **defaults,
+            }
+            existing_obj = Usuario.objects.filter(email__iexact=email).first()
+            changed = existing_obj is not None and any(
+                getattr(existing_obj, field) != value for field, value in upsert_defaults.items()
+            )
 
             try:
-                obj, created = Usuario.objects.update_or_create(
+                _, created = Usuario.objects.update_or_create(
                     email__iexact=email,
-                    defaults={
-                        "username": username,
-                        "email": email,
-                        **defaults,
-                    },
+                    defaults=upsert_defaults,
                 )
 
                 if created:
                     created_count += 1
                     self.stdout.write(f"  ✓ Created: {stg.nome} ({email})")
                 else:
-                    # Check if any field changed
-                    changed = False
-                    for field, value in defaults.items():
-                        if getattr(obj, field) != value:
-                            changed = True
-                            break
-
                     if changed:
                         updated_count += 1
                         self.stdout.write(f"  ↻ Updated: {stg.nome} ({email})")
@@ -168,15 +166,19 @@ class Command(BaseCommand):
             defaults = {
                 "ativo": stg.ativo,
             }
+            existing_obj = Municipio.objects.filter(nome=nome, uf=uf).first()
+            changed = existing_obj is not None and any(
+                getattr(existing_obj, field) != value for field, value in defaults.items()
+            )
 
             try:
-                obj, created = Municipio.objects.update_or_create(nome=nome, uf=uf, defaults=defaults)
+                _, created = Municipio.objects.update_or_create(nome=nome, uf=uf, defaults=defaults)
 
                 if created:
                     created_count += 1
                     self.stdout.write(f"  ✓ Created: {nome}-{uf}")
                 else:
-                    if obj.ativo != stg.ativo:
+                    if changed:
                         updated_count += 1
                         self.stdout.write(f"  ↻ Updated: {nome}-{uf}")
                     else:
@@ -219,15 +221,18 @@ class Command(BaseCommand):
                 "descricao": stg.descricao or "",
                 "ativo": stg.ativo,
             }
+            existing_obj = Projeto.objects.filter(nome=nome).first()
+            changed = existing_obj is not None and any(
+                getattr(existing_obj, field) != value for field, value in defaults.items()
+            )
 
             try:
-                obj, created = Projeto.objects.update_or_create(nome=nome, defaults=defaults)
+                _, created = Projeto.objects.update_or_create(nome=nome, defaults=defaults)
 
                 if created:
                     created_count += 1
                     self.stdout.write(f"  ✓ Created: {nome}")
                 else:
-                    changed = obj.descricao != stg.descricao or obj.ativo != stg.ativo
                     if changed:
                         updated_count += 1
                         self.stdout.write(f"  ↻ Updated: {nome}")
@@ -269,15 +274,18 @@ class Command(BaseCommand):
                 "descricao": stg.descricao or "",
                 "cor": stg.cor or "",
             }
+            existing_obj = TipoEvento.objects.filter(nome=nome).first()
+            changed = existing_obj is not None and any(
+                getattr(existing_obj, field) != value for field, value in defaults.items()
+            )
 
             try:
-                obj, created = TipoEvento.objects.update_or_create(nome=nome, defaults=defaults)
+                _, created = TipoEvento.objects.update_or_create(nome=nome, defaults=defaults)
 
                 if created:
                     created_count += 1
                     self.stdout.write(f"  ✓ Created: {nome}")
                 else:
-                    changed = obj.descricao != stg.descricao or obj.cor != stg.cor
                     if changed:
                         updated_count += 1
                         self.stdout.write(f"  ↻ Updated: {nome}")

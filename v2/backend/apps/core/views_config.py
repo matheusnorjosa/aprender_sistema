@@ -26,12 +26,39 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from drf_spectacular.utils import extend_schema
+
+from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.models import AuditLog, Config
 from apps.core.permissions import IsDAT, IsSuperintendencia
 from apps.core.serializers import ConfigSerializer
 from apps.core.services.config_service import bust_cfg, get_cfg
 
 
+@extend_schema(
+    methods=["GET"],
+    summary="Ler configurações do sistema",
+    description="Retorna configurações consolidadas em formato flat para uso do frontend.",
+    responses={
+        200: ConfigSerializer,
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+    },
+    tags=["config"],
+)
+@extend_schema(
+    methods=["PUT"],
+    summary="Atualizar configurações do sistema",
+    description="Valida e persiste configurações consolidadas, registrando AuditLog.",
+    request=ConfigSerializer,
+    responses={
+        200: ConfigSerializer,
+        400: COMMON_ERROR_RESPONSES[400],
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+    },
+    tags=["config"],
+)
 @api_view(["GET", "PUT"])
 @permission_classes([IsDAT | IsSuperintendencia])
 def config_view(request: Request) -> Response:

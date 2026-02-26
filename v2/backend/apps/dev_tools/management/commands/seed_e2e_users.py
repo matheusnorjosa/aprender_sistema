@@ -28,7 +28,7 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from apps.core.models import Municipio, Projeto
 
@@ -43,44 +43,43 @@ class Command(BaseCommand):
         self.stdout.write("SEED E2E USERS — Testes Playwright")
         self.stdout.write("=" * 80)
 
-        with transaction.atomic():
-            # 1. Criar grupos
-            self.stdout.write("\n1. Criando grupos necessários...")
-            grupos = {}
-            for nome_grupo in ["Coordenador", "Superintendência", "Controle", "Formador", "Gerente"]:
-                grupo, created = Group.objects.get_or_create(name=nome_grupo)
-                grupos[nome_grupo] = grupo
-                status = "✅ Criado" if created else "⏭️  Já existe"
-                self.stdout.write(f"   {status}: {nome_grupo}")
+        # 1. Criar grupos
+        self.stdout.write("\n1. Criando grupos necessários...")
+        grupos = {}
+        for nome_grupo in ["Coordenador", "Superintendência", "Controle", "Formador", "Gerente"]:
+            grupo, created = Group.objects.get_or_create(name=nome_grupo)
+            grupos[nome_grupo] = grupo
+            status = "✅ Criado" if created else "⏭️  Já existe"
+            self.stdout.write(f"   {status}: {nome_grupo}")
 
-            # 2. Criar usuários
-            self.stdout.write("\n2. Criando usuários de teste...")
-            usuarios = self._create_users(grupos)
+        # 2. Criar usuários
+        self.stdout.write("\n2. Criando usuários de teste...")
+        usuarios = self._create_users(grupos)
 
-            # 3. Criar município
-            self.stdout.write("\n3. Criando município de teste...")
-            municipio = self._create_municipio()
+        # 3. Criar município
+        self.stdout.write("\n3. Criando município de teste...")
+        municipio = self._create_municipio()
 
-            # 4. Criar projeto
-            self.stdout.write("\n4. Criando projeto de teste...")
-            projeto = self._create_projeto(municipio)
+        # 4. Criar projeto
+        self.stdout.write("\n4. Criando projeto de teste...")
+        projeto = self._create_projeto(municipio)
 
-            # 5. Resumo
-            self.stdout.write("\n" + "=" * 80)
-            self.stdout.write("✅ SEED E2E concluído com sucesso!")
-            self.stdout.write("\n📋 Resumo:")
-            self.stdout.write(f"   Usuários criados: {len(usuarios)}")
-            self.stdout.write(f"   Município: {municipio.nome} ({municipio.uf})")
-            self.stdout.write(f"   Projeto: {projeto.nome} (fluxo: {projeto.fluxo})")
-            self.stdout.write("\n🔑 Credenciais (todas com senha: testpass123):")
-            for usuario in usuarios:
-                grupos_str = ", ".join([g.name for g in usuario.groups.all()])
-                flags = []
-                if usuario.is_superuser:
-                    flags.append("is_superuser")
-                flags_str = f" [{', '.join(flags)}]" if flags else ""
-                self.stdout.write(f"   - {usuario.username} (grupos: {grupos_str}){flags_str}")
-            self.stdout.write("=" * 80)
+        # 5. Resumo
+        self.stdout.write("\n" + "=" * 80)
+        self.stdout.write("✅ SEED E2E concluído com sucesso!")
+        self.stdout.write("\n📋 Resumo:")
+        self.stdout.write(f"   Usuários criados: {len(usuarios)}")
+        self.stdout.write(f"   Município: {municipio.nome} ({municipio.uf})")
+        self.stdout.write(f"   Projeto: {projeto.nome} (fluxo: {projeto.fluxo})")
+        self.stdout.write("\n🔑 Credenciais (todas com senha: testpass123):")
+        for usuario in usuarios:
+            grupos_str = ", ".join([g.name for g in usuario.groups.all()])
+            flags = []
+            if usuario.is_superuser:
+                flags.append("is_superuser")
+            flags_str = f" [{', '.join(flags)}]" if flags else ""
+            self.stdout.write(f"   - {usuario.username} (grupos: {grupos_str}){flags_str}")
+        self.stdout.write("=" * 80)
 
     def _create_users(self, grupos: dict[str, Group]) -> list[Any]:
         """Cria 4 usuários para testes E2E."""
@@ -129,7 +128,7 @@ class Command(BaseCommand):
 
         usuarios_criados = []
         for user_data in users_data:
-            user, created = User.objects.get_or_create(
+            user, created = User.objects.update_or_create(
                 username=user_data["username"],
                 defaults={
                     "email": user_data["email"],
@@ -140,16 +139,14 @@ class Command(BaseCommand):
                 },
             )
 
-            if created:
+            if created or not user.check_password(user_data["password"]):
                 user.set_password(user_data["password"])
-                user.save()
-                status = "✅ Criado"
-            else:
-                status = "⏭️  Já existe"
+                user.save(update_fields=["password"])
 
-            # Adicionar grupos (sem duplicar)
-            for grupo in user_data["groups"]:
-                user.groups.add(grupo)
+            status = "✅ Criado" if created else "⏭️  Já existe"
+
+            # Garante estado determinístico dos grupos em reexecução.
+            user.groups.set(user_data["groups"])
 
             self.stdout.write(f"   {status}: {user.username}")
             usuarios_criados.append(user)
@@ -158,30 +155,135 @@ class Command(BaseCommand):
 
     def _create_municipio(self) -> Municipio:
         """Cria município para testes E2E."""
-        municipio, created = Municipio.objects.get_or_create(
-            ibge_code="2927408",  # Salvador
-            defaults={
-                "nome": "Salvador",
-                "uf": "BA",
-                "ativo": True,
-            },
-        )
+        target_nome = "Salvador"
+        target_uf = "BA"
+        target_ibge_code = "2927408"
 
-        status = "✅ Criado" if created else "⏭️  Já existe"
-        self.stdout.write(f"   {status}: {municipio.nome} ({municipio.uf})")
+        # Prioriza chave natural (nome+uf) para evitar violar unique constraint
+        # quando o município já existe sem ibge_code.
+        municipio = Municipio.objects.filter(nome=target_nome, uf=target_uf).first()
+        if municipio:
+            updated_fields = []
+
+            if not municipio.ativo:
+                municipio.ativo = True
+                updated_fields.append("ativo")
+
+            if not municipio.ibge_code:
+                ibge_conflict = Municipio.objects.filter(ibge_code=target_ibge_code).exclude(pk=municipio.pk).exists()
+                if ibge_conflict:
+                    self.stdout.write(
+                        "   ⚠️  Salvador (BA) já existe, mas ibge_code 2927408 está em outro registro. "
+                        "Mantendo município atual sem atualizar ibge_code."
+                    )
+                else:
+                    municipio.ibge_code = target_ibge_code
+                    updated_fields.append("ibge_code")
+
+            if updated_fields:
+                with transaction.atomic():
+                    municipio.save(update_fields=updated_fields)
+
+            self.stdout.write(f"   ⏭️  Já existe: {municipio.nome} ({municipio.uf})")
+            return municipio
+
+        # Fallback por IBGE (registro já criado em rodada anterior).
+        municipio = Municipio.objects.filter(ibge_code=target_ibge_code).first()
+        if municipio:
+            updated_fields = []
+
+            if not municipio.ativo:
+                municipio.ativo = True
+                updated_fields.append("ativo")
+            if municipio.nome != target_nome:
+                municipio.nome = target_nome
+                updated_fields.append("nome")
+            if municipio.uf != target_uf:
+                municipio.uf = target_uf
+                updated_fields.append("uf")
+
+            if updated_fields:
+                try:
+                    with transaction.atomic():
+                        municipio.save(update_fields=updated_fields)
+                except IntegrityError:
+                    municipio = Municipio.objects.get(nome=target_nome, uf=target_uf)
+
+            self.stdout.write(f"   ⏭️  Já existe: {municipio.nome} ({municipio.uf})")
+            return municipio
+
+        municipio = Municipio.objects.create(
+            nome=target_nome,
+            uf=target_uf,
+            ibge_code=target_ibge_code,
+            ativo=True,
+        )
+        self.stdout.write(f"   ✅ Criado: {municipio.nome} ({municipio.uf})")
         return municipio
 
     def _create_projeto(self, municipio: Municipio) -> Projeto:
         """Cria projeto para testes E2E."""
-        projeto, created = Projeto.objects.get_or_create(
-            codigo="E2E",
-            defaults={
-                "nome": "TESTE E2E",
-                "fluxo": "SUPER",  # Exige aprovação manual (Superintendência)
-                "ativo": True,
-            },
-        )
+        target_codigo = "E2E"
+        target_nome = "TESTE E2E"
+        target_fluxo = "SUPER"
 
-        status = "✅ Criado" if created else "⏭️  Já existe"
-        self.stdout.write(f"   {status}: {projeto.nome} (fluxo: {projeto.fluxo})")
+        projeto = Projeto.objects.filter(codigo=target_codigo).first()
+        if not projeto:
+            projeto = Projeto.objects.filter(nome=target_nome).first()
+
+        if projeto:
+            updated_fields = []
+            original_codigo = projeto.codigo
+
+            if projeto.nome != target_nome:
+                projeto.nome = target_nome
+                updated_fields.append("nome")
+            if projeto.fluxo != target_fluxo:
+                projeto.fluxo = target_fluxo
+                updated_fields.append("fluxo")
+            if not projeto.ativo:
+                projeto.ativo = True
+                updated_fields.append("ativo")
+            if projeto.codigo != target_codigo:
+                projeto.codigo = target_codigo
+                updated_fields.append("codigo")
+
+            if updated_fields:
+                try:
+                    with transaction.atomic():
+                        projeto.save(update_fields=updated_fields)
+                except IntegrityError:
+                    if "codigo" not in updated_fields:
+                        raise
+                    projeto.codigo = original_codigo
+                    retry_fields = [field for field in updated_fields if field != "codigo"]
+                    if retry_fields:
+                        with transaction.atomic():
+                            projeto.save(update_fields=retry_fields)
+                    self.stdout.write(
+                        "   ⚠️  Código E2E já está em uso por outro projeto. "
+                        "Mantendo o código atual do projeto existente."
+                    )
+
+            self.stdout.write(f"   ⏭️  Já existe: {projeto.nome} (fluxo: {projeto.fluxo})")
+            return projeto
+
+        try:
+            with transaction.atomic():
+                projeto = Projeto.objects.create(
+                    codigo=target_codigo,
+                    nome=target_nome,
+                    fluxo=target_fluxo,
+                    ativo=True,
+                )
+        except IntegrityError:
+            projeto = Projeto.objects.filter(nome=target_nome).first() or Projeto.objects.get(codigo=target_codigo)
+            projeto.fluxo = target_fluxo
+            projeto.ativo = True
+            with transaction.atomic():
+                projeto.save(update_fields=["fluxo", "ativo"])
+            self.stdout.write(f"   ⏭️  Já existe: {projeto.nome} (fluxo: {projeto.fluxo})")
+            return projeto
+
+        self.stdout.write(f"   ✅ Criado: {projeto.nome} (fluxo: {projeto.fluxo})")
         return projeto

@@ -15,6 +15,11 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from drf_spectacular.utils import extend_schema
+
+from .api_schemas import COMMON_ERROR_RESPONSES
+from .serializers import CurrentUserSerializer
+
 
 def api_root(request: HttpRequest) -> JsonResponse:
     """API root endpoint"""
@@ -74,6 +79,16 @@ class CurrentUserView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Retornar usuário autenticado",
+        description="Retorna dados do usuário autenticado com grupos e flags RBAC.",
+        responses={
+            200: CurrentUserSerializer,
+            401: COMMON_ERROR_RESPONSES[401],
+            403: COMMON_ERROR_RESPONSES[403],
+        },
+        tags=["auth"],
+    )
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         user = request.user
         groups: list[str] = list(user.groups.values_list("name", flat=True))

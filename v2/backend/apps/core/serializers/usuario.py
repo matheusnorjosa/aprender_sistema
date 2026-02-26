@@ -30,6 +30,25 @@ class UserSlimSerializer(serializers.ModelSerializer):
         fields = ("id", "first_name", "last_name", "email")
 
 
+class CurrentUserSerializer(serializers.Serializer):  # type: ignore[misc]
+    """
+    Response serializer for authenticated user payload (/api/me/).
+    """
+
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+    email = serializers.EmailField(allow_blank=True, required=False)
+    first_name = serializers.CharField(allow_blank=True, required=False)
+    last_name = serializers.CharField(allow_blank=True, required=False)
+    name = serializers.CharField()
+    groups = serializers.ListField(child=serializers.CharField())
+    setores = serializers.ListField(child=serializers.CharField())
+    funcoes = serializers.ListField(child=serializers.CharField())
+    is_superuser = serializers.BooleanField()
+    is_superintendencia = serializers.BooleanField()
+    can_approve_super = serializers.BooleanField()
+
+
 class UsuarioOptionSerializer(serializers.ModelSerializer):
     """
     Minimal serializer for Usuario (dropdowns/selects).

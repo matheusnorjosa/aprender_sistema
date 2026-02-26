@@ -65,6 +65,7 @@ from apps.core.serializers.solicitacao import (
     SolicitacaoSerializer,
 )
 from apps.core.serializers.usuario import (
+    CurrentUserSerializer,
     GroupSerializer,
     UserSlimSerializer,
     UsuarioAdminSerializer,
@@ -79,6 +80,7 @@ from apps.core.serializers.workflow import (
 
 __all__ = [
     # Usuario
+    "CurrentUserSerializer",
     "UserSlimSerializer",
     "UsuarioOptionSerializer",
     "UsuarioAdminSerializer",

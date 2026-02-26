@@ -369,7 +369,7 @@ export async function deleteCadastro(id: ID): Promise<void> {
 }
 
 export async function updateCadastroEtapa(id: ID, etapa: string, status: string): Promise<GenericRecord> {
-  return apiRequest(() => api.patch(`/dat/cadastros/${id}/etapa/`, { etapa, status }));
+  return apiRequest(() => api.post(`/dat/cadastros/${id}/etapa/`, { etapa, status }));
 }
 
 export async function getCadastrosStats(params: FilterParams = {}): Promise<GenericStats> {

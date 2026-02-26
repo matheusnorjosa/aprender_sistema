@@ -1,7 +1,7 @@
 /**
  * API Client - Google Calendar Dashboard
  *
- * Endpoints para painel de publicação GCal.
+ * Endpoints consumidos pelo frontend e implementados no backend.
  */
 
 import { fetchAPI, buildUrl, type QueryParams } from './config';
@@ -51,8 +51,10 @@ export interface BatchPublishRequest {
  */
 export interface BatchOperationResponse {
   queued: number;
-  skipped: number;
-  errors: Array<{ id: ID; error: string }>;
+  errors: Array<{ id: ID; detail?: string; error?: string }>;
+  skipped?: number;
+  dry_run?: boolean;
+  apply_blocked?: boolean;
   task_ids?: string[];
 }
 
@@ -60,7 +62,9 @@ export interface BatchOperationResponse {
  * Batch IDs request
  */
 export interface BatchIdsRequest {
-  solicitacao_ids: ID[];
+  ids: ID[];
+  dry_run?: boolean;
+  apply_blocked?: boolean;
 }
 
 /**
@@ -79,7 +83,7 @@ export async function getStatusSummary(filters: GCalFilters = {}): Promise<GCalS
  * @param filters - Filtros (date_from, date_to, sector, gcal_status, q)
  */
 export async function listApprovedWithGCalStatus(filters: GCalFilters = {}): Promise<PaginatedResponse<GCalDashboardEvent>> {
-  const url = buildUrl('/gcal/approved/', filters as QueryParams);
+  const url = buildUrl('/gcal/list/', filters as QueryParams);
   return await fetchAPI(url);
 }
 
@@ -96,24 +100,24 @@ export async function publishBatch(body: BatchPublishRequest): Promise<BatchOper
 }
 
 /**
- * Remove múltiplas solicitações do Google Calendar (unpublish).
+ * Reaplica eventos já publicados sem resetar hash.
  *
- * @param body - { solicitacao_ids: [...] }
+ * @param body - { ids: [...], dry_run?: bool, apply_blocked?: bool }
  */
-export async function unpublishBatch(body: BatchIdsRequest): Promise<BatchOperationResponse> {
-  return await fetchAPI('/gcal/unpublish-batch/', {
+export async function reapplyBatch(body: BatchIdsRequest): Promise<BatchOperationResponse> {
+  return await fetchAPI('/gcal/dashboard/batch/reapply/', {
     method: 'POST',
     body: JSON.stringify(body),
   });
 }
 
 /**
- * Sincroniza solicitações bloqueadas (marca como PENDING no GCal).
+ * Força resync (reseta hash + marca pending + republica em lote).
  *
- * @param body - { solicitacao_ids: [...] }
+ * @param body - { ids: [...], dry_run?: bool, apply_blocked?: bool }
  */
-export async function syncBlocked(body: BatchIdsRequest): Promise<BatchOperationResponse> {
-  return await fetchAPI('/gcal/sync-blocked/', {
+export async function resyncBatch(body: BatchIdsRequest): Promise<BatchOperationResponse> {
+  return await fetchAPI('/gcal/dashboard/batch/resync/', {
     method: 'POST',
     body: JSON.stringify(body),
   });

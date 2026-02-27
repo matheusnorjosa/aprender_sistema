@@ -44,3 +44,6 @@ backend/C:/
 
 # Generated ETL summaries
 data/csv-import/**/dry_run_summary.json
+
+# Scripts Google Apps Script (referência local, não versionados)
+data/csv-import/**/Scripts/

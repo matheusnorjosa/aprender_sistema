@@ -193,29 +193,51 @@ def resolve_municipio(nome: str) -> Municipio | None:
     return None
 
 
+_YEAR_PREFIX_RE = re.compile(r"^\d{4}\s+")
+
+_NIVEL_MAP: dict[str, str] = {
+    "Nível 1": "N1",
+    "Nível 2": "N2",
+    "Nível 3": "N3",
+    "Nivel 1": "N1",
+    "Nivel 2": "N2",
+    "Nivel 3": "N3",
+}
+
+
+def _strip_year_prefix(nome: str) -> str:
+    """Remove prefixo de ano (ex: '2026 ') do início do nome."""
+    # Collapse múltiplos espaços antes de testar o padrão
+    nome_clean = " ".join(nome.split())
+    return _YEAR_PREFIX_RE.sub("", nome_clean).strip()
+
+
 def normalize_projeto_name(nome: str) -> str:
     """
-    Normaliza nome de projeto aplicando aliases.
+    Normaliza nome de projeto removendo prefixo de ano e aplicando aliases.
 
-    ALIASES:
-    - "IDEB" / "IDEB10" → "GESTÃO ESCOLAR"
-    - "Vida & Ciências" → "VIDA E CIÊNCIAS"
-    - "Vida & Linguagem" → "VIDA E LINGUAGEM"
-    - "Vida & Matemática" → "VIDA E MATEMÁTICA"
-    - "Cataventos" → "PROJETO CATAVENTO 2"
-    - "Miudezas" → "PROJETO MIUDEZAS E DESCOBERTAS"
-    - "ACerta" → "ACERTA MATEMATICA"
-    - "Superativar" → "SUPERATIVAR - LINGUAGENS"
-    - "Avançando Juntos Língua Portuguesa" → "AVANÇANDO JUNTOS PORTUGUÊS"
+    Transformações aplicadas (em ordem):
+    1. Strip de prefixo de ano: "2026 Novo Lendo" → "Novo Lendo"
+    2. Normalização de nível: "Fluir das Emoções Nível 1" → "Fluir das Emoções N1"
+    3. Aliases canônicos (IDEB, Vida &, Cataventos, etc.)
 
     Args:
-        nome: Nome bruto do projeto
+        nome: Nome bruto do projeto (pode vir de CSV exportado das planilhas)
 
     Returns:
         Nome normalizado/mapeado
     """
     if not nome:
         return nome
+
+    # 1) Strip prefixo de ano ("2026 ", "2025 ", etc.)
+    nome = _strip_year_prefix(nome)
+    if not nome:
+        return nome
+
+    # 2) Normalizar variantes de nível ("Nível X" → "NX")
+    for nivel_raw, nivel_short in _NIVEL_MAP.items():
+        nome = nome.replace(nivel_raw, nivel_short)
 
     # Normalizar: lowercase, sem acentos, trim
     nome_norm = norm_text(nome)

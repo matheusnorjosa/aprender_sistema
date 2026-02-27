@@ -7,13 +7,13 @@ são normalizados antes do lookup em Projeto.
 
 import pytest
 
-from apps.core.services.resolvers import normalize_projeto_name, resolve_projeto
 from apps.core.models import Projeto
-
+from apps.core.services.resolvers import normalize_projeto_name, resolve_projeto
 
 # ---------------------------------------------------------------------------
 # normalize_projeto_name — unit tests (sem DB)
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizeProjetoName:
     """Testa a normalização de nomes de projeto sem tocar no banco."""
@@ -66,6 +66,7 @@ class TestNormalizeProjetoName:
 # ---------------------------------------------------------------------------
 # resolve_projeto com prefixo de ano — integration tests (com DB)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.django_db
 class TestResolveProjetoWithYearPrefix:

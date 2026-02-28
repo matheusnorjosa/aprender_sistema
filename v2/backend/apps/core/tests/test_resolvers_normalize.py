@@ -73,7 +73,7 @@ class TestResolveProjetoWithYearPrefix:
     """Testa que resolve_projeto encontra projetos mesmo com prefixo de ano."""
 
     @pytest.fixture(autouse=True)
-    def create_projetos(self, db):
+    def create_projetos(self, db: None) -> None:
         Projeto.objects.create(nome="Novo Lendo", fluxo="NAO_SUPER", ativo=True)
         Projeto.objects.create(nome="Fluir das Emoções N1", fluxo="SUPER", ativo=True)
         Projeto.objects.create(nome="Sou da Paz", fluxo="NAO_SUPER", ativo=True)

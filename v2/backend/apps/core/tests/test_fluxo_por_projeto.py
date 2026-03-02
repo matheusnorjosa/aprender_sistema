@@ -9,7 +9,7 @@ pelo projeto, não pelo campo coordenador_acompanha.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.contrib.auth.models import Group
 from django.test import TestCase
@@ -19,7 +19,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Compra, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 
 class TestFluxoPorProjeto(TestCase):
@@ -79,6 +79,26 @@ class TestFluxoPorProjeto(TestCase):
             codigo="",  # Explicitly set empty string (default)
             fluxo="NAO_SUPER",
             ativo=True,
+        )
+
+        # Regra de elegibilidade: compras liberam solicitação por município+projeto.
+        Compra.objects.create(
+            codigo="COMP-FLUXO-SUPER",
+            projeto=self.projeto_super,
+            municipio=self.municipio,
+            quantidade=20,
+            data=date(2026, 1, 10),
+            uso="Fluxo SUPER",
+            external_hash="fluxo-super-hash",
+        )
+        Compra.objects.create(
+            codigo="COMP-FLUXO-OUTROS",
+            projeto=self.projeto_outros,
+            municipio=self.municipio,
+            quantidade=15,
+            data=date(2026, 1, 11),
+            uso="Fluxo NAO_SUPER",
+            external_hash="fluxo-outros-hash",
         )
 
         # Datas para testes
@@ -201,6 +221,15 @@ class TestFluxoPorProjeto(TestCase):
         # Forçar fluxo como None para simular projeto antigo
         Projeto.objects.filter(id=projeto_sem_fluxo.id).update(fluxo="NAO_SUPER")
         projeto_sem_fluxo.refresh_from_db()
+        Compra.objects.create(
+            codigo="COMP-FLUXO-LEGADO",
+            projeto=projeto_sem_fluxo,
+            municipio=self.municipio,
+            quantidade=10,
+            data=date(2026, 1, 12),
+            uso="Fluxo legado",
+            external_hash="fluxo-legado-hash",
+        )
 
         self.client.force_authenticate(user=self.coordenador)
 

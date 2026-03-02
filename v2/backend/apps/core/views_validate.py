@@ -56,7 +56,7 @@ import pytz
 
 from apps.core.services.resolvers import resolve_municipio, resolve_projeto, resolve_tipo_evento, resolve_user_by_email
 
-from .models import Municipio, Projeto, TipoEvento
+from .models import Compra, Municipio, Projeto, TipoEvento
 
 
 class SolicitationValidateView(APIView):
@@ -104,6 +104,20 @@ class SolicitationValidateView(APIView):
                 canonical["tipo_evento_id"] = tipo_obj.id
             else:
                 errors.append(f"Tipo de evento não encontrado: {tipo_input}")
+
+        # 3.1 Validar elegibilidade de compra (município + projeto) para não-superuser
+        if (
+            request.user
+            and not request.user.is_superuser
+            and canonical.get("municipio_id") is not None
+            and canonical.get("projeto_id") is not None
+        ):
+            has_compra = Compra.objects.filter(
+                municipio_id=canonical["municipio_id"],
+                projeto_id=canonical["projeto_id"],
+            ).exists()
+            if not has_compra:
+                errors.append("Município e projeto sem compra registrada para elegibilidade de solicitação")
 
         # 4. Validar data/hora
         date_str = data.get("date")

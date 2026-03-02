@@ -24,7 +24,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog, Compra, Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
 
 
 @pytest.fixture
@@ -122,6 +122,20 @@ def projeto_super():
 def tipo_evento():
     """Test event type."""
     return TipoEvento.objects.get_or_create(nome="Formação")[0]
+
+
+@pytest.fixture
+def compra_projeto_super(municipio, projeto_super):
+    """Compra base para habilitar criação de solicitações via API nos edge cases."""
+    return Compra.objects.create(
+        codigo="COMP-VIEWS-COVERAGE",
+        projeto=projeto_super,
+        municipio=municipio,
+        quantidade=8,
+        data=date(2026, 1, 16),
+        uso="Teste views_solicitacao",
+        external_hash=f"test-views-solicitacao-{projeto_super.id}",
+    )
 
 
 # ============================================================
@@ -427,6 +441,7 @@ class TestSolicitacaoFilters:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("compra_projeto_super")
 class TestExtraParticipantsEdgeCases:
     """Tests for extra_participants edge cases."""
 

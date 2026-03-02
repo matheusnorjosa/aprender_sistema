@@ -13,8 +13,8 @@ Valida:
 
 from __future__ import annotations
 
-import json
 import tempfile
+from collections.abc import Generator
 from io import StringIO
 from pathlib import Path
 
@@ -43,7 +43,7 @@ def setup_data() -> None:
 
 
 @pytest.fixture()
-def csv_path(setup_data: None) -> str:
+def csv_path(setup_data: None) -> Generator[str, None, None]:
     tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
     tmp.write(CSV_CONTENT)
     tmp.close()

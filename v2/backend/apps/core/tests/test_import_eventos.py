@@ -15,6 +15,7 @@ Cobertura:
 
 import io
 import tempfile
+from datetime import date, timedelta
 from pathlib import Path
 
 from django.contrib.auth import get_user_model
@@ -135,9 +136,11 @@ def api_client():
 @pytest.fixture
 def sample_csv(coordenador_user, municipio, projeto_super, tipo_evento):
     """Cria arquivo CSV de teste com cleanup automatico."""
+    d1 = (date.today() + timedelta(days=30)).isoformat()
+    d2 = (date.today() + timedelta(days=31)).isoformat()
     content = f"""municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador,encontro,segmento,local
-{municipio.nome},{projeto_super.nome},{tipo_evento.nome},2026-03-01,08:00,12:00,{coordenador_user.email},EF1,Fundamental I,Escola Municipal
-{municipio.nome},{projeto_super.nome},{tipo_evento.nome},2026-03-02,14:00,18:00,{coordenador_user.first_name} {coordenador_user.last_name},EF2,Fundamental II,Escola Estadual
+{municipio.nome},{projeto_super.nome},{tipo_evento.nome},{d1},08:00,12:00,{coordenador_user.email},EF1,Fundamental I,Escola Municipal
+{municipio.nome},{projeto_super.nome},{tipo_evento.nome},{d2},14:00,18:00,{coordenador_user.first_name} {coordenador_user.last_name},EF2,Fundamental II,Escola Estadual
 """
     temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
     temp.write(content)
@@ -150,8 +153,9 @@ def sample_csv(coordenador_user, municipio, projeto_super, tipo_evento):
 @pytest.fixture
 def sample_csv_with_formadores(coordenador_user, formador1_user, municipio, projeto_super, tipo_evento):
     """CSV com formadores."""
+    d1 = (date.today() + timedelta(days=35)).isoformat()
     content = f"""municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador,formador1
-{municipio.nome},{projeto_super.nome},{tipo_evento.nome},2026-03-10,09:00,13:00,{coordenador_user.email},{formador1_user.email}
+{municipio.nome},{projeto_super.nome},{tipo_evento.nome},{d1},09:00,13:00,{coordenador_user.email},{formador1_user.email}
 """
     temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
     temp.write(content)
@@ -163,8 +167,9 @@ def sample_csv_with_formadores(coordenador_user, formador1_user, municipio, proj
 @pytest.fixture
 def sample_csv_nao_super(coordenador_user, municipio, projeto_nao_super, tipo_evento):
     """CSV com projeto NAO_SUPER (deve ser auto-aprovado)."""
+    d1 = (date.today() + timedelta(days=40)).isoformat()
     content = f"""municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador
-{municipio.nome},{projeto_nao_super.nome},{tipo_evento.nome},2026-03-15,10:00,14:00,{coordenador_user.email}
+{municipio.nome},{projeto_nao_super.nome},{tipo_evento.nome},{d1},10:00,14:00,{coordenador_user.email}
 """
     temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
     temp.write(content)

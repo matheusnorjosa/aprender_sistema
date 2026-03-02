@@ -15,13 +15,15 @@ Valida:
 
 from __future__ import annotations
 
+from datetime import date
+
 from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Compra, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 
 @pytest.fixture
@@ -86,7 +88,31 @@ def tipo_evento():
     return TipoEvento.objects.create(nome="Formação Inicial")
 
 
+@pytest.fixture
+def compras_fluxo_base(municipio, projeto_super, projeto_outros):
+    """Semear compras para liberar criação de solicitação por município+projeto."""
+    Compra.objects.create(
+        codigo="COMP-FLUXO-SUPER",
+        projeto=projeto_super,
+        municipio=municipio,
+        quantidade=10,
+        data=date(2026, 1, 10),
+        uso="Teste fluxo SUPER",
+        external_hash="test-solicitacao-fluxo-super",
+    )
+    Compra.objects.create(
+        codigo="COMP-FLUXO-OUTROS",
+        projeto=projeto_outros,
+        municipio=municipio,
+        quantidade=10,
+        data=date(2026, 1, 11),
+        uso="Teste fluxo NAO_SUPER",
+        external_hash="test-solicitacao-fluxo-outros",
+    )
+
+
 @pytest.mark.django_db
+@pytest.mark.usefixtures("compras_fluxo_base")
 class TestSolicitacaoFluxoSUPER:
     """
     Testes para solicitações de projetos com fluxo SUPER.
@@ -200,6 +226,7 @@ class TestSolicitacaoFluxoSUPER:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("compras_fluxo_base")
 class TestSolicitacaoFluxoNaoSuper:
     """
     Testes para solicitações de projetos com fluxo NAO_SUPER.
@@ -435,6 +462,16 @@ class TestProjetoSemFluxo:
         )
 
         assert projeto_default.fluxo == "NAO_SUPER"
+
+        Compra.objects.create(
+            codigo="COMP-FLUXO-DEFAULT",
+            projeto=projeto_default,
+            municipio=municipio,
+            quantidade=10,
+            data=date(2026, 1, 12),
+            uso="Teste fluxo default",
+            external_hash="test-solicitacao-fluxo-default",
+        )
 
         api_client.force_authenticate(user=usuario_coordenador)
 

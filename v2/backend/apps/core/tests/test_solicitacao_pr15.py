@@ -14,13 +14,15 @@ Valida:
 
 from __future__ import annotations
 
+from datetime import date
+
 from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Compra, Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
 
 
 @pytest.fixture
@@ -93,6 +95,20 @@ def projeto_nao_super():
 def tipo_evento():
     """TipoEvento de teste."""
     return TipoEvento.objects.create(nome="Formação")
+
+
+@pytest.fixture
+def compra_projeto_super(municipio, projeto_super):
+    """Compra base para habilitar criação de solicitações no fluxo PR15."""
+    return Compra.objects.create(
+        codigo="COMP-PR15-SUPER",
+        projeto=projeto_super,
+        municipio=municipio,
+        quantidade=12,
+        data=date(2026, 1, 15),
+        uso="Teste PR15",
+        external_hash="test-solicitacao-pr15-super",
+    )
 
 
 @pytest.mark.django_db
@@ -258,6 +274,7 @@ class TestFiltroStatusAlias:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("compra_projeto_super")
 class TestExtraParticipants:
     """Testes para extra_participants payload"""
 

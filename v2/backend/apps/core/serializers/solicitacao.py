@@ -10,7 +10,7 @@ Type-checked with Pyright (strict mode).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from rest_framework import serializers  # type: ignore[attr-defined]
 
@@ -187,7 +187,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         # Regra 4: Elegibilidade de compra por município+projeto (somente criação)
         # Superuser mantém bypass explícito.
         if instance is None:
-            request = self.context.get("request")
+            request = cast(Any, self.context.get("request"))
             user = getattr(request, "user", None)
             if not (user and getattr(user, "is_superuser", False)):
                 municipio = attrs.get("municipio")

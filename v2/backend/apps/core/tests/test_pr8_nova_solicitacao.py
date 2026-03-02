@@ -13,6 +13,8 @@ Testa:
 
 from __future__ import annotations
 
+from datetime import date
+
 from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status
@@ -20,7 +22,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Compra, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 pytestmark = pytest.mark.django_db
 
@@ -161,6 +163,15 @@ class TestSolicitacaoRBAC:
         tipo_evento = TipoEvento.objects.create(nome="Formação")
         municipio = Municipio.objects.create(nome="Fortaleza", uf="CE")
         projeto = Projeto.objects.create(nome="Projeto X", fluxo="SUPER")  # SUPER=pendente
+        Compra.objects.create(
+            codigo="COMP-COORD-001",
+            projeto=projeto,
+            municipio=municipio,
+            quantidade=12,
+            data=date(2026, 1, 10),
+            uso="Teste PR8/N",
+            external_hash="pr8-coord-create",
+        )
 
         client.force_authenticate(user=coord)
 
@@ -249,3 +260,36 @@ class TestSolicitacaoRBAC:
 
         # Assert
         assert response.status_code == status.HTTP_201_CREATED
+
+    def test_coordenador_sem_compra_para_projeto_recebe_400(self):
+        """Coordenador não pode criar solicitação quando município+projeto não têm compra."""
+        client = APIClient()
+        coord = Usuario.objects.create_user(username="coord2", password="pass", cpf="22222222222")
+        group_coord, _ = Group.objects.get_or_create(name="Coordenador")
+        coord.groups.add(group_coord)
+
+        tipo_evento = TipoEvento.objects.create(nome="Acompanhamento")
+        municipio = Municipio.objects.create(nome="Sobral", uf="CE")
+        projeto = Projeto.objects.create(nome="Projeto Y", fluxo="SUPER")
+
+        client.force_authenticate(user=coord)
+
+        inicio = timezone.now() + timezone.timedelta(days=2)
+        fim = inicio + timezone.timedelta(hours=2)
+
+        response = client.post(
+            "/api/solicitacoes/",
+            {
+                "municipio": municipio.id,
+                "projeto": projeto.id,
+                "tipo": "evento",
+                "tipo_evento": tipo_evento.id,
+                "inicio": inicio.isoformat(),
+                "fim": fim.isoformat(),
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "errors" in response.data
+        assert "municipio" in response.data["errors"]

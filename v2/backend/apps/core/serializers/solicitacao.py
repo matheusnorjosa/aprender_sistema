@@ -10,11 +10,11 @@ Type-checked with Pyright (strict mode).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from rest_framework import serializers  # type: ignore[attr-defined]
 
-from apps.core.models import AuditLog, Participation, Solicitacao
+from apps.core.models import AuditLog, Compra, Participation, Solicitacao
 from apps.core.serializers.usuario import UserSlimSerializer
 
 
@@ -157,6 +157,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         2. Bloqueia edição de solicitações já publicadas no Google Calendar
            (gcal_status == 'PUBLISHED') para evitar drift.
         3. Bloqueia edição de solicitações reprovadas.
+        4. Exige compra para o par município+projeto na criação (exceto superuser).
         """
         instance = getattr(self, "instance", None)
 
@@ -182,6 +183,26 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                         ]
                     }
                 )
+
+        # Regra 4: Elegibilidade de compra por município+projeto (somente criação)
+        # Superuser mantém bypass explícito.
+        if instance is None:
+            request = cast(Any, self.context.get("request"))
+            user = getattr(request, "user", None)
+            if not (user and getattr(user, "is_superuser", False)):
+                municipio = attrs.get("municipio")
+                projeto = attrs.get("projeto")
+                if municipio is not None and projeto is not None:
+                    has_compra = Compra.objects.filter(municipio=municipio, projeto=projeto).exists()
+                    if not has_compra:
+                        raise serializers.ValidationError(
+                            {
+                                "municipio": (
+                                    f"O município '{municipio.nome} - {municipio.uf}' não possui compra registrada "
+                                    f"para o projeto '{projeto.nome}'. Registre a compra antes de criar a solicitação."
+                                )
+                            }
+                        )
 
         # Regra 1: Validação de intervalo (fim > inicio)
         inicio = attrs.get("inicio", getattr(instance, "inicio", None))

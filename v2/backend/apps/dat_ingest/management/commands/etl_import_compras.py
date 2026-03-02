@@ -83,7 +83,7 @@ class Command(BaseCommand):
             for p in linhas_inv[:5]:
                 self.stdout.write(f"  linha {p['row']}: {p['motivo']}")
 
-        self.stdout.write(f"\nRelatório JSON: out_etl/import_compras_report.json")
+        self.stdout.write("\nRelatório JSON: out_etl/import_compras_report.json")
 
         if dry_run:
             self.stdout.write(self.style.WARNING("\n[DRY-RUN] Nenhuma alteração foi gravada."))

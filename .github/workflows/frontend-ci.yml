@@ -129,6 +129,7 @@ jobs:
     - name: Start backend services for functional contract checklist
       working-directory: .
       run: |
+        cp v2/infra/.env.example v2/infra/.env
         docker compose -f v2/infra/docker-compose.yml up -d --build db redis web
         docker compose -f v2/infra/docker-compose.yml exec -T web python manage.py migrate --noinput
         docker compose -f v2/infra/docker-compose.yml exec -T web python manage.py seed_frontend_contract_data

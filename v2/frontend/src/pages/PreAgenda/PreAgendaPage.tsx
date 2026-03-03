@@ -60,14 +60,13 @@ import {
   resyncSolicitacao,
   cancelSolicitacao,
 } from '../../api/solicitacoes';
-import { getStatusSummary } from '../../api/gcal';
+import { getStatusSummary, reapplyBatch, resyncBatch, type GCalStatusSummary } from '../../api/gcal';
 import { MeetLink } from '../../components/MeetLink';
 import { getMe } from '../../api/availability';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
 import useGoogleGuard from '../../hooks/useGoogleGuard';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
 import logger from '../../utils/logger';
-import { ensureCsrfToken } from '../../api/config';
 import type { ID, Solicitacao, GCalStatus, CurrentUser, PaginatedResponse } from '../../types';
 
 const { Title, Text } = Typography;
@@ -80,12 +79,6 @@ const GCAL_STATUS_COLORS: Record<string, string> = {
   PUBLISHED: 'success',
   ERROR: 'error',
 };
-
-/** Summary type */
-interface SummaryType {
-  counts: Record<string, number>;
-  total: number;
-}
 
 /** Preview data type */
 interface PreviewDataType {
@@ -105,18 +98,15 @@ interface PreviewDataType {
   };
 }
 
-/** Batch response type */
-interface BatchResponseType {
-  queued: number;
-  errors?: Array<{ detail: string }>;
-}
-
 export default function PreAgendaPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [rows, setRows] = useState<Solicitacao[]>([]);
   const [total, setTotal] = useState<number>(0);
 
-  const [summary, setSummary] = useState<SummaryType>({ counts: {}, total: 0 });
+  const [summary, setSummary] = useState<GCalStatusSummary>({
+    counts: { NONE: 0, PENDING: 0, PUBLISHED: 0, ERROR: 0 },
+    total: 0,
+  });
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sectorFilter, setSectorFilter] = useState<string>('');
@@ -166,7 +156,7 @@ export default function PreAgendaPage(): JSX.Element {
       const [superData, naoSuperData, summaryData] = await Promise.all([
         listSolicitacoes({ ...filters, flow: 'SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
         listSolicitacoes({ ...filters, flow: 'NAO_SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
-        getStatusSummary(filters) as unknown as Promise<SummaryType>,
+        getStatusSummary(filters),
       ]);
 
       const superRows = 'results' in superData ? superData.results : superData;
@@ -309,40 +299,22 @@ export default function PreAgendaPage(): JSX.Element {
       onOk: async () => {
         try {
           setBatchLoading(true);
-          const csrfToken = await ensureCsrfToken();
-          const response = await fetch('/api/gcal/dashboard/batch/reapply/', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-CSRFToken': csrfToken || '',
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-              ids: selectedRowKeys,
-              dry_run: false,
-              apply_blocked: true,
-            }),
+          const data = await reapplyBatch({
+            ids: selectedRowKeys as ID[],
+            dry_run: false,
+            apply_blocked: true,
           });
-
-          const data = await response.json() as BatchResponseType & { code?: string };
-
-          // Section 4 Epic #459: Handle Google not connected error
-          if (response.status === 403 && data.code === 'google_not_connected') {
-            handleGoogleError({ response: { status: 403, data } } as unknown as Error);
-            return;
-          }
-
-          if (!response.ok) {
-            throw new Error((data as { detail?: string }).detail || 'Erro ao reenviar eventos');
-          }
 
           message.success(`${data.queued} eventos enfileirados para reapply!`);
           if (data.errors && data.errors.length > 0) {
-            message.warning(`${data.errors.length} erros: ${data.errors.map(e => e.detail).join(', ')}`);
+            message.warning(
+              `${data.errors.length} erros: ${data.errors.map((e) => e.detail || e.error || 'erro').join(', ')}`
+            );
           }
           setSelectedRowKeys([]);
           loadData();
         } catch (error) {
+          if (handleGoogleError(error)) return;
           message.error('Erro ao reenviar em massa: ' + (error as Error).message);
         } finally {
           setBatchLoading(false);
@@ -378,40 +350,22 @@ export default function PreAgendaPage(): JSX.Element {
       onOk: async () => {
         try {
           setBatchLoading(true);
-          const csrfToken = await ensureCsrfToken();
-          const response = await fetch('/api/gcal/dashboard/batch/resync/', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-CSRFToken': csrfToken || '',
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-              ids: selectedRowKeys,
-              dry_run: false,
-              apply_blocked: true,
-            }),
+          const data = await resyncBatch({
+            ids: selectedRowKeys as ID[],
+            dry_run: false,
+            apply_blocked: true,
           });
-
-          const data = await response.json() as BatchResponseType & { code?: string };
-
-          // Section 4 Epic #459: Handle Google not connected error
-          if (response.status === 403 && data.code === 'google_not_connected') {
-            handleGoogleError({ response: { status: 403, data } } as unknown as Error);
-            return;
-          }
-
-          if (!response.ok) {
-            throw new Error((data as { detail?: string }).detail || 'Erro ao fazer resync de eventos');
-          }
 
           message.success(`${data.queued} eventos enfileirados para resync!`);
           if (data.errors && data.errors.length > 0) {
-            message.warning(`${data.errors.length} erros: ${data.errors.map(e => e.detail).join(', ')}`);
+            message.warning(
+              `${data.errors.length} erros: ${data.errors.map((e) => e.detail || e.error || 'erro').join(', ')}`
+            );
           }
           setSelectedRowKeys([]);
           loadData();
         } catch (error) {
+          if (handleGoogleError(error)) return;
           message.error('Erro ao resync em massa: ' + (error as Error).message);
         } finally {
           setBatchLoading(false);

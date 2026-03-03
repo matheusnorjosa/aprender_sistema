@@ -53,7 +53,22 @@ import {
 import dayjs from 'dayjs';
 import logger from '../../utils/logger';
 import { TIMING } from '../../constants';
-import { ensureCsrfToken } from '../../api/config';
+import {
+  getDashboardMetrics,
+  listDashboardEvents,
+  getDashboardSuccessRate,
+  getDashboardTopInsights,
+  getDashboardEventDetail,
+  reapplyBatch,
+  resyncBatch,
+  buildDashboardEventsExportUrl,
+  type GCalDashboardMetricsResponse,
+  type GCalDashboardEventRecord,
+  type GCalDashboardEventDetail,
+  type GCalSuccessRateResponse,
+  type GCalTopInsightsResponse,
+  type GCalTopInsightItem,
+} from '../../api/gcal';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -63,115 +78,12 @@ const { RangePicker } = DatePicker;
  */
 type GCalStatus = 'NONE' | 'PENDING' | 'PUBLISHED' | 'ERROR';
 
-/**
- * Status counts interface
- */
-interface StatusCounts {
-  NONE: number;
-  PENDING: number;
-  PUBLISHED: number;
-  ERROR: number;
-}
-
-/**
- * Recent error interface
- */
-interface RecentError {
-  id: number;
-  summary: string;
-  gcal_last_error: string;
-  updated_at: string;
-}
-
-/**
- * Metrics data interface
- */
-interface MetricsData {
-  counts: StatusCounts;
-  recent_errors: RecentError[];
-}
-
-/**
- * Event record interface
- */
-interface EventRecord {
-  id: number;
-  summary: string;
-  gcal_status: GCalStatus;
-  gcal_last_sync_at: string | null;
-  gcal_last_error: string | null;
-}
-
-/**
- * Event detail participation interface
- */
-interface Participation {
-  email: string;
-  role: string;
-  ch_horas?: number;
-  observacao?: string;
-}
-
-/**
- * Timeline log interface
- */
-interface TimelineLog {
-  action: string;
-  usuario_nome: string;
-  created_at: string;
-  details?: Record<string, unknown>;
-}
-
-/**
- * Event detail interface
- */
-interface EventDetail {
-  id: number;
-  municipio_nome: string | null;
-  projeto_nome: string | null;
-  tipo_evento_nome: string | null;
-  inicio: string | null;
-  fim: string | null;
-  usuario_username: string | null;
-  coordenador_username: string | null;
-  fluxo: string;
-  gcal_status: GCalStatus;
-  external_event_id: string | null;
-  gcal_last_sync_at: string | null;
-  meet_link: string | null;
-  gcal_payload_hash: string | null;
-  gcal_last_error: string | null;
-  updated_at: string | null;
-  participations: Participation[];
-  timeline: TimelineLog[];
-}
-
-/**
- * Success rate data interface
- */
-interface SuccessRateData {
-  rate: number;
-  published: number;
-  error: number;
-}
-
-/**
- * Top insight item interface
- */
-interface TopInsightItem {
-  name: string;
-  count: number;
-  published: number;
-  error: number;
-  rate: number;
-}
-
-/**
- * Top insights data interface
- */
-interface TopInsightsData {
-  items: TopInsightItem[];
-}
+type MetricsData = GCalDashboardMetricsResponse;
+type EventRecord = GCalDashboardEventRecord;
+type EventDetail = GCalDashboardEventDetail;
+type SuccessRateData = GCalSuccessRateResponse;
+type TopInsightItem = GCalTopInsightItem;
+type TopInsightsData = GCalTopInsightsResponse;
 
 /**
  * Pagination state interface
@@ -265,21 +177,10 @@ export default function GCalDashboardPage(): JSX.Element {
   const loadMetrics = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (dateRange && dateRange[0] && dateRange[1]) {
-        params.append('start', dateRange[0].format('YYYY-MM-DD'));
-        params.append('end', dateRange[1].format('YYYY-MM-DD'));
-      }
-
-      const response = await fetch(`/api/gcal/dashboard/metrics/?${params}`, {
-        credentials: 'include',
+      const data = await getDashboardMetrics({
+        start: dateRange[0].format('YYYY-MM-DD'),
+        end: dateRange[1].format('YYYY-MM-DD'),
       });
-
-      if (!response.ok) {
-        throw new Error('Erro ao carregar métricas');
-      }
-
-      const data = await response.json();
       setMetrics(data);
     } catch (error) {
       logger.error('Erro ao carregar métricas:', error);
@@ -292,28 +193,13 @@ export default function GCalDashboardPage(): JSX.Element {
   const loadEvents = async (page = 1, pageSize = 20) => {
     setTableLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.append('page', String(page));
-      params.append('page_size', String(pageSize));
-
-      if (dateRange && dateRange[0] && dateRange[1]) {
-        params.append('start', dateRange[0].format('YYYY-MM-DD'));
-        params.append('end', dateRange[1].format('YYYY-MM-DD'));
-      }
-
-      if (statusFilter) {
-        params.append('status', statusFilter);
-      }
-
-      const response = await fetch(`/api/gcal/dashboard/events/?${params}`, {
-        credentials: 'include',
+      const data = await listDashboardEvents({
+        page,
+        page_size: pageSize,
+        start: dateRange[0].format('YYYY-MM-DD'),
+        end: dateRange[1].format('YYYY-MM-DD'),
+        status: statusFilter || undefined,
       });
-
-      if (!response.ok) {
-        throw new Error('Erro ao carregar eventos');
-      }
-
-      const data = await response.json();
       setEvents(data.results || []);
       setPagination({
         current: page,
@@ -340,21 +226,10 @@ export default function GCalDashboardPage(): JSX.Element {
   const loadSuccessRate = async () => {
     setInsightsLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (dateRange && dateRange[0] && dateRange[1]) {
-        params.append('start', dateRange[0].format('YYYY-MM-DD'));
-        params.append('end', dateRange[1].format('YYYY-MM-DD'));
-      }
-
-      const response = await fetch(`/api/gcal/dashboard/insights/success-rate/?${params}`, {
-        credentials: 'include',
+      const data = await getDashboardSuccessRate({
+        start: dateRange[0].format('YYYY-MM-DD'),
+        end: dateRange[1].format('YYYY-MM-DD'),
       });
-
-      if (!response.ok) {
-        throw new Error('Erro ao carregar success rate');
-      }
-
-      const data = await response.json();
       setSuccessRate(data);
     } catch (error) {
       logger.error('Erro ao carregar success rate:', error);
@@ -367,24 +242,12 @@ export default function GCalDashboardPage(): JSX.Element {
   const loadTopInsights = async () => {
     setInsightsLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.append('metric', topMetric);
-      params.append('limit', '5');
-
-      if (dateRange && dateRange[0] && dateRange[1]) {
-        params.append('start', dateRange[0].format('YYYY-MM-DD'));
-        params.append('end', dateRange[1].format('YYYY-MM-DD'));
-      }
-
-      const response = await fetch(`/api/gcal/dashboard/insights/top/?${params}`, {
-        credentials: 'include',
+      const data = await getDashboardTopInsights({
+        metric: topMetric,
+        limit: 5,
+        start: dateRange[0].format('YYYY-MM-DD'),
+        end: dateRange[1].format('YYYY-MM-DD'),
       });
-
-      if (!response.ok) {
-        throw new Error('Erro ao carregar top insights');
-      }
-
-      const data = await response.json();
       setTopInsights(data);
     } catch (error) {
       logger.error('Erro ao carregar top insights:', error);
@@ -401,21 +264,12 @@ export default function GCalDashboardPage(): JSX.Element {
   };
 
   const handleExport = (format: string) => {
-    // Construir URL de export com os mesmos filtros ativos
-    const params = new URLSearchParams();
-    params.append('export_format', format);
-
-    if (dateRange && dateRange[0] && dateRange[1]) {
-      params.append('start', dateRange[0].format('YYYY-MM-DD'));
-      params.append('end', dateRange[1].format('YYYY-MM-DD'));
-    }
-
-    if (statusFilter) {
-      params.append('status', statusFilter);
-    }
-
-    // Abrir URL em nova aba (download automático via Content-Disposition)
-    const exportUrl = `/api/gcal/dashboard/events/export/?${params}`;
+    const exportUrl = buildDashboardEventsExportUrl({
+      export_format: format === 'json' ? 'json' : 'csv',
+      start: dateRange[0].format('YYYY-MM-DD'),
+      end: dateRange[1].format('YYYY-MM-DD'),
+      status: statusFilter || undefined,
+    });
     window.open(exportUrl, '_blank');
     message.success(`Exportação ${format.toUpperCase()} iniciada!`);
   };
@@ -431,15 +285,7 @@ export default function GCalDashboardPage(): JSX.Element {
   const loadEventDetail = async (eventId: number) => {
     setDetailLoading(true);
     try {
-      const response = await fetch(`/api/gcal/dashboard/events/${eventId}/detail/`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Erro ao carregar detalhes do evento');
-      }
-
-      const data = await response.json();
+      const data = await getDashboardEventDetail(eventId);
       setEventDetail(data);
     } catch (error) {
       logger.error('Erro ao carregar detalhes:', error);
@@ -461,27 +307,11 @@ export default function GCalDashboardPage(): JSX.Element {
     if (!selectedEventId) return;
 
     try {
-      const csrfToken = await ensureCsrfToken();
-      const response = await fetch('/api/gcal/dashboard/batch/reapply/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': csrfToken || '',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          ids: [selectedEventId],
-          dry_run: false,
-          apply_blocked: false,
-        }),
+      const data = await reapplyBatch({
+        ids: [selectedEventId],
+        dry_run: false,
+        apply_blocked: false,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Erro ao reapliar evento');
-      }
-
-      const data = await response.json();
 
       if (data.queued > 0) {
         message.success(`Evento reenfileirado para publicação (Reapply)`);
@@ -501,27 +331,11 @@ export default function GCalDashboardPage(): JSX.Element {
     if (!selectedEventId) return;
 
     try {
-      const csrfToken = await ensureCsrfToken();
-      const response = await fetch('/api/gcal/dashboard/batch/resync/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': csrfToken || '',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          ids: [selectedEventId],
-          dry_run: false,
-          apply_blocked: false,
-        }),
+      const data = await resyncBatch({
+        ids: [selectedEventId],
+        dry_run: false,
+        apply_blocked: false,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Erro ao ressincronizar evento');
-      }
-
-      const data = await response.json();
 
       if (data.queued > 0) {
         message.success(`Evento reenfileirado para ressincronização (Resync)`);

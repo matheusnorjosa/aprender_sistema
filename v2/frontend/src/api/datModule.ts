@@ -343,6 +343,29 @@ export async function getComprasDashboard(params: FilterParams = {}): Promise<Co
   return apiRequest(() => api.get('/dat/compras-materiais/dashboard/', { params }));
 }
 
+export interface CompraPendenteItem {
+  municipio_id: number;
+  municipio: string;
+  uf: string;
+  projeto_id: number;
+  projeto: string;
+  total_itens: number;
+  total_compras: number;
+  ultima_compra: string | null;
+}
+
+export interface ComprasPendenciasResponse {
+  total_com_compra: number;
+  total_com_evento: number;
+  total_pendentes: number;
+  percentual_pendentes: number;
+  pendentes: CompraPendenteItem[];
+}
+
+export async function getComprasPendencias(params: FilterParams = {}): Promise<ComprasPendenciasResponse> {
+  return apiRequest(() => api.get('/dat/compras-materiais/pendencias/', { params }));
+}
+
 // ========== CADASTROS (Workflow FORMAR/AVALIAR) ==========
 
 /**

@@ -30,7 +30,15 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+
+from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.permissions import IsControleOrSuper, IsDATOrSuper
+from apps.core.serializers.openapi_critical_contract import (
+    ImportFileUploadRequestSerializer,
+    ImportOperationErrorResponseSerializer,
+    ImportOperationResponseSerializer,
+)
 from apps.core.services.controle_acoes_import import import_acoes_controle
 from apps.core.services.dat_cadastros_import import import_dat_cadastros
 
@@ -70,6 +78,28 @@ class ControleImportAcoesView(APIView):
 
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
+    @extend_schema(
+        summary="Importar ações de controle",
+        parameters=[
+            OpenApiParameter(
+                name="dry_run",
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type=bool,
+                description="Quando true, executa validação sem persistir dados.",
+            ),
+        ],
+        request=ImportFileUploadRequestSerializer,
+        responses={
+            200: ImportOperationResponseSerializer,
+            400: ImportOperationErrorResponseSerializer,
+            401: COMMON_ERROR_RESPONSES[401],
+            403: COMMON_ERROR_RESPONSES[403],
+            413: ImportOperationErrorResponseSerializer,
+            500: ImportOperationErrorResponseSerializer,
+        },
+        tags=["imports"],
+    )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Parse dry_run query param
         dry_run_param = str(request.query_params.get("dry_run", "true")).lower()
@@ -151,6 +181,28 @@ class DATImportCadastrosView(APIView):
 
     permission_classes = [IsAuthenticated, IsDATOrSuper]
 
+    @extend_schema(
+        summary="Importar cadastros DAT",
+        parameters=[
+            OpenApiParameter(
+                name="dry_run",
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type=bool,
+                description="Quando true, executa validação sem persistir dados.",
+            ),
+        ],
+        request=ImportFileUploadRequestSerializer,
+        responses={
+            200: ImportOperationResponseSerializer,
+            400: ImportOperationErrorResponseSerializer,
+            401: COMMON_ERROR_RESPONSES[401],
+            403: COMMON_ERROR_RESPONSES[403],
+            413: ImportOperationErrorResponseSerializer,
+            500: ImportOperationErrorResponseSerializer,
+        },
+        tags=["imports"],
+    )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Parse dry_run query param
         dry_run_param = str(request.query_params.get("dry_run", "true")).lower()

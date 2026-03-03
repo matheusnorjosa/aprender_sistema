@@ -109,6 +109,21 @@ class TestOpenAPISchema(TestCase):
             if isinstance(first_ref, dict):
                 return self._resolve_schema_properties(schema, first_ref)
 
+        if "oneOf" in schema_ref and schema_ref["oneOf"]:
+            first_ref = schema_ref["oneOf"][0]
+            if isinstance(first_ref, dict):
+                return self._resolve_schema_properties(schema, first_ref)
+
+        if "anyOf" in schema_ref and schema_ref["anyOf"]:
+            first_ref = schema_ref["anyOf"][0]
+            if isinstance(first_ref, dict):
+                return self._resolve_schema_properties(schema, first_ref)
+
+        if schema_ref.get("type") == "array":
+            items_ref = schema_ref.get("items", {})
+            if isinstance(items_ref, dict):
+                return self._resolve_schema_properties(schema, items_ref)
+
         if "$ref" not in schema_ref:
             return schema_ref.get("properties", {})
 
@@ -195,6 +210,112 @@ class TestOpenAPISchema(TestCase):
                 properties,
                 f"Missing field '{field}' in /api/dashboard/overview/ OpenAPI response schema",
             )
+
+    def test_schema_has_typed_response_for_home_stats(self) -> None:
+        """Schema must define explicit response fields for /api/stats/home/."""
+        response = self.client.get("/api/schema/?format=json")
+        self.assertEqual(response.status_code, 200)
+        schema = response.json()
+
+        response_schema = self._get_response_schema(schema, "/api/stats/home/", "get", "200")
+        self.assertTrue(response_schema, "Expected typed 200 response schema for /api/stats/home/")
+
+        properties = self._resolve_schema_properties(schema, response_schema)
+        for field in ["pending_approvals", "upcoming_events", "my_requests"]:
+            self.assertIn(field, properties, f"Missing field '{field}' in /api/stats/home/ OpenAPI response schema")
+
+    def test_schema_has_typed_response_for_monthly_availability(self) -> None:
+        """Schema must define explicit response fields and query parameters for /api/availability/monthly/."""
+        response = self.client.get("/api/schema/?format=json")
+        self.assertEqual(response.status_code, 200)
+        schema = response.json()
+
+        response_schema = self._get_response_schema(schema, "/api/availability/monthly/", "get", "200")
+        self.assertTrue(response_schema, "Expected typed 200 response schema for /api/availability/monthly/")
+
+        properties = self._resolve_schema_properties(schema, response_schema)
+        for field in ["days", "legend", "people", "cells", "details_index"]:
+            self.assertIn(
+                field,
+                properties,
+                f"Missing field '{field}' in /api/availability/monthly/ OpenAPI response schema",
+            )
+
+        parameters = schema.get("paths", {}).get("/api/availability/monthly/", {}).get("get", {}).get("parameters", [])
+        parameter_names = {param.get("name") for param in parameters}
+        for param_name in ["year", "month", "role", "gerencia_id", "sector", "q"]:
+            self.assertIn(
+                param_name, parameter_names, f"Missing query parameter '{param_name}' in monthly availability"
+            )
+
+    def test_schema_has_typed_responses_for_options_endpoints(self) -> None:
+        """Schema must define explicit list item fields for /api/options/* endpoints used by frontend."""
+        response = self.client.get("/api/schema/?format=json")
+        self.assertEqual(response.status_code, 200)
+        schema = response.json()
+
+        endpoints = [
+            ("/api/options/municipios/", ["id", "nome", "uf"]),
+            ("/api/options/projetos/", ["id", "nome", "codigo"]),
+            ("/api/options/tipos-evento/", ["id", "nome"]),
+            ("/api/options/usuarios/", ["id", "first_name", "last_name", "email"]),
+            ("/api/options/produtos/", ["id", "nome", "codigo"]),
+            ("/api/options/coordenadores/", ["id", "nome", "area", "ativo"]),
+            ("/api/options/areas/", ["id", "nome", "cor"]),
+            ("/api/options/formadores-do-setor/", ["id", "first_name", "last_name", "email"]),
+        ]
+
+        for path, expected_fields in endpoints:
+            response_schema = self._get_response_schema(schema, path, "get", "200")
+            self.assertTrue(response_schema, f"Expected typed 200 response schema for {path} GET")
+            properties = self._resolve_schema_properties(schema, response_schema)
+            for field in expected_fields:
+                self.assertIn(
+                    field,
+                    properties,
+                    f"Missing field '{field}' in {path} GET OpenAPI response schema",
+                )
+
+    def test_schema_has_typed_responses_for_import_operations_used_by_frontend(self) -> None:
+        """Schema must define explicit request/response contracts for critical import operations."""
+        response = self.client.get("/api/schema/?format=json")
+        self.assertEqual(response.status_code, 200)
+        schema = response.json()
+
+        import_paths = [
+            "/api/controle/import-compras/",
+            "/api/controle/import-acoes/",
+            "/api/dat/import-cadastros/",
+            "/api/disponibilidade/import-bloqueios/",
+            "/api/deslocamentos/import/",
+            "/api/solicitacoes/import/",
+            "/api/usuarios/import/",
+            "/api/municipios/import/",
+            "/api/colecoes/import/",
+            "/api/equipe-gerencia/import/",
+            "/api/produtos/import/",
+        ]
+
+        for path in import_paths:
+            response_schema = self._get_response_schema(schema, path, "post", "200")
+            self.assertTrue(response_schema, f"Expected typed 200 response schema for {path} POST")
+            properties = self._resolve_schema_properties(schema, response_schema)
+
+            for field in ["stats", "pendencias", "dry_run", "file", "path", "detail"]:
+                self.assertIn(field, properties, f"Missing field '{field}' in {path} POST OpenAPI response schema")
+
+            request_schema = (
+                schema.get("paths", {})
+                .get(path, {})
+                .get("post", {})
+                .get("requestBody", {})
+                .get("content", {})
+                .get("multipart/form-data", {})
+                .get("schema", {})
+            )
+            self.assertTrue(request_schema, f"Expected multipart request schema for {path} POST")
+            request_properties = self._resolve_schema_properties(schema, request_schema)
+            self.assertIn("file", request_properties, f"Missing field 'file' in {path} POST request schema")
 
     def test_schema_has_typed_responses_for_gcal_dashboard_reads(self) -> None:
         """Schema must define explicit response fields for critical GCal dashboard read endpoints."""

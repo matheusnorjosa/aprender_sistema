@@ -44,7 +44,7 @@ jobs:
         run: npx --yes agent-browser install --with-deps
 
       - name: Install Playwright browsers for project runtime
-        run: npx playwright install chromium
+        run: npx playwright install chromium chromium-headless-shell
 
       - name: Start frontend dev server
         run: |

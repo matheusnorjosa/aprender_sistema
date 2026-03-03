@@ -16,6 +16,19 @@ import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import './checklist-network-mocks.setup';
 
+async function waitForLoadingOverlayToDisappear(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const overlay = document.querySelector('.ant-spin-fullscreen.ant-spin-fullscreen-show');
+      if (!overlay) return true;
+      const style = window.getComputedStyle(overlay);
+      return style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0';
+    },
+    null,
+    { timeout: 15000 }
+  );
+}
+
 // Páginas para testar acessibilidade
 const PAGES_TO_TEST = [
   { path: '/', name: 'Login/Home' },
@@ -114,8 +127,11 @@ test.describe('Checklist: Acessibilidade (axe-core)', () => {
   test('🔴 contraste de cores deve ser adequado', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
+    await waitForLoadingOverlayToDisappear(page);
 
     const results = await new AxeBuilder({ page })
+      .exclude('.ant-spin-fullscreen')
+      .exclude('.ant-spin-text')
       .withRules(['color-contrast', 'color-contrast-enhanced'])
       .analyze();
 

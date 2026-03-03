@@ -40,83 +40,37 @@ import {
   SafetyOutlined,
 } from '@ant-design/icons';
 import logger from '../../utils/logger';
+import {
+  getTeamProductivity,
+  getTeamFormadores,
+  getTeamQuality,
+  type TeamProductivityData,
+  type TeamFormadoresData,
+  type TeamQualityData,
+  type TeamFormadorRecord,
+} from '../../api/teamMetrics';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-
-/**
- * Productivity data interface
- */
-interface ProductivityData {
-  period: string;
-  events_created: number;
-  approval_rate: number;
-  avg_approval_time_hours: number;
-  gcal_error_rate: number;
-}
-
-/**
- * Formador record interface
- */
-interface FormadorRecord {
-  id: number;
-  nome: string;
-  eventos: number;
-  horas_trabalhadas: number;
-  municipios_atendidos: number;
-}
-
-/**
- * Formadores data interface
- */
-interface FormadoresData {
-  period: string;
-  formadores: FormadorRecord[];
-}
-
-/**
- * Quality data interface
- */
-interface QualityData {
-  period: string;
-  rejection_rate: number;
-  conflict_rate: number;
-  rework_rate: number;
-  avg_publish_time_minutes: number;
-}
 
 export default function EquipeDashboardPage(): JSX.Element {
   const [days, setDays] = useState<number>(7);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [productivityData, setProductivityData] = useState<ProductivityData | null>(null);
-  const [formadoresData, setFormadoresData] = useState<FormadoresData | null>(null);
-  const [qualityData, setQualityData] = useState<QualityData | null>(null);
+  const [productivityData, setProductivityData] = useState<TeamProductivityData | null>(null);
+  const [formadoresData, setFormadoresData] = useState<TeamFormadoresData | null>(null);
+  const [qualityData, setQualityData] = useState<TeamQualityData | null>(null);
 
   const loadAllMetrics = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Fetch em paralelo para performance
-      const [prodRes, formRes, qualRes] = await Promise.all([
-        fetch(`/api/metrics/team/productivity/?days=${days}`, { credentials: 'include' }),
-        fetch(`/api/metrics/team/formadores/?days=${days}`, { credentials: 'include' }),
-        fetch(`/api/metrics/team/quality/?days=${days}`, { credentials: 'include' }),
-      ]);
-
-      // Validar respostas
-      if (!prodRes.ok || !formRes.ok || !qualRes.ok) {
-        const errorStatus = !prodRes.ok ? prodRes.status : !formRes.ok ? formRes.status : qualRes.status;
-        throw new Error(`Erro HTTP ${errorStatus}`);
-      }
-
-      // Parse JSON
       const [prod, form, qual] = await Promise.all([
-        prodRes.json(),
-        formRes.json(),
-        qualRes.json(),
+        getTeamProductivity(days),
+        getTeamFormadores(days),
+        getTeamQuality(days),
       ]);
 
       setProductivityData(prod);
@@ -177,7 +131,7 @@ export default function EquipeDashboardPage(): JSX.Element {
   };
 
   // Columns for formadores table
-  const formadoresColumns: ColumnsType<FormadorRecord> = [
+  const formadoresColumns: ColumnsType<TeamFormadorRecord> = [
     {
       title: '#',
       key: 'rank',

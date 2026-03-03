@@ -5,6 +5,7 @@
  */
 
 import { fetchAPI, buildUrl, type QueryParams } from './config';
+import { API_BASE } from './config';
 import type { ID, PaginatedResponse, GCalDashboardEvent } from '../types';
 
 /**
@@ -68,6 +69,151 @@ export interface BatchIdsRequest {
 }
 
 /**
+ * GCal dashboard window filter params.
+ */
+export interface GCalDashboardWindowFilters {
+  start?: string;
+  end?: string;
+}
+
+/**
+ * GCal dashboard metrics response.
+ */
+export interface GCalDashboardMetricsResponse {
+  counts: GCalStatusCounts;
+  recent_errors: Array<{
+    id: number;
+    summary: string;
+    gcal_last_error: string;
+    updated_at: string | null;
+  }>;
+  window?: {
+    start?: string | null;
+    end?: string | null;
+  };
+}
+
+/**
+ * Event row in /api/gcal/dashboard/events/.
+ */
+export interface GCalDashboardEventRecord {
+  id: number;
+  summary: string;
+  gcal_status: 'NONE' | 'PENDING' | 'PUBLISHED' | 'ERROR';
+  gcal_last_sync_at: string | null;
+  gcal_last_error: string | null;
+}
+
+/**
+ * Params for dashboard events listing.
+ */
+export interface GCalDashboardEventsParams extends GCalDashboardWindowFilters {
+  page?: number;
+  page_size?: number;
+  status?: string;
+}
+
+/**
+ * Success rate response.
+ */
+export interface GCalSuccessRateResponse {
+  published: number;
+  error: number;
+  pending: number;
+  none: number;
+  rate: number;
+  window?: {
+    start?: string | null;
+    end?: string | null;
+  };
+}
+
+/**
+ * Top insights item.
+ */
+export interface GCalTopInsightItem {
+  name: string;
+  count: number;
+  published: number;
+  error: number;
+  rate: number;
+}
+
+/**
+ * Top insights response.
+ */
+export interface GCalTopInsightsResponse {
+  items: GCalTopInsightItem[];
+  window?: {
+    start?: string | null;
+    end?: string | null;
+  };
+  metric: 'municipios' | 'projetos' | string;
+  limit: number;
+}
+
+/**
+ * Params for top insights endpoint.
+ */
+export interface GCalTopInsightsParams extends GCalDashboardWindowFilters {
+  metric: 'municipios' | 'projetos' | string;
+  limit?: number;
+}
+
+/**
+ * Timeline item for event detail.
+ */
+export interface GCalEventTimelineItem {
+  action: string;
+  usuario_nome: string;
+  created_at: string;
+  details?: Record<string, unknown>;
+}
+
+/**
+ * Event detail response.
+ */
+export interface GCalDashboardEventDetail {
+  id: number;
+  municipio_nome: string | null;
+  projeto_nome: string | null;
+  tipo_evento_nome: string | null;
+  inicio: string | null;
+  fim: string | null;
+  usuario_username: string | null;
+  coordenador_username: string | null;
+  fluxo: string;
+  gcal_status: 'NONE' | 'PENDING' | 'PUBLISHED' | 'ERROR';
+  external_event_id: string | null;
+  gcal_last_sync_at: string | null;
+  meet_link: string | null;
+  gcal_payload_hash: string | null;
+  gcal_last_error: string | null;
+  updated_at: string | null;
+  participations: Array<{
+    email: string;
+    role: string;
+    ch_horas?: number;
+    observacao?: string;
+  }>;
+  timeline: GCalEventTimelineItem[];
+}
+
+/**
+ * Alerts summary response.
+ */
+export interface GCalAlertsSummaryResponse {
+  errors: number;
+  pending: number;
+  published: number;
+  none: number;
+  window?: {
+    start?: string | null;
+    end?: string | null;
+  };
+}
+
+/**
  * Busca resumo de status do GCal (contadores).
  *
  * @param filters - Filtros opcionais (date_from, date_to, sector, q, status)
@@ -121,4 +267,72 @@ export async function resyncBatch(body: BatchIdsRequest): Promise<BatchOperation
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+/**
+ * Loads dashboard metrics cards and recent errors.
+ */
+export async function getDashboardMetrics(
+  params: GCalDashboardWindowFilters = {}
+): Promise<GCalDashboardMetricsResponse> {
+  const url = buildUrl('/gcal/dashboard/metrics/', params as QueryParams);
+  return await fetchAPI(url);
+}
+
+/**
+ * Loads dashboard events table.
+ */
+export async function listDashboardEvents(
+  params: GCalDashboardEventsParams = {}
+): Promise<PaginatedResponse<GCalDashboardEventRecord>> {
+  const url = buildUrl('/gcal/dashboard/events/', params as QueryParams);
+  return await fetchAPI(url);
+}
+
+/**
+ * Loads success-rate insight card.
+ */
+export async function getDashboardSuccessRate(
+  params: GCalDashboardWindowFilters = {}
+): Promise<GCalSuccessRateResponse> {
+  const url = buildUrl('/gcal/dashboard/insights/success-rate/', params as QueryParams);
+  return await fetchAPI(url);
+}
+
+/**
+ * Loads top insights table.
+ */
+export async function getDashboardTopInsights(
+  params: GCalTopInsightsParams
+): Promise<GCalTopInsightsResponse> {
+  const queryParams: QueryParams = { ...params };
+  const url = buildUrl('/gcal/dashboard/insights/top/', queryParams);
+  return await fetchAPI(url);
+}
+
+/**
+ * Loads full event detail drawer payload.
+ */
+export async function getDashboardEventDetail(eventId: number): Promise<GCalDashboardEventDetail> {
+  return await fetchAPI(`/gcal/dashboard/events/${eventId}/detail/`);
+}
+
+/**
+ * Loads alerts summary used for menu badge/toast.
+ */
+export async function getAlertsSummary(): Promise<GCalAlertsSummaryResponse> {
+  return await fetchAPI('/gcal/dashboard/alerts/summary/');
+}
+
+/**
+ * Builds export URL for dashboard events with active filters.
+ */
+export function buildDashboardEventsExportUrl(params: {
+  export_format: 'csv' | 'json';
+  start?: string;
+  end?: string;
+  status?: string;
+}): string {
+  const relativePath = buildUrl('/gcal/dashboard/events/export/', params as QueryParams);
+  return `${API_BASE}${relativePath}`;
 }

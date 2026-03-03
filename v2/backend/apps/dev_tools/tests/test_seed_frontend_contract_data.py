@@ -61,12 +61,15 @@ class TestSeedFrontendContractDataCommand:
         assert compra.projeto_id == projeto.id
         assert compra.municipio_id == municipio.id
 
-        assert DATCompra.objects.filter(
-            municipio=municipio,
-            projeto=projeto,
-            descricao_produto=SEED_DAT_DESCRICAO,
-            ano_uso=2026,
-        ).count() == 1
+        assert (
+            DATCompra.objects.filter(
+                municipio=municipio,
+                projeto=projeto,
+                descricao_produto=SEED_DAT_DESCRICAO,
+                ano_uso=2026,
+            ).count()
+            == 1
+        )
         dat_compra = DATCompra.objects.get(
             municipio=municipio,
             projeto=projeto,
@@ -81,4 +84,3 @@ class TestSeedFrontendContractDataCommand:
         assert set(dat_user.groups.values_list("name", flat=True)) == {"DAT"}
 
         assert Usuario.objects.filter(username=SEED_CONTROLE_USERNAME).exists()
-

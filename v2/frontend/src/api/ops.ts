@@ -34,7 +34,7 @@ export interface Compra {
   data: string;
   codigo: string;
   uso: string;
-  valor: number;
+  quantidade: number;
 }
 
 /**

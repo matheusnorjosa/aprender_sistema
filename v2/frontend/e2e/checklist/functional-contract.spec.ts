@@ -30,13 +30,13 @@ async function loginByApi(page: Page, username: string, password: string): Promi
 }
 
 async function runCase(page: Page, matrixCase: FunctionalMatrixCase): Promise<void> {
-  const seenEndpoints = new Set<string>();
+  const successfulEndpoints = new Set<string>();
 
   page.on('response', (response) => {
     const url = response.url();
     for (const endpoint of matrixCase.endpoints) {
-      if (url.includes(endpoint)) {
-        seenEndpoints.add(endpoint);
+      if (url.includes(endpoint) && response.status() < 500) {
+        successfulEndpoints.add(endpoint);
       }
     }
   });
@@ -46,14 +46,15 @@ async function runCase(page: Page, matrixCase: FunctionalMatrixCase): Promise<vo
   await page.waitForLoadState('networkidle');
 
   for (const endpoint of matrixCase.endpoints) {
-    await page.waitForResponse(
-      (response) => response.url().includes(endpoint) && response.status() < 500,
-      { timeout: 15000 }
-    );
-    expect(
-      seenEndpoints.has(endpoint),
-      `[matrix][route=${matrixCase.route}][endpoint=${endpoint}] endpoint nao foi chamado`
-    ).toBeTruthy();
+    await expect
+      .poll(
+        () => successfulEndpoints.has(endpoint),
+        {
+          timeout: 15000,
+          message: `[matrix][route=${matrixCase.route}][endpoint=${endpoint}] endpoint nao foi chamado com status < 500`,
+        }
+      )
+      .toBeTruthy();
   }
 
   for (const assertion of matrixCase.assertions) {

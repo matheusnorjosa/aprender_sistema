@@ -229,7 +229,7 @@ export default function ControlePage(): JSX.Element {
                   <th className="px-4 py-3 text-left font-medium text-gray-700">UF</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-700">Projeto</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-700">Código</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-700">Valor</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-700">Quantidade</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-700">Uso</th>
                 </tr>
               </thead>
@@ -241,7 +241,7 @@ export default function ControlePage(): JSX.Element {
                     <td className="px-4 py-3">{r.uf}</td>
                     <td className="px-4 py-3">{r.projeto}</td>
                     <td className="px-4 py-3">{r.codigo}</td>
-                    <td className="px-4 py-3">{r.valor}</td>
+                    <td className="px-4 py-3">{r.quantidade}</td>
                     <td className="px-4 py-3">{r.uso}</td>
                   </tr>
                 ))}

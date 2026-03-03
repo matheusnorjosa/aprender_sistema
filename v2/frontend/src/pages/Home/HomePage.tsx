@@ -89,7 +89,7 @@ function AccessCard({ icon, title, description, link, badge, disabled = false }:
 }
 
 export default function HomePage(): JSX.Element {
-  const [user, setUser] = useState<(CurrentUser & { can_approve_super?: boolean }) | null>(null);
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [stats, setStats] = useState<StatsType>({
     pendingApprovals: 0,
@@ -102,7 +102,7 @@ export default function HomePage(): JSX.Element {
       try {
         // Carregar dados do usuário e estatísticas em paralelo
         const [userData, statsData] = await Promise.all([
-          getMe() as Promise<CurrentUser & { can_approve_super?: boolean }>,
+          getMe(),
           getHomeStats() as Promise<HomeStatsResponse>,
         ]);
 

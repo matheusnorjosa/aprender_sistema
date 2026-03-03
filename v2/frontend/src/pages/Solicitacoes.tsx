@@ -41,7 +41,7 @@ import {
 import { getMe } from '../api/availability';
 import { MeetLink } from '../components/MeetLink';
 import logger from '../utils/logger';
-import type { ID, Solicitacao, SolicitacaoStatus, CurrentUser, PaginatedResponse } from '../types';
+import type { ID, Solicitacao, SolicitacaoStatus, PaginatedResponse } from '../types';
 
 const { TextArea } = Input;
 
@@ -99,7 +99,7 @@ function Solicitacoes(): JSX.Element {
   useEffect(() => {
     async function fetchCurrentUser(): Promise<void> {
       try {
-        const user = await getMe() as CurrentUser & { is_superintendencia?: boolean };
+        const user = await getMe();
 
         // PA-06: Verificar se usuário pertence ao grupo "Superintendência" ou é superuser
         const isSuper =

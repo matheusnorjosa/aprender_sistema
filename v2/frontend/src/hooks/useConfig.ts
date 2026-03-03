@@ -25,21 +25,12 @@
 import { useState, useEffect } from 'react';
 import { message } from 'antd';
 import logger from '../utils/logger';
-
-/**
- * System configuration object
- */
-export interface SystemConfig {
-  buffer_deslocamento_minutos?: number;
-  session_cookie_age?: number;
-  batch_size?: number;
-  [key: string]: unknown;
-}
-
-/**
- * Validation errors from backend
- */
-type ValidationErrors = Record<string, string | string[]>;
+import {
+  getSystemConfig,
+  updateSystemConfig,
+  type ConfigValidationErrors,
+  type SystemConfig,
+} from '../api/systemConfig';
 
 /**
  * Return type for useConfig hook
@@ -58,21 +49,20 @@ export function useConfig(): UseConfigReturn {
   const [config, setConfig] = useState<SystemConfig | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
+  type ApiClientError = Error & {
+    response?: {
+      status?: number;
+      data?: unknown;
+    };
+  };
+
   /**
    * Load config from server
    */
   const loadConfig = async (): Promise<void> => {
     setLoading(true);
     try {
-      const res = await fetch('/api/config/', {
-        credentials: 'include'
-      });
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      }
-
-      const data: SystemConfig = await res.json();
+      const data = await getSystemConfig();
       setConfig(data);
     } catch (error) {
       message.error('Erro ao carregar configurações');
@@ -90,39 +80,25 @@ export function useConfig(): UseConfigReturn {
    */
   const saveConfig = async (values: SystemConfig): Promise<boolean> => {
     try {
-      const res = await fetch('/api/config/', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify(values)
-      });
-
-      if (!res.ok) {
-        const errors: ValidationErrors = await res.json();
-        logger.error('useConfig saveConfig validation errors:', errors);
-
-        // Display validation errors
-        if (typeof errors === 'object' && !Array.isArray(errors)) {
-          const errorMessages = Object.entries(errors)
-            .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
-            .join('\n');
-          message.error(`Erro de validação:\n${errorMessages}`, 5);
-        } else {
-          message.error('Erro ao salvar configurações');
-        }
-
-        return false;
-      }
-
-      const data: SystemConfig = await res.json();
+      const data = await updateSystemConfig(values);
       setConfig(data);
       message.success('Configurações salvas com sucesso!');
       return true;
     } catch (error) {
-      message.error('Erro ao salvar configurações');
+      const apiError = error as ApiClientError;
+      const validationData = apiError.response?.data;
       logger.error('useConfig saveConfig error:', error);
+
+      // Display backend validation errors when available.
+      if (validationData && typeof validationData === 'object' && !Array.isArray(validationData)) {
+        const errors = validationData as ConfigValidationErrors;
+        const errorMessages = Object.entries(errors)
+            .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
+            .join('\n');
+        message.error(`Erro de validação:\n${errorMessages}`, 5);
+      } else {
+        message.error('Erro ao salvar configurações');
+      }
       return false;
     }
   };

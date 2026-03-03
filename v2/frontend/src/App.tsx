@@ -28,6 +28,7 @@ import { ThemeProvider, useTheme, useBrandColors } from './contexts/ThemeContext
 import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
 import { logout as apiLogout } from './api/auth';
+import { getAlertsSummary } from './api/gcal';
 import { LAYOUT, TIMING } from './constants';
 import { preloadSearchData } from './services/preloadSearchData';
 import OfflineBanner from './components/OfflineBanner';
@@ -351,19 +352,7 @@ function AppContent(): JSX.Element {
 
     const fetchAlerts = async () => {
       try {
-        const response = await fetch('/api/gcal/dashboard/alerts/summary/', {
-          credentials: 'include'
-        });
-
-        if (!response.ok) {
-          if (response.status === 401 || response.status === 403) {
-            logger.warn('[Alerts] Sem permissão para acessar alerts');
-            return;
-          }
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await getAlertsSummary();
         setAlerts(data);
 
         // Toast quando errors aumentar (com cooldown)
@@ -382,6 +371,13 @@ function AppContent(): JSX.Element {
           localStorage.setItem('gcalAlertsLastErrors', data.errors.toString());
         }
       } catch (error) {
+        const status =
+          (error as { status?: number }).status
+          ?? (error as { response?: { status?: number } }).response?.status;
+        if (status === 401 || status === 403) {
+          logger.warn('[Alerts] Sem permissão para acessar alerts');
+          return;
+        }
         logger.error('[Alerts] Erro ao buscar alertas:', error);
       }
     };

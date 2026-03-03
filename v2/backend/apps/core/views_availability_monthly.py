@@ -33,7 +33,13 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+
 from apps.core.permissions import HasSectorAccess
+from apps.core.serializers.openapi_critical_contract import (
+    MonthlyAvailabilityErrorResponseSerializer,
+    MonthlyAvailabilityResponseSerializer,
+)
 from apps.core.services.monthly_grid_service import build_monthly_grid
 
 
@@ -61,6 +67,54 @@ class MonthlyAvailabilityView(APIView):
 
     permission_classes = [IsAuthenticated, HasSectorAccess]
 
+    @extend_schema(
+        summary="Grade mensal de disponibilidade",
+        parameters=[
+            OpenApiParameter(
+                name="year",
+                location=OpenApiParameter.QUERY,
+                required=True,
+                type=int,
+            ),
+            OpenApiParameter(
+                name="month",
+                location=OpenApiParameter.QUERY,
+                required=True,
+                type=int,
+            ),
+            OpenApiParameter(
+                name="role",
+                location=OpenApiParameter.QUERY,
+                required=True,
+                type=str,
+                enum=["FORMADOR", "COORDENADOR"],
+            ),
+            OpenApiParameter(
+                name="gerencia_id",
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type=int,
+            ),
+            OpenApiParameter(
+                name="sector",
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type=str,
+            ),
+            OpenApiParameter(
+                name="q",
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type=str,
+            ),
+        ],
+        responses={
+            200: MonthlyAvailabilityResponseSerializer,
+            400: MonthlyAvailabilityErrorResponseSerializer,
+            500: MonthlyAvailabilityErrorResponseSerializer,
+        },
+        tags=["availability"],
+    )
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Validação de parâmetros básicos
         try:

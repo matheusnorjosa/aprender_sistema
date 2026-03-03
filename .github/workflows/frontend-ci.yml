@@ -126,12 +126,24 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install chromium --with-deps
 
+    - name: Start backend services for functional contract checklist
+      working-directory: .
+      run: |
+        docker compose -f v2/infra/docker-compose.yml up -d --build db redis web
+        docker compose -f v2/infra/docker-compose.yml exec -T web python manage.py migrate --noinput
+        docker compose -f v2/infra/docker-compose.yml exec -T web python manage.py seed_frontend_contract_data
+
     - name: Run checklist tests
       run: npm run test:checklist -- --workers=${CHECKLIST_PLAYWRIGHT_WORKERS}
       env:
         # PR CI does not run behind production-grade reverse proxy headers.
         # Keep strict header assertions opt-in via STRICT_SECURITY_HEADERS=1.
         STRICT_SECURITY_HEADERS: '0'
+
+    - name: Stop backend services used by checklist
+      if: always()
+      working-directory: .
+      run: docker compose -f v2/infra/docker-compose.yml down -v || true
 
     - name: Upload test results
       uses: actions/upload-artifact@v4

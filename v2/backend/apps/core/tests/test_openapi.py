@@ -223,7 +223,9 @@ class TestOpenAPISchema(TestCase):
 
         for path, method, status_code, expected_fields in endpoints:
             response_schema = self._get_response_schema(schema, path, method, status_code)
-            self.assertTrue(response_schema, f"Expected typed {status_code} response schema for {path} {method.upper()}")
+            self.assertTrue(
+                response_schema, f"Expected typed {status_code} response schema for {path} {method.upper()}"
+            )
             properties = self._resolve_schema_properties(schema, response_schema)
             for field in expected_fields:
                 self.assertIn(

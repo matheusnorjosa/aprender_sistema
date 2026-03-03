@@ -15,12 +15,13 @@ from typing import Any
 
 from django.db.models import Q, QuerySet
 from django.http import HttpResponse
-from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 
 from apps.core.models import Solicitacao
 from apps.core.permissions import IsControleOrSuper

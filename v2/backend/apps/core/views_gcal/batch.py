@@ -13,13 +13,14 @@ import logging
 from typing import Any
 
 from django.conf import settings
-from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+
+from drf_spectacular.utils import extend_schema
 
 from apps.core.models import Solicitacao
 from apps.core.permissions import IsControleOrSuper

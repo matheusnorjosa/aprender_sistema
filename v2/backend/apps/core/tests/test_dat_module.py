@@ -24,10 +24,12 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.core.models import (
+    Compra,
     DATAcao,
     DATArea,
     DATCadastro,
@@ -38,6 +40,8 @@ from apps.core.models import (
     Produto,
     Projeto,
     ProjetoGeral,
+    Solicitacao,
+    TipoEvento,
 )
 
 User = get_user_model()
@@ -608,6 +612,61 @@ class DATCompraAPITests(DATModuleAPITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("total", response.data)
+
+    def test_pendencias_action_returns_only_pairs_without_active_event(self):
+        """Pendencias should list only core_compra pairs without pending/approved solicitacao."""
+        self.client.force_authenticate(user=self.dat_user)
+
+        tipo_evento = TipoEvento.objects.create(nome="Seminário DAT")
+
+        Compra.objects.create(
+            codigo="CORE-A",
+            projeto=self.projeto,
+            municipio=self.municipio,
+            quantidade=10,
+            data=date(2026, 3, 1),
+            uso="Fluxo A",
+            external_hash="a" * 64,
+        )
+        Compra.objects.create(
+            codigo="CORE-B",
+            projeto=self.projeto,
+            municipio=self.municipio2,
+            quantidade=20,
+            data=date(2026, 3, 2),
+            uso="Fluxo B",
+            external_hash="b" * 64,
+        )
+
+        inicio = timezone.now() + timedelta(days=2)
+        fim = inicio + timedelta(hours=2)
+        Solicitacao.objects.create(
+            usuario=self.dat_user,
+            municipio=self.municipio,
+            projeto=self.projeto,
+            tipo_evento=tipo_evento,
+            inicio=inicio,
+            fim=fim,
+            status="pendente",
+        )
+
+        url = reverse("core:dat-compra-material-pendencias")
+        response = self.client.get(url, secure=True)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["total_com_compra"], 2)
+        self.assertEqual(response.data["total_com_evento"], 1)
+        self.assertEqual(response.data["total_pendentes"], 1)
+        self.assertEqual(len(response.data["pendentes"]), 1)
+        self.assertEqual(response.data["pendentes"][0]["municipio"], self.municipio2.nome)
+        self.assertEqual(response.data["pendentes"][0]["projeto"], self.projeto.nome)
+
+    def test_pendencias_action_forbidden_for_regular_user(self):
+        """Regular users should not access pendencias action."""
+        self.client.force_authenticate(user=self.regular_user)
+        url = reverse("core:dat-compra-material-pendencias")
+        response = self.client.get(url, secure=True)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class DATCadastroAPITests(DATModuleAPITestCase):

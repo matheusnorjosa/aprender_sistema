@@ -13,6 +13,7 @@ import logging
 from typing import Any
 
 from django.conf import settings
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -22,6 +23,11 @@ from rest_framework.views import APIView
 
 from apps.core.models import Solicitacao
 from apps.core.permissions import IsControleOrSuper
+from apps.core.serializers.gcal_dashboard_contract import (
+    BatchActionRequestSerializer,
+    BatchActionResponseSerializer,
+    DetailMessageSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +70,12 @@ class GCalPublishBatchView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "gcal_write"  # 10/min (#409)
 
+    @extend_schema(
+        responses={
+            202: BatchActionResponseSerializer,
+            400: DetailMessageSerializer,
+        }
+    )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Parse request body
         solicitacao_ids = request.data.get("solicitacao_ids", [])
@@ -171,6 +183,14 @@ class GCalBatchReapplyView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "gcal_write"  # 10/min (#409)
 
+    @extend_schema(
+        request=BatchActionRequestSerializer,
+        responses={
+            202: BatchActionResponseSerializer,
+            400: DetailMessageSerializer,
+            403: DetailMessageSerializer,
+        },
+    )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         from apps.core.models import GoogleOAuthCredential
         from apps.core.tasks import task_publish_solicitacao_to_gcal
@@ -295,6 +315,14 @@ class GCalBatchResyncView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "gcal_write"  # 10/min (#409)
 
+    @extend_schema(
+        request=BatchActionRequestSerializer,
+        responses={
+            202: BatchActionResponseSerializer,
+            400: DetailMessageSerializer,
+            403: DetailMessageSerializer,
+        },
+    )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         from apps.core.models import GoogleOAuthCredential
         from apps.core.tasks import task_publish_solicitacao_to_gcal

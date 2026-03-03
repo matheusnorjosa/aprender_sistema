@@ -17,9 +17,16 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from drf_spectacular.utils import extend_schema
+
 from apps.core.permissions import IsDashboardOverview
+from apps.core.serializers.gcal_dashboard_contract import DashboardOverviewResponseSerializer
 
 
+@extend_schema(
+    responses=DashboardOverviewResponseSerializer,
+    tags=["Dashboard"],
+)
 @api_view(["GET"])
 @permission_classes([IsDashboardOverview])
 def dashboard_overview(request: Request) -> Response:

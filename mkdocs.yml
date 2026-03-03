@@ -76,6 +76,7 @@ nav:
     - Backend: architecture/backend.md
     - Frontend: architecture/frontend.md
     - Matriz Funcional Frontend: architecture/frontend-functional-matrix.md
+    - OpenAPI Contract Gate: architecture/openapi-contract-gate.md
     - Infraestrutura: architecture/infrastructure.md
   - Regras de Negócio:
     - Cláusulas Pétreas (CP): business-rules/clausulas-petreas.md

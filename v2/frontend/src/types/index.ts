@@ -30,6 +30,8 @@ export type {
   Group,
 } from './usuario';
 
+export { assertCurrentUserPayload, isCurrentUserPayload } from './usuario';
+
 // Solicitacao types
 export type {
   SolicitacaoStatus,

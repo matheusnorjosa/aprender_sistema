@@ -43,7 +43,7 @@ const GROUP_TO_NOME_SETOR: Record<string, string> = {
 
 export default function FiltersBar({ year, month, gerenciaId, sector, q, onChange }: FiltersBarProps): JSX.Element {
   const [allGerencias, setAllGerencias] = useState<Gerencia[]>([]);
-  const [userInfo, setUserInfo] = useState<(CurrentUser & { is_superintendencia?: boolean }) | null>(null);
+  const [userInfo, setUserInfo] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Carrega lista de gerências e info do usuário ao montar
@@ -52,7 +52,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
       try {
         const [gerenciasData, meData] = await Promise.all([
           getGerencias() as Promise<Gerencia[]>,
-          getMe() as Promise<CurrentUser & { is_superintendencia?: boolean }>,
+          getMe(),
         ]);
         setAllGerencias(gerenciasData);
         setUserInfo(meData);

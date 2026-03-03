@@ -6,8 +6,8 @@
  *
  * Navega pelas principais páginas e verifica se há erros no console.
  */
-import { test, expect, ConsoleMessage } from '@playwright/test';
-import './checklist-network-mocks.setup';
+import { test, expect, ConsoleMessage, Page, Request } from '@playwright/test';
+import { mockChecklistAuthBootstrap } from './checklist-network-mocks';
 
 // Páginas principais para testar
 const PAGES_TO_CHECK = [
@@ -17,54 +17,143 @@ const PAGES_TO_CHECK = [
   { path: '/dashboard', name: 'Dashboard', requiresAuth: true },
 ];
 
-// Erros conhecidos que devem ser ignorados (bibliotecas de terceiros, etc.)
-const IGNORED_ERRORS = [
-  // React DevTools
+// Ruídos não bloqueantes (bibliotecas/ambiente)
+const NON_BLOCKING_ERRORS = [
   'Download the React DevTools',
-  // Warnings de desenvolvimento
-  'Warning: ',
-  // Erros de rede que são esperados em testes
-  'net::ERR_',
-  'Failed to fetch',
-  // Ant Design warnings
   'findDOMNode is deprecated',
-  // React Router
   'No routes matched location',
-  // Auth errors on public/login pages
-  'As credenciais de autenticação não foram fornecidas.',
-  'Failed to load resource: the server responded with a status of 401',
-  'Failed to load resource: the server responded with a status of 403',
-  // Backend/proxy unavailable in checklist context (non-blocking for frontend runtime)
-  'Failed to load resource: the server responded with a status of 500',
-  '=== fetchAPI ERROR ===',
-  'Status: 401',
-  'Status: 500',
-  'StatusText: Unauthorized',
-  'StatusText: Internal Server Error',
-  'Response body:',
-  'Erro ao carregar usuário: Error: HTTP 401',
-  'Erro ao carregar usuário: Error: HTTP 500',
 ];
 
-function shouldIgnoreError(message: string): boolean {
-  return IGNORED_ERRORS.some((ignored) => message.includes(ignored));
+// Auth não autenticado esperado para bootstrap do app no checklist.
+const AUTH_ENDPOINT_PATTERN = /\/api\/me\/?(\?.*)?$/;
+const EXPECTED_AUTH_STATUSES = new Set([401, 403]);
+const AUTH_CONSOLE_FAILURE_PATTERN = /Failed to load resource: the server responded with a status of (401|403)/;
+
+// Mocks explícitos permitidos neste contexto (não devem falhar como requestfailed).
+const MOCKED_BOOTSTRAP_ENDPOINTS = [
+  /\/api\/csrf\/?(\?.*)?$/,
+];
+
+interface CollectedErrors {
+  consoleErrors: string[];
+  pageErrors: string[];
+  networkErrors: string[];
 }
+
+function isApiUrl(url: string): boolean {
+  return url.includes('/api/');
+}
+
+function shouldIgnoreConsoleError(message: string): boolean {
+  return NON_BLOCKING_ERRORS.some((ignored) => message.includes(ignored));
+}
+
+function isExpectedAuthResponse(url: string, status: number): boolean {
+  return AUTH_ENDPOINT_PATTERN.test(url) && EXPECTED_AUTH_STATUSES.has(status);
+}
+
+function isMockedBootstrapUrl(url: string): boolean {
+  return MOCKED_BOOTSTRAP_ENDPOINTS.some((pattern) => pattern.test(url));
+}
+
+function shouldIgnoreRequestFailed(request: Request): boolean {
+  const url = request.url();
+
+  if (!isApiUrl(url)) {
+    return true;
+  }
+
+  if (isMockedBootstrapUrl(url)) {
+    return true;
+  }
+
+  // Requests abortadas por navegação não representam degradação de backend.
+  const errorText = request.failure()?.errorText || '';
+  return errorText.includes('ERR_ABORTED');
+}
+
+function attachCollectors(page: Page): CollectedErrors {
+  let expectedAuthResponseBudget = 0;
+
+  const collected: CollectedErrors = {
+    consoleErrors: [],
+    pageErrors: [],
+    networkErrors: [],
+  };
+
+  page.on('console', (msg: ConsoleMessage) => {
+    if (msg.type() !== 'error') {
+      return;
+    }
+
+    const messageText = msg.text();
+    if (AUTH_CONSOLE_FAILURE_PATTERN.test(messageText) && expectedAuthResponseBudget > 0) {
+      expectedAuthResponseBudget -= 1;
+      return;
+    }
+
+    if (!shouldIgnoreConsoleError(messageText)) {
+      collected.consoleErrors.push(messageText);
+    }
+  });
+
+  page.on('pageerror', (error) => {
+    if (!shouldIgnoreConsoleError(error.message)) {
+      collected.pageErrors.push(error.message);
+    }
+  });
+
+  page.on('response', (response) => {
+    const url = response.url();
+    if (!isApiUrl(url)) {
+      return;
+    }
+
+    const status = response.status();
+    if (isExpectedAuthResponse(url, status)) {
+      expectedAuthResponseBudget += 1;
+      return;
+    }
+
+    if (status >= 500) {
+      collected.networkErrors.push(
+        `[api ${status}] ${response.request().method()} ${url}`
+      );
+    }
+  });
+
+  page.on('requestfailed', (request) => {
+    if (shouldIgnoreRequestFailed(request)) {
+      return;
+    }
+
+    const failure = request.failure()?.errorText || 'unknown request failure';
+    collected.networkErrors.push(
+      `[api requestfailed] ${request.method()} ${request.url()} :: ${failure}`
+    );
+  });
+
+  return collected;
+}
+
+function assertNoCollectedErrors(collected: CollectedErrors, context: string): void {
+  const allErrors = [
+    ...collected.consoleErrors.map((entry) => `[console] ${entry}`),
+    ...collected.pageErrors.map((entry) => `[pageerror] ${entry}`),
+    ...collected.networkErrors.map((entry) => `[network] ${entry}`),
+  ];
+
+  expect(allErrors, `${context}:\n${allErrors.join('\n')}`).toHaveLength(0);
+}
+
+// Neste spec endurecido, NÃO mascaramos /api/me para capturar 5xx/proxy reais.
+test.beforeEach(async ({ page }) => {
+  await mockChecklistAuthBootstrap(page, { mockMeUnauthorized: false });
+});
 
 test.describe('Checklist: Console Errors', () => {
   test('🔴 página inicial não deve ter erros no console', async ({ page }) => {
-    const errors: string[] = [];
-
-    page.on('console', (msg: ConsoleMessage) => {
-      if (msg.type() === 'error' && !shouldIgnoreError(msg.text())) {
-        errors.push(msg.text());
-      }
-    });
-
-    page.on('pageerror', (error) => {
-      if (!shouldIgnoreError(error.message)) {
-        errors.push(error.message);
-      }
-    });
+    const collected = attachCollectors(page);
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -72,44 +161,22 @@ test.describe('Checklist: Console Errors', () => {
     // Aguarda um pouco para capturar erros assíncronos
     await page.waitForTimeout(1000);
 
-    expect(errors, `Erros encontrados: ${errors.join(', ')}`).toHaveLength(0);
+    assertNoCollectedErrors(collected, 'Erros encontrados na página inicial');
   });
 
   test('🔴 navegação não deve gerar erros no console', async ({ page }) => {
-    const errors: string[] = [];
+    const collected = attachCollectors(page);
 
-    page.on('console', (msg: ConsoleMessage) => {
-      if (msg.type() === 'error' && !shouldIgnoreError(msg.text())) {
-        errors.push(`[${msg.type()}] ${msg.text()}`);
-      }
-    });
-
-    page.on('pageerror', (error) => {
-      if (!shouldIgnoreError(error.message)) {
-        errors.push(`[pageerror] ${error.message}`);
-      }
-    });
-
-    // Navega pela página inicial
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // Tenta clicar em links de navegação se existirem
-    const navLinks = page.locator('nav a, [role="navigation"] a').first();
-    if ((await navLinks.count()) > 0) {
-      await navLinks.click();
+    for (const pageToCheck of PAGES_TO_CHECK) {
+      await page.goto(pageToCheck.path);
       await page.waitForLoadState('networkidle');
     }
 
-    expect(errors, `Erros durante navegação: ${errors.join('\n')}`).toHaveLength(0);
+    assertNoCollectedErrors(collected, 'Erros durante navegação');
   });
 
   test('🔴 não deve ter erros de JavaScript não tratados', async ({ page }) => {
-    const uncaughtErrors: string[] = [];
-
-    page.on('pageerror', (error) => {
-      uncaughtErrors.push(error.message);
-    });
+    const collected = attachCollectors(page);
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -118,10 +185,7 @@ test.describe('Checklist: Console Errors', () => {
     await page.mouse.move(100, 100);
     await page.mouse.click(100, 100);
 
-    expect(
-      uncaughtErrors,
-      `Erros não tratados: ${uncaughtErrors.join(', ')}`
-    ).toHaveLength(0);
+    assertNoCollectedErrors(collected, 'Erros não tratados');
   });
 });
 

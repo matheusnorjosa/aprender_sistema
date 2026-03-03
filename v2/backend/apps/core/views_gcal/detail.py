@@ -21,9 +21,15 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+
 from apps.core.models import Solicitacao
 from apps.core.permissions import IsControleOrSuper
 from apps.core.serializers import EventDetailSerializer, SolicitacaoSerializer
+from apps.core.serializers.gcal_dashboard_contract import (
+    DetailMessageSerializer,
+    PaginatedSolicitacaoResponseSerializer,
+)
 from apps.core.services.gcal import compute_payload_hash
 from apps.core.views_gcal.helpers import DashboardEventsPagination, _filter_events_queryset
 
@@ -46,6 +52,7 @@ class DashboardEventsView(APIView):
 
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
+    @extend_schema(responses=PaginatedSolicitacaoResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Usar helper unificado timezone-aware (Issue #96 follow-up #124)
         qs = _filter_events_queryset(request, Solicitacao.objects.all())
@@ -183,6 +190,12 @@ class EventDetailAPIView(APIView):
 
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
+    @extend_schema(
+        responses={
+            200: EventDetailSerializer,
+            404: DetailMessageSerializer,
+        }
+    )
     def get(self, request: Request, pk: int, *args: Any, **kwargs: Any) -> Response:
         # Buscar solicitação com select_related para otimizar queries
         try:
@@ -227,6 +240,20 @@ class GCalDriftView(APIView):
 
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(
+                response={
+                    "type": "object",
+                    "properties": {
+                        "count": {"type": "integer"},
+                        "items": {"type": "array", "items": {"type": "object"}},
+                    },
+                    "required": ["count", "items"],
+                }
+            )
+        }
+    )
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas PUBLISHED
         # MP4: select_related para evitar N+1 (compute_payload_hash acessa 5 FKs)

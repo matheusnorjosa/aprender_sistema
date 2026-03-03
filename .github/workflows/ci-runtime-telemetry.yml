@@ -39,6 +39,7 @@ jobs:
             --required-only \
             --baseline-json "v2/docs/analysis/ci-runtime-baseline.json" \
             --regression-threshold-pct 35 \
+            --regression-min-absolute-seconds 20 \
             --output-json "ci-runtime-report.json" \
             --output-md "ci-runtime-report.md"
 

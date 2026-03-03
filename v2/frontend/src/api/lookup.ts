@@ -5,7 +5,7 @@
  * e validação de solicitações.
  */
 
-import { fetchAPI, buildUrl } from './config';
+import { fetchAPI, buildUrl, type QueryParams } from './config';
 import type { ID } from '../types';
 
 /**
@@ -15,6 +15,7 @@ export interface LookupItem {
   id: ID;
   label: string;
   kind: string;
+  [key: string]: unknown;
 }
 
 /**
@@ -51,6 +52,24 @@ export interface ValidateSolicResult {
 }
 
 /**
+ * Filtros opcionais para lookup de municípios.
+ */
+export type LookupMunicipiosParams = QueryParams & {
+  q?: string;
+  com_compra?: boolean;
+  projeto_id?: ID;
+};
+
+/**
+ * Filtros opcionais para lookup de projetos.
+ */
+export type LookupProjetosParams = QueryParams & {
+  q?: string;
+  com_compra?: boolean;
+  municipio_id?: ID;
+};
+
+/**
  * Buscar municípios (autocomplete)
  *
  * @param q - Query string
@@ -61,12 +80,32 @@ export async function lookupMunicipios(q: string = ''): Promise<LookupItem[]> {
 }
 
 /**
+ * Buscar municípios (autocomplete) com filtros de elegibilidade.
+ *
+ * @param params - Filtros do lookup
+ */
+export async function lookupMunicipiosWithFilters(params: LookupMunicipiosParams = {}): Promise<LookupItem[]> {
+  const url = buildUrl('/lookup/municipios/', params);
+  return await fetchAPI(url);
+}
+
+/**
  * Buscar projetos (autocomplete)
  *
  * @param q - Query string
  */
 export async function lookupProjetos(q: string = ''): Promise<LookupItem[]> {
   const url = buildUrl('/lookup/projetos/', { q });
+  return await fetchAPI(url);
+}
+
+/**
+ * Buscar projetos (autocomplete) com filtros de elegibilidade.
+ *
+ * @param params - Filtros do lookup
+ */
+export async function lookupProjetosWithFilters(params: LookupProjetosParams = {}): Promise<LookupItem[]> {
+  const url = buildUrl('/lookup/projetos/', params);
   return await fetchAPI(url);
 }
 

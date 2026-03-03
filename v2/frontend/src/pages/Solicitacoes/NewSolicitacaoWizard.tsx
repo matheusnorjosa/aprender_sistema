@@ -10,7 +10,7 @@
  * 4. Revisão e Confirmação
  */
 
-import { useState, useMemo, useCallback, ChangeEvent, JSX, ReactNode } from 'react';
+import { useState, useMemo, useCallback, useEffect, ChangeEvent, JSX, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 // antd - direct imports for tree-shaking (Issue #424)
 import Steps from 'antd/es/steps';
@@ -37,10 +37,11 @@ import timezone from 'dayjs/plugin/timezone';
 
 import { createSolicitacao } from '../../api/solicitacoes';
 import {
-  lookupMunicipios,
+  lookupMunicipiosWithFilters,
   lookupProjetos,
   lookupTiposEvento,
 } from '../../api/lookup';
+import { getMe } from '../../api/availability';
 import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
 import FormadoresPicker from '../../components/FormadoresPicker';
@@ -114,6 +115,8 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
+  const [isSuperuser, setIsSuperuser] = useState<boolean>(false);
+  const [municipioLookupHasResults, setMunicipioLookupHasResults] = useState<boolean | null>(null);
 
   // Estado do formulário
   const [formData, setFormData] = useState<FormDataType>({
@@ -135,6 +138,28 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     // PR19: Modalidade online/presencial
     is_online: false,
   });
+
+  useEffect(() => {
+    let mounted = true;
+    const loadUserRole = async (): Promise<void> => {
+      try {
+        const me = await getMe();
+        if (mounted) {
+          setIsSuperuser(Boolean(me?.is_superuser));
+        }
+      } catch (error) {
+        logger.warn('Falha ao carregar perfil do usuário no wizard:', error);
+        if (mounted) {
+          setIsSuperuser(false);
+        }
+      }
+    };
+
+    void loadUserRole();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Handler para DateTimeRange: converte {date, start, end} para ISO UTC (Issue #428)
   const handleRangeChange = useCallback((range: RangeValueType | null): void => {
@@ -172,6 +197,42 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       end: dayjs(formData.fim).tz(RANGE_TIMEZONE).format('HH:mm'),
     };
   }, [formData.inicio, formData.fim]);
+
+  const handleProjetoChange = useCallback((value: ComboBoxValue | null): void => {
+    const projetoChanged = formData.projeto?.id !== value?.id;
+    setFormData(prev => ({
+      ...prev,
+      projeto: value,
+      municipio: projetoChanged ? null : prev.municipio,
+    }));
+
+    if (projetoChanged) {
+      form.setFieldsValue({ municipio: null });
+      setMunicipioLookupHasResults(null);
+    }
+  }, [form, formData.projeto?.id]);
+
+  const lookupMunicipiosElegiveis = useCallback(async (q: string): Promise<Array<{ id: ID; label: string; [key: string]: unknown }>> => {
+    const projetoId = formData.projeto?.id;
+
+    // Para usuário comum, exige projeto para aplicar filtro município+projeto.
+    if (!isSuperuser && !projetoId) {
+      setMunicipioLookupHasResults(false);
+      return [];
+    }
+
+    const results = await lookupMunicipiosWithFilters({
+      q,
+      com_compra: isSuperuser ? undefined : true,
+      projeto_id: !isSuperuser ? projetoId : undefined,
+    });
+
+    if (!q.trim()) {
+      setMunicipioLookupHasResults(results.length > 0);
+    }
+
+    return results;
+  }, [formData.projeto?.id, isSuperuser]);
 
   // Navegação entre passos
   const next = (): void => {
@@ -274,7 +335,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
           >
             <ComboBox
               lookupFunction={lookupProjetos as unknown as (query: string) => Promise<Array<{ id: ID; label: string; [key: string]: unknown }>>}
-              onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, projeto: value })}
+              onChange={handleProjetoChange}
               value={formData.projeto as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um projeto"
             />
@@ -313,12 +374,32 @@ export default function NewSolicitacaoWizard(): JSX.Element {
             rules={[{ required: true, message: 'Por favor selecione um município' }]}
           >
             <ComboBox
-              lookupFunction={lookupMunicipios as unknown as (query: string) => Promise<Array<{ id: ID; label: string; [key: string]: unknown }>>}
+              lookupFunction={lookupMunicipiosElegiveis}
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, municipio: value })}
               value={formData.municipio as unknown as { id: ID; label: string; [key: string]: unknown } | null}
-              placeholder="Busque ou selecione um município"
+              placeholder={
+                !isSuperuser && !formData.projeto
+                  ? 'Selecione um projeto para carregar municípios elegíveis'
+                  : 'Busque ou selecione um município'
+              }
+              disabled={!isSuperuser && !formData.projeto}
+              notFoundContent={
+                !isSuperuser && formData.projeto
+                  ? 'Nenhum município elegível para o projeto selecionado'
+                  : 'Nenhum resultado encontrado'
+              }
             />
           </Form.Item>
+
+          {!isSuperuser && formData.projeto && municipioLookupHasResults === false && (
+            <Alert
+              message="Sem municípios elegíveis"
+              description="Não há municípios com compra registrada para o projeto selecionado."
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+          )}
 
           <DateTimeRange
             value={rangeValue}
@@ -539,7 +620,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         </>
       ),
     },
-  ], [formData, rangeValue, handleRangeChange]);
+  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupMunicipiosElegiveis, isSuperuser, municipioLookupHasResults]);
 
   return (
     <section className="p-6 max-w-4xl mx-auto" aria-labelledby="nova-solicitacao-title">

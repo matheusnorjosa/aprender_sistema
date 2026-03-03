@@ -209,8 +209,18 @@ export async function fetchAPI<T = unknown>(url: string, options: FetchOptions =
       error = { detail: `HTTP ${response.status}: ${response.statusText}` };
     }
 
-    const err = new Error(error.detail || error.message || `Erro ${response.status}`) as Error & { status?: number };
+    const err = new Error(error.detail || error.message || `Erro ${response.status}`) as Error & {
+      status?: number;
+      response?: {
+        status: number;
+        data: unknown;
+      };
+    };
     err.status = response.status;
+    err.response = {
+      status: response.status,
+      data: error,
+    };
     throw err;
   }
 

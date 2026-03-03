@@ -6,13 +6,14 @@ const baseUrl = (process.env.AGENT_BROWSER_BASE_URL || 'http://127.0.0.1:4173').
 const targetPath = process.env.AGENT_BROWSER_TARGET_PATH || '/login';
 const outputDir = resolve(process.env.AGENT_BROWSER_OUTPUT_DIR || 'test-results/agent-browser');
 const smokeUrl = `${baseUrl}${targetPath.startsWith('/') ? targetPath : `/${targetPath}`}`;
+const agentBrowserPackage = process.env.AGENT_BROWSER_NPX_PACKAGE || 'agent-browser@0.15.3';
 
 mkdirSync(outputDir, { recursive: true });
 
 function runAgentBrowser(args, { capture = false, allowFailure = false } = {}) {
   const result = spawnSync(
     'npx',
-    ['--yes', 'agent-browser', ...args],
+    ['--yes', agentBrowserPackage, ...args],
     {
       encoding: 'utf-8',
       stdio: capture ? 'pipe' : 'inherit',

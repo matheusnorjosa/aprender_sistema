@@ -41,9 +41,9 @@ jobs:
         run: npm ci
 
       - name: Install agent-browser runtime dependencies and browsers
-        # `agent-browser` bundles its own Playwright version; install through it
-        # to avoid browser build mismatches (e.g. 1208 expected vs 1200 installed).
-        run: npx --yes agent-browser install --with-deps
+        # Run from repository root to avoid picking frontend-local Playwright binaries.
+        working-directory: .
+        run: npx --yes agent-browser@0.15.3 install --with-deps
 
       - name: Start frontend dev server
         run: |
@@ -63,6 +63,7 @@ jobs:
       - name: Run agent-browser smoke
         run: npm run smoke:agent-browser
         env:
+          AGENT_BROWSER_NPX_PACKAGE: "agent-browser@0.15.3"
           AGENT_BROWSER_BASE_URL: "http://127.0.0.1:4173"
           AGENT_BROWSER_TARGET_PATH: "/login"
 

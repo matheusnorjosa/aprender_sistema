@@ -5,7 +5,7 @@
  * Trabalha com objetos {id, label} e fornece busca via lookup API
  */
 
-import { useState, useEffect } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { AutoComplete, Spin } from 'antd';
 import logger from '../utils/logger';
 import type { ID } from '../types';
@@ -37,6 +37,7 @@ export interface ComboBoxProps {
   lookupFunction: (query: string) => Promise<LookupItem[]>;
   placeholder?: string;
   disabled?: boolean;
+  notFoundContent?: ReactNode;
 }
 
 export default function ComboBox({
@@ -45,6 +46,7 @@ export default function ComboBox({
   lookupFunction,
   placeholder = 'Digite para buscar...',
   disabled = false,
+  notFoundContent = 'Nenhum resultado encontrado',
 }: ComboBoxProps): JSX.Element {
   const [options, setOptions] = useState<AutoCompleteOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -140,7 +142,7 @@ export default function ComboBox({
       placeholder={placeholder}
       disabled={disabled}
       style={{ width: '100%' }}
-      notFoundContent={loading ? <Spin size="small" /> : 'Nenhum resultado encontrado'}
+      notFoundContent={loading ? <Spin size="small" /> : notFoundContent}
       allowClear
     />
   );

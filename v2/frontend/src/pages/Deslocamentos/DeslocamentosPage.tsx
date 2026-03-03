@@ -52,7 +52,7 @@ import { getMe } from '../../api/availability';
 import { importDeslocamentos } from '../../api/ops';
 import ImportUploader, { ValidationResult, ApplyResult } from '../../components/ImportUploader';
 import logger from '../../utils/logger';
-import type { ID, CurrentUser } from '../../types';
+import type { ID } from '../../types';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -262,13 +262,13 @@ export default function DeslocamentosPage(): JSX.Element {
   useEffect(() => {
     async function loadUser(): Promise<void> {
       try {
-        const userData = await getMe() as CurrentUser;
+        const userData = await getMe();
 
         // Check RBAC: Controle, Coordenador, or DAT
         const canControle = userData.groups?.includes('Controle');
         const canCoordenador = userData.groups?.includes('Coordenador');
         const canDAT = userData.groups?.includes('DAT');
-        const canSuper = userData.is_superuser || (userData as CurrentUser & { is_superintendencia?: boolean }).is_superintendencia;
+        const canSuper = userData.is_superuser || userData.is_superintendencia;
 
         setCanAccess(!!(canControle || canCoordenador || canDAT || canSuper));
       } catch (error) {

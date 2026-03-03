@@ -8,7 +8,8 @@
  */
 
 import { fetchAPI, clearCsrfCache } from './config';
-import type { CurrentUser, LoginResponse, AuthCheckResponse } from '../types';
+import type { LoginResponse, AuthCheckResponse } from '../types';
+import { assertCurrentUserPayload } from '../types';
 
 /**
  * Realiza login com username e senha
@@ -43,7 +44,8 @@ export async function logout(): Promise<{ detail: string }> {
  */
 export async function checkAuth(): Promise<AuthCheckResponse> {
   try {
-    const user = await fetchAPI<CurrentUser>('/me/');
+    const payload = await fetchAPI<unknown>('/me/');
+    const user = assertCurrentUserPayload(payload);
     return { authenticated: true, user };
   } catch {
     return { authenticated: false, user: null };

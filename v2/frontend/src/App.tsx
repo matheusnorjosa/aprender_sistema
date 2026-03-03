@@ -308,7 +308,7 @@ function AppContent(): JSX.Element {
     try {
       const userData = await getMe();
       if (isMountedRef.current) {
-        setUser(userData as unknown as CurrentUser);
+        setUser(userData);
         // Issue #418: Preload search data after successful login
         preloadSearchData().catch((err) => logger.warn('Search preload failed:', err));
       }

@@ -19,7 +19,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from drf_spectacular.utils import extend_schema
+
 from apps.core.models import EquipeGerencia, Solicitacao
+from apps.core.serializers.openapi_critical_contract import HomeStatsResponseSerializer
 
 
 class HomeStatsView(APIView):
@@ -38,6 +41,11 @@ class HomeStatsView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        responses={200: HomeStatsResponseSerializer},
+        tags=["stats"],
+        summary="Estatísticas da home por perfil",
+    )
     def get(self, request: Request) -> Response:
         user = request.user
         now = timezone.now()

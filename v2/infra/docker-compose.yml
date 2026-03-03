@@ -92,6 +92,7 @@ services:
       - ../data/csv-import:/app/data/csv-import:ro
       - backup_data:/backups # MP5: Database backups storage
       - ./scripts:/app/infra/scripts:ro # MP5: Backup scripts
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/readyz/"]
       interval: 30s

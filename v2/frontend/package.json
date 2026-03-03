@@ -16,6 +16,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:checklist": "playwright test --project=checklist",
+    "smoke:agent-browser": "node scripts/agent-browser-smoke.mjs",
     "test:a11y": "playwright test e2e/checklist/accessibility.spec.ts",
     "lighthouse": "node scripts/lighthouse-ci.mjs",
     "lighthouse:ci": "node scripts/lighthouse-ci.mjs",

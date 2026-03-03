@@ -63,6 +63,12 @@ def parse_args() -> argparse.Namespace:
         default=35.0,
         help="Fail when p95 exceeds baseline by this percentage",
     )
+    parser.add_argument(
+        "--regression-min-absolute-seconds",
+        type=float,
+        default=20.0,
+        help="Only fail if p95 regression also exceeds this absolute delta in seconds",
+    )
     parser.add_argument("--output-json", required=True, help="Path to output json report")
     parser.add_argument("--output-md", required=True, help="Path to output markdown report")
     return parser.parse_args()
@@ -274,6 +280,7 @@ def detect_regressions(
     metrics: Dict[str, dict],
     baseline_metrics: Dict[str, dict],
     threshold_pct: float,
+    min_absolute_seconds: float,
 ) -> List[Tuple[str, float, float]]:
     regressions: List[Tuple[str, float, float]] = []
     factor = 1.0 + (threshold_pct / 100.0)
@@ -285,7 +292,8 @@ def detect_regressions(
         current_p95 = float(current.get("p95_seconds", 0.0))
         if baseline_p95 <= 0.0:
             continue
-        if current_p95 > baseline_p95 * factor:
+        absolute_delta = current_p95 - baseline_p95
+        if current_p95 > baseline_p95 * factor and absolute_delta >= min_absolute_seconds:
             regressions.append((key, baseline_p95, current_p95))
     return regressions
 
@@ -310,6 +318,10 @@ def write_markdown(path: str, payload: dict, regressions: List[Tuple[str, float,
     lines.append(f"- Repo: `{payload['repo']}`")
     lines.append(f"- Workflows: `{', '.join(payload['workflows'])}`")
     lines.append(f"- Runs per workflow: `{payload['runs_per_workflow']}`")
+    lines.append(f"- Regression threshold (p95): `+{payload['regression_threshold_pct']}%`")
+    lines.append(
+        f"- Regression minimum absolute delta: `+{payload['regression_min_absolute_seconds']}s`"
+    )
     lines.append("")
     lines.append("| Workflow | Job | Samples | Median (s) | P95 (s) | Min (s) | Max (s) |")
     lines.append("|---|---|---:|---:|---:|---:|---:|")
@@ -363,6 +375,8 @@ def main() -> int:
         "repo": args.repo,
         "workflows": args.workflows,
         "runs_per_workflow": args.runs_per_workflow,
+        "regression_threshold_pct": args.regression_threshold_pct,
+        "regression_min_absolute_seconds": args.regression_min_absolute_seconds,
         "metrics": metrics,
     }
 
@@ -371,6 +385,7 @@ def main() -> int:
         metrics=metrics,
         baseline_metrics=baseline_metrics,
         threshold_pct=args.regression_threshold_pct,
+        min_absolute_seconds=args.regression_min_absolute_seconds,
     )
 
     write_json(args.output_json, payload)

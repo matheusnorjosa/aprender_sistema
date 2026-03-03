@@ -126,12 +126,67 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install chromium --with-deps
 
+    - name: Start backend services for functional contract checklist
+      working-directory: .
+      run: |
+        cp v2/infra/.env.example v2/infra/.env
+        DB_NAME="$(grep -m1 '^DB_NAME=' v2/infra/.env | cut -d'=' -f2- | tr -d '\r')"
+        DB_USER="$(grep -m1 '^DB_USER=' v2/infra/.env | cut -d'=' -f2- | tr -d '\r')"
+        DB_PASSWORD="$(grep -m1 '^DB_PASSWORD=' v2/infra/.env | cut -d'=' -f2- | tr -d '\r')"
+
+        if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ]; then
+          echo "DB_* variables could not be parsed from v2/infra/.env"
+          exit 1
+        fi
+
+        {
+          echo "POSTGRES_DB=$DB_NAME"
+          echo "POSTGRES_USER=$DB_USER"
+          echo "POSTGRES_PASSWORD=$DB_PASSWORD"
+        } >> v2/infra/.env
+
+        docker compose -f v2/infra/docker-compose.yml up -d --build db redis web
+
+        for i in $(seq 1 60); do
+          if docker compose -f v2/infra/docker-compose.yml exec -T db sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1; then
+            echo "PostgreSQL is ready"
+            break
+          fi
+          if [ "$i" -eq 60 ]; then
+            echo "PostgreSQL did not become ready in time"
+            docker compose -f v2/infra/docker-compose.yml logs db
+            exit 1
+          fi
+          sleep 2
+        done
+
+        for i in $(seq 1 30); do
+          if docker compose -f v2/infra/docker-compose.yml exec -T web getent hosts db >/dev/null 2>&1; then
+            echo "Web can resolve db service"
+            break
+          fi
+          if [ "$i" -eq 30 ]; then
+            echo "Web could not resolve db service in time"
+            docker compose -f v2/infra/docker-compose.yml logs web db
+            exit 1
+          fi
+          sleep 1
+        done
+
+        docker compose -f v2/infra/docker-compose.yml exec -T web python manage.py migrate --noinput
+        docker compose -f v2/infra/docker-compose.yml exec -T web python manage.py seed_frontend_contract_data
+
     - name: Run checklist tests
       run: npm run test:checklist -- --workers=${CHECKLIST_PLAYWRIGHT_WORKERS}
       env:
         # PR CI does not run behind production-grade reverse proxy headers.
         # Keep strict header assertions opt-in via STRICT_SECURITY_HEADERS=1.
         STRICT_SECURITY_HEADERS: '0'
+
+    - name: Stop backend services used by checklist
+      if: always()
+      working-directory: .
+      run: docker compose -f v2/infra/docker-compose.yml down -v || true
 
     - name: Upload test results
       uses: actions/upload-artifact@v4

@@ -7,7 +7,7 @@
  * - UsuarioAdminSerializer
  */
 
-import type { ID, ISODateTime } from './common';
+import type { ID } from './common';
 
 /**
  * Slim user representation (UserSlimSerializer)
@@ -41,19 +41,53 @@ export interface CurrentUser {
   email: string;
   first_name: string;
   last_name: string;
-  is_active: boolean;
-  is_staff: boolean;
-  is_superuser: boolean;
-  date_joined: ISODateTime;
-  last_login: ISODateTime | null;
+  name: string;
   groups: string[];
   setores: string[];
   funcoes: string[];
-  permissions: string[];
-  // Optional computed properties from backend
-  name?: string;
-  can_approve_super?: boolean;
-  is_superintendencia?: boolean;
+  is_superuser: boolean;
+  is_superintendencia: boolean;
+  can_approve_super: boolean;
+}
+
+/**
+ * Runtime guard for /api/me/ payload.
+ * Keeps frontend authentication bootstrap aligned with backend contract.
+ */
+export function isCurrentUserPayload(value: unknown): value is CurrentUser {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const payload = value as Record<string, unknown>;
+  const isStringArray = (field: unknown): field is string[] =>
+    Array.isArray(field) && field.every((item) => typeof item === 'string');
+
+  return (
+    typeof payload.id === 'number'
+    && typeof payload.username === 'string'
+    && typeof payload.email === 'string'
+    && typeof payload.first_name === 'string'
+    && typeof payload.last_name === 'string'
+    && typeof payload.name === 'string'
+    && isStringArray(payload.groups)
+    && isStringArray(payload.setores)
+    && isStringArray(payload.funcoes)
+    && typeof payload.is_superuser === 'boolean'
+    && typeof payload.is_superintendencia === 'boolean'
+    && typeof payload.can_approve_super === 'boolean'
+  );
+}
+
+/**
+ * Asserts that payload matches /api/me/ minimal contract.
+ */
+export function assertCurrentUserPayload(value: unknown): CurrentUser {
+  if (!isCurrentUserPayload(value)) {
+    throw new Error('Invalid /api/me payload shape');
+  }
+
+  return value;
 }
 
 /**

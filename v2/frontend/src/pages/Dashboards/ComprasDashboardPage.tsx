@@ -25,6 +25,7 @@ import {
   AppstoreOutlined,
   BookOutlined,
   CheckCircleOutlined,
+  DownloadOutlined,
   DollarOutlined,
   EnvironmentOutlined,
   InboxOutlined,
@@ -33,9 +34,12 @@ import {
 } from '@ant-design/icons';
 import {
   getComprasDashboard,
+  getComprasPendencias,
   getProdutosOptions,
   getProjetosOptions,
+  type CompraPendenteItem,
   type ComprasDashboardData,
+  type ComprasPendenciasResponse,
 } from '../../api/datModule';
 import { UF_OPTIONS } from '../../constants';
 import './ComprasDashboardPage.css';
@@ -69,6 +73,11 @@ const formatNumber = (value: unknown): string =>
 
 const formatCurrency = (value: unknown): string =>
   `R$ ${toNumber(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
+const formatDate = (value: string | null): string => {
+  if (!value) return '-';
+  return new Date(`${value}T00:00:00`).toLocaleDateString('pt-BR');
+};
 
 function BarList({
   data,
@@ -175,6 +184,7 @@ export default function ComprasDashboardPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ComprasDashboardData | null>(null);
+  const [pendencias, setPendencias] = useState<ComprasPendenciasResponse | null>(null);
 
   const [projetos, setProjetos] = useState<OptionItem[]>([]);
   const [produtos, setProdutos] = useState<OptionItem[]>([]);
@@ -192,17 +202,26 @@ export default function ComprasDashboardPage(): JSX.Element {
     setError(null);
 
     try {
-      const params: Record<string, string | number> = {};
-      if (filters.uf) params.uf = filters.uf;
-      if (filters.ano_uso) params.ano_uso = filters.ano_uso;
-      if (filters.projeto) params.projeto_id = filters.projeto;
-      if (filters.produto) params.produto_id = filters.produto;
-      if (filters.tipo_compra) params.tipo_compra = filters.tipo_compra;
+      const dashboardParams: Record<string, string | number> = {};
+      if (filters.uf) dashboardParams.uf = filters.uf;
+      if (filters.ano_uso) dashboardParams.ano_uso = filters.ano_uso;
+      if (filters.projeto) dashboardParams.projeto_id = filters.projeto;
+      if (filters.produto) dashboardParams.produto_id = filters.produto;
+      if (filters.tipo_compra) dashboardParams.tipo_compra = filters.tipo_compra;
 
-      const response = await getComprasDashboard(params);
-      setData(response);
+      const pendenciasParams: Record<string, string | number> = {};
+      if (filters.uf) pendenciasParams.uf = filters.uf;
+      if (filters.projeto) pendenciasParams.projeto_id = filters.projeto;
+
+      const [dashboardResponse, pendenciasResponse] = await Promise.all([
+        getComprasDashboard(dashboardParams),
+        getComprasPendencias(pendenciasParams),
+      ]);
+      setData(dashboardResponse);
+      setPendencias(pendenciasResponse);
     } catch (err) {
       setError((err as Error).message || 'Erro ao carregar dashboard');
+      setPendencias(null);
     } finally {
       setLoading(false);
     }
@@ -297,6 +316,95 @@ export default function ComprasDashboardPage(): JSX.Element {
       },
     },
   ];
+
+  const pendenciasColumns: ColumnsType<CompraPendenteItem> = [
+    {
+      title: 'Município',
+      dataIndex: 'municipio',
+      key: 'municipio',
+      render: (value: string, record) => (
+        <Space>
+          <Tag color="gold">{record.uf}</Tag>
+          <Text strong>{value}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'Projeto',
+      dataIndex: 'projeto',
+      key: 'projeto',
+    },
+    {
+      title: 'Itens',
+      dataIndex: 'total_itens',
+      key: 'total_itens',
+      align: 'right',
+      render: (value: number) => formatNumber(value),
+    },
+    {
+      title: 'Compras',
+      dataIndex: 'total_compras',
+      key: 'total_compras',
+      align: 'right',
+      render: (value: number) => formatNumber(value),
+    },
+    {
+      title: 'Última compra',
+      dataIndex: 'ultima_compra',
+      key: 'ultima_compra',
+      align: 'right',
+      render: (value: string | null) => formatDate(value),
+    },
+  ];
+
+  const handleExportPendenciasCsv = () => {
+    if (!pendencias || pendencias.pendentes.length === 0) return;
+
+    const escapeCsv = (value: string | number | null) => {
+      const text = value === null ? '' : String(value);
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+
+    const header = [
+      'municipio_id',
+      'municipio',
+      'uf',
+      'projeto_id',
+      'projeto',
+      'total_itens',
+      'total_compras',
+      'ultima_compra',
+    ];
+
+    const lines = pendencias.pendentes.map((item) =>
+      [
+        item.municipio_id,
+        item.municipio,
+        item.uf,
+        item.projeto_id,
+        item.projeto,
+        item.total_itens,
+        item.total_compras,
+        item.ultima_compra ?? '',
+      ]
+        .map(escapeCsv)
+        .join(';')
+    );
+
+    const csv = `${header.join(';')}\n${lines.join('\n')}`;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute(
+      'download',
+      `municipios-pendentes-agendamento-${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
 
   if (loading) {
     return (
@@ -483,6 +591,45 @@ export default function ComprasDashboardPage(): JSX.Element {
           </Card>
         </Col>
       </Row>
+
+      <Card
+        className="chart-card mb-6"
+        bordered={false}
+        title={(
+          <Space>
+            <EnvironmentOutlined />
+            <span className="chart-title">Municípios pendentes de agendamento</span>
+          </Space>
+        )}
+        extra={(
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={handleExportPendenciasCsv}
+            disabled={!pendencias || pendencias.pendentes.length === 0}
+          >
+            Exportar CSV
+          </Button>
+        )}
+      >
+        {pendencias ? (
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <Text type="secondary">
+              {formatNumber(pendencias.total_com_compra)} com compra · {formatNumber(pendencias.total_com_evento)} com
+              evento · <Text strong>{formatNumber(pendencias.total_pendentes)} pendentes</Text>
+              {' '}({pendencias.percentual_pendentes}%)
+            </Text>
+            <Table
+              dataSource={pendencias.pendentes}
+              columns={pendenciasColumns}
+              rowKey={(record) => `${record.municipio_id}-${record.projeto_id}`}
+              pagination={{ pageSize: 10, showSizeChanger: false }}
+              locale={{ emptyText: 'Sem pendências para os filtros selecionados' }}
+            />
+          </Space>
+        ) : (
+          <Empty description="Sem dados de pendências" />
+        )}
+      </Card>
 
       <Row gutter={[16, 16]} className="mb-6">
         <Col xs={24} lg={12}>

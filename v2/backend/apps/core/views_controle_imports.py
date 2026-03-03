@@ -21,7 +21,15 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+
+from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.permissions import IsControleOrSuper
+from apps.core.serializers.openapi_critical_contract import (
+    ImportFileUploadRequestSerializer,
+    ImportOperationErrorResponseSerializer,
+    ImportOperationResponseSerializer,
+)
 from apps.core.services.controle_imports import import_compras_from_file
 
 # Issue #569: Upload validation hardening (DoS/malicious file prevention)
@@ -62,6 +70,28 @@ class ImportComprasView(APIView):
 
     permission_classes = [IsControleOrSuper]
 
+    @extend_schema(
+        summary="Importar compras",
+        parameters=[
+            OpenApiParameter(
+                name="dry_run",
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type=bool,
+                description="Quando true, executa validação sem persistir dados.",
+            ),
+        ],
+        request=ImportFileUploadRequestSerializer,
+        responses={
+            200: ImportOperationResponseSerializer,
+            400: ImportOperationErrorResponseSerializer,
+            401: COMMON_ERROR_RESPONSES[401],
+            403: COMMON_ERROR_RESPONSES[403],
+            413: ImportOperationErrorResponseSerializer,
+            500: ImportOperationErrorResponseSerializer,
+        },
+        tags=["imports"],
+    )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Parse dry_run query param
         dry_run_param = str(request.query_params.get("dry_run", "true")).lower()

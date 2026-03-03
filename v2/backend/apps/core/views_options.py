@@ -17,6 +17,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+
 from .models import DATArea, DATCoordenador, Municipio, Produto, Projeto, TipoEvento, Usuario
 from .serializers import (
     MunicipioOptionSerializer,
@@ -28,6 +30,12 @@ from .serializers import (
 from .serializers.dat_module import DATAreaOptionSerializer, DATCoordenadorOptionSerializer
 
 
+@extend_schema(
+    methods=["GET"],
+    summary="Listar municípios para opções",
+    responses=MunicipioOptionSerializer(many=True),
+    tags=["options"],
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def municipios_options(request: Request) -> Response:
@@ -63,6 +71,21 @@ def municipios_options(request: Request) -> Response:
     return Response(data)
 
 
+@extend_schema(
+    methods=["GET"],
+    summary="Listar projetos para opções",
+    parameters=[
+        OpenApiParameter(
+            name="include_test",
+            location=OpenApiParameter.QUERY,
+            required=False,
+            type=bool,
+            description="Quando true, inclui projetos de teste.",
+        ),
+    ],
+    responses=ProjetoOptionSerializer(many=True),
+    tags=["options"],
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def projetos_options(request: Request) -> Response:
@@ -110,6 +133,12 @@ def projetos_options(request: Request) -> Response:
     return Response(data)
 
 
+@extend_schema(
+    methods=["GET"],
+    summary="Listar tipos de evento para opções",
+    responses=TipoEventoOptionSerializer(many=True),
+    tags=["options"],
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def tipos_evento_options(request: Request) -> Response:
@@ -145,6 +174,12 @@ def tipos_evento_options(request: Request) -> Response:
     return Response(data)
 
 
+@extend_schema(
+    methods=["GET"],
+    summary="Listar usuários para opções",
+    responses=UsuarioOptionSerializer(many=True),
+    tags=["options"],
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def usuarios_options(request: Request) -> Response:
@@ -179,6 +214,12 @@ def usuarios_options(request: Request) -> Response:
     return Response(data)
 
 
+@extend_schema(
+    methods=["GET"],
+    summary="Listar produtos para opções",
+    responses=ProdutoOptionSerializer(many=True),
+    tags=["options"],
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def produtos_options(request: Request) -> Response:
@@ -209,6 +250,12 @@ def produtos_options(request: Request) -> Response:
     return Response(data)
 
 
+@extend_schema(
+    methods=["GET"],
+    summary="Listar coordenadores para opções",
+    responses=DATCoordenadorOptionSerializer(many=True),
+    tags=["options"],
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def coordenadores_options(request: Request) -> Response:
@@ -239,6 +286,12 @@ def coordenadores_options(request: Request) -> Response:
     return Response(data)
 
 
+@extend_schema(
+    methods=["GET"],
+    summary="Listar áreas DAT para opções",
+    responses=DATAreaOptionSerializer(many=True),
+    tags=["options"],
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def areas_options(request: Request) -> Response:
@@ -269,6 +322,12 @@ def areas_options(request: Request) -> Response:
     return Response(data)
 
 
+@extend_schema(
+    methods=["GET"],
+    summary="Listar formadores do setor para opções",
+    responses=UsuarioOptionSerializer(many=True),
+    tags=["options"],
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def formadores_do_setor_options(request: Request) -> Response:

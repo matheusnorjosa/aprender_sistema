@@ -18,8 +18,15 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from drf_spectacular.utils import extend_schema
+
 from apps.core.models import Solicitacao
 from apps.core.permissions import IsControleOrSuper
+from apps.core.serializers.gcal_dashboard_contract import (
+    DetailMessageSerializer,
+    SuccessRateResponseSerializer,
+    TopInsightsResponseSerializer,
+)
 from apps.core.views_gcal.helpers import _filter_events_queryset
 
 
@@ -48,6 +55,7 @@ class SuccessRateView(APIView):
 
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
+    @extend_schema(responses=SuccessRateResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Reutilizar helper TZ-aware
         qs = _filter_events_queryset(request, Solicitacao.objects.all())
@@ -121,6 +129,12 @@ class TopInsightsView(APIView):
 
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
+    @extend_schema(
+        responses={
+            200: TopInsightsResponseSerializer,
+            400: DetailMessageSerializer,
+        }
+    )
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Validar metric
         metric_param = request.query_params.get("metric", "").lower()

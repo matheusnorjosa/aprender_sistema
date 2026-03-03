@@ -104,6 +104,11 @@ class TestOpenAPISchema(TestCase):
         return content.get("schema", {})
 
     def _resolve_schema_properties(self, schema: dict[str, Any], schema_ref: dict[str, Any]) -> dict[str, Any]:
+        if "allOf" in schema_ref and schema_ref["allOf"]:
+            first_ref = schema_ref["allOf"][0]
+            if isinstance(first_ref, dict):
+                return self._resolve_schema_properties(schema, first_ref)
+
         if "$ref" not in schema_ref:
             return schema_ref.get("properties", {})
 
@@ -173,6 +178,88 @@ class TestOpenAPISchema(TestCase):
                     properties,
                     f"Missing field '{field}' in /api/config/ {method.upper()} OpenAPI response schema",
                 )
+
+    def test_schema_has_typed_response_for_dashboard_overview(self) -> None:
+        """Schema must define explicit response fields for /api/dashboard/overview/."""
+        response = self.client.get("/api/schema/?format=json")
+        self.assertEqual(response.status_code, 200)
+        schema = response.json()
+
+        response_schema = self._get_response_schema(schema, "/api/dashboard/overview/", "get", "200")
+        self.assertTrue(response_schema, "Expected typed 200 response schema for /api/dashboard/overview/")
+
+        properties = self._resolve_schema_properties(schema, response_schema)
+        for field in ["kpis", "por_fluxo", "por_gerencia", "top_coordenadores"]:
+            self.assertIn(
+                field,
+                properties,
+                f"Missing field '{field}' in /api/dashboard/overview/ OpenAPI response schema",
+            )
+
+    def test_schema_has_typed_responses_for_gcal_dashboard_reads(self) -> None:
+        """Schema must define explicit response fields for critical GCal dashboard read endpoints."""
+        response = self.client.get("/api/schema/?format=json")
+        self.assertEqual(response.status_code, 200)
+        schema = response.json()
+
+        endpoints = [
+            ("/api/gcal/status-summary/", "get", "200", ["counts", "total"]),
+            ("/api/gcal/dashboard/metrics/", "get", "200", ["counts", "recent_errors", "window"]),
+            ("/api/gcal/dashboard/events/", "get", "200", ["count", "next", "previous", "results"]),
+            (
+                "/api/gcal/dashboard/insights/success-rate/",
+                "get",
+                "200",
+                ["published", "error", "pending", "none", "rate", "window"],
+            ),
+            ("/api/gcal/dashboard/insights/top/", "get", "200", ["items", "window", "metric", "limit"]),
+            (
+                "/api/gcal/dashboard/events/{id}/detail/",
+                "get",
+                "200",
+                ["id", "gcal_status", "external_event_id", "timeline"],
+            ),
+        ]
+
+        for path, method, status_code, expected_fields in endpoints:
+            response_schema = self._get_response_schema(schema, path, method, status_code)
+            self.assertTrue(
+                response_schema, f"Expected typed {status_code} response schema for {path} {method.upper()}"
+            )
+            properties = self._resolve_schema_properties(schema, response_schema)
+            for field in expected_fields:
+                self.assertIn(
+                    field,
+                    properties,
+                    f"Missing field '{field}' in {path} {method.upper()} OpenAPI response schema",
+                )
+
+    def test_schema_has_typed_responses_for_gcal_dashboard_batch_actions(self) -> None:
+        """Schema must define explicit request/response schemas for critical GCal batch actions."""
+        response = self.client.get("/api/schema/?format=json")
+        self.assertEqual(response.status_code, 200)
+        schema = response.json()
+
+        for path in ["/api/gcal/dashboard/batch/reapply/", "/api/gcal/dashboard/batch/resync/"]:
+            response_schema = self._get_response_schema(schema, path, "post", "202")
+            self.assertTrue(response_schema, f"Expected typed 202 response schema for {path} POST")
+            properties = self._resolve_schema_properties(schema, response_schema)
+
+            for field in ["queued", "errors", "dry_run", "apply_blocked"]:
+                self.assertIn(field, properties, f"Missing field '{field}' in {path} POST OpenAPI response schema")
+
+            request_schema = (
+                schema.get("paths", {})
+                .get(path, {})
+                .get("post", {})
+                .get("requestBody", {})
+                .get("content", {})
+                .get("application/json", {})
+                .get("schema", {})
+            )
+            self.assertTrue(request_schema, f"Expected request schema for {path} POST")
+            request_properties = self._resolve_schema_properties(schema, request_schema)
+            self.assertIn("ids", request_properties, f"Missing field 'ids' in {path} POST request schema")
 
 
 class TestSchemaErrors(TestCase):

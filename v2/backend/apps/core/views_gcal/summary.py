@@ -19,10 +19,18 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from drf_spectacular.utils import extend_schema
+
 from apps.core.models import Solicitacao
 from apps.core.pagination import LargePagination
 from apps.core.permissions import IsControleOrSuper
 from apps.core.serializers import SolicitacaoSerializer
+from apps.core.serializers.gcal_dashboard_contract import (
+    AlertsSummaryResponseSerializer,
+    DashboardMetricsResponseSerializer,
+    GCalStatusSummaryResponseSerializer,
+    PaginatedSolicitacaoResponseSerializer,
+)
 from apps.core.views_gcal.helpers import _apply_common_filters, _filter_events_queryset
 
 
@@ -47,6 +55,7 @@ class GCalStatusSummaryView(APIView):
 
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
+    @extend_schema(responses=GCalStatusSummaryResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas solicitações aprovadas
         qs = Solicitacao.objects.filter(status="aprovado")
@@ -88,6 +97,7 @@ class GCalListView(APIView):
     permission_classes = [IsAuthenticated, IsControleOrSuper]
     pagination_class = LargePagination
 
+    @extend_schema(responses=PaginatedSolicitacaoResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas aprovadas
         # Fix N+1: prefetch participations with their users
@@ -154,6 +164,7 @@ class DashboardMetricsView(APIView):
 
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
+    @extend_schema(responses=DashboardMetricsResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas solicitações aprovadas
         qs = Solicitacao.objects.filter(status="aprovado")
@@ -254,6 +265,7 @@ class AlertsSummaryView(APIView):
 
     permission_classes = [IsAuthenticated, IsControleOrSuper]
 
+    @extend_schema(responses=AlertsSummaryResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Reutilizar helper TZ-aware
         qs = _filter_events_queryset(request, Solicitacao.objects.all())

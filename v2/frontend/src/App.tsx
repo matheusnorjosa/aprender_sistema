@@ -67,7 +67,7 @@ const DeslocamentosPage = lazy(() => import('./pages/Deslocamentos/Deslocamentos
 const DATRegistrosPage = lazy(() => import('./pages/DATModule/DATRegistrosPage'));
 // DAT Module - Novas páginas de gestão
 const AcoesPage = lazy(() => import('./pages/DATModule/AcoesPage'));
-const ComprasPage = lazy(() => import('./pages/DATModule/ComprasPage'));
+const DATComprasPage = lazy(() => import('./pages/DATModule/ComprasPage'));
 const CadastrosPage = lazy(() => import('./pages/DATModule/CadastrosPage'));
 const FormacoesPage = lazy(() => import('./pages/DATModule/FormacoesPage'));
 const PlanoFormacoesPage = lazy(() => import('./pages/DATModule/PlanoFormacoesPage'));
@@ -142,6 +142,7 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/dat/admin/colecoes': 'dat-admin-colecoes',
   '/dat/admin/equipe-gerencia': 'dat-admin-equipe-gerencia',
   '/dat/cadastros': 'dat-cadastros',
+  '/dat/compras-materiais': 'dat-compras-materiais',
   '/dat/coordenadores': 'dat-coordenadores',
   '/dat/importacao': 'dat-importacao',
   '/dat/registros': 'dat-registros',
@@ -171,6 +172,7 @@ const MENU_KEY_TO_PARENT: Record<string, string> = {
   'dat-admin-colecoes': 'dat-submenu',
   'dat-admin-equipe-gerencia': 'dat-submenu',
   'dat-cadastros': 'dat-submenu',
+  'dat-compras-materiais': 'dat-submenu',
   'dat-coordenadores': 'dat-submenu',
   'dat-etl-reports': 'dat-submenu',
   'dat-importacao': 'dat-submenu',
@@ -669,6 +671,9 @@ function AppContent(): JSX.Element {
                   <Menu.Item key="dat-cadastros">
                     <Link to="/dat/cadastros">Cadastros</Link>
                   </Menu.Item>
+                  <Menu.Item key="dat-compras-materiais">
+                    <Link to="/dat/compras-materiais">Compras Materiais</Link>
+                  </Menu.Item>
                   <Menu.Item key="dat-coordenadores">
                     <Link to="/dat/coordenadores">Coordenadores</Link>
                   </Menu.Item>
@@ -838,7 +843,7 @@ function AppContent(): JSX.Element {
                   />
                   <Route
                     path="/controle/compras"
-                    element={canControle ? <ComprasPage /> : <Forbidden />}
+                    element={canControle ? <ControlePage /> : <Forbidden />}
                   />
                   {/* Deslocamentos (item único no menu) */}
                   <Route
@@ -902,6 +907,10 @@ function AppContent(): JSX.Element {
                   <Route
                     path="/dat/cadastros"
                     element={canDAT ? <CadastrosPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/dat/compras-materiais"
+                    element={canDAT ? <DATComprasPage /> : <Forbidden />}
                   />
                   <Route
                     path="/dat/coordenadores"

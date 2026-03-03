@@ -14,6 +14,7 @@ import type {
   MonthlyGridResponse,
   Gerencia,
 } from '../types';
+import { assertCurrentUserPayload } from '../types';
 
 /**
  * Block filter parameters
@@ -59,7 +60,8 @@ export interface FeatureFlags {
  * Busca informações do usuário atual.
  */
 export async function getMe(): Promise<CurrentUser> {
-  return await fetchAPI('/me/');
+  const payload = await fetchAPI<unknown>('/me/');
+  return assertCurrentUserPayload(payload);
 }
 
 /**

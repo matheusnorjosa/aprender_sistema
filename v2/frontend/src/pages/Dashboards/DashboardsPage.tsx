@@ -29,6 +29,11 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import logger from '../../utils/logger';
 import {
+  getDashboardOverview,
+  type DashboardOverviewResponse,
+  type DashboardCoordenadorItem,
+} from '../../api/dashboard';
+import {
   CalendarOutlined,
   CheckCircleOutlined,
   TeamOutlined,
@@ -42,50 +47,6 @@ import {
 
 const { Title, Text } = Typography;
 
-/**
- * KPIs data interface
- */
-interface KPIs {
-  eventos_futuros: number;
-  eventos_aprovados: number;
-  total_formadores: number;
-  aprovacoes_pendentes: number;
-}
-
-/**
- * Fluxo item interface
- */
-interface FluxoItem {
-  fluxo: string;
-  quantidade: number;
-}
-
-/**
- * Gerencia item interface
- */
-interface GerenciaItem {
-  gerencia: string;
-  porcentagem: number;
-}
-
-/**
- * Coordenador item interface
- */
-interface CoordenadorItem {
-  nome: string;
-  eventos: number;
-}
-
-/**
- * Dashboard data interface
- */
-interface DashboardData {
-  kpis: KPIs;
-  por_fluxo: FluxoItem[];
-  por_gerencia: GerenciaItem[];
-  top_coordenadores: CoordenadorItem[];
-}
-
 // Cores para os graficos
 const FLUXO_COLORS: Record<string, string> = {
   SUPER: '#1890ff',
@@ -95,7 +56,7 @@ const FLUXO_COLORS: Record<string, string> = {
 const GERENCIA_COLORS = ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1'];
 
 export default function DashboardsPage(): JSX.Element {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setData] = useState<DashboardOverviewResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,15 +65,7 @@ export default function DashboardsPage(): JSX.Element {
     setError(null);
 
     try {
-      const response = await fetch('/api/dashboard/overview/', {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
+      const result = await getDashboardOverview();
       setData(result);
     } catch (err) {
       logger.error('Erro ao carregar dashboard:', err);
@@ -175,7 +128,7 @@ export default function DashboardsPage(): JSX.Element {
   const maxCoord = top_coordenadores.length > 0 ? top_coordenadores[0].eventos : 1;
 
   // Columns for top coordenadores table
-  const columns: ColumnsType<CoordenadorItem> = [
+  const columns: ColumnsType<DashboardCoordenadorItem> = [
     {
       title: 'Posicao',
       key: 'posicao',

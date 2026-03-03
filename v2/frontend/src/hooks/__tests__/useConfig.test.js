@@ -13,9 +13,15 @@ import { renderHook, waitFor, act } from '@testing-library/react'
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useConfig } from '../useConfig'
 
-// Mock fetch
-const mockFetch = vi.fn()
-globalThis.fetch = mockFetch
+const { getSystemConfigMock, updateSystemConfigMock } = vi.hoisted(() => ({
+  getSystemConfigMock: vi.fn(),
+  updateSystemConfigMock: vi.fn(),
+}))
+
+vi.mock('../../api/systemConfig', () => ({
+  getSystemConfig: getSystemConfigMock,
+  updateSystemConfig: updateSystemConfigMock,
+}))
 
 // Mock antd message
 vi.mock('antd', () => ({
@@ -45,10 +51,7 @@ describe('useConfig', () => {
   // ============================================================================
 
   test('deve iniciar com loading=true', () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockConfigData,
-    })
+    getSystemConfigMock.mockResolvedValueOnce(mockConfigData)
 
     const { result } = renderHook(() => useConfig())
 
@@ -56,10 +59,7 @@ describe('useConfig', () => {
   })
 
   test('deve carregar config com sucesso', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockConfigData,
-    })
+    getSystemConfigMock.mockResolvedValueOnce(mockConfigData)
 
     const { result } = renderHook(() => useConfig())
 
@@ -68,17 +68,11 @@ describe('useConfig', () => {
     })
 
     expect(result.current.config).toEqual(mockConfigData)
-    expect(mockFetch).toHaveBeenCalledWith('/api/config/', {
-      credentials: 'include',
-    })
+    expect(getSystemConfigMock).toHaveBeenCalledTimes(1)
   })
 
   test('deve lidar com erro de carregamento', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      statusText: 'Internal Server Error',
-    })
+    getSystemConfigMock.mockRejectedValueOnce(new Error('HTTP 500: Internal Server Error'))
 
     const { result } = renderHook(() => useConfig())
 
@@ -90,7 +84,7 @@ describe('useConfig', () => {
   })
 
   test('deve lidar com erro de rede', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    getSystemConfigMock.mockRejectedValueOnce(new Error('Network error'))
 
     const { result } = renderHook(() => useConfig())
 
@@ -107,10 +101,7 @@ describe('useConfig', () => {
 
   test('saveConfig deve retornar true em sucesso', async () => {
     // Mock para load inicial
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockConfigData,
-    })
+    getSystemConfigMock.mockResolvedValueOnce(mockConfigData)
 
     const { result } = renderHook(() => useConfig())
 
@@ -120,10 +111,7 @@ describe('useConfig', () => {
 
     // Mock para saveConfig
     const updatedConfig = { ...mockConfigData, buffer_deslocamento_minutos: 90 }
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => updatedConfig,
-    })
+    updateSystemConfigMock.mockResolvedValueOnce(updatedConfig)
 
     let saveResult
     await act(async () => {
@@ -132,14 +120,12 @@ describe('useConfig', () => {
 
     expect(saveResult).toBe(true)
     expect(result.current.config).toEqual(updatedConfig)
+    expect(updateSystemConfigMock).toHaveBeenCalledWith(updatedConfig)
   })
 
   test('saveConfig deve retornar false em erro', async () => {
     // Mock para load inicial
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockConfigData,
-    })
+    getSystemConfigMock.mockResolvedValueOnce(mockConfigData)
 
     const { result } = renderHook(() => useConfig())
 
@@ -148,9 +134,10 @@ describe('useConfig', () => {
     })
 
     // Mock para saveConfig com erro
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ buffer_deslocamento_minutos: ['Valor inválido'] }),
+    updateSystemConfigMock.mockRejectedValueOnce({
+      response: {
+        data: { buffer_deslocamento_minutos: ['Valor inválido'] },
+      },
     })
 
     let saveResult
@@ -167,10 +154,7 @@ describe('useConfig', () => {
 
   test('reload deve recarregar config do servidor', async () => {
     // Mock para load inicial
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockConfigData,
-    })
+    getSystemConfigMock.mockResolvedValueOnce(mockConfigData)
 
     const { result } = renderHook(() => useConfig())
 
@@ -180,16 +164,13 @@ describe('useConfig', () => {
 
     // Mock para reload
     const updatedConfig = { ...mockConfigData, buffer_deslocamento_minutos: 120 }
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => updatedConfig,
-    })
+    getSystemConfigMock.mockResolvedValueOnce(updatedConfig)
 
     await act(async () => {
       await result.current.reload()
     })
 
     expect(result.current.config).toEqual(updatedConfig)
-    expect(mockFetch).toHaveBeenCalledTimes(2)
+    expect(getSystemConfigMock).toHaveBeenCalledTimes(2)
   })
 })

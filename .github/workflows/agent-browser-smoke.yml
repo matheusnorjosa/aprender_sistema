@@ -43,6 +43,9 @@ jobs:
       - name: Install agent-browser runtime dependencies
         run: npx --yes agent-browser install --with-deps
 
+      - name: Install Playwright browsers for project runtime
+        run: npx playwright install chromium
+
       - name: Start frontend dev server
         run: |
           npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/vite-agent-browser.log 2>&1 &

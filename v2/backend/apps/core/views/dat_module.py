@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from django.db.models import Count, F, Q, Sum, Value
+from django.db.models import Count, Exists, F, Max, OuterRef, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -32,6 +32,7 @@ from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.core.models import (
+    Compra,
     DATAcao,
     DATArea,
     DATCadastro,
@@ -39,6 +40,7 @@ from apps.core.models import (
     DATCoordenador,
     DATFormacao,
     MunicipioReferencia,
+    Solicitacao,
 )
 from apps.core.permissions import IsDATOrSuper, IsSuperintendenciaOnly
 from apps.core.serializers import (
@@ -549,6 +551,82 @@ class DATCompraViewSet(viewsets.ModelViewSet):
                 "top_frequencia": top_frequencia,
                 "por_ano": por_ano,
                 "por_tipo_compra": por_tipo_compra,
+            }
+        )
+
+    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    def pendencias(self, request: Request) -> Response:
+        """
+        Municípios com compra no domínio core_compra e sem solicitação ativa.
+
+        A pendência é calculada por par (município + projeto) para refletir
+        a regra de negócio da operação.
+
+        GET /api/dat/compras-materiais/pendencias/
+        Query params opcionais:
+            - uf: filtra por UF
+            - projeto_id: filtra por projeto
+        """
+        compras_qs = Compra.objects.select_related("municipio", "projeto")
+
+        uf = request.query_params.get("uf")
+        projeto_id = request.query_params.get("projeto_id")
+
+        if uf:
+            compras_qs = compras_qs.filter(municipio__uf__iexact=uf)
+        if projeto_id:
+            compras_qs = compras_qs.filter(projeto_id=projeto_id)
+
+        solicitacoes_ativas = Solicitacao.objects.filter(
+            municipio_id=OuterRef("municipio_id"),
+            projeto_id=OuterRef("projeto_id"),
+            status__in=["pendente", "aprovado"],
+        )
+
+        base_pairs = (
+            compras_qs.values(
+                "municipio_id",
+                "municipio__nome",
+                "municipio__uf",
+                "projeto_id",
+                "projeto__nome",
+            )
+            .annotate(
+                total_itens=Sum("quantidade"),
+                total_compras=Count("id"),
+                ultima_compra=Max("data"),
+                possui_evento=Exists(solicitacoes_ativas),
+            )
+            .order_by("municipio__nome", "projeto__nome")
+        )
+
+        total_com_compra = base_pairs.count()
+        total_com_evento = base_pairs.filter(possui_evento=True).count()
+        pendentes_pairs = base_pairs.filter(possui_evento=False)
+        total_pendentes = pendentes_pairs.count()
+        percentual_pendentes = round((total_pendentes / total_com_compra) * 100, 1) if total_com_compra > 0 else 0
+
+        pendentes = [
+            {
+                "municipio_id": item["municipio_id"],
+                "municipio": item["municipio__nome"],
+                "uf": item["municipio__uf"],
+                "projeto_id": item["projeto_id"],
+                "projeto": item["projeto__nome"],
+                "total_itens": item["total_itens"] or 0,
+                "total_compras": item["total_compras"],
+                "ultima_compra": item["ultima_compra"],
+            }
+            for item in pendentes_pairs
+        ]
+
+        return Response(
+            {
+                "total_com_compra": total_com_compra,
+                "total_com_evento": total_com_evento,
+                "total_pendentes": total_pendentes,
+                "percentual_pendentes": percentual_pendentes,
+                "pendentes": pendentes,
             }
         )
 

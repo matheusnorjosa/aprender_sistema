@@ -66,6 +66,13 @@ make ban-v1
 - [ ] Publicar no Calendar funciona
 - [ ] Meet link é gerado
 
+### Compras (fronteira de domínio)
+
+- [ ] `/controle/compras` mostra dados de `core_compra` (com campo `quantidade`).
+- [ ] `/dat/compras-materiais` mostra dados de `core_dat_compra` (materiais/estoque DAT).
+- [ ] Criar solicitação aceita apenas município+projeto elegível em `core_compra`.
+- [ ] Alterações em `core_dat_compra` não mudam elegibilidade de solicitação.
+
 ### Técnicas
 
 - [ ] Logs sem erros críticos

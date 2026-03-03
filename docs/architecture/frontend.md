@@ -32,6 +32,8 @@ src/
 | `/aprovacoes` | Aprovação (Superintendência) |
 | `/pre-agenda` | Publicação no GCal (Controle) |
 | `/dashboards` | Dashboards e métricas |
+| `/controle/compras` | Compras do domínio Controle (`core_compra`) |
+| `/dat/compras-materiais` | Compras de materiais DAT (`core_dat_compra`) |
 
 ## Autenticação
 

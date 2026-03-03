@@ -191,16 +191,6 @@ urlpatterns = [
         name="controle-compras-list",
     ),
     path(
-        "controle/import-acoes/",
-        ControleImportAcoesView.as_view(),
-        name="controle-import-acoes",
-    ),
-    path(
-        "controle/compras/",
-        ControleComprasListView.as_view(),
-        name="controle-compras-list",
-    ),
-    path(
         "controle/acoes/",
         ControleAcoesListView.as_view(),
         name="controle-acoes-list",

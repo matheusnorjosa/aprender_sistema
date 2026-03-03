@@ -53,7 +53,7 @@ import {
 } from '../../api/solicitacoes';
 import { getMe } from '../../api/availability';
 import logger from '../../utils/logger';
-import type { ID, Solicitacao, SolicitacaoStatus, CurrentUser, PaginatedResponse, Participation, BatchOperationResult } from '../../types';
+import type { ID, Solicitacao, SolicitacaoStatus, PaginatedResponse, Participation, BatchOperationResult } from '../../types';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -131,7 +131,7 @@ export default function ApprovalsPage(): JSX.Element {
   useEffect(() => {
     const loadUser = async (): Promise<void> => {
       try {
-        const userData = await getMe() as CurrentUser & { can_approve_super?: boolean };
+        const userData = await getMe();
 
         // Usar can_approve_super da API (Superintendência/DAT ou superuser)
         // A API já calcula: is_superuser || Superintendência || DAT

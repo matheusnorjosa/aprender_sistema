@@ -111,11 +111,6 @@ interface BatchResponseType {
   errors?: Array<{ detail: string }>;
 }
 
-/** Extended current user */
-interface ExtendedCurrentUser extends CurrentUser {
-  is_superintendencia?: boolean;
-}
-
 export default function PreAgendaPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [rows, setRows] = useState<Solicitacao[]>([]);
@@ -135,7 +130,7 @@ export default function PreAgendaPage(): JSX.Element {
   const [batchLoading, setBatchLoading] = useState<boolean>(false);
 
   // OAuth Phase 5: Estado do usuário e integração Google
-  const [user, setUser] = useState<ExtendedCurrentUser | null>(null);
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const { status: googleStatus, disconnect: googleDisconnect } = useGoogleIntegration();
 
   // Section 4 Epic #459: Consolidated Google OAuth guard
@@ -148,7 +143,7 @@ export default function PreAgendaPage(): JSX.Element {
   useEffect(() => {
     const loadUser = async (): Promise<void> => {
       try {
-        const userData = await getMe() as ExtendedCurrentUser;
+        const userData = await getMe();
         setUser(userData);
       } catch (error) {
         logger.error('Erro ao carregar usuário:', error);

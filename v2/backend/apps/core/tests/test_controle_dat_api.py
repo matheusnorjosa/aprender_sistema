@@ -475,8 +475,10 @@ def test_tipo_acao_invalido_rejeitado_pelo_serializer():
     errors = response.data.get("errors", response.data)
     assert "tipo_acao" in errors
     message = str(errors["tipo_acao"][0]).lower()
-    assert ("valid choice" in message) or ("escolha" in message and "válid" in message) or (
-        "escolha" in message and "valid" in message
+    assert (
+        ("valid choice" in message)
+        or ("escolha" in message and "válid" in message)
+        or ("escolha" in message and "valid" in message)
     )
 
 

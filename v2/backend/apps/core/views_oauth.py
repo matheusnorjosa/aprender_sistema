@@ -36,6 +36,7 @@ from apps.core.models import AuditLog, GoogleOAuthCredential
 from apps.core.permissions import IsControleOrSuper
 from apps.core.services.google_oauth import (
     _encrypt_token,
+    _is_safe_url,
     build_authorization_url,
     exchange_code_for_tokens,
     revoke_token,
@@ -102,14 +103,17 @@ def _build_frontend_redirect_url(path: str) -> str:
     """
     import os
 
-    # Se já for URL absoluta, retornar como está
+    # Se já for URL absoluta, validar antes de usar
     parsed = urlparse(path)
     if parsed.scheme and parsed.netloc:
+        if not _is_safe_url(path):
+            logger.warning(f"URL absoluta rejeitada (open redirect): {path}")
+            return "/pre-agenda?google=error&reason=invalid_redirect"
         return path
 
     # Caminho relativo: construir URL do frontend
     # Usar primeira origem do CORS_ALLOWED_ORIGINS (geralmente o frontend)
-    frontend_origin = os.getenv("FRONTEND_URL")
+    frontend_origin = os.getenv("FRONTEND_URL", "").strip()
 
     if not frontend_origin and settings.CORS_ALLOWED_ORIGINS:
         # Issue #442: Use settings instead of hardcoded ports
@@ -133,6 +137,11 @@ def _build_frontend_redirect_url(path: str) -> str:
     if not frontend_origin:
         frontend_port = getattr(settings, "FRONTEND_DEV_PORT", "5173")
         frontend_origin = f"http://localhost:{frontend_port}"
+
+    # SECURITY: Validar origin antes de usar (previne env injection)
+    if not _is_safe_url(frontend_origin):
+        logger.error(f"Frontend origin não confiável, usando path relativo: {frontend_origin}")
+        return path
 
     # Construir URL absoluta
     full_url = f"{frontend_origin}{path}"

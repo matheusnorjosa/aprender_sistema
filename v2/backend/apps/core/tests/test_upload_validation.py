@@ -231,3 +231,202 @@ def test_controle_upload_xls_legacy_format(authenticated_controle_client):
         response.status_code != status.HTTP_400_BAD_REQUEST
         or "tipo de arquivo" not in response.data.get("detail", "").lower()
     )
+
+
+# ============================================================================
+# Testes de Magic Bytes (Issue #747 — Anti-Spoofing)
+# ============================================================================
+
+
+def test_validate_upload_rejects_exe_with_csv_content_type():
+    """Issue #747: Arquivo EXE com Content-Type spoofado é rejeitado via magic bytes."""
+    import sys
+    from types import ModuleType
+    from unittest.mock import MagicMock, patch
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.upload_validators import validate_upload
+
+    # Mock magic module to simulate detection of PE executable
+    mock_magic_module = ModuleType("magic")
+    mock_magic_module.from_buffer = MagicMock(return_value="application/x-dosexec")
+
+    exe_content = b"MZ" + b"\x00" * 100  # PE executable magic bytes
+    fake_csv = SimpleUploadedFile("data.csv", exe_content, content_type="text/csv")
+
+    with patch.dict(sys.modules, {"magic": mock_magic_module}):
+        result = validate_upload(fake_csv)
+
+    # Deve retornar Response de erro (não None)
+    assert result is not None
+    assert result.status_code == status.HTTP_400_BAD_REQUEST
+    assert "não corresponde" in result.data["detail"].lower()
+
+
+def test_validate_upload_accepts_real_csv():
+    """Issue #747: CSV real com conteúdo válido é aceito."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.upload_validators import validate_upload
+
+    csv_content = b"nome,uf\nFortaleza,CE\n"
+    file = SimpleUploadedFile("data.csv", csv_content, content_type="text/csv")
+
+    result = validate_upload(file)
+    assert result is None  # None = válido
+
+
+def test_validate_upload_rejects_invalid_mime():
+    """Issue #747: Content-Type não permitido é rejeitado na primeira camada."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.upload_validators import validate_upload
+
+    file = SimpleUploadedFile("script.sh", b"#!/bin/bash\nrm -rf /", content_type="application/x-sh")
+
+    result = validate_upload(file)
+    assert result is not None
+    assert result.status_code == status.HTTP_400_BAD_REQUEST
+    assert "não permitido" in result.data["detail"].lower()
+
+
+def test_validate_upload_rejects_oversized_file():
+    """Issue #747: Arquivo >10MB é rejeitado com 413."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.upload_validators import validate_upload
+
+    large = SimpleUploadedFile("big.csv", b"x" * (10 * 1024 * 1024 + 1), content_type="text/csv")
+
+    result = validate_upload(large)
+    assert result is not None
+    assert result.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+
+
+# ============================================================================
+# Testes de octet-stream e fail-closed/fail-open
+# ============================================================================
+
+
+def test_validate_upload_rejects_octet_stream_non_excel():
+    """octet-stream sem assinatura Excel é rejeitado mesmo com extensão .csv."""
+    import sys
+    from types import ModuleType
+    from unittest.mock import MagicMock, patch
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.upload_validators import validate_upload
+
+    mock_magic_module = ModuleType("magic")
+    mock_magic_module.from_buffer = MagicMock(return_value="application/octet-stream")
+
+    # Payload arbitrário (não é OLE2 nem ZIP)
+    fake_file = SimpleUploadedFile("data.csv", b"\x00\x01\x02\x03" * 100, content_type="text/csv")
+
+    with patch.dict(sys.modules, {"magic": mock_magic_module}):
+        result = validate_upload(fake_file)
+
+    assert result is not None
+    assert result.status_code == status.HTTP_400_BAD_REQUEST
+    assert "não corresponde" in result.data["detail"].lower()
+
+
+def test_validate_upload_accepts_octet_stream_xls_ole2():
+    """octet-stream com assinatura OLE2 e extensão .xls é aceito."""
+    import sys
+    from types import ModuleType
+    from unittest.mock import MagicMock, patch
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.upload_validators import validate_upload
+
+    mock_magic_module = ModuleType("magic")
+    mock_magic_module.from_buffer = MagicMock(return_value="application/octet-stream")
+
+    ole2_header = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 100
+    xls_file = SimpleUploadedFile("planilha.xls", ole2_header, content_type="text/csv")
+
+    with patch.dict(sys.modules, {"magic": mock_magic_module}):
+        result = validate_upload(xls_file)
+
+    assert result is None  # Válido
+
+
+def test_validate_upload_accepts_octet_stream_xlsx_zip():
+    """octet-stream com assinatura ZIP e extensão .xlsx é aceito."""
+    import sys
+    from types import ModuleType
+    from unittest.mock import MagicMock, patch
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.upload_validators import validate_upload
+
+    mock_magic_module = ModuleType("magic")
+    mock_magic_module.from_buffer = MagicMock(return_value="application/octet-stream")
+
+    zip_header = b"PK\x03\x04" + b"\x00" * 100
+    xlsx_file = SimpleUploadedFile("planilha.xlsx", zip_header, content_type="text/csv")
+
+    with patch.dict(sys.modules, {"magic": mock_magic_module}):
+        result = validate_upload(xlsx_file)
+
+    assert result is None  # Válido
+
+
+def test_validate_upload_fail_closed_on_import_error():
+    """Em modo fail-closed (production), ImportError de magic retorna 400."""
+    import sys
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from django.test import override_settings
+
+    from apps.core.upload_validators import validate_upload
+
+    csv_content = b"nome,uf\nFortaleza,CE\n"
+    file = SimpleUploadedFile("data.csv", csv_content, content_type="text/csv")
+
+    # sys.modules["magic"] = None faz Python lançar ImportError na próxima tentativa de import
+    saved = sys.modules.get("magic", _SENTINEL := object())
+    sys.modules["magic"] = None  # type: ignore[assignment]
+    try:
+        with override_settings(UPLOAD_MAGIC_FAIL_OPEN=False):
+            result = validate_upload(file)
+    finally:
+        if saved is _SENTINEL:
+            del sys.modules["magic"]
+        else:
+            sys.modules["magic"] = saved  # type: ignore[assignment]
+
+    assert result is not None
+    assert result.status_code == status.HTTP_400_BAD_REQUEST
+    assert "não foi possível validar" in result.data["detail"].lower()
+
+
+def test_validate_upload_fail_open_on_import_error():
+    """Em modo fail-open (dev), ImportError de magic permite o upload."""
+    import sys
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from django.test import override_settings
+
+    from apps.core.upload_validators import validate_upload
+
+    csv_content = b"nome,uf\nFortaleza,CE\n"
+    file = SimpleUploadedFile("data.csv", csv_content, content_type="text/csv")
+
+    saved = sys.modules.get("magic", _SENTINEL := object())
+    sys.modules["magic"] = None  # type: ignore[assignment]
+    try:
+        with override_settings(UPLOAD_MAGIC_FAIL_OPEN=True):
+            result = validate_upload(file)
+    finally:
+        if saved is _SENTINEL:
+            del sys.modules["magic"]
+        else:
+            sys.modules["magic"] = saved  # type: ignore[assignment]
+
+    assert result is None  # Fail-open: aceita mesmo sem magic

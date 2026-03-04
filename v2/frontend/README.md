@@ -63,6 +63,36 @@ Output em: `dist/`
 npm run preview
 ```
 
+## 🧪 Execução E2E Canônica (Playwright + Docker)
+
+Para evitar drift de runtime (libs de browser no host e browser ausente no container frontend),
+o caminho canônico de E2E é o runner Docker `frontend-e2e` (imagem oficial Playwright).
+
+No diretório `v2/frontend`:
+
+```bash
+npm run test:e2e:docker -- e2e/z-auth.spec.ts --project=chromium --reporter=line
+```
+
+Esse comando:
+- sobe `db/redis/web` via Docker Compose;
+- aplica migrations;
+- executa `seed_e2e_users`;
+- roda Playwright no runner canônico com web server Vite interno + proxy para `http://web:8000`.
+
+Para rodar a suíte chromium padrão:
+
+```bash
+npm run test:e2e:docker
+```
+
+Após finalizar, se quiser limpar o ambiente:
+
+```bash
+cd ../infra
+docker compose -p aprender_v2 -f docker-compose.yml down
+```
+
 ## 🔐 Autenticação
 
 O frontend utiliza **sessão/cookie do Django** para autenticação. Para testar localmente:

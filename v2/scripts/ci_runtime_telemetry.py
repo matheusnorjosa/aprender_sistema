@@ -53,6 +53,22 @@ def parse_args() -> argparse.Namespace:
         help="Only include jobs with name starting with [required]",
     )
     parser.add_argument(
+        "--branch",
+        default="",
+        help="Optional branch filter for workflow runs (e.g. main)",
+    )
+    parser.add_argument(
+        "--events",
+        nargs="+",
+        default=[],
+        help="Optional run event filters (e.g. push pull_request)",
+    )
+    parser.add_argument(
+        "--successful-runs-only",
+        action="store_true",
+        help="Only include workflow runs with conclusion=success",
+    )
+    parser.add_argument(
         "--baseline-json",
         default="",
         help="Optional baseline json for regression detection",
@@ -173,24 +189,69 @@ def fetch_workflow_id(repo: str, workflow_name: str, token: str) -> int:
 
 
 def fetch_completed_runs(repo: str, workflow_id: int, token: str, limit: int) -> List[dict]:
-    runs: List[dict] = []
-    page = 1
-    while len(runs) < limit:
-        payload = github_get(
-            f"/repos/{repo}/actions/workflows/{workflow_id}/runs",
-            token,
-            params={
+    return fetch_completed_runs_with_filters(
+        repo=repo,
+        workflow_id=workflow_id,
+        token=token,
+        limit=limit,
+        branch="",
+        events=[],
+        successful_runs_only=False,
+    )
+
+
+def fetch_completed_runs_with_filters(
+    repo: str,
+    workflow_id: int,
+    token: str,
+    limit: int,
+    branch: str,
+    events: List[str],
+    successful_runs_only: bool,
+) -> List[dict]:
+    runs_by_id: Dict[int, dict] = {}
+    event_filters = events if events else [""]
+
+    for event_filter in event_filters:
+        page = 1
+        while True:
+            params = {
                 "status": "completed",
                 "per_page": "100",
                 "page": str(page),
-            },
-        )
-        page_runs = payload.get("workflow_runs", [])
-        if not page_runs:
-            break
-        runs.extend(page_runs)
-        page += 1
-    return runs[:limit]
+            }
+            if branch:
+                params["branch"] = branch
+            if event_filter:
+                params["event"] = event_filter
+
+            payload = github_get(
+                f"/repos/{repo}/actions/workflows/{workflow_id}/runs",
+                token,
+                params=params,
+            )
+            page_runs = payload.get("workflow_runs", [])
+            if not page_runs:
+                break
+
+            for run in page_runs:
+                run_id = int(run.get("id", 0))
+                if run_id <= 0:
+                    continue
+                if successful_runs_only and run.get("conclusion") != "success":
+                    continue
+                runs_by_id[run_id] = run
+
+            if len(page_runs) < 100:
+                break
+            page += 1
+
+    runs_sorted = sorted(
+        runs_by_id.values(),
+        key=lambda item: parse_ts(item.get("created_at", "1970-01-01T00:00:00Z")),
+        reverse=True,
+    )
+    return runs_sorted[:limit]
 
 
 def fetch_run_jobs(repo: str, run_id: int, token: str) -> List[dict]:
@@ -218,11 +279,22 @@ def collect_samples(
     token: str,
     runs_per_workflow: int,
     required_only: bool,
+    branch: str,
+    events: List[str],
+    successful_runs_only: bool,
 ) -> List[JobSample]:
     samples: List[JobSample] = []
     for workflow_name in workflows:
         workflow_id = fetch_workflow_id(repo, workflow_name, token)
-        runs = fetch_completed_runs(repo, workflow_id, token, runs_per_workflow)
+        runs = fetch_completed_runs_with_filters(
+            repo=repo,
+            workflow_id=workflow_id,
+            token=token,
+            limit=runs_per_workflow,
+            branch=branch,
+            events=events,
+            successful_runs_only=successful_runs_only,
+        )
         for run in runs:
             run_id = int(run["id"])
             jobs = fetch_run_jobs(repo, run_id, token)
@@ -318,6 +390,12 @@ def write_markdown(path: str, payload: dict, regressions: List[Tuple[str, float,
     lines.append(f"- Repo: `{payload['repo']}`")
     lines.append(f"- Workflows: `{', '.join(payload['workflows'])}`")
     lines.append(f"- Runs per workflow: `{payload['runs_per_workflow']}`")
+    if payload.get("branch"):
+        lines.append(f"- Branch filter: `{payload['branch']}`")
+    events = payload.get("events", [])
+    if events:
+        lines.append(f"- Event filters: `{', '.join(events)}`")
+    lines.append(f"- Successful runs only: `{payload.get('successful_runs_only', False)}`")
     lines.append(f"- Regression threshold (p95): `+{payload['regression_threshold_pct']}%`")
     lines.append(
         f"- Regression minimum absolute delta: `+{payload['regression_min_absolute_seconds']}s`"
@@ -367,6 +445,9 @@ def main() -> int:
         token=token,
         runs_per_workflow=args.runs_per_workflow,
         required_only=args.required_only,
+        branch=args.branch,
+        events=args.events,
+        successful_runs_only=args.successful_runs_only,
     )
     metrics = build_metrics(samples)
 
@@ -375,6 +456,9 @@ def main() -> int:
         "repo": args.repo,
         "workflows": args.workflows,
         "runs_per_workflow": args.runs_per_workflow,
+        "branch": args.branch,
+        "events": args.events,
+        "successful_runs_only": args.successful_runs_only,
         "regression_threshold_pct": args.regression_threshold_pct,
         "regression_min_absolute_seconds": args.regression_min_absolute_seconds,
         "metrics": metrics,

@@ -1,100 +1,107 @@
 {
-  "generated_at_utc": "2026-02-27T17:30:00.000000+00:00",
+  "branch": "main",
+  "events": [
+    "push"
+  ],
+  "generated_at_utc": "2026-03-04T11:03:08.803465+00:00",
   "metrics": {
     "CI \u2013 Continuous Integration::[required] backend impact": {
       "max_seconds": 109.0,
       "median_seconds": 8.0,
       "min_seconds": 6.0,
-      "p95_seconds": 10.0,
+      "p95_seconds": 12.0,
       "samples": 30
     },
     "CI \u2013 Continuous Integration::[required] backend tests (runner)": {
       "max_seconds": 177.0,
-      "median_seconds": 67.0,
-      "min_seconds": 0.0,
+      "median_seconds": 70.0,
+      "min_seconds": 60.0,
       "p95_seconds": 82.0,
-      "samples": 27
+      "samples": 30
     },
     "CI \u2013 Continuous Integration::[required] backend typecheck (pyright)": {
-      "max_seconds": 78.0,
-      "median_seconds": 72.0,
-      "min_seconds": 0.0,
-      "p95_seconds": 78.0,
-      "samples": 27
+      "max_seconds": 90.0,
+      "median_seconds": 72.5,
+      "min_seconds": 63.0,
+      "p95_seconds": 79.0,
+      "samples": 30
     },
     "CI \u2013 Continuous Integration::[required] docker parity (backend)": {
-      "max_seconds": 139.0,
-      "median_seconds": 126.0,
-      "min_seconds": 0.0,
-      "p95_seconds": 136.0,
-      "samples": 27
+      "max_seconds": 150.0,
+      "median_seconds": 130.0,
+      "min_seconds": 114.0,
+      "p95_seconds": 140.0,
+      "samples": 30
     },
     "CI \u2013 Continuous Integration::[required] lint": {
-      "max_seconds": 139.0,
-      "median_seconds": 24.0,
+      "max_seconds": 29.0,
+      "median_seconds": 25.0,
       "min_seconds": 21.0,
-      "p95_seconds": 31.0,
+      "p95_seconds": 29.0,
       "samples": 30
     },
     "CI \u2013 Continuous Integration::[required] tests": {
-      "max_seconds": 32.0,
+      "max_seconds": 4.0,
       "median_seconds": 3.0,
       "min_seconds": 2.0,
       "p95_seconds": 4.0,
       "samples": 30
     },
     "Security Scan::[required] Container Scan": {
-      "max_seconds": 157.0,
-      "median_seconds": 130.0,
-      "min_seconds": 114.0,
-      "p95_seconds": 152.0,
+      "max_seconds": 148.0,
+      "median_seconds": 127.5,
+      "min_seconds": 117.0,
+      "p95_seconds": 144.0,
       "samples": 30
     },
     "Security Scan::[required] Frontend Dependencies": {
-      "max_seconds": 31.0,
-      "median_seconds": 21.0,
+      "max_seconds": 28.0,
+      "median_seconds": 20.0,
       "min_seconds": 17.0,
-      "p95_seconds": 28.0,
+      "p95_seconds": 24.0,
       "samples": 30
     },
     "Security Scan::[required] Python Dependencies": {
-      "max_seconds": 181.0,
-      "median_seconds": 45.0,
-      "min_seconds": 40.0,
-      "p95_seconds": 54.0,
+      "max_seconds": 53.0,
+      "median_seconds": 44.0,
+      "min_seconds": 37.0,
+      "p95_seconds": 52.0,
       "samples": 30
     },
     "Security Scan::[required] Secret Detection": {
-      "max_seconds": 47.0,
-      "median_seconds": 16.0,
+      "max_seconds": 23.0,
+      "median_seconds": 15.0,
       "min_seconds": 12.0,
-      "p95_seconds": 23.0,
+      "p95_seconds": 22.0,
       "samples": 30
     },
     "frontend-ci::[required] build/lint do frontend": {
-      "max_seconds": 316.0,
-      "median_seconds": 55.0,
-      "min_seconds": 49.0,
-      "p95_seconds": 188.0,
-      "samples": 30
+      "max_seconds": 188.0,
+      "median_seconds": 57.0,
+      "min_seconds": 47.0,
+      "p95_seconds": 67.0,
+      "samples": 21
     },
     "frontend-ci::[required] checklist tests (meta, a11y, security)": {
-      "max_seconds": 686.0,
-      "median_seconds": 76.0,
+      "max_seconds": 197.0,
+      "median_seconds": 88.0,
       "min_seconds": 70.0,
-      "p95_seconds": 97.0,
-      "samples": 30
+      "p95_seconds": 187.0,
+      "samples": 21
     },
     "frontend-ci::[required] react doctor quality gate": {
       "max_seconds": 102.0,
       "median_seconds": 31.0,
-      "min_seconds": 17.0,
-      "p95_seconds": 40.0,
-      "samples": 30
+      "min_seconds": 24.0,
+      "p95_seconds": 38.0,
+      "samples": 21
     }
   },
+  "regression_min_absolute_seconds": 20.0,
+  "regression_threshold_pct": 35.0,
   "repo": "matheusnorjosa/aprender_sistema",
   "runs_per_workflow": 30,
+  "successful_runs_only": true,
   "workflows": [
     "CI \u2013 Continuous Integration",
     "frontend-ci",

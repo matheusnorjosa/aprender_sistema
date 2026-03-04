@@ -37,6 +37,9 @@ jobs:
             --workflows "CI – Continuous Integration" "frontend-ci" "Security Scan" \
             --runs-per-workflow 30 \
             --required-only \
+            --branch "main" \
+            --events "push" \
+            --successful-runs-only \
             --baseline-json "v2/docs/analysis/ci-runtime-baseline.json" \
             --regression-threshold-pct 35 \
             --regression-min-absolute-seconds 20 \

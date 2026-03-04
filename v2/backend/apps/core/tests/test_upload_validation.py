@@ -231,3 +231,74 @@ def test_controle_upload_xls_legacy_format(authenticated_controle_client):
         response.status_code != status.HTTP_400_BAD_REQUEST
         or "tipo de arquivo" not in response.data.get("detail", "").lower()
     )
+
+
+# ============================================================================
+# Testes de Magic Bytes (Issue #747 — Anti-Spoofing)
+# ============================================================================
+
+
+def test_validate_upload_rejects_exe_with_csv_content_type():
+    """Issue #747: Arquivo EXE com Content-Type spoofado é rejeitado via magic bytes."""
+    import sys
+    from types import ModuleType
+    from unittest.mock import MagicMock, patch
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.upload_validators import validate_upload
+
+    # Mock magic module to simulate detection of PE executable
+    mock_magic_module = ModuleType("magic")
+    mock_magic_module.from_buffer = MagicMock(return_value="application/x-dosexec")
+
+    exe_content = b"MZ" + b"\x00" * 100  # PE executable magic bytes
+    fake_csv = SimpleUploadedFile("data.csv", exe_content, content_type="text/csv")
+
+    with patch.dict(sys.modules, {"magic": mock_magic_module}):
+        result = validate_upload(fake_csv)
+
+    # Deve retornar Response de erro (não None)
+    assert result is not None
+    assert result.status_code == status.HTTP_400_BAD_REQUEST
+    assert "não corresponde" in result.data["detail"].lower()
+
+
+def test_validate_upload_accepts_real_csv():
+    """Issue #747: CSV real com conteúdo válido é aceito."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.upload_validators import validate_upload
+
+    csv_content = b"nome,uf\nFortaleza,CE\n"
+    file = SimpleUploadedFile("data.csv", csv_content, content_type="text/csv")
+
+    result = validate_upload(file)
+    assert result is None  # None = válido
+
+
+def test_validate_upload_rejects_invalid_mime():
+    """Issue #747: Content-Type não permitido é rejeitado na primeira camada."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.upload_validators import validate_upload
+
+    file = SimpleUploadedFile("script.sh", b"#!/bin/bash\nrm -rf /", content_type="application/x-sh")
+
+    result = validate_upload(file)
+    assert result is not None
+    assert result.status_code == status.HTTP_400_BAD_REQUEST
+    assert "não permitido" in result.data["detail"].lower()
+
+
+def test_validate_upload_rejects_oversized_file():
+    """Issue #747: Arquivo >10MB é rejeitado com 413."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.upload_validators import validate_upload
+
+    large = SimpleUploadedFile("big.csv", b"x" * (10 * 1024 * 1024 + 1), content_type="text/csv")
+
+    result = validate_upload(large)
+    assert result is not None
+    assert result.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE

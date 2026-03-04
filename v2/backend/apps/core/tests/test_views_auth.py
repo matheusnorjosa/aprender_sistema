@@ -282,11 +282,11 @@ def test_login_uses_dummy_hash_for_failed_authentication(mock_make_password, api
     """
     response = api_client.post(
         "/api/auth/login/",
-        {"username": "nonexistent_timing_user", "password": "timing-pass-123"},
+        {"username": "nonexistent_timing_user", "password": "testpass123"},
         format="json",
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    mock_make_password.assert_called_once_with("timing-pass-123")
+    mock_make_password.assert_called_once_with("testpass123")
 
 
 def test_login_returns_groups(api_client, usuario_superintendencia):

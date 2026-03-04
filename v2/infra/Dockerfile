@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     curl jq httpie vim nano tree less tzdata ca-certificates libpq5 \
     postgresql-client \
+    libmagic-dev \
  && rm -rf /var/lib/apt/lists/*
 
 # === Python pacotes de dados/cli (modo único) ===

@@ -938,13 +938,23 @@ class TestViewsOAuthCoverage:
 
     def test_build_frontend_redirect_url_with_absolute_url(self):
         """
-        Linha 114: Se URL já é absoluta, retorna como está.
+        Issue #746: URL absoluta de origem confiável é aceita; origem desconhecida é rejeitada.
         """
+        from django.test import override_settings
+
         from apps.core.views_oauth import _build_frontend_redirect_url
 
-        absolute_url = "https://example.com/callback?google=connected"
-        result = _build_frontend_redirect_url(absolute_url)
-        assert result == absolute_url
+        # URL de origem confiável (em CORS_ALLOWED_ORIGINS) é aceita
+        trusted_url = "http://localhost:5173/callback?google=connected"
+        with override_settings(CORS_ALLOWED_ORIGINS=["http://localhost:5173"]):
+            result = _build_frontend_redirect_url(trusted_url)
+        assert result == trusted_url
+
+        # URL de origem não confiável é rejeitada (open redirect prevention)
+        malicious_url = "https://example.com/callback?google=connected"
+        result_rejected = _build_frontend_redirect_url(malicious_url)
+        assert "example.com" not in result_rejected
+        assert "invalid_redirect" in result_rejected
 
     def test_build_frontend_redirect_url_with_relative_path(self):
         """

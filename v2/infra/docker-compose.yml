@@ -192,6 +192,22 @@ services:
       retries: 3
       start_period: 30s
 
+  # Runner canônico para E2E (Issue #615):
+  # usa imagem oficial do Playwright com browsers + deps pré-instalados.
+  frontend-e2e:
+    image: mcr.microsoft.com/playwright:v1.57.0-noble
+    working_dir: /work
+    environment:
+      CI: "1"
+      E2E_DOCKER: "1"
+      PROXY_TARGET: "http://web:8000"
+      VITE_API_URL: "/api"
+      PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"
+    volumes:
+      - ../frontend:/work
+    depends_on:
+      - web
+
   # ================================================================
   # Observability Stack (Prometheus + Grafana + Exporters)
   # ================================================================

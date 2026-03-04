@@ -26,7 +26,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AcaoControle, AcaoDAT, Municipio, Projeto
+from apps.core.models import AcaoControle, AcaoDAT, Municipio, Projeto, TipoAcaoDAT
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
@@ -207,7 +207,7 @@ def test_dat_user_can_list():
     AcaoDAT.objects.create(
         municipio=municipio,
         projeto=projeto,
-        tipo_acao="Cadastro INEP",
+        tipo_acao=TipoAcaoDAT.CRIACAO_CURSO,
         observacao="Teste DAT",
     )
 
@@ -218,7 +218,7 @@ def test_dat_user_can_list():
     assert response.status_code == status.HTTP_200_OK
     assert response.data["count"] == 1
     assert len(response.data["results"]) == 1
-    assert response.data["results"][0]["tipo_acao"] == "Cadastro INEP"
+    assert response.data["results"][0]["tipo_acao"] == TipoAcaoDAT.CRIACAO_CURSO
 
 
 def test_regular_user_cannot_list_dat_acoes():
@@ -235,7 +235,7 @@ def test_regular_user_cannot_list_dat_acoes():
     AcaoDAT.objects.create(
         municipio=municipio,
         projeto=projeto,
-        tipo_acao="Cadastro INEP",
+        tipo_acao=TipoAcaoDAT.CRIACAO_CURSO,
     )
 
     client = APIClient()
@@ -263,12 +263,12 @@ def test_filter_by_projeto():
     AcaoDAT.objects.create(
         municipio=municipio,
         projeto=projeto1,
-        tipo_acao="Cadastro INEP",
+        tipo_acao=TipoAcaoDAT.CRIACAO_CURSO,
     )
     AcaoDAT.objects.create(
         municipio=municipio,
         projeto=projeto2,
-        tipo_acao="Outra Ação",
+        tipo_acao=TipoAcaoDAT.CRIACAO_CHAVES,
     )
 
     client = APIClient()
@@ -278,7 +278,7 @@ def test_filter_by_projeto():
     assert response.status_code == status.HTTP_200_OK
     assert response.data["count"] == 1
     assert len(response.data["results"]) == 1
-    assert response.data["results"][0]["tipo_acao"] == "Cadastro INEP"
+    assert response.data["results"][0]["tipo_acao"] == TipoAcaoDAT.CRIACAO_CURSO
 
 
 def test_filter_by_tipo_acao():
@@ -298,22 +298,22 @@ def test_filter_by_tipo_acao():
     AcaoDAT.objects.create(
         municipio=municipio,
         projeto=projeto,
-        tipo_acao="Cadastro INEP",
+        tipo_acao=TipoAcaoDAT.CRIACAO_CURSO,
     )
     AcaoDAT.objects.create(
         municipio=municipio,
         projeto=projeto,
-        tipo_acao="Cadastro SIGPEC",
+        tipo_acao=TipoAcaoDAT.CRIACAO_CHAVES,
     )
 
     client = APIClient()
     client.force_authenticate(user=user)
-    response = client.get("/api/dat/acoes/", {"tipo_acao": "INEP"})
+    response = client.get("/api/dat/acoes/", {"tipo_acao": "Curso"})
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["count"] == 1
     assert len(response.data["results"]) == 1
-    assert response.data["results"][0]["tipo_acao"] == "Cadastro INEP"
+    assert response.data["results"][0]["tipo_acao"] == TipoAcaoDAT.CRIACAO_CURSO
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -344,7 +344,7 @@ def test_dat_user_can_create():
     payload = {
         "municipio": municipio.id,
         "projeto": projeto.id,
-        "tipo_acao": "Novo Cadastro",
+        "tipo_acao": TipoAcaoDAT.CRIACAO_CURSO,
         "responsavel": coord.id,
         "data_registro": "2025-03-01",
         "observacao": "Criado via API",
@@ -355,11 +355,11 @@ def test_dat_user_can_create():
     response = client.post("/api/dat/acoes/", payload, format="json")
 
     assert response.status_code == status.HTTP_201_CREATED
-    assert response.data["tipo_acao"] == "Novo Cadastro"
+    assert response.data["tipo_acao"] == TipoAcaoDAT.CRIACAO_CURSO
     assert response.data["observacao"] == "Criado via API"
 
     # Verificar que foi criado no banco
-    assert AcaoDAT.objects.filter(tipo_acao="Novo Cadastro").exists()
+    assert AcaoDAT.objects.filter(tipo_acao=TipoAcaoDAT.CRIACAO_CURSO).exists()
 
 
 def test_regular_user_cannot_create():
@@ -377,7 +377,7 @@ def test_regular_user_cannot_create():
     payload = {
         "municipio": municipio.id,
         "projeto": projeto.id,
-        "tipo_acao": "Tentativa bloqueada",
+        "tipo_acao": TipoAcaoDAT.CRIACAO_CHAVES,
     }
 
     client = APIClient()
@@ -404,7 +404,7 @@ def test_create_returns_read_serializer():
     payload = {
         "municipio": municipio.id,
         "projeto": projeto.id,
-        "tipo_acao": "Teste Serializer",
+        "tipo_acao": TipoAcaoDAT.CRIACAO_INSTRUCOES,
     }
 
     client = APIClient()
@@ -435,7 +435,7 @@ def test_create_without_optional_fields():
     payload = {
         "municipio": municipio.id,
         "projeto": projeto.id,
-        "tipo_acao": "Mínimo",
+        "tipo_acao": TipoAcaoDAT.REUNIAO_DAT,
     }
 
     client = APIClient()
@@ -443,8 +443,43 @@ def test_create_without_optional_fields():
     response = client.post("/api/dat/acoes/", payload, format="json")
 
     assert response.status_code == status.HTTP_201_CREATED
-    assert response.data["tipo_acao"] == "Mínimo"
+    assert response.data["tipo_acao"] == TipoAcaoDAT.REUNIAO_DAT
     assert response.data["responsavel"] is None
+
+
+def test_tipo_acao_invalido_rejeitado_pelo_serializer():
+    """POST com tipo_acao fora dos choices retorna erro claro de validação."""
+    dat_group, _ = Group.objects.get_or_create(name="DAT")
+    user = User.objects.create_user(
+        username="dat1",
+        email="dat@example.com",
+        password="test123",
+        cpf="22222222222",
+    )
+    user.groups.add(dat_group)
+
+    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+
+    payload = {
+        "municipio": municipio.id,
+        "projeto": projeto.id,
+        "tipo_acao": "Cadastro INEP",
+    }
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+    response = client.post("/api/dat/acoes/", payload, format="json")
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    errors = response.data.get("errors", response.data)
+    assert "tipo_acao" in errors
+    message = str(errors["tipo_acao"][0]).lower()
+    assert (
+        ("valid choice" in message)
+        or ("escolha" in message and "válid" in message)
+        or ("escolha" in message and "valid" in message)
+    )
 
 
 def test_create_missing_required_fields():

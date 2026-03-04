@@ -20,6 +20,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth import login as django_login
 from django.contrib.auth import logout as django_logout
+from django.contrib.auth.hashers import make_password
 from django.core.cache import cache
 from django.middleware.csrf import get_token
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -94,6 +95,16 @@ def _get_lockout_remaining_time(username: str) -> int | None:
     return None
 
 
+def _invalid_credentials_response() -> Response:
+    """
+    Generic authentication failure response to prevent account enumeration.
+
+    OWASP recommendation: never disclose whether username exists, password is wrong,
+    or account is locked.
+    """
+    return Response({"error": "Credenciais inválidas."}, status=status.HTTP_400_BAD_REQUEST)
+
+
 # Issue #135: CSRF token endpoint (SEC-P2)
 @ensure_csrf_cookie
 @api_view(["GET"])
@@ -149,8 +160,7 @@ def login(request: Request) -> Response:
 
     Returns:
         200: Login bem-sucedido com dados do usuário
-        400: Credenciais inválidas
-        403: Conta bloqueada por excesso de tentativas
+        400: Falha de autenticação (resposta genérica)
         429: Too Many Requests (rate limit excedido)
     """
     username = request.data.get("username")
@@ -159,13 +169,22 @@ def login(request: Request) -> Response:
     if not username or not password:
         return Response({"error": "Username e password são obrigatórios."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Security Audit 2025-01: Account Lockout
-    # Verifica se a conta está bloqueada ANTES de tentar autenticar
-    if _is_account_locked(username):
-        lockout_duration = getattr(settings, "ACCOUNT_LOCKOUT_DURATION", 900)
-        minutes = lockout_duration // 60
+    # Security hardening #745:
+    # - Keep a generic client response for all auth failures
+    # - Preserve detailed reason only in AuditLog
+    is_locked = _is_account_locked(username)
 
-        # Log tentativa de login em conta bloqueada
+    user = authenticate(request, username=username, password=password)
+    if user is None:
+        # Dummy hash to reduce timing differences between existing/non-existing users.
+        make_password(password)
+
+    if is_locked:
+        threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10)
+        attempts = _get_failed_attempts(username)
+        lockout_remaining_seconds = _get_lockout_remaining_time(username)
+
+        # Log tentativa de login em conta bloqueada (detalhes só internamente)
         AuditLog.objects.create(
             usuario=None,
             action="LOGIN_BLOCKED",
@@ -175,25 +194,18 @@ def login(request: Request) -> Response:
                 "ip_address": request.META.get("REMOTE_ADDR", ""),
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
                 "reason": "account_locked",
+                "attempts": attempts,
+                "threshold": threshold,
+                "lockout_remaining_seconds": lockout_remaining_seconds,
             },
         )
 
-        return Response(
-            {
-                "error": f"Conta bloqueada por excesso de tentativas. Tente novamente em {minutes} minutos.",
-                "locked": True,
-                "lockout_minutes": minutes,
-            },
-            status=status.HTTP_403_FORBIDDEN,
-        )
-
-    user = authenticate(request, username=username, password=password)
+        return _invalid_credentials_response()
 
     if user is None:
-        # Incrementa contador de tentativas falhas
+        # Incrementa contador de tentativas falhas (estado interno)
         attempts = _increment_failed_attempts(username)
         threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10)
-        remaining = threshold - attempts
 
         # Log tentativa falha
         AuditLog.objects.create(
@@ -204,33 +216,32 @@ def login(request: Request) -> Response:
                 "username": username,
                 "ip_address": request.META.get("REMOTE_ADDR", ""),
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+                "reason": "invalid_credentials",
                 "attempts": attempts,
                 "threshold": threshold,
             },
         )
 
-        if remaining <= 0:
-            lockout_duration = getattr(settings, "ACCOUNT_LOCKOUT_DURATION", 900)
-            minutes = lockout_duration // 60
-            return Response(
-                {
-                    "error": f"Conta bloqueada por excesso de tentativas. Tente novamente em {minutes} minutos.",
-                    "locked": True,
-                    "lockout_minutes": minutes,
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        return Response(
-            {
-                "error": "Credenciais inválidas.",
-                "remaining_attempts": remaining if remaining > 0 else 0,
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        return _invalid_credentials_response()
 
     if not user.is_active:
-        return Response({"error": "Usuário inativo."}, status=status.HTTP_400_BAD_REQUEST)
+        # Defensive fallback for alternate backends that might return inactive users.
+        attempts = _increment_failed_attempts(username)
+        threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10)
+        AuditLog.objects.create(
+            usuario=None,
+            action="LOGIN_FAILED",
+            model_name="Usuario",
+            details={
+                "username": username,
+                "ip_address": request.META.get("REMOTE_ADDR", ""),
+                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+                "reason": "inactive_user",
+                "attempts": attempts,
+                "threshold": threshold,
+            },
+        )
+        return _invalid_credentials_response()
 
     # Login bem-sucedido: limpa contador de tentativas
     _clear_failed_attempts(username)

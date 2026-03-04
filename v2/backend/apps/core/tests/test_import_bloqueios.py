@@ -255,11 +255,12 @@ class TestImportBloqueiosView:
 
     def test_invalid_mime_type_returns_400(self, api_client, controle_user):
         """Tipo de arquivo invalido retorna 400."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
         api_client.force_authenticate(user=controle_user)
 
-        # Criar arquivo com extensao invalida
-        fake_file = io.BytesIO(b"fake content")
-        fake_file.name = "test.txt"
+        # Usar MIME type explicitamente inválido (não text/plain, pois CSVs podem ser text/plain)
+        fake_file = SimpleUploadedFile("malicious.exe", b"MZ\x90\x00", content_type="application/x-msdownload")
 
         response = api_client.post(
             IMPORT_BLOQUEIOS_URL,

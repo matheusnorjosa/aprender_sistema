@@ -13,6 +13,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+from django.db import transaction
 from django.utils import timezone
 
 from apps.core.exceptions import ValidationAPIError
@@ -52,6 +53,25 @@ def _get_client_ip(request: Any) -> str:
     return request.META.get("REMOTE_ADDR", "unknown")
 
 
+def _raise_invalid_status_error(solicitacao: Solicitacao) -> None:
+    """Raise ValidationAPIError for non-pending solicitacao status."""
+    if solicitacao.status == "aprovado":
+        raise ValidationAPIError(
+            message="Solicitação já está aprovada.",
+            code="already_approved",
+        )
+    if solicitacao.status == "reprovado":
+        raise ValidationAPIError(
+            message="Solicitação já está reprovada.",
+            code="already_rejected",
+        )
+    raise ValidationAPIError(
+        message="Solicitação não está pendente.",
+        code="invalid_status",
+        extra={"status": solicitacao.status},
+    )
+
+
 def approve_solicitacao(
     solicitacao: Solicitacao,
     user: Usuario,
@@ -73,56 +93,43 @@ def approve_solicitacao(
     Raises:
         ValidationAPIError: If solicitacao is not pending
     """
-    if solicitacao.status != "pendente":
-        if solicitacao.status == "aprovado":
-            raise ValidationAPIError(
-                message="Solicitação já está aprovada.",
-                code="already_approved",
-            )
-        if solicitacao.status == "reprovado":
-            raise ValidationAPIError(
-                message="Solicitação já está reprovada.",
-                code="already_rejected",
-            )
-        raise ValidationAPIError(
-            message="Solicitação não está pendente.",
-            code="invalid_status",
-            extra={"status": solicitacao.status},
+    client_ip = _get_client_ip(request)
+    with transaction.atomic():
+        solicitacao = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
+        if solicitacao.status != "pendente":
+            _raise_invalid_status_error(solicitacao)
+
+        prev_status = solicitacao.status
+        solicitacao.status = "aprovado"
+        solicitacao.save()
+
+        # Persist AuditLog
+        AuditLog.objects.create(
+            usuario=user,
+            action="APPROVE",
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": solicitacao.id,
+                "prev_status": prev_status,
+                "new_status": solicitacao.status,
+                "ip_address": client_ip,
+            },
         )
 
-    prev_status = solicitacao.status
-    solicitacao.status = "aprovado"
-    solicitacao.save()
-
-    client_ip = _get_client_ip(request)
-
-    # Persist AuditLog
-    AuditLog.objects.create(
-        usuario=user,
-        action="APPROVE",
-        model_name="Solicitacao",
-        details={
-            "solicitacao_id": solicitacao.id,
-            "prev_status": prev_status,
-            "new_status": solicitacao.status,
-            "ip_address": client_ip,
-        },
-    )
-
-    logger.info(
-        "solicitacao_approved",
-        extra={
-            "event": "solicitacao_approved",
-            "user_id": user.id,
-            "username": user.username,
-            "solicitation_id": solicitacao.id,
-            "action": "approve",
-            "ip_address": client_ip,
-            "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-            "justificativa": justificativa,
-            "timestamp": timezone.now().isoformat(),
-        },
-    )
+        logger.info(
+            "solicitacao_approved",
+            extra={
+                "event": "solicitacao_approved",
+                "user_id": user.id,
+                "username": user.username,
+                "solicitation_id": solicitacao.id,
+                "action": "approve",
+                "ip_address": client_ip,
+                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+                "justificativa": justificativa,
+                "timestamp": timezone.now().isoformat(),
+            },
+        )
 
     return ApprovalResult(
         success=True,
@@ -154,57 +161,44 @@ def reject_solicitacao(
     Raises:
         ValidationAPIError: If solicitacao is not pending
     """
-    if solicitacao.status != "pendente":
-        if solicitacao.status == "aprovado":
-            raise ValidationAPIError(
-                message="Solicitação já está aprovada.",
-                code="already_approved",
-            )
-        if solicitacao.status == "reprovado":
-            raise ValidationAPIError(
-                message="Solicitação já está reprovada.",
-                code="already_rejected",
-            )
-        raise ValidationAPIError(
-            message="Solicitação não está pendente.",
-            code="invalid_status",
-            extra={"status": solicitacao.status},
+    client_ip = _get_client_ip(request)
+    with transaction.atomic():
+        solicitacao = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
+        if solicitacao.status != "pendente":
+            _raise_invalid_status_error(solicitacao)
+
+        prev_status = solicitacao.status
+        solicitacao.status = "reprovado"
+        solicitacao.save()
+
+        # Persist AuditLog
+        AuditLog.objects.create(
+            usuario=user,
+            action="REJECT",
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": solicitacao.id,
+                "prev_status": prev_status,
+                "new_status": solicitacao.status,
+                "justificativa": justificativa,
+                "ip_address": client_ip,
+            },
         )
 
-    prev_status = solicitacao.status
-    solicitacao.status = "reprovado"
-    solicitacao.save()
-
-    client_ip = _get_client_ip(request)
-
-    # Persist AuditLog
-    AuditLog.objects.create(
-        usuario=user,
-        action="REJECT",
-        model_name="Solicitacao",
-        details={
-            "solicitacao_id": solicitacao.id,
-            "prev_status": prev_status,
-            "new_status": solicitacao.status,
-            "justificativa": justificativa,
-            "ip_address": client_ip,
-        },
-    )
-
-    logger.info(
-        "solicitacao_rejected",
-        extra={
-            "event": "solicitacao_rejected",
-            "user_id": user.id,
-            "username": user.username,
-            "solicitation_id": solicitacao.id,
-            "action": "reject",
-            "ip_address": client_ip,
-            "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-            "justificativa": justificativa,
-            "timestamp": timezone.now().isoformat(),
-        },
-    )
+        logger.info(
+            "solicitacao_rejected",
+            extra={
+                "event": "solicitacao_rejected",
+                "user_id": user.id,
+                "username": user.username,
+                "solicitation_id": solicitacao.id,
+                "action": "reject",
+                "ip_address": client_ip,
+                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+                "justificativa": justificativa,
+                "timestamp": timezone.now().isoformat(),
+            },
+        )
 
     return ApprovalResult(
         success=True,
@@ -250,53 +244,56 @@ def batch_approve_solicitacoes(
     errors: list[dict[str, Any]] = []
     client_ip = _get_client_ip(request)
 
-    # Fetch pending solicitacoes
-    solicitacoes = Solicitacao.objects.filter(id__in=ids, status="pendente")
-    found_ids = set(solicitacoes.values_list("id", flat=True))
-
-    # Record errors for not found or already processed IDs
-    for sol_id in ids:
-        if sol_id not in found_ids:
-            sol = Solicitacao.objects.filter(id=sol_id).first()
-            if sol:
-                errors.append({"id": sol_id, "detail": f"Status já é '{sol.status}'"})
-            else:
-                errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
-
-    # Approve in batch
-    for sol in solicitacoes:
-        prev_status = sol.status
-        sol.status = "aprovado"
-        sol.save()
-
-        # PA-05: Individual AuditLog with batch=true
-        AuditLog.objects.create(
-            usuario=user,
-            action="APPROVE",
-            model_name="Solicitacao",
-            details={
-                "solicitacao_id": sol.id,
-                "prev_status": prev_status,
-                "new_status": "aprovado",
-                "batch": True,
-                "ip_address": client_ip,
-            },
+    with transaction.atomic():
+        # Fetch and lock pending solicitacoes to avoid double-approval races
+        solicitacoes = list(
+            Solicitacao.objects.filter(id__in=ids, status="pendente").select_for_update().order_by("id")
         )
+        found_ids = {sol.id for sol in solicitacoes}
 
-        logger.info(
-            "solicitacao_batch_approved",
-            extra={
-                "event": "solicitacao_batch_approved",
-                "user_id": user.id,
-                "username": user.username,
-                "solicitacao_id": sol.id,
-                "batch": True,
-                "ip_address": client_ip,
-                "timestamp": timezone.now().isoformat(),
-            },
-        )
+        # Record errors for not found or already processed IDs
+        for sol_id in ids:
+            if sol_id not in found_ids:
+                sol = Solicitacao.objects.filter(id=sol_id).first()
+                if sol:
+                    errors.append({"id": sol_id, "detail": f"Status já é '{sol.status}'"})
+                else:
+                    errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
 
-        approved += 1
+        # Approve in batch
+        for sol in solicitacoes:
+            prev_status = sol.status
+            sol.status = "aprovado"
+            sol.save()
+
+            # PA-05: Individual AuditLog with batch=true
+            AuditLog.objects.create(
+                usuario=user,
+                action="APPROVE",
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_id": sol.id,
+                    "prev_status": prev_status,
+                    "new_status": "aprovado",
+                    "batch": True,
+                    "ip_address": client_ip,
+                },
+            )
+
+            logger.info(
+                "solicitacao_batch_approved",
+                extra={
+                    "event": "solicitacao_batch_approved",
+                    "user_id": user.id,
+                    "username": user.username,
+                    "solicitacao_id": sol.id,
+                    "batch": True,
+                    "ip_address": client_ip,
+                    "timestamp": timezone.now().isoformat(),
+                },
+            )
+
+            approved += 1
 
     return BatchApprovalResult(
         approved_count=approved,
@@ -340,53 +337,56 @@ def batch_reject_solicitacoes(
     errors: list[dict[str, Any]] = []
     client_ip = _get_client_ip(request)
 
-    # Fetch pending solicitacoes
-    solicitacoes = Solicitacao.objects.filter(id__in=ids, status="pendente")
-    found_ids = set(solicitacoes.values_list("id", flat=True))
-
-    # Record errors for not found or already processed IDs
-    for sol_id in ids:
-        if sol_id not in found_ids:
-            sol = Solicitacao.objects.filter(id=sol_id).first()
-            if sol:
-                errors.append({"id": sol_id, "detail": f"Status já é '{sol.status}'"})
-            else:
-                errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
-
-    # Reject in batch
-    for sol in solicitacoes:
-        prev_status = sol.status
-        sol.status = "reprovado"
-        sol.save()
-
-        # PA-05: Individual AuditLog with batch=true
-        AuditLog.objects.create(
-            usuario=user,
-            action="REJECT",
-            model_name="Solicitacao",
-            details={
-                "solicitacao_id": sol.id,
-                "prev_status": prev_status,
-                "new_status": "reprovado",
-                "batch": True,
-                "ip_address": client_ip,
-            },
+    with transaction.atomic():
+        # Fetch and lock pending solicitacoes to avoid double-reject races
+        solicitacoes = list(
+            Solicitacao.objects.filter(id__in=ids, status="pendente").select_for_update().order_by("id")
         )
+        found_ids = {sol.id for sol in solicitacoes}
 
-        logger.info(
-            "solicitacao_batch_rejected",
-            extra={
-                "event": "solicitacao_batch_rejected",
-                "user_id": user.id,
-                "username": user.username,
-                "solicitacao_id": sol.id,
-                "batch": True,
-                "ip_address": client_ip,
-                "timestamp": timezone.now().isoformat(),
-            },
-        )
+        # Record errors for not found or already processed IDs
+        for sol_id in ids:
+            if sol_id not in found_ids:
+                sol = Solicitacao.objects.filter(id=sol_id).first()
+                if sol:
+                    errors.append({"id": sol_id, "detail": f"Status já é '{sol.status}'"})
+                else:
+                    errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
 
-        rejected += 1
+        # Reject in batch
+        for sol in solicitacoes:
+            prev_status = sol.status
+            sol.status = "reprovado"
+            sol.save()
+
+            # PA-05: Individual AuditLog with batch=true
+            AuditLog.objects.create(
+                usuario=user,
+                action="REJECT",
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_id": sol.id,
+                    "prev_status": prev_status,
+                    "new_status": "reprovado",
+                    "batch": True,
+                    "ip_address": client_ip,
+                },
+            )
+
+            logger.info(
+                "solicitacao_batch_rejected",
+                extra={
+                    "event": "solicitacao_batch_rejected",
+                    "user_id": user.id,
+                    "username": user.username,
+                    "solicitacao_id": sol.id,
+                    "batch": True,
+                    "ip_address": client_ip,
+                    "timestamp": timezone.now().isoformat(),
+                },
+            )
+
+            rejected += 1
 
     return BatchApprovalResult(
         approved_count=0,

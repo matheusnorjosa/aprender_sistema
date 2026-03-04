@@ -121,6 +121,17 @@ class AcaoControle(models.Model):
         return f"{self.municipio_id} | {self.projeto_id} | {data_display}"  # type: ignore[attr-defined]
 
 
+class TipoAcaoDAT(models.TextChoices):
+    """Valores canônicos de tipo_acao para AcaoDAT (planilha DAT)."""
+
+    CRIACAO_CURSO = "FORMAR - Criação de Curso", "FORMAR - Criação de Curso"
+    CRIACAO_CHAVES = "FORMAR - Criação de Chaves", "FORMAR - Criação de Chaves"
+    CRIACAO_INSTRUCOES = "FORMAR - Criação de Instruções", "FORMAR - Criação de Instruções"
+    CHAVES_ENVIADAS = "FORMAR - Chaves enviadas", "FORMAR - Chaves enviadas"
+    CODIGOS_ENVIADOS = "Códigos enviados", "Códigos enviados"
+    REUNIAO_DAT = "Reunião DAT", "Reunião DAT"
+
+
 class AcaoDAT(models.Model):
     """
     Acoes do setor DAT: cadastros diversos por municipio/projeto.
@@ -142,7 +153,11 @@ class AcaoDAT(models.Model):
         related_name="acoes_dat",
         verbose_name="Projeto",
     )
-    tipo_acao = models.CharField(max_length=120, verbose_name="Tipo de acao")
+    tipo_acao = models.CharField(
+        max_length=120,
+        choices=TipoAcaoDAT.choices,
+        verbose_name="Tipo de Ação",
+    )
     responsavel = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",
         null=True,

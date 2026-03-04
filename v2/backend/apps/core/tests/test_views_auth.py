@@ -15,10 +15,12 @@ Valida:
 
 from __future__ import annotations
 
+from unittest.mock import patch
 from uuid import uuid4
 
 from django.contrib.auth.models import Group
 from django.core.cache import cache
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -199,6 +201,9 @@ def test_login_invalid_credentials_rejected(api_client, usuario_ativo):
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["error"] == "Credenciais inválidas."
+    assert "remaining_attempts" not in response.data
+    assert "locked" not in response.data
+    assert "lockout_minutes" not in response.data
 
     # Usuário inexistente
     response = api_client.post(
@@ -206,6 +211,82 @@ def test_login_invalid_credentials_rejected(api_client, usuario_ativo):
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["error"] == "Credenciais inválidas."
+    assert "remaining_attempts" not in response.data
+    assert "locked" not in response.data
+    assert "lockout_minutes" not in response.data
+
+
+@override_settings(ACCOUNT_LOCKOUT_THRESHOLD=1, ACCOUNT_LOCKOUT_DURATION=900)
+def test_login_locked_account_returns_generic_error_response(api_client, usuario_ativo):
+    """
+    Conta bloqueada deve retornar a mesma resposta genérica de credencial inválida.
+
+    Valida:
+    - Status 400 (não 403) mesmo em lockout
+    - Sem campos sensíveis (locked/remaining_attempts/lockout_minutes)
+    - Detalhes de lockout mantidos apenas em AuditLog
+    """
+    # 1ª tentativa inválida: incrementa contador para atingir lockout (threshold=1)
+    first = api_client.post(
+        "/api/auth/login/", {"username": usuario_ativo.username, "password": "wrongpass"}, format="json"
+    )
+    assert first.status_code == status.HTTP_400_BAD_REQUEST
+    assert first.data == {"error": "Credenciais inválidas."}
+
+    # 2ª tentativa: conta já bloqueada internamente, resposta pública continua genérica
+    locked = api_client.post(
+        "/api/auth/login/", {"username": usuario_ativo.username, "password": "wrongpass"}, format="json"
+    )
+    assert locked.status_code == status.HTTP_400_BAD_REQUEST
+    assert locked.data == {"error": "Credenciais inválidas."}
+    assert "locked" not in locked.data
+    assert "remaining_attempts" not in locked.data
+    assert "lockout_minutes" not in locked.data
+
+    blocked_log = AuditLog.objects.filter(action="LOGIN_BLOCKED").latest("created_at")
+    assert blocked_log.details["username"] == usuario_ativo.username
+    assert blocked_log.details["reason"] == "account_locked"
+
+
+@override_settings(ACCOUNT_LOCKOUT_THRESHOLD=1, ACCOUNT_LOCKOUT_DURATION=900)
+def test_login_failure_response_is_uniform_across_invalid_nonexistent_and_locked(api_client, usuario_ativo):
+    """
+    Cenários de falha de autenticação devem ter payload idêntico (anti-enumeração).
+
+    Valida:
+    - Senha inválida (usuário existente)
+    - Usuário inexistente
+    - Conta bloqueada por lockout
+    """
+    expected = {"error": "Credenciais inválidas."}
+
+    invalid_existing = api_client.post(
+        "/api/auth/login/", {"username": usuario_ativo.username, "password": "wrongpass"}, format="json"
+    )
+    nonexistent = api_client.post("/api/auth/login/", {"username": "ghost_user_123", "password": "wrongpass"})
+    locked = api_client.post("/api/auth/login/", {"username": usuario_ativo.username, "password": "wrongpass"})
+
+    assert invalid_existing.status_code == status.HTTP_400_BAD_REQUEST
+    assert nonexistent.status_code == status.HTTP_400_BAD_REQUEST
+    assert locked.status_code == status.HTTP_400_BAD_REQUEST
+
+    assert invalid_existing.data == expected
+    assert nonexistent.data == expected
+    assert locked.data == expected
+
+
+@patch("apps.core.views_auth.make_password")
+def test_login_uses_dummy_hash_for_failed_authentication(mock_make_password, api_client):
+    """
+    Em falha de autenticação, deve executar hash dummy para reduzir timing leak.
+    """
+    response = api_client.post(
+        "/api/auth/login/",
+        {"username": "nonexistent_timing_user", "password": "timing-pass-123"},
+        format="json",
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    mock_make_password.assert_called_once_with("timing-pass-123")
 
 
 def test_login_returns_groups(api_client, usuario_superintendencia):

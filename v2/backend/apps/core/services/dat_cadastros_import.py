@@ -27,13 +27,51 @@ from typing import Any
 from django.conf import settings
 from django.db import transaction
 
-from apps.core.models import AcaoDAT, Municipio, Projeto, Usuario
+from apps.core.models import AcaoDAT, Municipio, Projeto, TipoAcaoDAT, Usuario
 from apps.core.services.normalize import norm_text
 from apps.core.services.resolvers import resolve_municipio, resolve_user_by_email, resolve_user_by_name
 from apps.core.types import ExternalHash
 
 OUT_DIR: Path = Path(settings.BASE_DIR) / "out_etl"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+TIPO_ACAO_MAP: dict[str, str] = {
+    # FORMAR - Criação de Curso
+    "formar - criacao de curso": TipoAcaoDAT.CRIACAO_CURSO,
+    "formar-criacao de curso": TipoAcaoDAT.CRIACAO_CURSO,
+    "formar criacao de curso": TipoAcaoDAT.CRIACAO_CURSO,
+    "formar criacao curso": TipoAcaoDAT.CRIACAO_CURSO,
+    # FORMAR - Criação de Chaves
+    "formar - criacao de chaves": TipoAcaoDAT.CRIACAO_CHAVES,
+    "formar-criacao de chaves": TipoAcaoDAT.CRIACAO_CHAVES,
+    "formar criacao de chaves": TipoAcaoDAT.CRIACAO_CHAVES,
+    "formar criacao chaves": TipoAcaoDAT.CRIACAO_CHAVES,
+    # FORMAR - Criação de Instruções
+    "formar - criacao de instrucoes": TipoAcaoDAT.CRIACAO_INSTRUCOES,
+    "formar-criacao de instrucoes": TipoAcaoDAT.CRIACAO_INSTRUCOES,
+    "formar criacao de instrucoes": TipoAcaoDAT.CRIACAO_INSTRUCOES,
+    "formar criacao instrucoes": TipoAcaoDAT.CRIACAO_INSTRUCOES,
+    # FORMAR - Chaves enviadas
+    "formar - chaves enviadas": TipoAcaoDAT.CHAVES_ENVIADAS,
+    "formar-chaves enviadas": TipoAcaoDAT.CHAVES_ENVIADAS,
+    "formar chaves enviadas": TipoAcaoDAT.CHAVES_ENVIADAS,
+    "formar - chave enviada": TipoAcaoDAT.CHAVES_ENVIADAS,
+    # Códigos enviados
+    "codigos enviados": TipoAcaoDAT.CODIGOS_ENVIADOS,
+    "codigo enviado": TipoAcaoDAT.CODIGOS_ENVIADOS,
+    # Reunião DAT
+    "reuniao dat": TipoAcaoDAT.REUNIAO_DAT,
+    "reuniao - dat": TipoAcaoDAT.REUNIAO_DAT,
+}
+
+
+def _normalize_tipo_acao_dat(value: str | None) -> str | None:
+    """Mapeia variações de grafia para o valor canônico de TipoAcaoDAT."""
+    if not value:
+        return None
+
+    key = norm_text(value)
+    return TIPO_ACAO_MAP.get(key)
 
 
 def import_dat_cadastros(file_path: str, dry_run: bool = False) -> dict[str, Any]:
@@ -225,10 +263,11 @@ def _process_row(
         return "skip"
 
     # Tipo de ação (obrigatório)
-    tipo_acao: str | None = norm["tipo_acao"]
+    tipo_acao_raw: str | None = norm["tipo_acao"]
+    tipo_acao: str | None = _normalize_tipo_acao_dat(tipo_acao_raw)
     if not tipo_acao:
         stats["skipped"]["tipo_acao"] += 1
-        pendencias["tipo_acao"].append({"linha": idx, "valor": None})
+        pendencias["tipo_acao"].append({"linha": idx, "valor": tipo_acao_raw})
         return "skip"
 
     # Resolver responsável (opcional)

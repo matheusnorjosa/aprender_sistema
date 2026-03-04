@@ -25,7 +25,7 @@ from django.contrib.auth import get_user_model
 
 import pytest
 
-from apps.core.models import AcaoDAT, Municipio, Projeto
+from apps.core.models import AcaoDAT, Municipio, Projeto, TipoAcaoDAT
 from apps.core.services.dat_cadastros_import import import_dat_cadastros
 
 User = get_user_model()
@@ -61,7 +61,7 @@ def test_import_creates_acao_dat():
             {
                 "Município": "Fortaleza",
                 "Projeto": "ACerta",
-                "Tipo de Ação": "Cadastro INEP",
+                "Tipo de Ação": TipoAcaoDAT.CRIACAO_CURSO,
                 "Responsável": "resp@example.com",
                 "Data Registro": "2025-01-15",
                 "Observação": "Cadastro realizado",
@@ -79,11 +79,35 @@ def test_import_creates_acao_dat():
     acao = AcaoDAT.objects.first()
     assert acao.municipio.nome == "Fortaleza"
     assert acao.projeto.nome == "ACerta"
-    assert acao.tipo_acao == "Cadastro INEP"
+    assert acao.tipo_acao == TipoAcaoDAT.CRIACAO_CURSO
     assert acao.responsavel.email == "resp@example.com"
     assert acao.data_registro == date(2025, 1, 15)
     assert acao.observacao == "Cadastro realizado"
     assert acao.external_hash is not None
+
+
+def test_etl_normaliza_variacao_de_grafia():
+    """Variação de grafia é normalizada para valor canônico."""
+    Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": "FORMAR-Criação de Curso",
+                "Data Registro": "2025-01-15",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Data Registro"],
+    )
+
+    report = import_dat_cadastros(csv_file, dry_run=False)
+
+    assert report["stats"]["created"] == 1
+    acao = AcaoDAT.objects.get()
+    assert acao.tipo_acao == TipoAcaoDAT.CRIACAO_CURSO
 
 
 def test_idempotency_no_duplicates():
@@ -96,7 +120,7 @@ def test_idempotency_no_duplicates():
             {
                 "Município": "Fortaleza",
                 "Projeto": "ACerta",
-                "Tipo de Ação": "Cadastro INEP",
+                "Tipo de Ação": TipoAcaoDAT.CRIACAO_CURSO,
                 "Data Registro": "2025-01-15",
             }
         ],
@@ -126,7 +150,7 @@ def test_dry_run_does_not_commit():
             {
                 "Município": "Fortaleza",
                 "Projeto": "ACerta",
-                "Tipo de Ação": "Cadastro INEP",
+                "Tipo de Ação": TipoAcaoDAT.CRIACAO_CURSO,
                 "Data Registro": "2025-01-15",
             }
         ],
@@ -177,7 +201,7 @@ def test_report_saved_to_out_etl():
             {
                 "Município": "Fortaleza",
                 "Projeto": "ACerta",
-                "Tipo de Ação": "Cadastro INEP",
+                "Tipo de Ação": TipoAcaoDAT.CRIACAO_CURSO,
             }
         ],
         fieldnames=["Município", "Projeto", "Tipo de Ação"],
@@ -208,7 +232,7 @@ def test_responsavel_optional():
             {
                 "Município": "Fortaleza",
                 "Projeto": "ACerta",
-                "Tipo de Ação": "Cadastro SIGPEC",
+                "Tipo de Ação": TipoAcaoDAT.CRIACAO_CHAVES,
                 "Data Registro": "2025-01-01",
             }
         ],
@@ -221,7 +245,7 @@ def test_responsavel_optional():
 
     acao = AcaoDAT.objects.first()
     assert acao.responsavel is None  # Opcional, não bloqueia criação
-    assert acao.tipo_acao == "Cadastro SIGPEC"
+    assert acao.tipo_acao == TipoAcaoDAT.CRIACAO_CHAVES
 
 
 def test_update_existing_record():
@@ -235,7 +259,7 @@ def test_update_existing_record():
             {
                 "Município": "Fortaleza",
                 "Projeto": "ACerta",
-                "Tipo de Ação": "Cadastro Teste",
+                "Tipo de Ação": TipoAcaoDAT.CRIACAO_INSTRUCOES,
                 "Data Registro": "2025-01-01",
                 "Observação": "Versão 1",
             }
@@ -252,7 +276,7 @@ def test_update_existing_record():
             {
                 "Município": "Fortaleza",
                 "Projeto": "ACerta",
-                "Tipo de Ação": "Cadastro Teste",
+                "Tipo de Ação": TipoAcaoDAT.CRIACAO_INSTRUCOES,
                 "Data Registro": "2025-01-01",
                 "Observação": "Versão 2 - atualizada",
             }
@@ -279,13 +303,13 @@ def test_external_hash_includes_tipo_acao():
             {
                 "Município": "Fortaleza",
                 "Projeto": "ACerta",
-                "Tipo de Ação": "Cadastro INEP",
+                "Tipo de Ação": TipoAcaoDAT.CRIACAO_CURSO,
                 "Data Registro": "2025-01-01",
             },
             {
                 "Município": "Fortaleza",
                 "Projeto": "ACerta",
-                "Tipo de Ação": "Cadastro SIGPEC",
+                "Tipo de Ação": TipoAcaoDAT.CRIACAO_CHAVES,
                 "Data Registro": "2025-01-01",
             },
         ],
@@ -312,14 +336,14 @@ def test_date_parsing_formats():
             {
                 "Município": "Fortaleza",
                 "Projeto": "ACerta",
-                "Tipo de Ação": "Teste ISO",
+                "Tipo de Ação": TipoAcaoDAT.CODIGOS_ENVIADOS,
                 "Data Registro": "2025-01-15",
             },
             # dd/mm/yyyy format
             {
                 "Município": "Fortaleza",
                 "Projeto": "ACerta",
-                "Tipo de Ação": "Teste BR",
+                "Tipo de Ação": TipoAcaoDAT.REUNIAO_DAT,
                 "Data Registro": "20/01/2025",
             },
         ],
@@ -331,8 +355,8 @@ def test_date_parsing_formats():
     assert report["stats"]["created"] == 2
 
     # Validar datas parseadas corretamente
-    acao_iso = AcaoDAT.objects.get(tipo_acao="Teste ISO")
+    acao_iso = AcaoDAT.objects.get(tipo_acao=TipoAcaoDAT.CODIGOS_ENVIADOS)
     assert acao_iso.data_registro == date(2025, 1, 15)
 
-    acao_br = AcaoDAT.objects.get(tipo_acao="Teste BR")
+    acao_br = AcaoDAT.objects.get(tipo_acao=TipoAcaoDAT.REUNIAO_DAT)
     assert acao_br.data_registro == date(2025, 1, 20)

@@ -33,14 +33,7 @@ from apps.core.serializers.openapi_critical_contract import (
     ImportOperationResponseSerializer,
 )
 from apps.core.services.produtos_import import import_produtos_from_file
-
-# Issue #132: Upload validation (SEC-P0)
-MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
-ALLOWED_CONTENT_TYPES = {
-    "text/csv",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-}
+from apps.core.upload_validators import validate_upload
 
 
 class ImportProdutosView(APIView):
@@ -107,19 +100,10 @@ class ImportProdutosView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Issue #132: Validar tamanho (DoS prevention)
-        if upload.size > MAX_UPLOAD_SIZE:
-            return Response(
-                {"detail": f"Arquivo muito grande. Maximo: {MAX_UPLOAD_SIZE / 1024 / 1024:.0f}MB"},
-                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            )
-
-        # Issue #132: Validar MIME type (malicious file prevention)
-        if upload.content_type not in ALLOWED_CONTENT_TYPES:
-            return Response(
-                {"detail": f"Tipo de arquivo nao permitido. Aceitos: CSV, XLS, XLSX. Recebido: {upload.content_type}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # Issue #132/#747: Validar tamanho, MIME type e magic bytes
+        error_response = validate_upload(upload)
+        if error_response:
+            return error_response
 
         # Salvar upload em /tmp via tempfile
         temp_file = None

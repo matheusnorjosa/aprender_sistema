@@ -74,6 +74,40 @@ Generate or obtain SSL certificate and update paths in nginx config.
 ./scripts/deploy.sh
 ```
 
+## Environment Contracts (dev/staging/producao)
+
+Use the operational matrix in `ENVIRONMENTS.md` to avoid context confusion between local dev, staging and production.
+
+Quick commands (from `v2/infra`):
+
+```bash
+# DEV
+make check-env-dev
+make up-dev
+make health-dev
+make down-dev
+
+# STAGING
+make check-env-staging
+make up-staging
+make health-staging
+make down-staging
+
+# PROD (local controlled validation)
+make check-env-prod
+make up-prod
+make health-prod
+make down-prod
+```
+
+Default env templates are versioned as:
+
+- `.env.dev`
+- `.env.staging`
+- `.env.production`
+
+Important: keep placeholders only in these files. Real secrets must stay outside Git.
+
 ## Environment Variables
 
 Create `/etc/aprender/env` with:

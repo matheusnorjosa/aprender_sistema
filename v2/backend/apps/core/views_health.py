@@ -6,7 +6,9 @@ Health Check and Features Views
 
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
 from typing import Any
 
 from django.core.cache import cache
@@ -69,6 +71,38 @@ def readyz(request: Request) -> Response:
     status = "healthy" if db_ok else "unhealthy"
 
     return JsonResponse({"status": status, "checks": checks}, status=status_code)
+
+
+def versionz(request: Request) -> JsonResponse:
+    """
+    Returns the deployed version of the application.
+
+    Reads from BUILD_INFO.json baked into the image at build time.
+    Used by CI/CD (release.yaml) to verify the correct version is running.
+
+    GET /api/version/
+
+    Response format:
+    {
+        "version": "v2026.03.05-abc1234",
+        "git_sha": "abc1234",
+        "build_date": "2026-03-05"
+    }
+    """
+    build_info_path = Path("/app/BUILD_INFO.json")
+    try:
+        with build_info_path.open(encoding="utf-8") as f:
+            data: dict[str, str] = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        data = {"version": "unknown", "git_sha": "unknown", "build_date": "unknown"}
+
+    return JsonResponse(
+        {
+            "version": data.get("version", "unknown"),
+            "git_sha": data.get("git_sha", "unknown"),
+            "build_date": data.get("build_date", "unknown"),
+        }
+    )
 
 
 @api_view(["GET"])

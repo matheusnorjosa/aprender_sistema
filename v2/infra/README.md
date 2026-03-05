@@ -110,7 +110,7 @@ Default env templates are versioned as:
 
 Important:
 - keep placeholders only in these files (real secrets outside Git).
-- `staging/prod` require explicit `IMAGE_TAG` (no implicit `latest`).
+- `staging` uses explicit `IMAGE_TAG`; `prod` stays on `IMAGE_TAG=latest` with controlled promotion by workflow.
 - `staging/prod` do not use local build; use published images (`pull + up --no-build`).
 
 ## Backend Dockerfiles
@@ -132,21 +132,26 @@ Create `/etc/aprender/env` with:
 ```bash
 DJANGO_SETTINGS_MODULE=config.settings
 SECRET_KEY=your-secret-key
-DB_HOST=10.0.0.2
+DB_HOST=172.17.0.3
 DB_PORT=5432
 DB_NAME=aprender_db
-DB_USER=aprender_user
+DB_USER=matheus_aprender
 DB_PASSWORD=your-db-password
-REDIS_PASSWORD=your-redis-password
+REDIS_HOST=172.17.0.4
+REDIS_PORT=6379
+IMAGE_TAG=latest
+FRONTEND_PORT=81
+DOCKER_HUB_TOKEN=your-docker-hub-token
+WATCHTOWER_TOKEN=your-watchtower-token
 ```
 
 ## VM Architecture
 
-| VM | Role | IP | Ports |
+| VM | Role | IP interno | Ports |
 |----|------|-----|-------|
-| VM01_App | App + Workers | 10.0.0.1 | 80, 443 |
-| VM02_Banco | PostgreSQL | 10.0.0.2 | 5432 |
-| VM03_Redis | Redis | 10.0.0.3 | 6379 |
+| VM01_App | App + Workers (Docker) | 172.17.0.2 | 8000 (web), 81 (frontend), 80/443 (via NPM) |
+| VM02_Banco | PostgreSQL 15 (servico nativo) | 172.17.0.3 | 5432 |
+| VM03_Redis | Redis 7 (servico nativo) | 172.17.0.4 | 6379 |
 
 ## Related Documentation
 

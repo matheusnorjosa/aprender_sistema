@@ -143,8 +143,6 @@ class DATCoordenadorViewSet(viewsets.ModelViewSet):
         """Permissões baseadas na ação."""
         if self.action == "destroy":
             return [IsSuperintendenciaOnly()]
-        if self.action in {"dashboard", "pendencias"}:
-            return [IsComprasDashboardAccess()]
         return [IsDATOrSuper()]
 
     def perform_create(self, serializer: Any) -> None:
@@ -369,6 +367,8 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         """Permissões baseadas na ação."""
         if self.action == "destroy":
             return [IsSuperintendenciaOnly()]
+        if self.action in {"dashboard", "pendencias"}:
+            return [IsComprasDashboardAccess()]
         return [IsDATOrSuper()]
 
     def perform_create(self, serializer: Any) -> None:

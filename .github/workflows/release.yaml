@@ -79,6 +79,101 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
+      # =========================================================================
+      # Pre-publish Security Gate (blocks HIGH/CRITICAL before push)
+      # =========================================================================
+      - name: Prepare release security artifact directory
+        run: mkdir -p supply-chain/security
+
+      - name: Build Backend image for pre-release scan
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./v2
+          file: ./v2/infra/Dockerfile.prod
+          push: false
+          load: true
+          tags: aprender-backend:scan-${{ github.run_id }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Frontend image for pre-release scan
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./v2/frontend
+          file: ./v2/frontend/Dockerfile.prod
+          push: false
+          load: true
+          tags: aprender-frontend:scan-${{ github.run_id }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Generate Trivy report (backend pre-release)
+        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        with:
+          image-ref: aprender-backend:scan-${{ github.run_id }}
+          format: json
+          output: supply-chain/security/trivy-backend-pre-release.json
+          vuln-type: os,library
+          severity: CRITICAL,HIGH,MEDIUM
+          ignore-unfixed: true
+
+      - name: Generate Trivy report (frontend pre-release)
+        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        with:
+          image-ref: aprender-frontend:scan-${{ github.run_id }}
+          format: json
+          output: supply-chain/security/trivy-frontend-pre-release.json
+          vuln-type: os,library
+          severity: CRITICAL,HIGH,MEDIUM
+          ignore-unfixed: true
+
+      - name: Enforce security gate (block HIGH/CRITICAL on release publish)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sys
+
+          backend_report = "supply-chain/security/trivy-backend-pre-release.json"
+          frontend_report = "supply-chain/security/trivy-frontend-pre-release.json"
+
+          def count_blocking(path: str) -> int:
+              with open(path, encoding="utf-8") as fp:
+                  data = json.load(fp)
+              total = 0
+              for result in data.get("Results", []):
+                  for vuln in result.get("Vulnerabilities", []) or []:
+                      if vuln.get("Severity") in {"HIGH", "CRITICAL"}:
+                          total += 1
+              return total
+
+          backend_blocking = count_blocking(backend_report)
+          frontend_blocking = count_blocking(frontend_report)
+          total_blocking = backend_blocking + frontend_blocking
+
+          print(f"Backend HIGH/CRITICAL vulnerabilities: {backend_blocking}")
+          print(f"Frontend HIGH/CRITICAL vulnerabilities: {frontend_blocking}")
+          print(f"Total HIGH/CRITICAL vulnerabilities: {total_blocking}")
+
+          with open("supply-chain/security/gate-summary.txt", "w", encoding="utf-8") as fp:
+              fp.write(f"backend_high_critical={backend_blocking}\n")
+              fp.write(f"frontend_high_critical={frontend_blocking}\n")
+              fp.write(f"total_high_critical={total_blocking}\n")
+
+          if total_blocking > 0:
+              print("Release blocked: HIGH/CRITICAL vulnerabilities detected in pre-release images.", file=sys.stderr)
+              sys.exit(1)
+          PY
+
+      - name: Upload release security scan artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-security-scan-${{ steps.version.outputs.version }}
+          path: supply-chain/security/
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Login to Docker Hub
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:

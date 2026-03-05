@@ -35,7 +35,7 @@ services:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
     build:
       context: ..
-      dockerfile: infra/Dockerfile
+      dockerfile: infra/Dockerfile.dev
     command: gunicorn config.wsgi:application --config /app/infra/gunicorn.conf.py
     env_file:
       - ${APP_ENV_FILE:-.env}
@@ -105,7 +105,7 @@ services:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
     build:
       context: ..
-      dockerfile: infra/Dockerfile
+      dockerfile: infra/Dockerfile.dev
     command: celery -A config worker -l info
     env_file:
       - ${APP_ENV_FILE:-.env}
@@ -142,7 +142,7 @@ services:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
     build:
       context: ..
-      dockerfile: infra/Dockerfile
+      dockerfile: infra/Dockerfile.dev
     command: celery -A config beat -l info
     env_file:
       - ${APP_ENV_FILE:-.env}

@@ -90,7 +90,7 @@ jobs:
       - name: Build Docker image
         run: |
           cd v2
-          docker build -f infra/Dockerfile -t aprender-backend:scan .
+          docker build -f infra/Dockerfile.prod -t aprender-backend:scan .
 
       - name: Run Trivy (JSON report)
         uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1

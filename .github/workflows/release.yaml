@@ -90,7 +90,7 @@ jobs:
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./v2
-          file: ./v2/infra/Dockerfile
+          file: ./v2/infra/Dockerfile.prod
           push: true
           tags: |
             ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}

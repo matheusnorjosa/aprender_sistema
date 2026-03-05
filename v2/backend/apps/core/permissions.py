@@ -148,6 +148,27 @@ class IsDATOrSuper(permissions.BasePermission):  # type: ignore[misc]
         )
 
 
+class IsComprasDashboardAccess(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Permissão para dashboard de compras (somente leitura executiva).
+
+    Grupos permitidos: DAT e Diretoria.
+    Nota: Superusers sempre têm acesso completo.
+    """
+
+    message = "Apenas usuários dos grupos DAT ou Diretoria podem acessar o dashboard de compras."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (
+                getattr(request.user, "is_superuser", False)
+                or request.user.groups.filter(name__in=["DAT", "Diretoria"]).exists()  # type: ignore[attr-defined]
+            )
+        )
+
+
 class IsDAT(permissions.BasePermission):  # type: ignore[misc]
     """
     Permissão: apenas usuários do grupo 'DAT' (sem incluir Super).

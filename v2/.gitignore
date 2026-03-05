@@ -7,6 +7,9 @@ __pycache__/
 .env
 .env.*
 !.env.example
+!.env.dev
+!.env.staging
+!.env.production
 backend/.pytest_cache/
 backend/staticfiles/
 backend/media/*

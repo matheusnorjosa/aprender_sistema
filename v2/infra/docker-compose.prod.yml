@@ -43,7 +43,8 @@ services:
   web:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
     command: gunicorn config.wsgi:application --config /app/infra/gunicorn.conf.py
-    env_file: .env
+    env_file:
+      - ${APP_ENV_FILE:-.env}
     environment:
       ENVIRONMENT: production
       DEBUG: "False"
@@ -70,7 +71,8 @@ services:
   worker:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
     command: celery -A config worker -l info
-    env_file: .env
+    env_file:
+      - ${APP_ENV_FILE:-.env}
     environment:
       ENVIRONMENT: production
       DEBUG: "False"
@@ -95,7 +97,8 @@ services:
   beat:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
     command: celery -A config beat -l info
-    env_file: .env
+    env_file:
+      - ${APP_ENV_FILE:-.env}
     environment:
       ENVIRONMENT: production
       DEBUG: "False"

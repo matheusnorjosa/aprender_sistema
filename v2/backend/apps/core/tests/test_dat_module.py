@@ -430,6 +430,7 @@ class DATModuleAPITestCase(APITestCase):
 
         # Create groups
         cls.dat_group, _ = Group.objects.get_or_create(name="DAT")
+        cls.diretoria_group, _ = Group.objects.get_or_create(name="Diretoria")
         cls.super_group, _ = Group.objects.get_or_create(name="Superintendência")
         cls.gerente_group, _ = Group.objects.get_or_create(name="Gerente")
 
@@ -450,6 +451,12 @@ class DATModuleAPITestCase(APITestCase):
         cls.regular_user = User.objects.create_user(
             username=f"regular_user_{uid3}", password="test123", cpf=f"888{uid3}888"  # 11 chars
         )
+
+        uid4 = uuid.uuid4().hex[:5]
+        cls.diretoria_user = User.objects.create_user(
+            username=f"diretoria_user_{uid4}", password="test123", cpf=f"889{uid4}889"  # 11 chars
+        )
+        cls.diretoria_user.groups.add(cls.diretoria_group)
 
         # Create base data with unique names
         uid = uuid.uuid4().hex[:8]
@@ -613,6 +620,21 @@ class DATCompraAPITests(DATModuleAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("total", response.data)
 
+    def test_dashboard_action_allows_diretoria_user(self):
+        """Diretoria deve acessar dashboard de compras (somente leitura)."""
+        self.client.force_authenticate(user=self.diretoria_user)
+        url = reverse("core:dat-compra-material-dashboard")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("kpis", response.data)
+
+    def test_dashboard_action_forbidden_for_regular_user(self):
+        """Regular user should not access compras dashboard action."""
+        self.client.force_authenticate(user=self.regular_user)
+        url = reverse("core:dat-compra-material-dashboard")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_pendencias_action_returns_only_pairs_without_active_event(self):
         """Pendencias should list only core_compra pairs without pending/approved solicitacao."""
         self.client.force_authenticate(user=self.dat_user)
@@ -660,6 +682,14 @@ class DATCompraAPITests(DATModuleAPITestCase):
         self.assertEqual(len(response.data["pendentes"]), 1)
         self.assertEqual(response.data["pendentes"][0]["municipio"], self.municipio2.nome)
         self.assertEqual(response.data["pendentes"][0]["projeto"], self.projeto.nome)
+
+    def test_pendencias_action_allows_diretoria_user(self):
+        """Diretoria deve acessar pendências de compras para leitura executiva."""
+        self.client.force_authenticate(user=self.diretoria_user)
+        url = reverse("core:dat-compra-material-pendencias")
+        response = self.client.get(url, secure=True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("pendentes", response.data)
 
     def test_pendencias_action_forbidden_for_regular_user(self):
         """Regular users should not access pendencias action."""

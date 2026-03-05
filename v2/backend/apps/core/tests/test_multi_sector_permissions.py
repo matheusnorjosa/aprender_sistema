@@ -11,13 +11,27 @@ Conforme PLAN_multi_sector_availability.md:
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from django.contrib.auth.models import Group
+from django.core.cache import cache
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient, APIRequestFactory
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, EquipeGerencia, Gerencia, Usuario
+from apps.core.models import (
+    AvailabilityBlock,
+    EquipeGerencia,
+    Gerencia,
+    Municipio,
+    Participation,
+    Projeto,
+    Solicitacao,
+    TipoEvento,
+    Usuario,
+)
 from apps.core.permissions import HasSectorAccess
 
 
@@ -219,15 +233,78 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_user_without_gerencia_id_gets_super_data(self):
-        """Sem gerencia_id assume SUPER (conforme plano Seção 5)."""
+    def test_user_without_gerencia_id_is_allowed_with_scoped_data(self):
+        """Sem gerencia_id mantém acesso, porém com escopo filtrado no backend."""
         self.client.force_authenticate(user=self.user_vidas)
         response = self.client.get(
             "/api/availability/monthly/",
             {"year": 2025, "month": 1, "role": "FORMADOR"},
         )
-        # Conforme plano: sem gerencia_id = comportamento SUPER (permitido)
         self.assertEqual(response.status_code, 200)
+
+    def test_user_without_gerencia_id_does_not_see_other_gerencia_people(self):
+        """
+        Regressão #567: sem gerencia_id não pode retornar dados globais da organização.
+
+        Usuário comum deve ver apenas pessoas do seu próprio escopo de gerência.
+        """
+        cache.clear()
+        tz = timezone.get_current_timezone()
+
+        # Segunda gerência e usuário de outro setor
+        gerencia_fluir = Gerencia.objects.create(nome="GERENCIA 3", nome_setor="Fluir")
+        user_fluir = Usuario.objects.create_user(
+            username="fluir_user",
+            email="fluir@test.com",
+            password="test123",
+            cpf="33333333333",
+        )
+        EquipeGerencia.objects.create(
+            gerencia=gerencia_fluir,
+            usuario=user_fluir,
+            papel="FORMADOR",
+        )
+
+        municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+        projeto = Projeto.objects.create(nome="Projeto SUPER", fluxo="SUPER", ativo=True)
+        tipo_evento = TipoEvento.objects.create(nome="Formação")
+
+        # Evento da gerência do usuário autenticado
+        sol_vidas = Solicitacao.objects.create(
+            usuario=self.user_vidas,
+            municipio=municipio,
+            projeto=projeto,
+            tipo_evento=tipo_evento,
+            inicio=timezone.make_aware(datetime(2025, 1, 10, 8, 0), tz),
+            fim=timezone.make_aware(datetime(2025, 1, 10, 12, 0), tz),
+            status="aprovado",
+        )
+        Participation.objects.create(solicitacao=sol_vidas, usuario=self.user_vidas, role="FORMADOR")
+
+        # Evento de outra gerência (não deve aparecer)
+        sol_fluir = Solicitacao.objects.create(
+            usuario=user_fluir,
+            municipio=municipio,
+            projeto=projeto,
+            tipo_evento=tipo_evento,
+            inicio=timezone.make_aware(datetime(2025, 1, 11, 8, 0), tz),
+            fim=timezone.make_aware(datetime(2025, 1, 11, 12, 0), tz),
+            status="aprovado",
+        )
+        Participation.objects.create(solicitacao=sol_fluir, usuario=user_fluir, role="FORMADOR")
+
+        self.client.force_authenticate(user=self.user_vidas)
+        response = self.client.get(
+            "/api/availability/monthly/",
+            {"year": 2025, "month": 1, "role": "FORMADOR"},
+        )
+        self.assertEqual(response.status_code, 200)
+
+        people = response.data.get("people", [])
+        emails = {item["email"] for item in people}
+
+        self.assertIn(self.user_vidas.email, emails)
+        self.assertNotIn(user_fluir.email, emails)
 
     def test_controle_user_is_blocked(self):
         """Grupo Controle não tem acesso à grade mensal."""

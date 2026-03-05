@@ -129,7 +129,7 @@ O sistema valida automaticamente em produção (`ENVIRONMENT=production`):
 
 ```bash
 # Build da imagem
-docker build -t aprender:prod -f infra/Dockerfile .
+docker build -t aprender:prod -f infra/Dockerfile.prod .
 
 # Deploy com variáveis de produção
 docker compose -f docker-compose.yml up -d

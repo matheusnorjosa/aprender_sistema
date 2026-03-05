@@ -558,9 +558,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Build backend image (official Dockerfile)
+    - name: Build backend image (Dockerfile.prod)
       run: |
-        docker build -f v2/infra/Dockerfile -t aprender-backend:ci-parity-${{ github.sha }} v2
+        docker build -f v2/infra/Dockerfile.prod -t aprender-backend:ci-parity-${{ github.sha }} v2
 
     - name: Run smoke checks inside container
       env:

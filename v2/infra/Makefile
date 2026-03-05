@@ -4,14 +4,25 @@
 # Comandos unificados para operações comuns
 # ================================================================
 
-.PHONY: help build up up-obs down down-obs restart logs shell migrate test clean
+.PHONY: help build up up-obs down down-obs restart logs shell migrate test clean \
+	check-env-dev up-dev health-dev down-dev \
+	check-env-staging up-staging health-staging down-staging \
+	check-env-prod up-prod health-prod down-prod
 
 # Variáveis
 COMPOSE_FILE := docker-compose.yml
+COMPOSE_OVERRIDE_FILE := docker-compose.override.yml
+COMPOSE_PROD_FILE := docker-compose.prod.yml
 COMPOSE_OBS_FILE := docker-compose.observability.yml
 SERVICE_WEB := web
 SERVICE_DB := db
 SERVICE_WORKER := worker
+ENV_FILE_DEV := .env.dev
+ENV_FILE_STAGING := .env.staging
+ENV_FILE_PROD := .env.production
+PROJECT_DEV := aprender_dev
+PROJECT_STAGING := aprender_staging
+PROJECT_PROD := aprender_prod
 
 # ================================================================
 # Help
@@ -68,6 +79,91 @@ logs:  ## Ver logs (use: make logs SERVICE=web)
 ps:  ## Ver status dos containers
 	@echo "📊 Status dos containers:"
 	docker compose -f $(COMPOSE_FILE) ps
+
+# ================================================================
+# Ambientes (issue #753)
+# ================================================================
+
+check-env-dev: ## Validar configuração do ambiente DEV
+	@echo "🔎 [DEV] validando compose..."
+	@echo "    project: $(PROJECT_DEV)"
+	@echo "    env-file: $(ENV_FILE_DEV)"
+	@echo "    compose: $(COMPOSE_FILE) + $(COMPOSE_OVERRIDE_FILE)"
+	docker compose -p $(PROJECT_DEV) --env-file $(ENV_FILE_DEV) \
+		-f $(COMPOSE_FILE) -f $(COMPOSE_OVERRIDE_FILE) config > /dev/null
+	@echo "✅ [DEV] configuração válida"
+
+up-dev: ## Subir ambiente DEV (compose + override)
+	@echo "🚀 [DEV] subindo ambiente..."
+	docker compose -p $(PROJECT_DEV) --env-file $(ENV_FILE_DEV) \
+		-f $(COMPOSE_FILE) -f $(COMPOSE_OVERRIDE_FILE) up -d
+	@echo "✅ [DEV] ambiente iniciado"
+	@echo "🌐 [DEV] backend: http://localhost:8002"
+	@echo "🌐 [DEV] frontend: http://localhost:5173"
+
+health-dev: ## Verificar health do ambiente DEV
+	@echo "❤️  [DEV] verificando /api/readyz..."
+	@curl -fsS http://localhost:8002/api/readyz/ > /dev/null && echo "✅ [DEV] readyz ok" || (echo "❌ [DEV] readyz falhou" && exit 1)
+
+down-dev: ## Derrubar ambiente DEV
+	@echo "⏹️  [DEV] derrubando ambiente..."
+	docker compose -p $(PROJECT_DEV) --env-file $(ENV_FILE_DEV) \
+		-f $(COMPOSE_FILE) -f $(COMPOSE_OVERRIDE_FILE) down
+	@echo "✅ [DEV] ambiente finalizado"
+
+check-env-staging: ## Validar configuração do ambiente STAGING
+	@echo "🔎 [STAGING] validando compose..."
+	@echo "    project: $(PROJECT_STAGING)"
+	@echo "    env-file: $(ENV_FILE_STAGING)"
+	@echo "    compose: $(COMPOSE_FILE)"
+	docker compose -p $(PROJECT_STAGING) --env-file $(ENV_FILE_STAGING) \
+		-f $(COMPOSE_FILE) config > /dev/null
+	@echo "✅ [STAGING] configuração válida"
+
+up-staging: ## Subir ambiente STAGING (local de homologação)
+	@echo "🚀 [STAGING] subindo ambiente..."
+	docker compose -p $(PROJECT_STAGING) --env-file $(ENV_FILE_STAGING) \
+		-f $(COMPOSE_FILE) up -d
+	@echo "✅ [STAGING] ambiente iniciado"
+	@echo "🌐 [STAGING] backend: http://localhost:8002"
+	@echo "🌐 [STAGING] frontend: http://localhost:5173"
+
+health-staging: ## Verificar health do ambiente STAGING
+	@echo "❤️  [STAGING] verificando /api/readyz..."
+	@curl -fsS http://localhost:8002/api/readyz/ > /dev/null && echo "✅ [STAGING] readyz ok" || (echo "❌ [STAGING] readyz falhou" && exit 1)
+
+down-staging: ## Derrubar ambiente STAGING
+	@echo "⏹️  [STAGING] derrubando ambiente..."
+	docker compose -p $(PROJECT_STAGING) --env-file $(ENV_FILE_STAGING) \
+		-f $(COMPOSE_FILE) down
+	@echo "✅ [STAGING] ambiente finalizado"
+
+check-env-prod: ## Validar configuração do ambiente PRODUÇÃO
+	@echo "🔎 [PROD] validando compose..."
+	@echo "    project: $(PROJECT_PROD)"
+	@echo "    env-file: $(ENV_FILE_PROD)"
+	@echo "    compose: $(COMPOSE_PROD_FILE)"
+	docker compose -p $(PROJECT_PROD) --env-file $(ENV_FILE_PROD) \
+		-f $(COMPOSE_PROD_FILE) config > /dev/null
+	@echo "✅ [PROD] configuração válida"
+
+up-prod: ## Subir ambiente PRODUÇÃO (validação local controlada)
+	@echo "🚀 [PROD] subindo ambiente..."
+	docker compose -p $(PROJECT_PROD) --env-file $(ENV_FILE_PROD) \
+		-f $(COMPOSE_PROD_FILE) up -d
+	@echo "✅ [PROD] ambiente iniciado"
+	@echo "🌐 [PROD] backend: http://localhost:8000"
+	@echo "🌐 [PROD] frontend: http://localhost"
+
+health-prod: ## Verificar health do ambiente PRODUÇÃO
+	@echo "❤️  [PROD] verificando /api/readyz..."
+	@curl -fsS http://localhost:8000/api/readyz/ > /dev/null && echo "✅ [PROD] readyz ok" || (echo "❌ [PROD] readyz falhou" && exit 1)
+
+down-prod: ## Derrubar ambiente PRODUÇÃO
+	@echo "⏹️  [PROD] derrubando ambiente..."
+	docker compose -p $(PROJECT_PROD) --env-file $(ENV_FILE_PROD) \
+		-f $(COMPOSE_PROD_FILE) down
+	@echo "✅ [PROD] ambiente finalizado"
 
 # ================================================================
 # Django

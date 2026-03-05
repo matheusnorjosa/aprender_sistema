@@ -6,7 +6,7 @@ Query params:
     - year: int (YYYY) - obrigatório
     - month: int (1..12) - obrigatório
     - role: str ("FORMADOR" | "COORDENADOR") - obrigatório
-    - gerencia_id: int (opcional) - Se omitido, assume SUPERINTENDENCIA (SUPER)
+    - gerencia_id: int (opcional)
     - sector: str (opcional) - Filtro por nome do projeto
     - q: str (opcional) - Filtro por nome/email
 
@@ -14,9 +14,9 @@ Permissões (conforme PLAN_multi_sector_availability.md):
     - Superusers: acesso a todas as gerências
     - Controle: BLOQUEADO (sem acesso à grade mensal)
     - Com gerencia_id: verifica se usuário pertence à gerência
-    - Sem gerencia_id: assume SUPER (comportamento atual)
+    - Sem gerencia_id: escopo filtrado por gerências vinculadas do usuário
 
-Cache Redis 5 minutos por (year, month, role, gerencia_id, sector, q).
+Cache Redis 5 minutos por (year, month, role, escopo, sector, q).
 """
 
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
@@ -35,6 +35,7 @@ from rest_framework.views import APIView
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
+from apps.core.models import EquipeGerencia
 from apps.core.permissions import HasSectorAccess
 from apps.core.serializers.openapi_critical_contract import (
     MonthlyAvailabilityErrorResponseSerializer,
@@ -53,7 +54,7 @@ class MonthlyAvailabilityView(APIView):
         - Superusers: acesso a todas as gerências
         - Controle: BLOQUEADO
         - Com gerencia_id: verifica se usuário pertence à gerência
-        - Sem gerencia_id: assume SUPER (comportamento atual)
+        - Sem gerencia_id: escopo filtrado por gerências vinculadas do usuário
 
     Returns:
         {
@@ -160,12 +161,45 @@ class MonthlyAvailabilityView(APIView):
                     {"error": "Parâmetro 'gerencia_id' deve ser um inteiro válido."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        # Se não fornecido, gerencia_id permanece None (assume SUPER no service)
+        # Sem gerencia_id, restringir escopo para evitar vazamento global:
+        # - Perfis amplos (super/superintendência/gerência/diretoria): visão ampla
+        # - Demais perfis: limitar aos usuários das gerências vinculadas
+        allowed_user_ids: list[int] | None = None
+        cache_scope = "global"
+        if gerencia_id is None:
+            has_wide_scope = bool(
+                getattr(request.user, "is_superuser", False)
+                or request.user.groups.filter(name__in=["Superintendência", "Gerência", "Diretoria"]).exists()
+            )
+            if has_wide_scope:
+                cache_scope = "wide"
+            else:
+                user_gerencia_ids = list(
+                    EquipeGerencia.objects.filter(
+                        usuario=request.user,
+                        ativo=True,
+                    ).values_list("gerencia_id", flat=True)
+                )
+                if user_gerencia_ids:
+                    allowed_user_ids = list(
+                        EquipeGerencia.objects.filter(
+                            gerencia_id__in=user_gerencia_ids,
+                            ativo=True,
+                        )
+                        .values_list("usuario_id", flat=True)
+                        .distinct()
+                    )
+                else:
+                    # Usuário sem vínculo explícito: restringe ao próprio usuário
+                    allowed_user_ids = [request.user.id]
+                cache_scope = f"user:{request.user.id}"
+        else:
+            cache_scope = f"gerencia:{gerencia_id}"
 
-        # Cache key (incluindo gerencia_id)
+        # Cache key inclui escopo para impedir compartilhamento indevido entre perfis
         cache_key = (
-            f"monthly:v3:{year}:{month}:{role}:"
-            f"{gerencia_id or 'all'}:{sector or '*'}:"
+            f"monthly:v4:{year}:{month}:{role}:"
+            f"{cache_scope}:{sector or '*'}:"
             f"{(q or '').strip().lower()}"
         )
 
@@ -183,6 +217,7 @@ class MonthlyAvailabilityView(APIView):
                 gerencia_id=gerencia_id,
                 sector=sector,
                 q=q,
+                allowed_user_ids=allowed_user_ids,
             )
         except Exception as e:
             return Response(

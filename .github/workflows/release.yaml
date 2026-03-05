@@ -11,6 +11,10 @@ on:
         options:
           - production
           - staging
+      promotion_tag:
+        description: "Required for production: existing tag validated in staging (example: v2026.03.05-abc1234)"
+        required: false
+        type: string
 
 env:
   DOCKER_USERNAME: norjosamatheus
@@ -40,11 +44,27 @@ jobs:
 
       - name: Generate version
         id: version
+        env:
+          TARGET_ENV: ${{ github.event.inputs.environment }}
+          PROMOTION_TAG: ${{ github.event.inputs.promotion_tag }}
         run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          VERSION="v$(date -u +%Y.%m.%d)-${SHORT_SHA}"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if [ "$TARGET_ENV" = "production" ]; then
+            if [ -z "${PROMOTION_TAG:-}" ]; then
+              echo "For production promotion, input 'promotion_tag' is required." >&2
+              exit 1
+            fi
+            VERSION="$PROMOTION_TAG"
+            MODE="production-promotion"
+          else
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            VERSION="v$(date -u +%Y.%m.%d)-${SHORT_SHA}"
+            MODE="staging-release"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "Generated version: $VERSION"
+          echo "Release mode: $MODE"
 
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -67,11 +87,22 @@ jobs:
           python manage.py check --deploy
 
       - name: Create tag
+        if: github.event.inputs.environment != 'production'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git tag -a "${{ steps.version.outputs.version }}" -m "Release ${{ steps.version.outputs.version }}"
           git push origin "${{ steps.version.outputs.version }}"
+
+      - name: Validate promotion tag exists
+        if: github.event.inputs.environment == 'production'
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          if ! git rev-parse -q --verify "refs/tags/${{ steps.version.outputs.version }}" >/dev/null; then
+            echo "Promotion tag '${{ steps.version.outputs.version }}' was not found in the repository tags." >&2
+            exit 1
+          fi
 
       # =========================================================================
       # Docker Hub Authentication & Build
@@ -83,9 +114,11 @@ jobs:
       # Pre-publish Security Gate (blocks HIGH/CRITICAL before push)
       # =========================================================================
       - name: Prepare release security artifact directory
+        if: github.event.inputs.environment != 'production'
         run: mkdir -p supply-chain/security
 
       - name: Build Backend image for pre-release scan
+        if: github.event.inputs.environment != 'production'
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./v2
@@ -95,8 +128,13 @@ jobs:
           tags: aprender-backend:scan-${{ github.run_id }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
 
       - name: Build Frontend image for pre-release scan
+        if: github.event.inputs.environment != 'production'
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./v2/frontend
@@ -108,6 +146,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Generate Trivy report (backend pre-release)
+        if: github.event.inputs.environment != 'production'
         uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
         with:
           image-ref: aprender-backend:scan-${{ github.run_id }}
@@ -118,6 +157,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Generate Trivy report (frontend pre-release)
+        if: github.event.inputs.environment != 'production'
         uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
         with:
           image-ref: aprender-frontend:scan-${{ github.run_id }}
@@ -128,6 +168,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Enforce security gate (block HIGH/CRITICAL on release publish)
+        if: github.event.inputs.environment != 'production'
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -166,7 +207,7 @@ jobs:
           PY
 
       - name: Upload release security scan artifacts
-        if: always()
+        if: always() && github.event.inputs.environment != 'production'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-security-scan-${{ steps.version.outputs.version }}
@@ -182,6 +223,7 @@ jobs:
 
       - name: Build and push Backend image
         id: build-backend
+        if: github.event.inputs.environment != 'production'
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./v2
@@ -192,6 +234,10 @@ jobs:
             ${{ env.BACKEND_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
           labels: |
             org.opencontainers.image.title=Aprender Sistema Backend
             org.opencontainers.image.description=Django backend for Aprender Sistema
@@ -201,6 +247,7 @@ jobs:
 
       - name: Build and push Frontend image
         id: build-frontend
+        if: github.event.inputs.environment != 'production'
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./v2/frontend
@@ -218,6 +265,40 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
 
+      - name: Resolve image digests for deployment and evidence
+        id: image-digests
+        env:
+          TARGET_ENV: ${{ github.event.inputs.environment }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          BACKEND_DIGEST_FROM_BUILD: ${{ steps.build-backend.outputs.digest }}
+          FRONTEND_DIGEST_FROM_BUILD: ${{ steps.build-frontend.outputs.digest }}
+        run: |
+          set -euo pipefail
+
+          backend_digest=""
+          frontend_digest=""
+
+          if [ "$TARGET_ENV" = "production" ]; then
+            docker pull "${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}"
+            docker pull "${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}"
+
+            backend_digest="$(docker image inspect "${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}" --format '{{index .RepoDigests 0}}' | sed 's|.*@||')"
+            frontend_digest="$(docker image inspect "${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}" --format '{{index .RepoDigests 0}}' | sed 's|.*@||')"
+          else
+            backend_digest="$BACKEND_DIGEST_FROM_BUILD"
+            frontend_digest="$FRONTEND_DIGEST_FROM_BUILD"
+          fi
+
+          if [ -z "$backend_digest" ] || [ -z "$frontend_digest" ]; then
+            echo "Could not resolve backend/frontend digest for release version '${RELEASE_VERSION}'." >&2
+            exit 1
+          fi
+
+          echo "backend_digest=$backend_digest" >> "$GITHUB_OUTPUT"
+          echo "frontend_digest=$frontend_digest" >> "$GITHUB_OUTPUT"
+          echo "Resolved backend digest: $backend_digest"
+          echo "Resolved frontend digest: $frontend_digest"
+
       # =========================================================================
       # Supply Chain Hardening (SBOM + Provenance Attestation)
       # =========================================================================
@@ -227,7 +308,7 @@ jobs:
       - name: Generate Backend SBOM (SPDX JSON)
         uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
         with:
-          image: ${{ env.BACKEND_IMAGE }}@${{ steps.build-backend.outputs.digest }}
+          image: ${{ env.BACKEND_IMAGE }}@${{ steps.image-digests.outputs.backend_digest }}
           format: spdx-json
           output-file: supply-chain/backend-sbom.spdx.json
           upload-artifact: false
@@ -236,7 +317,7 @@ jobs:
       - name: Generate Frontend SBOM (SPDX JSON)
         uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
         with:
-          image: ${{ env.FRONTEND_IMAGE }}@${{ steps.build-frontend.outputs.digest }}
+          image: ${{ env.FRONTEND_IMAGE }}@${{ steps.image-digests.outputs.frontend_digest }}
           format: spdx-json
           output-file: supply-chain/frontend-sbom.spdx.json
           upload-artifact: false
@@ -247,14 +328,14 @@ jobs:
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-name: ${{ env.BACKEND_IMAGE }}
-          subject-digest: ${{ steps.build-backend.outputs.digest }}
+          subject-digest: ${{ steps.image-digests.outputs.backend_digest }}
 
       - name: Attest Frontend image provenance
         id: attest-frontend-image
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-name: ${{ env.FRONTEND_IMAGE }}
-          subject-digest: ${{ steps.build-frontend.outputs.digest }}
+          subject-digest: ${{ steps.image-digests.outputs.frontend_digest }}
 
       - name: Attest SBOM files provenance
         id: attest-sbom-files
@@ -302,14 +383,19 @@ jobs:
           echo "# Release ${{ steps.version.outputs.version }}" > release_notes.md
           echo "" >> release_notes.md
           echo "**Environment:** ${{ github.event.inputs.environment }}" >> release_notes.md
+          echo "**Mode:** ${{ steps.version.outputs.mode }}" >> release_notes.md
           echo "**Date:** $(date -u +%Y-%m-%d)" >> release_notes.md
+          if [ "${{ github.event.inputs.environment }}" = "production" ]; then
+            echo "**Promotion Source:** staging tag \`${{ steps.version.outputs.version }}\`" >> release_notes.md
+            echo "**Latest Alias:** refreshed to \`${{ steps.version.outputs.version }}\` before deploy trigger" >> release_notes.md
+          fi
           echo "" >> release_notes.md
           echo "## Docker Images" >> release_notes.md
           echo "" >> release_notes.md
           echo "- Backend: \`${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}\`" >> release_notes.md
-          echo "  - Digest: \`${{ steps.build-backend.outputs.digest }}\`" >> release_notes.md
+          echo "  - Digest: \`${{ steps.image-digests.outputs.backend_digest }}\`" >> release_notes.md
           echo "- Frontend: \`${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.version }}\`" >> release_notes.md
-          echo "  - Digest: \`${{ steps.build-frontend.outputs.digest }}\`" >> release_notes.md
+          echo "  - Digest: \`${{ steps.image-digests.outputs.frontend_digest }}\`" >> release_notes.md
           echo "" >> release_notes.md
           echo "## Supply Chain Artifacts" >> release_notes.md
           echo "" >> release_notes.md
@@ -331,11 +417,14 @@ jobs:
       # Deployment
       # =========================================================================
       - name: Release summary
+        env:
+          RELEASE_MODE: ${{ steps.version.outputs.mode }}
         run: |
           echo "========================================"
-          echo "Docker images published to Docker Hub!"
+          echo "Release pipeline summary"
           echo "========================================"
           echo ""
+          echo "Mode: $RELEASE_MODE"
           echo "Backend:  ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}"
           echo "Frontend: ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.version }}"
           echo ""
@@ -388,6 +477,71 @@ jobs:
             echo "$DEPLOY_COMMAND"
             echo "$delimiter"
           } >> "$GITHUB_ENV"
+
+      - name: Verify staging is running promoted release
+        if: github.event.inputs.environment == 'production'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          STAGING_VERSIONCHECK_URL_SECRET: ${{ secrets.STAGING_VERSIONCHECK_URL || '' }}
+          STAGING_VERSIONCHECK_URL_VAR: ${{ vars.STAGING_VERSIONCHECK_URL || '' }}
+        run: |
+          set -euo pipefail
+
+          STAGING_VERSION_URL="$STAGING_VERSIONCHECK_URL_SECRET"
+          if [ -z "$STAGING_VERSION_URL" ]; then
+            STAGING_VERSION_URL="$STAGING_VERSIONCHECK_URL_VAR"
+          fi
+
+          if [ -z "$STAGING_VERSION_URL" ]; then
+            echo "STAGING_VERSIONCHECK_URL is required to verify production promotion." >&2
+            exit 1
+          fi
+
+          echo "::add-mask::$STAGING_VERSION_URL"
+          response_file="supply-chain/verification/pre-prod-staging-version-response.txt"
+          attempts=8
+          sleep_seconds=8
+
+          for attempt in $(seq 1 "$attempts"); do
+            http_code="$(curl --silent --show-error --location --max-time 20 -o "$response_file" -w '%{http_code}' "$STAGING_VERSION_URL" || true)"
+            if [ "$http_code" = "200" ]; then
+              break
+            fi
+            if [ "$attempt" -eq "$attempts" ]; then
+              echo "Could not read staging version endpoint (HTTP=${http_code:-curl_error})." >&2
+              exit 1
+            fi
+            echo "Staging version check attempt ${attempt}/${attempts} failed (HTTP=${http_code:-curl_error}). Retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+          done
+
+          if ! grep -Fq "$RELEASE_VERSION" "$response_file"; then
+            echo "Staging version endpoint does not contain promoted release '$RELEASE_VERSION'." >&2
+            cat "$response_file" >&2
+            exit 1
+          fi
+
+          echo "Staging is serving release '$RELEASE_VERSION'. Proceeding with production promotion."
+
+      - name: Promote selected release tag to latest (production)
+        if: github.event.inputs.environment == 'production'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          echo "Promoting release tag '${RELEASE_VERSION}' to :latest for production rollout."
+
+          docker pull "${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}"
+          docker pull "${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}"
+
+          docker tag "${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}" "${{ env.BACKEND_IMAGE }}:latest"
+          docker tag "${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}" "${{ env.FRONTEND_IMAGE }}:latest"
+
+          docker push "${{ env.BACKEND_IMAGE }}:latest"
+          docker push "${{ env.FRONTEND_IMAGE }}:latest"
+
+          echo "Promotion to :latest completed."
 
       - name: Execute deploy command
         id: deploy-command
@@ -544,8 +698,8 @@ jobs:
           HEALTHCHECK_URL: ${{ steps.resolve-post-deploy-verification.outputs.healthcheck_url }}
           VERSIONCHECK_URL: ${{ steps.resolve-post-deploy-verification.outputs.versioncheck_url }}
           COMMAND_HASH: ${{ steps.resolve-deploy-command.outputs.command_hash }}
-          BACKEND_DIGEST: ${{ steps.build-backend.outputs.digest }}
-          FRONTEND_DIGEST: ${{ steps.build-frontend.outputs.digest }}
+          BACKEND_DIGEST: ${{ steps.image-digests.outputs.backend_digest }}
+          FRONTEND_DIGEST: ${{ steps.image-digests.outputs.frontend_digest }}
         run: |
           set -euo pipefail
           {
@@ -576,6 +730,7 @@ jobs:
           retention-days: 30
 
       - name: Create GitHub Release
+        if: github.event.inputs.environment != 'production'
         uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -586,18 +741,32 @@ jobs:
           draft: false
           prerelease: false
 
+      - name: Ensure GitHub Release exists for promotion tag
+        if: github.event.inputs.environment == 'production'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release view "${{ steps.version.outputs.version }}" >/dev/null
+
       - name: Upload release assets (SBOM + provenance + evidence)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release upload "${{ steps.version.outputs.version }}" \
-            supply-chain/backend-sbom.spdx.json \
-            supply-chain/frontend-sbom.spdx.json \
-            supply-chain/attestations/backend-image-provenance.bundle.jsonl \
-            supply-chain/attestations/frontend-image-provenance.bundle.jsonl \
-            supply-chain/attestations/sbom-files-provenance.bundle.jsonl \
-            supply-chain/verification/post-deploy-health-response.txt \
-            supply-chain/verification/post-deploy-version-response.txt \
-            deploy-evidence.txt \
-            --clobber
+          files=(
+            "supply-chain/backend-sbom.spdx.json"
+            "supply-chain/frontend-sbom.spdx.json"
+            "supply-chain/attestations/backend-image-provenance.bundle.jsonl"
+            "supply-chain/attestations/frontend-image-provenance.bundle.jsonl"
+            "supply-chain/attestations/sbom-files-provenance.bundle.jsonl"
+            "supply-chain/verification/post-deploy-health-response.txt"
+            "supply-chain/verification/post-deploy-version-response.txt"
+            "deploy-evidence.txt"
+          )
+
+          if [ -f "supply-chain/verification/pre-prod-staging-version-response.txt" ]; then
+            files+=("supply-chain/verification/pre-prod-staging-version-response.txt")
+          fi
+
+          gh release upload "${{ steps.version.outputs.version }}" "${files[@]}" --clobber

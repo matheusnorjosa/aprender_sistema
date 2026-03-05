@@ -198,9 +198,7 @@ class MonthlyAvailabilityView(APIView):
 
         # Cache key inclui escopo para impedir compartilhamento indevido entre perfis
         cache_key = (
-            f"monthly:v4:{year}:{month}:{role}:"
-            f"{cache_scope}:{sector or '*'}:"
-            f"{(q or '').strip().lower()}"
+            f"monthly:v4:{year}:{month}:{role}:" f"{cache_scope}:{sector or '*'}:" f"{(q or '').strip().lower()}"
         )
 
         # Tentar buscar do cache

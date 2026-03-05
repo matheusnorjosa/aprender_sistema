@@ -32,6 +32,9 @@ LABEL org.opencontainers.image.description="React frontend for Aprender Sistema"
 LABEL org.opencontainers.image.vendor="norjosamatheus"
 LABEL org.opencontainers.image.source="https://github.com/matheusnorjosa/aprender-sistema"
 
+# Atualiza pacotes base para reduzir CVEs conhecidos da imagem runtime.
+RUN apk upgrade --no-cache
+
 # Remover configuracao default do nginx
 RUN rm /etc/nginx/conf.d/default.conf
 

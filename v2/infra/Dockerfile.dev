@@ -1,0 +1,53 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Copy requirements first for better layer caching.
+COPY backend/requirements.txt /app/requirements.txt
+COPY backend/requirements-dev.txt /app/requirements-dev.txt
+
+# Dev image installs runtime + developer dependencies.
+RUN pip install --no-cache-dir -r /app/requirements.txt \
+ && pip install --no-cache-dir -r /app/requirements-dev.txt
+
+# Dev tools are intentionally present only in Dockerfile.dev.
+# postgresql-client is required by backup scripts (Issue #562 C-05).
+RUN apt-get update \
+ && apt-get upgrade -y \
+ && apt-get install -y --no-install-recommends \
+    curl jq httpie vim nano tree less tzdata ca-certificates \
+    libpq5 postgresql-client libmagic-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY backend /app
+
+# Gunicorn config used by web service.
+RUN mkdir -p /app/infra
+COPY infra/gunicorn.conf.py /app/infra/gunicorn.conf.py
+
+# Backup scripts used by Celery tasks.
+COPY infra/scripts /app/infra/scripts
+RUN chmod +x /app/infra/scripts/*.sh
+
+ARG GIT_SHA=unknown
+ARG BUILD_DATE=unknown
+RUN python - <<'PY2'
+import json
+import os
+
+with open("/app/BUILD_INFO.json", "w", encoding="utf-8") as f:
+    json.dump(
+        {
+            "git_sha": os.environ.get("GIT_SHA", "unknown"),
+            "build_date": os.environ.get("BUILD_DATE", "unknown"),
+            "profile": "dev",
+            "note": "Developer image with local tooling.",
+        },
+        f,
+        indent=2,
+    )
+print("Wrote /app/BUILD_INFO.json")
+PY2
+
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

@@ -13,18 +13,18 @@ import logging
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.core.exceptions import ServiceUnavailableError
+from apps.core.permissions import IsControleOrSuper
 from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
 
 logger = logging.getLogger(__name__)
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsControleOrSuper])
 def gcal_calendars(request: Request) -> Response:
     """
     GET /api/gcal/calendars/
@@ -32,7 +32,7 @@ def gcal_calendars(request: Request) -> Response:
     Lista calendários disponíveis.
 
     Autenticação: Obrigatória
-    Permissões: Qualquer usuário autenticado
+    Permissões: Controle, Superintendência ou superuser
 
     Returns:
         200: Lista de calendários
@@ -56,7 +56,7 @@ def gcal_calendars(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsControleOrSuper])
 def gcal_health(request: Request) -> Response:
     """
     GET /api/gcal/health/
@@ -64,7 +64,7 @@ def gcal_health(request: Request) -> Response:
     Health check da integração com Google Calendar.
 
     Autenticação: Obrigatória
-    Permissões: Qualquer usuário autenticado
+    Permissões: Controle, Superintendência ou superuser
 
     Returns:
         200: Service healthy

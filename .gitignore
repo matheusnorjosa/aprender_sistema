@@ -535,6 +535,10 @@ v2/docs/memoria/
 # Claude local workspace (local only)
 .claude/
 
+# Agent instruction files (local only)
+AGENTS.md
+v2/docs/AGENTS.md
+
 # Session/handoff notes (local only)
 thoughts/
 

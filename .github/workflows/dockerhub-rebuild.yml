@@ -28,7 +28,6 @@ jobs:
   rebuild-and-publish:
     name: "[ops] rebuild Docker Hub images (weekly)"
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout code
@@ -49,22 +48,39 @@ jobs:
         id: publish-mode
         env:
           EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF_NAME: ${{ github.ref }}
           DISPATCH_PUBLISH_IMAGES: ${{ inputs.publish_images }}
         run: |
           set -euo pipefail
           publish_images="false"
+          publish_reason="manual-skip"
 
-          if [ "$EVENT_NAME" = "schedule" ]; then
+          if [ "$GITHUB_REF_NAME" != "refs/heads/main" ]; then
+            publish_images="false"
+            publish_reason="non-main-ref"
+          elif [ "$EVENT_NAME" = "schedule" ]; then
             publish_images="true"
+            publish_reason="scheduled-main"
           elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             case "$DISPATCH_PUBLISH_IMAGES" in
-              true|false) publish_images="$DISPATCH_PUBLISH_IMAGES" ;;
-              *) publish_images="true" ;;
+              true)
+                publish_images="true"
+                publish_reason="dispatch-enabled"
+                ;;
+              false)
+                publish_images="false"
+                publish_reason="dispatch-disabled"
+                ;;
+              *)
+                publish_images="true"
+                publish_reason="dispatch-default"
+                ;;
             esac
           fi
 
           echo "publish_images=$publish_images" >> "$GITHUB_OUTPUT"
-          echo "Publish images: $publish_images"
+          echo "publish_reason=$publish_reason" >> "$GITHUB_OUTPUT"
+          echo "Publish images: $publish_images ($publish_reason)"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -89,6 +105,7 @@ jobs:
             echo "short_sha=${{ steps.version.outputs.short_sha }}"
             echo "maintenance_tag=${{ steps.version.outputs.maintenance_tag }}"
             echo "publish_images=${{ steps.publish-mode.outputs.publish_images }}"
+            echo "publish_reason=${{ steps.publish-mode.outputs.publish_reason }}"
             echo "started_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } > supply-chain/rebuild/rebuild-metrics.txt
 

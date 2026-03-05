@@ -120,6 +120,9 @@ gh workflow run dockerhub-rebuild.yml -f publish_images=true
 gh workflow run dockerhub-rebuild.yml -f publish_images=false
 ```
 
+Observação:
+- fora da `main`, o workflow força `publish_images=false` para evitar push acidental.
+
 ## 🏷️ Deploy por Tag (Staging/Produção)
 
 Staging e produção devem operar somente com imagem publicada.

@@ -37,7 +37,8 @@ services:
       context: ..
       dockerfile: infra/Dockerfile
     command: gunicorn config.wsgi:application --config /app/infra/gunicorn.conf.py
-    env_file: .env
+    env_file:
+      - ${APP_ENV_FILE:-.env}
     environment:
       # ================================================================
       # Environment & Security (CP-01)
@@ -106,7 +107,8 @@ services:
       context: ..
       dockerfile: infra/Dockerfile
     command: celery -A config worker -l info
-    env_file: .env
+    env_file:
+      - ${APP_ENV_FILE:-.env}
     environment:
       # Environment
       ENVIRONMENT: ${ENVIRONMENT:-staging}
@@ -142,7 +144,8 @@ services:
       context: ..
       dockerfile: infra/Dockerfile
     command: celery -A config beat -l info
-    env_file: .env
+    env_file:
+      - ${APP_ENV_FILE:-.env}
     environment:
       # Environment
       ENVIRONMENT: ${ENVIRONMENT:-staging}

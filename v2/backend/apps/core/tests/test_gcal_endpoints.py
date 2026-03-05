@@ -12,6 +12,7 @@ Testes com override_settings para fake vs google client.
 
 from __future__ import annotations
 
+from django.contrib.auth.models import Group
 from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -27,13 +28,15 @@ class TestGCalCalendarsEndpoint(APITestCase):
     """
 
     def setUp(self):
-        """Setup: criar usuário autenticado"""
+        """Setup: criar usuário com permissão de acesso ao GCal"""
         self.usuario = Usuario.objects.create_user(
             username="testuser",
             password="testpass123",
             email="test@example.com",
             cpf="12345678901",
         )
+        group, _ = Group.objects.get_or_create(name="Controle")
+        self.usuario.groups.add(group)
         self.client.force_authenticate(user=self.usuario)
 
     @override_settings(GCAL_CLIENT="fake")
@@ -74,6 +77,18 @@ class TestGCalCalendarsEndpoint(APITestCase):
         response = self.client.get("/api/gcal/calendars/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_list_calendars_denies_authenticated_user_without_role(self):
+        """Usuário autenticado sem Controle/Superintendência recebe 403."""
+        no_role_user = Usuario.objects.create_user(
+            username="norole",
+            password="testpass123",
+            email="norole@example.com",
+            cpf="12345678902",
+        )
+        self.client.force_authenticate(user=no_role_user)
+        response = self.client.get("/api/gcal/calendars/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
 
 class TestGCalHealthEndpoint(APITestCase):
     """
@@ -81,13 +96,15 @@ class TestGCalHealthEndpoint(APITestCase):
     """
 
     def setUp(self):
-        """Setup: criar usuário autenticado"""
+        """Setup: criar usuário com permissão de acesso ao GCal"""
         self.usuario = Usuario.objects.create_user(
             username="testuser",
             password="testpass123",
             email="test@example.com",
             cpf="12345678901",
         )
+        group, _ = Group.objects.get_or_create(name="Controle")
+        self.usuario.groups.add(group)
         self.client.force_authenticate(user=self.usuario)
 
     @override_settings(GCAL_CLIENT="fake")
@@ -124,6 +141,18 @@ class TestGCalHealthEndpoint(APITestCase):
         response = self.client.get("/api/gcal/health/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_health_check_denies_authenticated_user_without_role(self):
+        """Usuário autenticado sem Controle/Superintendência recebe 403."""
+        no_role_user = Usuario.objects.create_user(
+            username="norole2",
+            password="testpass123",
+            email="norole2@example.com",
+            cpf="12345678903",
+        )
+        self.client.force_authenticate(user=no_role_user)
+        response = self.client.get("/api/gcal/health/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     @override_settings(GCAL_CLIENT="fake")
     def test_health_check_includes_client_type(self):
         """
@@ -142,13 +171,15 @@ class TestGCalEndpointsIntegration(APITestCase):
     """
 
     def setUp(self):
-        """Setup: criar usuário autenticado"""
+        """Setup: criar usuário com permissão de acesso ao GCal"""
         self.usuario = Usuario.objects.create_user(
             username="testuser",
             password="testpass123",
             email="test@example.com",
             cpf="12345678901",
         )
+        group, _ = Group.objects.get_or_create(name="Controle")
+        self.usuario.groups.add(group)
         self.client.force_authenticate(user=self.usuario)
 
     @override_settings(GCAL_CLIENT="fake")

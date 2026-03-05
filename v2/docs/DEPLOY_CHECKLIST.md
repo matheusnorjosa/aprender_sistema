@@ -57,6 +57,15 @@ Checklist de variáveis de ambiente para deploy em produção.
 | `REDIS_PORT` | `6379` | Porta do Redis |
 | `CELERY_BROKER_URL` | `redis://<host>:6379/0` | URL do broker Celery |
 
+### Stack de Produção (Watchtower)
+
+| Variável | Valor Prod | Descrição |
+|----------|------------|-----------|
+| `IMAGE_TAG` | `latest` | Stack produtiva fixa em latest (promovido pelo workflow) |
+| `DOCKER_HUB_TOKEN` | `<token>` | Token para pull autenticado no Watchtower |
+| `WATCHTOWER_TOKEN` | `<token-forte>` | Token do endpoint `POST /v1/update` |
+| `FRONTEND_PORT` | `81` | Porta host do frontend na VM01 |
+
 ### GitHub Release Workflow (Deploy + Verificação)
 
 Use **secrets** ou **variables** com os mesmos nomes (secrets têm prioridade):
@@ -108,6 +117,12 @@ DB_PASSWORD=<senha-forte>
 REDIS_HOST=redis.exemplo.com
 REDIS_PORT=6379
 CELERY_BROKER_URL=redis://redis.exemplo.com:6379/0
+
+# Watchtower / imagem
+IMAGE_TAG=latest
+DOCKER_HUB_TOKEN=<docker-hub-token>
+WATCHTOWER_TOKEN=<watchtower-token-forte>
+FRONTEND_PORT=81
 ```
 
 ---
@@ -128,23 +143,56 @@ O sistema valida automaticamente em produção (`ENVIRONMENT=production`):
 ## Comandos de Deploy
 
 ```bash
-# Definir tag explicita da release (obrigatorio)
-export IMAGE_TAG=vYYYY.MM.DD-<sha>
+# Produção usa promoção por tag homologada em staging
+gh workflow run release.yaml -f environment=production -f promotion_tag=vYYYY.MM.DD-<sha>
 
-# Atualizar template de ambiente com IMAGE_TAG e segredos reais (fora do Git)
-# Exemplo: /etc/aprender/.env.production
+# O workflow promove a tag para latest e dispara o deploy via Watchtower
+# (equivalente ao PRODUCTION_DEPLOY_COMMAND):
+curl -H "Authorization: Bearer $WATCHTOWER_TOKEN" \
+  -X POST http://45.174.67.141:8080/v1/update
 
-# Pull das imagens publicadas (build once, deploy many)
-docker compose --env-file /etc/aprender/.env.production -f infra/docker-compose.prod.yml pull
+# Validar health
+curl http://45.174.67.141:8000/api/readyz/
+```
 
-# Subir sem build local
-docker compose --env-file /etc/aprender/.env.production -f infra/docker-compose.prod.yml up -d --no-build
+---
 
-# Verificar logs
-docker compose --env-file /etc/aprender/.env.production -f infra/docker-compose.prod.yml logs -f web
+## Promocao Staging -> Producao (Mesmo Artefato)
 
-# Verificar health
-curl https://aprender.com.br/healthz/
+No workflow `Release`:
+
+1. Executar em `staging` (gera tag `vYYYY.MM.DD-<sha>` e valida health/version).
+2. Executar em `production` com `promotion_tag` igual a tag homologada em staging.
+3. O workflow valida o endpoint de versao de staging antes do deploy em producao.
+4. Producao usa a mesma tag/digest homologada (sem rebuild na etapa de producao).
+5. Antes do deploy, o workflow repointa `latest` para a `promotion_tag`.
+6. Watchtower aplica update dos containers monitorados.
+
+Topologia alvo em producao:
+- VM01_App: containers `web`, `worker`, `beat`, `frontend`, `watchtower`
+- VM02_Banco: PostgreSQL externo (`DB_HOST`)
+- VM03_Redis: Redis externo (`REDIS_HOST`)
+
+Exemplo (GitHub CLI):
+
+```bash
+# 1) staging (gera tag nova)
+gh workflow run release.yaml -f environment=staging
+
+# 2) producao (promove tag homologada)
+gh workflow run release.yaml -f environment=production -f promotion_tag=vYYYY.MM.DD-<sha>
+```
+
+---
+
+## Rollback por Tag Anterior
+
+```bash
+# Exemplo: rollback para tag anterior homologada
+gh workflow run release.yaml -f environment=production -f promotion_tag=vYYYY.MM.DD-<sha-anterior>
+
+# Confirmar versao ativa apos rollback
+curl https://aprender.com.br/version
 ```
 
 ---

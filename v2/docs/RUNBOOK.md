@@ -30,24 +30,36 @@ Configure como **secret** ou **variable** (secret tem prioridade):
 - `STAGING_HEALTHCHECK_URL` / `PRODUCTION_HEALTHCHECK_URL`
 - `STAGING_VERSIONCHECK_URL` / `PRODUCTION_VERSIONCHECK_URL`
 
+Exemplo de `PRODUCTION_DEPLOY_COMMAND` (Watchtower HTTP API):
+
+```bash
+curl -H "Authorization: Bearer $WATCHTOWER_TOKEN" -X POST http://45.174.67.141:8080/v1/update
+```
+
 ### **2. Fluxo operacional**
 
 ```bash
 # A execução é manual (workflow_dispatch):
 # GitHub -> Actions -> Release -> Run workflow
 # Environment: staging ou production
+#
+# Para production:
+# - informar promotion_tag com a mesma tag homologada em staging
+#   (ex.: vYYYY.MM.DD-<sha>)
 ```
 
 Ordem crítica no pipeline:
 
-1. Build e push de imagens backend/frontend.
-2. Geração de SBOM (`backend-sbom.spdx.json`, `frontend-sbom.spdx.json`).
-3. Geração de provenance attestation (imagens + SBOM).
-4. Deploy via comando configurado.
-5. Verificação pós-deploy:
+1. `staging`: build/push de imagens backend/frontend + gate de segurança.
+2. `production`: promoção por `promotion_tag` (sem rebuild) com repoint de `:latest`.
+3. Resolução de digest e geração de SBOM (`backend-sbom.spdx.json`, `frontend-sbom.spdx.json`).
+4. Geração de provenance attestation (imagens + SBOM).
+5. `production`: verificação prévia de staging para garantir que a mesma tag está homologada.
+6. Deploy via comando configurado.
+7. Verificação pós-deploy:
    - health endpoint deve retornar HTTP 200
    - version endpoint deve conter a release (`vYYYY.MM.DD-<sha>`)
-6. Criação da GitHub Release + upload dos assets de evidência.
+8. Criação/atualização da GitHub Release + upload dos assets de evidência.
 
 ### **3. Evidências geradas**
 
@@ -66,6 +78,16 @@ O workflow falha quando qualquer item crítico falha:
 - geração de SBOM/attestation
 
 Isso evita sinal verde operacional sem confirmação real de deploy íntegro.
+
+### Promoção staging -> produção (mesmo artefato)
+
+1. Executar release em `staging` (gera tag `vYYYY.MM.DD-<sha>`).
+2. Validar staging (health/version) no próprio workflow.
+3. Executar release em `production` com `promotion_tag` igual à tag homologada.
+4. Workflow valida staging com essa mesma tag antes do deploy em produção.
+5. Workflow promove a tag homologada para `latest` no Docker Hub.
+6. `PRODUCTION_DEPLOY_COMMAND` dispara `POST /v1/update` no Watchtower da VM01.
+7. Watchtower executa pull/restart dos containers monitorados (web/worker/beat/frontend).
 
 ## Gate de Segurança no Release (Publicação de Imagem)
 
@@ -123,12 +145,13 @@ gh workflow run dockerhub-rebuild.yml -f publish_images=false
 Observação:
 - fora da `main`, o workflow força `publish_images=false` para evitar push acidental.
 
-## 🏷️ Deploy por Tag (Staging/Produção)
+## 🏷️ Deploy por Imagem Publicada (Staging/Produção)
 
-Staging e produção devem operar somente com imagem publicada.
+Staging e produção operam somente com imagem publicada.
 
 Regras operacionais:
-- `IMAGE_TAG` é obrigatória (sem fallback para `latest`).
+- `staging`: `IMAGE_TAG` explícita da release.
+- `produção`: stack fixa em `IMAGE_TAG=latest` + promoção controlada por `promotion_tag`.
 - Fazer `pull` antes do `up`.
 - Usar `up --no-build` (proibido build local em VM).
 - Não aplicar `docker-compose.override.yml` em staging/produção.
@@ -152,17 +175,25 @@ docker compose --env-file .env.staging -f docker-compose.yml up -d --no-build
 ### Produção
 
 ```bash
-cd v2/infra
+# 1) stack em producao permanece com IMAGE_TAG=latest
+# 2) release em production com promotion_tag valida staging e repointa latest
+# 3) deploy trigger via Watchtower HTTP API
+curl -H "Authorization: Bearer $WATCHTOWER_TOKEN" \
+  -X POST http://45.174.67.141:8080/v1/update
+```
 
-# 1) Definir tag explícita
-export IMAGE_TAG=vYYYY.MM.DD-<sha>
+Observacao de seguranca:
+- manter `WATCHTOWER_TOKEN` longo e rotacionado;
+- restringir firewall da porta `8080` sempre que possivel.
 
-# 2) Validar compose (falha se IMAGE_TAG estiver vazia)
-docker compose --env-file .env.production -f docker-compose.prod.yml config
+### Rollback por tag anterior (staging/producao)
 
-# 3) Pull + up sem build
-docker compose --env-file .env.production -f docker-compose.prod.yml pull
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-build
+```bash
+# Produção: rollback = reexecutar release em production com promotion_tag anterior
+gh workflow run release.yaml -f environment=production -f promotion_tag=vYYYY.MM.DD-<sha-anterior>
+
+# Confirmar versao ativa
+curl -fsS https://SEU_HOST/version
 ```
 
 ## 🔄 Recarregar Variáveis de Ambiente (.env)

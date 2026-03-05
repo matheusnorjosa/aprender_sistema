@@ -4,7 +4,7 @@
 # Comandos unificados para operações comuns
 # ================================================================
 
-.PHONY: help build up up-obs down down-obs restart logs shell migrate test clean \
+.PHONY: help build build-dev-image build-prod-image up up-obs down down-obs restart logs shell migrate test clean \
 	check-env-dev up-dev health-dev down-dev \
 	check-env-staging up-staging health-staging down-staging \
 	check-env-prod up-prod health-prod down-prod
@@ -14,6 +14,8 @@ COMPOSE_FILE := docker-compose.yml
 COMPOSE_OVERRIDE_FILE := docker-compose.override.yml
 COMPOSE_PROD_FILE := docker-compose.prod.yml
 COMPOSE_OBS_FILE := docker-compose.observability.yml
+DOCKERFILE_DEV := Dockerfile.dev
+DOCKERFILE_PROD := Dockerfile.prod
 SERVICE_WEB := web
 SERVICE_DB := db
 SERVICE_WORKER := worker
@@ -43,6 +45,16 @@ help:  ## Mostrar esta mensagem de ajuda
 build:  ## Construir imagens Docker
 	@echo "🔨 Construindo imagens Docker..."
 	docker compose -f $(COMPOSE_FILE) build --no-cache
+
+build-dev-image:  ## Construir imagem backend DEV (Dockerfile.dev)
+	@echo "🔨 Construindo backend DEV..."
+	docker build -f $(DOCKERFILE_DEV) -t aprender-backend:dev-local ..
+	@echo "✅ Imagem DEV: aprender-backend:dev-local"
+
+build-prod-image:  ## Construir imagem backend PROD (Dockerfile.prod)
+	@echo "🔨 Construindo backend PROD..."
+	docker build -f $(DOCKERFILE_PROD) -t aprender-backend:prod-local ..
+	@echo "✅ Imagem PROD: aprender-backend:prod-local"
 
 up:  ## Iniciar todos os serviços
 	@echo "🚀 Iniciando serviços..."

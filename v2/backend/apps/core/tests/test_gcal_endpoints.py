@@ -1,5 +1,5 @@
 """
-Testes para endpoints GCal (Sprint 2 - Issue #65)
+Testes para endpoints GCal (Sprint 2 - Issue #65, RBAC #568)
 
 Endpoints testados:
 - GET /api/gcal/calendars/

@@ -1,4 +1,4 @@
-DC = COMPOSE_PROJECT_NAME=aprender_v2 docker compose -f infra/docker-compose.yml
+DC = COMPOSE_PROJECT_NAME=aprender_v2 IMAGE_TAG=latest docker compose -f infra/docker-compose.yml -f infra/docker-compose.override.yml
 WEB = $(DC) exec -T web
 
 .PHONY: up down build logs shell migrate collect seed seed-demo seed-rbac \

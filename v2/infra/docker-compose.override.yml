@@ -9,13 +9,16 @@
 # - Faster iteration during development
 # - Pyright/IDE can see live changes
 #
-# Production: This file should NOT be deployed to production.
-# Use docker-compose.yml only for production builds.
+# Staging/Production: this file must NOT be applied.
+# Use only docker-compose.yml (staging) or docker-compose.prod.yml (producao).
 
 name: aprender_v2
 
 services:
   web:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.dev
     volumes:
       # Mount backend code as volume for live reload
       - ../backend:/app:delegated
@@ -23,13 +26,24 @@ services:
       - ../data/csv-import:/app/data/csv-import:ro
 
   worker:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.dev
     volumes:
       # Mount backend code as volume for live reload
       - ../backend:/app:delegated
       - ../data/csv-import:/app/data/csv-import:ro
 
   beat:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.dev
     volumes:
       # Mount backend code as volume for live reload
       - ../backend:/app:delegated
       - ../data/csv-import:/app/data/csv-import:ro
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile

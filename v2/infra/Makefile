@@ -6,8 +6,8 @@
 
 .PHONY: help build build-dev-image build-prod-image up up-obs down down-obs restart logs shell migrate test clean \
 	check-env-dev up-dev health-dev down-dev \
-	check-env-staging up-staging health-staging down-staging \
-	check-env-prod up-prod health-prod down-prod
+	check-env-staging pull-staging up-staging health-staging down-staging \
+	check-env-prod pull-prod up-prod health-prod down-prod
 
 # Variáveis
 COMPOSE_FILE := docker-compose.yml
@@ -22,9 +22,6 @@ SERVICE_WORKER := worker
 ENV_FILE_DEV := .env.dev
 ENV_FILE_STAGING := .env.staging
 ENV_FILE_PROD := .env.production
-PROJECT_DEV := aprender_dev
-PROJECT_STAGING := aprender_staging
-PROJECT_PROD := aprender_prod
 
 # ================================================================
 # Help
@@ -98,16 +95,16 @@ ps:  ## Ver status dos containers
 
 check-env-dev: ## Validar configuração do ambiente DEV
 	@echo "🔎 [DEV] validando compose..."
-	@echo "    project: $(PROJECT_DEV)"
+	@echo "    project: COMPOSE_PROJECT_NAME (from $(ENV_FILE_DEV))"
 	@echo "    env-file: $(ENV_FILE_DEV)"
 	@echo "    compose: $(COMPOSE_FILE) + $(COMPOSE_OVERRIDE_FILE)"
-	docker compose -p $(PROJECT_DEV) --env-file $(ENV_FILE_DEV) \
+	docker compose --env-file $(ENV_FILE_DEV) \
 		-f $(COMPOSE_FILE) -f $(COMPOSE_OVERRIDE_FILE) config > /dev/null
 	@echo "✅ [DEV] configuração válida"
 
 up-dev: ## Subir ambiente DEV (compose + override)
 	@echo "🚀 [DEV] subindo ambiente..."
-	docker compose -p $(PROJECT_DEV) --env-file $(ENV_FILE_DEV) \
+	docker compose --env-file $(ENV_FILE_DEV) \
 		-f $(COMPOSE_FILE) -f $(COMPOSE_OVERRIDE_FILE) up -d
 	@echo "✅ [DEV] ambiente iniciado"
 	@echo "🌐 [DEV] backend: http://localhost:8002"
@@ -119,23 +116,29 @@ health-dev: ## Verificar health do ambiente DEV
 
 down-dev: ## Derrubar ambiente DEV
 	@echo "⏹️  [DEV] derrubando ambiente..."
-	docker compose -p $(PROJECT_DEV) --env-file $(ENV_FILE_DEV) \
+	docker compose --env-file $(ENV_FILE_DEV) \
 		-f $(COMPOSE_FILE) -f $(COMPOSE_OVERRIDE_FILE) down
 	@echo "✅ [DEV] ambiente finalizado"
 
 check-env-staging: ## Validar configuração do ambiente STAGING
 	@echo "🔎 [STAGING] validando compose..."
-	@echo "    project: $(PROJECT_STAGING)"
+	@echo "    project: COMPOSE_PROJECT_NAME (from $(ENV_FILE_STAGING))"
 	@echo "    env-file: $(ENV_FILE_STAGING)"
 	@echo "    compose: $(COMPOSE_FILE)"
-	docker compose -p $(PROJECT_STAGING) --env-file $(ENV_FILE_STAGING) \
+	docker compose --env-file $(ENV_FILE_STAGING) \
 		-f $(COMPOSE_FILE) config > /dev/null
 	@echo "✅ [STAGING] configuração válida"
 
-up-staging: ## Subir ambiente STAGING (local de homologação)
+pull-staging: ## Pull das imagens do ambiente STAGING (tag obrigatoria)
+	@echo "📥 [STAGING] puxando imagens por tag..."
+	docker compose --env-file $(ENV_FILE_STAGING) \
+		-f $(COMPOSE_FILE) pull
+	@echo "✅ [STAGING] pull concluido"
+
+up-staging: ## Subir ambiente STAGING (sem build local)
 	@echo "🚀 [STAGING] subindo ambiente..."
-	docker compose -p $(PROJECT_STAGING) --env-file $(ENV_FILE_STAGING) \
-		-f $(COMPOSE_FILE) up -d
+	docker compose --env-file $(ENV_FILE_STAGING) \
+		-f $(COMPOSE_FILE) up -d --no-build
 	@echo "✅ [STAGING] ambiente iniciado"
 	@echo "🌐 [STAGING] backend: http://localhost:8002"
 	@echo "🌐 [STAGING] frontend: http://localhost:5173"
@@ -146,23 +149,29 @@ health-staging: ## Verificar health do ambiente STAGING
 
 down-staging: ## Derrubar ambiente STAGING
 	@echo "⏹️  [STAGING] derrubando ambiente..."
-	docker compose -p $(PROJECT_STAGING) --env-file $(ENV_FILE_STAGING) \
+	docker compose --env-file $(ENV_FILE_STAGING) \
 		-f $(COMPOSE_FILE) down
 	@echo "✅ [STAGING] ambiente finalizado"
 
 check-env-prod: ## Validar configuração do ambiente PRODUÇÃO
 	@echo "🔎 [PROD] validando compose..."
-	@echo "    project: $(PROJECT_PROD)"
+	@echo "    project: COMPOSE_PROJECT_NAME (from $(ENV_FILE_PROD))"
 	@echo "    env-file: $(ENV_FILE_PROD)"
 	@echo "    compose: $(COMPOSE_PROD_FILE)"
-	docker compose -p $(PROJECT_PROD) --env-file $(ENV_FILE_PROD) \
+	docker compose --env-file $(ENV_FILE_PROD) \
 		-f $(COMPOSE_PROD_FILE) config > /dev/null
 	@echo "✅ [PROD] configuração válida"
 
-up-prod: ## Subir ambiente PRODUÇÃO (validação local controlada)
+pull-prod: ## Pull das imagens do ambiente PRODUÇÃO (tag obrigatoria)
+	@echo "📥 [PROD] puxando imagens por tag..."
+	docker compose --env-file $(ENV_FILE_PROD) \
+		-f $(COMPOSE_PROD_FILE) pull
+	@echo "✅ [PROD] pull concluido"
+
+up-prod: ## Subir ambiente PRODUÇÃO (sem build local)
 	@echo "🚀 [PROD] subindo ambiente..."
-	docker compose -p $(PROJECT_PROD) --env-file $(ENV_FILE_PROD) \
-		-f $(COMPOSE_PROD_FILE) up -d
+	docker compose --env-file $(ENV_FILE_PROD) \
+		-f $(COMPOSE_PROD_FILE) up -d --no-build
 	@echo "✅ [PROD] ambiente iniciado"
 	@echo "🌐 [PROD] backend: http://localhost:8000"
 	@echo "🌐 [PROD] frontend: http://localhost"
@@ -173,7 +182,7 @@ health-prod: ## Verificar health do ambiente PRODUÇÃO
 
 down-prod: ## Derrubar ambiente PRODUÇÃO
 	@echo "⏹️  [PROD] derrubando ambiente..."
-	docker compose -p $(PROJECT_PROD) --env-file $(ENV_FILE_PROD) \
+	docker compose --env-file $(ENV_FILE_PROD) \
 		-f $(COMPOSE_PROD_FILE) down
 	@echo "✅ [PROD] ambiente finalizado"
 

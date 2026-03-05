@@ -89,12 +89,14 @@ make down-dev
 
 # STAGING
 make check-env-staging
+make pull-staging
 make up-staging
 make health-staging
 make down-staging
 
 # PROD (local controlled validation)
 make check-env-prod
+make pull-prod
 make up-prod
 make health-prod
 make down-prod
@@ -106,7 +108,10 @@ Default env templates are versioned as:
 - `.env.staging`
 - `.env.production`
 
-Important: keep placeholders only in these files. Real secrets must stay outside Git.
+Important:
+- keep placeholders only in these files (real secrets outside Git).
+- `staging/prod` require explicit `IMAGE_TAG` (no implicit `latest`).
+- `staging/prod` do not use local build; use published images (`pull + up --no-build`).
 
 ## Backend Dockerfiles
 

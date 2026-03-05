@@ -162,8 +162,8 @@ check-env-prod: ## Validar configuração do ambiente PRODUÇÃO
 		-f $(COMPOSE_PROD_FILE) config > /dev/null
 	@echo "✅ [PROD] configuração válida"
 
-pull-prod: ## Pull das imagens do ambiente PRODUÇÃO (tag obrigatoria)
-	@echo "📥 [PROD] puxando imagens por tag..."
+pull-prod: ## Pull das imagens do ambiente PRODUÇÃO (latest promovida)
+	@echo "📥 [PROD] puxando imagens publicadas..."
 	docker compose --env-file $(ENV_FILE_PROD) \
 		-f $(COMPOSE_PROD_FILE) pull
 	@echo "✅ [PROD] pull concluido"
@@ -174,7 +174,7 @@ up-prod: ## Subir ambiente PRODUÇÃO (sem build local)
 		-f $(COMPOSE_PROD_FILE) up -d --no-build
 	@echo "✅ [PROD] ambiente iniciado"
 	@echo "🌐 [PROD] backend: http://localhost:8000"
-	@echo "🌐 [PROD] frontend: http://localhost"
+	@echo "🌐 [PROD] frontend: http://localhost:$${FRONTEND_PORT:-81}"
 
 health-prod: ## Verificar health do ambiente PRODUÇÃO
 	@echo "❤️  [PROD] verificando /api/readyz..."

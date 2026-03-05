@@ -42,7 +42,7 @@ from apps.core.models import (
     MunicipioReferencia,
     Solicitacao,
 )
-from apps.core.permissions import IsDATOrSuper, IsSuperintendenciaOnly
+from apps.core.permissions import IsComprasDashboardAccess, IsDATOrSuper, IsSuperintendenciaOnly
 from apps.core.serializers import (
     DATAcaoListSerializer,
     DATAcaoSerializer,
@@ -412,7 +412,7 @@ class DATCompraViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    @action(detail=False, methods=["get"], permission_classes=[IsComprasDashboardAccess])
     def dashboard(self, request: Request) -> Response:
         """
         Dashboard de compras com métricas agregadas.
@@ -554,7 +554,7 @@ class DATCompraViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    @action(detail=False, methods=["get"], permission_classes=[IsComprasDashboardAccess])
     def pendencias(self, request: Request) -> Response:
         """
         Municípios com compra no domínio core_compra e sem solicitação ativa.

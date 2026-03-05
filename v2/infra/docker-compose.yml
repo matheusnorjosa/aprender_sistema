@@ -1,4 +1,4 @@
-name: aprender_v2
+name: ${COMPOSE_PROJECT_NAME:-aprender_v2}
 services:
   db:
     image: postgres:15-alpine
@@ -32,10 +32,7 @@ services:
     volumes:
       - redis_data:/data
   web:
-    image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile.dev
+    image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
     command: gunicorn config.wsgi:application --config /app/infra/gunicorn.conf.py
     env_file:
       - ${APP_ENV_FILE:-.env}
@@ -102,10 +99,7 @@ services:
       start_period: 40s
 
   worker:
-    image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile.dev
+    image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
     command: celery -A config worker -l info
     env_file:
       - ${APP_ENV_FILE:-.env}
@@ -139,10 +133,7 @@ services:
       start_period: 60s
 
   beat:
-    image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile.dev
+    image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
     command: celery -A config beat -l info
     env_file:
       - ${APP_ENV_FILE:-.env}
@@ -175,10 +166,7 @@ services:
       start_period: 30s
 
   frontend:
-    image: norjosamatheus/aprender-frontend:${IMAGE_TAG:-latest}
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
+    image: norjosamatheus/aprender-frontend:${IMAGE_TAG:?IMAGE_TAG is required}
     environment:
       PROXY_TARGET: http://web:8000 # Proxy server-side para o backend interno
     ports:

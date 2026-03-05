@@ -11,7 +11,7 @@ Fonte operacional oficial para evitar confusao de contexto no fluxo solo.
 
 ## 2) Matriz Rapida
 
-| Ambiente | Objetivo | Compose | Env file | Dockerfile backend | Projeto compose | Porta backend |
+| Ambiente | Objetivo | Compose | Env file | Dockerfile backend | COMPOSE_PROJECT_NAME | Porta backend |
 |---|---|---|---|---|---|---|
 | dev | Desenvolvimento local | `docker-compose.yml + docker-compose.override.yml` | `.env.dev` | `infra/Dockerfile.dev` | `aprender_dev` | `8002` |
 | staging | Homologacao | `docker-compose.yml` | `.env.staging` | imagem publicada (`IMAGE_TAG`) | `aprender_staging` | `8002` |
@@ -32,12 +32,14 @@ make down-dev
 
 # STAGING
 make check-env-staging
+make pull-staging
 make up-staging
 make health-staging
 make down-staging
 
 # PRODUCAO (validacao local controlada)
 make check-env-prod
+make pull-prod
 make up-prod
 make health-prod
 make down-prod
@@ -59,6 +61,8 @@ make build-prod-image
 4. Para deploy real em VM, registrar `IMAGE_TAG` usada como evidencia.
 5. Arquivos `.env.*` deste diretorio sao templates e nao devem conter segredos reais.
 6. `staging/producao` devem usar imagem publicada gerada com `Dockerfile.prod`.
+7. `staging/producao` exigem `IMAGE_TAG` explicita (sem fallback implicito para `latest`).
+8. Em `staging/producao`, `docker-compose.override.yml` nao e aplicado.
 
 ## 5) Evidencias Minimas por Mudanca
 

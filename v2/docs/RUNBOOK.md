@@ -83,6 +83,46 @@ Política de exceção (temporária):
 - referenciar a issue no PR da exceção;
 - remover a exceção no prazo e registrar evidências.
 
+## Rebuild Periódico no Docker Hub
+
+Workflow: `.github/workflows/dockerhub-rebuild.yml`
+
+Objetivo:
+- reduzir defasagem de imagens no Docker Hub;
+- manter `latest` atualizado com rebuild validado;
+- publicar tag imutável de manutenção para rastreabilidade.
+
+Trigger:
+- `schedule`: semanal (domingo 03:00 UTC);
+- `workflow_dispatch`: execução manual.
+
+Estratégia de tags:
+- backend/frontend recebem:
+  - `latest`
+  - `maint-YYYY.MM.DD-<sha>-r<run_id>` (imutável)
+
+Gate obrigatório antes do push:
+- build de backend/frontend para scan local no runner;
+- Trivy JSON para os dois artefatos;
+- bloqueio automático quando houver `HIGH`/`CRITICAL`.
+
+Artifacts do workflow:
+- `supply-chain/security/*` (relatórios + resumo do gate)
+- `supply-chain/rebuild/rebuild-metrics.txt` (métricas da execução)
+
+Execução manual via CLI:
+
+```bash
+# Publica imagens (somente após gate aprovado)
+gh workflow run dockerhub-rebuild.yml -f publish_images=true
+
+# Validação manual sem push (dry-run operacional)
+gh workflow run dockerhub-rebuild.yml -f publish_images=false
+```
+
+Observação:
+- fora da `main`, o workflow força `publish_images=false` para evitar push acidental.
+
 ## 🏷️ Deploy por Tag (Staging/Produção)
 
 Staging e produção devem operar somente com imagem publicada.

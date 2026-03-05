@@ -599,7 +599,14 @@ jobs:
           aprender-backend:ci-parity-${{ github.sha }} \
           bash -lc '
             set -euo pipefail
-            pip install --no-cache-dir pytest pytest-django black isort flake8
+            pip install --no-cache-dir \
+              pytest==8.3.2 \
+              pytest-django==4.8.0 \
+              black==24.8.0 \
+              isort==5.13.2 \
+              flake8==7.1.1 \
+              faker==28.4.1 \
+              factory-boy==3.3.1
             black --check apps/core/auth_backends.py apps/core/models/__init__.py
             isort --check-only apps/core/auth_backends.py
             flake8 apps/core/auth_backends.py

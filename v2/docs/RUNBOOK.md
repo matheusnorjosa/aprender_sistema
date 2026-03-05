@@ -67,6 +67,48 @@ O workflow falha quando qualquer item crítico falha:
 
 Isso evita sinal verde operacional sem confirmação real de deploy íntegro.
 
+## 🏷️ Deploy por Tag (Staging/Produção)
+
+Staging e produção devem operar somente com imagem publicada.
+
+Regras operacionais:
+- `IMAGE_TAG` é obrigatória (sem fallback para `latest`).
+- Fazer `pull` antes do `up`.
+- Usar `up --no-build` (proibido build local em VM).
+- Não aplicar `docker-compose.override.yml` em staging/produção.
+
+### Staging
+
+```bash
+cd v2/infra
+
+# 1) Definir tag explícita
+export IMAGE_TAG=vYYYY.MM.DD-<sha>
+
+# 2) Validar compose (falha se IMAGE_TAG estiver vazia)
+docker compose --env-file .env.staging -f docker-compose.yml config
+
+# 3) Pull + up sem build
+docker compose --env-file .env.staging -f docker-compose.yml pull
+docker compose --env-file .env.staging -f docker-compose.yml up -d --no-build
+```
+
+### Produção
+
+```bash
+cd v2/infra
+
+# 1) Definir tag explícita
+export IMAGE_TAG=vYYYY.MM.DD-<sha>
+
+# 2) Validar compose (falha se IMAGE_TAG estiver vazia)
+docker compose --env-file .env.production -f docker-compose.prod.yml config
+
+# 3) Pull + up sem build
+docker compose --env-file .env.production -f docker-compose.prod.yml pull
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-build
+```
+
 ## 🔄 Recarregar Variáveis de Ambiente (.env)
 
 ### ⚠️ **IMPORTANTE: `restart` NÃO recarrega variáveis!**

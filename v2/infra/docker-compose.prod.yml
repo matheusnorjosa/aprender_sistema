@@ -8,7 +8,7 @@
 #   IMAGE_TAG=v1.0.0 docker compose -f docker-compose.prod.yml up -d
 # =============================================================================
 
-name: aprender_v2_prod
+name: ${COMPOSE_PROJECT_NAME:-aprender_v2_prod}
 
 services:
   db:
@@ -41,7 +41,7 @@ services:
     restart: unless-stopped
 
   web:
-    image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
+    image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
     command: gunicorn config.wsgi:application --config /app/infra/gunicorn.conf.py
     env_file:
       - ${APP_ENV_FILE:-.env}
@@ -69,7 +69,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
+    image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
     command: celery -A config worker -l info
     env_file:
       - ${APP_ENV_FILE:-.env}
@@ -95,7 +95,7 @@ services:
     restart: unless-stopped
 
   beat:
-    image: norjosamatheus/aprender-backend:${IMAGE_TAG:-latest}
+    image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
     command: celery -A config beat -l info
     env_file:
       - ${APP_ENV_FILE:-.env}
@@ -121,7 +121,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: norjosamatheus/aprender-frontend:${IMAGE_TAG:-latest}
+    image: norjosamatheus/aprender-frontend:${IMAGE_TAG:?IMAGE_TAG is required}
     ports:
       - "80:80"
     depends_on:

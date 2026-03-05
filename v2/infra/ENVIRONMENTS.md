@@ -11,11 +11,11 @@ Fonte operacional oficial para evitar confusao de contexto no fluxo solo.
 
 ## 2) Matriz Rapida
 
-| Ambiente | Objetivo | Compose | Env file | Projeto compose | Porta backend |
-|---|---|---|---|---|---|
-| dev | Desenvolvimento local | `docker-compose.yml + docker-compose.override.yml` | `.env.dev` | `aprender_dev` | `8002` |
-| staging | Homologacao | `docker-compose.yml` | `.env.staging` | `aprender_staging` | `8002` |
-| producao | Runtime final | `docker-compose.prod.yml` | `.env.production` | `aprender_prod` | `8000` |
+| Ambiente | Objetivo | Compose | Env file | Dockerfile backend | Projeto compose | Porta backend |
+|---|---|---|---|---|---|---|
+| dev | Desenvolvimento local | `docker-compose.yml + docker-compose.override.yml` | `.env.dev` | `infra/Dockerfile.dev` | `aprender_dev` | `8002` |
+| staging | Homologacao | `docker-compose.yml` | `.env.staging` | imagem publicada (`IMAGE_TAG`) | `aprender_staging` | `8002` |
+| producao | Runtime final | `docker-compose.prod.yml` | `.env.production` | imagem publicada (`IMAGE_TAG`) | `aprender_prod` | `8000` |
 
 ## 3) Comandos Oficiais
 
@@ -43,6 +43,14 @@ make health-prod
 make down-prod
 ```
 
+Build explicito do backend por perfil:
+
+```bash
+cd v2/infra
+make build-dev-image
+make build-prod-image
+```
+
 ## 4) Boas Praticas Operacionais
 
 1. Antes de subir ambiente, rode `check-env-*`.
@@ -50,6 +58,7 @@ make down-prod
 3. Nunca assumir ambiente pelo terminal; validar pelo comando executado.
 4. Para deploy real em VM, registrar `IMAGE_TAG` usada como evidencia.
 5. Arquivos `.env.*` deste diretorio sao templates e nao devem conter segredos reais.
+6. `staging/producao` devem usar imagem publicada gerada com `Dockerfile.prod`.
 
 ## 5) Evidencias Minimas por Mudanca
 

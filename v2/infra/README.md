@@ -108,6 +108,18 @@ Default env templates are versioned as:
 
 Important: keep placeholders only in these files. Real secrets must stay outside Git.
 
+## Backend Dockerfiles
+
+- `Dockerfile.dev`: local development image (developer tooling included).
+- `Dockerfile.prod`: runtime image for publish/deploy (lean profile).
+
+Build examples (from `v2/infra`):
+
+```bash
+make build-dev-image
+make build-prod-image
+```
+
 ## Environment Variables
 
 Create `/etc/aprender/env` with:

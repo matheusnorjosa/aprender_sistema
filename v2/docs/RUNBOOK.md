@@ -67,6 +67,22 @@ O workflow falha quando qualquer item crítico falha:
 
 Isso evita sinal verde operacional sem confirmação real de deploy íntegro.
 
+## Gate de Segurança no Release (Publicação de Imagem)
+
+No workflow manual de release (`.github/workflows/release.yaml`), a publicação de imagem no Docker Hub só ocorre após scan prévio de vulnerabilidades.
+
+Regras:
+- backend e frontend são buildados localmente no runner para scan pré-publicação;
+- relatórios Trivy são gerados em `supply-chain/security/`;
+- o release falha se houver vulnerabilidade `HIGH` ou `CRITICAL`;
+- os relatórios são sempre anexados como artifact do workflow.
+
+Política de exceção (temporária):
+- abrir issue específica de exceção com CVE, justificativa técnica e mitigação;
+- registrar prazo máximo de remoção (ex.: 14 dias);
+- referenciar a issue no PR da exceção;
+- remover a exceção no prazo e registrar evidências.
+
 ## 🏷️ Deploy por Tag (Staging/Produção)
 
 Staging e produção devem operar somente com imagem publicada.

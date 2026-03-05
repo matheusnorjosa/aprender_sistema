@@ -60,7 +60,7 @@ from .views_gcal import (  # Core GCal; Dashboard views
     gcal_calendars,
     gcal_health,
 )
-from .views_health import features, readyz
+from .views_health import features, readyz, versionz
 from .views_import_bloqueios import ImportBloqueiosView
 from .views_import_colecoes import ImportColecoesView
 from .views_import_deslocamentos import ImportDeslocamentosView
@@ -138,6 +138,7 @@ router.register(r"dat/plano-formacoes", PlanoFormacoesViewSet, basename="plano-f
 urlpatterns = [
     path("", api_root, name="api-root"),
     path("readyz/", readyz, name="readyz"),
+    path("version/", versionz, name="version"),
     path("features/", features, name="features"),
     path("me/", CurrentUserView.as_view(), name="current-user"),
     path("stats/home/", HomeStatsView.as_view(), name="stats-home"),

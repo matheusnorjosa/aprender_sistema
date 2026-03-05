@@ -32,6 +32,7 @@ RUN chmod +x /app/infra/scripts/*.sh
 
 ARG GIT_SHA=unknown
 ARG BUILD_DATE=unknown
+ARG APP_VERSION=dev
 RUN python - <<'PY2'
 import json
 import os
@@ -39,6 +40,7 @@ import os
 with open("/app/BUILD_INFO.json", "w", encoding="utf-8") as f:
     json.dump(
         {
+            "version": os.environ.get("APP_VERSION", "dev"),
             "git_sha": os.environ.get("GIT_SHA", "unknown"),
             "build_date": os.environ.get("BUILD_DATE", "unknown"),
             "profile": "prod",

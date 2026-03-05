@@ -128,14 +128,20 @@ O sistema valida automaticamente em produção (`ENVIRONMENT=production`):
 ## Comandos de Deploy
 
 ```bash
-# Build da imagem
-docker build -t aprender:prod -f infra/Dockerfile.prod .
+# Definir tag explicita da release (obrigatorio)
+export IMAGE_TAG=vYYYY.MM.DD-<sha>
 
-# Deploy com variáveis de produção
-docker compose -f docker-compose.yml up -d
+# Atualizar template de ambiente com IMAGE_TAG e segredos reais (fora do Git)
+# Exemplo: /etc/aprender/.env.production
+
+# Pull das imagens publicadas (build once, deploy many)
+docker compose --env-file /etc/aprender/.env.production -f infra/docker-compose.prod.yml pull
+
+# Subir sem build local
+docker compose --env-file /etc/aprender/.env.production -f infra/docker-compose.prod.yml up -d --no-build
 
 # Verificar logs
-docker compose logs -f web
+docker compose --env-file /etc/aprender/.env.production -f infra/docker-compose.prod.yml logs -f web
 
 # Verificar health
 curl https://aprender.com.br/healthz/

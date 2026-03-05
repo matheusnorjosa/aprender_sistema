@@ -145,36 +145,41 @@ jobs:
           echo "POSTGRES_PASSWORD=$DB_PASSWORD"
         } >> v2/infra/.env
 
-        docker compose -f v2/infra/docker-compose.yml up -d --build db redis web
+        export IMAGE_TAG=latest
+        compose() {
+          docker compose -f v2/infra/docker-compose.yml -f v2/infra/docker-compose.override.yml "$@"
+        }
+
+        compose up -d --build db redis web
 
         for i in $(seq 1 60); do
-          if docker compose -f v2/infra/docker-compose.yml exec -T db sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1; then
+          if compose exec -T db sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1; then
             echo "PostgreSQL is ready"
             break
           fi
           if [ "$i" -eq 60 ]; then
             echo "PostgreSQL did not become ready in time"
-            docker compose -f v2/infra/docker-compose.yml logs db
+            compose logs db
             exit 1
           fi
           sleep 2
         done
 
         for i in $(seq 1 30); do
-          if docker compose -f v2/infra/docker-compose.yml exec -T web getent hosts db >/dev/null 2>&1; then
+          if compose exec -T web getent hosts db >/dev/null 2>&1; then
             echo "Web can resolve db service"
             break
           fi
           if [ "$i" -eq 30 ]; then
             echo "Web could not resolve db service in time"
-            docker compose -f v2/infra/docker-compose.yml logs web db
+            compose logs web db
             exit 1
           fi
           sleep 1
         done
 
-        docker compose -f v2/infra/docker-compose.yml exec -T web python manage.py migrate --noinput
-        docker compose -f v2/infra/docker-compose.yml exec -T web python manage.py seed_frontend_contract_data
+        compose exec -T web python manage.py migrate --noinput
+        compose exec -T web python manage.py seed_frontend_contract_data
 
     - name: Run checklist tests
       run: npm run test:checklist -- --workers=${CHECKLIST_PLAYWRIGHT_WORKERS}
@@ -186,7 +191,7 @@ jobs:
     - name: Stop backend services used by checklist
       if: always()
       working-directory: .
-      run: docker compose -f v2/infra/docker-compose.yml down -v || true
+      run: IMAGE_TAG=latest docker compose -f v2/infra/docker-compose.yml -f v2/infra/docker-compose.override.yml down -v || true
 
     - name: Upload test results
       uses: actions/upload-artifact@v4

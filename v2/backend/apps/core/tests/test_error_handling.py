@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from unittest import mock
 
+from django.contrib.auth.models import Group
 from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -121,13 +122,15 @@ class TestGCalHealthErrorHandling(APITestCase):
     """Test gcal_health returns proper HTTP status codes (#407)."""
 
     def setUp(self):
-        """Create authenticated user."""
+        """Create authenticated user with GCal access role."""
         self.usuario = Usuario.objects.create_user(
             username="testuser",
             password="testpass123",
             email="test@example.com",
             cpf="12345678901",
         )
+        group, _ = Group.objects.get_or_create(name="Controle")
+        self.usuario.groups.add(group)
         self.client.force_authenticate(user=self.usuario)
 
     @override_settings(GCAL_CLIENT="fake")

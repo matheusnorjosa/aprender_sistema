@@ -346,6 +346,10 @@ docker compose -p aprender_v2 -f infra/docker-compose.yml ps worker beat
    - "beat: Starting..."
 ```
 
+Notas operacionais:
+- Em produção/systemd, usar scheduler padrão do Celery para respeitar `app.conf.beat_schedule` definido em `config/celery.py`.
+- Só usar `django_celery_beat.schedulers:DatabaseScheduler` se as `PeriodicTask` estiverem cadastradas no banco.
+
 ---
 
 ## 🏥 Health Checks e Validações

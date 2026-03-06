@@ -18,11 +18,13 @@ WorkingDirectory=/var/www/aprender/backend
 Environment="PATH=/var/www/aprender/venv/bin"
 Environment="DJANGO_SETTINGS_MODULE=config.settings"
 
+# Use Celery default scheduler (PersistentScheduler) so app.conf.beat_schedule
+# from config/celery.py is applied. If DatabaseScheduler is required, create
+# periodic entries in django_celery_beat first.
 ExecStart=/var/www/aprender/venv/bin/celery -A config beat \
     --pidfile=/run/aprender/celerybeat.pid \
     --logfile=/var/log/aprender/celerybeat.log \
-    --loglevel=INFO \
-    --scheduler=django_celery_beat.schedulers:DatabaseScheduler
+    --loglevel=INFO
 
 Restart=on-failure
 RestartSec=10

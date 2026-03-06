@@ -153,6 +153,13 @@ class TestViewsPackageDirectImports:
 
         assert SolicitacaoViewSet is not None
 
+    def test_solicitacao_module_uses_canonical_viewset(self):
+        """views.solicitacao should re-export the active canonical ViewSet."""
+        from apps.core.views.solicitacao import SolicitacaoViewSet as ModularViewSet
+        from apps.core.views_solicitacao import SolicitacaoViewSet as CanonicalViewSet
+
+        assert ModularViewSet is CanonicalViewSet
+
     def test_availability_module_importable(self):
         """Availability module should be importable."""
         from apps.core.views.availability import (

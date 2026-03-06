@@ -45,6 +45,7 @@ from .services.solicitacao_approval import (
     batch_reject_solicitacoes,
     reject_solicitacao,
 )
+from .services.solicitacao_create import resolve_initial_status
 from .services.solicitacao_publish import cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, resync_to_gcal
@@ -286,8 +287,25 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                     extra={"conflicts": [c.__dict__ for c in result.conflicts]},
                 )
 
-        # PR15: Salvar instance - o model.save() gerencia auto-aprovação baseado em projeto.fluxo
-        instance = serializer.save(usuario=self.request.user)
+        projeto = serializer.validated_data.get("projeto")
+        initial_status = resolve_initial_status(projeto=projeto)
+
+        # ASQ-002: status inicial decidido em camada de serviço (não no model.save()).
+        instance = serializer.save(usuario=self.request.user, status=initial_status.status)
+
+        logger.info(
+            "solicitacao_initial_status_decided",
+            extra={
+                "event": "solicitacao_initial_status_decided",
+                "user_id": self.request.user.id,
+                "username": self.request.user.username,
+                "solicitacao_id": instance.id,
+                "projeto_id": getattr(projeto, "id", None),
+                "projeto_fluxo": initial_status.fluxo,
+                "initial_status": initial_status.status,
+                "reason": initial_status.reason,
+            },
+        )
 
         # PR15: Processar extra_participants
         extra_participants = self.request.data.get("extra_participants", {})

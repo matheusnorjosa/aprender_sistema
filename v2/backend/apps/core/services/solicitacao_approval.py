@@ -72,6 +72,32 @@ def _raise_invalid_status_error(solicitacao: Solicitacao) -> None:
     )
 
 
+def _build_batch_status_errors(ids: list[int], found_ids: set[int]) -> list[dict[str, Any]]:
+    """
+    Build per-ID errors for batch actions without N+1 queries.
+
+    Strategy:
+    - Pending/locked IDs are in `found_ids` and will be processed.
+    - For the remaining IDs, fetch status in a single query and emit:
+      - \"Status já é 'X'\" when record exists but is not pending
+      - \"Solicitação não encontrada\" when record does not exist
+    """
+    status_by_id: dict[int, str] = dict(Solicitacao.objects.filter(id__in=ids).values_list("id", "status"))
+    errors: list[dict[str, Any]] = []
+
+    for sol_id in ids:
+        if sol_id in found_ids:
+            continue
+
+        existing_status = status_by_id.get(sol_id)
+        if existing_status is None:
+            errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
+        else:
+            errors.append({"id": sol_id, "detail": f"Status já é '{existing_status}'"})
+
+    return errors
+
+
 def approve_solicitacao(
     solicitacao: Solicitacao,
     user: Usuario,
@@ -251,14 +277,7 @@ def batch_approve_solicitacoes(
         )
         found_ids = {sol.id for sol in solicitacoes}
 
-        # Record errors for not found or already processed IDs
-        for sol_id in ids:
-            if sol_id not in found_ids:
-                sol = Solicitacao.objects.filter(id=sol_id).first()
-                if sol:
-                    errors.append({"id": sol_id, "detail": f"Status já é '{sol.status}'"})
-                else:
-                    errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
+        errors.extend(_build_batch_status_errors(ids, found_ids))
 
         # Approve in batch
         for sol in solicitacoes:
@@ -344,14 +363,7 @@ def batch_reject_solicitacoes(
         )
         found_ids = {sol.id for sol in solicitacoes}
 
-        # Record errors for not found or already processed IDs
-        for sol_id in ids:
-            if sol_id not in found_ids:
-                sol = Solicitacao.objects.filter(id=sol_id).first()
-                if sol:
-                    errors.append({"id": sol_id, "detail": f"Status já é '{sol.status}'"})
-                else:
-                    errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
+        errors.extend(_build_batch_status_errors(ids, found_ids))
 
         # Reject in batch
         for sol in solicitacoes:

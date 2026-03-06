@@ -297,26 +297,6 @@ class Solicitacao(models.Model):
 
         self.save(update_fields=update_fields)
 
-    def save(self, *args: Any, **kwargs: Any) -> None:
-        """
-        Override save para implementar auto-aprovacao de fluxo NAO_SUPER.
-
-        Fluxos do sistema:
-        - SUPER: Requer aprovacao manual pela Superintendencia (PA-01 a PA-07)
-        - NAO_SUPER: Auto-aprovado automaticamente na criacao
-
-        Historico:
-        - PR 13/N: Auto-aprovacao implementada para NAO_SUPER
-        - PR17: REMOVEU auto-aprovacao (INCORRETO - revertido em PR18)
-        - PR18: RESTAURA auto-aprovacao para NAO_SUPER conforme especificacao correta
-        """
-        # Auto-aprovar apenas projetos NAO_SUPER na criacao
-        if self.pk is None and self.projeto and self.projeto.fluxo == "NAO_SUPER":
-            self.status = "aprovado"
-
-        super().save(*args, **kwargs)
-
-
 class Participation(models.Model):
     """
     Participacao de usuarios em eventos (Solicitacoes).

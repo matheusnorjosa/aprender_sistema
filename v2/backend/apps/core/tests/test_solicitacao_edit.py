@@ -903,7 +903,7 @@ class TestSolicitacaoDelete:
         self, api_client, usuario_owner, municipio, projeto_nao_super, tipo_evento
     ):
         """Pode excluir solicitação NAO_SUPER aprovada (se não publicada)."""
-        # Criar solicitação NAO_SUPER (será auto-aprovada)
+        # Criar solicitação NAO_SUPER já aprovada para validar regra de exclusão.
         sol = Solicitacao.objects.create(
             usuario=usuario_owner,
             municipio=municipio,
@@ -911,9 +911,9 @@ class TestSolicitacaoDelete:
             tipo_evento=tipo_evento,
             inicio=timezone.now() + timedelta(days=7),
             fim=timezone.now() + timedelta(days=7, hours=2),
+            status="aprovado",
             gcal_status="NONE",
         )
-        # Confirmar auto-aprovação
         assert sol.status == "aprovado"
         assert sol.projeto.fluxo == "NAO_SUPER"
 
@@ -928,7 +928,7 @@ class TestSolicitacaoDelete:
         self, api_client, usuario_owner, municipio, projeto_nao_super, tipo_evento
     ):
         """Pode excluir solicitação NAO_SUPER reprovada (se não publicada)."""
-        # Criar e reprovar solicitação NAO_SUPER
+        # Criar e reprovar solicitação NAO_SUPER.
         sol = Solicitacao.objects.create(
             usuario=usuario_owner,
             municipio=municipio,
@@ -936,6 +936,7 @@ class TestSolicitacaoDelete:
             tipo_evento=tipo_evento,
             inicio=timezone.now() + timedelta(days=7),
             fim=timezone.now() + timedelta(days=7, hours=2),
+            status="aprovado",
             gcal_status="NONE",
         )
         sol.status = "reprovado"

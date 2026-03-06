@@ -297,6 +297,7 @@ class Solicitacao(models.Model):
 
         self.save(update_fields=update_fields)
 
+
 class Participation(models.Model):
     """
     Participacao de usuarios em eventos (Solicitacoes).

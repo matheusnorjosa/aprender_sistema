@@ -48,14 +48,14 @@ jobs:
         id: publish-mode
         env:
           EVENT_NAME: ${{ github.event_name }}
-          GITHUB_REF_NAME: ${{ github.ref }}
+          GH_REF: ${{ github.ref }}
           DISPATCH_PUBLISH_IMAGES: ${{ inputs.publish_images }}
         run: |
           set -euo pipefail
           publish_images="false"
           publish_reason="manual-skip"
 
-          if [ "$GITHUB_REF_NAME" != "refs/heads/main" ]; then
+          if [ "$GH_REF" != "refs/heads/main" ]; then
             publish_images="false"
             publish_reason="non-main-ref"
           elif [ "$EVENT_NAME" = "schedule" ]; then

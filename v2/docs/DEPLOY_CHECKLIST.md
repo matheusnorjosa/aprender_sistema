@@ -149,10 +149,10 @@ gh workflow run release.yaml -f environment=production -f promotion_tag=vYYYY.MM
 # O workflow promove a tag para latest e dispara o deploy via Watchtower
 # (equivalente ao PRODUCTION_DEPLOY_COMMAND):
 curl -H "Authorization: Bearer $WATCHTOWER_TOKEN" \
-  -X POST http://45.174.67.141:8080/v1/update
+  -X POST http://<PUBLIC_IP>:8080/v1/update
 
 # Validar health
-curl http://45.174.67.141:8000/api/readyz/
+curl http://<PUBLIC_IP>:8000/api/readyz/
 ```
 
 ---

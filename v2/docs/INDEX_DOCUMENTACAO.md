@@ -1,6 +1,6 @@
 # 📚 Índice da Documentação - AS v2
 
-**Última Atualização**: 2026-01-13
+**Última Atualização**: 2026-03-09
 
 ---
 
@@ -19,6 +19,14 @@
 ---
 
 ## 🎯 Guias Principais
+
+### 0. 🔒 **Política Público x Privado**
+
+**Arquivo**: [PUBLIC_PRIVATE_POLICY.md](./PUBLIC_PRIVATE_POLICY.md)
+
+**Quando usar**: Antes de criar/editar docs em repositório público.
+
+---
 
 ### 1. 📋 **CLAUDE.md** (Guia Principal)
 
@@ -146,18 +154,56 @@
 
 ---
 
+### 🧾 **Relatórios e Consolidados**
+
+**Arquivos**:
+- [reports/README.md](./reports/README.md) - Índice dos relatórios técnicos
+- [RELATORIO_TECNICO_ARQUITETURA_2026-03-06.md](./reports/RELATORIO_TECNICO_ARQUITETURA_2026-03-06.md)
+- [BACKLOG_QUALIDADE_SISTEMA_2026-03-06.md](./reports/BACKLOG_QUALIDADE_SISTEMA_2026-03-06.md)
+- [ESTIMATIVAS_PRAZOS_QUALIDADE_2026-03-06.md](./reports/ESTIMATIVAS_PRAZOS_QUALIDADE_2026-03-06.md)
+- [CLASSIFICACAO_PUBLICO_PRIVADO_2026-03-09.md](./reports/CLASSIFICACAO_PUBLICO_PRIVADO_2026-03-09.md)
+- [relatorio_deploy.md](./reports/relatorio_deploy.md)
+
+---
+
+### 🔎 **Análises Técnicas**
+
+**Arquivos**:
+- [analysis/README.md](./analysis/README.md) - Índice das análises técnicas
+- [ANALISE_COMPLETA_SISTEMA.md](./analysis/ANALISE_COMPLETA_SISTEMA.md)
+- [ANALISE_ESCALABILIDADE.md](./analysis/ANALISE_ESCALABILIDADE.md)
+
+---
+
+### 🛡️ **Hardening Cybersegurança (Execução)**
+
+**Arquivos**:
+- [plans/PLAN_cybersecurity_hardening_2026-03-09.md](./plans/PLAN_cybersecurity_hardening_2026-03-09.md)
+- [issues/README.md](./issues/README.md)
+- [issues/security_hardening_2026-03-09/README.md](./issues/security_hardening_2026-03-09/README.md)
+
+---
+
 ## 🏗️ Planos de Implementação
+
+### 🧭 Ativos (2026-03)
+
+- [plans/README.md](./plans/README.md)
+- [PLAN_API_CANONICA_DEFINITIVA_2026-03-09.md](./plans/PLAN_API_CANONICA_DEFINITIVA_2026-03-09.md)
+- [PLAN_cybersecurity_hardening_2026-03-09.md](./plans/PLAN_cybersecurity_hardening_2026-03-09.md)
+
+---
 
 ### ✅ Concluídos
 
 | Plano | Status | PR |
 |-------|--------|-----|
-| [PLAN_type_hints_100.md](./PLAN_type_hints_100.md) | ✅ Completo | #392, #394 |
-| [PLAN_maturity_gaps.md](./PLAN_maturity_gaps.md) | ✅ Completo | #390 |
-| [PLAN_infrastructure_scaling.md](./PLAN_infrastructure_scaling.md) | ✅ Completo | #391 |
-| [PLAN_multi_sector_availability.md](./PLAN_multi_sector_availability.md) | ✅ Completo | #389 |
-| [PLAN_dev_tools_app.md](./PLAN_dev_tools_app.md) | ✅ Completo | #340 |
-| [PLAN_separate_dev_prod.md](./PLAN_separate_dev_prod.md) | ✅ Completo | #339 |
+| [PLAN_type_hints_100.md](./_archive/plans/PLAN_type_hints_100.md) | ✅ Completo | #392, #394 |
+| [PLAN_maturity_gaps.md](./_archive/plans/PLAN_maturity_gaps.md) | ✅ Completo | #390 |
+| [PLAN_infrastructure_scaling.md](./_archive/plans/PLAN_infrastructure_scaling.md) | ✅ Completo | #391 |
+| [PLAN_multi_sector_availability.md](./_archive/plans/PLAN_multi_sector_availability.md) | ✅ Completo | #389 |
+| [PLAN_dev_tools_app.md](./_archive/plans/PLAN_dev_tools_app.md) | ✅ Completo | #340 |
+| [PLAN_separate_dev_prod.md](./_archive/plans/PLAN_separate_dev_prod.md) | ✅ Completo | #339 |
 
 ---
 

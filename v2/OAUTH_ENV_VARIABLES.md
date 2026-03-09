@@ -39,10 +39,10 @@ GCAL_CLIENT=fake  # ou omitir (default)
 
 ```bash
 # OAuth 2.0 Client ID (Google Cloud Console)
-GCAL_OAUTH_CLIENT_ID=123456789-abc.apps.googleusercontent.com
+GCAL_OAUTH_CLIENT_ID=<oauth-client-id>
 
 # OAuth 2.0 Client Secret (Google Cloud Console)
-GCAL_OAUTH_CLIENT_SECRET=GOCSPX-xyz123abc456
+GCAL_OAUTH_CLIENT_SECRET=<oauth-client-secret>
 
 # Redirect URI (deve estar registrada no Google Cloud Console)
 GCAL_OAUTH_REDIRECT_URI=https://seu-dominio.com/api/oauth/google/callback/
@@ -85,8 +85,8 @@ GCAL_CLIENT_MODE=service_account
 # .env (staging)
 GCAL_CLIENT=google
 GCAL_CLIENT_MODE=oauth
-GCAL_OAUTH_CLIENT_ID=123456789-abc.apps.googleusercontent.com
-GCAL_OAUTH_CLIENT_SECRET=GOCSPX-xyz123abc456
+GCAL_OAUTH_CLIENT_ID=<oauth-client-id-staging>
+GCAL_OAUTH_CLIENT_SECRET=<oauth-client-secret-staging>
 GCAL_OAUTH_REDIRECT_URI=https://staging.seu-dominio.com/api/oauth/google/callback/
 GCAL_ENCRYPTION_KEY=your-staging-fernet-key
 GCAL_CALENDAR_ID=primary
@@ -98,8 +98,8 @@ GCAL_CALENDAR_ID=primary
 # .env (produção)
 GCAL_CLIENT=google
 GCAL_CLIENT_MODE=oauth
-GCAL_OAUTH_CLIENT_ID=987654321-xyz.apps.googleusercontent.com
-GCAL_OAUTH_CLIENT_SECRET=GOCSPX-prod789def012
+GCAL_OAUTH_CLIENT_ID=<oauth-client-id-prod>
+GCAL_OAUTH_CLIENT_SECRET=<oauth-client-secret-prod>
 GCAL_OAUTH_REDIRECT_URI=https://seu-dominio.com/api/oauth/google/callback/
 GCAL_ENCRYPTION_KEY=your-production-fernet-key
 GCAL_CALENDAR_ID=calendario-aprender@group.calendar.google.com

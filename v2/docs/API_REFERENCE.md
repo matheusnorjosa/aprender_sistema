@@ -1,12 +1,29 @@
 # 📡 API Reference — Aprender Sistema v2
 
-**Última Atualização**: 2026-01-22
-**Total de Endpoints**: 87+
+**Última Atualização**: 2026-03-06
+**Total de Endpoints**: 139 (base canônica `/api`)
 **ViewSets**: 26
 
 > **Legenda de Status**: ![Stable](https://img.shields.io/badge/-stable-green) Estável | ![Beta](https://img.shields.io/badge/-beta-yellow) Beta | ![Deprecated](https://img.shields.io/badge/-deprecated-red) Deprecated | ![Internal](https://img.shields.io/badge/-internal-gray) Interno
 >
 > Ver [API_BADGES.md](./API_BADGES.md) para detalhes.
+
+---
+
+## 🧭 Política Canônica de Rotas
+
+- **Base path canônico oficial**: `/api/`
+- **Alias de compatibilidade temporário**: `/api/v1/`
+
+Regras:
+
+- Toda documentação nova deve usar `/api/*`.
+- Todo código novo (frontend/backend/tests/scripts) deve usar `/api/*`.
+- `/api/v1/*` existe apenas para compatibilidade e não deve ser usado em novas integrações.
+
+Observação:
+
+- Quando um endpoint aparecer como `/alguma-rota/` nesta referência, ele é relativo ao base path canônico (`/api/alguma-rota/`).
 
 ---
 
@@ -21,8 +38,8 @@ Todos os endpoints (exceto `/auth/` e `/csrf/`) requerem autenticação via sess
 | POST | `/auth/login/` | ![Stable](https://img.shields.io/badge/-stable-green) | Login com username/password | AllowAny |
 | POST | `/auth/logout/` | ![Stable](https://img.shields.io/badge/-stable-green) | Logout e invalidação de sessão | IsAuthenticated |
 | GET | `/csrf/` | ![Stable](https://img.shields.io/badge/-stable-green) | Obter CSRF token | AllowAny |
-| GET | `/api/ping/` | ![Stable](https://img.shields.io/badge/-stable-green) | Health check simples | AllowAny |
-| GET | `/api/me/` | ![Stable](https://img.shields.io/badge/-stable-green) | Dados do usuário logado + RBAC | IsAuthenticated |
+| GET | `/auth/ping/` | ![Stable](https://img.shields.io/badge/-stable-green) | Health check simples | AllowAny |
+| GET | `/me/` | ![Stable](https://img.shields.io/badge/-stable-green) | Dados do usuário logado + RBAC | IsAuthenticated |
 
 ### Headers Obrigatórios
 

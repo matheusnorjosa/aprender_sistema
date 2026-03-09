@@ -33,7 +33,7 @@ Configure como **secret** ou **variable** (secret tem prioridade):
 Exemplo de `PRODUCTION_DEPLOY_COMMAND` (Watchtower HTTP API):
 
 ```bash
-curl -H "Authorization: Bearer $WATCHTOWER_TOKEN" -X POST http://45.174.67.141:8080/v1/update
+curl -H "Authorization: Bearer $WATCHTOWER_TOKEN" -X POST http://<PUBLIC_IP>:8080/v1/update
 ```
 
 ### **2. Fluxo operacional**
@@ -179,7 +179,7 @@ docker compose --env-file .env.staging -f docker-compose.yml up -d --no-build
 # 2) release em production com promotion_tag valida staging e repointa latest
 # 3) deploy trigger via Watchtower HTTP API
 curl -H "Authorization: Bearer $WATCHTOWER_TOKEN" \
-  -X POST http://45.174.67.141:8080/v1/update
+  -X POST http://<PUBLIC_IP>:8080/v1/update
 ```
 
 Observacao de seguranca:

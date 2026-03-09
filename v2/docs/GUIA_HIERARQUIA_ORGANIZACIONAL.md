@@ -428,7 +428,7 @@ python manage.py seed_rbac --verbose
 
 ## 📚 Documentação Relacionada
 
-- [PROPOSTA_HIERARQUIA_ORGANIZACIONAL.md](PROPOSTA_HIERARQUIA_ORGANIZACIONAL.md) - Análise completa e decisões
+- [PROPOSTA_HIERARQUIA_ORGANIZACIONAL.md](./_archive/reports/PROPOSTA_HIERARQUIA_ORGANIZACIONAL.md) - Analise completa e decisoes
 - [RBAC_COMPLETO.md](RBAC_COMPLETO.md) - Guia completo de permissões
 - [MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md](MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md) - Estrutura organizacional
 

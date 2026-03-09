@@ -1,4 +1,4 @@
-# API Examples - Aprender Sistema v2
+﻿# API Examples - Aprender Sistema v2
 
 Exemplos práticos de uso da API para desenvolvedores.
 
@@ -48,7 +48,7 @@ curl -X POST http://localhost:8000/api/auth/login/ \
 ### 3. Verificar Sessao
 
 ```bash
-curl -s http://localhost:8000/api/auth/me/ \
+curl -s http://localhost:8000/api/me/ \
   -b cookies.txt | jq
 ```
 
@@ -59,7 +59,7 @@ curl -s http://localhost:8000/api/auth/me/ \
 ### Criar Solicitacao Presencial
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/solicitacoes/ \
+curl -X POST http://localhost:8000/api/solicitacoes/ \
   -H "Content-Type: application/json" \
   -H "X-CSRFToken: $CSRF" \
   -b cookies.txt \
@@ -95,7 +95,7 @@ curl -X POST http://localhost:8000/api/v1/solicitacoes/ \
 ### Criar Solicitacao Online
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/solicitacoes/ \
+curl -X POST http://localhost:8000/api/solicitacoes/ \
   -H "Content-Type: application/json" \
   -H "X-CSRFToken: $CSRF" \
   -b cookies.txt \
@@ -114,22 +114,22 @@ curl -X POST http://localhost:8000/api/v1/solicitacoes/ \
 
 ```bash
 # Minhas solicitacoes pendentes
-curl -s "http://localhost:8000/api/v1/solicitacoes/?mine=true&status=pendente" \
+curl -s "http://localhost:8000/api/solicitacoes/?mine=true&status=pendente" \
   -b cookies.txt | jq
 
 # Busca textual
-curl -s "http://localhost:8000/api/v1/solicitacoes/?search=fortaleza" \
+curl -s "http://localhost:8000/api/solicitacoes/?search=fortaleza" \
   -b cookies.txt | jq
 
 # Paginacao
-curl -s "http://localhost:8000/api/v1/solicitacoes/?page=2&page_size=20" \
+curl -s "http://localhost:8000/api/solicitacoes/?page=2&page_size=20" \
   -b cookies.txt | jq
 ```
 
 ### Aprovar Solicitacao (PA-02)
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/solicitacoes/123/approve/ \
+curl -X POST http://localhost:8000/api/solicitacoes/123/approve/ \
   -H "Content-Type: application/json" \
   -H "X-CSRFToken: $CSRF" \
   -b cookies.txt
@@ -146,7 +146,7 @@ curl -X POST http://localhost:8000/api/v1/solicitacoes/123/approve/ \
 ### Reprovar Solicitacao
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/solicitacoes/123/reject/ \
+curl -X POST http://localhost:8000/api/solicitacoes/123/reject/ \
   -H "Content-Type: application/json" \
   -H "X-CSRFToken: $CSRF" \
   -b cookies.txt \
@@ -158,7 +158,7 @@ curl -X POST http://localhost:8000/api/v1/solicitacoes/123/reject/ \
 ### Aprovar em Lote
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/solicitacoes/batch-approve/ \
+curl -X POST http://localhost:8000/api/solicitacoes/batch-approve/ \
   -H "Content-Type: application/json" \
   -H "X-CSRFToken: $CSRF" \
   -b cookies.txt \
@@ -185,7 +185,7 @@ curl -X POST http://localhost:8000/api/v1/solicitacoes/batch-approve/ \
 ### Verificar Disponibilidade
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/availability/check/ \
+curl -X POST http://localhost:8000/api/availability/check/ \
   -H "Content-Type: application/json" \
   -H "X-CSRFToken: $CSRF" \
   -b cookies.txt \
@@ -232,7 +232,7 @@ curl -X POST http://localhost:8000/api/v1/availability/check/ \
 ### Grade Mensal
 
 ```bash
-curl -s "http://localhost:8000/api/v1/availability/monthly/?year=2026&month=1&formador_id=1" \
+curl -s "http://localhost:8000/api/availability/monthly/?year=2026&month=1&formador_id=1" \
   -b cookies.txt | jq
 ```
 
@@ -243,14 +243,14 @@ curl -s "http://localhost:8000/api/v1/availability/monthly/?year=2026&month=1&fo
 ### Preview antes de Publicar
 
 ```bash
-curl -s http://localhost:8000/api/v1/solicitacoes/123/preview-gcal/ \
+curl -s http://localhost:8000/api/solicitacoes/123/preview-gcal/ \
   -b cookies.txt | jq
 ```
 
 ### Publicar no Google Calendar
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/solicitacoes/123/publish/ \
+curl -X POST http://localhost:8000/api/solicitacoes/123/publish/ \
   -H "Content-Type: application/json" \
   -H "X-CSRFToken: $CSRF" \
   -b cookies.txt
@@ -259,7 +259,7 @@ curl -X POST http://localhost:8000/api/v1/solicitacoes/123/publish/ \
 ### Publicar em Lote
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/gcal/batch/publish/ \
+curl -X POST http://localhost:8000/api/gcal/publish-batch/ \
   -H "Content-Type: application/json" \
   -H "X-CSRFToken: $CSRF" \
   -b cookies.txt \
@@ -275,21 +275,21 @@ curl -X POST http://localhost:8000/api/v1/gcal/batch/publish/ \
 ### Listar Municipios
 
 ```bash
-curl -s http://localhost:8000/api/v1/options/municipios/ \
+curl -s http://localhost:8000/api/options/municipios/ \
   -b cookies.txt | jq
 ```
 
 ### Listar Projetos
 
 ```bash
-curl -s http://localhost:8000/api/v1/options/projetos/ \
+curl -s http://localhost:8000/api/options/projetos/ \
   -b cookies.txt | jq
 ```
 
 ### Listar Tipos de Evento
 
 ```bash
-curl -s http://localhost:8000/api/v1/options/tipos-evento/ \
+curl -s http://localhost:8000/api/options/tipos-evento/ \
   -b cookies.txt | jq
 ```
 
@@ -332,10 +332,11 @@ Todos os erros seguem o formato:
 
 ## Swagger UI Interativo
 
-Acesse `/api/v1/docs/` para testar endpoints interativamente com "Try it out".
+Acesse `/api/docs/` para testar endpoints interativamente com "Try it out".
 
 ## OpenAPI Schema
 
 ```bash
-curl -s http://localhost:8000/api/v1/schema/ -o openapi.json
+curl -s http://localhost:8000/api/schema/ -o openapi.json
 ```
+

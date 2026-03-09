@@ -349,4 +349,4 @@ redis-cli FLUSHDB  # Cuidado: limpa tudo
 - [Django Database Pooling](https://docs.djangoproject.com/en/5.0/ref/databases/#persistent-database-connections)
 - [Gunicorn Deployment](https://docs.gunicorn.org/en/stable/deploy.html)
 - [Celery Workers Guide](https://docs.celeryq.dev/en/stable/userguide/workers.html)
-- [PLAN_infrastructure_scaling.md](./PLAN_infrastructure_scaling.md)
+- [PLAN_infrastructure_scaling.md](./_archive/plans/PLAN_infrastructure_scaling.md)

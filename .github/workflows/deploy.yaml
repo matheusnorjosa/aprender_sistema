@@ -1,0 +1,676 @@
+name: Deploy (Portainer CE)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: "Target environment"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - staging
+          - production
+      promotion_tag:
+        description: "Production promotion tag (immutable, ex: v2026.03.09-abc1234)"
+        required: false
+        type: string
+      rollback_tag:
+        description: "Production rollback tag (immutable, ex: v2026.03.05-def5678)"
+        required: false
+        type: string
+
+env:
+  DOCKER_USERNAME: norjosamatheus
+  BACKEND_IMAGE: norjosamatheus/aprender-backend
+  FRONTEND_IMAGE: norjosamatheus/aprender-frontend
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.event_name == 'push' && 'staging' || github.event.inputs.target_environment || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare release context
+    runs-on: ubuntu-latest
+    outputs:
+      target_environment: ${{ steps.compute.outputs.target_environment }}
+      release_mode: ${{ steps.compute.outputs.release_mode }}
+      release_version: ${{ steps.compute.outputs.release_version }}
+      should_build: ${{ steps.compute.outputs.should_build }}
+      build_date: ${{ steps.compute.outputs.build_date }}
+    steps:
+      - name: Compute mode and release version
+        id: compute
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TARGET_ENV_INPUT: ${{ github.event.inputs.target_environment || '' }}
+          PROMOTION_TAG_INPUT: ${{ github.event.inputs.promotion_tag || '' }}
+          ROLLBACK_TAG_INPUT: ${{ github.event.inputs.rollback_tag || '' }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          short_sha="${GIT_SHA:0:7}"
+          auto_version="v$(date -u +%Y.%m.%d)-${short_sha}"
+          build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          target_environment=""
+          release_mode=""
+          release_version=""
+          should_build="false"
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            target_environment="staging"
+            release_mode="staging-auto"
+            release_version="$auto_version"
+            should_build="true"
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            target_environment="${TARGET_ENV_INPUT:-production}"
+            promotion_tag="$(echo "${PROMOTION_TAG_INPUT:-}" | xargs)"
+            rollback_tag="$(echo "${ROLLBACK_TAG_INPUT:-}" | xargs)"
+
+            if [ "$target_environment" = "staging" ]; then
+              if [ -n "$promotion_tag" ] || [ -n "$rollback_tag" ]; then
+                echo "For staging dispatch, leave promotion_tag and rollback_tag empty." >&2
+                exit 1
+              fi
+              release_mode="staging-manual"
+              release_version="$auto_version"
+              should_build="true"
+            elif [ "$target_environment" = "production" ]; then
+              if [ -n "$promotion_tag" ] && [ -n "$rollback_tag" ]; then
+                echo "Provide only one of promotion_tag or rollback_tag for production." >&2
+                exit 1
+              fi
+              if [ -z "$promotion_tag" ] && [ -z "$rollback_tag" ]; then
+                echo "For production dispatch, provide promotion_tag or rollback_tag." >&2
+                exit 1
+              fi
+
+              if [ -n "$promotion_tag" ]; then
+                release_mode="production-promotion"
+                release_version="$promotion_tag"
+              else
+                release_mode="production-rollback"
+                release_version="$rollback_tag"
+              fi
+              should_build="false"
+            else
+              echo "Invalid target environment: $target_environment" >&2
+              exit 1
+            fi
+          else
+            echo "Unsupported event: $EVENT_NAME" >&2
+            exit 1
+          fi
+
+          {
+            echo "target_environment=$target_environment"
+            echo "release_mode=$release_mode"
+            echo "release_version=$release_version"
+            echo "should_build=$should_build"
+            echo "build_date=$build_date"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Release mode: $release_mode"
+          echo "Target environment: $target_environment"
+          echo "Release version: $release_version"
+          echo "Should build: $should_build"
+
+  build_and_push:
+    name: Build, scan, and push images
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: needs.prepare.outputs.should_build == 'true'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build backend image for pre-publish scan
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./v2
+          file: ./v2/infra/Dockerfile.prod
+          push: false
+          load: true
+          tags: aprender-backend:scan-${{ github.run_id }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            APP_VERSION=${{ needs.prepare.outputs.release_version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ needs.prepare.outputs.build_date }}
+
+      - name: Build frontend image for pre-publish scan
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./v2/frontend
+          file: ./v2/frontend/Dockerfile.prod
+          push: false
+          load: true
+          tags: aprender-frontend:scan-${{ github.run_id }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Generate Trivy report (backend)
+        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        with:
+          image-ref: aprender-backend:scan-${{ github.run_id }}
+          format: json
+          output: trivy-backend.json
+          vuln-type: os,library
+          severity: CRITICAL,HIGH,MEDIUM
+          ignore-unfixed: true
+
+      - name: Generate Trivy report (frontend)
+        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        with:
+          image-ref: aprender-frontend:scan-${{ github.run_id }}
+          format: json
+          output: trivy-frontend.json
+          vuln-type: os,library
+          severity: CRITICAL,HIGH,MEDIUM
+          ignore-unfixed: true
+
+      - name: Enforce security gate (block HIGH/CRITICAL)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sys
+
+          reports = ["trivy-backend.json", "trivy-frontend.json"]
+          total = 0
+
+          for report in reports:
+              with open(report, encoding="utf-8") as fp:
+                  data = json.load(fp)
+              for result in data.get("Results", []):
+                  for vuln in result.get("Vulnerabilities", []) or []:
+                      if vuln.get("Severity") in {"HIGH", "CRITICAL"}:
+                          total += 1
+
+          print(f"Total HIGH/CRITICAL vulnerabilities: {total}")
+          if total > 0:
+              print("Publish blocked by security gate.", file=sys.stderr)
+              sys.exit(1)
+          PY
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./v2
+          file: ./v2/infra/Dockerfile.prod
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ needs.prepare.outputs.release_version }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            APP_VERSION=${{ needs.prepare.outputs.release_version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ needs.prepare.outputs.build_date }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./v2/frontend
+          file: ./v2/frontend/Dockerfile.prod
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ needs.prepare.outputs.release_version }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create git tag if missing
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/${RELEASE_VERSION}" >/dev/null; then
+            echo "Tag ${RELEASE_VERSION} already exists. Skipping creation."
+            exit 0
+          fi
+
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag -a "${RELEASE_VERSION}" -m "Release ${RELEASE_VERSION}"
+          git push origin "${RELEASE_VERSION}"
+
+      - name: Create or update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
+          RELEASE_MODE: ${{ needs.prepare.outputs.release_mode }}
+          TARGET_ENV: ${{ needs.prepare.outputs.target_environment }}
+        run: |
+          set -euo pipefail
+          {
+            echo "# Release ${RELEASE_VERSION}"
+            echo
+            echo "- Environment: \`${TARGET_ENV}\`"
+            echo "- Mode: \`${RELEASE_MODE}\`"
+            echo "- Backend: \`${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}\`"
+            echo "- Frontend: \`${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}\`"
+            echo
+            echo "## Pull Commands"
+            echo
+            echo '```bash'
+            echo "docker pull ${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}"
+            echo "docker pull ${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}"
+            echo '```'
+          } > release_notes.md
+
+          if gh release view "${RELEASE_VERSION}" >/dev/null 2>&1; then
+            gh release edit "${RELEASE_VERSION}" \
+              --title "Release ${RELEASE_VERSION}" \
+              --notes-file release_notes.md
+          else
+            gh release create "${RELEASE_VERSION}" \
+              --title "Release ${RELEASE_VERSION}" \
+              --notes-file release_notes.md
+          fi
+
+  validate_existing_tag:
+    name: Validate immutable tag exists (promotion/rollback)
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: needs.prepare.outputs.should_build != 'true'
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Check backend and frontend tags
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}" >/dev/null
+          docker buildx imagetools inspect "${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}" >/dev/null
+          echo "Tag ${RELEASE_VERSION} exists for backend and frontend."
+
+  deploy:
+    name: Deploy via Portainer CE API
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - build_and_push
+      - validate_existing_tag
+    if: |
+      needs.prepare.result == 'success' &&
+      (needs.build_and_push.result == 'success' || needs.build_and_push.result == 'skipped') &&
+      (needs.validate_existing_tag.result == 'success' || needs.validate_existing_tag.result == 'skipped')
+    steps:
+      - name: Resolve deploy endpoints and configuration
+        id: resolve
+        env:
+          TARGET_ENV: ${{ needs.prepare.outputs.target_environment }}
+          RELEASE_MODE: ${{ needs.prepare.outputs.release_mode }}
+          STAGING_PORTAINER_URL_SECRET: ${{ secrets.STAGING_PORTAINER_URL || '' }}
+          STAGING_PORTAINER_URL_VAR: ${{ vars.STAGING_PORTAINER_URL || '' }}
+          PRODUCTION_PORTAINER_URL_SECRET: ${{ secrets.PRODUCTION_PORTAINER_URL || '' }}
+          PRODUCTION_PORTAINER_URL_VAR: ${{ vars.PRODUCTION_PORTAINER_URL || '' }}
+          PORTAINER_URL_SECRET: ${{ secrets.PORTAINER_URL || '' }}
+          PORTAINER_URL_VAR: ${{ vars.PORTAINER_URL || '' }}
+          STAGING_PORTAINER_STACK_ID_SECRET: ${{ secrets.STAGING_PORTAINER_STACK_ID || '' }}
+          STAGING_PORTAINER_STACK_ID_VAR: ${{ vars.STAGING_PORTAINER_STACK_ID || '' }}
+          PRODUCTION_PORTAINER_STACK_ID_SECRET: ${{ secrets.PRODUCTION_PORTAINER_STACK_ID || '' }}
+          PRODUCTION_PORTAINER_STACK_ID_VAR: ${{ vars.PRODUCTION_PORTAINER_STACK_ID || '' }}
+          PORTAINER_STACK_ID_SECRET: ${{ secrets.PORTAINER_STACK_ID || '' }}
+          PORTAINER_STACK_ID_VAR: ${{ vars.PORTAINER_STACK_ID || '' }}
+          STAGING_PORTAINER_ENDPOINT_ID_SECRET: ${{ secrets.STAGING_PORTAINER_ENDPOINT_ID || '' }}
+          STAGING_PORTAINER_ENDPOINT_ID_VAR: ${{ vars.STAGING_PORTAINER_ENDPOINT_ID || '' }}
+          PRODUCTION_PORTAINER_ENDPOINT_ID_SECRET: ${{ secrets.PRODUCTION_PORTAINER_ENDPOINT_ID || '' }}
+          PRODUCTION_PORTAINER_ENDPOINT_ID_VAR: ${{ vars.PRODUCTION_PORTAINER_ENDPOINT_ID || '' }}
+          PORTAINER_ENDPOINT_ID_SECRET: ${{ secrets.PORTAINER_ENDPOINT_ID || '' }}
+          PORTAINER_ENDPOINT_ID_VAR: ${{ vars.PORTAINER_ENDPOINT_ID || '' }}
+          STAGING_PORTAINER_SKIP_TLS_VERIFY_VAR: ${{ vars.STAGING_PORTAINER_SKIP_TLS_VERIFY || '' }}
+          PRODUCTION_PORTAINER_SKIP_TLS_VERIFY_VAR: ${{ vars.PRODUCTION_PORTAINER_SKIP_TLS_VERIFY || '' }}
+          PORTAINER_SKIP_TLS_VERIFY_VAR: ${{ vars.PORTAINER_SKIP_TLS_VERIFY || '' }}
+          STAGING_HEALTHCHECK_URL_SECRET: ${{ secrets.STAGING_HEALTHCHECK_URL || '' }}
+          STAGING_HEALTHCHECK_URL_VAR: ${{ vars.STAGING_HEALTHCHECK_URL || '' }}
+          PRODUCTION_HEALTHCHECK_URL_SECRET: ${{ secrets.PRODUCTION_HEALTHCHECK_URL || '' }}
+          PRODUCTION_HEALTHCHECK_URL_VAR: ${{ vars.PRODUCTION_HEALTHCHECK_URL || '' }}
+          STAGING_VERSIONCHECK_URL_SECRET: ${{ secrets.STAGING_VERSIONCHECK_URL || '' }}
+          STAGING_VERSIONCHECK_URL_VAR: ${{ vars.STAGING_VERSIONCHECK_URL || '' }}
+          PRODUCTION_VERSIONCHECK_URL_SECRET: ${{ secrets.PRODUCTION_VERSIONCHECK_URL || '' }}
+          PRODUCTION_VERSIONCHECK_URL_VAR: ${{ vars.PRODUCTION_VERSIONCHECK_URL || '' }}
+          POST_DEPLOY_SKIP_TLS_VERIFY_VAR: ${{ vars.POST_DEPLOY_SKIP_TLS_VERIFY || '' }}
+        run: |
+          set -euo pipefail
+
+          pick_first_non_empty() {
+            for candidate in "$@"; do
+              if [ -n "${candidate:-}" ]; then
+                echo "$candidate"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          portainer_url=""
+          portainer_stack_id=""
+          portainer_endpoint_id=""
+          portainer_skip_tls_verify="true"
+          post_deploy_skip_tls_verify="${POST_DEPLOY_SKIP_TLS_VERIFY_VAR:-false}"
+
+          healthcheck_url=""
+          versioncheck_url=""
+          staging_versioncheck_url=""
+
+          if [ "$TARGET_ENV" = "staging" ]; then
+            portainer_url="$(pick_first_non_empty \
+              "$STAGING_PORTAINER_URL_SECRET" "$STAGING_PORTAINER_URL_VAR" \
+              "$PORTAINER_URL_SECRET" "$PORTAINER_URL_VAR" || true)"
+            portainer_stack_id="$(pick_first_non_empty \
+              "$STAGING_PORTAINER_STACK_ID_SECRET" "$STAGING_PORTAINER_STACK_ID_VAR" \
+              "$PORTAINER_STACK_ID_SECRET" "$PORTAINER_STACK_ID_VAR" || true)"
+            portainer_endpoint_id="$(pick_first_non_empty \
+              "$STAGING_PORTAINER_ENDPOINT_ID_SECRET" "$STAGING_PORTAINER_ENDPOINT_ID_VAR" \
+              "$PORTAINER_ENDPOINT_ID_SECRET" "$PORTAINER_ENDPOINT_ID_VAR" || true)"
+            portainer_skip_tls_verify="$(pick_first_non_empty \
+              "$STAGING_PORTAINER_SKIP_TLS_VERIFY_VAR" "$PORTAINER_SKIP_TLS_VERIFY_VAR" "true" || true)"
+
+            healthcheck_url="$STAGING_HEALTHCHECK_URL_SECRET"
+            [ -z "$healthcheck_url" ] && healthcheck_url="$STAGING_HEALTHCHECK_URL_VAR"
+            versioncheck_url="$STAGING_VERSIONCHECK_URL_SECRET"
+            [ -z "$versioncheck_url" ] && versioncheck_url="$STAGING_VERSIONCHECK_URL_VAR"
+          elif [ "$TARGET_ENV" = "production" ]; then
+            portainer_url="$(pick_first_non_empty \
+              "$PRODUCTION_PORTAINER_URL_SECRET" "$PRODUCTION_PORTAINER_URL_VAR" \
+              "$PORTAINER_URL_SECRET" "$PORTAINER_URL_VAR" || true)"
+            portainer_stack_id="$(pick_first_non_empty \
+              "$PRODUCTION_PORTAINER_STACK_ID_SECRET" "$PRODUCTION_PORTAINER_STACK_ID_VAR" \
+              "$PORTAINER_STACK_ID_SECRET" "$PORTAINER_STACK_ID_VAR" || true)"
+            portainer_endpoint_id="$(pick_first_non_empty \
+              "$PRODUCTION_PORTAINER_ENDPOINT_ID_SECRET" "$PRODUCTION_PORTAINER_ENDPOINT_ID_VAR" \
+              "$PORTAINER_ENDPOINT_ID_SECRET" "$PORTAINER_ENDPOINT_ID_VAR" || true)"
+            portainer_skip_tls_verify="$(pick_first_non_empty \
+              "$PRODUCTION_PORTAINER_SKIP_TLS_VERIFY_VAR" "$PORTAINER_SKIP_TLS_VERIFY_VAR" "true" || true)"
+
+            healthcheck_url="$PRODUCTION_HEALTHCHECK_URL_SECRET"
+            [ -z "$healthcheck_url" ] && healthcheck_url="$PRODUCTION_HEALTHCHECK_URL_VAR"
+            versioncheck_url="$PRODUCTION_VERSIONCHECK_URL_SECRET"
+            [ -z "$versioncheck_url" ] && versioncheck_url="$PRODUCTION_VERSIONCHECK_URL_VAR"
+            staging_versioncheck_url="$STAGING_VERSIONCHECK_URL_SECRET"
+            [ -z "$staging_versioncheck_url" ] && staging_versioncheck_url="$STAGING_VERSIONCHECK_URL_VAR"
+          else
+            echo "Invalid target environment: $TARGET_ENV" >&2
+            exit 1
+          fi
+
+          if [ -z "$portainer_url" ] || [ -z "$portainer_stack_id" ] || [ -z "$portainer_endpoint_id" ]; then
+            echo "Portainer settings are incomplete for ${TARGET_ENV}." >&2
+            echo "Configure ${TARGET_ENV^^}_PORTAINER_* or fallback PORTAINER_* values." >&2
+            exit 1
+          fi
+
+          if [ -z "$healthcheck_url" ] || [ -z "$versioncheck_url" ]; then
+            echo "Healthcheck/versioncheck URLs are not configured for ${TARGET_ENV}." >&2
+            exit 1
+          fi
+
+          if [ "$RELEASE_MODE" = "production-promotion" ] && [ -z "$staging_versioncheck_url" ]; then
+            echo "STAGING_VERSIONCHECK_URL is required for production promotion gate." >&2
+            exit 1
+          fi
+
+          echo "::add-mask::$portainer_url"
+          echo "::add-mask::$healthcheck_url"
+          echo "::add-mask::$versioncheck_url"
+          if [ -n "$staging_versioncheck_url" ]; then
+            echo "::add-mask::$staging_versioncheck_url"
+          fi
+
+          {
+            echo "portainer_url=$portainer_url"
+            echo "portainer_stack_id=$portainer_stack_id"
+            echo "portainer_endpoint_id=$portainer_endpoint_id"
+            echo "portainer_skip_tls_verify=$portainer_skip_tls_verify"
+            echo "post_deploy_skip_tls_verify=$post_deploy_skip_tls_verify"
+            echo "healthcheck_url=$healthcheck_url"
+            echo "versioncheck_url=$versioncheck_url"
+            echo "staging_versioncheck_url=$staging_versioncheck_url"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify staging is serving requested tag (production gate)
+        if: needs.prepare.outputs.release_mode == 'production-promotion'
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
+          STAGING_VERSIONCHECK_URL: ${{ steps.resolve.outputs.staging_versioncheck_url }}
+          POST_DEPLOY_SKIP_TLS_VERIFY: ${{ steps.resolve.outputs.post_deploy_skip_tls_verify }}
+        run: |
+          set -euo pipefail
+
+          curl_opts=(--silent --show-error --location --max-time 20)
+          if [ "$POST_DEPLOY_SKIP_TLS_VERIFY" = "true" ]; then
+            curl_opts+=(--insecure)
+          fi
+
+          attempts=8
+          sleep_seconds=8
+          response_file="$(mktemp)"
+
+          for attempt in $(seq 1 "$attempts"); do
+            http_code="$(curl "${curl_opts[@]}" -o "$response_file" -w '%{http_code}' "$STAGING_VERSIONCHECK_URL" || true)"
+            if [ "$http_code" = "200" ]; then
+              break
+            fi
+            if [ "$attempt" -eq "$attempts" ]; then
+              echo "Could not read staging version endpoint (HTTP=${http_code:-curl_error})." >&2
+              exit 1
+            fi
+            echo "Attempt ${attempt}/${attempts} failed (HTTP=${http_code:-curl_error}). Retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+          done
+
+          if ! grep -Fq "$RELEASE_VERSION" "$response_file"; then
+            echo "Staging endpoint does not contain release version '${RELEASE_VERSION}'." >&2
+            cat "$response_file" >&2
+            exit 1
+          fi
+
+      - name: Deploy via Portainer CE API (update IMAGE_TAG)
+        env:
+          TARGET_ENV: ${{ needs.prepare.outputs.target_environment }}
+          STAGING_PORTAINER_ACCESS_TOKEN: ${{ secrets.STAGING_PORTAINER_ACCESS_TOKEN || '' }}
+          PRODUCTION_PORTAINER_ACCESS_TOKEN: ${{ secrets.PRODUCTION_PORTAINER_ACCESS_TOKEN || '' }}
+          PORTAINER_ACCESS_TOKEN_DEFAULT: ${{ secrets.PORTAINER_ACCESS_TOKEN || '' }}
+          PORTAINER_URL: ${{ steps.resolve.outputs.portainer_url }}
+          PORTAINER_STACK_ID: ${{ steps.resolve.outputs.portainer_stack_id }}
+          PORTAINER_ENDPOINT_ID: ${{ steps.resolve.outputs.portainer_endpoint_id }}
+          PORTAINER_SKIP_TLS_VERIFY: ${{ steps.resolve.outputs.portainer_skip_tls_verify }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
+        run: |
+          set -euo pipefail
+
+          portainer_access_token="$PORTAINER_ACCESS_TOKEN_DEFAULT"
+          if [ "$TARGET_ENV" = "staging" ] && [ -n "$STAGING_PORTAINER_ACCESS_TOKEN" ]; then
+            portainer_access_token="$STAGING_PORTAINER_ACCESS_TOKEN"
+          elif [ "$TARGET_ENV" = "production" ] && [ -n "$PRODUCTION_PORTAINER_ACCESS_TOKEN" ]; then
+            portainer_access_token="$PRODUCTION_PORTAINER_ACCESS_TOKEN"
+          fi
+
+          if [ -z "${portainer_access_token:-}" ]; then
+            echo "Missing Portainer token. Configure ${TARGET_ENV^^}_PORTAINER_ACCESS_TOKEN or PORTAINER_ACCESS_TOKEN." >&2
+            exit 1
+          fi
+
+          portainer_url="${PORTAINER_URL:-}"
+          if [ -z "$portainer_url" ]; then
+            echo "Resolved PORTAINER_URL is empty." >&2
+            exit 1
+          fi
+          portainer_url="${portainer_url%/}"
+
+          curl_opts=(--silent --show-error --location --max-time 120)
+          if [ "$PORTAINER_SKIP_TLS_VERIFY" = "true" ]; then
+            curl_opts+=(--insecure)
+          fi
+
+          stack_json="$(curl "${curl_opts[@]}" \
+            -H "X-API-KEY: ${portainer_access_token}" \
+            "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}")"
+
+          stack_file_json="$(curl "${curl_opts[@]}" \
+            -H "X-API-KEY: ${portainer_access_token}" \
+            "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}/file")"
+
+          stack_file_content="$(printf '%s' "$stack_file_json" | jq -r '.StackFileContent')"
+          if [ -z "$stack_file_content" ] || [ "$stack_file_content" = "null" ]; then
+            echo "Could not read StackFileContent from Portainer." >&2
+            exit 1
+          fi
+
+          current_env_json="$(printf '%s' "$stack_json" | jq -c '.Env // []')"
+          updated_env_json="$(printf '%s' "$current_env_json" | jq -c --arg tag "$RELEASE_VERSION" '
+            map(select(.name != "IMAGE_TAG")) + [{"name":"IMAGE_TAG","value":$tag}]
+          ')"
+
+          payload="$(jq -n \
+            --arg stack_file_content "$stack_file_content" \
+            --argjson env "$updated_env_json" \
+            '{
+              StackFileContent: $stack_file_content,
+              Env: $env,
+              Prune: true,
+              RepullImageAndRedeploy: true
+            }')"
+
+          http_code="$(curl "${curl_opts[@]}" \
+            -o /tmp/portainer-stack-update-response.json \
+            -w '%{http_code}' \
+            -X PUT \
+            -H "X-API-KEY: ${portainer_access_token}" \
+            -H "Content-Type: application/json" \
+            "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}?endpointId=${PORTAINER_ENDPOINT_ID}" \
+            --data-raw "$payload" || true)"
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Portainer stack update failed (HTTP ${http_code})." >&2
+            cat /tmp/portainer-stack-update-response.json >&2 || true
+            exit 1
+          fi
+
+          echo "Portainer stack update succeeded (HTTP ${http_code})."
+
+      - name: Wait for containers to restart
+        run: sleep 15
+
+      - name: Post-deploy verification (health + version)
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
+          HEALTHCHECK_URL: ${{ steps.resolve.outputs.healthcheck_url }}
+          VERSIONCHECK_URL: ${{ steps.resolve.outputs.versioncheck_url }}
+          POST_DEPLOY_SKIP_TLS_VERIFY: ${{ steps.resolve.outputs.post_deploy_skip_tls_verify }}
+        run: |
+          set -euo pipefail
+
+          curl_opts=(--silent --show-error --location --max-time 20)
+          if [ "$POST_DEPLOY_SKIP_TLS_VERIFY" = "true" ]; then
+            curl_opts+=(--insecure)
+          fi
+
+          fetch_with_retry() {
+            local url="$1"
+            local label="$2"
+            local attempts=12
+            local sleep_seconds=10
+            local response_file
+            response_file="$(mktemp)"
+
+            for attempt in $(seq 1 "$attempts"); do
+              local http_code
+              http_code="$(curl "${curl_opts[@]}" -o "$response_file" -w '%{http_code}' "$url" || true)"
+              if [ "$http_code" = "200" ]; then
+                cat "$response_file"
+                rm -f "$response_file"
+                return 0
+              fi
+              echo "Attempt ${attempt}/${attempts} failed for ${label} (HTTP=${http_code:-curl_error}). Retrying in ${sleep_seconds}s..."
+              sleep "$sleep_seconds"
+            done
+
+            echo "Post-deploy ${label} check failed after ${attempts} attempts." >&2
+            if [ -s "$response_file" ]; then
+              echo "Last ${label} response:" >&2
+              cat "$response_file" >&2
+            fi
+            rm -f "$response_file"
+            return 1
+          }
+
+          health_response="$(fetch_with_retry "$HEALTHCHECK_URL" "health")"
+          printf '%s\n' "$health_response" > post-deploy-health-response.txt
+
+          version_response="$(fetch_with_retry "$VERSIONCHECK_URL" "version")"
+          printf '%s\n' "$version_response" > post-deploy-version-response.txt
+
+          if ! printf '%s' "$version_response" | grep -Fq "$RELEASE_VERSION"; then
+            echo "Version check mismatch. Expected '${RELEASE_VERSION}' in response." >&2
+            exit 1
+          fi
+
+      - name: Generate deploy evidence
+        if: always()
+        env:
+          TARGET_ENV: ${{ needs.prepare.outputs.target_environment }}
+          RELEASE_MODE: ${{ needs.prepare.outputs.release_mode }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
+          HEALTHCHECK_URL: ${{ steps.resolve.outputs.healthcheck_url }}
+          VERSIONCHECK_URL: ${{ steps.resolve.outputs.versioncheck_url }}
+        run: |
+          set -euo pipefail
+          {
+            echo "workflow=${{ github.workflow }}"
+            echo "run_id=${{ github.run_id }}"
+            echo "run_attempt=${{ github.run_attempt }}"
+            echo "repository=${{ github.repository }}"
+            echo "target_environment=$TARGET_ENV"
+            echo "release_mode=$RELEASE_MODE"
+            echo "release_version=$RELEASE_VERSION"
+            echo "backend_image=${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}"
+            echo "frontend_image=${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}"
+            echo "healthcheck_url=$HEALTHCHECK_URL"
+            echo "versioncheck_url=$VERSIONCHECK_URL"
+            echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > deploy-evidence.txt
+
+      - name: Upload deploy evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: deploy-evidence-${{ github.run_id }}
+          path: |
+            deploy-evidence.txt
+            post-deploy-health-response.txt
+            post-deploy-version-response.txt
+          if-no-files-found: warn
+          retention-days: 30

@@ -22,14 +22,14 @@ Definições de badges de status para endpoints da API.
 ```markdown
 | Método | Endpoint | Status | Descrição |
 |--------|----------|--------|-----------|
-| GET | `/api/v1/solicitacoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar |
-| GET | `/api/v1/insights/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Insights |
+| GET | `/api/solicitacoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar |
+| GET | `/api/insights/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Insights |
 ```
 
 ### Em Headers
 
 ```markdown
-### POST /api/v1/solicitacoes/ ![Stable](https://img.shields.io/badge/-stable-green)
+### POST /api/solicitacoes/ ![Stable](https://img.shields.io/badge/-stable-green)
 ```
 
 ---

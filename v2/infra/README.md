@@ -104,9 +104,17 @@ make down-prod
 
 Default env templates are versioned as:
 
-- `.env.dev`
-- `.env.staging`
-- `.env.production`
+- `.env.dev.example`
+- `.env.staging.example`
+- `.env.production.example`
+
+Create local operational files before running compose:
+
+```bash
+cp .env.dev.example .env.dev
+cp .env.staging.example .env.staging
+cp .env.production.example .env.production
+```
 
 Important:
 - keep placeholders only in these files (real secrets outside Git).
@@ -132,12 +140,12 @@ Create `/etc/aprender/env` with:
 ```bash
 DJANGO_SETTINGS_MODULE=config.settings
 SECRET_KEY=your-secret-key
-DB_HOST=172.17.0.3
+DB_HOST=db.externo.local
 DB_PORT=5432
 DB_NAME=aprender_db
-DB_USER=matheus_aprender
+DB_USER=aprender_user
 DB_PASSWORD=your-db-password
-REDIS_HOST=172.17.0.4
+REDIS_HOST=redis.externo.local
 REDIS_PORT=6379
 IMAGE_TAG=latest
 FRONTEND_PORT=81
@@ -149,9 +157,9 @@ WATCHTOWER_TOKEN=your-watchtower-token
 
 | VM | Role | IP interno | Ports |
 |----|------|-----|-------|
-| VM01_App | App + Workers (Docker) | 172.17.0.2 | 8000 (web), 81 (frontend), 80/443 (via NPM) |
-| VM02_Banco | PostgreSQL 15 (servico nativo) | 172.17.0.3 | 5432 |
-| VM03_Redis | Redis 7 (servico nativo) | 172.17.0.4 | 6379 |
+| VM01_App | App + Workers (Docker) | <VM01_IP_PRIVADO> | 8000 (web), 81 (frontend), 80/443 (via NPM) |
+| VM02_Banco | PostgreSQL 15 (servico nativo) | <VM02_IP_PRIVADO> | 5432 |
+| VM03_Redis | Redis 7 (servico nativo) | <VM03_IP_PRIVADO> | 6379 |
 
 ## Related Documentation
 

@@ -1,4 +1,4 @@
-# Análise: Scripts Google Sheets → Backend ETL → Gaps → Plano
+﻿# Análise: Scripts Google Sheets → Backend ETL → Gaps → Plano
 
 **Data**: 2026-02-27
 **Autor**: Claude Code (análise automatizada)
@@ -337,6 +337,7 @@ class CompraSerializer:
 
 - Scripts: `v2/data/csv-import/2026/Scripts/`
 - CSVs prontos: `v2/data/csv-import/2026/PRONTOS_PARA_IMPORTAR/`
-- Plano de resolução: [PLAN_compras_flow_end_to_end.md](PLAN_compras_flow_end_to_end.md)
-- Regras de disponibilidade: [GUIDE_AVAILABILITY.md](GUIDE_AVAILABILITY.md)
+- Plano de resolução: [PLAN_compras_flow_end_to_end.md](../plans/PLAN_compras_flow_end_to_end.md)
+- Regras de disponibilidade: [GUIDE_AVAILABILITY.md](../GUIDE_AVAILABILITY.md)
 - Política de aprovação: ver `CLAUDE.md` → CP-02 (PA-01 a PA-07)
+

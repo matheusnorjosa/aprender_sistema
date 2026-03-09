@@ -118,6 +118,7 @@ docker compose exec web python manage.py import_usuarios --apply
 
 | Documento | Descrição |
 |-----------|-----------|
+| [API_REFERENCE.md](docs/API_REFERENCE.md) | Referência da API e política canônica de rotas |
 | [PROJETO_ORIGEM.md](docs/PROJETO_ORIGEM.md) | Origem, modelos, regras |
 | [GUIDE_GCAL.md](docs/GUIDE_GCAL.md) | Integração Google Calendar |
 | [RBAC_COMPLETO.md](docs/RBAC_COMPLETO.md) | Sistema de permissões |

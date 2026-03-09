@@ -389,4 +389,4 @@ Usar Chrome DevTools Device Toolbar para simular.
 
 - [Ant Design Responsive](https://ant.design/components/grid/#components-grid-demo-responsive)
 - [Tailwind Responsive Design](https://tailwindcss.com/docs/responsive-design)
-- [LAYOUT Constants](../frontend/src/constants/layout.ts)
+- [LAYOUT Constants](../../frontend/src/constants/layout.ts)

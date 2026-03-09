@@ -170,5 +170,5 @@ sum(rate(http_requests_total[5m]))
 ## 9. Referências
 
 - [Google SRE Book - SLOs](https://sre.google/sre-book/service-level-objectives/)
-- [PLAN_maturity_gaps.md](./PLAN_maturity_gaps.md)
-- [Prometheus Alerting Rules](../infra/prometheus/alerts.yml)
+- [PLAN_maturity_gaps.md](./_archive/plans/PLAN_maturity_gaps.md)
+- Prometheus Alerting Rules: arquivo nao versionado neste repositorio (ver Issue #585 para controle de pendencia)

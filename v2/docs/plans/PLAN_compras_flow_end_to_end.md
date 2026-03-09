@@ -1,8 +1,8 @@
-# Plano: Fluxo Compras End-to-End
+﻿# Plano: Fluxo Compras End-to-End
 
 **Data**: 2026-02-27
 **Épico**: Compras → Solicitação → Google Calendar (entrega funcional)
-**Referência de análise**: [ANALISE_scripts_google_sheets.md](ANALISE_scripts_google_sheets.md)
+**Referência de análise**: [ANALISE_scripts_google_sheets.md](../analysis/ANALISE_scripts_google_sheets.md)
 **Status**: 🆕 Planejamento
 
 ---
@@ -452,7 +452,8 @@ def test_pendencias_conta_por_projeto():
 
 ## Referências
 
-- Análise dos scripts: [ANALISE_scripts_google_sheets.md](ANALISE_scripts_google_sheets.md)
+- Análise dos scripts: [ANALISE_scripts_google_sheets.md](../analysis/ANALISE_scripts_google_sheets.md)
 - Regras de aprovação: `CLAUDE.md` → CP-02 (PA-01 a PA-07)
-- Regras de disponibilidade: [GUIDE_AVAILABILITY.md](GUIDE_AVAILABILITY.md)
+- Regras de disponibilidade: [GUIDE_AVAILABILITY.md](../GUIDE_AVAILABILITY.md)
 - CSV de compras: `v2/data/csv-import/2026/PRONTOS_PARA_IMPORTAR/COMPRAS_pronto.csv`
+

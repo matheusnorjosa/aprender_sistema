@@ -399,6 +399,27 @@ analisar_*
 gerar_planilha_*.py
 mudanca_acesso_*.md
 
+# ========================================
+# PUBLIC REPO HYGIENE (docs and local scans)
+# ========================================
+# Keep public docs versioned, but never commit private/local/generated docs.
+v2/docs/private/
+v2/docs/**/*.private.md
+v2/docs/**/*.local.md
+v2/docs/**/scratch/
+v2/docs/**/tmp/
+v2/docs/**/exports/
+
+# Local security scan outputs (generated locally)
+v2/backend/*-local-report.json
+v2/backend/*-local-report-*.json
+v2/frontend/*-local-report.json
+v2/frontend/*-local-report-*.json
+
+# Workspace temp folders
+tmp/
+v2/tmp/
+
 # Arquivos de memória antigos
 docs/memoria/
 lighthouse-*.json
@@ -513,7 +534,6 @@ debug_*
 # OS files
 .DS_Store
 Thumbs.db
-v2/docs/issues/
 v2/docs/PLANO_MELHORIAS.md
 v2/docs/_archive/reports/PLANO_CORRECOES_CODIGO.md
 v2/docs/_archive/reports/PLANO_REFATORACAO_MODULAR.md

@@ -130,5 +130,5 @@ monthly:v3:{year}:{month}:{role}:{gerencia_id}:{sector}:{q}
 
 ## Referências
 
-- [PLAN_multi_sector_availability.md](./PLAN_multi_sector_availability.md) - Plano de implementação
+- [PLAN_multi_sector_availability.md](./_archive/plans/PLAN_multi_sector_availability.md) - Plano de implementação
 - Epic #379 - Disponibilidade Multi-Setor

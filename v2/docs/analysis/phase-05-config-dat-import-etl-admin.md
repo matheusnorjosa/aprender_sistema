@@ -17,8 +17,8 @@ Read: `v2/docs/GUIA_ADMIN_RBAC.md`
 Read: `v2/docs/USERS_CPF_GUIDE.md`
 Read: `v2/docs/ENV_VARS_ETL.md`
 Read: `v2/docs/SPEC_DAT_REGISTROS.md`
-Read: `v2/docs/PLAN_import_pages.md`
-Read: `v2/docs/ANALISE_planilhas_completa.md`
+Read: `v2/docs/plans/PLAN_import_pages.md`
+Read: `v2/docs/analysis/ANALISE_planilhas_completa.md`
 Read: `v2/docs/API_REFERENCE.md`
 Read: `v2/docs/AGENTS.md`
 Read: `v2/backend/apps/core/models/config.py`

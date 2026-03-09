@@ -14,7 +14,7 @@
 - `v2/docs/GO_LIVE_CHECKLIST.md`
 - `v2/docs/SLO_DEFINITIONS.md`
 - `v2/docs/SCALING.md`
-- `v2/docs/ANALISE_ESCALABILIDADE.md`
+- `v2/docs/analysis/ANALISE_ESCALABILIDADE.md`
 - `v2/infra/README.md`
 - `v2/infra/docker-compose.yml`
 - `v2/infra/docker-compose.observability.yml`

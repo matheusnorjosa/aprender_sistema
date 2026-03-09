@@ -671,7 +671,7 @@ ALLOWED_USER_GROUPS: set[str] = {
 
 if not DEBUG:
     # --- SSL/TLS ---
-    SECURE_SSL_REDIRECT = ENVIRONMENT not in ("testing", "development")  # Disable in tests and local dev
+    SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "1" if ENVIRONMENT not in ("testing", "development") else "0") == "1"
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 

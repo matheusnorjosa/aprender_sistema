@@ -582,10 +582,7 @@ jobs:
 
           echo "Portainer stack update succeeded (HTTP ${http_code})."
 
-      - name: Wait for containers to restart
-        run: sleep 15
-
-      - name: Post-deploy verification (health + version)
+      - name: Post-deploy verification (version-aware polling)
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
           HEALTHCHECK_URL: ${{ steps.resolve.outputs.healthcheck_url }}
@@ -599,45 +596,60 @@ jobs:
             curl_opts+=(--insecure)
           fi
 
-          fetch_with_retry() {
-            local url="$1"
-            local label="$2"
-            local attempts=12
-            local sleep_seconds=10
-            local response_file
-            response_file="$(mktemp)"
+          timeout=120
+          interval=5
+          elapsed=0
+          last_health_response=""
+          last_version_response=""
+          last_health_status=""
+          last_version_status=""
 
-            for attempt in $(seq 1 "$attempts"); do
-              local http_code
-              http_code="$(curl "${curl_opts[@]}" -o "$response_file" -w '%{http_code}' "$url" || true)"
-              if [ "$http_code" = "200" ]; then
-                cat "$response_file"
-                rm -f "$response_file"
-                return 0
-              fi
-              echo "Attempt ${attempt}/${attempts} failed for ${label} (HTTP=${http_code:-curl_error}). Retrying in ${sleep_seconds}s..."
-              sleep "$sleep_seconds"
-            done
+          echo "Waiting for version ${RELEASE_VERSION} (timeout=${timeout}s, interval=${interval}s)..."
 
-            echo "Post-deploy ${label} check failed after ${attempts} attempts." >&2
-            if [ -s "$response_file" ]; then
-              echo "Last ${label} response:" >&2
-              cat "$response_file" >&2
+          while (( elapsed < timeout )); do
+            health_code="$(curl "${curl_opts[@]}" -o /tmp/health_resp.json -w '%{http_code}' "$HEALTHCHECK_URL" 2>/dev/null || echo "000")"
+            version_code="$(curl "${curl_opts[@]}" -o /tmp/version_resp.json -w '%{http_code}' "$VERSIONCHECK_URL" 2>/dev/null || echo "000")"
+
+            last_health_status="$health_code"
+            last_version_status="$version_code"
+
+            if [ "$health_code" = "200" ]; then
+              last_health_response="$(cat /tmp/health_resp.json)"
             fi
-            rm -f "$response_file"
-            return 1
-          }
+            if [ "$version_code" = "200" ]; then
+              last_version_response="$(cat /tmp/version_resp.json)"
+            fi
 
-          health_response="$(fetch_with_retry "$HEALTHCHECK_URL" "health")"
-          printf '%s\n' "$health_response" > post-deploy-health-response.txt
+            if [ "$health_code" = "200" ] && [ "$version_code" = "200" ]; then
+              if grep -Fq "$RELEASE_VERSION" /tmp/version_resp.json; then
+                echo "[${elapsed}s] Version ${RELEASE_VERSION} is live. Health OK."
+                printf '%s\n' "$last_health_response" > post-deploy-health-response.txt
+                printf '%s\n' "$last_version_response" > post-deploy-version-response.txt
+                exit 0
+              fi
+              live_version="$(grep -o '"version":"[^"]*"' /tmp/version_resp.json || echo 'unknown')"
+              echo "[${elapsed}s] Version mismatch: expected=${RELEASE_VERSION}, got=${live_version} -- container still updating"
+            elif [ "$health_code" = "000" ] || [ "$version_code" = "000" ]; then
+              echo "[${elapsed}s] Connection refused (health=${health_code}, version=${version_code}) -- container restarting"
+            else
+              echo "[${elapsed}s] Not ready (health=HTTP${health_code}, version=HTTP${version_code})"
+            fi
 
-          version_response="$(fetch_with_retry "$VERSIONCHECK_URL" "version")"
-          printf '%s\n' "$version_response" > post-deploy-version-response.txt
+            sleep "$interval"
+            elapsed=$(( elapsed + interval ))
+          done
 
-          if ! printf '%s' "$version_response" | grep -Fq "$RELEASE_VERSION"; then
-            echo "Version check mismatch. Expected '${RELEASE_VERSION}' in response." >&2
-            exit 1
+          echo "TIMEOUT: Version ${RELEASE_VERSION} did not appear within ${timeout}s." >&2
+          echo "Last health status: HTTP ${last_health_status}" >&2
+          echo "Last version status: HTTP ${last_version_status}" >&2
+          if [ -n "$last_version_response" ]; then
+            echo "Last version response:" >&2
+            printf '%s\n' "$last_version_response" >&2
           fi
+
+          printf '%s\n' "${last_health_response:-no response}" > post-deploy-health-response.txt
+          printf '%s\n' "${last_version_response:-no response}" > post-deploy-version-response.txt
+          exit 1
 
       - name: Generate deploy evidence
         if: always()

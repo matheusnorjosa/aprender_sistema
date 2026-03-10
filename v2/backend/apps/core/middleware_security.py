@@ -49,17 +49,35 @@ class SecurityHeadersMiddleware:
         # ================================================================
         # Content-Security-Policy (CSP)
         # ================================================================
-        # Política restritiva mas compatível com Ant Design e React
+        # Política restritiva mas compatível com Ant Design e React.
+        # Para /api/docs/ e /api/redoc/ liberamos somente os CDNs usados
+        # pelas páginas de documentação do drf-spectacular.
+        is_api_docs = request.path.startswith("/api/docs") or request.path.startswith("/api/redoc")
+
         # - 'self': Permite recursos do mesmo domínio
         # - 'unsafe-inline': Necessário para Ant Design inline styles
         # - data:: Necessário para imagens base64 (ícones, avatars)
         # - blob:: Necessário para download de arquivos
+        script_src = "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+        style_src = "style-src 'self' 'unsafe-inline'"
+        font_src = "font-src 'self' data:"
+        img_src = "img-src 'self' data: blob: https:"
+        worker_src = None
+
+        if is_api_docs:
+            script_src += " https://cdn.jsdelivr.net"
+            style_src += " https://cdn.jsdelivr.net https://fonts.googleapis.com"
+            font_src += " https://fonts.gstatic.com"
+            img_src += " https://cdn.jsdelivr.net"
+            # ReDoc usa Web Worker em URL blob: para parsing do schema.
+            worker_src = "worker-src 'self' blob:"
+
         csp_directives = [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  # React em dev precisa de eval
-            "style-src 'self' 'unsafe-inline'",  # Ant Design usa inline styles
-            "img-src 'self' data: blob: https:",  # Imagens de qualquer HTTPS
-            "font-src 'self' data:",  # Fontes locais e data URIs
+            script_src,  # React em dev precisa de eval
+            style_src,  # Ant Design usa inline styles
+            img_src,  # Imagens de qualquer HTTPS
+            font_src,  # Fontes locais e data URIs
             "connect-src 'self' https://api.github.com",  # APIs permitidas
             "frame-ancestors 'none'",  # Previne clickjacking (como X-Frame-Options)
             "base-uri 'self'",  # Previne ataques de base tag
@@ -67,6 +85,9 @@ class SecurityHeadersMiddleware:
             "object-src 'none'",  # Bloqueia plugins (Flash, etc)
             "upgrade-insecure-requests",  # Força upgrade HTTP -> HTTPS
         ]
+
+        if worker_src:
+            csp_directives.insert(5, worker_src)
 
         response["Content-Security-Policy"] = "; ".join(csp_directives)
 

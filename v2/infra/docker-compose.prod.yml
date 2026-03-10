@@ -1,10 +1,10 @@
 # =============================================================================
-# Docker Compose - Production Configuration (Golden Cloud — topologia 3-VMs)
+# Docker Compose - Production Configuration
 # =============================================================================
 # Topologia:
-#   VM01_App  — esta stack (web, worker, beat, frontend, watchtower)
+#   VM01_App  — esta stack (web, worker, beat, frontend, redis, watchtower)
 #   VM02_Banco — PostgreSQL externo (DB_HOST apontando para IP da VM02)
-#   VM03_Redis — Redis externo (REDIS_HOST apontando para IP da VM03)
+#   Redis — container local nesta stack (serviço "redis")
 #
 # Uso:
 #   IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
@@ -16,7 +16,7 @@
 # Variaveis obrigatorias no .env (ou stack.env no Portainer):
 #   IMAGE_TAG=latest
 #   DB_HOST, DB_NAME, DB_USER, DB_PASSWORD
-#   REDIS_HOST, REDIS_PORT, SECRET_KEY
+#   REDIS_HOST, REDIS_PASSWORD, REDIS_PORT, SECRET_KEY
 #   WATCHTOWER_TOKEN  (token para acionar o deploy via HTTP API)
 #   DOCKER_HUB_TOKEN  (access token do Docker Hub para evitar rate limit)
 # =============================================================================
@@ -36,6 +36,8 @@ services:
       SERVICE_NAME: web
     ports:
       - "8000:8000"
+    depends_on:
+      - redis
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     healthcheck:
@@ -45,6 +47,16 @@ services:
       retries: 3
       start_period: 40s
     restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass "${REDIS_PASSWORD}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   worker:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -56,6 +68,8 @@ services:
       DEBUG: "False"
       REQUIRE_DOCKER: "1"
       SERVICE_NAME: worker
+    depends_on:
+      - redis
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     healthcheck:
@@ -76,6 +90,8 @@ services:
       DEBUG: "False"
       REQUIRE_DOCKER: "1"
       SERVICE_NAME: beat
+    depends_on:
+      - redis
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     healthcheck:

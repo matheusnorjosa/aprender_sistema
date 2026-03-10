@@ -58,6 +58,6 @@ class PreAgendaListView(generics.ListAPIView):
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Override para retornar formato paginado com count."""
         queryset: QuerySet[Solicitacao] = self.get_queryset()
-        serializer: SolicitacaoSerializer = self.get_serializer(queryset, many=True)
+        serializer = self.get_serializer(queryset, many=True)
 
         return Response({"count": queryset.count(), "results": serializer.data})

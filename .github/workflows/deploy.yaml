@@ -323,6 +323,7 @@ jobs:
       - build_and_push
       - validate_existing_tag
     if: |
+      always() &&
       needs.prepare.result == 'success' &&
       (needs.build_and_push.result == 'success' || needs.build_and_push.result == 'skipped') &&
       (needs.validate_existing_tag.result == 'success' || needs.validate_existing_tag.result == 'skipped')

@@ -11,13 +11,10 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.management import BaseCommand, call_command
 
-from apps.core.models import Compra, DATCompra, Municipio, Projeto, Solicitacao
-
-User = get_user_model()
+from apps.core.models import Compra, DATCompra, Municipio, Projeto, Solicitacao, Usuario
 
 
 class Command(BaseCommand):
@@ -32,7 +29,7 @@ class Command(BaseCommand):
         call_command("seed_e2e_users")
 
         dat_group, _ = Group.objects.get_or_create(name="DAT")
-        dat_user, created = User.objects.update_or_create(
+        dat_user, created = Usuario.objects.update_or_create(
             username="dat_matrix@test.com",
             defaults={
                 "email": "dat_matrix@test.com",

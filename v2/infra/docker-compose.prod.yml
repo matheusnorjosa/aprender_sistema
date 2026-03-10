@@ -108,6 +108,9 @@ services:
       - "${FRONTEND_PORT:-81}:80"
     depends_on:
       - web
+    networks:
+      - default
+      - shared_proxy
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     healthcheck:
@@ -133,3 +136,9 @@ services:
     ports:
       - "8080:8080"
     restart: unless-stopped
+
+# Rede externa compartilhada com NPM (Nginx Proxy Manager).
+# Deve ser criada uma vez na VM01: docker network create shared_proxy
+networks:
+  shared_proxy:
+    external: true

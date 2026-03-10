@@ -102,7 +102,7 @@ class ETLReport:
     metrics: ETLMetrics
     filters: Dict[str, str]
     errors: List[ETLError]
-    warnings: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=lambda: list[str]())
 
     def duration_seconds(self) -> float:
         """Calcula duração da execução em segundos"""

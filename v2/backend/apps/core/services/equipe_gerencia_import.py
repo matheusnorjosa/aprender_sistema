@@ -357,7 +357,7 @@ def _process_row(
         pendencias["papel_missing"].append({"linha": linha_num, "erro": "Papel/funcao ausente"})
         return
 
-    setor = SETOR_MAPPING.get(setor_raw, setor_raw)
+    setor = SETOR_MAPPING.get(setor_raw) or setor_raw
     papel = _resolve_papel(papel_raw)
 
     if papel not in {"GERENTE", "COORDENADOR", "APOIO", "FORMADOR"}:

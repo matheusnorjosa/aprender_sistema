@@ -33,6 +33,7 @@ RUN chmod +x /app/infra/scripts/*.sh
 ARG GIT_SHA=unknown
 ARG BUILD_DATE=unknown
 ARG APP_VERSION=dev
+ENV GIT_SHA=$GIT_SHA BUILD_DATE=$BUILD_DATE APP_VERSION=$APP_VERSION
 RUN python - <<'PY2'
 import json
 import os

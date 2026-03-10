@@ -75,10 +75,10 @@ def compra_dat(municipio: Municipio, projeto: Projeto, dat_user: Usuario) -> DAT
     )
 
 
-def _records(data):
+def _records(data):  # type: ignore[return-type]
     if isinstance(data, dict) and "results" in data:
         return data["results"]
-    return data
+    return list(data) if not isinstance(data, list) else data
 
 
 def test_controle_endpoint_exposes_core_compra_contract(

@@ -64,9 +64,9 @@ services:
     depends_on:
       - redis
     healthcheck:
-      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME || exit 1"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "celery -A config inspect ping --timeout 10 -d celery@$$HOSTNAME || exit 1"]
+      interval: 60s
+      timeout: 15s
       retries: 3
       start_period: 60s
     restart: unless-stopped
@@ -101,7 +101,7 @@ services:
       - default
       - shared_proxy
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:80/health || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:80/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

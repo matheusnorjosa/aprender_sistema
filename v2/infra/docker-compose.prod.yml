@@ -2,23 +2,18 @@
 # Docker Compose - Production Configuration
 # =============================================================================
 # Topologia:
-#   VM01_App  — esta stack (web, worker, beat, frontend, redis, watchtower)
+#   VM01_App  — esta stack (web, worker, beat, frontend, redis)
 #   VM02_Banco — PostgreSQL externo (DB_HOST apontando para IP da VM02)
 #   Redis — container local nesta stack (serviço "redis")
 #
-# Uso:
-#   IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
-#
-# IMPORTANTE: IMAGE_TAG deve ser "latest" para o Watchtower detectar atualizacoes.
-# O GitHub Actions publica :latest a cada release, o Watchtower detecta e atualiza.
-# Apenas servicos com label com.centurylinklabs.watchtower.enable=true sao atualizados.
+# Deploy:
+#   GitHub Actions publica imagens no Docker Hub e aciona redeploy
+#   via Portainer CE API. Não há polling automático (Watchtower removido).
 #
 # Variaveis obrigatorias no .env (ou stack.env no Portainer):
-#   IMAGE_TAG=latest
+#   IMAGE_TAG
 #   DB_HOST, DB_NAME, DB_USER, DB_PASSWORD
 #   REDIS_HOST, REDIS_PASSWORD, REDIS_PORT, SECRET_KEY
-#   WATCHTOWER_TOKEN  (token para acionar o deploy via HTTP API)
-#   DOCKER_HUB_TOKEN  (access token do Docker Hub para evitar rate limit)
 # =============================================================================
 
 name: ${COMPOSE_PROJECT_NAME:-aprender_prod}
@@ -38,8 +33,6 @@ services:
       - "8000:8000"
     depends_on:
       - redis
-    labels:
-      com.centurylinklabs.watchtower.enable: "true"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/readyz/"]
       interval: 30s
@@ -70,8 +63,6 @@ services:
       SERVICE_NAME: worker
     depends_on:
       - redis
-    labels:
-      com.centurylinklabs.watchtower.enable: "true"
     healthcheck:
       test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME || exit 1"]
       interval: 30s
@@ -92,8 +83,6 @@ services:
       SERVICE_NAME: beat
     depends_on:
       - redis
-    labels:
-      com.centurylinklabs.watchtower.enable: "true"
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import celery; print(celery.__version__)' || exit 1"]
       interval: 60s
@@ -111,30 +100,12 @@ services:
     networks:
       - default
       - shared_proxy
-    labels:
-      com.centurylinklabs.watchtower.enable: "true"
     healthcheck:
       test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:80/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-    restart: unless-stopped
-
-  watchtower:
-    image: containrrr/watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      # Autenticacao no Docker Hub (evita rate limit de pulls)
-      REPO_USER: norjosamatheus
-      REPO_PASS: ${DOCKER_HUB_TOKEN:?DOCKER_HUB_TOKEN is required}
-      # HTTP API — permite acionar update imediato via POST /v1/update
-      WATCHTOWER_HTTP_API_UPDATE: "true"
-      WATCHTOWER_HTTP_API_TOKEN: ${WATCHTOWER_TOKEN:?WATCHTOWER_TOKEN is required}
-    command: --label-enable --rolling-restart --cleanup --interval 300
-    ports:
-      - "8080:8080"
     restart: unless-stopped
 
 # Rede externa compartilhada com NPM (Nginx Proxy Manager).

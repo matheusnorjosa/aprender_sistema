@@ -26,6 +26,8 @@ from django.core.management.base import BaseCommand, CommandParser
 
 from apps.core.models import AvailabilityBlock, Compra, Municipio, Projeto, Solicitacao, Usuario
 
+# Subconjunto de grupos que recebem Django model permissions via seed.
+# Lista canônica completa: apps.core.constants.SETOR_GROUPS + FUNCAO_GROUPS
 GROUPS = [
     "Superintendência",
     "Coordenador",

@@ -596,8 +596,8 @@ jobs:
             curl_opts+=(--insecure)
           fi
 
-          timeout=120
-          interval=5
+          timeout=180
+          interval=10
           elapsed=0
           last_health_response=""
           last_version_response=""

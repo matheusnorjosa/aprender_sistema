@@ -20,25 +20,8 @@ from typing import Any
 from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand, CommandParser
 
+from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
 from apps.core.models import Usuario
-
-# Definição dos grupos de SETOR e FUNÇÃO
-# Setores baseados no mapeamento de gerências (docs/MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md)
-SETOR_GROUPS: list[str] = [
-    # Gerências de projeto
-    "Superintendência",  # SUPERINTENDENCIA - Fluxo SUPER
-    "Vidas",  # GERENCIA 2 - Fluxo NAO_SUPER
-    "Fluir",  # GERENCIA 3 - Fluxo NAO_SUPER
-    "ACerta",  # GERENCIA 4 - Fluxo NAO_SUPER
-    "Brincando",  # GERENCIA 5 - Fluxo NAO_SUPER
-    "Sou da Paz",  # GERENCIA 6 - Fluxo NAO_SUPER
-    # Setores administrativos/operacionais
-    "DAT",  # Departamento de Apoio Técnico
-    "Controle",  # Setor de Controle
-    "Gerência",  # Gerência genérica
-    "Diretoria",  # Diretoria - Acesso a dashboards
-]
-FUNCAO_GROUPS: list[str] = ["Formador", "Coordenador", "Apoio de Coordenação", "Gerente"]
 
 
 class Command(BaseCommand):

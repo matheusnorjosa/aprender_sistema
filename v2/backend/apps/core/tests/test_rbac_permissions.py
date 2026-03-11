@@ -19,8 +19,8 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Usuario
 from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
+from apps.core.models import Usuario
 
 
 class TestRBACConstants(TestCase):

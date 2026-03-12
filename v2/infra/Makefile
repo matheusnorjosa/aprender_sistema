@@ -8,7 +8,8 @@
 	check-env-dev up-dev health-dev down-dev \
 	check-env-staging pull-staging up-staging health-staging down-staging \
 	check-env-prod pull-prod up-prod health-prod down-prod \
-	check-env-prod-like pull-prod-like up-prod-like health-prod-like down-prod-like
+	check-env-prod-like pull-prod-like up-prod-like health-prod-like down-prod-like \
+	staging-precheck staging-build staging-up staging-test staging-down staging-full
 
 # Variáveis
 COMPOSE_FILE := docker-compose.yml
@@ -28,6 +29,15 @@ DEV_COMPOSE := docker compose --env-file $(ENV_FILE_DEV) -f $(COMPOSE_FILE) -f $
 STAGING_COMPOSE := docker compose --env-file $(ENV_FILE_STAGING) -f $(COMPOSE_FILE)
 PROD_COMPOSE := docker compose --env-file $(ENV_FILE_PROD) -f $(COMPOSE_PROD_FILE)
 PRODLIKE_COMPOSE := docker compose --env-file $(ENV_FILE_PRODLIKE) -f $(COMPOSE_PROD_FILE)
+
+# Staging Gate (local pre-merge validation)
+STAGING_TAG := staging-local
+GIT_SHA := $(shell git rev-parse --short HEAD)
+BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+COMPOSE_STAGING_GATE := docker-compose.staging-gate.yml
+STAGING_GATE_COMPOSE = IMAGE_TAG=$(STAGING_TAG) docker compose --env-file $(ENV_FILE_STAGING) -f $(COMPOSE_FILE) -f $(COMPOSE_STAGING_GATE)
+BACKEND_IMAGE := norjosamatheus/aprender-backend:$(STAGING_TAG)
+FRONTEND_IMAGE := norjosamatheus/aprender-frontend:$(STAGING_TAG)
 
 # ================================================================
 # Help
@@ -358,6 +368,69 @@ health:  ## Verificar health dos serviços
 stats:  ## Ver estatísticas de uso (CPU, memória)
 	@echo "📊 Estatísticas dos containers:"
 	docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}" $(shell $(DEV_COMPOSE) ps -q)
+
+# ================================================================
+# Staging Gate (Epic #838)
+# ================================================================
+# Local pre-merge validation: build prod images, run staging stack,
+# execute smoke tests. Run via Git Bash on Windows.
+# Transitório: usa docker-compose.staging-gate.yml com !reset para
+# remover volumes de dev do frontend. Solução estrutural: #857.
+# ================================================================
+
+staging-precheck: ## Validar compose com !reset override
+	@if ! IMAGE_TAG=$(STAGING_TAG) docker compose --env-file $(ENV_FILE_STAGING) \
+	    -f $(COMPOSE_FILE) -f $(COMPOSE_STAGING_GATE) config > /dev/null 2>&1; then \
+	  echo "❌ staging-precheck falhou: compose override com !reset não suportado ou inválido."; \
+	  echo "   Ação: atualize Docker Compose para versão com suporte a !reset (v2.24.6+)"; \
+	  echo "   ou aplique fallback de arquitetura (mover binds dev para docker-compose.override.yml)."; \
+	  exit 2; \
+	fi
+	@echo "✅ staging-precheck ok"
+
+staging-build: ## Build backend+frontend PROD images para staging gate
+	@echo "=============================================="
+	@echo "   STAGING GATE — Build"
+	@echo "=============================================="
+	@echo "🔨 [STAGING] building backend ($(BACKEND_IMAGE))..."
+	docker build -f $(DOCKERFILE_PROD) \
+	  --build-arg GIT_SHA=$(GIT_SHA) \
+	  --build-arg BUILD_DATE=$(BUILD_DATE) \
+	  --build-arg APP_VERSION=$(STAGING_TAG) \
+	  -t $(BACKEND_IMAGE) ..
+	@echo "🔨 [STAGING] building frontend ($(FRONTEND_IMAGE))..."
+	docker build -f ../frontend/Dockerfile.prod \
+	  -t $(FRONTEND_IMAGE) ../frontend
+	@echo "✅ [STAGING] build concluído"
+
+staging-up: staging-precheck ## Subir stack staging + migrations
+	@echo "🚀 [STAGING] subindo ambiente..."
+	@docker image inspect $(BACKEND_IMAGE) > /dev/null 2>&1 || \
+	  (echo "❌ Imagem backend não encontrada: $(BACKEND_IMAGE)"; echo "   Execute: make staging-build"; exit 1)
+	@docker image inspect $(FRONTEND_IMAGE) > /dev/null 2>&1 || \
+	  (echo "❌ Imagem frontend não encontrada: $(FRONTEND_IMAGE)"; echo "   Execute: make staging-build"; exit 1)
+	$(STAGING_GATE_COMPOSE) up -d --no-build
+	$(STAGING_GATE_COMPOSE) run --rm web python manage.py migrate --noinput
+	@echo "✅ [STAGING] ambiente pronto"
+	@echo "🌐 [STAGING] backend: http://localhost:18002"
+	@echo "🌐 [STAGING] frontend: http://localhost:15173"
+
+staging-test: ## Executar smoke tests no staging
+	@echo "=============================================="
+	@echo "   STAGING GATE — Smoke Tests"
+	@echo "=============================================="
+	@bash scripts/smoke_test_staging.sh
+
+staging-down: ## Derrubar stack staging (com volumes)
+	@echo "⏹️  [STAGING] derrubando ambiente..."
+	-$(STAGING_GATE_COMPOSE) down -v
+	@echo "✅ [STAGING] ambiente finalizado"
+
+staging-full: ## Pipeline completo: precheck → build → up → test → teardown
+	@echo "=============================================="
+	@echo "   STAGING GATE — Full Validation Pipeline"
+	@echo "=============================================="
+	@bash -lc 'set -euo pipefail; trap "$(MAKE) staging-down || true" EXIT; $(MAKE) staging-precheck && $(MAKE) staging-build && $(MAKE) staging-up && $(MAKE) staging-test'
 
 # ================================================================
 # Deploy

@@ -10,7 +10,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 CORE_APP_DIR = Path(__file__).resolve().parents[1]
 
 
@@ -44,12 +43,9 @@ def _imports_dat_ingest(path: Path) -> bool:
 
 def test_core_must_not_import_dat_ingest() -> None:
     violating_files = [
-        str(path.relative_to(CORE_APP_DIR))
-        for path in _iter_core_python_files()
-        if _imports_dat_ingest(path)
+        str(path.relative_to(CORE_APP_DIR)) for path in _iter_core_python_files() if _imports_dat_ingest(path)
     ]
 
     assert not violating_files, (
-        "apps.core nao deve importar apps.dat_ingest diretamente.\n"
-        f"Arquivos com violacao: {sorted(violating_files)}"
+        "apps.core nao deve importar apps.dat_ingest diretamente.\n" f"Arquivos com violacao: {sorted(violating_files)}"
     )

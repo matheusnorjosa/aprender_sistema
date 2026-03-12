@@ -30,7 +30,7 @@ services:
       REQUIRE_DOCKER: "1"
       SERVICE_NAME: web
     ports:
-      - "8000:8000"
+      - "${BACKEND_HOST_PORT:-8000}:8000"
     depends_on:
       - redis
     healthcheck:

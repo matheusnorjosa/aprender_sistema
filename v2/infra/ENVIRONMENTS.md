@@ -73,7 +73,62 @@ make build-prod-image
 8. Em `staging/producao`, `docker-compose.override.yml` nao e aplicado.
 9. Em producao Golden Cloud (3-VMs), `docker-compose.prod.yml` usa DB/Redis externos (VM02/VM03); a stack da VM01 sobe `web/worker/beat/frontend`.
 
-## 5) Evidencias Minimas por Mudanca
+## 5) Staging Gate — Validacao Local Pre-Merge
+
+Pipeline local que builda imagens prod, sobe stack staging, roda smoke tests e reporta PASS/FAIL.
+Objetivo: validar Dockerfile.prod + integracao de servicos antes do merge.
+
+### Quick start
+
+```bash
+cd v2/infra
+make staging-full    # build → up → smoke test → teardown (trap EXIT)
+```
+
+### O que valida (8 checks)
+
+| # | Check | Endpoint/Comando | Criterio |
+| --- | ----- | ---------------- | -------- |
+| 1 | Backend readyz | `GET /api/readyz/` | HTTP 200 + `"healthy"` |
+| 2 | Backend version | `GET /api/version/` | HTTP 200 + version != "unknown" |
+| 3 | CSRF endpoint | `GET /api/csrf/` | HTTP 200 + `csrfToken` presente |
+| 4 | Auth pipeline | `POST /api/auth/login/` | HTTP 4xx (Django processa, nao 301) |
+| 5 | Celery worker | `celery inspect ping` | resposta `pong` (retry 12x) |
+| 6 | Celery beat | `compose ps` + `compose top` | container running + processo ativo |
+| 7 | Frontend HTTP | `GET /` (frontend) | HTTP 200 + `<div id="root"` |
+| 8 | Frontend health | `GET /health` (nginx) | HTTP 200 |
+
+### Portas (dev vs staging)
+
+| Servico | Dev | Staging |
+| ------- | --- | ------- |
+| Backend | 8002 | 18002 |
+| Frontend | 5173 | 15173 |
+| DB | 5434 | 15434 |
+| Redis | 6380 | 16380 |
+
+### Targets individuais
+
+```bash
+make staging-precheck   # valida suporte a !reset no compose
+make staging-build      # build imagens prod (backend + frontend)
+make staging-up         # sobe stack + migrations
+make staging-test       # roda smoke tests (pode rodar com stack ja up)
+make staging-down       # derruba stack + remove volumes
+```
+
+### Nota: X-Forwarded-Proto
+
+Staging roda com `DEBUG=0` e `SECURE_SSL_REDIRECT=1`. Todos os curls para o backend
+incluem `-H X-Forwarded-Proto:https` para evitar redirect 301.
+
+### Pre-requisitos
+
+- Docker Compose v2.24.6+ (suporte a `!reset`)
+- Git Bash (Windows) para execucao dos targets `staging-*`
+- Imagens devem ser buildadas localmente antes de `staging-up`
+
+## 6) Evidencias Minimas por Mudanca
 
 1. Comando executado e ambiente alvo.
 2. Resultado de `check-env-*`.

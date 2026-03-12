@@ -12,8 +12,6 @@
 # Staging/Production: this file must NOT be applied.
 # Use only docker-compose.yml (staging) or docker-compose.prod.yml (producao).
 
-name: aprender_v2
-
 services:
   web:
     build:

@@ -171,9 +171,6 @@ services:
       PROXY_TARGET: http://web:8000 # Proxy server-side para o backend interno
     ports:
       - "${FRONTEND_HOST_PORT:-5173}:${FRONTEND_CONTAINER_PORT:-5173}"
-    volumes:
-      - ../frontend/src:/app/src:ro # Hot reload do código fonte
-      - ../frontend/public:/app/public:ro
     depends_on:
       - web
     healthcheck:

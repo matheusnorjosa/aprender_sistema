@@ -1,0 +1,15 @@
+# ================================================================
+# Staging Gate Override
+# ================================================================
+# Remove dev volume mounts from frontend for prod-like fidelity.
+# Used by: make staging-* targets
+# Requires: Docker Compose with !reset support (v2.24.6+)
+#
+# Transitório: este override existe porque docker-compose.yml base
+# monta volumes de dev no frontend. A solução estrutural (#857) é
+# mover esses binds para docker-compose.override.yml (dev-only).
+# ================================================================
+
+services:
+  frontend:
+    volumes: !reset []

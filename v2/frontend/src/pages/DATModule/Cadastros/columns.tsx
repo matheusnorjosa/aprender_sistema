@@ -13,40 +13,9 @@ import {
 import dayjs from 'dayjs';
 import { PLATAFORMAS } from './constants';
 import { renderStatusIcon, getStepStatus, getCurrentStep } from './helpers';
-import type { ID } from '../../../types';
+import type { CadastroRecord } from './types';
 
 const { Text } = Typography;
-
-/**
- * Cadastro record interface
- */
-export interface CadastroRecord {
-  id: ID;
-  projeto_geral_nome: string;
-  municipio_nome: string;
-  uf: string;
-  quantidade_alunos?: number;
-  quantidade_professores?: number;
-  quantidade_codigos?: number;
-  status_criacao_curso?: string;
-  data_criacao_curso?: string;
-  status_chaves?: string;
-  data_chaves?: string;
-  status_instrucoes?: string;
-  data_instrucoes?: string;
-  status_envio?: string;
-  data_envio?: string;
-  status_recebidos?: string;
-  quantidade_recebidos?: number;
-  status_validados?: string;
-  quantidade_validados?: number;
-  status_importados?: string;
-  quantidade_importados?: number;
-  link_planilha?: string;
-  link_plataforma?: string;
-  // Index signature for dynamic property access
-  [key: string]: unknown;
-}
 
 /**
  * Column handlers interface

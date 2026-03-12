@@ -45,3 +45,7 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+    volumes:
+      # Mount frontend code as read-only for hot reload in local dev
+      - ../frontend/src:/app/src:ro
+      - ../frontend/public:/app/public:ro

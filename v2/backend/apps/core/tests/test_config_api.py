@@ -72,6 +72,13 @@ def test_config_get_endpoint(client: APIClient, dat_user: Any) -> None:
     When: DAT user calls GET /api/config/
     Then: Response is 200 with default values
     """
+    # xdist safety: clear stale Config records and cache from parallel workers
+    Config.objects.all().delete()
+    from apps.core.services.config_service import bust_cfg
+
+    for key in ("availability", "gcal_sync", "session", "features"):
+        bust_cfg(key)
+
     client.force_authenticate(user=dat_user)
 
     url = reverse("core:config")

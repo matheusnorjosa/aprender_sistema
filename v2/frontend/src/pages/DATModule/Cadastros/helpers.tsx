@@ -10,7 +10,7 @@ import {
   MinusCircleFilled,
 } from '@ant-design/icons';
 import type { Etapa } from './constants';
-import type { CadastroRecord } from './columns';
+import type { CadastroRecord } from './types';
 
 /**
  * Status type for workflow steps

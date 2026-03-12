@@ -16,6 +16,11 @@
 - [ ] Testes criados/ajustados para comportamento novo ou corrigido
 - [ ] Evidencias anexadas (logs, screenshots, outputs de teste) quando aplicavel
 
+## Staging Gate
+
+- [ ] `make staging-full` executado com sucesso (8/8 PASS)
+- [ ] Evidencia anexada no PR (trecho de log contendo "ALL 8 CHECKS PASSED")
+
 ## Validacoes
 
 - [ ] Checks `[required]` verdes (somente gates bloqueantes)

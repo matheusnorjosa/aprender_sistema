@@ -27,7 +27,7 @@ from django.db import transaction
 import pandas as pd
 
 from apps.core.models import Deslocamento
-from apps.dat_ingest.services.resolvers import resolve_user_by_email, resolve_user_by_name
+from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 
 TZ = ZoneInfo("America/Fortaleza")
 

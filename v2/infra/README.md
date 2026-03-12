@@ -94,6 +94,13 @@ make up-staging
 make health-staging
 make down-staging
 
+# PROD-LIKE (local)
+make check-env-prod-like
+make pull-prod-like
+make up-prod-like
+make health-prod-like
+make down-prod-like
+
 # PROD (local controlled validation)
 make check-env-prod
 make pull-prod
@@ -107,6 +114,7 @@ Default env templates are versioned as:
 - `.env.dev.example`
 - `.env.staging.example`
 - `.env.production.example`
+- `.env.prodlike.example`
 
 Create local operational files before running compose:
 
@@ -114,6 +122,7 @@ Create local operational files before running compose:
 cp .env.dev.example .env.dev
 cp .env.staging.example .env.staging
 cp .env.production.example .env.production
+cp .env.prodlike.example .env.prodlike.local
 ```
 
 Important:

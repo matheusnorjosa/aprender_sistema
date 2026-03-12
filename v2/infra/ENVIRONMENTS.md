@@ -11,11 +11,12 @@ Fonte operacional oficial para evitar confusao de contexto no fluxo solo.
 
 ## 2) Matriz Rapida
 
-| Ambiente | Objetivo | Compose | Env file | Dockerfile backend | COMPOSE_PROJECT_NAME | Porta backend |
-|---|---|---|---|---|---|---|
-| dev | Desenvolvimento local | `docker-compose.yml + docker-compose.override.yml` | `.env.dev` | `infra/Dockerfile.dev` | `aprender_dev` | `8002` |
-| staging | Homologacao | `docker-compose.yml` | `.env.staging` | imagem publicada (`IMAGE_TAG`) | `aprender_staging` | `8002` |
-| producao | Runtime final | `docker-compose.prod.yml` | `.env.production` | imagem publicada (`IMAGE_TAG`) | `aprender_prod` | `8000` |
+| Ambiente | Objetivo | Compose | Env file | COMPOSE_PROJECT_NAME | Backend | Frontend | DB | Redis |
+|---|---|---|---|---|---|---|---|---|
+| dev | Desenvolvimento local | `docker-compose.yml + docker-compose.override.yml` | `.env.dev` | `aprender_dev` | `8002` | `5173` | `5434` | `6380` |
+| staging | Homologacao local | `docker-compose.yml` | `.env.staging` | `aprender_staging` | `18002` | `15173` | `15434` | `16380` |
+| prod-like | Validacao local fiel ao compose de producao | `docker-compose.prod.yml` | `.env.prodlike.local` | `aprender_prod_like` | `28000` | `18081` | externo | interno |
+| producao | Runtime final (VM01) | `docker-compose.prod.yml` | `stack.env`/`.env.production` | `aprender_prod` | `8000` | `81` | VM02 | VM03 |
 
 ## 3) Comandos Oficiais
 
@@ -36,6 +37,13 @@ make pull-staging
 make up-staging
 make health-staging
 make down-staging
+
+# PROD-LIKE (LOCAL)
+make check-env-prod-like
+make pull-prod-like
+make up-prod-like
+make health-prod-like
+make down-prod-like
 
 # PRODUCAO (validacao local controlada)
 make check-env-prod
@@ -63,7 +71,7 @@ make build-prod-image
 6. `staging/producao` devem usar imagem publicada gerada com `Dockerfile.prod`.
 7. `staging` exige `IMAGE_TAG` explicita da release; em `producao` a stack opera com `IMAGE_TAG=latest` e promocao controlada por `promotion_tag` no workflow.
 8. Em `staging/producao`, `docker-compose.override.yml` nao e aplicado.
-9. Em producao Golden Cloud (3-VMs), `docker-compose.prod.yml` usa DB/Redis externos (VM02/VM03); a stack da VM01 sobe `web/worker/beat/frontend/watchtower`.
+9. Em producao Golden Cloud (3-VMs), `docker-compose.prod.yml` usa DB/Redis externos (VM02/VM03); a stack da VM01 sobe `web/worker/beat/frontend`.
 
 ## 5) Evidencias Minimas por Mudanca
 

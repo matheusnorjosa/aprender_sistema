@@ -72,6 +72,7 @@ make build-prod-image
 7. `staging` exige `IMAGE_TAG` explicita da release; em `producao` a stack opera com `IMAGE_TAG=latest` e promocao controlada por `promotion_tag` no workflow.
 8. Em `staging/producao`, `docker-compose.override.yml` nao e aplicado.
 9. Em producao Golden Cloud (3-VMs), `docker-compose.prod.yml` usa DB/Redis externos (VM02/VM03); a stack da VM01 sobe `web/worker/beat/frontend`.
+10. O `docker-compose.yml` base e prod-like: binds de codigo do frontend (`src/public`) ficam apenas no `docker-compose.override.yml` (dev-only).
 
 ## 5) Staging Gate — Validacao Local Pre-Merge
 

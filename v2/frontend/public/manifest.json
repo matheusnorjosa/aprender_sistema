@@ -1,7 +1,7 @@
 {
-  "name": "Aprender Sistema v2",
-  "short_name": "AS v2",
-  "description": "Sistema de gestao de eventos de formacao",
+  "name": "Aprender Sistema",
+  "short_name": "Aprender",
+  "description": "Plataforma para gestao de solicitacoes, disponibilidade, aprovacoes e dashboards",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

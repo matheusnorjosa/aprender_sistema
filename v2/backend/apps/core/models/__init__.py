@@ -29,12 +29,23 @@ Estrutura:
     ├── formacao.py          # Formacao
     ├── acompanhamento.py    # Acompanhamento
     └── prova.py             # Prova
+    └── acoes_notificacao.py # Acoes/notificacoes internas (32 passos)
 
 Type-checked with Pyright (strict mode).
 """
 
 from __future__ import annotations
 
+from apps.core.models.acoes_notificacao import (
+    AcaoInstancia,
+    AcaoTemplate,
+    AcaoTemplateExecutor,
+    CicloAcoes,
+    FeriadoLocal,
+    NotificacaoInterna,
+    RegistroAncora,
+    RegistroConclusaoAcao,
+)
 from apps.core.models.acompanhamento import Acompanhamento
 from apps.core.models.agenda import AvailabilityBlock
 from apps.core.models.auditoria import AuditLog
@@ -110,4 +121,13 @@ __all__ = [
     "AuditLog",
     # Integracao
     "GoogleOAuthCredential",
+    # Acoes/Notificacoes Internas
+    "AcaoTemplate",
+    "AcaoTemplateExecutor",
+    "CicloAcoes",
+    "AcaoInstancia",
+    "RegistroAncora",
+    "RegistroConclusaoAcao",
+    "FeriadoLocal",
+    "NotificacaoInterna",
 ]

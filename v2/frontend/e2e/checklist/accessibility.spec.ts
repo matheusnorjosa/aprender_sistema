@@ -14,7 +14,11 @@
  */
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import './checklist-network-mocks.setup';
+import { mockChecklistAuthBootstrap } from './checklist-network-mocks';
+
+test.beforeEach(async ({ page }) => {
+  await mockChecklistAuthBootstrap(page);
+});
 
 async function waitForLoadingOverlayToDisappear(page: Page): Promise<void> {
   await page.waitForFunction(

@@ -9,7 +9,11 @@
  * Usa métricas coletadas via Performance API do navegador.
  */
 import { test, expect, Page } from '@playwright/test';
-import './checklist-network-mocks.setup';
+import { mockChecklistAuthBootstrap } from './checklist-network-mocks';
+
+test.beforeEach(async ({ page }) => {
+  await mockChecklistAuthBootstrap(page);
+});
 
 // Thresholds do checklist
 const THRESHOLDS = {

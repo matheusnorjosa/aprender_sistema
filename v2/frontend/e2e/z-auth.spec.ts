@@ -65,8 +65,8 @@ test.describe('Fluxo de Autenticação', () => {
       // Verificar que está logado
       await expect(page.locator('.ant-layout-sider').first()).toBeVisible({ timeout: 5000 });
 
-      // Clicar no botão de logout
-      await page.click('button:has-text("Sair")');
+      // Clicar no botão de logout (selector explícito para evitar ambiguidades)
+      await page.click('[data-testid="app-logout-button"]');
 
       // Deve voltar para tela de login (h1, não h2)
       await expect(page.locator('h1:has-text("Login")')).toBeVisible({ timeout: 10000 });

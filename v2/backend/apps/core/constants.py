@@ -12,7 +12,7 @@ Ref: docs/MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md
 
 from __future__ import annotations
 
-# === SETORES (10) — Onde o usuário trabalha ===
+# === SETORES (14) — Onde o usuário trabalha ===
 SETOR_GROUPS: list[str] = [
     # Gerências de projeto
     "Superintendência",  # SUPERINTENDENCIA - Fluxo SUPER
@@ -26,6 +26,11 @@ SETOR_GROUPS: list[str] = [
     "Controle",  # Setor de Controle
     "Gerência",  # Gerência genérica
     "Diretoria",  # Diretoria - Acesso a dashboards
+    # Novos setores de operação de ações/notificações (32 passos)
+    "Comercial",
+    "Relacionamento",
+    "Logística Viagens",
+    "Logística Galpão",
 ]
 
 # === FUNÇÕES (4) — O que o usuário pode fazer ===

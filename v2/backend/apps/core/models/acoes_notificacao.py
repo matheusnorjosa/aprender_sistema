@@ -147,7 +147,7 @@ class AcaoTemplateExecutor(models.Model):
     )
     group = models.ForeignKey(  # type: ignore[misc]
         Group,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name="acoes_template",
     )
     ativo = models.BooleanField(default=True)

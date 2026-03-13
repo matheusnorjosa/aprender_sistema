@@ -51,3 +51,17 @@ def test_custom_feriado_local_affects_due_date():
     )
     due = BusinessCalendarService.add_business_days(date(2026, 3, 18), 1)
     assert due == date(2026, 3, 23)
+
+
+@pytest.mark.django_db
+def test_business_days_between_future():
+    # 11,12,13 => 3 dias uteis
+    diff = BusinessCalendarService.business_days_between(date(2026, 3, 10), date(2026, 3, 13))
+    assert diff == 3
+
+
+@pytest.mark.django_db
+def test_business_days_between_past():
+    # 11,12,13 => -3 dias uteis (direcao inversa)
+    diff = BusinessCalendarService.business_days_between(date(2026, 3, 13), date(2026, 3, 10))
+    assert diff == -3

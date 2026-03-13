@@ -23,6 +23,7 @@ import {
   SolutionOutlined,
   MenuOutlined,
   CloseOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
 import { ThemeProvider, useTheme, useBrandColors } from './contexts/ThemeContext';
 import ptBR from 'antd/locale/pt_BR';
@@ -73,6 +74,9 @@ const CadastrosPage = lazy(() => import('./pages/DATModule/CadastrosPage'));
 const FormacoesPage = lazy(() => import('./pages/DATModule/FormacoesPage'));
 const PlanoFormacoesPage = lazy(() => import('./pages/DATModule/PlanoFormacoesPage'));
 const CoordenadoresPage = lazy(() => import('./pages/DATModule/CoordenadoresPage'));
+const AcoesNotificacaoPage = lazy(() => import('./pages/Controle/AcoesNotificacaoPage'));
+const NotificacoesInternasPage = lazy(() => import('./pages/Controle/NotificacoesInternasPage'));
+const AcoesTimelinePage = lazy(() => import('./pages/Controle/AcoesTimelinePage'));
 
 const { Header, Content, Sider } = Layout;
 const { SubMenu } = Menu;
@@ -129,6 +133,9 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/controle/plano-formacoes': 'controle-plano-formacoes',
   '/controle/pre-agenda': 'controle-pre-agenda',
   '/pre-agenda': 'controle-pre-agenda',
+  '/acoes-notificacao': 'acoes-notificacao-ciclo',
+  '/acoes-notificacao/timeline': 'acoes-notificacao-timeline',
+  '/notificacoes-internas': 'acoes-notificacao-inbox',
   '/dat/etl-reports': 'dat-etl-reports',
   // Item único
   '/deslocamentos': 'deslocamentos',
@@ -162,6 +169,10 @@ const MENU_KEY_TO_PARENT: Record<string, string> = {
   'controle-formacoes': 'controle-submenu',
   'controle-plano-formacoes': 'controle-submenu',
   'controle-pre-agenda': 'controle-submenu',
+  // Acoes/Notificacoes submenu
+  'acoes-notificacao-ciclo': 'acoes-notificacao-submenu',
+  'acoes-notificacao-timeline': 'acoes-notificacao-submenu',
+  'acoes-notificacao-inbox': 'acoes-notificacao-submenu',
   // Dashboards submenu
   'dashboard-geral': 'dashboards-submenu',
   'dashboard-compras': 'dashboards-submenu',
@@ -466,6 +477,7 @@ function AppContent(): JSX.Element {
 
   // Permissões baseadas em FUNÇÃO
   const isCoordenador = funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação');
+  const isGerente = funcoes.includes('Gerente');
 
   // Permissões baseadas em SETOR
   const inSuperintendencia = setores.includes('Superintendência');
@@ -483,6 +495,8 @@ function AppContent(): JSX.Element {
   const canControle = user?.is_superuser || inControle;
   // canDAT = acesso a Admin DAT
   const canDAT = user?.is_superuser || inDAT;
+  // canAcoesInternas = modulo de acoes/notificacoes 32 passos
+  const canAcoesInternas = user?.is_superuser || inDAT || isCoordenador || isGerente;
   // Acesso por página de dashboard
   const canDashboardOverview = user?.is_superuser || inSuperintendencia || inGerencia || inDiretoria;
   const canDashboardEquipe = user?.is_superuser || inControle || inGerencia || inSuperintendencia || inDiretoria;
@@ -605,6 +619,19 @@ function AppContent(): JSX.Element {
                   </Menu.Item>
                   <Menu.Item key="controle-pre-agenda">
                     <Link to="/controle/pre-agenda">Pré-agenda</Link>
+                  </Menu.Item>
+                </SubMenu>
+              )}
+              {canAcoesInternas && (
+                <SubMenu key="acoes-notificacao-submenu" icon={<BellOutlined />} title="Ações Internas">
+                  <Menu.Item key="acoes-notificacao-ciclo">
+                    <Link to="/acoes-notificacao">Ciclos e Ações</Link>
+                  </Menu.Item>
+                  <Menu.Item key="acoes-notificacao-timeline">
+                    <Link to="/acoes-notificacao/timeline">Timeline</Link>
+                  </Menu.Item>
+                  <Menu.Item key="acoes-notificacao-inbox">
+                    <Link to="/notificacoes-internas">Notificações</Link>
                   </Menu.Item>
                 </SubMenu>
               )}
@@ -861,6 +888,18 @@ function AppContent(): JSX.Element {
                   <Route
                     path="/pre-agenda"
                     element={canControle ? <PreAgendaPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/acoes-notificacao"
+                    element={canAcoesInternas ? <AcoesNotificacaoPage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/acoes-notificacao/timeline"
+                    element={canAcoesInternas ? <AcoesTimelinePage /> : <Forbidden />}
+                  />
+                  <Route
+                    path="/notificacoes-internas"
+                    element={canAcoesInternas ? <NotificacoesInternasPage /> : <Forbidden />}
                   />
                   <Route
                     path="/dat/etl-reports"

@@ -15,13 +15,21 @@ from .admin_site import admin_site
 from .models import (
     AcaoControle,
     AcaoDAT,
+    AcaoInstancia,
+    AcaoTemplate,
+    AcaoTemplateExecutor,
     AuditLog,
     AvailabilityBlock,
+    CicloAcoes,
     Compra,
     Deslocamento,
+    FeriadoLocal,
     Municipio,
+    NotificacaoInterna,
     Participation,
     Projeto,
+    RegistroAncora,
+    RegistroConclusaoAcao,
     Solicitacao,
     TipoEvento,
     Usuario,
@@ -250,6 +258,68 @@ class AuditLogAdmin(admin.ModelAdmin):
         return False
 
 
+class AcaoTemplateAdmin(admin.ModelAdmin):
+    list_display = ("ordem", "nome", "tipo_ancora", "dias_prazo_uteis", "ativo")
+    list_filter = ("tipo_ancora", "ativo")
+    search_fields = ("nome", "descricao_prazo", "ref_evento_externo")
+    ordering = ("ordem",)
+
+
+class AcaoTemplateExecutorAdmin(admin.ModelAdmin):
+    list_display = ("acao_template", "group", "ativo", "created_at")
+    list_filter = ("ativo", "group")
+    search_fields = ("acao_template__nome", "group__name")
+    autocomplete_fields = ("acao_template",)
+    list_select_related = ("acao_template", "group")
+
+
+class CicloAcoesAdmin(admin.ModelAdmin):
+    list_display = ("projeto", "municipio", "semestre", "ano", "status", "created_at")
+    list_filter = ("semestre", "status", "ano")
+    search_fields = ("projeto__nome", "municipio__nome")
+    autocomplete_fields = ("projeto", "municipio", "created_by")
+    list_select_related = ("projeto", "municipio", "created_by")
+
+
+class AcaoInstanciaAdmin(admin.ModelAdmin):
+    list_display = ("ciclo", "ordem", "estado", "data_ancora", "data_vencimento", "data_realizacao")
+    list_filter = ("estado",)
+    search_fields = ("ciclo__projeto__nome", "ciclo__municipio__nome", "template__nome")
+    autocomplete_fields = ("ciclo", "template", "concluida_por")
+    list_select_related = ("ciclo", "template", "concluida_por")
+
+
+class RegistroAncoraAdmin(admin.ModelAdmin):
+    list_display = ("acao_instancia", "data_ancora", "registrado_por", "created_at")
+    list_filter = ("data_ancora",)
+    search_fields = ("acao_instancia__template__nome", "registrado_por__username")
+    autocomplete_fields = ("acao_instancia", "registrado_por")
+    list_select_related = ("acao_instancia", "registrado_por")
+
+
+class RegistroConclusaoAcaoAdmin(admin.ModelAdmin):
+    list_display = ("acao_instancia", "data_realizacao", "registrado_por", "created_at")
+    list_filter = ("data_realizacao",)
+    search_fields = ("acao_instancia__template__nome", "registrado_por__username")
+    autocomplete_fields = ("acao_instancia", "registrado_por")
+    list_select_related = ("acao_instancia", "registrado_por")
+
+
+class FeriadoLocalAdmin(admin.ModelAdmin):
+    list_display = ("data", "nome", "abrangencia", "ativo")
+    list_filter = ("abrangencia", "ativo")
+    search_fields = ("nome",)
+    ordering = ("data",)
+
+
+class NotificacaoInternaAdmin(admin.ModelAdmin):
+    list_display = ("destinatario", "tipo", "nivel", "prioridade", "lida", "referencia_data", "created_at")
+    list_filter = ("tipo", "nivel", "prioridade", "lida")
+    search_fields = ("destinatario__username", "titulo", "mensagem")
+    autocomplete_fields = ("destinatario", "acao_instancia")
+    list_select_related = ("destinatario", "acao_instancia")
+
+
 # Registro funcional (evita problemas de importação circular com decoradores)
 admin_site.register(Usuario, UsuarioAdmin)
 admin_site.register(Municipio, MunicipioAdmin)
@@ -263,3 +333,11 @@ admin_site.register(Deslocamento, DeslocamentoAdmin)
 admin_site.register(AcaoControle, AcaoControleAdmin)
 admin_site.register(AcaoDAT, AcaoDATAdmin)
 admin_site.register(AuditLog, AuditLogAdmin)
+admin_site.register(AcaoTemplate, AcaoTemplateAdmin)
+admin_site.register(AcaoTemplateExecutor, AcaoTemplateExecutorAdmin)
+admin_site.register(CicloAcoes, CicloAcoesAdmin)
+admin_site.register(AcaoInstancia, AcaoInstanciaAdmin)
+admin_site.register(RegistroAncora, RegistroAncoraAdmin)
+admin_site.register(RegistroConclusaoAcao, RegistroConclusaoAcaoAdmin)
+admin_site.register(FeriadoLocal, FeriadoLocalAdmin)
+admin_site.register(NotificacaoInterna, NotificacaoInternaAdmin)

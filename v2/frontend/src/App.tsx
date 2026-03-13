@@ -464,9 +464,10 @@ function AppContent(): JSX.Element {
       logger.error('Erro no logout:', error);
       message.warning('Sessão encerrada localmente');
     } finally {
-      // Sempre limpar estado local, mesmo se API falhar.
-      // Evita "re-login" imediato quando o backend não invalida a sessão a tempo.
+      // Sempre limpar estado local e redirecionar, mesmo se API falhar
       setUser(null);
+      // Recarregar a página para voltar para tela de login
+      window.location.reload();
     }
   };
 
@@ -783,7 +784,6 @@ function AppContent(): JSX.Element {
                   type="primary"
                   danger
                   icon={<LogoutOutlined />}
-                  data-testid="app-logout-button"
                   onClick={handleLogout}
                 >
                   Sair

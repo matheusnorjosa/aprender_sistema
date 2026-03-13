@@ -301,18 +301,21 @@ class AcaoInstancia(models.Model):
         if self.estado == EstadoAcaoChoices.CONCLUIDA:
             raise ValidationError("Nao e permitido alterar ancora de acao concluida.")
 
-        if self.estado == EstadoAcaoChoices.AGUARDANDO_ANCORA:
-            self.estado = EstadoAcaoChoices.EM_ANDAMENTO
+        from apps.core.services.prazo_engine_service import PrazoEngineService
 
-        self.data_ancora = data_ancora
-        self.save(update_fields=["estado", "data_ancora", "updated_at"])
+        with transaction.atomic():
+            PrazoEngineService.recalculate_action(
+                self,
+                explicit_anchor_date=data_ancora,
+                save=True,
+            )
 
-        return RegistroAncora.objects.create(
-            acao_instancia=self,
-            data_ancora=data_ancora,
-            observacao=observacao,
-            registrado_por=usuario,
-        )
+            return RegistroAncora.objects.create(
+                acao_instancia=self,
+                data_ancora=data_ancora,
+                observacao=observacao,
+                registrado_por=usuario,
+            )
 
     def concluir(
         self,
@@ -329,6 +332,8 @@ class AcaoInstancia(models.Model):
             raise ValidationError({"observacao": "Observacao e obrigatoria para concluir a acao."})
 
         with transaction.atomic():
+            from apps.core.services.prazo_engine_service import PrazoEngineService
+
             self.estado = EstadoAcaoChoices.CONCLUIDA
             self.data_realizacao = data_realizacao
             self.observacao_conclusao = obs
@@ -348,12 +353,14 @@ class AcaoInstancia(models.Model):
             if RegistroConclusaoAcao.objects.filter(acao_instancia=self).exists():
                 raise ValidationError("Registro de conclusao ja existe para esta acao.")
 
-            return RegistroConclusaoAcao.objects.create(
+            registro = RegistroConclusaoAcao.objects.create(
                 acao_instancia=self,
                 data_realizacao=data_realizacao,
                 observacao=obs,
                 registrado_por=usuario,
             )
+            PrazoEngineService.recalculate_dependents(self)
+            return registro
 
 
 class RegistroAncora(models.Model):

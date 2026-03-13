@@ -49,6 +49,7 @@ def test_custom_feriado_local_affects_due_date():
         abrangencia="MUNICIPAL_FORTALEZA",
         ativo=True,
     )
+    BusinessCalendarService.invalidate_cache()
     due = BusinessCalendarService.add_business_days(date(2026, 3, 18), 1)
     assert due == date(2026, 3, 23)
 

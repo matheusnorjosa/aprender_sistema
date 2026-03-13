@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import date
 from io import StringIO
 from typing import Any
 
@@ -291,6 +292,26 @@ def task_cancel_solicitacao_from_gcal(solicitation_id: int) -> dict[str, Any]:
             "summary": f"Erro ao cancelar: {str(e)}",
             "error": str(e)[:500],
         }
+
+
+@shared_task(name="apps.core.tasks.processar_notificacoes_acoes_diarias")
+def processar_notificacoes_acoes_diarias(reference_date_iso: str | None = None) -> dict[str, Any]:
+    """
+    Processa notificacoes de acoes internas (D-7/D-3/D-1/D0 e D+1/D+3).
+
+    Args:
+        reference_date_iso: data de referencia no formato YYYY-MM-DD (opcional).
+            Quando vazio, usa timezone.localdate().
+
+    Returns:
+        dict com metricas da execucao (acoes avaliadas/disparadas, criadas, deduplicadas, fases).
+    """
+    from apps.core.services.notificacoes_acoes_service import AcoesNotificacaoDailyService
+
+    parsed_date: date | None = None
+    if reference_date_iso:
+        parsed_date = date.fromisoformat(reference_date_iso)
+    return AcoesNotificacaoDailyService.run(reference_date=parsed_date)
 
 
 @shared_task(name="apps.core.tasks.preview_then_apply_gcal")

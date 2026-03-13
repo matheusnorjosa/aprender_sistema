@@ -39,13 +39,17 @@ class TestRBACConstants(TestCase):
             "Controle",
             "Gerência",
             "Diretoria",
+            "Comercial",
+            "Relacionamento",
+            "Logística Viagens",
+            "Logística Galpão",
         ]
         for setor in expected_setores:
             self.assertIn(setor, SETOR_GROUPS, f"Setor '{setor}' não encontrado em SETOR_GROUPS")
 
     def test_setor_groups_count(self):
-        """SETOR_GROUPS deve ter exatamente 10 setores."""
-        self.assertEqual(len(SETOR_GROUPS), 10)
+        """SETOR_GROUPS deve ter exatamente 14 setores."""
+        self.assertEqual(len(SETOR_GROUPS), 14)
 
     def test_funcao_groups_contains_expected_funcoes(self):
         """FUNCAO_GROUPS deve conter todas as funções esperadas."""

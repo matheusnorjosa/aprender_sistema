@@ -18,11 +18,16 @@ const ADMIN_USER = {
 };
 
 setup('authenticate', async ({ page }) => {
-  // Obter CSRF token no contexto do browser
-  await page.goto('/api/csrf/');
-  const csrfBody = await page.textContent('body');
-  const csrfData = csrfBody ? JSON.parse(csrfBody) : null;
-  const csrfToken = csrfData?.csrfToken;
+  // Navega para app shell e obtém CSRF via fetch.
+  // Evita navegar diretamente para /api/csrf/ (response com CSP
+  // "upgrade-insecure-requests" pode forçar requests seguintes para https).
+  await page.goto('/');
+  const csrfToken = await page.evaluate(async () => {
+    const resp = await fetch('/api/csrf/', { credentials: 'include' });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data?.csrfToken ?? null;
+  });
   expect(csrfToken).toBeTruthy();
 
   // Login via fetch no browser (cookies ficam no contexto do page)

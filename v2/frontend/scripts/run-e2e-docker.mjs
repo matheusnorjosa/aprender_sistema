@@ -68,6 +68,9 @@ try {
   console.log('[e2e-docker] seeding E2E users...');
   runCompose(['exec', '-T', 'web', 'python', 'manage.py', 'seed_e2e_users']);
 
+  console.log('[e2e-docker] seeding functional-contract data...');
+  runCompose(['exec', '-T', 'web', 'python', 'manage.py', 'seed_frontend_contract_data']);
+
   const playwrightArgString = finalTestArgs.map(shellEscape).join(' ');
   const runnerCmd = [
     'npm ci',

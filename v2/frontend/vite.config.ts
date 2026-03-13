@@ -44,6 +44,9 @@ export default defineConfig({
   },
   server: {
     host: true, // Permite acesso externo (necessário para Docker)
+    // Vite 7 bloqueia hosts desconhecidos por padrão; liberar host do compose
+    // evita resposta "Blocked request" nos testes E2E rodando em container.
+    allowedHosts: ['frontend', 'localhost', '127.0.0.1'],
     port: 5173,
     watch: {
       usePolling: true, // Necessário para HMR funcionar em Docker no Windows

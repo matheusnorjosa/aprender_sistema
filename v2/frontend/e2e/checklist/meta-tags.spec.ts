@@ -9,7 +9,11 @@
  * - 🟢 Theme color
  */
 import { test, expect, Page } from '@playwright/test';
-import './checklist-network-mocks.setup';
+import { mockChecklistAuthBootstrap } from './checklist-network-mocks';
+
+test.beforeEach(async ({ page }) => {
+  await mockChecklistAuthBootstrap(page);
+});
 
 // Helper para extrair meta tags
 async function getMetaContent(page: Page, selector: string): Promise<string | null> {

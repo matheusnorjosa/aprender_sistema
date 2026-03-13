@@ -58,7 +58,7 @@ def municipio(db):
 @pytest.fixture
 def acao_template(db):
     return AcaoTemplate.objects.create(
-        ordem=1,
+        ordem=101,
         nome="Entrega de Materiais",
         descricao_prazo="Até 21 dias úteis após ordem de fornecimento",
         tipo_ancora="EVENTO_EXTERNO",
@@ -83,7 +83,7 @@ def acao_instancia(ciclo, acao_template):
     return AcaoInstancia.objects.create(
         ciclo=ciclo,
         template=acao_template,
-        ordem=1,
+        ordem=101,
         estado="AGUARDANDO_ANCORA",
     )
 
@@ -111,7 +111,7 @@ def test_ciclo_acoes_unique_contexto(projeto, municipio, usuario_factory):
 
 @pytest.mark.django_db
 def test_acao_template_executor_unique_mapping(acao_template):
-    group = Group.objects.create(name="Comercial")
+    group, _ = Group.objects.get_or_create(name="Comercial")
     AcaoTemplateExecutor.objects.create(acao_template=acao_template, group=group)
 
     with pytest.raises(IntegrityError):

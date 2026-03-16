@@ -9,6 +9,13 @@ Type-checked with Pyright (strict mode).
 
 from __future__ import annotations
 
+from apps.core.serializers.acoes_notificacao import (
+    AcaoInstanciaSerializer,
+    CicloAcoesSerializer,
+    ConcluirAcaoSerializer,
+    NotificacaoInternaSerializer,
+    RegistrarAncoraSerializer,
+)
 from apps.core.serializers.agenda import AvailabilityBlockSerializer
 from apps.core.serializers.auditoria import AuditLogSerializer
 from apps.core.serializers.compra import CompraSerializer
@@ -79,6 +86,12 @@ from apps.core.serializers.workflow import (
 )
 
 __all__ = [
+    # Acoes/Notificacoes internas
+    "CicloAcoesSerializer",
+    "AcaoInstanciaSerializer",
+    "RegistrarAncoraSerializer",
+    "ConcluirAcaoSerializer",
+    "NotificacaoInternaSerializer",
     # Usuario
     "CurrentUserSerializer",
     "UserSlimSerializer",

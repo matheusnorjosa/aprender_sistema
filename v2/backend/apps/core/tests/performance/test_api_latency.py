@@ -53,6 +53,7 @@ def measure_latency(
     url: str,
     iterations: int = 50,
     method: str = "get",
+    warmup_iterations: int = 5,
 ) -> dict[str, float]:
     """
     Measure latency for an endpoint over multiple iterations.
@@ -61,6 +62,12 @@ def measure_latency(
     """
     times: list[float] = []
     request_method: Callable = getattr(client, method)
+
+    # Warmup avoids cold-start artifacts (lazy imports/cache/session init)
+    # from skewing p99 in short synthetic runs.
+    for _ in range(warmup_iterations):
+        response = request_method(url)
+        assert response.status_code < 500, f"Server error: {response.status_code}"
 
     for _ in range(iterations):
         start = time.perf_counter()

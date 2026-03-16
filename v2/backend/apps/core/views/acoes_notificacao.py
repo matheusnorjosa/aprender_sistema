@@ -2,10 +2,13 @@
 API endpoints for ciclos/acoes/ancoras/conclusoes/notificacoes (issue #872).
 """
 
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportArgumentType=false
 
 from __future__ import annotations
 
+from typing import Any
+
+from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import QuerySet
@@ -14,6 +17,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from django_filters.rest_framework import DjangoFilterBackend
@@ -28,17 +32,17 @@ from apps.core.serializers import (
 )
 
 
-def _is_dat_or_super(user) -> bool:
-    return bool(getattr(user, "is_superuser", False) or user.groups.filter(name="DAT").exists())
+def _is_dat_or_super(user: AbstractBaseUser | AnonymousUser) -> bool:
+    return bool(getattr(user, "is_superuser", False) or user.groups.filter(name="DAT").exists())  # type: ignore[union-attr]
 
 
-def _has_any_group(user, group_names: set[str]) -> bool:
+def _has_any_group(user: AbstractBaseUser | AnonymousUser, group_names: set[str]) -> bool:
     if getattr(user, "is_superuser", False):
         return True
-    return user.groups.filter(name__in=group_names).exists()
+    return user.groups.filter(name__in=group_names).exists()  # type: ignore[union-attr]
 
 
-def _visible_cycles_queryset_for_user(user) -> QuerySet[CicloAcoes]:
+def _visible_cycles_queryset_for_user(user: AbstractBaseUser | AnonymousUser) -> QuerySet[CicloAcoes]:
     qs = CicloAcoes.objects.select_related("projeto", "municipio").all()
     if _is_dat_or_super(user):
         return qs
@@ -46,7 +50,7 @@ def _visible_cycles_queryset_for_user(user) -> QuerySet[CicloAcoes]:
     return qs.filter(acoes__template__executores__group_id__in=user_group_ids).distinct()
 
 
-def _visible_actions_queryset_for_user(user) -> QuerySet[AcaoInstancia]:
+def _visible_actions_queryset_for_user(user: AbstractBaseUser | AnonymousUser) -> QuerySet[AcaoInstancia]:
     qs = AcaoInstancia.objects.select_related(
         "template",
         "ciclo",
@@ -107,7 +111,7 @@ class CicloAcoesViewSet(viewsets.ModelViewSet):
             )
 
     @action(detail=True, methods=["get"], url_path="acoes")
-    def acoes(self, request, pk=None):
+    def acoes(self, request: Request, pk: Any = None) -> Response:
         ciclo = self.get_object()
         actions_qs = _visible_actions_queryset_for_user(request.user).filter(ciclo_id=ciclo.id).order_by("ordem")
         page = self.paginate_queryset(actions_qs)
@@ -133,7 +137,7 @@ class AcaoInstanciaViewSet(viewsets.ReadOnlyModelViewSet):
         return _visible_actions_queryset_for_user(self.request.user)
 
     @action(detail=True, methods=["post"], url_path="registrar-ancora")
-    def registrar_ancora(self, request, pk=None):
+    def registrar_ancora(self, request: Request, pk: Any = None) -> Response:
         if not _has_any_group(request.user, {"DAT", "Gerente", "Coordenador"}):
             raise PermissionDenied("Sem permissão para registrar âncora.")
 
@@ -169,7 +173,7 @@ class AcaoInstanciaViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(output, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="concluir")
-    def concluir(self, request, pk=None):
+    def concluir(self, request: Request, pk: Any = None) -> Response:
         if not _has_any_group(request.user, {"Gerente", "Coordenador"}):
             raise PermissionDenied("Sem permissão para concluir ação.")
 
@@ -219,7 +223,7 @@ class NotificacaoInternaViewSet(viewsets.ReadOnlyModelViewSet):
         return NotificacaoInterna.objects.filter(destinatario=self.request.user).select_related("acao_instancia")
 
     @action(detail=True, methods=["post"], url_path="marcar-lida")
-    def marcar_lida(self, request, pk=None):
+    def marcar_lida(self, request: Request, pk: Any = None) -> Response:
         notificacao = self.get_object()
         notificacao.marcar_lida()
         return Response(NotificacaoInternaSerializer(notificacao).data, status=status.HTTP_200_OK)

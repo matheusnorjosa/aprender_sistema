@@ -160,16 +160,29 @@ class PrazoEngineService:
         source_action: "AcaoInstancia",
         *,
         reference_date: date | None = None,
+        visited: set[int] | None = None,
     ) -> int:
         from apps.core.models import AcaoInstancia
 
-        dependents = AcaoInstancia.objects.select_related("template", "ciclo").filter(
-            ciclo_id=source_action.ciclo_id,
-            template__ref_acao_template_id=source_action.template_id,
+        visited = visited or set()
+        visited.add(source_action.pk)
+
+        dependents = (
+            AcaoInstancia.objects.select_related("template", "ciclo")
+            .filter(
+                ciclo_id=source_action.ciclo_id,
+                template__ref_acao_template_id=source_action.template_id,
+            )
+            .order_by("ordem")
         )
         updated = 0
         with transaction.atomic():
             for action in dependents:
+                if action.pk in visited:
+                    continue
                 cls.recalculate_action(action, reference_date=reference_date, save=True)
                 updated += 1
+                updated += cls.recalculate_dependents(
+                    action, reference_date=reference_date, visited=visited
+                )
         return updated

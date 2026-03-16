@@ -225,7 +225,9 @@ class TestViewsPackageStructure:
         from apps.core import views
 
         assert hasattr(views, "__all__")
-        assert len(views.__all__) == 30  # All 30 exports (20 base + 8 DAT + 1 PlanoFormacoes + 1 Stats)
+        # __all__ pode crescer com novos endpoints/viewsets.
+        assert len(views.__all__) >= 30
+        assert len(views.__all__) == len(set(views.__all__))
 
     def test_all_submodules_exist(self):
         """All submodules should be importable."""

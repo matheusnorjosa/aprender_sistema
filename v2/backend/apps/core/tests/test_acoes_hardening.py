@@ -1,11 +1,18 @@
 """Tests for acoes/notificacao hardening fixes."""
 
-from datetime import date
+from __future__ import annotations
 
-import pytest
+from datetime import date
+from typing import TYPE_CHECKING
+
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
+
+import pytest
+
+if TYPE_CHECKING:
+    from apps.core.models import Usuario
 
 from apps.core.models.acoes_notificacao import (
     AcaoInstancia,
@@ -92,9 +99,7 @@ def usuario(db):  # type: ignore[no-untyped-def]
 
 @pytest.mark.django_db()
 class TestExecutorGroupProtect:
-    def test_delete_group_with_executor_raises_protected_error(
-        self, group: Group, template_a: AcaoTemplate
-    ) -> None:
+    def test_delete_group_with_executor_raises_protected_error(self, group: Group, template_a: AcaoTemplate) -> None:
         AcaoTemplateExecutor.objects.create(acao_template=template_a, group=group)
         with pytest.raises(ProtectedError):
             group.delete()
@@ -127,16 +132,10 @@ class TestRecalculateDependentsCascade:
             data_realizacao=ref_date,
             observacao_conclusao="Concluida para teste cascade",
         )
-        action_b = AcaoInstancia.objects.create(
-            ciclo=ciclo, template=template_b, ordem=2
-        )
-        action_c = AcaoInstancia.objects.create(
-            ciclo=ciclo, template=template_c, ordem=3
-        )
+        action_b = AcaoInstancia.objects.create(ciclo=ciclo, template=template_b, ordem=2)
+        action_c = AcaoInstancia.objects.create(ciclo=ciclo, template=template_c, ordem=3)
 
-        updated = PrazoEngineService.recalculate_dependents(
-            action_a, reference_date=ref_date
-        )
+        updated = PrazoEngineService.recalculate_dependents(action_a, reference_date=ref_date)
 
         action_b.refresh_from_db()
         action_c.refresh_from_db()
@@ -154,12 +153,8 @@ class TestRecalculateDependentsCascade:
         template_b: AcaoTemplate,
     ) -> None:
         ref_date = date(2026, 3, 16)
-        action_a = AcaoInstancia.objects.create(
-            ciclo=ciclo, template=template_a, ordem=1
-        )
-        AcaoInstancia.objects.create(
-            ciclo=ciclo, template=template_b, ordem=2
-        )
+        action_a = AcaoInstancia.objects.create(ciclo=ciclo, template=template_a, ordem=1)
+        AcaoInstancia.objects.create(ciclo=ciclo, template=template_b, ordem=2)
 
         # Should not raise RecursionError
         PrazoEngineService.recalculate_dependents(action_a, reference_date=ref_date)
@@ -174,9 +169,7 @@ class TestRecalculateDependentsCascade:
         """Dependents are processed in ordem order."""
         ref_date = date(2026, 3, 16)
         # Create C before B to test ordering
-        action_a = AcaoInstancia.objects.create(
-            ciclo=ciclo, template=template_a, ordem=1
-        )
+        action_a = AcaoInstancia.objects.create(ciclo=ciclo, template=template_a, ordem=1)
         AcaoInstancia.objects.create(ciclo=ciclo, template=template_c, ordem=3)
         AcaoInstancia.objects.create(ciclo=ciclo, template=template_b, ordem=2)
 
@@ -194,7 +187,7 @@ class TestConcluirAtomicity:
         self,
         ciclo: CicloAcoes,
         template_a: AcaoTemplate,
-        usuario,  # type: ignore[no-untyped-def]
+        usuario: Usuario,
     ) -> None:
         action = AcaoInstancia.objects.create(
             ciclo=ciclo,
@@ -225,7 +218,7 @@ class TestConcluirAtomicity:
         self,
         ciclo: CicloAcoes,
         template_a: AcaoTemplate,
-        usuario,  # type: ignore[no-untyped-def]
+        usuario: Usuario,
     ) -> None:
         action = AcaoInstancia.objects.create(
             ciclo=ciclo,

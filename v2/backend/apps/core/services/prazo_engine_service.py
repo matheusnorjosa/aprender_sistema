@@ -182,7 +182,5 @@ class PrazoEngineService:
                     continue
                 cls.recalculate_action(action, reference_date=reference_date, save=True)
                 updated += 1
-                updated += cls.recalculate_dependents(
-                    action, reference_date=reference_date, visited=visited
-                )
+                updated += cls.recalculate_dependents(action, reference_date=reference_date, visited=visited)
         return updated

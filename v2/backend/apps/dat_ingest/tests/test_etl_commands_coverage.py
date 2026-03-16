@@ -349,7 +349,10 @@ class TestBackfillUserGroups:
 
     def test_error_when_groups_missing(self, usuario_formador):
         """Test: Shows error when Formador/Coordenador groups don't exist."""
-        # Ensure groups don't exist
+        from apps.core.models.acoes_notificacao import AcaoTemplateExecutor
+
+        # Ensure groups don't exist — remove PROTECT references first
+        AcaoTemplateExecutor.objects.filter(group__name__in=["Formador", "Coordenador"]).delete()
         Group.objects.filter(name__in=["Formador", "Coordenador"]).delete()
 
         out = StringIO()

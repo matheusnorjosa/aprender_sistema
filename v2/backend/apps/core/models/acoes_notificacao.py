@@ -150,7 +150,7 @@ class AcaoTemplateExecutor(models.Model):
     )
     group = models.ForeignKey(  # type: ignore[misc]
         Group,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="acoes_template",
     )
     ativo = models.BooleanField(default=True)
@@ -353,15 +353,16 @@ class AcaoInstancia(models.Model):
                 ]
             )
 
-            if RegistroConclusaoAcao.objects.filter(acao_instancia=self).exists():
-                raise ValidationError("Registro de conclusao ja existe para esta acao.")
-
-            registro = RegistroConclusaoAcao.objects.create(
+            registro, created = RegistroConclusaoAcao.objects.get_or_create(
                 acao_instancia=self,
-                data_realizacao=data_realizacao,
-                observacao=obs,
-                registrado_por=usuario,
+                defaults={
+                    "data_realizacao": data_realizacao,
+                    "observacao": obs,
+                    "registrado_por": usuario,
+                },
             )
+            if not created:
+                raise ValidationError("Registro de conclusao ja existe para esta acao.")
             PrazoEngineService.recalculate_dependents(self)
             return registro
 

@@ -12,7 +12,7 @@ Comandos:
 - Beat: celery -A config beat -l info
 """
 
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportCallIssue=false, reportUntypedFunctionDecorator=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportUnknownArgumentType=false, reportArgumentType=false
 
 from __future__ import annotations
 
@@ -30,22 +30,32 @@ app = Celery("config")
 # Load config from Django settings (namespace CELERY_*)
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
-# MP5: Automated backup schedule
-app.conf.beat_schedule = {
-    # Daily full backup at 2am (America/Fortaleza)
-    "daily-database-backup": {
-        "task": "backup.perform_database_backup",
-        "schedule": crontab(hour=2, minute=0),  # 2:00 AM daily
-        "args": ("full",),
-        "options": {"expires": 3600},  # Task expires after 1h if not run
-    },
-    # Weekly backup health check (Sundays at 3am)
-    "weekly-backup-health-check": {
-        "task": "backup.verify_backup_health",
-        "schedule": crontab(hour=3, minute=0, day_of_week=0),  # Sunday 3:00 AM
-        "options": {"expires": 1800},  # Task expires after 30min if not run
-    },
-}
+# Merge local schedules with settings.py schedules (no override).
+existing_schedule = dict(app.conf.get("CELERY_BEAT_SCHEDULE", {}) or {})
+existing_schedule.update(
+    {
+        # MP5: Daily full backup at 2am (America/Fortaleza)
+        "daily-database-backup": {
+            "task": "backup.perform_database_backup",
+            "schedule": crontab(hour=2, minute=0),
+            "args": ("full",),
+            "options": {"expires": 3600},
+        },
+        # MP5: Weekly backup health check (Sundays at 3am)
+        "weekly-backup-health-check": {
+            "task": "backup.verify_backup_health",
+            "schedule": crontab(hour=3, minute=0, day_of_week=0),
+            "options": {"expires": 1800},
+        },
+        # #871: Daily notifications/escalation processing at 08:00 (America/Fortaleza)
+        "acoes-notificacoes-diarias": {
+            "task": "apps.core.tasks.processar_notificacoes_acoes_diarias",
+            "schedule": crontab(hour=8, minute=0),
+            "options": {"expires": 3600},
+        },
+    }
+)
+app.conf.update(CELERY_BEAT_SCHEDULE=existing_schedule)
 
 # Auto-discover tasks in all installed apps (ex: apps.core.tasks)
 app.autodiscover_tasks()

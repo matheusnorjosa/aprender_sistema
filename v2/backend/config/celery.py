@@ -12,7 +12,7 @@ Comandos:
 - Beat: celery -A config beat -l info
 """
 
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportCallIssue=false, reportUntypedFunctionDecorator=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportUnknownArgumentType=false, reportArgumentType=false
 
 from __future__ import annotations
 

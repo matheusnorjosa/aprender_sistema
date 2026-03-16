@@ -233,5 +233,5 @@ class TestConcluirAtomicity:
             usuario=usuario,
         )
         assert registro is not None
-        assert registro.acao_instancia == action
+        assert registro.acao_instancia == action  # pyright: ignore[reportUnknownMemberType]
         assert registro.registrado_por == usuario

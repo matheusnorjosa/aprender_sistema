@@ -18,7 +18,9 @@ from .views import ProdutoViewSet  # Issue #146
 from .views import ProjetoGeralViewSet  # DAT Registros module
 from .views import UsuarioAdminViewSet  # Reativado (Fase 1 Iteração 2, GAP-001)
 from .views import (  # DAT Module ViewSets; Plano Formacoes (novo modelo estruturado)
+    AcaoInstanciaViewSet,
     AuditLogViewSet,
+    CicloAcoesViewSet,
     CompraViewSet,
     DATAcaoViewSet,
     DATAreaViewSet,
@@ -27,6 +29,7 @@ from .views import (  # DAT Module ViewSets; Plano Formacoes (novo modelo estrut
     DATCoordenadorViewSet,
     DATFormacaoViewSet,
     MunicipioViewSet,
+    NotificacaoInternaViewSet,
     PlanoFormacoesViewSet,
     ProjetoViewSet,
 )
@@ -134,6 +137,10 @@ router.register(r"dat/cadastros", DATCadastroViewSet, basename="dat-cadastro")
 router.register(r"dat/formacoes", DATFormacaoViewSet, basename="dat-formacao")
 # Plano Formacoes (novo modelo estruturado)
 router.register(r"dat/plano-formacoes", PlanoFormacoesViewSet, basename="plano-formacoes")
+# Acoes/Notificacoes internas (Issue #872)
+router.register(r"ciclos-acoes", CicloAcoesViewSet, basename="ciclo-acoes")
+router.register(r"acoes-instancia", AcaoInstanciaViewSet, basename="acao-instancia")
+router.register(r"notificacoes-internas", NotificacaoInternaViewSet, basename="notificacao-interna")
 
 urlpatterns = [
     path("", api_root, name="api-root"),

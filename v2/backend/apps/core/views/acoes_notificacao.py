@@ -1,0 +1,229 @@
+"""
+API endpoints for ciclos/acoes/ancoras/conclusoes/notificacoes (issue #872).
+"""
+
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportArgumentType=false
+
+from __future__ import annotations
+
+from typing import Any
+
+from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
+from django.db.models import QuerySet
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.response import Response
+
+from django_filters.rest_framework import DjangoFilterBackend
+
+from apps.core.models import AcaoInstancia, AcaoTemplate, AuditLog, CicloAcoes, NotificacaoInterna
+from apps.core.serializers import (
+    AcaoInstanciaSerializer,
+    CicloAcoesSerializer,
+    ConcluirAcaoSerializer,
+    NotificacaoInternaSerializer,
+    RegistrarAncoraSerializer,
+)
+
+
+def _is_dat_or_super(user: AbstractBaseUser | AnonymousUser) -> bool:
+    return bool(getattr(user, "is_superuser", False) or user.groups.filter(name="DAT").exists())  # type: ignore[union-attr]
+
+
+def _has_any_group(user: AbstractBaseUser | AnonymousUser, group_names: set[str]) -> bool:
+    if getattr(user, "is_superuser", False):
+        return True
+    return user.groups.filter(name__in=group_names).exists()  # type: ignore[union-attr]
+
+
+def _visible_cycles_queryset_for_user(user: AbstractBaseUser | AnonymousUser) -> QuerySet[CicloAcoes]:
+    qs = CicloAcoes.objects.select_related("projeto", "municipio").all()
+    if _is_dat_or_super(user):
+        return qs
+    user_group_ids = user.groups.values_list("id", flat=True)
+    return qs.filter(acoes__template__executores__group_id__in=user_group_ids).distinct()
+
+
+def _visible_actions_queryset_for_user(user: AbstractBaseUser | AnonymousUser) -> QuerySet[AcaoInstancia]:
+    qs = AcaoInstancia.objects.select_related(
+        "template",
+        "ciclo",
+        "ciclo__projeto",
+        "ciclo__municipio",
+    ).all()
+    if _is_dat_or_super(user):
+        return qs
+    user_group_ids = user.groups.values_list("id", flat=True)
+    return qs.filter(template__executores__group_id__in=user_group_ids).distinct()
+
+
+class CicloAcoesViewSet(viewsets.ModelViewSet):
+    """
+    CRUD de ciclos + listagem de acoes por ciclo.
+    """
+
+    serializer_class = CicloAcoesSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["projeto", "municipio", "semestre", "ano", "status"]
+    search_fields = ["projeto__nome", "municipio__nome"]
+    ordering_fields = ["ano", "semestre", "created_at", "id"]
+    ordering = ["-ano", "semestre", "id"]
+
+    def get_queryset(self) -> QuerySet[CicloAcoes]:
+        return _visible_cycles_queryset_for_user(self.request.user)
+
+    def perform_create(self, serializer: CicloAcoesSerializer) -> None:
+        if not _has_any_group(self.request.user, {"DAT", "Gerente", "Coordenador"}):
+            raise PermissionDenied("Sem permissão para criar ciclo de ações.")
+
+        with transaction.atomic():
+            ciclo = serializer.save(created_by=self.request.user)
+            templates = list(AcaoTemplate.objects.filter(ativo=True).order_by("ordem"))
+            instances = [
+                AcaoInstancia(
+                    ciclo=ciclo,
+                    template=template,
+                    ordem=template.ordem,
+                )
+                for template in templates
+            ]
+            AcaoInstancia.objects.bulk_create(instances)
+
+            AuditLog.objects.create(
+                usuario=self.request.user,
+                action="CICLO_ACOES_CREATE",
+                model_name="CicloAcoes",
+                details={
+                    "ciclo_id": ciclo.id,
+                    "projeto_id": ciclo.projeto_id,
+                    "municipio_id": ciclo.municipio_id,
+                    "semestre": ciclo.semestre,
+                    "ano": ciclo.ano,
+                    "acoes_criadas": len(instances),
+                },
+            )
+
+    @action(detail=True, methods=["get"], url_path="acoes")
+    def acoes(self, request: Request, pk: Any = None) -> Response:
+        ciclo = self.get_object()
+        actions_qs = _visible_actions_queryset_for_user(request.user).filter(ciclo_id=ciclo.id).order_by("ordem")
+        page = self.paginate_queryset(actions_qs)
+        serializer = AcaoInstanciaSerializer(page if page is not None else actions_qs, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
+
+class AcaoInstanciaViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Listagem de acoes e comandos operacionais (âncora/conclusão).
+    """
+
+    serializer_class = AcaoInstanciaSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ["ciclo", "estado", "ordem"]
+    ordering_fields = ["ordem", "estado", "data_vencimento", "created_at"]
+    ordering = ["ordem"]
+
+    def get_queryset(self) -> QuerySet[AcaoInstancia]:
+        return _visible_actions_queryset_for_user(self.request.user)
+
+    @action(detail=True, methods=["post"], url_path="registrar-ancora")
+    def registrar_ancora(self, request: Request, pk: Any = None) -> Response:
+        if not _has_any_group(request.user, {"DAT", "Gerente", "Coordenador"}):
+            raise PermissionDenied("Sem permissão para registrar âncora.")
+
+        serializer = RegistrarAncoraSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            action_instance = AcaoInstancia.objects.select_for_update().get(pk=self.get_object().pk)
+
+            try:
+                registro = action_instance.registrar_ancora(
+                    data_ancora=serializer.validated_data["data_ancora"],
+                    usuario=request.user,
+                    observacao=serializer.validated_data.get("observacao", ""),
+                )
+            except DjangoValidationError as exc:
+                raise ValidationError(exc.message_dict if hasattr(exc, "message_dict") else exc.messages) from exc
+
+            AuditLog.objects.create(
+                usuario=request.user,
+                action="ACAO_REGISTRAR_ANCORA",
+                model_name="AcaoInstancia",
+                details={
+                    "acao_instancia_id": action_instance.id,
+                    "ciclo_id": action_instance.ciclo_id,
+                    "ordem": action_instance.ordem,
+                    "registro_ancora_id": registro.id,
+                    "data_ancora": str(registro.data_ancora),
+                },
+            )
+
+        output = AcaoInstanciaSerializer(action_instance).data
+        return Response(output, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="concluir")
+    def concluir(self, request: Request, pk: Any = None) -> Response:
+        if not _has_any_group(request.user, {"Gerente", "Coordenador"}):
+            raise PermissionDenied("Sem permissão para concluir ação.")
+
+        action_instance = self.get_object()
+        serializer = ConcluirAcaoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            registro = action_instance.concluir(
+                data_realizacao=serializer.validated_data["data_realizacao"],
+                observacao=serializer.validated_data["observacao"],
+                usuario=request.user,
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.message_dict if hasattr(exc, "message_dict") else exc.messages) from exc
+
+        AuditLog.objects.create(
+            usuario=request.user,
+            action="ACAO_CONCLUIR",
+            model_name="AcaoInstancia",
+            details={
+                "acao_instancia_id": action_instance.id,
+                "ciclo_id": action_instance.ciclo_id,
+                "ordem": action_instance.ordem,
+                "registro_conclusao_id": registro.id,
+                "data_realizacao": str(registro.data_realizacao),
+            },
+        )
+
+        output = AcaoInstanciaSerializer(action_instance).data
+        return Response(output, status=status.HTTP_200_OK)
+
+
+class NotificacaoInternaViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Inbox de notificacoes in-app do usuario logado.
+    """
+
+    serializer_class = NotificacaoInternaSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ["lida", "tipo", "nivel", "fase_disparo", "referencia_data"]
+    ordering_fields = ["created_at", "referencia_data", "prioridade"]
+    ordering = ["-created_at"]
+
+    def get_queryset(self) -> QuerySet[NotificacaoInterna]:
+        return NotificacaoInterna.objects.filter(destinatario=self.request.user).select_related("acao_instancia")
+
+    @action(detail=True, methods=["post"], url_path="marcar-lida")
+    def marcar_lida(self, request: Request, pk: Any = None) -> Response:
+        notificacao = self.get_object()
+        notificacao.marcar_lida()
+        return Response(NotificacaoInternaSerializer(notificacao).data, status=status.HTTP_200_OK)

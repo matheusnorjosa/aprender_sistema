@@ -126,7 +126,10 @@ class AcaoTemplate(models.Model):
                 name="acao_template_ancora_acao_requer_ref",
             ),
             models.CheckConstraint(
-                check=(models.Q(tipo_ancora=TipoAncoraChoices.ACAO_ANTERIOR) | (~models.Q(ref_evento_externo=""))),
+                check=(
+                    models.Q(tipo_ancora__in=[TipoAncoraChoices.ACAO_ANTERIOR, TipoAncoraChoices.MARCO_CALENDARIO])
+                    | ~models.Q(ref_evento_externo="")
+                ),
                 name="acao_template_ancora_evento_requer_ref",
             ),
         ]
@@ -470,7 +473,7 @@ class NotificacaoInterna(models.Model):
     )
     acao_instancia = models.ForeignKey(  # type: ignore[misc]
         "core.AcaoInstancia",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="notificacoes",

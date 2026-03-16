@@ -8,6 +8,7 @@ Re-exports all views for backwards compatibility.
 
 from __future__ import annotations
 
+from apps.core.views.acoes_notificacao import AcaoInstanciaViewSet, CicloAcoesViewSet, NotificacaoInternaViewSet
 from apps.core.views.admin import (
     AuditLogViewSet,
     CompraViewSet,
@@ -42,6 +43,10 @@ from apps.core.views.utils import _get_client_ip, api_root
 from apps.core.views_basic import CurrentUserView
 
 __all__ = [
+    # Acoes/Notificacoes internas
+    "CicloAcoesViewSet",
+    "AcaoInstanciaViewSet",
+    "NotificacaoInternaViewSet",
     # Utils
     "_get_client_ip",
     "api_root",

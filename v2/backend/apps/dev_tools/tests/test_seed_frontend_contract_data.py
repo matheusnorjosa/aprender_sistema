@@ -27,6 +27,9 @@ def clean_contract_seed_state(db):
     Compra.objects.filter(external_hash=SEED_EXTERNAL_HASH).delete()
     Municipio.objects.filter(nome="Matrizopolis", uf="BA").delete()
     Usuario.objects.filter(username__in=[SEED_DAT_USERNAME, SEED_CONTROLE_USERNAME]).delete()
+    from apps.core.models.acoes_notificacao import AcaoTemplateExecutor
+
+    AcaoTemplateExecutor.objects.filter(group__name="DAT").delete()
     Group.objects.filter(name="DAT").delete()
     yield
     DATCompra.objects.filter(descricao_produto=SEED_DAT_DESCRICAO, ano_uso=2026).delete()

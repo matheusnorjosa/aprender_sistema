@@ -27,7 +27,11 @@ def clean_seed_e2e_state(db):
     Usuario.objects.filter(username__in=SEED_USERNAMES).delete()
     Projeto.objects.filter(nome="TESTE E2E").delete()
     Municipio.objects.filter(nome="Salvador", uf="BA").delete()
-    Group.objects.filter(name__in=["Coordenador", "Superintendência", "Controle", "Formador", "Gerente"]).delete()
+    from apps.core.models.acoes_notificacao import AcaoTemplateExecutor
+
+    groups_to_clean = ["Coordenador", "Superintendência", "Controle", "Formador", "Gerente"]
+    AcaoTemplateExecutor.objects.filter(group__name__in=groups_to_clean).delete()
+    Group.objects.filter(name__in=groups_to_clean).delete()
     yield
     Usuario.objects.filter(username__in=SEED_USERNAMES).delete()
     Projeto.objects.filter(nome="TESTE E2E").delete()

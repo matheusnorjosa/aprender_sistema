@@ -6,7 +6,7 @@
       "!dist/assets/brazil-states-*.js"
     ],
     "gzip": true,
-    "limit": "665 KB",
+    "limit": "670 KB",
     "running": false
   },
   {

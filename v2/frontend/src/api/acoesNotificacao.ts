@@ -53,3 +53,11 @@ export async function listNotificacoesInternas(params?: Record<string, unknown>)
 export async function marcarNotificacaoLida(notificacaoId: number): Promise<NotificacaoInterna> {
   return apiRequest(() => api.post(`/notificacoes-internas/${notificacaoId}/marcar-lida/`));
 }
+
+export async function getNotificacoesNaoLidasCount(): Promise<{ count: number }> {
+  return apiRequest(() => api.get('/notificacoes-internas/unread-count/'));
+}
+
+export async function marcarTodasNotificacoesLidas(): Promise<{ updated: number }> {
+  return apiRequest(() => api.post('/notificacoes-internas/marcar-todas-lidas/'));
+}

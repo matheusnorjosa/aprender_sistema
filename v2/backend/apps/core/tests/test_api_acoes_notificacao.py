@@ -6,7 +6,7 @@ API tests for acoes/notificacoes endpoints (issue #872).
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
@@ -254,3 +254,133 @@ def test_notificacao_inbox_list_and_mark_read(api_client, user_factory, ciclo_co
     assert mark_response.status_code == 200
     own_notif.refresh_from_db()
     assert own_notif.lida is True
+
+
+def _create_notif(*, destinatario, action, fase="D-3", lida=False):
+    """Helper to create NotificacaoInterna with minimal boilerplate."""
+    notif = NotificacaoInterna.objects.create(
+        destinatario=destinatario,
+        acao_instancia=action,
+        titulo=f"Notif {fase}",
+        mensagem="msg",
+        tipo="LEMBRETE",
+        nivel="RESPONSAVEL",
+        prioridade="MEDIA",
+        fase_disparo=fase,
+        referencia_data=date(2026, 6, 1),
+    )
+    if lida:
+        notif.marcar_lida()
+    return notif
+
+
+@pytest.mark.django_db
+def test_unread_count(api_client, user_factory, ciclo_com_acao):
+    action = ciclo_com_acao["acao"]
+    user = user_factory(prefix="uc", groups=["Comercial", "Coordenador"])
+
+    _create_notif(destinatario=user, action=action, fase="D-7")
+    _create_notif(destinatario=user, action=action, fase="D-3")
+    _create_notif(destinatario=user, action=action, fase="D-1", lida=True)
+
+    api_client.force_authenticate(user=user)
+    response = api_client.get("/api/notificacoes-internas/unread-count/")
+    assert response.status_code == 200
+    assert response.data["count"] == 2
+
+
+@pytest.mark.django_db
+def test_unread_count_zero(api_client, user_factory, ciclo_com_acao):
+    action = ciclo_com_acao["acao"]
+    user = user_factory(prefix="ucz", groups=["Comercial", "Coordenador"])
+
+    _create_notif(destinatario=user, action=action, fase="D-7", lida=True)
+
+    api_client.force_authenticate(user=user)
+    response = api_client.get("/api/notificacoes-internas/unread-count/")
+    assert response.status_code == 200
+    assert response.data["count"] == 0
+
+
+@pytest.mark.django_db
+def test_marcar_todas_lidas(api_client, user_factory, ciclo_com_acao):
+    action = ciclo_com_acao["acao"]
+    user = user_factory(prefix="mtl", groups=["Comercial", "Coordenador"])
+
+    n1 = _create_notif(destinatario=user, action=action, fase="D-7")
+    n2 = _create_notif(destinatario=user, action=action, fase="D-3")
+    n3 = _create_notif(destinatario=user, action=action, fase="D-1")
+
+    api_client.force_authenticate(user=user)
+    response = api_client.post("/api/notificacoes-internas/marcar-todas-lidas/")
+    assert response.status_code == 200
+    assert response.data["updated"] == 3
+
+    for notif in [n1, n2, n3]:
+        notif.refresh_from_db()
+        assert notif.lida is True
+        assert notif.lida_em is not None
+        assert notif.updated_at is not None
+
+
+@pytest.mark.django_db
+def test_unread_count_escopo_usuario(api_client, user_factory, ciclo_com_acao):
+    action = ciclo_com_acao["acao"]
+    user_a = user_factory(prefix="esc_a", groups=["Comercial", "Coordenador"])
+    user_b = user_factory(prefix="esc_b", groups=["Comercial", "Gerente"])
+
+    _create_notif(destinatario=user_a, action=action, fase="D-7")
+    _create_notif(destinatario=user_a, action=action, fase="D-3")
+    notif_b = _create_notif(destinatario=user_b, action=action, fase="D-1")
+
+    # user_a vê apenas suas 2
+    api_client.force_authenticate(user=user_a)
+    response = api_client.get("/api/notificacoes-internas/unread-count/")
+    assert response.data["count"] == 2
+
+    # user_a marca todas — não deve afetar user_b
+    api_client.post("/api/notificacoes-internas/marcar-todas-lidas/")
+
+    api_client.force_authenticate(user=user_b)
+    response = api_client.get("/api/notificacoes-internas/unread-count/")
+    assert response.data["count"] == 1
+
+    notif_b.refresh_from_db()
+    assert notif_b.lida is False
+
+
+@pytest.mark.django_db
+def test_marcar_todas_lidas_idempotente(api_client, user_factory, ciclo_com_acao):
+    action = ciclo_com_acao["acao"]
+    user = user_factory(prefix="idem", groups=["Comercial", "Coordenador"])
+
+    _create_notif(destinatario=user, action=action, fase="D-7")
+
+    api_client.force_authenticate(user=user)
+    r1 = api_client.post("/api/notificacoes-internas/marcar-todas-lidas/")
+    assert r1.data["updated"] == 1
+
+    r2 = api_client.post("/api/notificacoes-internas/marcar-todas-lidas/")
+    assert r2.data["updated"] == 0
+
+
+@pytest.mark.django_db
+def test_marcar_todas_lidas_nao_altera_ja_lidas(api_client, user_factory, ciclo_com_acao):
+    action = ciclo_com_acao["acao"]
+    user = user_factory(prefix="pres", groups=["Comercial", "Coordenador"])
+
+    # Criar notificação já lida com timestamp antigo
+    old_notif = _create_notif(destinatario=user, action=action, fase="D-7", lida=True)
+    old_lida_em = old_notif.lida_em
+    old_updated_at = old_notif.updated_at
+
+    # Criar uma não-lida
+    _create_notif(destinatario=user, action=action, fase="D-3")
+
+    api_client.force_authenticate(user=user)
+    response = api_client.post("/api/notificacoes-internas/marcar-todas-lidas/")
+    assert response.data["updated"] == 1  # Só a não-lida
+
+    old_notif.refresh_from_db()
+    assert old_notif.lida_em == old_lida_em
+    assert old_notif.updated_at == old_updated_at

@@ -34,7 +34,7 @@ DEBUG = os.getenv("DEBUG", "0") == "1"
 # Detect if running under pytest (for disabling debug toolbar during tests)
 TESTING = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
 
-print("AS v2 inicializado; legado arquivado e bloqueado")
+print("Aprender Sistema Inicializado")
 # ================================================================
 # SECRET KEY
 # ================================================================

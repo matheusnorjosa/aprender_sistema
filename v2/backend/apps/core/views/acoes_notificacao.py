@@ -12,6 +12,7 @@ from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import QuerySet
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -227,3 +228,14 @@ class NotificacaoInternaViewSet(viewsets.ReadOnlyModelViewSet):
         notificacao = self.get_object()
         notificacao.marcar_lida()
         return Response(NotificacaoInternaSerializer(notificacao).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="unread-count")
+    def unread_count(self, request: Request) -> Response:
+        count = self.get_queryset().filter(lida=False).count()
+        return Response({"count": count}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="marcar-todas-lidas")
+    def marcar_todas_lidas(self, request: Request) -> Response:
+        now = timezone.now()
+        updated = self.get_queryset().filter(lida=False).update(lida=True, lida_em=now, updated_at=now)
+        return Response({"updated": updated}, status=status.HTTP_200_OK)

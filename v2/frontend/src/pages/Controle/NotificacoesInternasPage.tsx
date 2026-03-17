@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, Card, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
-import { listNotificacoesInternas, marcarNotificacaoLida } from '../../api/acoesNotificacao';
+import { listNotificacoesInternas, marcarNotificacaoLida, marcarTodasNotificacoesLidas } from '../../api/acoesNotificacao';
 import type { NotificacaoInterna } from '../../types/acoesNotificacao';
 
 const { Title, Text } = Typography;
@@ -11,6 +11,7 @@ export default function NotificacoesInternasPage(): JSX.Element {
   const [notifications, setNotifications] = useState<NotificacaoInterna[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [markingId, setMarkingId] = useState<number | null>(null);
+  const [markingAll, setMarkingAll] = useState<boolean>(false);
 
   const loadNotifications = async () => {
     setLoading(true);
@@ -33,10 +34,24 @@ export default function NotificacoesInternasPage(): JSX.Element {
     try {
       await marcarNotificacaoLida(notificationId);
       await loadNotifications();
+      window.dispatchEvent(new Event('notificacoes:refresh'));
     } catch (error) {
       message.error(`Erro ao marcar notificação como lida: ${(error as Error).message}`);
     } finally {
       setMarkingId(null);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    setMarkingAll(true);
+    try {
+      await marcarTodasNotificacoesLidas();
+      await loadNotifications();
+      window.dispatchEvent(new Event('notificacoes:refresh'));
+    } catch (error) {
+      message.error(`Erro ao marcar todas como lidas: ${(error as Error).message}`);
+    } finally {
+      setMarkingAll(false);
     }
   };
 
@@ -111,6 +126,16 @@ export default function NotificacoesInternasPage(): JSX.Element {
           <Text style={{ marginLeft: 16 }} type="warning">
             Não lidas: {unreadCount}
           </Text>
+          {unreadCount > 0 && (
+            <Button
+              size="small"
+              style={{ marginLeft: 16 }}
+              loading={markingAll}
+              onClick={() => void handleMarkAllRead()}
+            >
+              Marcar todas como lidas
+            </Button>
+          )}
         </Card>
 
         <Card>

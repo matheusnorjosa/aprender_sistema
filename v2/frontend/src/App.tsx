@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useRef, useCallback, lazy, Suspense, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge } from 'antd';
+import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge, Popover, List, Tag, Empty } from 'antd';
 import logger from './utils/logger';
 import {
   CalendarOutlined,
@@ -30,7 +30,8 @@ import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
 import { logout as apiLogout } from './api/auth';
 import { getAlertsSummary } from './api/gcal';
-import { getNotificacoesNaoLidasCount } from './api/acoesNotificacao';
+import { getNotificacoesNaoLidasCount, listNotificacoesInternas, marcarNotificacaoLida } from './api/acoesNotificacao';
+import type { NotificacaoInterna } from './types/acoesNotificacao';
 import toast, { Toaster } from 'react-hot-toast';
 import { LAYOUT, TIMING } from './constants';
 import { preloadSearchData } from './services/preloadSearchData';
@@ -275,10 +276,13 @@ function AppContent(): JSX.Element {
   const [lastErrorsCount, setLastErrorsCount] = useState<number>(0);
   const [cooldownUntil, setCooldownUntil] = useState<number>(0);
 
-  // Notification badge (unread count)
+  // Notification badge (unread count) + popover
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
   const [lastNotifCount, setLastNotifCount] = useState<number>(-1);
   const [notifCooldownUntil, setNotifCooldownUntil] = useState<number>(0);
+  const [popoverOpen, setPopoverOpen] = useState<boolean>(false);
+  const [popoverNotifs, setPopoverNotifs] = useState<NotificacaoInterna[]>([]);
+  const [popoverLoading, setPopoverLoading] = useState<boolean>(false);
 
   // Issue #255: Ref para evitar memory leak (atualizações após unmount)
   const isMountedRef = useRef<boolean>(true);
@@ -541,6 +545,32 @@ function AppContent(): JSX.Element {
       window.removeEventListener('notificacoes:refresh', handleRefreshEvent);
     };
   }, [user, canAcoesInternas, lastNotifCount, notifCooldownUntil]);
+
+  // Popover: fetch recent notifications when opened
+  const handlePopoverOpenChange = useCallback(async (open: boolean) => {
+    setPopoverOpen(open);
+    if (open) {
+      setPopoverLoading(true);
+      try {
+        const data = await listNotificacoesInternas({ page_size: 8, ordering: '-created_at' });
+        if (isMountedRef.current) setPopoverNotifs(data.results);
+      } catch {
+        // silently fail — badge still works
+      } finally {
+        if (isMountedRef.current) setPopoverLoading(false);
+      }
+    }
+  }, []);
+
+  const handlePopoverMarkRead = useCallback(async (notifId: number) => {
+    try {
+      await marcarNotificacaoLida(notifId);
+      setPopoverNotifs((prev) => prev.map((n) => (n.id === notifId ? { ...n, lida: true } : n)));
+      window.dispatchEvent(new Event('notificacoes:refresh'));
+    } catch {
+      message.error('Erro ao marcar notificação como lida');
+    }
+  }, []);
 
   if (loading) {
     return <Spin size="large" tip="Carregando..." fullscreen />;
@@ -846,6 +876,73 @@ function AppContent(): JSX.Element {
                   <UserOutlined />
                   <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
                 </div>
+                {canAcoesInternas && (
+                  <Popover
+                    trigger="click"
+                    open={popoverOpen}
+                    onOpenChange={(open) => void handlePopoverOpenChange(open)}
+                    placement="bottomRight"
+                    overlayStyle={{ width: 'min(360px, calc(100vw - 32px))' }}
+                    title={
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>Notificações</span>
+                        {unreadNotifications > 0 && <Tag color="blue">{unreadNotifications} não lida{unreadNotifications > 1 ? 's' : ''}</Tag>}
+                      </div>
+                    }
+                    content={
+                      <div>
+                        {popoverLoading ? (
+                          <div style={{ textAlign: 'center', padding: 24 }}><Spin size="small" /></div>
+                        ) : popoverNotifs.length === 0 ? (
+                          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nenhuma notificação" />
+                        ) : (
+                          <List
+                            size="small"
+                            dataSource={popoverNotifs}
+                            renderItem={(item: NotificacaoInterna) => (
+                              <List.Item
+                                style={{
+                                  background: item.lida ? undefined : 'rgba(0, 107, 82, 0.06)',
+                                  padding: '8px 12px',
+                                  cursor: item.lida ? 'default' : 'pointer',
+                                }}
+                                onClick={() => { if (!item.lida) void handlePopoverMarkRead(item.id as number); }}
+                              >
+                                <List.Item.Meta
+                                  title={
+                                    <span style={{ fontSize: 13 }}>
+                                      {!item.lida && <Badge status="processing" style={{ marginRight: 6 }} />}
+                                      {item.titulo}
+                                    </span>
+                                  }
+                                  description={
+                                    <span style={{ fontSize: 12 }}>
+                                      <Tag color="purple" style={{ fontSize: 11 }}>{item.fase_disparo}</Tag>
+                                      {item.prioridade === 'CRITICA' ? <Tag color="red" style={{ fontSize: 11 }}>CRÍTICA</Tag>
+                                        : item.prioridade === 'ALTA' ? <Tag color="orange" style={{ fontSize: 11 }}>ALTA</Tag>
+                                        : null}
+                                    </span>
+                                  }
+                                />
+                              </List.Item>
+                            )}
+                          />
+                        )}
+                        <div style={{ textAlign: 'center', borderTop: '1px solid #f0f0f0', paddingTop: 8, marginTop: 4 }}>
+                          <Link to="/notificacoes-internas" onClick={() => setPopoverOpen(false)}>
+                            Ver todas as notificações
+                          </Link>
+                        </div>
+                      </div>
+                    }
+                  >
+                    <span style={{ cursor: 'pointer' }} aria-label="Notificações">
+                      <Badge count={unreadNotifications} size="small" offset={[2, 0]}>
+                        <BellOutlined style={{ fontSize: 18, color: unreadNotifications > 0 ? '#006B52' : undefined }} />
+                      </Badge>
+                    </span>
+                  </Popover>
+                )}
                 <Button
                   type="primary"
                   danger

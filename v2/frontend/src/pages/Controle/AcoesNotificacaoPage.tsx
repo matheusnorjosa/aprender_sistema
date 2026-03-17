@@ -209,7 +209,7 @@ export default function AcoesNotificacaoPage(): JSX.Element {
                 value: cycle.id,
                 label: `${cycle.projeto_nome} / ${cycle.municipio_nome} (${cycle.semestre}/${cycle.ano})`,
               }))}
-              style={{ maxWidth: 520 }}
+              style={{ width: 520, maxWidth: '100%' }}
             />
             {selectedCycleLabel && <Text type="secondary">Ciclo ativo: {selectedCycleLabel}</Text>}
           </Space>

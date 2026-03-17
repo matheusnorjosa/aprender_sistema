@@ -846,6 +846,13 @@ function AppContent(): JSX.Element {
                   <UserOutlined />
                   <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
                 </div>
+                {canAcoesInternas && (
+                  <Link to="/notificacoes-internas" aria-label="Notificações">
+                    <Badge count={unreadNotifications} size="small" offset={[2, 0]}>
+                      <BellOutlined style={{ fontSize: 18 }} />
+                    </Badge>
+                  </Link>
+                )}
                 <Button
                   type="primary"
                   danger

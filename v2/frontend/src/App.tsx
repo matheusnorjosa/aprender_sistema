@@ -30,6 +30,8 @@ import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
 import { logout as apiLogout } from './api/auth';
 import { getAlertsSummary } from './api/gcal';
+import { getNotificacoesNaoLidasCount } from './api/acoesNotificacao';
+import toast, { Toaster } from 'react-hot-toast';
 import { LAYOUT, TIMING } from './constants';
 import { preloadSearchData } from './services/preloadSearchData';
 import OfflineBanner from './components/OfflineBanner';
@@ -273,6 +275,11 @@ function AppContent(): JSX.Element {
   const [lastErrorsCount, setLastErrorsCount] = useState<number>(0);
   const [cooldownUntil, setCooldownUntil] = useState<number>(0);
 
+  // Notification badge (unread count)
+  const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+  const [lastNotifCount, setLastNotifCount] = useState<number>(-1);
+  const [notifCooldownUntil, setNotifCooldownUntil] = useState<number>(0);
+
   // Issue #255: Ref para evitar memory leak (atualizações após unmount)
   const isMountedRef = useRef<boolean>(true);
 
@@ -303,6 +310,30 @@ function AppContent(): JSX.Element {
 
   // Controle de submenus (apenas um aberto por vez)
   const { openKeys, onOpenChange, closeAllSubmenus } = useMenuOpenKeys();
+
+  // Calcular flags de permissão (RBAC com Setor + Função)
+  const setores = user?.setores || [];
+  const funcoes = user?.funcoes || [];
+  const isCoordenador = funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação');
+  const isGerente = funcoes.includes('Gerente');
+  const inSuperintendencia = setores.includes('Superintendência');
+  const inGerencia = setores.includes('Gerência');
+  const inDAT = setores.includes('DAT');
+  const inControle = setores.includes('Controle');
+  const inDiretoria = setores.includes('Diretoria');
+  const canApproveSuper = user?.can_approve_super || false;
+  const canCoordenador = user?.is_superuser || isCoordenador || inDAT;
+  const canControle = user?.is_superuser || inControle;
+  const canDAT = user?.is_superuser || inDAT;
+  const canAcoesInternas = user?.is_superuser || inDAT || isCoordenador || isGerente;
+  const canDashboardOverview = user?.is_superuser || inSuperintendencia || inGerencia || inDiretoria;
+  const canDashboardEquipe = user?.is_superuser || inControle || inGerencia || inSuperintendencia || inDiretoria;
+  const canDashboardGcal = user?.is_superuser || inControle || inSuperintendencia;
+  const canDashboardCompras = user?.is_superuser || inDiretoria || inDAT;
+  const canMapaBrasil = user?.is_superuser || inControle || inDAT || inSuperintendencia || inGerencia || inDiretoria;
+  const canDashboardsMenu =
+    canDashboardOverview || canDashboardCompras || canDashboardEquipe || canDashboardGcal || canMapaBrasil;
+  const canDisponibilidade = user?.is_superuser || !inControle;
 
   // Toggle do sidebar (para mobile)
   const toggleSidebar = useCallback(() => {
@@ -369,9 +400,9 @@ function AppContent(): JSX.Element {
         // Toast quando errors aumentar (com cooldown)
         const now = Date.now();
         if (data.errors > lastErrorsCount && now > cooldownUntil) {
-          message.warning(
+          toast.error(
             `Novos erros de publicação detectados (${lastErrorsCount} → ${data.errors})`,
-            5 // duração 5s
+            { duration: 5000 }
           );
           setCooldownUntil(now + TIMING.TOAST_COOLDOWN_MS);
         }
@@ -439,6 +470,78 @@ function AppContent(): JSX.Element {
     };
   }, [user, lastErrorsCount, cooldownUntil]);
 
+  // Sincronizar lastNotifCount com localStorage quando user muda (login, troca de conta)
+  useEffect(() => {
+    if (!user?.id) return;
+    setUnreadNotifications(0);
+    setNotifCooldownUntil(0);
+    const stored = localStorage.getItem(`notifLastUnread:${user.id}`);
+    const parsed = stored ? parseInt(stored, 10) : NaN;
+    setLastNotifCount(Number.isNaN(parsed) ? -1 : parsed);
+  }, [user?.id]);
+
+  // Notification polling (badge + toast)
+  useEffect(() => {
+    if (!canAcoesInternas) return;
+
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const fetchUnread = async () => {
+      try {
+        const data = await getNotificacoesNaoLidasCount();
+        if (!isMountedRef.current) return;
+        setUnreadNotifications(data.count);
+
+        const now = Date.now();
+        if (data.count > lastNotifCount && lastNotifCount >= 0 && now > notifCooldownUntil) {
+          const diff = data.count - lastNotifCount;
+          toast(`${diff} nova${diff > 1 ? 's' : ''} notificação${diff > 1 ? 'ões' : ''}`, {
+            icon: '🔔',
+            duration: 5000,
+            id: 'new-notifications',
+          });
+          setNotifCooldownUntil(now + TIMING.TOAST_COOLDOWN_MS);
+        }
+
+        if (data.count !== lastNotifCount) {
+          setLastNotifCount(data.count);
+          if (user?.id) localStorage.setItem(`notifLastUnread:${user.id}`, data.count.toString());
+        }
+      } catch (error) {
+        const errStatus = (error as { status?: number }).status
+          ?? (error as { response?: { status?: number } }).response?.status;
+        if (errStatus === 401 || errStatus === 403) return;
+        logger.error('[Notifications] Polling error:', error);
+      }
+    };
+
+    const startPolling = () => {
+      if (!intervalId) {
+        intervalId = setInterval(fetchUnread, TIMING.ALERT_POLL_INTERVAL_MS);
+      }
+    };
+    const stopPolling = () => {
+      if (intervalId) { clearInterval(intervalId); intervalId = null; }
+    };
+    const handleVisibility = () => {
+      if (document.hidden) { stopPolling(); }
+      else { fetchUnread(); startPolling(); }
+    };
+
+    const handleRefreshEvent = () => { fetchUnread(); };
+    window.addEventListener('notificacoes:refresh', handleRefreshEvent);
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    fetchUnread();
+    if (!document.hidden) startPolling();
+
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('notificacoes:refresh', handleRefreshEvent);
+    };
+  }, [user, canAcoesInternas, lastNotifCount, notifCooldownUntil]);
+
   if (loading) {
     return <Spin size="large" tip="Carregando..." fullscreen />;
   }
@@ -471,46 +574,9 @@ function AppContent(): JSX.Element {
     }
   };
 
-  // Calcular flags de permissão (RBAC com Setor + Função)
-  // Extrair setores e funções da API
-  const setores = user?.setores || [];
-  const funcoes = user?.funcoes || [];
-
-  // Permissões baseadas em FUNÇÃO
-  const isCoordenador = funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação');
-  const isGerente = funcoes.includes('Gerente');
-
-  // Permissões baseadas em SETOR
-  const inSuperintendencia = setores.includes('Superintendência');
-  const inGerencia = setores.includes('Gerência');
-  const inDAT = setores.includes('DAT');
-  const inControle = setores.includes('Controle');
-  const inDiretoria = setores.includes('Diretoria');
-
-  // Permissões compostas (Setor + Função)
-  // canApproveSuper = pode aprovar/reprovar solicitações (Superintendência/DAT)
-  const canApproveSuper = user?.can_approve_super || false;
-  // canCoordenador = pode criar solicitações
-  const canCoordenador = user?.is_superuser || isCoordenador || inDAT;
-  // canControle = acesso a funcionalidades de Controle
-  const canControle = user?.is_superuser || inControle;
-  // canDAT = acesso a Admin DAT
-  const canDAT = user?.is_superuser || inDAT;
-  // canAcoesInternas = modulo de acoes/notificacoes 32 passos
-  const canAcoesInternas = user?.is_superuser || inDAT || isCoordenador || isGerente;
-  // Acesso por página de dashboard
-  const canDashboardOverview = user?.is_superuser || inSuperintendencia || inGerencia || inDiretoria;
-  const canDashboardEquipe = user?.is_superuser || inControle || inGerencia || inSuperintendencia || inDiretoria;
-  const canDashboardGcal = user?.is_superuser || inControle || inSuperintendencia;
-  const canDashboardCompras = user?.is_superuser || inDiretoria || inDAT; // dados sensíveis de compras
-  const canMapaBrasil = user?.is_superuser || inControle || inDAT || inSuperintendencia || inGerencia || inDiretoria;
-  const canDashboardsMenu =
-    canDashboardOverview || canDashboardCompras || canDashboardEquipe || canDashboardGcal || canMapaBrasil;
-  // canDisponibilidade = acesso à grade mensal (todos exceto Controle)
-  const canDisponibilidade = user?.is_superuser || !inControle;
-
   return (
     <ConfigProvider locale={ptBR} theme={antThemeConfig}>
+      <Toaster position="top-right" toastOptions={{ duration: 5000 }} />
       <Router>
         {/* Issue #416: Offline warning banner */}
         <OfflineBanner />
@@ -624,7 +690,7 @@ function AppContent(): JSX.Element {
                 </SubMenu>
               )}
               {canAcoesInternas && (
-                <SubMenu key="acoes-notificacao-submenu" icon={<BellOutlined />} title="Ações Internas">
+                <SubMenu key="acoes-notificacao-submenu" icon={<Badge count={unreadNotifications} size="small" offset={[6, 0]}><BellOutlined /></Badge>} title="Ações Internas">
                   <Menu.Item key="acoes-notificacao-ciclo">
                     <Link to="/acoes-notificacao">Ciclos e Ações</Link>
                   </Menu.Item>

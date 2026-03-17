@@ -122,20 +122,21 @@ export default function NotificacoesInternasPage(): JSX.Element {
         </div>
 
         <Card>
-          <Text strong>Total: {notifications.length}</Text>
-          <Text style={{ marginLeft: 16 }} type="warning">
-            Não lidas: {unreadCount}
-          </Text>
-          {unreadCount > 0 && (
-            <Button
-              size="small"
-              style={{ marginLeft: 16 }}
-              loading={markingAll}
-              onClick={() => void handleMarkAllRead()}
-            >
-              Marcar todas como lidas
-            </Button>
-          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', alignItems: 'center' }}>
+            <Text strong>Total: {notifications.length}</Text>
+            <Text type="warning">
+              Não lidas: {unreadCount}
+            </Text>
+            {unreadCount > 0 && (
+              <Button
+                size="small"
+                loading={markingAll}
+                onClick={() => void handleMarkAllRead()}
+              >
+                Marcar todas como lidas
+              </Button>
+            )}
+          </div>
         </Card>
 
         <Card>
@@ -145,6 +146,7 @@ export default function NotificacoesInternasPage(): JSX.Element {
             columns={columns}
             loading={loading}
             pagination={{ pageSize: 12 }}
+            scroll={{ x: 760 }}
             expandable={{
               expandedRowRender: (record) => <Text>{record.mensagem}</Text>,
               rowExpandable: (record) => Boolean(record.mensagem),

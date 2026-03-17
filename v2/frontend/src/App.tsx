@@ -882,7 +882,7 @@ function AppContent(): JSX.Element {
                     open={popoverOpen}
                     onOpenChange={(open) => void handlePopoverOpenChange(open)}
                     placement="bottomRight"
-                    overlayStyle={{ width: 360 }}
+                    overlayStyle={{ width: 'min(360px, calc(100vw - 32px))' }}
                     title={
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>Notificações</span>

@@ -53,6 +53,17 @@ Cada execução gera artifact `deploy-evidence-<run_id>` com:
 - `post-deploy-debug.txt`
 - `portainer-stack-update-attempts.txt` (quando aplicável)
 
+## Política de promoção (com rastreabilidade)
+
+Antes de promover para produção, o PR que originou a mudança deve ter:
+- check `[required] staging gate evidence` verde;
+- checklist de staging gate marcado no PR;
+- evidência textual com `ALL 8 CHECKS PASSED` no corpo do PR.
+
+Escopo do check:
+- obrigatório para PR com impacto em runtime (`v2/backend/**`, `v2/frontend/**`, `v2/infra/**`);
+- PRs somente de documentação/CI ficam `skipped` nesse check.
+
 ## Deprecação (issue #814)
 
 Workflows removidos:

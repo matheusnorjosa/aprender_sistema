@@ -170,7 +170,7 @@ check-env-prod: ## Validar configuração do ambiente PRODUÇÃO
 	$(PROD_COMPOSE) config > /dev/null
 	@echo "✅ [PROD] configuração válida"
 
-pull-prod: ## Pull das imagens do ambiente PRODUÇÃO (latest promovida)
+pull-prod: ## Pull das imagens do ambiente PRODUÇÃO (tag imutavel promovida)
 	@echo "📥 [PROD] puxando imagens publicadas..."
 	$(PROD_COMPOSE) pull
 	@echo "✅ [PROD] pull concluido"

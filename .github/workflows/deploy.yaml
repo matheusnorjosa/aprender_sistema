@@ -58,6 +58,22 @@ jobs:
         run: |
           set -euo pipefail
 
+          validate_immutable_tag() {
+            local tag_value="$1"
+            local input_name="$2"
+            local immutable_regex='^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9A-Za-z._-]+$'
+
+            if [ "$tag_value" = "latest" ]; then
+              echo "Invalid ${input_name}: 'latest' is not allowed for production promotion/rollback. Use an immutable release tag." >&2
+              exit 1
+            fi
+
+            if ! printf '%s' "$tag_value" | grep -Eq "$immutable_regex"; then
+              echo "Invalid ${input_name}: '${tag_value}'. Expected format: vYYYY.MM.DD-<sha-or-id>." >&2
+              exit 1
+            fi
+          }
+
           short_sha="${GIT_SHA:0:7}"
           auto_version="v$(date -u +%Y.%m.%d)-${short_sha}"
           build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -98,9 +114,11 @@ jobs:
               if [ -n "$promotion_tag" ]; then
                 release_mode="production-promotion"
                 release_version="$promotion_tag"
+                validate_immutable_tag "$release_version" "promotion_tag"
               else
                 release_mode="production-rollback"
                 release_version="$rollback_tag"
+                validate_immutable_tag "$release_version" "rollback_tag"
               fi
               should_build="false"
             else
@@ -225,7 +243,6 @@ jobs:
           push: true
           tags: |
             ${{ env.BACKEND_IMAGE }}:${{ needs.prepare.outputs.release_version }}
-            ${{ env.BACKEND_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -241,7 +258,6 @@ jobs:
           push: true
           tags: |
             ${{ env.FRONTEND_IMAGE }}:${{ needs.prepare.outputs.release_version }}
-            ${{ env.FRONTEND_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -312,6 +328,17 @@ jobs:
           RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
         run: |
           set -euo pipefail
+
+          if [ "$RELEASE_VERSION" = "latest" ]; then
+            echo "Invalid production tag: 'latest' is not allowed. Use immutable tag vYYYY.MM.DD-<sha-or-id>." >&2
+            exit 1
+          fi
+
+          if ! printf '%s' "$RELEASE_VERSION" | grep -Eq '^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9A-Za-z._-]+$'; then
+            echo "Invalid production tag format: '$RELEASE_VERSION'. Expected vYYYY.MM.DD-<sha-or-id>." >&2
+            exit 1
+          fi
+
           docker buildx imagetools inspect "${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}" >/dev/null
           docker buildx imagetools inspect "${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}" >/dev/null
           echo "Tag ${RELEASE_VERSION} exists for backend and frontend."

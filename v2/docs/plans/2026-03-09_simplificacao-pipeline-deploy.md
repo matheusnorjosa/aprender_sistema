@@ -47,7 +47,7 @@ código → PR → merge main
 | `ci.yaml` | push/PR | Testes, lint, coverage | ✅ Manter |
 | `release.yaml` | workflow_dispatch | Build + push + deploy | ❌ Deprecar |
 | `dockerhub-rebuild.yml` | cron semanal + dispatch | Rebuild security + push | ❌ Deprecar |
-| `security-scan.yml` | push/PR/cron | Safety, Trivy, Bandit, Gitleaks, TruffleHog | ✅ Manter |
+| `security-scan.yml` | push/PR/cron | Safety scan (CLI v3), pip-audit, Trivy, Bandit, Gitleaks, TruffleHog | ✅ Manter |
 | `strict-security-headers.yml` | cron diário | Playwright headers check | ✅ Manter |
 | `dependency-review-scorecard.yml` | PR | Dependency review + OpenSSF | ✅ Manter |
 | `docs.yml` | - | Documentação | ✅ Manter |
@@ -202,7 +202,7 @@ código → PR → CI (ci.yaml) → merge main
 
 **Escopo**: Deprecar **apenas** esses dois workflows. Manter intactos:
 
-- `security-scan.yml` (Safety, Trivy, Bandit, Gitleaks, TruffleHog)
+- `security-scan.yml` (Safety scan CLI v3 + pip-audit, Trivy, Bandit, Gitleaks, TruffleHog)
 - `strict-security-headers.yml` (Playwright headers)
 - `dependency-review-scorecard.yml` (Dependency review + OpenSSF)
 - Todos os demais workflows existentes

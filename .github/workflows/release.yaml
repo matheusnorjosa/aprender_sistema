@@ -23,6 +23,7 @@ env:
 
 permissions:
   contents: read
+  deployments: write
 
 concurrency:
   group: release-${{ github.event.inputs.environment }}
@@ -32,8 +33,11 @@ jobs:
   release:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    environment:
+      name: ${{ github.event.inputs.environment }}
     permissions:
       contents: write
+      deployments: write
       id-token: write
       attestations: write
 

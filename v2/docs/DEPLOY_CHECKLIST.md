@@ -70,14 +70,21 @@ Observação:
 - [ ] `post-deploy-version-response.txt` presente
 - [ ] Em caso de falha de update: `portainer-stack-update-attempts.txt`
 
-## 6. Variáveis obsoletas (remover)
+## 6. Gate de PR (staging)
+
+- [ ] Check `[required] staging gate evidence` verde no PR
+- [ ] PR contém `ALL 8 CHECKS PASSED` no corpo (evidência auditável)
+- [ ] Checklist `make staging-full` marcado no PR
+- [ ] PR com impacto em runtime (`v2/backend/**`, `v2/frontend/**`, `v2/infra/**`); se não houver impacto, o check pode ficar `skipped`
+
+## 7. Variáveis obsoletas (remover)
 
 As variáveis abaixo não são mais usadas após a depreciação do `release.yaml`:
 
 - `STAGING_DEPLOY_COMMAND`
 - `PRODUCTION_DEPLOY_COMMAND`
 
-## 7. Critérios de aceite do deploy
+## 8. Critérios de aceite do deploy
 
 - [ ] Deploy de `staging` conclui sem erro opaco
 - [ ] Deploy de `production` exige aprovação do environment

@@ -27,7 +27,8 @@ env:
 jobs:
   react-doctor:
     name: "[required] react doctor quality gate"
-    runs-on: ubuntu-latest
+    # Job lightweight (lint-like), apto para runner econômico 1 vCPU.
+    runs-on: ubuntu-slim
     timeout-minutes: 12
 
     steps:

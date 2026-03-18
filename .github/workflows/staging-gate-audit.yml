@@ -1,0 +1,118 @@
+name: Staging Gate Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  staging-gate-evidence:
+    name: "[required] staging gate evidence"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect runtime-impact scope
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune --depth=1 origin "$BASE_SHA" "$HEAD_SHA"
+          changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          printf '%s\n' "$changed_files"
+
+          requires_staging_gate=false
+          if echo "$changed_files" | grep -Eq '^(v2/backend/|v2/frontend/|v2/infra/)'; then
+            requires_staging_gate=true
+          fi
+
+          echo "requires_staging_gate=$requires_staging_gate" >> "$GITHUB_OUTPUT"
+
+      - name: Validate PR checklist and staging gate evidence
+        if: steps.scope.outputs.requires_staging_gate == 'true'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          set -euo pipefail
+
+          if [ "$PR_DRAFT" = "true" ]; then
+            echo "PR #$PR_NUMBER is draft. Staging gate evidence check skipped until ready for review."
+            {
+              echo "## Staging Gate Evidence"
+              echo
+              echo "- Status: skipped (draft PR)"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          body_file="$(mktemp)"
+          printf '%s' "$PR_BODY" > "$body_file"
+
+          has_staging_full_checkbox=false
+          has_evidence_checkbox=false
+          has_pass_marker=false
+
+          if grep -Eiq -- "-[[:space:]]*\[[xX]\][[:space:]]*`make staging-full`[[:space:]]+executado[[:space:]]+com[[:space:]]+sucesso[[:space:]]*\(8/8[[:space:]]+PASS\)" "$body_file"; then
+            has_staging_full_checkbox=true
+          fi
+
+          if grep -Eiq -- "-[[:space:]]*\[[xX]\][[:space:]]*Evidencia[[:space:]]+anexada[[:space:]]+no[[:space:]]+PR" "$body_file"; then
+            has_evidence_checkbox=true
+          fi
+
+          if grep -Fqi "ALL 8 CHECKS PASSED" "$body_file"; then
+            has_pass_marker=true
+          fi
+
+          {
+            echo "## Staging Gate Evidence"
+            echo
+            echo "- PR: #$PR_NUMBER"
+            echo "- `make staging-full` checklist: $has_staging_full_checkbox"
+            echo "- Evidence checklist: $has_evidence_checkbox"
+            echo "- Marker `ALL 8 CHECKS PASSED` in PR body: $has_pass_marker"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$has_staging_full_checkbox" != "true" ] || \
+             [ "$has_evidence_checkbox" != "true" ] || \
+             [ "$has_pass_marker" != "true" ]; then
+            echo "Staging gate evidence missing or incomplete in PR body." >&2
+            echo "Expected in PR body:" >&2
+            echo "1) Checkbox marcado para \`make staging-full\` (8/8 PASS)" >&2
+            echo "2) Checkbox marcado para evidencia anexada" >&2
+            echo "3) Trecho com \`ALL 8 CHECKS PASSED\`" >&2
+            exit 1
+          fi
+
+          echo "Staging gate evidence validated."
+
+      - name: Skip evidence check for non-runtime scope
+        if: steps.scope.outputs.requires_staging_gate != 'true'
+        run: |
+          {
+            echo "## Staging Gate Evidence"
+            echo
+            echo "- Status: skipped (PR sem impacto em runtime backend/frontend/infra)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Staging gate evidence skipped for non-runtime scope."

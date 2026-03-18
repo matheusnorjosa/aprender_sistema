@@ -18,8 +18,15 @@
 
 ## Staging Gate
 
+<!-- Obrigatorio para PRs com impacto em runtime (v2/backend, v2/frontend, v2/infra). -->
 - [ ] `make staging-full` executado com sucesso (8/8 PASS)
 - [ ] Evidencia anexada no PR (trecho de log contendo "ALL 8 CHECKS PASSED")
+
+### Evidencia Staging Gate (obrigatorio para merge)
+
+```text
+ALL 8 CHECKS PASSED
+```
 
 ## Validacoes
 

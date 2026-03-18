@@ -1,163 +1,61 @@
 # Deploy
 
-Guia de deploy do Aprender Sistema v2.
+Guia operacional de deploy do Aprender Sistema v2.
 
-## Requisitos
+## Workflow canônico
 
-- Docker Engine 24+
-- Docker Compose v2
-- Git
-- 4GB RAM mínimo
-- 20GB disco
+Workflow único de deploy:
+- `.github/workflows/deploy.yaml`
 
-## Release via GitHub Actions
+Comportamento:
+- `push` na `main`: deploy automático em `staging`.
+- `workflow_dispatch`:
+  - `target_environment=staging`: novo build/deploy de staging.
+  - `target_environment=production` + `promotion_tag`: promoção de tag imutável.
+  - `target_environment=production` + `rollback_tag`: rollback para tag imutável.
 
-Workflow: `.github/workflows/release.yaml`
+## Governança por environment
 
-Comportamento atual:
-- Publica imagens Docker e executa deploy real por comando configurado para o ambiente selecionado.
-- Se não houver comando configurado, o workflow falha explicitamente (não há falso sinal de deploy concluído).
-- Gera artefato `deploy-evidence-<run_id>` com evidências da execução.
-- Registra deployment no GitHub Environments (`staging` ou `production`) para trilha auditável.
+O job de deploy usa GitHub Environments:
+- `staging`
+- `production`
 
-### GitHub Environments (governança de promoção)
+Recomendação:
+- `staging`: sem aprovação obrigatória.
+- `production`: reviewers obrigatórios (+ wait timer opcional).
 
-Configurar no repositório (`Settings` -> `Environments`):
+## Variáveis/secrets obrigatórios
 
-1. Criar environment `staging`:
-   - sem reviewers obrigatórios (fluxo ágil).
-2. Criar environment `production`:
-   - exigir reviewers obrigatórios;
-   - opcional: wait timer para janela operacional.
+O `deploy.yaml` resolve valores por ambiente com fallback global.
 
-Comportamento esperado:
-- `workflow_dispatch` para `production` fica **aguardando aprovação** antes do job de deploy/release.
-- `staging` segue execução direta.
-- histórico de Deployments mostra environment e aprovadores.
+Exemplos:
+- `STAGING_PORTAINER_URL` / `PRODUCTION_PORTAINER_URL` ou `PORTAINER_URL`
+- `STAGING_PORTAINER_STACK_ID` / `PRODUCTION_PORTAINER_STACK_ID` ou `PORTAINER_STACK_ID`
+- `STAGING_PORTAINER_ENDPOINT_ID` / `PRODUCTION_PORTAINER_ENDPOINT_ID` ou `PORTAINER_ENDPOINT_ID`
+- `STAGING_PORTAINER_ACCESS_TOKEN` / `PRODUCTION_PORTAINER_ACCESS_TOKEN` ou `PORTAINER_ACCESS_TOKEN`
+- `STAGING_HEALTHCHECK_URL` / `PRODUCTION_HEALTHCHECK_URL`
+- `STAGING_VERSIONCHECK_URL` / `PRODUCTION_VERSIONCHECK_URL`
 
-Configuração obrigatória por ambiente:
-- `STAGING_DEPLOY_COMMAND` (secret ou variável de repositório)
-- `PRODUCTION_DEPLOY_COMMAND` (secret ou variável de repositório)
+Consulte checklist completo em:
+- `v2/docs/DEPLOY_CHECKLIST.md`
 
-Variáveis disponíveis para o comando:
-- `TARGET_ENV`
-- `RELEASE_VERSION`
-- `IMAGE_TAG`
-- `BACKEND_IMAGE`
-- `FRONTEND_IMAGE`
+## Evidências do deploy
 
-## Deploy Local (Development)
+Cada execução gera artifact `deploy-evidence-<run_id>` com:
+- `deploy-evidence.txt`
+- `post-deploy-health-response.txt`
+- `post-deploy-version-response.txt`
+- `post-deploy-debug.txt`
+- `portainer-stack-update-attempts.txt` (quando aplicável)
 
-```bash
-# Clonar repositório
-git clone https://github.com/matheusnorjosa/aprender_sistema.git
-cd aprender_sistema
+## Deprecação (issue #814)
 
-# Subir ambiente
-cd v2/infra
-make up
+Workflows removidos:
+- `.github/workflows/release.yaml`
+- `.github/workflows/dockerhub-rebuild.yml`
 
-# Verificar status
-make healthz
-```
+Variáveis obsoletas:
+- `STAGING_DEPLOY_COMMAND`
+- `PRODUCTION_DEPLOY_COMMAND`
 
-## Deploy Staging
-
-```bash
-# Usar o slash command
-/deploy-staging full
-
-# Ou manualmente
-cd v2/infra
-docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
-```
-
-### Variáveis de Ambiente (Staging)
-
-```bash
-# .env.staging
-ENVIRONMENT=staging
-DEBUG=False
-SECRET_KEY=<generate-random-key>
-ALLOWED_HOSTS=staging.aprender.com.br
-
-# Database
-DB_HOST=db
-DB_PORT=5432
-DB_NAME=aprender_staging
-DB_USER=aprender
-DB_PASSWORD=<secure-password>
-
-# Redis
-REDIS_URL=redis://redis:6379/0
-
-# Google Calendar
-GCAL_CLIENT=google
-GCAL_CALENDAR_ID=<calendar-id>
-GOOGLE_SERVICE_ACCOUNT_FILE=/secrets/sa-key.json
-
-# Sentry
-SENTRY_DSN=<sentry-dsn>
-SENTRY_TRACES_SAMPLE_RATE=0.5
-```
-
-## Deploy Produção
-
-### Checklist Pré-Deploy
-
-- [ ] Testes passando (`make test`)
-- [ ] Migrations aplicadas
-- [ ] Variáveis de ambiente configuradas
-- [ ] Secrets armazenados de forma segura
-- [ ] Backup do banco realizado
-
-### Comandos
-
-```bash
-# Build e push das imagens
-docker build -t aprender-web:latest v2/backend
-docker push registry.example.com/aprender-web:latest
-
-# Deploy
-docker compose -f docker-compose.prod.yml up -d
-
-# Aplicar migrations
-docker compose exec web python manage.py migrate
-
-# Coletar static files
-docker compose exec web python manage.py collectstatic --no-input
-```
-
-## Makefile
-
-```bash
-# Comandos disponíveis
-make up          # Subir ambiente
-make down        # Parar ambiente
-make logs        # Ver logs
-make shell       # Django shell
-make test        # Rodar testes
-make migrate     # Aplicar migrations
-make healthz     # Health check
-make readyz      # Ready check
-```
-
-## Rollback
-
-```bash
-# Ver histórico de deploys
-docker compose ps --all
-
-# Voltar para versão anterior
-docker compose up -d --force-recreate web
-
-# Ou restaurar backup do banco
-docker compose exec db pg_restore -U aprender -d aprender_db backup.dump
-```
-
-## Monitoramento Pós-Deploy
-
-1. Verificar logs: `docker compose logs -f web`
-2. Verificar métricas: http://localhost:9090 (Prometheus)
-3. Verificar Sentry para erros
-4. Testar endpoints críticos
+Essas variáveis não são mais usadas pelo pipeline canônico.

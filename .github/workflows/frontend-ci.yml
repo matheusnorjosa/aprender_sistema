@@ -1,4 +1,4 @@
-name: frontend-ci
+﻿name: frontend-ci
 
 on:
   push:
@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 12
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       with:
         # React Doctor gate here runs full score mode (no git diff analysis),
         # so shallow checkout is enough and faster.
@@ -39,7 +39,7 @@ jobs:
         fetch-depth: 1
 
     - name: Setup Node.js 20.x
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version: '20.x'
         cache: 'npm'
@@ -64,10 +64,10 @@ jobs:
         working-directory: v2/frontend
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
     - name: Setup Node.js 20.x
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version: '20.x'
         cache: 'npm'
@@ -89,7 +89,7 @@ jobs:
       run: npm run size
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
         name: frontend-build
         path: v2/frontend/dist
@@ -111,10 +111,10 @@ jobs:
         working-directory: v2/frontend
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
     - name: Setup Node.js 20.x
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version: '20.x'
         cache: 'npm'
@@ -194,7 +194,7 @@ jobs:
       run: IMAGE_TAG=latest docker compose -f v2/infra/docker-compose.yml -f v2/infra/docker-compose.override.yml down -v || true
 
     - name: Upload test results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: checklist-test-results
@@ -215,10 +215,10 @@ jobs:
         working-directory: v2/frontend
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
     - name: Setup Node.js 20.x
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version: '20.x'
         cache: 'npm'
@@ -229,7 +229,7 @@ jobs:
 
     - name: Setup Chrome
       id: setup-chrome
-      uses: browser-actions/setup-chrome@v1
+      uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1
       with:
         chrome-version: stable
 
@@ -237,7 +237,7 @@ jobs:
       run: ${{ steps.setup-chrome.outputs.chrome-path }} --version
 
     - name: Download build artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
       with:
         name: frontend-build
         path: v2/frontend/dist
@@ -250,7 +250,7 @@ jobs:
       continue-on-error: true
 
     - name: Upload Lighthouse results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: lighthouse-results

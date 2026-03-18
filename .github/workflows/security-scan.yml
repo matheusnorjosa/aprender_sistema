@@ -49,12 +49,32 @@ jobs:
 
       - name: Install security tools
         run: |
-          pip install safety bandit pip-audit
+          pip install "safety>=3,<4" bandit pip-audit
 
-      - name: Run Safety (CVE check)
+      - name: Run Safety scan (modern CLI, complementary)
+        env:
+          SAFETY_API_KEY: ${{ secrets.SAFETY_API_KEY }}
         run: |
+          set -euo pipefail
           cd v2/backend
-          safety check -r requirements.txt --output json > safety-report.json
+
+          if [ -n "${SAFETY_API_KEY:-}" ]; then
+            set +e
+            safety --key "$SAFETY_API_KEY" scan --target . --output json > safety-report.json
+            safety_exit=$?
+            set -e
+
+            if [ "$safety_exit" -ne 0 ]; then
+              echo "Safety scan exit=${safety_exit}; pip-audit remains the blocking CVE gate."
+            fi
+          else
+            printf '%s\n' '{"tool":"safety","mode":"scan","status":"skipped","reason":"SAFETY_API_KEY not configured"}' > safety-report.json
+            echo "Safety scan skipped: SAFETY_API_KEY not configured. pip-audit remains blocking."
+          fi
+
+          if [ ! -s safety-report.json ]; then
+            printf '%s\n' '{"tool":"safety","mode":"scan","status":"error","reason":"empty report output"}' > safety-report.json
+          fi
 
       - name: Run pip-audit (PyPI Advisory Database)
         run: |

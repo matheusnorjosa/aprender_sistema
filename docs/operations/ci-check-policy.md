@@ -51,4 +51,13 @@ Executados por `schedule` ou `workflow_dispatch`:
 - Só checks `required` entram no ruleset.
 - Workflow que publica check `required` não deve usar `paths` no gatilho de `pull_request`.
 - Checks `info` podem usar `continue-on-error`, com artifact/log para análise posterior.
-- Não usar runners `self-hosted` nos gates de PR; manter `ubuntu-latest` hospedado pelo GitHub.
+- Não usar runners `self-hosted` nos gates de PR.
+- Preferir `ubuntu-slim` para jobs leves (lint/quality gates sem Docker) com timeout <= 15 min.
+- Manter `ubuntu-latest` para jobs com Docker, Playwright/Lighthouse, build pesado ou timeout > 15 min.
+
+## Monitoramento de custo (GitHub Actions)
+
+- Revisão operacional mensal via API de billing:
+  - `gh api /repos/<owner>/<repo>/actions/billing/usage`
+- Correlacionar custo com a telemetria de duração:
+  - workflow `[monitoring] ci runtime baseline (median/p95)` em `.github/workflows/ci-runtime-telemetry.yml`.

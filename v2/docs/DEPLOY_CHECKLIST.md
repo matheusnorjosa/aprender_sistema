@@ -58,6 +58,10 @@ gh workflow run deploy.yaml -f target_environment=production -f promotion_tag=vY
 gh workflow run deploy.yaml -f target_environment=production -f rollback_tag=vYYYY.MM.DD-<sha-anterior>
 ```
 
+Observação:
+- O workflow rejeita `latest` em produção. Use apenas tag imutável no formato `vYYYY.MM.DD-<sha-or-id>`.
+- O build/publish do pipeline usa somente a tag imutável da release (sem retag `latest`).
+
 ## 5. Evidências obrigatórias
 
 - [ ] Artifact `deploy-evidence-<run_id>` disponível

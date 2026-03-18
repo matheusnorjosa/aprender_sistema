@@ -127,7 +127,7 @@ cp .env.prodlike.example .env.prodlike.local
 
 Important:
 - keep placeholders only in these files (real secrets outside Git).
-- `staging` uses explicit `IMAGE_TAG`; `prod` stays on `IMAGE_TAG=latest` with controlled promotion by workflow.
+- `staging` and `prod` use explicit immutable `IMAGE_TAG` (`vYYYY.MM.DD-<sha-or-id>`).
 - `staging/prod` do not use local build; use published images (`pull + up --no-build`).
 
 ## Backend Dockerfiles
@@ -156,10 +156,9 @@ DB_USER=aprender_user
 DB_PASSWORD=your-db-password
 REDIS_HOST=redis.externo.local
 REDIS_PORT=6379
-IMAGE_TAG=latest
+IMAGE_TAG=vYYYY.MM.DD-<sha-or-id>
 FRONTEND_PORT=81
 DOCKER_HUB_TOKEN=your-docker-hub-token
-WATCHTOWER_TOKEN=your-watchtower-token
 ```
 
 ## VM Architecture

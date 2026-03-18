@@ -9,7 +9,8 @@
 	check-env-staging pull-staging up-staging health-staging down-staging \
 	check-env-prod pull-prod up-prod health-prod down-prod \
 	check-env-prod-like pull-prod-like up-prod-like health-prod-like down-prod-like \
-	staging-precheck staging-build staging-up staging-test staging-down staging-full
+	staging-precheck staging-build staging-up staging-test staging-down staging-full \
+	architecture-guardrails
 
 # Variáveis
 COMPOSE_FILE := docker-compose.yml
@@ -345,6 +346,14 @@ lint:  ## Executar linters (Black, Flake8, Bandit)
 	$(DEV_COMPOSE) exec $(SERVICE_WEB) black --check backend/
 	$(DEV_COMPOSE) exec $(SERVICE_WEB) flake8 backend/
 	$(DEV_COMPOSE) exec $(SERVICE_WEB) bandit -r backend/ -ll
+
+architecture-guardrails: ## Executar guardrails arquiteturais (backend+frontend)
+	@echo "🧭 Executando guardrails arquiteturais..."
+	@echo "   Backend (import-linter)..."
+	@cd ../backend && python scripts/run_import_linter.py
+	@echo "   Frontend (dependency-cruiser)..."
+	@cd ../frontend && npm run deps:check
+	@echo "✅ Guardrails arquiteturais aprovados"
 
 format:  ## Formatar código (Black)
 	@echo "✨ Formatando código..."

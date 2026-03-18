@@ -75,6 +75,7 @@ nav:
     - Visão Geral: architecture/overview.md
     - Backend: architecture/backend.md
     - Frontend: architecture/frontend.md
+    - Guardrails de Dependência: architecture/dependency-guardrails.md
     - Matriz Funcional Frontend: architecture/frontend-functional-matrix.md
     - OpenAPI Contract Gate: architecture/openapi-contract-gate.md
     - Infraestrutura: architecture/infrastructure.md

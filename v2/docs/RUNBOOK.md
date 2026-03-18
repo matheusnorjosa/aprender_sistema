@@ -30,6 +30,11 @@ Comportamento:
   - `target_environment=production` + `promotion_tag`,
   - `target_environment=production` + `rollback_tag`.
 
+Regra de produção:
+- usar somente tag imutável `vYYYY.MM.DD-<sha-or-id>`;
+- `latest` é bloqueada para promoção/rollback.
+- o pipeline publica apenas a tag imutável da release (sem retag `latest`).
+
 ### Variáveis obrigatórias por ambiente
 
 Portainer:

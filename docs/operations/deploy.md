@@ -14,6 +14,11 @@ Comportamento:
   - `target_environment=production` + `promotion_tag`: promoção de tag imutável.
   - `target_environment=production` + `rollback_tag`: rollback para tag imutável.
 
+Regra de tag em produção:
+- `promotion_tag` e `rollback_tag` devem seguir `vYYYY.MM.DD-<sha-or-id>`.
+- `latest` é rejeitada explicitamente no workflow.
+- O publish de imagens no CI gera somente a tag imutável da release (sem retag `latest`).
+
 ## Governança por environment
 
 O job de deploy usa GitHub Environments:

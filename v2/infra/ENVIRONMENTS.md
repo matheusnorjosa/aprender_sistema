@@ -69,7 +69,7 @@ make build-prod-image
 4. Para deploy real em VM, registrar `IMAGE_TAG` usada como evidencia.
 5. Arquivos `.env.*` deste diretorio sao templates e nao devem conter segredos reais.
 6. `staging/producao` devem usar imagem publicada gerada com `Dockerfile.prod`.
-7. `staging` exige `IMAGE_TAG` explicita da release; em `producao` a stack opera com `IMAGE_TAG=latest` e promocao controlada por `promotion_tag` no workflow.
+7. `staging` e `producao` exigem `IMAGE_TAG` explicita e imutavel (`vYYYY.MM.DD-<sha-or-id>`); `latest` nao e permitido em promocao/rollback de producao.
 8. Em `staging/producao`, `docker-compose.override.yml` nao e aplicado.
 9. Em producao Golden Cloud (3-VMs), `docker-compose.prod.yml` usa DB/Redis externos (VM02/VM03); a stack da VM01 sobe `web/worker/beat/frontend`.
 10. O `docker-compose.yml` base e prod-like: binds de codigo do frontend (`src/public`) ficam apenas no `docker-compose.override.yml` (dev-only).

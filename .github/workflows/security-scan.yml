@@ -107,37 +107,94 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Build Docker image
+      - name: Build backend image
         run: |
           cd v2
           docker build -f infra/Dockerfile.prod -t aprender-backend:scan .
 
-      - name: Run Trivy (JSON report)
+      - name: Build frontend image
+        run: |
+          docker build -f v2/frontend/Dockerfile.prod -t aprender-frontend:scan v2/frontend
+
+      - name: Run Trivy (backend JSON report)
         uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
         with:
           image-ref: 'aprender-backend:scan'
           format: 'json'
-          output: 'trivy-report.json'
+          output: 'trivy-backend-report.json'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH,MEDIUM'
 
-      - name: Run Trivy vulnerability scanner (blocking HIGH/CRITICAL)
+      - name: Run Trivy (frontend JSON report)
         uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
         with:
-          image-ref: 'aprender-backend:scan'
-          format: 'table'
-          exit-code: '1'
+          image-ref: 'aprender-frontend:scan'
+          format: 'json'
+          output: 'trivy-frontend-report.json'
           ignore-unfixed: true
           vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Enforce unified container security gate (HIGH/CRITICAL)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          reports = {
+              "backend": Path("trivy-backend-report.json"),
+              "frontend": Path("trivy-frontend-report.json"),
+          }
+
+          def count_blocking(path: Path) -> int:
+              data = json.loads(path.read_text(encoding="utf-8"))
+              total = 0
+              for result in data.get("Results", []) or []:
+                  for vuln in result.get("Vulnerabilities", []) or []:
+                      if vuln.get("Severity") in {"HIGH", "CRITICAL"}:
+                          total += 1
+              return total
+
+          counts = {name: count_blocking(path) for name, path in reports.items()}
+          total_blocking = sum(counts.values())
+
+          summary = (
+              "# Container Scan Summary\n\n"
+              "| Image | HIGH/CRITICAL |\n"
+              "|---|---:|\n"
+              f"| backend | {counts['backend']} |\n"
+              f"| frontend | {counts['frontend']} |\n"
+              f"| **total** | **{total_blocking}** |\n"
+          )
+
+          Path("trivy-summary.md").write_text(summary, encoding="utf-8")
+          print(summary)
+          github_step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if github_step_summary:
+              with Path(github_step_summary).open("a", encoding="utf-8") as fp:
+                  fp.write(summary + "\n")
+
+          if total_blocking > 0:
+              print(
+                  f"Container security gate failed: found {total_blocking} HIGH/CRITICAL vulnerabilities.",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          PY
 
       - name: Upload Trivy report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: trivy-report
-          path: trivy-report.json
+          name: trivy-reports
+          path: |
+            trivy-backend-report.json
+            trivy-frontend-report.json
+            trivy-summary.md
 
   # ================================================================
   # Job 3: Frontend Dependency Scan

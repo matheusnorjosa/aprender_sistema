@@ -79,6 +79,30 @@ O workflow falha quando qualquer item crítico falha:
 
 Isso evita sinal verde operacional sem confirmação real de deploy íntegro.
 
+### **4.1 Troubleshooting do `deploy.yaml` (Portainer CE)**
+
+Quando a etapa **Post-deploy verification (version-aware polling)** falhar no workflow
+`.github/workflows/deploy.yaml`, usar os artifacts:
+
+- `deploy-evidence.txt`
+- `post-deploy-debug.txt`
+- `post-deploy-health-response.txt`
+- `post-deploy-version-response.txt`
+
+O campo `failure_cause` em `post-deploy-debug.txt` classifica a causa primária:
+
+- `network_unavailable`: falha de conectividade/transporte (curl não conseguiu conectar).
+- `endpoint_not_ready`: endpoint respondeu, mas serviço ainda não estabilizou.
+- `version_mismatch`: health/version em HTTP 200, porém versão ativa não bate com a release esperada.
+
+Fluxo recomendado:
+
+1. Confirmar `release_version` e `verification_outcome` em `deploy-evidence.txt`.
+2. Ler `failure_cause` e `last_*_status` em `post-deploy-debug.txt`.
+3. Se `network_unavailable`, validar DNS/rota/firewall/NAT e reachability externo.
+4. Se `endpoint_not_ready`, revisar logs dos containers (`web`, `frontend`, `worker`, `beat`) e tempo de startup.
+5. Se `version_mismatch`, validar `IMAGE_TAG` aplicado no stack e resposta do endpoint `/api/version`.
+
 ### Promoção staging -> produção (mesmo artefato)
 
 1. Executar release em `staging` (gera tag `vYYYY.MM.DD-<sha>`).

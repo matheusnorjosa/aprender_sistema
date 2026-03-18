@@ -583,6 +583,7 @@ jobs:
           echo "Portainer stack update succeeded (HTTP ${http_code})."
 
       - name: Post-deploy verification (version-aware polling)
+        id: post-deploy-verification
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
           HEALTHCHECK_URL: ${{ steps.resolve.outputs.healthcheck_url }}
@@ -596,28 +597,84 @@ jobs:
             curl_opts+=(--insecure)
           fi
 
-          timeout=180
-          interval=10
+          timeout=360
+          base_interval=8
+          max_interval=20
           elapsed=0
+          attempt=0
           last_health_response=""
           last_version_response=""
           last_health_status=""
           last_version_status=""
+          last_health_error=""
+          last_version_error=""
+          network_failures=0
+          health_200_seen=0
+          version_200_seen=0
+          version_mismatch_seen=0
 
-          echo "Waiting for version ${RELEASE_VERSION} (timeout=${timeout}s, interval=${interval}s)..."
+          mask_url() {
+            local raw="$1"
+            printf '%s' "$raw" | sed -E 's#^(https?://[^/]+).*$#\1/***#'
+          }
+
+          request_endpoint() {
+            local url="$1"
+            local body_file="$2"
+            local err_file="$3"
+            local http_code=""
+
+            if http_code="$(curl "${curl_opts[@]}" -o "$body_file" -w '%{http_code}' "$url" 2>"$err_file")"; then
+              echo "${http_code}|0"
+              return 0
+            fi
+
+            local curl_exit=$?
+            echo "000|${curl_exit}"
+          }
+
+          health_url_masked="$(mask_url "$HEALTHCHECK_URL")"
+          version_url_masked="$(mask_url "$VERSIONCHECK_URL")"
+          : > post-deploy-debug.txt
+
+          echo "Waiting for version ${RELEASE_VERSION} (timeout=${timeout}s)..."
+          {
+            echo "health_url_masked=${health_url_masked}"
+            echo "version_url_masked=${version_url_masked}"
+            echo "expected_release_version=${RELEASE_VERSION}"
+            echo "timeout_seconds=${timeout}"
+            echo "post_deploy_skip_tls_verify=${POST_DEPLOY_SKIP_TLS_VERIFY}"
+          } >> post-deploy-debug.txt
 
           while (( elapsed < timeout )); do
-            health_code="$(curl "${curl_opts[@]}" -o /tmp/health_resp.json -w '%{http_code}' "$HEALTHCHECK_URL" 2>/dev/null || echo "000")"
-            version_code="$(curl "${curl_opts[@]}" -o /tmp/version_resp.json -w '%{http_code}' "$VERSIONCHECK_URL" 2>/dev/null || echo "000")"
+            attempt=$(( attempt + 1 ))
+            health_result="$(request_endpoint "$HEALTHCHECK_URL" /tmp/health_resp.json /tmp/health_err.log)"
+            version_result="$(request_endpoint "$VERSIONCHECK_URL" /tmp/version_resp.json /tmp/version_err.log)"
+
+            health_code="${health_result%%|*}"
+            health_exit="${health_result##*|}"
+            version_code="${version_result%%|*}"
+            version_exit="${version_result##*|}"
 
             last_health_status="$health_code"
             last_version_status="$version_code"
 
+            if [ "$health_exit" != "0" ]; then
+              network_failures=$(( network_failures + 1 ))
+              last_health_error="$(tr '\n' ' ' </tmp/health_err.log | sed -E 's/[[:space:]]+/ /g' | cut -c1-240)"
+            fi
+            if [ "$version_exit" != "0" ]; then
+              network_failures=$(( network_failures + 1 ))
+              last_version_error="$(tr '\n' ' ' </tmp/version_err.log | sed -E 's/[[:space:]]+/ /g' | cut -c1-240)"
+            fi
+
             if [ "$health_code" = "200" ]; then
               last_health_response="$(cat /tmp/health_resp.json)"
+              health_200_seen=1
             fi
             if [ "$version_code" = "200" ]; then
               last_version_response="$(cat /tmp/version_resp.json)"
+              version_200_seen=1
             fi
 
             if [ "$health_code" = "200" ] && [ "$version_code" = "200" ]; then
@@ -625,27 +682,73 @@ jobs:
                 echo "[${elapsed}s] Version ${RELEASE_VERSION} is live. Health OK."
                 printf '%s\n' "$last_health_response" > post-deploy-health-response.txt
                 printf '%s\n' "$last_version_response" > post-deploy-version-response.txt
+                {
+                  echo "result=success"
+                  echo "failure_cause=none"
+                  echo "attempts=${attempt}"
+                  echo "elapsed_seconds=${elapsed}"
+                } >> post-deploy-debug.txt
                 exit 0
               fi
+              version_mismatch_seen=$(( version_mismatch_seen + 1 ))
               live_version="$(grep -o '"version":"[^"]*"' /tmp/version_resp.json || echo 'unknown')"
               echo "[${elapsed}s] Version mismatch: expected=${RELEASE_VERSION}, got=${live_version} -- container still updating"
-            elif [ "$health_code" = "000" ] || [ "$version_code" = "000" ]; then
-              echo "[${elapsed}s] Connection refused (health=${health_code}, version=${version_code}) -- container restarting"
+            elif [ "$health_exit" != "0" ] || [ "$version_exit" != "0" ]; then
+              echo "[${elapsed}s] Network unavailable (health=${health_code}/curl_exit=${health_exit}, version=${version_code}/curl_exit=${version_exit})"
             else
               echo "[${elapsed}s] Not ready (health=HTTP${health_code}, version=HTTP${version_code})"
             fi
 
+            {
+              echo "attempt=${attempt} elapsed_seconds=${elapsed} health_status=${health_code} health_curl_exit=${health_exit} version_status=${version_code} version_curl_exit=${version_exit}"
+              if [ -n "$last_health_error" ]; then
+                echo "last_health_error=${last_health_error}"
+              fi
+              if [ -n "$last_version_error" ]; then
+                echo "last_version_error=${last_version_error}"
+              fi
+            } >> post-deploy-debug.txt
+
+            interval=$(( base_interval + (attempt * 2) ))
+            if [ "$interval" -gt "$max_interval" ]; then
+              interval="$max_interval"
+            fi
             sleep "$interval"
             elapsed=$(( elapsed + interval ))
           done
 
+          failure_cause="endpoint_not_ready"
+          if [ "$health_200_seen" -eq 0 ] && [ "$version_200_seen" -eq 0 ] && [ "$network_failures" -gt 0 ]; then
+            failure_cause="network_unavailable"
+          elif [ "$health_200_seen" -eq 1 ] && [ "$version_200_seen" -eq 1 ] && [ "$version_mismatch_seen" -gt 0 ]; then
+            failure_cause="version_mismatch"
+          fi
+
           echo "TIMEOUT: Version ${RELEASE_VERSION} did not appear within ${timeout}s." >&2
+          echo "Failure cause: ${failure_cause}" >&2
           echo "Last health status: HTTP ${last_health_status}" >&2
           echo "Last version status: HTTP ${last_version_status}" >&2
+          if [ -n "$last_health_error" ]; then
+            echo "Last health curl error: ${last_health_error}" >&2
+          fi
+          if [ -n "$last_version_error" ]; then
+            echo "Last version curl error: ${last_version_error}" >&2
+          fi
           if [ -n "$last_version_response" ]; then
             echo "Last version response:" >&2
             printf '%s\n' "$last_version_response" >&2
           fi
+
+          {
+            echo "result=timeout"
+            echo "failure_cause=${failure_cause}"
+            echo "attempts=${attempt}"
+            echo "elapsed_seconds=${elapsed}"
+            echo "last_health_status=${last_health_status}"
+            echo "last_version_status=${last_version_status}"
+            echo "last_health_error=${last_health_error:-none}"
+            echo "last_version_error=${last_version_error:-none}"
+          } >> post-deploy-debug.txt
 
           printf '%s\n' "${last_health_response:-no response}" > post-deploy-health-response.txt
           printf '%s\n' "${last_version_response:-no response}" > post-deploy-version-response.txt
@@ -659,8 +762,18 @@ jobs:
           RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
           HEALTHCHECK_URL: ${{ steps.resolve.outputs.healthcheck_url }}
           VERSIONCHECK_URL: ${{ steps.resolve.outputs.versioncheck_url }}
+          VERIFICATION_OUTCOME: ${{ steps.post-deploy-verification.outcome }}
         run: |
           set -euo pipefail
+
+          mask_url() {
+            local raw="$1"
+            printf '%s' "$raw" | sed -E 's#^(https?://[^/]+).*$#\1/***#'
+          }
+
+          health_url_masked="$(mask_url "$HEALTHCHECK_URL")"
+          version_url_masked="$(mask_url "$VERSIONCHECK_URL")"
+
           {
             echo "workflow=${{ github.workflow }}"
             echo "run_id=${{ github.run_id }}"
@@ -669,10 +782,11 @@ jobs:
             echo "target_environment=$TARGET_ENV"
             echo "release_mode=$RELEASE_MODE"
             echo "release_version=$RELEASE_VERSION"
+            echo "verification_outcome=$VERIFICATION_OUTCOME"
             echo "backend_image=${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}"
             echo "frontend_image=${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}"
-            echo "healthcheck_url=$HEALTHCHECK_URL"
-            echo "versioncheck_url=$VERSIONCHECK_URL"
+            echo "healthcheck_url=$health_url_masked"
+            echo "versioncheck_url=$version_url_masked"
             echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } > deploy-evidence.txt
 
@@ -685,5 +799,6 @@ jobs:
             deploy-evidence.txt
             post-deploy-health-response.txt
             post-deploy-version-response.txt
+            post-deploy-debug.txt
           if-no-files-found: warn
           retention-days: 30

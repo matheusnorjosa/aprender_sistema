@@ -14,211 +14,76 @@
 4. [ETL: Importação de Ações (Controle e DAT)](#etl-importação-de-ações-controle-e-dat)
 5. [APIs REST: Ações (Controle e DAT)](#apis-rest-ações-controle-e-dat)
 6. [Troubleshooting Comum](#troubleshooting-comum)
-7. [Release Workflow Hardening](#release-workflow-hardening)
+7. [Deploy Workflow (Canônico)](#deploy-workflow-canônico)
 
 ---
 
-## 🚀 Release Workflow Hardening
+## 🚀 Deploy Workflow (Canônico)
 
-O workflow `.github/workflows/release.yaml` agora inclui evidências de supply chain e validação pós-deploy bloqueante.
+Workflow oficial:
+- `.github/workflows/deploy.yaml`
 
-### **1. Variáveis obrigatórias por ambiente**
+Comportamento:
+- `push` na `main` -> deploy automático em `staging`.
+- `workflow_dispatch`:
+  - `target_environment=staging` (build e deploy de staging),
+  - `target_environment=production` + `promotion_tag`,
+  - `target_environment=production` + `rollback_tag`.
 
-Configure como **secret** ou **variable** (secret tem prioridade):
+### Variáveis obrigatórias por ambiente
 
-- `STAGING_DEPLOY_COMMAND` / `PRODUCTION_DEPLOY_COMMAND`
+Portainer:
+- `STAGING_PORTAINER_URL` / `PRODUCTION_PORTAINER_URL` ou `PORTAINER_URL`
+- `STAGING_PORTAINER_STACK_ID` / `PRODUCTION_PORTAINER_STACK_ID` ou `PORTAINER_STACK_ID`
+- `STAGING_PORTAINER_ENDPOINT_ID` / `PRODUCTION_PORTAINER_ENDPOINT_ID` ou `PORTAINER_ENDPOINT_ID`
+- `STAGING_PORTAINER_ACCESS_TOKEN` / `PRODUCTION_PORTAINER_ACCESS_TOKEN` ou `PORTAINER_ACCESS_TOKEN`
+
+Verificação:
 - `STAGING_HEALTHCHECK_URL` / `PRODUCTION_HEALTHCHECK_URL`
 - `STAGING_VERSIONCHECK_URL` / `PRODUCTION_VERSIONCHECK_URL`
 
-Exemplo de `PRODUCTION_DEPLOY_COMMAND` (Watchtower HTTP API):
+### Evidências geradas
 
-```bash
-curl -H "Authorization: Bearer $WATCHTOWER_TOKEN" -X POST http://<PUBLIC_IP>:8080/v1/update
-```
-
-### **2. Fluxo operacional**
-
-```bash
-# A execução é manual (workflow_dispatch):
-# GitHub -> Actions -> Release -> Run workflow
-# Environment: staging ou production
-#
-# Para production:
-# - informar promotion_tag com a mesma tag homologada em staging
-#   (ex.: vYYYY.MM.DD-<sha>)
-```
-
-Ordem crítica no pipeline:
-
-1. `staging`: build/push de imagens backend/frontend + gate de segurança.
-2. `production`: promoção por `promotion_tag` (sem rebuild) com repoint de `:latest`.
-3. Resolução de digest e geração de SBOM (`backend-sbom.spdx.json`, `frontend-sbom.spdx.json`).
-4. Geração de provenance attestation (imagens + SBOM).
-5. `production`: verificação prévia de staging para garantir que a mesma tag está homologada.
-6. Deploy via comando configurado.
-7. Verificação pós-deploy:
-   - health endpoint deve retornar HTTP 200
-   - version endpoint deve conter a release (`vYYYY.MM.DD-<sha>`)
-8. Criação/atualização da GitHub Release + upload dos assets de evidência.
-
-### **3. Evidências geradas**
-
-- `deploy-evidence.txt` (contexto do deploy, digests, outcome de verificação)
-- `supply-chain/*.spdx.json` (SBOM)
-- `supply-chain/attestations/*.bundle.jsonl` (attestation bundle)
-- `supply-chain/verification/post-deploy-*.txt` (respostas health/version)
-
-### **4. Critério de falha**
-
-O workflow falha quando qualquer item crítico falha:
-
-- comando de deploy
-- health check pós-deploy
-- version check pós-deploy
-- geração de SBOM/attestation
-
-Isso evita sinal verde operacional sem confirmação real de deploy íntegro.
-
-### **4.1 Troubleshooting do `deploy.yaml` (Portainer CE)**
-
-Quando a etapa **Post-deploy verification (version-aware polling)** falhar no workflow
-`.github/workflows/deploy.yaml`, usar os artifacts:
-
+Artifacts relevantes:
 - `deploy-evidence.txt`
-- `post-deploy-debug.txt`
 - `post-deploy-health-response.txt`
 - `post-deploy-version-response.txt`
+- `post-deploy-debug.txt`
+- `portainer-stack-update-attempts.txt` (quando houver retries/falhas no update da stack)
 
-O campo `failure_cause` em `post-deploy-debug.txt` classifica a causa primária:
+### Troubleshooting do post-deploy
 
-- `network_unavailable`: falha de conectividade/transporte (curl não conseguiu conectar).
-- `endpoint_not_ready`: endpoint respondeu, mas serviço ainda não estabilizou.
-- `version_mismatch`: health/version em HTTP 200, porém versão ativa não bate com a release esperada.
+Quando falhar a verificação de versão/health no `deploy.yaml`, usar:
 
-Fluxo recomendado:
+1. `deploy-evidence.txt` para contexto do run.
+2. `post-deploy-debug.txt` para causa classificada (`failure_cause`):
+   - `network_unavailable`
+   - `endpoint_not_ready`
+   - `version_mismatch`
+3. `post-deploy-*.txt` para última resposta dos endpoints.
 
-1. Confirmar `release_version` e `verification_outcome` em `deploy-evidence.txt`.
-2. Ler `failure_cause` e `last_*_status` em `post-deploy-debug.txt`.
-3. Se `network_unavailable`, validar DNS/rota/firewall/NAT e reachability externo.
-4. Se `endpoint_not_ready`, revisar logs dos containers (`web`, `frontend`, `worker`, `beat`) e tempo de startup.
-5. Se `version_mismatch`, validar `IMAGE_TAG` aplicado no stack e resposta do endpoint `/api/version`.
-
-### Promoção staging -> produção (mesmo artefato)
-
-1. Executar release em `staging` (gera tag `vYYYY.MM.DD-<sha>`).
-2. Validar staging (health/version) no próprio workflow.
-3. Executar release em `production` com `promotion_tag` igual à tag homologada.
-4. Workflow valida staging com essa mesma tag antes do deploy em produção.
-5. Workflow promove a tag homologada para `latest` no Docker Hub.
-6. `PRODUCTION_DEPLOY_COMMAND` dispara `POST /v1/update` no Watchtower da VM01.
-7. Watchtower executa pull/restart dos containers monitorados (web/worker/beat/frontend).
-
-## Gate de Segurança no Release (Publicação de Imagem)
-
-No workflow manual de release (`.github/workflows/release.yaml`), a publicação de imagem no Docker Hub só ocorre após scan prévio de vulnerabilidades.
-
-Regras:
-- backend e frontend são buildados localmente no runner para scan pré-publicação;
-- relatórios Trivy são gerados em `supply-chain/security/`;
-- o release falha se houver vulnerabilidade `HIGH` ou `CRITICAL`;
-- os relatórios são sempre anexados como artifact do workflow.
-
-Política de exceção (temporária):
-- abrir issue específica de exceção com CVE, justificativa técnica e mitigação;
-- registrar prazo máximo de remoção (ex.: 14 dias);
-- referenciar a issue no PR da exceção;
-- remover a exceção no prazo e registrar evidências.
-
-## Rebuild Periódico no Docker Hub
-
-Workflow: `.github/workflows/dockerhub-rebuild.yml`
-
-Objetivo:
-- reduzir defasagem de imagens no Docker Hub;
-- manter `latest` atualizado com rebuild validado;
-- publicar tag imutável de manutenção para rastreabilidade.
-
-Trigger:
-- `schedule`: semanal (domingo 03:00 UTC);
-- `workflow_dispatch`: execução manual.
-
-Estratégia de tags:
-- backend/frontend recebem:
-  - `latest`
-  - `maint-YYYY.MM.DD-<sha>-r<run_id>` (imutável)
-
-Gate obrigatório antes do push:
-- build de backend/frontend para scan local no runner;
-- Trivy JSON para os dois artefatos;
-- bloqueio automático quando houver `HIGH`/`CRITICAL`.
-
-Artifacts do workflow:
-- `supply-chain/security/*` (relatórios + resumo do gate)
-- `supply-chain/rebuild/rebuild-metrics.txt` (métricas da execução)
-
-Execução manual via CLI:
+### Comandos canônicos
 
 ```bash
-# Publica imagens (somente após gate aprovado)
-gh workflow run dockerhub-rebuild.yml -f publish_images=true
+# Staging manual
+gh workflow run deploy.yaml -f target_environment=staging
 
-# Validação manual sem push (dry-run operacional)
-gh workflow run dockerhub-rebuild.yml -f publish_images=false
+# Produção (promoção)
+gh workflow run deploy.yaml -f target_environment=production -f promotion_tag=vYYYY.MM.DD-<sha>
+
+# Produção (rollback)
+gh workflow run deploy.yaml -f target_environment=production -f rollback_tag=vYYYY.MM.DD-<sha-anterior>
 ```
 
-Observação:
-- fora da `main`, o workflow força `publish_images=false` para evitar push acidental.
+### Deprecação aplicada
 
-## 🏷️ Deploy por Imagem Publicada (Staging/Produção)
+Workflows removidos:
+- `.github/workflows/release.yaml`
+- `.github/workflows/dockerhub-rebuild.yml`
 
-Staging e produção operam somente com imagem publicada.
-
-Regras operacionais:
-- `staging`: `IMAGE_TAG` explícita da release.
-- `produção`: stack fixa em `IMAGE_TAG=latest` + promoção controlada por `promotion_tag`.
-- Fazer `pull` antes do `up`.
-- Usar `up --no-build` (proibido build local em VM).
-- Não aplicar `docker-compose.override.yml` em staging/produção.
-
-### Staging
-
-```bash
-cd v2/infra
-
-# 1) Definir tag explícita
-export IMAGE_TAG=vYYYY.MM.DD-<sha>
-
-# 2) Validar compose (falha se IMAGE_TAG estiver vazia)
-docker compose --env-file .env.staging -f docker-compose.yml config
-
-# 3) Pull + up sem build
-docker compose --env-file .env.staging -f docker-compose.yml pull
-docker compose --env-file .env.staging -f docker-compose.yml up -d --no-build
-```
-
-### Produção
-
-```bash
-# 1) stack em producao permanece com IMAGE_TAG=latest
-# 2) release em production com promotion_tag valida staging e repointa latest
-# 3) deploy trigger via Watchtower HTTP API
-curl -H "Authorization: Bearer $WATCHTOWER_TOKEN" \
-  -X POST http://<PUBLIC_IP>:8080/v1/update
-```
-
-Observacao de seguranca:
-- manter `WATCHTOWER_TOKEN` longo e rotacionado;
-- restringir firewall da porta `8080` sempre que possivel.
-
-### Rollback por tag anterior (staging/producao)
-
-```bash
-# Produção: rollback = reexecutar release em production com promotion_tag anterior
-gh workflow run release.yaml -f environment=production -f promotion_tag=vYYYY.MM.DD-<sha-anterior>
-
-# Confirmar versao ativa
-curl -fsS https://SEU_HOST/version
-```
+Variáveis obsoletas:
+- `STAGING_DEPLOY_COMMAND`
+- `PRODUCTION_DEPLOY_COMMAND`
 
 ## 🔄 Recarregar Variáveis de Ambiente (.env)
 

@@ -201,7 +201,8 @@ jobs:
   # ================================================================
   frontend-security:
     name: "[required] Frontend Dependencies"
-    runs-on: ubuntu-latest
+    # npm audit de dependências de produção é workload leve de CPU.
+    runs-on: ubuntu-slim
     timeout-minutes: 12
     steps:
       - name: Checkout code

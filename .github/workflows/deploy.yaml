@@ -554,6 +554,7 @@ jobs:
           fi
 
           current_env_json="$(printf '%s' "$stack_json" | jq -c '.Env // []')"
+          previous_image_tag="$(printf '%s' "$current_env_json" | jq -r '([.[] | select(.name == "IMAGE_TAG") | .value] | first) // ""')"
           updated_env_json="$(printf '%s' "$current_env_json" | jq -c --arg tag "$RELEASE_VERSION" '
             map(select(.name != "IMAGE_TAG")) + [{"name":"IMAGE_TAG","value":$tag}]
           ')"
@@ -564,7 +565,7 @@ jobs:
             '{
               StackFileContent: $stack_file_content,
               Env: $env,
-              Prune: true,
+              Prune: false,
               RepullImageAndRedeploy: true
             }')"
 
@@ -572,6 +573,12 @@ jobs:
           retry_sleep=15
           http_code="000"
           : > /tmp/portainer-stack-update-attempts.log
+          {
+            echo "target_environment=${TARGET_ENV}"
+            echo "release_version=${RELEASE_VERSION}"
+            echo "previous_image_tag=${previous_image_tag:-none}"
+            echo "---"
+          } >> /tmp/portainer-stack-update-attempts.log
 
           for attempt in $(seq 1 "$max_attempts"); do
             http_code="$(curl "${curl_opts[@]}" \
@@ -618,6 +625,48 @@ jobs:
 
             echo "Portainer stack update failed (HTTP ${http_code})." >&2
             cat /tmp/portainer-stack-update-response.json >&2 || true
+
+            if [ -n "$previous_image_tag" ] && [ "$previous_image_tag" != "$RELEASE_VERSION" ]; then
+              echo "Attempting emergency rollback to previous IMAGE_TAG=${previous_image_tag}..." >&2
+              rollback_env_json="$(printf '%s' "$current_env_json" | jq -c --arg tag "$previous_image_tag" '
+                map(select(.name != "IMAGE_TAG")) + [{"name":"IMAGE_TAG","value":$tag}]
+              ')"
+              rollback_payload="$(jq -n \
+                --arg stack_file_content "$stack_file_content" \
+                --argjson env "$rollback_env_json" \
+                '{
+                  StackFileContent: $stack_file_content,
+                  Env: $env,
+                  Prune: false,
+                  RepullImageAndRedeploy: false
+                }')"
+              rollback_code="$(curl "${curl_opts[@]}" \
+                -o /tmp/portainer-stack-rollback-response.json \
+                -w '%{http_code}' \
+                -X PUT \
+                -H "X-API-KEY: ${portainer_access_token}" \
+                -H "Content-Type: application/json" \
+                "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}?endpointId=${PORTAINER_ENDPOINT_ID}" \
+                --data-raw "$rollback_payload" || true)"
+
+              {
+                echo "rollback_attempt_for=${previous_image_tag}"
+                echo "rollback_http_code=${rollback_code}"
+                rollback_body="$(cat /tmp/portainer-stack-rollback-response.json 2>/dev/null || true)"
+                if [ -n "$rollback_body" ]; then
+                  echo "rollback_response_body=${rollback_body}"
+                fi
+                echo "---"
+              } >> /tmp/portainer-stack-update-attempts.log
+
+              if [[ "$rollback_code" =~ ^[0-9]+$ ]] && [ "$rollback_code" -ge 200 ] && [ "$rollback_code" -lt 300 ]; then
+                echo "Emergency rollback succeeded (HTTP ${rollback_code})." >&2
+              else
+                echo "Emergency rollback failed (HTTP ${rollback_code})." >&2
+                cat /tmp/portainer-stack-rollback-response.json >&2 || true
+              fi
+            fi
+
             echo "Attempt history:" >&2
             cat /tmp/portainer-stack-update-attempts.log >&2 || true
             cp /tmp/portainer-stack-update-attempts.log portainer-stack-update-attempts.txt || true

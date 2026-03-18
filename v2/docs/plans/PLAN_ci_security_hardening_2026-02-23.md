@@ -141,7 +141,27 @@ Critério de aceite:
 
 ---
 
-## 5) Referências
+## 5) Política de Pinagem SHA em Workflows (Issue #895)
+
+Regra operacional:
+- Em workflows de PR críticos, toda action externa deve usar pinagem por commit SHA (`owner/action@<40-hex>`).
+- O comentário da linha deve manter a tag humana de referência (`# v4`, `# v5`, etc.) para facilitar auditoria.
+- Não usar tags móveis (`@v4`, `@v5`, `@main`) em workflows protegidos por ruleset.
+
+Processo de atualização:
+1. Abrir PR dedicado de manutenção (sem misturar com feature).
+2. Atualizar SHAs somente após validar release/tag upstream.
+3. Executar auditoria local antes do PR:
+   - `rg --line-number "uses:\\s*[^#\\n]+@v[0-9]" .github/workflows/ci.yaml .github/workflows/frontend-ci.yml .github/workflows/docs.yml .github/workflows/strict-security-headers.yml .github/workflows/agent-browser-smoke.yml .github/workflows/backend-xdist-canary.yml .github/workflows/ci-runtime-telemetry.yml`
+4. Exigir CI verde completo e merge squash.
+
+Cadência:
+- Revisão mensal de SHAs em workflows críticos.
+- Revisão extraordinária imediata quando houver advisory/CVE da action usada.
+
+---
+
+## 6) Referências
 
 - Epic atual: `#620`
 - Issues deste ciclo: `#627`, `#628`, `#629`, `#630`, `#633`

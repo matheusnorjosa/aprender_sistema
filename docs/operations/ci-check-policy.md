@@ -17,6 +17,7 @@ Estes checks devem ficar obrigatórios no ruleset `Protect main`:
 - `[required] build/lint do frontend`
 - `[required] checklist tests (meta, a11y, security)`
 - `[required] dependency review`
+- `[required] architecture dependency guardrails`
 - `[required] Python Dependencies`
 - `[required] Frontend Dependencies`
 - `[required] Container Scan`

@@ -41,7 +41,10 @@ jobs:
           printf '%s\n' "$changed_files"
 
           requires_staging_gate=false
-          if echo "$changed_files" | grep -Eq '^(v2/backend/|v2/frontend/|v2/infra/)'; then
+          # Staging gate evidence is required only for runtime-impacting changes.
+          # CI/docs/test-only changes are intentionally excluded.
+          runtime_regex='^(v2/backend/(apps/|config/|requirements\.txt$)|v2/frontend/(src/|public/|Dockerfile\.prod$)|v2/infra/(docker-compose(\.[^/]*)?\.yml$|Dockerfile(\.prod|\.dev)?$|scripts/smoke_test_staging\.sh$))'
+          if echo "$changed_files" | grep -Eq "$runtime_regex"; then
             requires_staging_gate=true
           fi
 
@@ -67,21 +70,23 @@ jobs:
           fi
 
           body_file="$(mktemp)"
+          body_normalized_file="$(mktemp)"
           printf '%s' "$PR_BODY" > "$body_file"
+          tr -d '`' < "$body_file" > "$body_normalized_file"
 
           has_staging_full_checkbox=false
           has_evidence_checkbox=false
           has_pass_marker=false
 
-          if grep -Eiq -- "-[[:space:]]*\[[xX]\][[:space:]]*`make staging-full`[[:space:]]+executado[[:space:]]+com[[:space:]]+sucesso[[:space:]]*\(8/8[[:space:]]+PASS\)" "$body_file"; then
+          if grep -Eiq -- "-[[:space:]]*\[[xX]\][[:space:]]*make staging-full[[:space:]]+executado[[:space:]]+com[[:space:]]+sucesso[[:space:]]*\(8/8[[:space:]]+PASS\)" "$body_normalized_file"; then
             has_staging_full_checkbox=true
           fi
 
-          if grep -Eiq -- "-[[:space:]]*\[[xX]\][[:space:]]*Evidencia[[:space:]]+anexada[[:space:]]+no[[:space:]]+PR" "$body_file"; then
+          if grep -Eiq -- "-[[:space:]]*\[[xX]\][[:space:]]*Evidencia[[:space:]]+anexada[[:space:]]+no[[:space:]]+PR" "$body_normalized_file"; then
             has_evidence_checkbox=true
           fi
 
-          if grep -Fqi "ALL 8 CHECKS PASSED" "$body_file"; then
+          if grep -Fqi "ALL 8 CHECKS PASSED" "$body_normalized_file"; then
             has_pass_marker=true
           fi
 
@@ -89,9 +94,9 @@ jobs:
             echo "## Staging Gate Evidence"
             echo
             echo "- PR: #$PR_NUMBER"
-            echo "- `make staging-full` checklist: $has_staging_full_checkbox"
+            echo "- make staging-full checklist: $has_staging_full_checkbox"
             echo "- Evidence checklist: $has_evidence_checkbox"
-            echo "- Marker `ALL 8 CHECKS PASSED` in PR body: $has_pass_marker"
+            echo "- Marker ALL 8 CHECKS PASSED in PR body: $has_pass_marker"
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$has_staging_full_checkbox" != "true" ] || \
@@ -99,9 +104,9 @@ jobs:
              [ "$has_pass_marker" != "true" ]; then
             echo "Staging gate evidence missing or incomplete in PR body." >&2
             echo "Expected in PR body:" >&2
-            echo "1) Checkbox marcado para \`make staging-full\` (8/8 PASS)" >&2
+            echo "1) Checkbox marcado para make staging-full (8/8 PASS)" >&2
             echo "2) Checkbox marcado para evidencia anexada" >&2
-            echo "3) Trecho com \`ALL 8 CHECKS PASSED\`" >&2
+            echo "3) Trecho com ALL 8 CHECKS PASSED" >&2
             exit 1
           fi
 
@@ -113,6 +118,6 @@ jobs:
           {
             echo "## Staging Gate Evidence"
             echo
-            echo "- Status: skipped (PR sem impacto em runtime backend/frontend/infra)"
+            echo "- Status: skipped (PR sem impacto em runtime)"
           } >> "$GITHUB_STEP_SUMMARY"
           echo "Staging gate evidence skipped for non-runtime scope."

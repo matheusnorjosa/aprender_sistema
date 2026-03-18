@@ -18,6 +18,22 @@ Comportamento atual:
 - Publica imagens Docker e executa deploy real por comando configurado para o ambiente selecionado.
 - Se não houver comando configurado, o workflow falha explicitamente (não há falso sinal de deploy concluído).
 - Gera artefato `deploy-evidence-<run_id>` com evidências da execução.
+- Registra deployment no GitHub Environments (`staging` ou `production`) para trilha auditável.
+
+### GitHub Environments (governança de promoção)
+
+Configurar no repositório (`Settings` -> `Environments`):
+
+1. Criar environment `staging`:
+   - sem reviewers obrigatórios (fluxo ágil).
+2. Criar environment `production`:
+   - exigir reviewers obrigatórios;
+   - opcional: wait timer para janela operacional.
+
+Comportamento esperado:
+- `workflow_dispatch` para `production` fica **aguardando aprovação** antes do job de deploy/release.
+- `staging` segue execução direta.
+- histórico de Deployments mostra environment e aprovadores.
 
 Configuração obrigatória por ambiente:
 - `STAGING_DEPLOY_COMMAND` (secret ou variável de repositório)

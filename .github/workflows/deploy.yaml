@@ -30,6 +30,7 @@ env:
 
 permissions:
   contents: read
+  deployments: write
 
 concurrency:
   group: deploy-${{ github.event_name == 'push' && 'staging' || github.event.inputs.target_environment || 'production' }}
@@ -318,6 +319,8 @@ jobs:
   deploy:
     name: Deploy via Portainer CE API
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.prepare.outputs.target_environment }}
     needs:
       - prepare
       - build_and_push

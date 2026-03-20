@@ -36,3 +36,21 @@ Comportamento:
 Ação recomendada:
 - Monitorar tendência do score ao longo do tempo.
 - Priorizar melhorias com pior pontuação antes de tornar esse check bloqueante.
+
+## SLSA Provenance + Cosign (operacional)
+
+Workflow: `SLSA Provenance and Signing`  
+Job: `[ops] slsa provenance + cosign`
+
+Objetivo:
+- Gerar provenance SLSA para imagens backend/frontend ja publicadas.
+- Assinar imagens com Cosign keyless (OIDC).
+- Verificar assinatura e attestation no proprio workflow.
+
+Gatilhos:
+- `release.published`
+- `workflow_dispatch` (input `release_tag`)
+
+Comportamento:
+- Nao e gate bloqueante de PR.
+- Publica artifacts com evidencias de verificacao (`cosign-verify-*.json`, `attestation-verify-*.json`).

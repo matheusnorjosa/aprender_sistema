@@ -20,6 +20,7 @@ from drf_spectacular.utils import extend_schema
 from .api_schemas import COMMON_ERROR_RESPONSES
 from .constants import FUNCAO_GROUPS, SETOR_GROUPS
 from .serializers import CurrentUserSerializer
+from .services.rbac_permissions import get_user_functional_permissions
 
 
 def api_root(request: HttpRequest) -> JsonResponse:
@@ -55,7 +56,8 @@ class CurrentUserView(APIView):
             "funcoes": list[str],       # Grupos de FUNÇÃO (o que pode fazer)
             "is_superuser": bool,
             "is_superintendencia": bool,
-            "can_approve_super": bool   # Pode aprovar/reprovar (Superintendência/DAT)
+            "can_approve_super": bool,  # Pode aprovar/reprovar (Superintendência/DAT)
+            "permissions": list[str]    # Permissões funcionais efetivas (codenames)
         }
     """
 
@@ -105,6 +107,7 @@ class CurrentUserView(APIView):
                 "is_superuser": user.is_superuser,
                 "is_superintendencia": is_superintendencia,
                 "can_approve_super": can_approve_super,
+                "permissions": sorted(get_user_functional_permissions(user)),
             },
             status=status.HTTP_200_OK,
         )

@@ -20,7 +20,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Municipio, Projeto, Usuario
+from apps.core.models import Compra, Municipio, PermissaoFuncional, Projeto, Usuario
 
 
 @pytest.fixture
@@ -438,6 +438,52 @@ class TestUsuarioAdminAPI:
         errors = get_errors(response)
         assert "cpf" in errors
 
+    def test_dat_cannot_patch_is_superuser(self, api_client, usuario_dat, db):
+        """DAT não pode alterar is_superuser via endpoint de admin."""
+        target = Usuario.objects.create_user(
+            username="target_common_user",
+            email="target_common_user@example.com",
+            password="SecurePass123!",
+            cpf="12312312312",
+        )
+
+        api_client.force_authenticate(user=usuario_dat)
+        response = api_client.patch(
+            f"/api/usuarios-admin/{target.id}/",
+            {"is_superuser": True},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        target.refresh_from_db()
+        assert target.is_superuser is False
+
+    def test_superuser_can_patch_is_superuser_for_other_user(self, api_client, db):
+        """Superuser pode promover outro usuário para superuser via endpoint."""
+        super_admin = Usuario.objects.create_superuser(
+            username="api_super_admin",
+            email="api_super_admin@example.com",
+            password="SecurePass123!",
+            cpf="22312312312",
+        )
+        target = Usuario.objects.create_user(
+            username="api_target_common_user",
+            email="api_target_common_user@example.com",
+            password="SecurePass123!",
+            cpf="32312312312",
+        )
+
+        api_client.force_authenticate(user=super_admin)
+        response = api_client.patch(
+            f"/api/usuarios-admin/{target.id}/",
+            {"is_superuser": True},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        target.refresh_from_db()
+        assert target.is_superuser is True
+
 
 # ==========================
 # Testes de AuditLog
@@ -489,3 +535,107 @@ class TestAuditLogAPI:
             status.HTTP_405_METHOD_NOT_ALLOWED,
             status.HTTP_403_FORBIDDEN,
         ]
+
+
+# ==========================
+# Testes de RBAC Funcional (Issue #829)
+# ==========================
+
+
+@pytest.mark.django_db
+class TestRbacFunctionalAPI:
+    """Testes de endpoints RBAC funcional para DAT."""
+
+    def test_dat_can_list_permissoes_funcionais(self, api_client, usuario_dat):
+        """DAT pode listar permissões funcionais."""
+        permissao = PermissaoFuncional.objects.create(
+            codename="rbac.test_list",
+            label="Permissão Teste Lista",
+            description="Teste de listagem RBAC",
+            category="admin",
+            is_system=False,
+        )
+
+        api_client.force_authenticate(user=usuario_dat)
+        response = api_client.get("/api/permissoes-funcionais/")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["count"] >= 1
+        returned_ids = {item["id"] for item in response.data["results"]}
+        assert permissao.id in returned_ids
+
+    def test_non_dat_cannot_access_permissoes_funcionais(self, api_client, usuario_controle):
+        """Usuário sem DAT não pode acessar permissões funcionais."""
+        api_client.force_authenticate(user=usuario_controle)
+        response = api_client.get("/api/permissoes-funcionais/")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_dat_can_get_rbac_meta(self, api_client, usuario_dat):
+        """DAT pode consultar metadados de RBAC."""
+        PermissaoFuncional.objects.create(
+            codename="rbac.meta_category",
+            label="Permissão Categoria Meta",
+            description="Valida retorno de category no meta",
+            category="governanca",
+            is_system=False,
+        )
+
+        api_client.force_authenticate(user=usuario_dat)
+        response = api_client.get("/api/rbac/meta/")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "setor_groups" in response.data
+        assert "funcao_groups" in response.data
+        assert "categories" in response.data
+        assert "DAT" in response.data["setor_groups"]
+        assert "Gerente" in response.data["funcao_groups"]
+        assert "governanca" in response.data["categories"]
+
+    def test_dat_can_patch_group_permissoes_funcionais(self, api_client, usuario_dat):
+        """DAT pode vincular permissões funcionais a um grupo."""
+        group, _ = Group.objects.get_or_create(name="Equipe Operacional")
+        permissao_a = PermissaoFuncional.objects.create(
+            codename="rbac.group_patch_a",
+            label="Permissão Group Patch A",
+            description="Teste patch A",
+            category="operacao",
+            is_system=False,
+        )
+        permissao_b = PermissaoFuncional.objects.create(
+            codename="rbac.group_patch_b",
+            label="Permissão Group Patch B",
+            description="Teste patch B",
+            category="operacao",
+            is_system=False,
+        )
+
+        api_client.force_authenticate(user=usuario_dat)
+        payload = {"permissao_funcional_ids": [permissao_a.id, permissao_b.id]}
+        response = api_client.patch(f"/api/grupos/{group.id}/", payload, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        group.refresh_from_db()
+        linked_ids = set(group.permissoes_funcionais.values_list("id", flat=True))
+        assert linked_ids == {permissao_a.id, permissao_b.id}
+        returned_ids = {item["id"] for item in response.data["permissoes_funcionais"]}
+        assert returned_ids == {permissao_a.id, permissao_b.id}
+
+    def test_rename_reserved_group_requires_confirmation(self, api_client, usuario_dat):
+        """Renomeio de grupo reservado exige ?confirm_reserved=true."""
+        group, _ = Group.objects.get_or_create(name="Controle")
+        api_client.force_authenticate(user=usuario_dat)
+
+        response = api_client.patch(f"/api/grupos/{group.id}/", {"name": "Controle Novo"}, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "confirm_reserved=true" in str(response.data)
+
+    def test_delete_reserved_group_requires_confirmation(self, api_client, usuario_dat):
+        """Exclusão de grupo reservado exige ?confirm_reserved=true."""
+        group, _ = Group.objects.get_or_create(name="Formador")
+        api_client.force_authenticate(user=usuario_dat)
+
+        response = api_client.delete(f"/api/grupos/{group.id}/")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert Group.objects.filter(id=group.id).exists()

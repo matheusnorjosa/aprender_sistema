@@ -1,93 +1,41 @@
 /**
  * App Principal - AS v2 Frontend
  *
- * Roteamento para todas as páginas do sistema.
- * PR15: RBAC e menu dinâmico por perfil
- * Issue #207: Code-splitting com React.lazy() para reduzir bundle size
+ * Composition layer: wires hooks, providers, and layout components.
+ * All logic is extracted to dedicated hooks and components.
+ *
+ * Issue #927: App.tsx decomposition (Frente A — Arquitetura Frontend)
  */
 
-import { useState, useEffect, useRef, useCallback, lazy, Suspense, useMemo } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { ConfigProvider, Layout, Menu, Spin, Result, Typography, Button, message, Badge, Popover, List, Tag, Empty } from 'antd';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import { BrowserRouter as Router } from 'react-router-dom';
+import { ConfigProvider, Layout, Spin, message } from 'antd';
 import logger from './utils/logger';
-import {
-  CalendarOutlined,
-  CheckCircleOutlined,
-  TableOutlined,
-  FileTextOutlined,
-  SafetyOutlined,
-  UserOutlined,
-  BarChartOutlined,
-  HomeOutlined,
-  LogoutOutlined,
-  SolutionOutlined,
-  MenuOutlined,
-  CloseOutlined,
-  BellOutlined,
-} from '@ant-design/icons';
+import { isAuthError } from './utils/errors';
+import { deduplicatedFetch } from './utils/request';
 import { ThemeProvider, useTheme, useBrandColors } from './contexts/ThemeContext';
 import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
 import { logout as apiLogout } from './api/auth';
 import { getAlertsSummary } from './api/gcal';
-import { getNotificacoesNaoLidasCount, listNotificacoesInternas, marcarNotificacaoLida } from './api/acoesNotificacao';
-import type { NotificacaoInterna } from './types/acoesNotificacao';
+import { getNotificacoesNaoLidasCount } from './api/acoesNotificacao';
 import toast, { Toaster } from 'react-hot-toast';
 import { LAYOUT, TIMING } from './constants';
 import { preloadSearchData } from './services/preloadSearchData';
 import OfflineBanner from './components/OfflineBanner';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { AppSidebar } from './components/AppSidebar';
+import { AppHeader } from './components/AppHeader';
+import { AppRoutes } from './components/AppRoutes';
+import { usePermissions } from './hooks/usePermissions';
+import { usePolling } from './hooks/usePolling';
 import type { CurrentUser } from './types';
 import './App.css';
 
-// ============================================================================
-// Issue #207: Lazy loading de páginas para code-splitting
-// ============================================================================
-const DisponibilidadeBlocks = lazy(() => import('./pages/Disponibilidade'));
-const MonthlyPage = lazy(() => import('./pages/Disponibilidade/MonthlyPage'));
-const ControlePage = lazy(() => import('./pages/Controle/ControlePage'));
-const EtlReportsPage = lazy(() => import('./pages/Controle/EtlReportsPage'));
-const DATPage = lazy(() => import('./pages/DAT/DATPage'));
-const NewSolicitacaoWizard = lazy(() => import('./pages/Solicitacoes/NewSolicitacaoWizard'));
-const EditSolicitacaoPage = lazy(() => import('./pages/Solicitacoes/EditSolicitacaoPage'));
-const MySolicitacoesPage = lazy(() => import('./pages/Solicitacoes/MySolicitacoesPage'));
-const ApprovalsPage = lazy(() => import('./pages/Aprovacoes/ApprovalsPage'));
-const PreAgendaPage = lazy(() => import('./pages/PreAgenda/PreAgendaPage'));
 const LoginPage = lazy(() => import('./pages/Auth/LoginPage'));
-const HomePage = lazy(() => import('./pages/Home/HomePage'));
-const DashboardsPage = lazy(() => import('./pages/Dashboards/DashboardsPage'));
-const EquipeDashboardPage = lazy(() => import('./pages/Dashboards/EquipeDashboardPage'));
-const GCalDashboardPage = lazy(() => import('./pages/Dashboards/GCalDashboardPage'));
-const ComprasDashboardPage = lazy(() => import('./pages/Dashboards/ComprasDashboardPage'));
-const MapaBrasilPage = lazy(() => import('./pages/MapaBrasil/MapaBrasilPage'));
-const AdminDATHomePage = lazy(() => import('./pages/AdminDAT/AdminDATHomePage'));
-const UsuariosPage = lazy(() => import('./pages/AdminDAT/UsuariosPage'));
-const MunicipiosPage = lazy(() => import('./pages/AdminDAT/MunicipiosPage'));
-const ProjetosPage = lazy(() => import('./pages/AdminDAT/ProjetosPage'));
-const GruposPage = lazy(() => import('./pages/AdminDAT/GruposPage'));
-const ConfiguracoesPage = lazy(() => import('./pages/AdminDAT/ConfiguracoesPage'));
-const ColecoesImportPage = lazy(() => import('./pages/AdminDAT/ColecoesImportPage'));
-const EquipeGerenciaImportPage = lazy(() => import('./pages/AdminDAT/EquipeGerenciaImportPage'));
-const DeslocamentosPage = lazy(() => import('./pages/Deslocamentos/DeslocamentosPage'));
-// DAT Module - Acompanhamento de Turmas (SPEC_DAT_REGISTROS.md)
-const DATRegistrosPage = lazy(() => import('./pages/DATModule/DATRegistrosPage'));
-// DAT Module - Novas páginas de gestão
-const AcoesPage = lazy(() => import('./pages/DATModule/AcoesPage'));
-const DATComprasPage = lazy(() => import('./pages/DATModule/ComprasPage'));
-const CadastrosPage = lazy(() => import('./pages/DATModule/CadastrosPage'));
-const FormacoesPage = lazy(() => import('./pages/DATModule/FormacoesPage'));
-const PlanoFormacoesPage = lazy(() => import('./pages/DATModule/PlanoFormacoesPage'));
-const CoordenadoresPage = lazy(() => import('./pages/DATModule/CoordenadoresPage'));
-const AcoesNotificacaoPage = lazy(() => import('./pages/Controle/AcoesNotificacaoPage'));
-const NotificacoesInternasPage = lazy(() => import('./pages/Controle/NotificacoesInternasPage'));
-const AcoesTimelinePage = lazy(() => import('./pages/Controle/AcoesTimelinePage'));
 
-const { Header, Content, Sider } = Layout;
-const { SubMenu } = Menu;
-const { Text } = Typography;
+const { Content } = Layout;
 
-/**
- * Alerts summary interface
- */
 interface AlertsSummary {
   errors: number;
   pending: number;
@@ -95,386 +43,154 @@ interface AlertsSummary {
   none: number;
 }
 
-/**
- * Hook return interface for menu open keys
- */
-interface UseMenuOpenKeysReturn {
-  openKeys: string[];
-  onOpenChange: (keys: string[]) => void;
-  closeAllSubmenus: () => void;
-}
+// Stable events array (defined outside component to avoid re-renders)
+const NOTIF_EVENTS = ['notificacoes:refresh'];
 
-// Hook para controlar abertura de submenus (apenas um aberto por vez)
-function useMenuOpenKeys(): UseMenuOpenKeysReturn {
-  const [openKeys, setOpenKeys] = useState<string[]>([]);
-
-  const onOpenChange = (keys: string[]) => {
-    // Pegar apenas a última key aberta (fecha as outras)
-    const latestOpenKey = keys.find((key) => openKeys.indexOf(key) === -1);
-    setOpenKeys(latestOpenKey ? [latestOpenKey] : []);
-  };
-
-  // Fecha todos os submenus ao clicar em item fora de submenu
-  const closeAllSubmenus = () => {
-    setOpenKeys([]);
-  };
-
-  return { openKeys, onOpenChange, closeAllSubmenus };
-}
-
-// Mapeamento de rotas para keys do menu
-const ROUTE_TO_MENU_KEY: Record<string, string> = {
-  '/': 'home',
-  '/home': 'home',
-  '/aprovacoes': 'aprovacoes',
-  '/bloqueios': 'bloqueios',
-  // Controle module
-  '/controle': 'controle-ops',
-  '/controle/acoes': 'controle-acoes',
-  '/controle/compras': 'controle-compras',
-  '/controle/formacoes': 'controle-formacoes',
-  '/controle/plano-formacoes': 'controle-plano-formacoes',
-  '/controle/pre-agenda': 'controle-pre-agenda',
-  '/pre-agenda': 'controle-pre-agenda',
-  '/acoes-notificacao': 'acoes-notificacao-ciclo',
-  '/acoes-notificacao/timeline': 'acoes-notificacao-timeline',
-  '/notificacoes-internas': 'acoes-notificacao-inbox',
-  '/dat/etl-reports': 'dat-etl-reports',
-  // Item único
-  '/deslocamentos': 'deslocamentos',
-  // Dashboards
-  '/dashboards': 'dashboard-geral',
-  '/dashboards/compras': 'dashboard-compras',
-  '/dashboards/equipe': 'dashboard-equipe',
-  '/dashboards/gcal': 'gcal-dashboard',
-  '/mapa-brasil': 'mapa-brasil',
-  // DAT module
-  '/dat/admin': 'dat-admin',
-  '/dat/admin/colecoes': 'dat-admin-colecoes',
-  '/dat/admin/equipe-gerencia': 'dat-admin-equipe-gerencia',
-  '/dat/cadastros': 'dat-cadastros',
-  '/dat/compras-materiais': 'dat-compras-materiais',
-  '/dat/coordenadores': 'dat-coordenadores',
-  '/dat/importacao': 'dat-importacao',
-  '/dat/registros': 'dat-registros',
-  // Outros
-  '/disponibilidade': 'grade-mensal',
-  '/solicitacoes/minhas': 'minhas-solicitacoes',
-  '/solicitacoes/nova': 'nova-solicitacao',
-};
-
-// Mapeamento de menu keys para seus submenus pais
-const MENU_KEY_TO_PARENT: Record<string, string> = {
-  // Controle submenu
-  'controle-ops': 'controle-submenu',
-  'controle-acoes': 'controle-submenu',
-  'controle-compras': 'controle-submenu',
-  'controle-formacoes': 'controle-submenu',
-  'controle-plano-formacoes': 'controle-submenu',
-  'controle-pre-agenda': 'controle-submenu',
-  // Acoes/Notificacoes submenu
-  'acoes-notificacao-ciclo': 'acoes-notificacao-submenu',
-  'acoes-notificacao-timeline': 'acoes-notificacao-submenu',
-  'acoes-notificacao-inbox': 'acoes-notificacao-submenu',
-  // Dashboards submenu
-  'dashboard-geral': 'dashboards-submenu',
-  'dashboard-compras': 'dashboards-submenu',
-  'dashboard-equipe': 'dashboards-submenu',
-  'gcal-dashboard': 'dashboards-submenu',
-  'mapa-brasil': 'dashboards-submenu',
-  // DAT submenu
-  'dat-admin': 'dat-submenu',
-  'dat-admin-colecoes': 'dat-submenu',
-  'dat-admin-equipe-gerencia': 'dat-submenu',
-  'dat-cadastros': 'dat-submenu',
-  'dat-compras-materiais': 'dat-submenu',
-  'dat-coordenadores': 'dat-submenu',
-  'dat-etl-reports': 'dat-submenu',
-  'dat-importacao': 'dat-submenu',
-  'dat-registros': 'dat-submenu',
-  // Solicitações submenu
-  'minhas-solicitacoes': 'solicitacoes-submenu',
-  'nova-solicitacao': 'solicitacoes-submenu',
-};
-
-// Hook para obter a key do menu baseada na rota atual
-function useSelectedMenuKey(): string {
-  const location = useLocation();
-  return useMemo(() => {
-    // Tenta match exato primeiro
-    if (ROUTE_TO_MENU_KEY[location.pathname]) {
-      return ROUTE_TO_MENU_KEY[location.pathname];
-    }
-    // Tenta match parcial para rotas com parâmetros (ex: /solicitacoes/:id/editar)
-    for (const [route, key] of Object.entries(ROUTE_TO_MENU_KEY)) {
-      if (location.pathname.startsWith(route) && route !== '/') {
-        return key;
-      }
-    }
-    return 'home';
-  }, [location.pathname]);
-}
-
-// Props do SidebarMenu
-interface SidebarMenuProps {
-  openKeys: string[];
-  onOpenChange: (keys: string[]) => void;
-  onItemClick?: () => void;
-  children: React.ReactNode;
-}
-
-// Componente que usa useLocation para seleção dinâmica do menu
-function SidebarMenu({ openKeys, onOpenChange, onItemClick, children }: SidebarMenuProps): JSX.Element {
-  const selectedKey = useSelectedMenuKey();
-
-  // Auto-abrir submenu pai quando navegar diretamente para uma rota interna
-  useEffect(() => {
-    const parentKey = MENU_KEY_TO_PARENT[selectedKey];
-    if (parentKey && !openKeys.includes(parentKey)) {
-      onOpenChange([parentKey]);
-    }
-  }, [selectedKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <Menu
-      theme="dark"
-      mode="inline"
-      selectedKeys={[selectedKey]}
-      openKeys={openKeys}
-      onOpenChange={onOpenChange}
-      onClick={onItemClick}
-      style={{ borderRight: 0 }}
-    >
-      {children}
-    </Menu>
-  );
-}
-
-// Componente de loading para Suspense
-function PageLoader(): JSX.Element {
-  return (
-    <div className="flex justify-center items-center" style={{ height: '100%', minHeight: '300px' }}>
-      <Spin size="large" tip="Carregando página..." />
-    </div>
-  );
-}
-
-// Componente 403 Forbidden
-function Forbidden(): JSX.Element {
-  return <Result status="403" title="Sem permissão" subTitle="Você não tem permissão para acessar esta página." />;
-}
-
-// Componente principal que usa o tema
 function AppContent(): JSX.Element {
   const { antThemeConfig } = useTheme();
   const colors = useBrandColors();
+
+  // ── User state ──
   const [user, setUser] = useState<CurrentUser | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
 
-  // Issue #97: GCal Alerts (badge + toast)
+  // ── GCal alerts state ──
   const [alerts, setAlerts] = useState<AlertsSummary>({ errors: 0, pending: 0, published: 0, none: 0 });
-  const [lastErrorsCount, setLastErrorsCount] = useState<number>(0);
-  const [cooldownUntil, setCooldownUntil] = useState<number>(0);
+  const [lastErrorsCount, setLastErrorsCount] = useState(0);
+  const [cooldownUntil, setCooldownUntil] = useState(0);
 
-  // Notification badge (unread count) + popover
-  const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
-  const [lastNotifCount, setLastNotifCount] = useState<number>(-1);
-  const [notifCooldownUntil, setNotifCooldownUntil] = useState<number>(0);
-  const [popoverOpen, setPopoverOpen] = useState<boolean>(false);
-  const [popoverNotifs, setPopoverNotifs] = useState<NotificacaoInterna[]>([]);
-  const [popoverLoading, setPopoverLoading] = useState<boolean>(false);
+  // ── Notification badge state ──
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [lastNotifCount, setLastNotifCount] = useState(-1);
+  const [notifCooldownUntil, setNotifCooldownUntil] = useState(0);
 
-  // Issue #255: Ref para evitar memory leak (atualizações após unmount)
-  const isMountedRef = useRef<boolean>(true);
+  // ── Mobile responsiveness ──
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < LAYOUT.MOBILE_BREAKPOINT);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < LAYOUT.MOBILE_BREAKPOINT);
 
-  // Mobile responsiveness: sidebar colapsável
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    return window.innerWidth < LAYOUT.MOBILE_BREAKPOINT;
-  });
-  const [isMobile, setIsMobile] = useState<boolean>(() => {
-    return window.innerWidth < LAYOUT.MOBILE_BREAKPOINT;
-  });
-
-  // Detectar mudanças de tamanho da tela
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < LAYOUT.MOBILE_BREAKPOINT;
       setIsMobile(mobile);
-      // Auto-colapsar em mobile, expandir em desktop
-      if (mobile) {
-        setSidebarCollapsed(true);
-      } else {
-        setSidebarCollapsed(false);
-      }
+      setSidebarCollapsed(mobile);
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Controle de submenus (apenas um aberto por vez)
-  const { openKeys, onOpenChange, closeAllSubmenus } = useMenuOpenKeys();
-
-  // Calcular flags de permissão (RBAC com Setor + Função)
-  const setores = user?.setores || [];
-  const funcoes = user?.funcoes || [];
-  const isCoordenador = funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação');
-  const isGerente = funcoes.includes('Gerente');
-  const inSuperintendencia = setores.includes('Superintendência');
-  const inGerencia = setores.includes('Gerência');
-  const inDAT = setores.includes('DAT');
-  const inControle = setores.includes('Controle');
-  const inDiretoria = setores.includes('Diretoria');
-  const canApproveSuper = user?.can_approve_super || false;
-  const canCoordenador = user?.is_superuser || isCoordenador || inDAT;
-  const canControle = user?.is_superuser || inControle;
-  const canDAT = user?.is_superuser || inDAT;
-  const canAcoesInternas = user?.is_superuser || inDAT || isCoordenador || isGerente;
-  const canDashboardOverview = user?.is_superuser || inSuperintendencia || inGerencia || inDiretoria;
-  const canDashboardEquipe = user?.is_superuser || inControle || inGerencia || inSuperintendencia || inDiretoria;
-  const canDashboardGcal = user?.is_superuser || inControle || inSuperintendencia;
-  const canDashboardCompras = user?.is_superuser || inDiretoria || inDAT;
-  const canMapaBrasil = user?.is_superuser || inControle || inDAT || inSuperintendencia || inGerencia || inDiretoria;
-  const canDashboardsMenu =
-    canDashboardOverview || canDashboardCompras || canDashboardEquipe || canDashboardGcal || canMapaBrasil;
-  const canDisponibilidade = user?.is_superuser || !inControle;
-
-  // Toggle do sidebar (para mobile)
   const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed(prev => {
-      // Se vai colapsar, fechar submenus também
-      if (!prev) {
-        closeAllSubmenus();
-      }
-      return !prev;
-    });
-  }, [closeAllSubmenus]);
+    setSidebarCollapsed(prev => !prev);
+  }, []);
 
-  // Carregar dados do usuário - useCallback para poder passar como prop
+  // ── Permissions (single source of truth) ──
+  const permissions = usePermissions(user);
+
+  // ── Load user ──
   const loadUser = useCallback(async () => {
     try {
       const userData = await getMe();
       if (isMountedRef.current) {
         setUser(userData);
-        // Issue #418: Preload search data after successful login
         preloadSearchData().catch((err) => logger.warn('Search preload failed:', err));
       }
     } catch (error) {
       if (isMountedRef.current) {
-        const status = (error as { status?: number }).status;
-        const isAuthError = status === 401 || status === 403;
-        const log = isAuthError ? logger.warn : logger.error;
+        const log = isAuthError(error) ? logger.warn : logger.error;
         log('Erro ao carregar usuário:', error);
         setUser(null);
       }
     } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-      }
+      if (isMountedRef.current) setLoading(false);
     }
   }, []);
 
-  // Carregar usuário no mount e cleanup no unmount
   useEffect(() => {
     isMountedRef.current = true;
     loadUser();
-
-    return () => {
-      isMountedRef.current = false;
-    };
+    return () => { isMountedRef.current = false; };
   }, [loadUser]);
 
-  // Issue #97: Polling de alertas GCal (badge + toast)
-  // Issue #259: Pausar polling quando aba não está visível (Page Visibility API)
+  // ── GCal alerts polling (usePolling) ──
+  const gcalEnabled = !!(user?.setores?.includes('Controle') || user?.is_superuser);
+
+  // Use refs to avoid stale closures in polling callback
+  const lastErrorsRef = useRef(lastErrorsCount);
+  lastErrorsRef.current = lastErrorsCount;
+  const cooldownRef = useRef(cooldownUntil);
+  cooldownRef.current = cooldownUntil;
+
+  const fetchGCalAlerts = useCallback(async () => {
+    try {
+      const data = await deduplicatedFetch('gcal-alerts', getAlertsSummary);
+      setAlerts(data);
+
+      const now = Date.now();
+      if (data.errors > lastErrorsRef.current && now > cooldownRef.current) {
+        toast.error(
+          `Novos erros de publicação detectados (${lastErrorsRef.current} → ${data.errors})`,
+          { duration: 5000 },
+        );
+        setCooldownUntil(now + TIMING.TOAST_COOLDOWN_MS);
+      }
+
+      if (data.errors !== lastErrorsRef.current) {
+        setLastErrorsCount(data.errors);
+        localStorage.setItem('gcalAlertsLastErrors', data.errors.toString());
+      }
+    } catch (error) {
+      if (isAuthError(error)) return;
+      logger.error('[Alerts] Erro ao buscar alertas:', error);
+    }
+  }, []);
+
+  // Load lastErrorsCount from localStorage on mount
   useEffect(() => {
-    // Só ativar polling para Controle (Gerentes de Controle)
-    const inControle = user?.setores?.includes('Controle');
-
-    if (!inControle && !user?.is_superuser) {
-      return; // Não tem permissão, não fazer polling
-    }
-
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-
-    const fetchAlerts = async () => {
-      try {
-        const data = await getAlertsSummary();
-        setAlerts(data);
-
-        // Toast quando errors aumentar (com cooldown)
-        const now = Date.now();
-        if (data.errors > lastErrorsCount && now > cooldownUntil) {
-          toast.error(
-            `Novos erros de publicação detectados (${lastErrorsCount} → ${data.errors})`,
-            { duration: 5000 }
-          );
-          setCooldownUntil(now + TIMING.TOAST_COOLDOWN_MS);
-        }
-
-        // Atualizar lastErrorsCount e persistir em localStorage
-        if (data.errors !== lastErrorsCount) {
-          setLastErrorsCount(data.errors);
-          localStorage.setItem('gcalAlertsLastErrors', data.errors.toString());
-        }
-      } catch (error) {
-        const status =
-          (error as { status?: number }).status
-          ?? (error as { response?: { status?: number } }).response?.status;
-        if (status === 401 || status === 403) {
-          logger.warn('[Alerts] Sem permissão para acessar alerts');
-          return;
-        }
-        logger.error('[Alerts] Erro ao buscar alertas:', error);
-      }
-    };
-
-    // Issue #259: Funções para controlar polling baseado em visibilidade
-    const startPolling = () => {
-      if (!intervalId) {
-        intervalId = setInterval(fetchAlerts, TIMING.ALERT_POLL_INTERVAL_MS);
-      }
-    };
-
-    const stopPolling = () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-        intervalId = null;
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        stopPolling();
-      } else {
-        // Fetch imediato ao voltar, depois retomar polling
-        fetchAlerts();
-        startPolling();
-      }
-    };
-
-    // Carregar lastErrorsCount do localStorage na inicialização
     const stored = localStorage.getItem('gcalAlertsLastErrors');
-    if (stored) {
-      setLastErrorsCount(parseInt(stored, 10) || 0);
+    if (stored) setLastErrorsCount(parseInt(stored, 10) || 0);
+  }, []);
+
+  usePolling(fetchGCalAlerts, {
+    enabled: gcalEnabled,
+    intervalMs: TIMING.ALERT_POLL_INTERVAL_MS,
+  });
+
+  // ── Notification badge polling (usePolling) ──
+  const notifEnabled = permissions.canAcoesInternas;
+
+  const lastNotifRef = useRef(lastNotifCount);
+  lastNotifRef.current = lastNotifCount;
+  const notifCooldownRef = useRef(notifCooldownUntil);
+  notifCooldownRef.current = notifCooldownUntil;
+
+  const fetchUnreadNotifications = useCallback(async () => {
+    try {
+      const data = await deduplicatedFetch('unread-count', getNotificacoesNaoLidasCount);
+      if (!isMountedRef.current) return;
+      setUnreadNotifications(data.count);
+
+      const now = Date.now();
+      if (data.count > lastNotifRef.current && lastNotifRef.current >= 0 && now > notifCooldownRef.current) {
+        const diff = data.count - lastNotifRef.current;
+        toast(`${diff} nova${diff > 1 ? 's' : ''} notificação${diff > 1 ? 'ões' : ''}`, {
+          icon: '🔔',
+          duration: 5000,
+          id: 'new-notifications',
+        });
+        setNotifCooldownUntil(now + TIMING.TOAST_COOLDOWN_MS);
+      }
+
+      if (data.count !== lastNotifRef.current) {
+        setLastNotifCount(data.count);
+        if (user?.id) localStorage.setItem(`notifLastUnread:${user.id}`, data.count.toString());
+      }
+    } catch (error) {
+      if (isAuthError(error)) return;
+      logger.error('[Notifications] Polling error:', error);
     }
+  }, [user?.id]);
 
-    // Setup: listener de visibilidade
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Fetch inicial e iniciar polling se aba está visível
-    fetchAlerts();
-    if (!document.hidden) {
-      startPolling();
-    }
-
-    // Cleanup: parar polling e remover listener
-    return () => {
-      stopPolling();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [user, lastErrorsCount, cooldownUntil]);
-
-  // Sincronizar lastNotifCount com localStorage quando user muda (login, troca de conta)
+  // Sync lastNotifCount with localStorage when user changes
   useEffect(() => {
     if (!user?.id) return;
     setUnreadNotifications(0);
@@ -484,99 +200,31 @@ function AppContent(): JSX.Element {
     setLastNotifCount(Number.isNaN(parsed) ? -1 : parsed);
   }, [user?.id]);
 
-  // Notification polling (badge + toast)
-  useEffect(() => {
-    if (!canAcoesInternas) return;
+  usePolling(fetchUnreadNotifications, {
+    enabled: notifEnabled,
+    intervalMs: TIMING.ALERT_POLL_INTERVAL_MS,
+    events: NOTIF_EVENTS,
+  });
 
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-
-    const fetchUnread = async () => {
-      try {
-        const data = await getNotificacoesNaoLidasCount();
-        if (!isMountedRef.current) return;
-        setUnreadNotifications(data.count);
-
-        const now = Date.now();
-        if (data.count > lastNotifCount && lastNotifCount >= 0 && now > notifCooldownUntil) {
-          const diff = data.count - lastNotifCount;
-          toast(`${diff} nova${diff > 1 ? 's' : ''} notificação${diff > 1 ? 'ões' : ''}`, {
-            icon: '🔔',
-            duration: 5000,
-            id: 'new-notifications',
-          });
-          setNotifCooldownUntil(now + TIMING.TOAST_COOLDOWN_MS);
-        }
-
-        if (data.count !== lastNotifCount) {
-          setLastNotifCount(data.count);
-          if (user?.id) localStorage.setItem(`notifLastUnread:${user.id}`, data.count.toString());
-        }
-      } catch (error) {
-        const errStatus = (error as { status?: number }).status
-          ?? (error as { response?: { status?: number } }).response?.status;
-        if (errStatus === 401 || errStatus === 403) return;
-        logger.error('[Notifications] Polling error:', error);
-      }
-    };
-
-    const startPolling = () => {
-      if (!intervalId) {
-        intervalId = setInterval(fetchUnread, TIMING.ALERT_POLL_INTERVAL_MS);
-      }
-    };
-    const stopPolling = () => {
-      if (intervalId) { clearInterval(intervalId); intervalId = null; }
-    };
-    const handleVisibility = () => {
-      if (document.hidden) { stopPolling(); }
-      else { fetchUnread(); startPolling(); }
-    };
-
-    const handleRefreshEvent = () => { fetchUnread(); };
-    window.addEventListener('notificacoes:refresh', handleRefreshEvent);
-
-    document.addEventListener('visibilitychange', handleVisibility);
-    fetchUnread();
-    if (!document.hidden) startPolling();
-
-    return () => {
-      stopPolling();
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('notificacoes:refresh', handleRefreshEvent);
-    };
-  }, [user, canAcoesInternas, lastNotifCount, notifCooldownUntil]);
-
-  // Popover: fetch recent notifications when opened
-  const handlePopoverOpenChange = useCallback(async (open: boolean) => {
-    setPopoverOpen(open);
-    if (open) {
-      setPopoverLoading(true);
-      try {
-        const data = await listNotificacoesInternas({ page_size: 8, ordering: '-created_at' });
-        if (isMountedRef.current) setPopoverNotifs(data.results);
-      } catch {
-        // silently fail — badge still works
-      } finally {
-        if (isMountedRef.current) setPopoverLoading(false);
-      }
-    }
-  }, []);
-
-  const handlePopoverMarkRead = useCallback(async (notifId: number) => {
+  // ── Logout ──
+  const handleLogout = useCallback(async () => {
     try {
-      await marcarNotificacaoLida(notifId);
-      setPopoverNotifs((prev) => prev.map((n) => (n.id === notifId ? { ...n, lida: true } : n)));
-      window.dispatchEvent(new Event('notificacoes:refresh'));
-    } catch {
-      message.error('Erro ao marcar notificação como lida');
+      await apiLogout();
+      message.success('Logout realizado com sucesso');
+    } catch (error) {
+      logger.error('Erro no logout:', error);
+      message.warning('Sessão encerrada localmente');
+    } finally {
+      setUser(null);
+      window.location.reload();
     }
   }, []);
 
+  // ── Render ──
   if (loading) {
     return <Spin size="large" tip="Carregando..." fullscreen />;
   }
 
-  // Se não autenticado, mostrar página de login
   if (!user) {
     return (
       <ConfigProvider locale={ptBR} theme={antThemeConfig}>
@@ -587,551 +235,44 @@ function AppContent(): JSX.Element {
     );
   }
 
-  // Função de logout
-  const handleLogout = async () => {
-    try {
-      await apiLogout();
-      message.success('Logout realizado com sucesso');
-    } catch (error) {
-      // Log detalhado do erro
-      logger.error('Erro no logout:', error);
-      message.warning('Sessão encerrada localmente');
-    } finally {
-      // Sempre limpar estado local e redirecionar, mesmo se API falhar
-      setUser(null);
-      // Recarregar a página para voltar para tela de login
-      window.location.reload();
-    }
-  };
-
   return (
     <ConfigProvider locale={ptBR} theme={antThemeConfig}>
       <Toaster position="top-right" toastOptions={{ duration: 5000 }} />
       <Router>
-        {/* Issue #416: Offline warning banner */}
         <OfflineBanner />
         <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
-          {/* Overlay para fechar sidebar em mobile */}
-          {isMobile && !sidebarCollapsed && (
-            <div
-              className="mobile-sidebar-overlay"
-              onClick={toggleSidebar}
-              aria-hidden="true"
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(0, 0, 0, 0.45)',
-                zIndex: 999,
-              }}
-            />
-          )}
-          {/* Sider lateral - colapsável em mobile */}
-          <Sider
-            width={LAYOUT.SIDEBAR_WIDTH}
-            collapsedWidth={isMobile ? 0 : LAYOUT.SIDEBAR_COLLAPSED_WIDTH}
-            collapsed={sidebarCollapsed}
-            collapsible
-            trigger={null}
-            role="navigation"
-            aria-label="Navegacao principal"
-            className={isMobile && !sidebarCollapsed ? 'mobile-sidebar-open' : ''}
-            style={{
-              overflow: 'auto',
-              height: '100vh',
-              position: 'fixed',
-              left: 0,
-              top: 0,
-              bottom: 0,
-              background: colors.sidebarBackground,
-              zIndex: isMobile ? 1000 : 1,
-              transition: 'all 0.2s ease',
-            }}
-          >
-            {/* Logo/Título - header semântico para branding */}
-            <header
-              role="banner"
-              className="flex items-center justify-center font-bold"
-              style={{
-                height: '64px',
-                color: 'white',
-                fontSize: '22px',
-                borderBottom: `1px solid ${colors.borderLight}`,
-              }}
-            >
-              Aprender Sistema
-            </header>
-
-            {/* Menu vertical - Ordem alfabética (exceto Página Inicial) */}
-            {/* Não renderizar menu quando colapsado em mobile para evitar popups */}
-            {!(isMobile && sidebarCollapsed) && (
-            <SidebarMenu
-              openKeys={openKeys}
-              onOpenChange={onOpenChange}
-              onItemClick={() => {
-                if (isMobile) {
-                  setSidebarCollapsed(true);
-                  closeAllSubmenus(); // Fechar submenus também
-                }
-              }}
-            >
-              {/* 1. Página Inicial (sempre primeiro) */}
-              <Menu.Item key="home" icon={<HomeOutlined />} onClick={closeAllSubmenus}>
-                <Link to="/home">Página Inicial</Link>
-              </Menu.Item>
-
-              {/* 2. Aprovações */}
-              {canApproveSuper && (
-                <Menu.Item key="aprovacoes" icon={<SafetyOutlined />} onClick={closeAllSubmenus}>
-                  <Link to="/aprovacoes">Aprovações</Link>
-                </Menu.Item>
-              )}
-
-              {/* 3. Bloqueios */}
-              {(canControle || canCoordenador || user?.groups?.includes('Formador')) && (
-                <Menu.Item key="bloqueios" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
-                  <Link to="/bloqueios">Bloqueios</Link>
-                </Menu.Item>
-              )}
-
-              {/* 4. Controle */}
-              {canControle && (
-                <SubMenu key="controle-submenu" icon={<CheckCircleOutlined />} title="Controle">
-                  <Menu.Item key="controle-acoes">
-                    <Link to="/controle/acoes">Ações</Link>
-                  </Menu.Item>
-                  <Menu.Item key="controle-compras">
-                    <Link to="/controle/compras">Compras</Link>
-                  </Menu.Item>
-                  <Menu.Item key="controle-formacoes">
-                    <Link to="/controle/formacoes">Formações</Link>
-                  </Menu.Item>
-                  <Menu.Item key="controle-ops">
-                    <Link to="/controle">Painel de Controle</Link>
-                  </Menu.Item>
-                  <Menu.Item key="controle-plano-formacoes">
-                    <Link to="/controle/plano-formacoes">Plano Anual</Link>
-                  </Menu.Item>
-                  <Menu.Item key="controle-pre-agenda">
-                    <Link to="/controle/pre-agenda">Pré-agenda</Link>
-                  </Menu.Item>
-                </SubMenu>
-              )}
-              {canAcoesInternas && (
-                <SubMenu key="acoes-notificacao-submenu" icon={<Badge count={unreadNotifications} size="small" offset={[6, 0]}><BellOutlined /></Badge>} title="Ações Internas">
-                  <Menu.Item key="acoes-notificacao-ciclo">
-                    <Link to="/acoes-notificacao">Ciclos e Ações</Link>
-                  </Menu.Item>
-                  <Menu.Item key="acoes-notificacao-timeline">
-                    <Link to="/acoes-notificacao/timeline">Timeline</Link>
-                  </Menu.Item>
-                  <Menu.Item key="acoes-notificacao-inbox">
-                    <Link to="/notificacoes-internas">Notificações</Link>
-                  </Menu.Item>
-                </SubMenu>
-              )}
-
-              {/* 5. Deslocamentos (item único) */}
-              {(canControle || canCoordenador || canDAT) && (
-                <Menu.Item key="deslocamentos" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
-                  <Link to="/deslocamentos">Deslocamentos</Link>
-                </Menu.Item>
-              )}
-
-              {/* 5. Dashboards */}
-              {canDashboardsMenu && (
-                <SubMenu key="dashboards-submenu" icon={<BarChartOutlined />} title="Dashboards">
-                  {canDashboardOverview && (
-                    <Menu.Item key="dashboard-geral">
-                      <Link to="/dashboards">Dashboard Geral</Link>
-                    </Menu.Item>
-                  )}
-                  {canDashboardCompras && (
-                    <Menu.Item key="dashboard-compras">
-                      <Link to="/dashboards/compras">Dashboard Compras</Link>
-                    </Menu.Item>
-                  )}
-                  {canDashboardEquipe && (
-                    <Menu.Item key="dashboard-equipe">
-                      <Link to="/dashboards/equipe">Dashboard Equipe</Link>
-                    </Menu.Item>
-                  )}
-                  {canDashboardGcal && (
-                    <Menu.Item key="gcal-dashboard">
-                      <Link to="/dashboards/gcal">
-                        <Badge count={alerts.errors} offset={[10, 0]} size="small">
-                          Dashboard GCal
-                        </Badge>
-                      </Link>
-                    </Menu.Item>
-                  )}
-                  {canMapaBrasil && (
-                    <Menu.Item key="mapa-brasil">
-                      <Link to="/mapa-brasil">Mapa do Brasil</Link>
-                    </Menu.Item>
-                  )}
-                </SubMenu>
-              )}
-
-              {/* 6. DAT */}
-              {canDAT && (
-                <SubMenu key="dat-submenu" icon={<SolutionOutlined />} title="DAT">
-                  <Menu.Item key="dat-admin">
-                    <Link to="/dat/admin">Administração</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-admin-colecoes">
-                    <Link to="/dat/admin/colecoes">Importar Coleções</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-admin-equipe-gerencia">
-                    <Link to="/dat/admin/equipe-gerencia">Importar Vínculos</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-cadastros">
-                    <Link to="/dat/cadastros">Cadastros</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-compras-materiais">
-                    <Link to="/dat/compras-materiais">Compras Materiais</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-coordenadores">
-                    <Link to="/dat/coordenadores">Coordenadores</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-importacao">
-                    <Link to="/dat/importacao">Importação</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-registros">
-                    <Link to="/dat/registros">Registros de Turmas</Link>
-                  </Menu.Item>
-                  <Menu.Item key="dat-etl-reports">
-                    <Link to="/dat/etl-reports">Relatórios ETL</Link>
-                  </Menu.Item>
-                </SubMenu>
-              )}
-
-              {/* 7. Grade Mensal (todos exceto Controle) */}
-              {canDisponibilidade && (
-                <Menu.Item key="grade-mensal" icon={<TableOutlined />} onClick={closeAllSubmenus}>
-                  <Link to="/disponibilidade">Grade Mensal</Link>
-                </Menu.Item>
-              )}
-
-              {/* 8. Solicitações */}
-              {canCoordenador && (
-                <SubMenu key="solicitacoes-submenu" icon={<FileTextOutlined />} title="Solicitações">
-                  <Menu.Item key="minhas-solicitacoes">
-                    <Link to="/solicitacoes/minhas">Minhas Solicitações</Link>
-                  </Menu.Item>
-                  <Menu.Item key="nova-solicitacao">
-                    <Link to="/solicitacoes/nova">Nova Solicitação</Link>
-                  </Menu.Item>
-                </SubMenu>
-              )}
-            </SidebarMenu>
-            )}
-          </Sider>
-
-          {/* Layout com margem para compensar Sider fixo */}
+          <AppSidebar
+            user={user}
+            permissions={permissions}
+            gcalErrorCount={alerts.errors}
+            unreadNotifications={unreadNotifications}
+            isMobile={isMobile}
+            sidebarCollapsed={sidebarCollapsed}
+            toggleSidebar={toggleSidebar}
+            colors={{ sidebarBackground: colors.sidebarBackground, borderLight: colors.borderLight }}
+          />
           <Layout style={{
             marginLeft: isMobile ? 0 : (sidebarCollapsed ? LAYOUT.SIDEBAR_COLLAPSED_WIDTH : LAYOUT.SIDEBAR_WIDTH),
             minHeight: '100vh',
             background: colors.pageBackground,
             transition: 'margin-left 0.2s ease',
           }}>
-            {/* Header com info do usuário - aria-label para acessibilidade */}
-            <Header
-              className="flex items-center justify-between w-full"
-              aria-label="Perfil do usuario e acoes"
-              style={{
-                background: colors.cardBackground,
-                padding: '0 24px',
-                borderBottom: `1px solid ${colors.borderDefault}`,
-              }}
-            >
-              {/* Botão hambúrguer para mobile */}
-              <Button
-                type="text"
-                icon={sidebarCollapsed ? <MenuOutlined /> : <CloseOutlined />}
-                onClick={toggleSidebar}
-                aria-label={sidebarCollapsed ? 'Abrir menu' : 'Fechar menu'}
-                className="mobile-menu-toggle"
-                style={{
-                  fontSize: '18px',
-                  display: isMobile ? 'flex' : 'none',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              />
-              <div className="flex items-center gap-4" style={{ whiteSpace: 'nowrap', marginLeft: 'auto' }}>
-                {/* Toggle de tema - ocultado temporariamente
-                <Tooltip title={isDark ? 'Modo claro' : 'Modo escuro'}>
-                  <Button
-                    type="text"
-                    icon={isDark ? <SunOutlined /> : <MoonOutlined />}
-                    onClick={toggleTheme}
-                    style={{ color: isDark ? '#fff' : undefined }}
-                  />
-                </Tooltip>
-                */}
-                <div className="flex items-center gap-2">
-                  <UserOutlined />
-                  <Text strong>{user?.name || user?.username || 'Usuário'}</Text>
-                </div>
-                {canAcoesInternas && (
-                  <Popover
-                    trigger="click"
-                    open={popoverOpen}
-                    onOpenChange={(open) => void handlePopoverOpenChange(open)}
-                    placement="bottomRight"
-                    overlayStyle={{ width: 'min(360px, calc(100vw - 16px))' }}
-                    overlayClassName="notif-popover"
-                    arrow={{ pointAtCenter: true }}
-                    afterOpenChange={(visible) => {
-                      if (visible && window.innerWidth <= 480) {
-                        const el = document.querySelector('.notif-popover') as HTMLElement;
-                        if (el) { el.style.left = '8px'; el.style.right = '8px'; }
-                      }
-                    }}
-                    title={
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>Notificações</span>
-                        {unreadNotifications > 0 && <Tag color="blue">{unreadNotifications} não lida{unreadNotifications > 1 ? 's' : ''}</Tag>}
-                      </div>
-                    }
-                    content={
-                      <div>
-                        {popoverLoading ? (
-                          <div style={{ textAlign: 'center', padding: 24 }}><Spin size="small" /></div>
-                        ) : popoverNotifs.length === 0 ? (
-                          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nenhuma notificação" />
-                        ) : (
-                          <List
-                            size="small"
-                            dataSource={popoverNotifs}
-                            renderItem={(item: NotificacaoInterna) => (
-                              <List.Item
-                                style={{
-                                  background: item.lida ? undefined : 'rgba(0, 107, 82, 0.06)',
-                                  padding: '8px 12px',
-                                  cursor: item.lida ? 'default' : 'pointer',
-                                }}
-                                onClick={() => { if (!item.lida) void handlePopoverMarkRead(item.id as number); }}
-                              >
-                                <List.Item.Meta
-                                  title={
-                                    <span style={{ fontSize: 13 }}>
-                                      {!item.lida && <Badge status="processing" style={{ marginRight: 6 }} />}
-                                      {item.titulo}
-                                    </span>
-                                  }
-                                  description={
-                                    <span style={{ fontSize: 12 }}>
-                                      <Tag color="purple" style={{ fontSize: 11 }}>{item.fase_disparo}</Tag>
-                                      {item.prioridade === 'CRITICA' ? <Tag color="red" style={{ fontSize: 11 }}>CRÍTICA</Tag>
-                                        : item.prioridade === 'ALTA' ? <Tag color="orange" style={{ fontSize: 11 }}>ALTA</Tag>
-                                        : null}
-                                    </span>
-                                  }
-                                />
-                              </List.Item>
-                            )}
-                          />
-                        )}
-                        <div style={{ textAlign: 'center', borderTop: '1px solid #f0f0f0', paddingTop: 8, marginTop: 4 }}>
-                          <Link to="/notificacoes-internas" onClick={() => setPopoverOpen(false)}>
-                            Ver todas as notificações
-                          </Link>
-                        </div>
-                      </div>
-                    }
-                  >
-                    <span style={{ cursor: 'pointer' }} aria-label="Notificações">
-                      <Badge count={unreadNotifications} size="small" offset={[2, 0]}>
-                        <BellOutlined style={{ fontSize: 18, color: unreadNotifications > 0 ? '#006B52' : undefined }} />
-                      </Badge>
-                    </span>
-                  </Popover>
-                )}
-                <Button
-                  type="primary"
-                  danger
-                  icon={<LogoutOutlined />}
-                  onClick={handleLogout}
-                >
-                  Sair
-                </Button>
-              </div>
-            </Header>
-
-            {/* Conteúdo principal com Suspense para lazy loading - role main para semantica */}
+            <AppHeader
+              user={user}
+              canAcoesInternas={permissions.canAcoesInternas}
+              unreadNotifications={unreadNotifications}
+              isMobile={isMobile}
+              sidebarCollapsed={sidebarCollapsed}
+              toggleSidebar={toggleSidebar}
+              onLogout={handleLogout}
+              colors={{ cardBackground: colors.cardBackground, borderDefault: colors.borderDefault }}
+            />
             <Content
               id="main"
               role="main"
               style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: colors.pageBackground }}
             >
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/home" element={<HomePage />} />
-
-                  {/* Dashboard Geral */}
-                  <Route
-                    path="/dashboards"
-                    element={canDashboardOverview ? <DashboardsPage /> : <Forbidden />}
-                  />
-
-{/* Dashboard Compras (Diretoria, DAT, superuser) */}
-                  <Route
-                    path="/dashboards/compras"
-                    element={canDashboardCompras ? <ComprasDashboardPage /> : <Forbidden />}
-                  />
-
-                  {/* Dashboard Equipe */}
-                  <Route
-                    path="/dashboards/equipe"
-                    element={canDashboardEquipe ? <EquipeDashboardPage /> : <Forbidden />}
-                  />
-
-                  {/* GCal Dashboard */}
-                  <Route
-                    path="/dashboards/gcal"
-                    element={canDashboardGcal ? <GCalDashboardPage /> : <Forbidden />}
-                  />
-
-                  {/* Mapa do Brasil */}
-                  <Route
-                    path="/mapa-brasil"
-                    element={canMapaBrasil ? <MapaBrasilPage /> : <Forbidden />}
-                  />
-
-                  <Route
-                    path="/disponibilidade"
-                    element={canDisponibilidade ? <MonthlyPage /> : <Forbidden />}
-                  />
-                  <Route path="/bloqueios" element={<DisponibilidadeBlocks />} />
-
-                  {/* PR15: Novas rotas de solicitações */}
-                  <Route
-                    path="/solicitacoes/minhas"
-                    element={canCoordenador ? <MySolicitacoesPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/solicitacoes/nova"
-                    element={canCoordenador ? <NewSolicitacaoWizard /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/solicitacoes/:id/editar"
-                    element={user ? <EditSolicitacaoPage /> : <Forbidden />}
-                  />
-
-                  {/* PR15: Rota de aprovações (Superintendência/DAT) */}
-                  <Route
-                    path="/aprovacoes"
-                    element={canApproveSuper ? <ApprovalsPage /> : <Forbidden />}
-                  />
-
-                  {/* ========== CONTROLE MODULE ========== */}
-                  <Route path="/controle" element={canControle ? <ControlePage /> : <Forbidden />} />
-                  <Route
-                    path="/controle/acoes"
-                    element={canControle ? <AcoesPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/controle/compras"
-                    element={canControle ? <ControlePage /> : <Forbidden />}
-                  />
-                  {/* Deslocamentos (item único no menu) */}
-                  <Route
-                    path="/deslocamentos"
-                    element={(canControle || canCoordenador || canDAT) ? <DeslocamentosPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/controle/formacoes"
-                    element={canControle ? <FormacoesPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/controle/plano-formacoes"
-                    element={canControle ? <PlanoFormacoesPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/controle/pre-agenda"
-                    element={canControle ? <PreAgendaPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/pre-agenda"
-                    element={canControle ? <PreAgendaPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/acoes-notificacao"
-                    element={canAcoesInternas ? <AcoesNotificacaoPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/acoes-notificacao/timeline"
-                    element={canAcoesInternas ? <AcoesTimelinePage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/notificacoes-internas"
-                    element={canAcoesInternas ? <NotificacoesInternasPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/etl-reports"
-                    element={canDAT ? <EtlReportsPage /> : <Forbidden />}
-                  />
-
-                  {/* ========== DAT MODULE ========== */}
-                  <Route
-                    path="/dat/admin"
-                    element={canDAT ? <AdminDATHomePage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/admin/usuarios"
-                    element={canDAT ? <UsuariosPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/admin/municipios"
-                    element={canDAT ? <MunicipiosPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/admin/projetos"
-                    element={canDAT ? <ProjetosPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/admin/grupos"
-                    element={canDAT ? <GruposPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/admin/configuracoes"
-                    element={canDAT ? <ConfiguracoesPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/admin/colecoes"
-                    element={canDAT ? <ColecoesImportPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/admin/equipe-gerencia"
-                    element={canDAT ? <EquipeGerenciaImportPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/cadastros"
-                    element={canDAT ? <CadastrosPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/compras-materiais"
-                    element={canDAT ? <DATComprasPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/coordenadores"
-                    element={canDAT ? <CoordenadoresPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/importacao"
-                    element={canDAT ? <DATPage /> : <Forbidden />}
-                  />
-                  <Route
-                    path="/dat/registros"
-                    element={canDAT ? <DATRegistrosPage /> : <Forbidden />}
-                  />
-                </Routes>
-              </Suspense>
+              <AppRoutes user={user} permissions={permissions} />
             </Content>
           </Layout>
         </Layout>
@@ -1140,11 +281,12 @@ function AppContent(): JSX.Element {
   );
 }
 
-// App wrapper com ThemeProvider
 function App(): JSX.Element {
   return (
     <ThemeProvider>
-      <AppContent />
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }

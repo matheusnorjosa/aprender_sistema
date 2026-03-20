@@ -52,8 +52,8 @@ class TestHasSectorAccessPermission(TestCase):
         self.permission = HasSectorAccess()
 
         # Criar grupos
-        self.controle_group = Group.objects.create(name="Controle")
-        self.formador_group = Group.objects.create(name="Formador")
+        self.controle_group, _ = Group.objects.get_or_create(name="Controle")
+        self.formador_group, _ = Group.objects.get_or_create(name="Formador")
 
         # Criar gerências
         self.gerencia_vidas = Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")
@@ -172,7 +172,7 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
         self.client = APIClient()
 
         # Criar grupos
-        self.controle_group = Group.objects.create(name="Controle")
+        self.controle_group, _ = Group.objects.get_or_create(name="Controle")
 
         # Criar gerências
         self.gerencia_vidas = Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")

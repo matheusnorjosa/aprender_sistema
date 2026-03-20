@@ -17,7 +17,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Usuario
+from apps.core.models import PermissaoFuncional, Usuario
 
 pytestmark = pytest.mark.django_db
 
@@ -42,9 +42,12 @@ def test_me_includes_groups_and_flag():
 
     assert "groups" in data, "Missing 'groups' field"
     assert "is_superintendencia" in data, "Missing 'is_superintendencia' field"
+    assert "permissions" in data, "Missing 'permissions' field"
 
     assert isinstance(data["groups"], list), "groups should be a list"
+    assert isinstance(data["permissions"], list), "permissions should be a list"
     assert set(data["groups"]) == {"Coordenador", "Formador"}
+    assert all(isinstance(item, str) for item in data["permissions"])
     assert data["is_superintendencia"] is False, "User not in Superintendência"
 
 
@@ -106,6 +109,7 @@ def test_me_no_groups_returns_empty_list():
     data = res.json()
 
     assert data["groups"] == []
+    assert data["permissions"] == []
     assert data["is_superintendencia"] is False
 
 
@@ -126,3 +130,32 @@ def test_superuser_always_has_access():
 
     assert data["is_superuser"] is True
     assert data["is_superintendencia"] is True, "Superuser should always have access"
+
+
+def test_me_returns_effective_functional_permissions():
+    """
+    /api/me/ deve retornar permissions (codenames) vindos do mapeamento funcional.
+    """
+    user = Usuario.objects.create_user(username="u5", email="u5@x.com", password="x", cpf="66666666666")
+    dat_group, _ = Group.objects.get_or_create(name="DAT")
+    user.groups.add(dat_group)
+
+    perm = PermissaoFuncional.objects.create(
+        codename="acoes.notificacao.manage",
+        label="Gerenciar notificações",
+        description="Teste de permissões efetivas",
+        category="acoes",
+        is_system=False,
+    )
+    perm.groups.add(dat_group)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("core:current-user")
+    res = client.get(url)
+
+    assert res.status_code == 200
+    data = res.json()
+    assert "permissions" in data
+    assert "acoes.notificacao.manage" in data["permissions"]

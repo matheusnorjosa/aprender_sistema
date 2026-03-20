@@ -12,13 +12,17 @@ from django.contrib.auth.models import Group
 from django.db.models import Count, Q, QuerySet
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from django_filters.rest_framework import DjangoFilterBackend
 
-from apps.core.models import AuditLog, Compra, Gerencia, Municipio, Produto, Projeto, Usuario
+from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
+from apps.core.models import AuditLog, Compra, Gerencia, Municipio, PermissaoFuncional, Produto, Projeto, Usuario
 from apps.core.permissions import IsControleOrDAT, IsDAT
 from apps.core.serializers import (
     AuditLogSerializer,
@@ -26,6 +30,7 @@ from apps.core.serializers import (
     GerenciaSerializer,
     GroupSerializer,
     MunicipioSerializer,
+    PermissaoFuncionalSerializer,
     ProdutoSerializer,
     ProjetoSerializer,
     UsuarioAdminSerializer,
@@ -308,7 +313,7 @@ class GroupViewSet(viewsets.ModelViewSet):
     GAP-002 (resolvido): Endpoint criado em Fase 1 Iteração 2.
     """
 
-    queryset = Group.objects.prefetch_related("permissions").all()
+    queryset = Group.objects.prefetch_related("permissions", "permissoes_funcionais").all()
     serializer_class = GroupSerializer
     permission_classes = [IsDAT]
 
@@ -316,6 +321,49 @@ class GroupViewSet(viewsets.ModelViewSet):
     search_fields = ["name"]
     ordering_fields = ["name", "id"]
     ordering = ["name"]
+
+    def perform_destroy(self, instance: Group) -> None:
+        is_reserved = instance.name in RESERVED_GROUPS
+        confirmed = str(self.request.query_params.get("confirm_reserved", "")).lower() == "true"
+        if is_reserved and not confirmed:
+            raise ValidationError(
+                {"detail": "Grupo reservado. Para excluir, use ?confirm_reserved=true na requisição."}
+            )
+        super().perform_destroy(instance)
+
+
+class PermissaoFuncionalViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Endpoint read-only para listar permissões funcionais de negócio.
+    """
+
+    queryset = PermissaoFuncional.objects.prefetch_related("groups").all()
+    serializer_class = PermissaoFuncionalSerializer
+    permission_classes = [IsDAT]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["category", "is_system"]
+    search_fields = ["codename", "label", "description"]
+    ordering_fields = ["category", "label", "codename"]
+    ordering = ["category", "label"]
+
+
+class RBACMetaView(APIView):
+    """
+    Metadados de RBAC para telas admin.
+    """
+
+    permission_classes = [IsDAT]
+
+    def get(self, request: Request, *args: object, **kwargs: object) -> Response:
+        categories = list(PermissaoFuncional.objects.values_list("category", flat=True).distinct().order_by("category"))
+        return Response(
+            {
+                "setor_groups": SETOR_GROUPS,
+                "funcao_groups": FUNCAO_GROUPS,
+                "categories": categories,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):

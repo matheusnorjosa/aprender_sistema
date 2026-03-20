@@ -9,7 +9,7 @@ Type-checked with Pyright (strict mode).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -157,6 +157,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         Regras de segurança para operações sensíveis de admin.
         """
         attrs = super().validate(attrs)
+        attrs_typed = cast(dict[str, object], attrs)
 
         request: Any = self.context.get("request")
         request_user: Any = getattr(request, "user", None)
@@ -164,9 +165,11 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
         current_is_superuser = bool(getattr(instance, "is_superuser", False)) if instance is not None else False
         current_is_active = bool(getattr(instance, "is_active", True)) if instance is not None else True
-        target_is_superuser = bool(attrs["is_superuser"]) if "is_superuser" in attrs else current_is_superuser
-        target_is_active = bool(attrs["is_active"]) if "is_active" in attrs else current_is_active
-        incoming_is_superuser = "is_superuser" in attrs
+        target_is_superuser = (
+            bool(attrs_typed["is_superuser"]) if "is_superuser" in attrs_typed else current_is_superuser
+        )
+        target_is_active = bool(attrs_typed["is_active"]) if "is_active" in attrs_typed else current_is_active
+        incoming_is_superuser = "is_superuser" in attrs_typed
 
         # Apenas superuser pode alterar is_superuser.
         if incoming_is_superuser and (not request_user or not getattr(request_user, "is_superuser", False)):

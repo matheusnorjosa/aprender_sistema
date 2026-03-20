@@ -18,6 +18,9 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework import serializers  # type: ignore[attr-defined]
 
+from apps.core.constants import RESERVED_GROUPS
+from apps.core.models import PermissaoFuncional
+
 
 class UserSlimSerializer(serializers.ModelSerializer):
     """
@@ -47,6 +50,7 @@ class CurrentUserSerializer(serializers.Serializer):  # type: ignore[misc]
     is_superuser = serializers.BooleanField()
     is_superintendencia = serializers.BooleanField()
     can_approve_super = serializers.BooleanField()
+    permissions = serializers.ListField(child=serializers.CharField())
 
 
 class UsuarioOptionSerializer(serializers.ModelSerializer):
@@ -65,9 +69,14 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
     Includes groups and permissions for DAT admin operations.
 
     P1.1 Security Hardening:
-    - is_staff and is_superuser are read-only
+    - is_staff remains read-only
     - Groups whitelist: DAT, Controle, Superintendência, Coordenador, Formador, Gerência
     - Users cannot modify their own groups
+
+    RBAC funcional (Issue #829):
+    - is_superuser é editável apenas por superuser
+    - auto-demotion de superuser é bloqueada
+    - último superuser ativo é protegido
 
     API Design:
     - groups (read-only): Retorna nomes dos grupos (ex: ["DAT", "Coordenador"])
@@ -135,13 +144,61 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             "date_joined",
             "last_login",
         ]
-        # P1.1: is_staff and is_superuser are read-only
+        # P1.1: is_staff permanece read-only
         # LGPD: CPF is write-only (use cpf_masked for display)
-        read_only_fields = ["id", "date_joined", "last_login", "is_staff", "is_superuser"]
+        read_only_fields = ["id", "date_joined", "last_login", "is_staff"]
         extra_kwargs = {
             "password": {"write_only": True},
             "cpf": {"write_only": True},  # LGPD: don't expose full CPF in responses
         }
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """
+        Regras de segurança para operações sensíveis de admin.
+        """
+        attrs = super().validate(attrs)
+
+        request = self.context.get("request")
+        request_user = getattr(request, "user", None)
+        instance = self.instance
+
+        target_is_superuser = attrs.get("is_superuser", getattr(instance, "is_superuser", False))
+        target_is_active = attrs.get("is_active", getattr(instance, "is_active", True))
+        incoming_is_superuser = "is_superuser" in attrs
+
+        # Apenas superuser pode alterar is_superuser.
+        if incoming_is_superuser and (not request_user or not getattr(request_user, "is_superuser", False)):
+            raise serializers.ValidationError(
+                {"is_superuser": "Apenas superusuários podem alterar o campo is_superuser."}
+            )
+
+        if instance and getattr(instance, "is_superuser", False):
+            # Bloqueia auto-demotion de superuser.
+            if (
+                request_user
+                and getattr(request_user, "id", None) == getattr(instance, "id", None)
+                and incoming_is_superuser
+                and not target_is_superuser
+            ):
+                raise serializers.ValidationError(
+                    {"is_superuser": "Você não pode remover seu próprio privilégio de superusuário."}
+                )
+
+            # Protege o último superuser ativo.
+            removing_superuser = getattr(instance, "is_superuser", False) and not target_is_superuser
+            deactivating_superuser = getattr(instance, "is_superuser", False) and not target_is_active
+            if removing_superuser or deactivating_superuser:
+                UserModel = get_user_model()
+                has_other_active_superuser = (
+                    UserModel.objects.filter(is_superuser=True, is_active=True).exclude(pk=instance.pk).exists()
+                )
+                if not has_other_active_superuser:
+                    message = "Não é possível remover ou desativar o último superusuário ativo."
+                    if removing_superuser:
+                        raise serializers.ValidationError({"is_superuser": message})
+                    raise serializers.ValidationError({"is_active": message})
+
+        return attrs
 
     def validate_group_ids(self, value: list[int]) -> list[int]:
         """
@@ -229,10 +286,26 @@ class GroupSerializer(serializers.ModelSerializer):
 
     permissions = serializers.SerializerMethodField(read_only=True)
     user_count = serializers.SerializerMethodField(read_only=True)
+    permissoes_funcionais = serializers.SerializerMethodField(read_only=True)
+    permissao_funcional_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=PermissaoFuncional.objects.all(),
+        required=False,
+        allow_empty=True,
+        write_only=True,
+        source="permissoes_funcionais",
+    )
 
     class Meta:
         model = Group
-        fields = ["id", "name", "permissions", "user_count"]
+        fields = [
+            "id",
+            "name",
+            "permissions",
+            "user_count",
+            "permissoes_funcionais",
+            "permissao_funcional_ids",
+        ]
         read_only_fields = ["id", "permissions", "user_count"]
 
     def get_permissions(self, obj: Group) -> list[str]:
@@ -242,3 +315,61 @@ class GroupSerializer(serializers.ModelSerializer):
     def get_user_count(self, obj: Group) -> int:
         """Return count of users in this group."""
         return obj.user_set.count()
+
+    def get_permissoes_funcionais(self, obj: Group) -> list[dict[str, Any]]:
+        return [
+            {
+                "id": permissao.id,
+                "codename": permissao.codename,
+                "label": permissao.label,
+                "category": permissao.category,
+            }
+            for permissao in obj.permissoes_funcionais.all().order_by("category", "label")
+        ]
+
+    def validate_name(self, value: str) -> str:
+        instance = self.instance
+        if instance and instance.name in RESERVED_GROUPS and value != instance.name:
+            request = self.context.get("request")
+            confirmed = False
+            if request is not None:
+                confirmed = str(request.query_params.get("confirm_reserved", "")).lower() == "true"
+            if not confirmed:
+                raise serializers.ValidationError(
+                    "Grupo reservado. Para renomear, use ?confirm_reserved=true na requisição."
+                )
+        return value
+
+    def create(self, validated_data: dict[str, Any]) -> Group:
+        permissoes_funcionais = validated_data.pop("permissoes_funcionais", [])
+        instance = super().create(validated_data)
+        if permissoes_funcionais:
+            instance.permissoes_funcionais.set(permissoes_funcionais)
+        return instance
+
+    def update(self, instance: Group, validated_data: dict[str, Any]) -> Group:
+        permissoes_funcionais = validated_data.pop("permissoes_funcionais", None)
+        instance = super().update(instance, validated_data)
+        if permissoes_funcionais is not None:
+            instance.permissoes_funcionais.set(permissoes_funcionais)
+        return instance
+
+
+class PermissaoFuncionalSerializer(serializers.ModelSerializer):
+    groups = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = PermissaoFuncional
+        fields = [
+            "id",
+            "codename",
+            "label",
+            "description",
+            "category",
+            "is_system",
+            "groups",
+        ]
+        read_only_fields = fields
+
+    def get_groups(self, obj: PermissaoFuncional) -> list[dict[str, Any]]:
+        return [{"id": group.id, "name": group.name} for group in obj.groups.all().order_by("name")]

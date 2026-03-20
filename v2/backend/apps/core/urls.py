@@ -14,8 +14,10 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, Spec
 from .views import DATRegistroViewSet  # DAT Registros module
 from .views import GerenciaViewSet  # Issue #145
 from .views import GroupViewSet  # Criado (Fase 1 Iteração 2, GAP-002)
+from .views import PermissaoFuncionalViewSet  # Issue #829
 from .views import ProdutoViewSet  # Issue #146
 from .views import ProjetoGeralViewSet  # DAT Registros module
+from .views import RBACMetaView  # Issue #829
 from .views import UsuarioAdminViewSet  # Reativado (Fase 1 Iteração 2, GAP-001)
 from .views import (  # DAT Module ViewSets; Plano Formacoes (novo modelo estruturado)
     AcaoInstanciaViewSet,
@@ -123,6 +125,11 @@ router.register(
     r"usuarios-admin", UsuarioAdminViewSet, basename="usuario-admin"
 )  # Reativado (Fase 1 Iteração 2, GAP-001)
 router.register(r"grupos", GroupViewSet, basename="grupo")  # Criado (Fase 1 Iteração 2, GAP-002)
+router.register(
+    r"permissoes-funcionais",
+    PermissaoFuncionalViewSet,
+    basename="permissao-funcional",
+)  # Issue #829
 router.register(r"audit-logs", AuditLogViewSet, basename="audit-log")
 router.register(r"deslocamentos", DeslocamentoViewSet, basename="deslocamento")  # Issue #188
 # DAT Registros module (SPEC_DAT_REGISTROS.md)
@@ -148,6 +155,7 @@ urlpatterns = [
     path("version/", versionz, name="version"),
     path("features/", features, name="features"),
     path("me/", CurrentUserView.as_view(), name="current-user"),
+    path("rbac/meta/", RBACMetaView.as_view(), name="rbac-meta"),
     path("stats/home/", HomeStatsView.as_view(), name="stats-home"),
     # CSRF Token (Issue #135)
     path("csrf/", csrf_token, name="csrf-token"),

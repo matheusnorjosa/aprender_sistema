@@ -1,0 +1,204 @@
+name: SLSA Provenance and Signing
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag imutável para atestar/assinar (ex: v2026.03.20-abc1234)"
+        required: true
+        type: string
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+  attestations: write
+  id-token: write
+
+concurrency:
+  group: slsa-${{ github.event_name }}-${{ github.event.release.tag_name || github.event.inputs.release_tag || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  DOCKER_USERNAME: norjosamatheus
+  BACKEND_IMAGE: norjosamatheus/aprender-backend
+  FRONTEND_IMAGE: norjosamatheus/aprender-frontend
+
+jobs:
+  provenance-signing:
+    name: "[ops] slsa provenance + cosign"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Resolve release tag
+        id: resolve
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG_INPUT: ${{ github.event.inputs.release_tag || '' }}
+          RELEASE_TAG_EVENT: ${{ github.event.release.tag_name || '' }}
+        run: |
+          set -euo pipefail
+          release_tag=""
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            release_tag="$(echo "${RELEASE_TAG_INPUT}" | xargs)"
+          elif [ "$EVENT_NAME" = "release" ]; then
+            release_tag="$(echo "${RELEASE_TAG_EVENT}" | xargs)"
+          fi
+
+          if [ -z "$release_tag" ]; then
+            echo "Unable to resolve release tag for event=${EVENT_NAME}." >&2
+            exit 1
+          fi
+
+          if [ "$release_tag" = "latest" ]; then
+            echo "Invalid tag 'latest'. Use immutable tag vYYYY.MM.DD-<sha-or-id>." >&2
+            exit 1
+          fi
+
+          if ! printf '%s' "$release_tag" | grep -Eq '^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9A-Za-z._-]+$'; then
+            echo "Invalid tag format: $release_tag. Expected vYYYY.MM.DD-<sha-or-id>." >&2
+            exit 1
+          fi
+
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Resolve image digests from immutable tag
+        id: digests
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          backend_ref="${BACKEND_IMAGE}:${RELEASE_TAG}"
+          frontend_ref="${FRONTEND_IMAGE}:${RELEASE_TAG}"
+
+          backend_digest="$(docker buildx imagetools inspect "${backend_ref}" | awk '/Digest:/ {print $2; exit}')"
+          frontend_digest="$(docker buildx imagetools inspect "${frontend_ref}" | awk '/Digest:/ {print $2; exit}')"
+
+          if [ -z "${backend_digest}" ] || [ -z "${frontend_digest}" ]; then
+            echo "Could not resolve backend/frontend digest for tag ${RELEASE_TAG}." >&2
+            exit 1
+          fi
+
+          echo "backend_ref=${backend_ref}" >> "$GITHUB_OUTPUT"
+          echo "frontend_ref=${frontend_ref}" >> "$GITHUB_OUTPUT"
+          echo "backend_digest=${backend_digest}" >> "$GITHUB_OUTPUT"
+          echo "frontend_digest=${frontend_digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate SLSA provenance attestation (backend)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ${{ env.BACKEND_IMAGE }}
+          subject-digest: ${{ steps.digests.outputs.backend_digest }}
+          push-to-registry: true
+
+      - name: Generate SLSA provenance attestation (frontend)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ${{ env.FRONTEND_IMAGE }}
+          subject-digest: ${{ steps.digests.outputs.frontend_digest }}
+          push-to-registry: true
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
+
+      - name: Sign images with keyless Cosign
+        env:
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+          BACKEND_DIGEST: ${{ steps.digests.outputs.backend_digest }}
+          FRONTEND_DIGEST: ${{ steps.digests.outputs.frontend_digest }}
+        run: |
+          set -euo pipefail
+          cosign sign --yes "${BACKEND_IMAGE}@${BACKEND_DIGEST}"
+          cosign sign --yes "${FRONTEND_IMAGE}@${FRONTEND_DIGEST}"
+
+      - name: Verify Cosign signatures
+        env:
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+          BACKEND_DIGEST: ${{ steps.digests.outputs.backend_digest }}
+          FRONTEND_DIGEST: ${{ steps.digests.outputs.frontend_digest }}
+          CERT_IDENTITY_REGEX: ^https://github.com/${{ github.repository }}/.github/workflows/slsa-provenance.yml@refs/(heads/main|tags/.+)$
+        run: |
+          set -euo pipefail
+          cosign verify "${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp "${CERT_IDENTITY_REGEX}" \
+            > cosign-verify-backend.json
+
+          cosign verify "${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp "${CERT_IDENTITY_REGEX}" \
+            > cosign-verify-frontend.json
+
+      - name: Verify provenance attestations
+        env:
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+          BACKEND_DIGEST: ${{ steps.digests.outputs.backend_digest }}
+          FRONTEND_DIGEST: ${{ steps.digests.outputs.frontend_digest }}
+          SIGNER_WORKFLOW: ${{ github.repository }}/.github/workflows/slsa-provenance.yml
+        run: |
+          set -euo pipefail
+          gh attestation verify "oci://${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${SIGNER_WORKFLOW}" \
+            --bundle-from-oci \
+            --format json \
+            > attestation-verify-backend.json
+
+          gh attestation verify "oci://${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${SIGNER_WORKFLOW}" \
+            --bundle-from-oci \
+            --format json \
+            > attestation-verify-frontend.json
+
+      - name: Build supply chain summary
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+          BACKEND_DIGEST: ${{ steps.digests.outputs.backend_digest }}
+          FRONTEND_DIGEST: ${{ steps.digests.outputs.frontend_digest }}
+        run: |
+          set -euo pipefail
+          {
+            echo "# SLSA Provenance + Cosign"
+            echo
+            echo "- Release tag: \`${RELEASE_TAG}\`"
+            echo "- Backend: \`${BACKEND_IMAGE}@${BACKEND_DIGEST}\`"
+            echo "- Frontend: \`${FRONTEND_IMAGE}@${FRONTEND_DIGEST}\`"
+            echo "- Attestation predicate: \`https://slsa.dev/provenance/v1\`"
+            echo "- Signer workflow: \`${GITHUB_REPOSITORY}/.github/workflows/slsa-provenance.yml\`"
+          } | tee slsa-summary.md
+
+          cat slsa-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload SLSA artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: slsa-provenance-${{ github.run_id }}
+          path: |
+            slsa-summary.md
+            cosign-verify-backend.json
+            cosign-verify-frontend.json
+            attestation-verify-backend.json
+            attestation-verify-frontend.json
+          if-no-files-found: error
+          retention-days: 30

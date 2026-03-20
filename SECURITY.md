@@ -33,6 +33,30 @@
 
 ---
 
+## Supply Chain (SLSA + Cosign)
+
+- Workflow operacional: `.github/workflows/slsa-provenance.yml`
+- Gera attestations SLSA v1 para imagens Docker publicadas.
+- Assina imagens com Cosign keyless (OIDC GitHub Actions).
+- Verifica assinatura e provenance na mesma execucao.
+
+### Verificacao manual (exemplo)
+
+```bash
+# assinatura
+cosign verify norjosamatheus/aprender-backend@sha256:<digest> \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp "^https://github.com/matheusnorjosa/aprender_sistema/.github/workflows/slsa-provenance.yml@refs/(heads/main|tags/.+)$"
+
+# attestation/provenance
+gh attestation verify oci://norjosamatheus/aprender-backend@sha256:<digest> \
+  --repo matheusnorjosa/aprender_sistema \
+  --signer-workflow matheusnorjosa/aprender_sistema/.github/workflows/slsa-provenance.yml \
+  --bundle-from-oci
+```
+
+---
+
 ## Contato
 
 - **Security Team**: <security@aprender.gov.br>
@@ -40,4 +64,4 @@
 
 ---
 
-Atualizado: 2026-02-03
+Atualizado: 2026-03-20

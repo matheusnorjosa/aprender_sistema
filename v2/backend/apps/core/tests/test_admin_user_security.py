@@ -2,7 +2,8 @@
 P1.1 - Testes de Segurança para UsuarioAdminSerializer
 
 Valida hardening do serializer de admin de usuários:
-- is_staff e is_superuser são read_only
+- is_staff é read_only
+- is_superuser só pode ser alterado por superuser (com guardas)
 - Groups whitelist (DAT, Controle, Superintendência, Coordenador, Formador)
 - Usuários não podem modificar próprios groups
 - Campos com whitelist explícito (sem setattr indiscriminado)
@@ -55,38 +56,55 @@ class AdminUserSecurityTests(TestCase):
 
     def test_dat_cannot_set_is_superuser_or_is_staff(self):
         """
-        P1.1 - DAT não pode setar is_superuser ou is_staff via serializer
+        P1.1 - DAT não pode setar is_superuser via serializer
 
         Cenário:
-        - DAT tenta criar usuário com is_staff=True
         - DAT tenta criar usuário com is_superuser=True
 
         Expectativa:
-        - Campos são read_only, valores ignorados
-        - Usuário criado com is_staff=False, is_superuser=False
+        - ValidationError em is_superuser
         """
         data = {
             "username": "new_user",
             "email": "new@example.com",
             "password": "T3stP@ssw0rd!Qwerty#2025XyZ",
             "cpf": "33333333333",  # Required field
-            "is_staff": True,  # Deve ser ignorado (read_only)
-            "is_superuser": True,  # Deve ser ignorado (read_only)
+            "is_superuser": True,  # Deve falhar (somente superuser pode alterar)
         }
 
         request = self.factory.post("/api/usuarios/", data)
         request.user = self.user_dat
 
         serializer = UsuarioAdminSerializer(data=data, context={"request": request})
-        if not serializer.is_valid():
-            print("Serializer errors:", serializer.errors)  # Debug
-        self.assertTrue(serializer.is_valid())
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("is_superuser", serializer.errors)
 
+    def test_dat_cannot_set_is_staff(self):
+        """
+        P1.1 - DAT não consegue setar is_staff (campo read-only).
+
+        Cenário:
+        - DAT cria usuário com is_staff=True
+
+        Expectativa:
+        - Serializer ignora campo read-only
+        - Usuário é criado com is_staff=False
+        """
+        data = {
+            "username": "new_user_staff",
+            "email": "new_staff@example.com",
+            "password": "T3stP@ssw0rd!Qwerty#2025XyZ",
+            "cpf": "33333333334",
+            "is_staff": True,
+        }
+
+        request = self.factory.post("/api/usuarios/", data)
+        request.user = self.user_dat
+
+        serializer = UsuarioAdminSerializer(data=data, context={"request": request})
+        self.assertTrue(serializer.is_valid(), serializer.errors)
         usuario = serializer.save()
-
-        # Validar que is_staff e is_superuser NÃO foram setados
         self.assertFalse(usuario.is_staff)
-        self.assertFalse(usuario.is_superuser)
 
     def test_dat_cannot_change_own_groups(self):
         """
@@ -297,3 +315,123 @@ class AdminUserSecurityTests(TestCase):
         # Verificar que Gerência foi atribuído
         group_names = set(usuario.groups.values_list("name", flat=True))
         self.assertEqual(group_names, {"Gerência"})
+
+    def test_superuser_can_set_is_superuser_for_other_user(self):
+        """
+        RBAC funcional - superuser pode promover outro usuário a superuser.
+        """
+        super_admin = Usuario.objects.create_superuser(
+            username="super_admin",
+            email="super_admin@example.com",
+            password="T3stP@ssw0rd!Qwerty#2025XyZ",
+            cpf="44444444444",
+        )
+        data = {"is_superuser": True}
+
+        request = self.factory.patch(f"/api/usuarios/{self.user_comum.id}/", data)
+        request.user = super_admin
+
+        serializer = UsuarioAdminSerializer(
+            instance=self.user_comum,
+            data=data,
+            partial=True,
+            context={"request": request},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_user = serializer.save()
+        self.assertTrue(updated_user.is_superuser)
+
+    def test_superuser_cannot_self_demote(self):
+        """
+        RBAC funcional - superuser não pode remover o próprio privilégio.
+        """
+        super_admin = Usuario.objects.create_superuser(
+            username="self_demote_admin",
+            email="self_demote_admin@example.com",
+            password="T3stP@ssw0rd!Qwerty#2025XyZ",
+            cpf="55555555555",
+        )
+        data = {"is_superuser": False}
+
+        request = self.factory.patch(f"/api/usuarios/{super_admin.id}/", data)
+        request.user = super_admin
+
+        serializer = UsuarioAdminSerializer(
+            instance=super_admin,
+            data=data,
+            partial=True,
+            context={"request": request},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("is_superuser", serializer.errors)
+        self.assertIn("próprio privilégio", str(serializer.errors["is_superuser"]))
+
+    def test_cannot_remove_last_active_superuser(self):
+        """
+        RBAC funcional - último superuser ativo não pode ser removido.
+        """
+        last_super = Usuario.objects.create_superuser(
+            username="last_super_admin",
+            email="last_super_admin@example.com",
+            password="T3stP@ssw0rd!Qwerty#2025XyZ",
+            cpf="66666666666",
+        )
+        actor_super = Usuario.objects.create_superuser(
+            username="inactive_super_actor",
+            email="inactive_super_actor@example.com",
+            password="T3stP@ssw0rd!Qwerty#2025XyZ",
+            cpf="77777777777",
+        )
+        actor_super.is_active = False
+        actor_super.save(update_fields=["is_active"])
+
+        data = {"is_superuser": False}
+        request = self.factory.patch(f"/api/usuarios/{last_super.id}/", data)
+        request.user = actor_super
+
+        serializer = UsuarioAdminSerializer(
+            instance=last_super,
+            data=data,
+            partial=True,
+            context={"request": request},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("is_superuser", serializer.errors)
+        self.assertIn("último superusuário ativo", str(serializer.errors["is_superuser"]))
+
+    def test_cannot_deactivate_last_active_superuser(self):
+        """
+        RBAC funcional - último superuser ativo não pode ser desativado.
+        """
+        last_super = Usuario.objects.create_superuser(
+            username="last_super_active",
+            email="last_super_active@example.com",
+            password="T3stP@ssw0rd!Qwerty#2025XyZ",
+            cpf="88888888888",
+        )
+        actor_super = Usuario.objects.create_superuser(
+            username="inactive_super_actor_two",
+            email="inactive_super_actor_two@example.com",
+            password="T3stP@ssw0rd!Qwerty#2025XyZ",
+            cpf="99999999999",
+        )
+        actor_super.is_active = False
+        actor_super.save(update_fields=["is_active"])
+
+        data = {"is_active": False}
+        request = self.factory.patch(f"/api/usuarios/{last_super.id}/", data)
+        request.user = actor_super
+
+        serializer = UsuarioAdminSerializer(
+            instance=last_super,
+            data=data,
+            partial=True,
+            context={"request": request},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("is_active", serializer.errors)
+        self.assertIn("último superusuário ativo", str(serializer.errors["is_active"]))

@@ -538,6 +538,18 @@ html.dark .ant-alert-success {
   }
 }
 
+/* Popover de notificações: ajustar posição em mobile */
+@media screen and (max-width: 480px) {
+  .notif-popover.ant-popover {
+    inset-inline-start: 8px !important;
+    width: calc(100vw - 16px) !important;
+  }
+
+  .notif-popover .ant-popover-arrow {
+    display: none;
+  }
+}
+
 /* Telas muito pequenas (< 480px) */
 @media screen and (max-width: 480px) {
   .ant-layout-header .ant-typography {

@@ -1,342 +1,217 @@
 """
-DRF Permissions for RBAC
+DRF permissions para RBAC funcional (database-driven).
 
-PA-02 (Adaptada): Superintendência, DAT e Superusuários podem aprovar/reprovar solicitações.
+Backwards compatible:
+- nomes das classes publicas preservados;
+- imports existentes continuam funcionando.
 """
 
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
+
+from typing import cast
 
 from rest_framework import permissions  # type: ignore[attr-defined]
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
+from apps.core.services.rbac_permissions import get_user_functional_permissions
 
-class IsSuperintendencia(permissions.BasePermission):  # type: ignore[misc]
+
+class HasFunctionalPermission(permissions.BasePermission):  # type: ignore[misc]
     """
-    Permissão: usuários dos grupos 'Superintendência', 'DAT' ou superusers podem executar.
-    PA-02 (Adaptada): Aprovação/reprovação permitida para Superintendência, DAT e Superusuários.
-
-    Nota: Superusers sempre têm acesso completo.
+    Base class para checagem por codename funcional.
     """
 
-    message = "Apenas usuários da Superintendência, DAT ou Superusuários podem realizar esta ação."
+    functional_codename = ""
+    message = "Você não tem permissão para realizar esta ação."
 
     def has_permission(self, request: Request, view: APIView) -> bool:
-        return (
-            request.user
-            and request.user.is_authenticated
-            and (
-                getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name__in=["Superintendência", "DAT"]).exists()  # type: ignore[attr-defined]
-            )
-        )
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if getattr(user, "is_superuser", False):
+            return True
+        if not self.functional_codename:
+            return False
+        return self.functional_codename in get_user_functional_permissions(user)
 
 
-class IsGerenteSuperintendencia(permissions.BasePermission):  # type: ignore[misc]
+def funcperm_factory(
+    class_name: str,
+    functional_codename: str,
+    message: str,
+) -> type[HasFunctionalPermission]:
+    attrs = {
+        "functional_codename": functional_codename,
+        "message": message,
+    }
+    return cast(type[HasFunctionalPermission], type(class_name, (HasFunctionalPermission,), attrs))
+
+
+class IsSuperintendencia(
+    funcperm_factory(
+        "IsSuperintendencia",
+        "pode_aprovar_superintendencia",
+        "Apenas usuários da Superintendência, DAT ou Superusuários podem realizar esta ação.",
+    )
+):
+    pass
+
+
+class IsSuperintendenciaOnly(
+    funcperm_factory(
+        "IsSuperintendenciaOnly",
+        "pode_gerenciar_superintendencia_only",
+        "Apenas usuários da Superintendência podem realizar esta ação.",
+    )
+):
+    pass
+
+
+class IsCoordenadorOrDAT(
+    funcperm_factory(
+        "IsCoordenadorOrDAT",
+        "pode_criar_solicitacao_coord_dat",
+        "Apenas Coordenadores, Apoio de Coordenação ou DAT podem criar solicitações.",
+    )
+):
+    pass
+
+
+class IsControleOrSuper(
+    funcperm_factory(
+        "IsControleOrSuper",
+        "pode_importar_controle_super",
+        "Apenas Controle ou Superintendência podem realizar esta ação.",
+    )
+):
+    pass
+
+
+class IsDATOrSuper(
+    funcperm_factory(
+        "IsDATOrSuper",
+        "pode_operar_dat",
+        "Apenas usuários do grupo DAT ou superusers podem realizar esta ação.",
+    )
+):
+    pass
+
+
+class IsComprasDashboardAccess(
+    funcperm_factory(
+        "IsComprasDashboardAccess",
+        "pode_acessar_dashboard_compras",
+        "Apenas usuários dos grupos DAT ou Diretoria podem acessar o dashboard de compras.",
+    )
+):
+    pass
+
+
+class IsDAT(
+    funcperm_factory(
+        "IsDAT",
+        "pode_operar_dat_exclusivo",
+        "Apenas usuários do grupo DAT podem realizar esta ação.",
+    )
+):
+    pass
+
+
+class IsControleOrDAT(
+    funcperm_factory(
+        "IsControleOrDAT",
+        "pode_operar_controle_dat",
+        "Apenas Controle ou DAT podem realizar esta ação.",
+    )
+):
+    pass
+
+
+class IsControle(
+    funcperm_factory(
+        "IsControle",
+        "pode_operar_controle",
+        "Apenas usuários do grupo Controle podem realizar esta ação.",
+    )
+):
+    pass
+
+
+class IsGerencia(
+    funcperm_factory(
+        "IsGerencia",
+        "pode_operar_gerencia",
+        "Apenas usuários de Gerência, Superintendência ou Diretoria podem realizar esta ação.",
+    )
+):
+    pass
+
+
+class IsDashboardOverview(
+    funcperm_factory(
+        "IsDashboardOverview",
+        "pode_acessar_dashboard_overview",
+        "Apenas usuários de Superintendência, Gerência ou Diretoria podem acessar o dashboard geral.",
+    )
+):
+    pass
+
+
+class IsMapMetrics(
+    funcperm_factory(
+        "IsMapMetrics",
+        "pode_acessar_map_metrics",
+        "Apenas usuários autorizados podem acessar métricas do mapa.",
+    )
+):
+    pass
+
+
+class IsGerenteSuperintendencia(HasFunctionalPermission):  # type: ignore[misc]
     """
-    Permissão: apenas Gerentes vinculados à Superintendência ou superusers.
-
-    Requer AMBOS:
-    - Função "Gerente" (grupo de função)
-    - Setor "Superintendência" (grupo de setor)
-
-    Usado para operações críticas como aprovação/reprovação em lote.
-    Nota: Superusers sempre têm acesso completo.
+    Regra composta fixa:
+    - permissão funcional "pode_aprovar_gerente_superintendencia"
+    - grupo de função "Gerente"
     """
 
+    functional_codename = "pode_aprovar_gerente_superintendencia"
     message = "Apenas Gerentes da Superintendência podem realizar esta ação."
 
     def has_permission(self, request: Request, view: APIView) -> bool:
-        if not request.user or not request.user.is_authenticated:
+        if not super().has_permission(request, view):
             return False
-
-        if getattr(request.user, "is_superuser", False):
-            return True
-
-        user_groups = set(request.user.groups.values_list("name", flat=True))  # type: ignore[attr-defined]
-        has_gerente = "Gerente" in user_groups
-        has_superintendencia = "Superintendência" in user_groups
-
-        return has_gerente and has_superintendencia
+        user = request.user
+        return bool(user and user.groups.filter(name="Gerente").exists())
 
 
-class IsSuperintendenciaOnly(permissions.BasePermission):  # type: ignore[misc]
-    """
-    Permissão: APENAS usuários do grupo 'Superintendência' ou superusers podem executar.
-
-    Diferença de IsSuperintendencia: NÃO inclui DAT.
-    Usado para operações destrutivas (delete) que requerem maior privilégio.
-
-    Nota: Superusers sempre têm acesso completo.
-    """
-
-    message = "Apenas usuários da Superintendência podem realizar esta ação."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        return (
-            request.user
-            and request.user.is_authenticated
-            and (
-                getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name="Superintendência").exists()  # type: ignore[attr-defined]
-            )
-        )
-
-
-class IsCoordenadorOrDAT(permissions.BasePermission):  # type: ignore[misc]
-    """
-    Permissão: Coordenadores, Apoio de Coordenação ou DAT podem criar solicitações.
-
-    Apoio de Coordenação tem as mesmas permissões de Coordenador para auxiliar
-    nas operações quando necessário.
-
-    Nota: Superusers sempre têm acesso completo.
-    """
-
-    message = "Apenas Coordenadores, Apoio de Coordenação ou DAT podem criar solicitações."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        return (
-            request.user
-            and request.user.is_authenticated
-            and (
-                getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name__in=["Coordenador", "Apoio de Coordenação", "DAT"]).exists()  # type: ignore[attr-defined]
-            )
-        )
-
-
-class IsControleOrSuper(permissions.BasePermission):  # type: ignore[misc]
-    """
-    Permissão: apenas usuários do grupo 'Controle' ou 'Superintendência' podem executar.
-
-    Usado para operações de importação e controle de dados.
-    Nota: Superusers sempre têm acesso completo.
-    """
-
-    message = "Apenas Controle ou Superintendência podem realizar esta ação."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        return (
-            request.user
-            and request.user.is_authenticated
-            and (
-                getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name__in=["Controle", "Superintendência"]).exists()  # type: ignore[attr-defined]
-            )
-        )
-
-
-class IsDATOrSuper(permissions.BasePermission):  # type: ignore[misc]
-    """
-    Permissão: apenas usuários do grupo 'DAT' ou superusers podem executar.
-
-    Usado para operações de cadastro e gerenciamento de dados do DAT.
-    Nota: Superusers sempre têm acesso completo.
-    """
-
-    message = "Apenas usuários do grupo DAT ou superusers podem realizar esta ação."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        return (
-            request.user
-            and request.user.is_authenticated
-            and (
-                getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name="DAT").exists()  # type: ignore[attr-defined]
-            )
-        )
-
-
-class IsComprasDashboardAccess(permissions.BasePermission):  # type: ignore[misc]
-    """
-    Permissão para dashboard de compras (somente leitura executiva).
-
-    Grupos permitidos: DAT e Diretoria.
-    Nota: Superusers sempre têm acesso completo.
-    """
-
-    message = "Apenas usuários dos grupos DAT ou Diretoria podem acessar o dashboard de compras."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        return (
-            request.user
-            and request.user.is_authenticated
-            and (
-                getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name__in=["DAT", "Diretoria"]).exists()  # type: ignore[attr-defined]
-            )
-        )
-
-
-class IsDAT(permissions.BasePermission):  # type: ignore[misc]
-    """
-    Permissão: apenas usuários do grupo 'DAT' (sem incluir Super).
-
-    Usado para operações específicas do DAT.
-    Nota: Superusers sempre têm acesso completo.
-    """
-
-    message = "Apenas usuários do grupo DAT podem realizar esta ação."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        return (
-            request.user
-            and request.user.is_authenticated
-            and (
-                getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name="DAT").exists()  # type: ignore[attr-defined]
-            )
-        )
-
-
-class IsControleOrDAT(permissions.BasePermission):  # type: ignore[misc]
-    """
-    Permissão: apenas usuários dos grupos 'Controle' ou 'DAT' podem executar.
-
-    Usado para operações de visualização e relatórios compartilhados.
-    Nota: Superusers sempre têm acesso completo.
-    """
-
-    message = "Apenas Controle ou DAT podem realizar esta ação."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        return (
-            request.user
-            and request.user.is_authenticated
-            and (
-                getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name__in=["Controle", "DAT", "Superintendência"]).exists()  # type: ignore[attr-defined]
-            )
-        )
-
-
-class IsControle(permissions.BasePermission):  # type: ignore[misc]
-    """
-    Permissão: apenas usuários do grupo 'Controle' ou superusers podem executar.
-
-    Usado para operações específicas de controle (métricas, dashboards).
-    Nota: Superusers sempre têm acesso completo.
-    """
-
-    message = "Apenas usuários do grupo Controle podem realizar esta ação."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        return (
-            request.user
-            and request.user.is_authenticated
-            and (
-                getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name="Controle").exists()  # type: ignore[attr-defined]
-            )
-        )
-
-
-class IsGerencia(permissions.BasePermission):  # type: ignore[misc]
-    """
-    Permissão: usuários dos grupos 'Gerência', 'Superintendência' ou 'Diretoria' podem executar.
-
-    Usado para operações de gerenciamento e métricas executivas.
-    Nota: Superusers sempre têm acesso completo.
-    """
-
-    message = "Apenas usuários de Gerência, Superintendência ou Diretoria podem realizar esta ação."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        return (
-            request.user
-            and request.user.is_authenticated
-            and (
-                getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name__in=["Gerência", "Superintendência", "Diretoria"]).exists()  # type: ignore[union-attr]
-            )
-        )
-
-
-class IsDashboardOverview(permissions.BasePermission):  # type: ignore[misc]
-    """
-    Permissão: apenas usuários com acesso ao dashboard geral.
-
-    Grupos permitidos: Superintendência, Gerência, Diretoria.
-    Nota: Superusers sempre têm acesso completo.
-    """
-
-    message = "Apenas usuários de Superintendência, Gerência ou Diretoria podem acessar o dashboard geral."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        return (
-            request.user
-            and request.user.is_authenticated
-            and (
-                getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name__in=["Superintendência", "Gerência", "Diretoria"]).exists()  # type: ignore[union-attr]
-            )
-        )
-
-
-class IsMapMetrics(permissions.BasePermission):  # type: ignore[misc]
-    """
-    Permissão: usuários com acesso ao Mapa Brasil (métricas geográficas).
-
-    Grupos permitidos: Controle, DAT, Superintendência, Gerência, Diretoria.
-    Nota: Superusers sempre têm acesso completo.
-    """
-
-    message = "Apenas usuários autorizados podem acessar métricas do mapa."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        return (
-            request.user
-            and request.user.is_authenticated
-            and (
-                getattr(request.user, "is_superuser", False)
-                or request.user.groups.filter(name__in=["Controle", "DAT", "Superintendência", "Gerência", "Diretoria"]).exists()  # type: ignore[union-attr]
-            )
-        )
-
-
-class IsOwnerOrPrivileged(permissions.BasePermission):  # type: ignore[misc]
+class IsOwnerOrPrivileged(HasFunctionalPermission):  # type: ignore[misc]
     """
     Permissão para edição de solicitações.
 
-    Permite acesso se:
-    - Usuário é superuser, OU
-    - Usuário pertence a grupo privilegiado (Superintendência, DAT), OU
-    - Usuário é o criador (owner) da solicitação
-
-    Usado para controlar quem pode editar uma solicitação existente.
+    - superuser: acesso total
+    - usuário com permissão funcional privilegiada: acesso total
+    - owner do objeto: acesso ao próprio objeto
     """
 
-    message = "Você só pode editar suas próprias solicitações ou ser membro da Superintendência/DAT."
+    functional_codename = "pode_editar_como_owner_ou_privilegiado"
+    message = "Você só pode editar suas próprias solicitações ou possuir privilégio de gestão."
 
     def has_permission(self, request: Request, view: APIView) -> bool:
-        """Verifica permissão básica de autenticação."""
         return bool(request.user and request.user.is_authenticated)
 
     def has_object_permission(self, request: Request, view: APIView, obj: object) -> bool:
-        """
-        Verifica permissão no objeto (Solicitacao).
-
-        Permite se:
-        - Superuser
-        - Grupo privilegiado (Superintendência, DAT)
-        - Owner (usuario da solicitação)
-        """
-        if not request.user or not request.user.is_authenticated:
+        user = request.user
+        if not user or not user.is_authenticated:
             return False
-
-        # Superuser sempre pode
-        if getattr(request.user, "is_superuser", False):
+        if getattr(user, "is_superuser", False):
+            return True
+        if self.functional_codename in get_user_functional_permissions(user):
             return True
 
-        # Grupos privilegiados podem editar qualquer solicitação
-        privileged_groups = ["Superintendência", "DAT"]
-        if request.user.groups.filter(name__in=privileged_groups).exists():  # type: ignore[attr-defined]
-            return True
-
-        # Owner pode editar sua própria solicitação
         obj_usuario = getattr(obj, "usuario", None)
-        return obj_usuario == request.user
+        return obj_usuario == user
 
 
 class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]

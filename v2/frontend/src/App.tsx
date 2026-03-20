@@ -882,7 +882,15 @@ function AppContent(): JSX.Element {
                     open={popoverOpen}
                     onOpenChange={(open) => void handlePopoverOpenChange(open)}
                     placement="bottomRight"
-                    overlayStyle={{ width: 'min(360px, calc(100vw - 32px))' }}
+                    overlayStyle={{ width: 'min(360px, calc(100vw - 16px))' }}
+                    overlayClassName="notif-popover"
+                    arrow={{ pointAtCenter: true }}
+                    afterOpenChange={(visible) => {
+                      if (visible && window.innerWidth <= 480) {
+                        const el = document.querySelector('.notif-popover') as HTMLElement;
+                        if (el) { el.style.left = '8px'; el.style.right = '8px'; }
+                      }
+                    }}
                     title={
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>Notificações</span>

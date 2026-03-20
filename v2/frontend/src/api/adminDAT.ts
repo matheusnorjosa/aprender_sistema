@@ -55,6 +55,29 @@ export interface AssignGroupsPayload {
  */
 export interface GroupPayload {
   name: string;
+  permissao_funcional_ids?: ID[];
+}
+
+/**
+ * Functional permission representation
+ */
+export interface PermissaoFuncional {
+  id: ID;
+  codename: string;
+  label: string;
+  description: string;
+  category: string;
+  is_system: boolean;
+  groups?: Array<{ id: ID; name: string }>;
+}
+
+/**
+ * RBAC meta payload
+ */
+export interface RBACMetaPayload {
+  setor_groups: string[];
+  funcao_groups: string[];
+  categories: string[];
 }
 
 /**
@@ -206,16 +229,38 @@ export async function createGroup(data: GroupPayload): Promise<Group> {
  * @param id - Group ID
  * @param data - Updated fields
  */
-export async function updateGroup(id: ID, data: GroupPayload): Promise<Group> {
-  return apiRequest(() => api.patch(`/grupos/${id}/`, data));
+export async function updateGroup(
+  id: ID,
+  data: GroupPayload,
+  options: { confirmReserved?: boolean } = {}
+): Promise<Group> {
+  const params = options.confirmReserved ? { confirm_reserved: true } : undefined;
+  return apiRequest(() => api.patch(`/grupos/${id}/`, data, { params }));
 }
 
 /**
  * Delete group
  * @param id - Group ID
  */
-export async function deleteGroup(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/grupos/${id}/`));
+export async function deleteGroup(id: ID, options: { confirmReserved?: boolean } = {}): Promise<void> {
+  const params = options.confirmReserved ? { confirm_reserved: true } : undefined;
+  return apiRequest(() => api.delete(`/grupos/${id}/`, { params }));
+}
+
+/**
+ * List functional permissions
+ */
+export async function listPermissoesFuncionais(
+  params: { category?: string; search?: string; ordering?: string; page_size?: number } = {}
+): Promise<PaginatedResponse<PermissaoFuncional>> {
+  return apiRequest(() => api.get('/permissoes-funcionais/', { params }));
+}
+
+/**
+ * RBAC metadata for admin UI
+ */
+export async function getRBACMeta(): Promise<RBACMetaPayload> {
+  return apiRequest(() => api.get('/rbac/meta/'));
 }
 
 // ========== MUNICIPIOS ==========

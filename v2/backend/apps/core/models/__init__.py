@@ -26,6 +26,7 @@ Estrutura:
     ├── dat_cadastro.py      # DATCadastro
     ├── dat_formacao.py      # DATFormacao
     ├── plano_formacoes.py   # PlanoFormacoes
+    ├── permissao_funcional.py # PermissaoFuncional
     ├── formacao.py          # Formacao
     ├── acompanhamento.py    # Acompanhamento
     └── prova.py             # Prova
@@ -70,6 +71,7 @@ from apps.core.models.organizacao import (
     ProjetoGeral,
     TipoEvento,
 )
+from apps.core.models.permissao_funcional import PermissaoFuncional
 from apps.core.models.plano_formacoes import PlanoFormacoes
 from apps.core.models.prova import Prova
 from apps.core.models.solicitacao import Participation, Solicitacao
@@ -112,6 +114,7 @@ __all__ = [
     "DATFormacao",
     # Plano Formacoes (novo modelo estruturado)
     "PlanoFormacoes",
+    "PermissaoFuncional",
     "Formacao",
     "Acompanhamento",
     "Prova",

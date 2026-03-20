@@ -25,6 +25,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandParser
 
 from apps.core.models import AvailabilityBlock, Compra, Municipio, Projeto, Solicitacao, Usuario
+from apps.core.services.functional_permissions_seed import seed_functional_permissions
 
 # Subconjunto de grupos que recebem Django model permissions via seed.
 # Lista canônica completa: apps.core.constants.SETOR_GROUPS + FUNCAO_GROUPS
@@ -124,7 +125,7 @@ class Command(BaseCommand):
 
         # Criar grupos
         for name in GROUPS:
-            group, created = Group.objects.get_or_create(name=name)
+            _, created = Group.objects.get_or_create(name=name)
             if verbose and created:
                 self.stdout.write(f"  ✅ Grupo criado: {name}")
             elif verbose:
@@ -145,5 +146,15 @@ class Command(BaseCommand):
                     # Silencioso: permissão não existe (pode ser normal)
                     if verbose:
                         self.stdout.write(self.style.WARNING(f"  ⚠️  Permissão não encontrada: {code}"))
+
+        fp_stats = seed_functional_permissions(verbose=verbose)
+        if verbose:
+            self.stdout.write(
+                "  ✅ Permissões funcionais: created={created} updated={updated} groups_created={groups}".format(
+                    created=fp_stats["permissions_created"],
+                    updated=fp_stats["permissions_updated"],
+                    groups=fp_stats["groups_created"],
+                )
+            )
 
         self.stdout.write(self.style.SUCCESS("RBAC seeds aplicados (idempotente)."))

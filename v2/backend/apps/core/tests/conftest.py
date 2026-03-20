@@ -14,6 +14,8 @@ from django.conf import settings
 
 import pytest
 
+from apps.core.services.functional_permissions_seed import seed_functional_permissions
+
 
 def get_field_errors(response) -> dict[str, Any]:
     """
@@ -59,3 +61,15 @@ def force_service_account_mode():
     # Restore original value
     if original_value is not None:
         settings.GCAL_AUTH_MODE = original_value
+
+
+@pytest.fixture(autouse=True, scope="session")
+def seed_functional_permissions_fixture(django_db_setup, django_db_blocker):
+    """
+    Garante baseline de permissoes funcionais em todos os testes de apps.core.
+
+    Idempotente: usa get_or_create/update_or_create internamente.
+    """
+
+    with django_db_blocker.unblock():
+        seed_functional_permissions()

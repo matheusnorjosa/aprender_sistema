@@ -122,7 +122,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
     # Whitelist of allowed groups (P1.1) - configurável via settings (Issue #254)
     # Fallback para set vazio se não configurado (todos os grupos bloqueados)
-    ALLOWED_GROUPS: set[str] = getattr(settings, "ALLOWED_USER_GROUPS", set())
+    ALLOWED_GROUPS: set[str] = set(getattr(settings, "ALLOWED_USER_GROUPS", set()))
 
     class Meta:
         model = get_user_model()
@@ -158,12 +158,14 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         """
         attrs = super().validate(attrs)
 
-        request = self.context.get("request")
-        request_user = getattr(request, "user", None)
-        instance = self.instance
+        request: Any = self.context.get("request")
+        request_user: Any = getattr(request, "user", None)
+        instance: Any = self.instance
 
-        target_is_superuser = attrs.get("is_superuser", getattr(instance, "is_superuser", False))
-        target_is_active = attrs.get("is_active", getattr(instance, "is_active", True))
+        current_is_superuser = bool(getattr(instance, "is_superuser", False)) if instance is not None else False
+        current_is_active = bool(getattr(instance, "is_active", True)) if instance is not None else True
+        target_is_superuser = bool(attrs.get("is_superuser", current_is_superuser))
+        target_is_active = bool(attrs.get("is_active", current_is_active))
         incoming_is_superuser = "is_superuser" in attrs
 
         # Apenas superuser pode alterar is_superuser.
@@ -200,7 +202,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def validate_group_ids(self, value: list[int]) -> list[int]:
+    def validate_group_ids(self, value: list[Group]) -> list[Group]:
         """
         P1.1: Validate group_ids against whitelist and self-modification.
 
@@ -330,7 +332,7 @@ class GroupSerializer(serializers.ModelSerializer):
     def validate_name(self, value: str) -> str:
         instance = self.instance
         if instance and instance.name in RESERVED_GROUPS and value != instance.name:
-            request = self.context.get("request")
+            request: Any = self.context.get("request")
             confirmed = False
             if request is not None:
                 confirmed = str(request.query_params.get("confirm_reserved", "")).lower() == "true"

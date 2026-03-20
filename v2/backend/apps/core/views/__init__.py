@@ -15,8 +15,10 @@ from apps.core.views.admin import (
     GerenciaViewSet,
     GroupViewSet,
     MunicipioViewSet,
+    PermissaoFuncionalViewSet,
     ProdutoViewSet,
     ProjetoViewSet,
+    RBACMetaView,
     UsuarioAdminViewSet,
 )
 from apps.core.views.availability import AvailabilityBlockViewSet, AvailabilityCheckManyView, AvailabilityCheckView
@@ -66,6 +68,8 @@ __all__ = [
     "CompraViewSet",
     "UsuarioAdminViewSet",
     "GroupViewSet",
+    "PermissaoFuncionalViewSet",
+    "RBACMetaView",
     "AuditLogViewSet",
     # DAT Registros
     "DATRegistroViewSet",

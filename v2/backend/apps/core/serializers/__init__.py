@@ -74,6 +74,7 @@ from apps.core.serializers.solicitacao import (
 from apps.core.serializers.usuario import (
     CurrentUserSerializer,
     GroupSerializer,
+    PermissaoFuncionalSerializer,
     UserSlimSerializer,
     UsuarioAdminSerializer,
     UsuarioOptionSerializer,
@@ -98,6 +99,7 @@ __all__ = [
     "UsuarioOptionSerializer",
     "UsuarioAdminSerializer",
     "GroupSerializer",
+    "PermissaoFuncionalSerializer",
     # Organizacao
     "MunicipioSerializer",
     "MunicipioOptionSerializer",

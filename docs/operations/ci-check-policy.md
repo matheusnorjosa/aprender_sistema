@@ -37,6 +37,7 @@ Executados por `schedule` ou `workflow_dispatch`:
 
 - `[ops] strict security headers (staging/prod)`
 - `[ops] backend xdist canary summary`
+- `[ops] slsa provenance + cosign`
 
 ## Trilha Canary Backend xdist
 

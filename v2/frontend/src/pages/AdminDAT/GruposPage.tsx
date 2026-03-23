@@ -32,7 +32,6 @@ import {
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import {
-  assignGroups,
   createGroup,
   deleteGroup,
   getGroup,
@@ -40,6 +39,7 @@ import {
   listGroups,
   listPermissoesFuncionais,
   listUsers,
+  syncGroupMembers,
   updateGroup,
 } from '../../api/adminDAT';
 import type { PermissaoFuncional, RBACMetaPayload } from '../../api/adminDAT';
@@ -267,26 +267,10 @@ export default function GruposPage(): JSX.Element {
 
     setSavingMembers(true);
     try {
-      const operations = usuarios.map(async (usuario) => {
-        const selected = selectedUsers.includes(usuario.id);
-        const currentGroupIds = usuario.groups
-          ? usuario.groups.map((groupRef) => (typeof groupRef === 'object' ? groupRef.id : groupRef))
-          : [];
-        const alreadyMember = currentGroupIds.includes(selectedGroup.id);
-
-        if (selected && !alreadyMember) {
-          return assignGroups(usuario.id, { group_ids: [...currentGroupIds, selectedGroup.id] });
-        }
-        if (!selected && alreadyMember) {
-          return assignGroups(usuario.id, {
-            group_ids: currentGroupIds.filter((groupId) => groupId !== selectedGroup.id),
-          });
-        }
-        return Promise.resolve();
-      });
-
-      await Promise.all(operations);
-      message.success('Membros atualizados com sucesso');
+      const result = await syncGroupMembers(selectedGroup.id, { user_ids: selectedUsers });
+      message.success(
+        `Membros atualizados com sucesso (${result.members_count} total, +${result.added}/-${result.removed})`
+      );
       setMembersModalVisible(false);
       await Promise.all([fetchGrupos(), fetchUsuarios()]);
     } catch (error) {

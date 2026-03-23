@@ -51,6 +51,24 @@ export interface AssignGroupsPayload {
 }
 
 /**
+ * Group member sync payload
+ */
+export interface SyncGroupMembersPayload {
+  user_ids: ID[];
+}
+
+/**
+ * Group member sync response
+ */
+export interface SyncGroupMembersResponse {
+  group_id: ID;
+  members_count: number;
+  member_ids: ID[];
+  added: number;
+  removed: number;
+}
+
+/**
  * Group create/update payload
  */
 export interface GroupPayload {
@@ -245,6 +263,18 @@ export async function updateGroup(
 export async function deleteGroup(id: ID, options: { confirmReserved?: boolean } = {}): Promise<void> {
   const params = options.confirmReserved ? { confirm_reserved: true } : undefined;
   return apiRequest(() => api.delete(`/grupos/${id}/`, { params }));
+}
+
+/**
+ * Sync group members in one request
+ * @param groupId - Group ID
+ * @param data - {user_ids: [...]}
+ */
+export async function syncGroupMembers(
+  groupId: ID,
+  data: SyncGroupMembersPayload
+): Promise<SyncGroupMembersResponse> {
+  return apiRequest(() => api.post(`/grupos/${groupId}/sync-members/`, data));
 }
 
 /**

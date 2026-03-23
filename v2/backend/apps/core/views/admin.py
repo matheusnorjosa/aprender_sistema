@@ -9,6 +9,7 @@ CRUD ViewSets for admin entities (DAT permissions).
 from __future__ import annotations
 
 from django.contrib.auth.models import Group
+from django.db import transaction
 from django.db.models import Count, Q, QuerySet
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -330,6 +331,74 @@ class GroupViewSet(viewsets.ModelViewSet):
                 {"detail": "Grupo reservado. Para excluir, use ?confirm_reserved=true na requisição."}
             )
         super().perform_destroy(instance)
+
+    @action(detail=True, methods=["post"], url_path="sync-members", permission_classes=[IsDAT])
+    def sync_members(self, request: Request, pk: str | None = None) -> Response:
+        """
+        Sincroniza membros de um grupo em lote.
+
+        Endpoint: POST /api/grupos/{id}/sync-members/
+        Payload: {"user_ids": [1, 2, 3]}
+        """
+
+        group = self.get_object()
+        user_ids = request.data.get("user_ids", [])
+
+        if not isinstance(user_ids, list):
+            return Response(
+                {"error": "user_ids must be a list of integers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user_ids = [int(user_id) for user_id in user_ids]
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "user_ids must contain only integers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        dedup_user_ids = sorted(set(user_ids))
+        users = Usuario.objects.filter(id__in=dedup_user_ids)
+        found_ids = set(users.values_list("id", flat=True))
+        missing_ids = sorted(set(dedup_user_ids) - found_ids)
+        if missing_ids:
+            return Response(
+                {"error": f"Users not found with IDs: {missing_ids}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        current_member_ids = set(group.user_set.values_list("id", flat=True))
+        target_member_ids = set(dedup_user_ids)
+        added_ids = sorted(target_member_ids - current_member_ids)
+        removed_ids = sorted(current_member_ids - target_member_ids)
+
+        with transaction.atomic():
+            group.user_set.set(users)
+
+            AuditLog.objects.create(
+                usuario=request.user if request.user.is_authenticated else None,
+                action="SYNC_GROUP_MEMBERS",
+                model_name="Group",
+                details={
+                    "group_id": group.id,
+                    "group_name": group.name,
+                    "target_user_ids": dedup_user_ids,
+                    "added_user_ids": added_ids,
+                    "removed_user_ids": removed_ids,
+                },
+            )
+
+        return Response(
+            {
+                "group_id": group.id,
+                "members_count": len(dedup_user_ids),
+                "member_ids": dedup_user_ids,
+                "added": len(added_ids),
+                "removed": len(removed_ids),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class PermissaoFuncionalViewSet(viewsets.ReadOnlyModelViewSet):

@@ -5,6 +5,7 @@ Servicos RBAC de suporte para regras de atribuicao de grupos.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import cast
 
 from django.conf import settings
 from django.contrib.auth.models import Group
@@ -32,7 +33,8 @@ def get_assignable_group_names() -> set[str]:
 
     cached = cache.get(ASSIGNABLE_GROUPS_CACHE_KEY)
     if isinstance(cached, list):
-        return {str(item) for item in cached}
+        cached_names = cast(list[str], cached)
+        return set(cached_names)
 
     fallback = set(getattr(settings, "ALLOWED_USER_GROUPS", ALLOWED_USER_GROUPS))
     dynamic = set(

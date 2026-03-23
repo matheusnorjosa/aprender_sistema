@@ -4,6 +4,8 @@ Testes para whitelist dinamica de grupos atribuiveis (#832).
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 from django.contrib.auth.models import Group
 
 import pytest
@@ -36,7 +38,8 @@ class TestRBACServiceWhitelist:
                 "is_system": False,
             },
         )
-        permission.groups.add(group)
+        permission_groups = cast(Any, permission.groups)
+        permission_groups.add(group)
 
         names = get_assignable_group_names()
         assert "GrupoDinamicoService" in names
@@ -56,7 +59,8 @@ class TestRBACServiceWhitelist:
         names_before = get_assignable_group_names()
         assert "GrupoCacheInvalidation" not in names_before
 
-        permission.groups.add(group)
+        permission_groups = cast(Any, permission.groups)
+        permission_groups.add(group)
 
         names_after = get_assignable_group_names()
         assert "GrupoCacheInvalidation" in names_after

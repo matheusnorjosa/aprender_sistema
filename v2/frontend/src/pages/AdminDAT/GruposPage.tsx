@@ -61,7 +61,8 @@ interface UserRecord {
   id: ID;
   username: string;
   email: string;
-  groups?: Array<{ id: ID } | ID>;
+  groups?: string[];
+  group_ids_display?: ID[];
 }
 
 interface GroupFormValues {
@@ -251,13 +252,8 @@ export default function GruposPage(): JSX.Element {
     setSelectedGroup(group);
     setMembersModalVisible(true);
 
-    const usersInGroup = usuarios.filter(
-      (usuario) =>
-        usuario.groups &&
-        usuario.groups.some((groupRef) => {
-          const groupId = typeof groupRef === 'object' ? groupRef.id : groupRef;
-          return groupId === group.id;
-        })
+    const usersInGroup = usuarios.filter((usuario) =>
+      (usuario.group_ids_display || []).includes(group.id)
     );
     setSelectedUsers(usersInGroup.map((user) => user.id));
   };

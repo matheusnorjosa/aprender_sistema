@@ -21,7 +21,7 @@ class SuperuserOnlyAdminSite(BaseAdminSite):
 
     Rationale:
     - Django Admin passa a ser ferramenta de desenvolvimento/debugging.
-    - Gestão cotidiana (DAT) migra para interface React em /admin-dat.
+    - Gestão cotidiana (DAT) migra para interface React em /dat/admin.
     - Apenas desenvolvedores (superusers) acessam o admin nativo.
     """
 

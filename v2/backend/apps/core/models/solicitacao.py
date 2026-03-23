@@ -225,6 +225,10 @@ class Solicitacao(models.Model):
             models.Index(fields=["updated_at", "last_synced_at"]),
             # Indice composto para queries do painel GCal (PR14)
             models.Index(fields=["gcal_status", "status"]),
+            # #929: Indice para filtro por usuario + status (listagens paginadas)
+            models.Index(fields=["usuario", "status"], name="idx_solic_usuario_status"),
+            # #929: Indice para availability checks por municipio + intervalo
+            models.Index(fields=["municipio", "inicio", "fim"], name="idx_solic_mun_intervalo"),
         ]
         constraints = [
             models.CheckConstraint(
@@ -373,6 +377,8 @@ class Participation(models.Model):
             models.Index(fields=["solicitacao", "role"]),
             models.Index(fields=["usuario", "role"]),
             models.Index(fields=["guest_email"]),
+            # #929: Indice para verificar participacao em solicitacao especifica
+            models.Index(fields=["solicitacao", "usuario"], name="idx_part_solic_usuario"),
         ]
 
     def __str__(self) -> str:

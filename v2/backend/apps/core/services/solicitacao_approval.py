@@ -273,7 +273,7 @@ def batch_approve_solicitacoes(
     with transaction.atomic():
         # Fetch and lock pending solicitacoes to avoid double-approval races
         solicitacoes = list(
-            Solicitacao.objects.filter(id__in=ids, status="pendente").select_for_update().order_by("id")
+            Solicitacao.objects.filter(id__in=ids, status="pendente").select_for_update(skip_locked=True).order_by("id")
         )
         found_ids = {sol.id for sol in solicitacoes}
 
@@ -359,7 +359,7 @@ def batch_reject_solicitacoes(
     with transaction.atomic():
         # Fetch and lock pending solicitacoes to avoid double-reject races
         solicitacoes = list(
-            Solicitacao.objects.filter(id__in=ids, status="pendente").select_for_update().order_by("id")
+            Solicitacao.objects.filter(id__in=ids, status="pendente").select_for_update(skip_locked=True).order_by("id")
         )
         found_ids = {sol.id for sol in solicitacoes}
 

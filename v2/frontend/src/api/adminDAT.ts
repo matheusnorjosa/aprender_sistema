@@ -109,6 +109,26 @@ export interface MunicipioPayload {
 }
 
 /**
+ * Municipio autocomplete item used by Admin DAT assisted form
+ */
+export interface MunicipioAutocompleteItem {
+  nome: string;
+  uf: string;
+  ibge_code: string | null;
+  source: 'referencia' | 'cadastro';
+  confidence: 'high' | 'low';
+}
+
+/**
+ * Municipio autocomplete query params
+ */
+export interface MunicipioAutocompleteParams {
+  q: string;
+  uf?: string;
+  limit?: number;
+}
+
+/**
  * Project create/update payload
  */
 export interface ProjetoPayload {
@@ -334,6 +354,19 @@ export async function updateMunicipio(id: ID, data: MunicipioPayload): Promise<M
  */
 export async function deleteMunicipio(id: ID): Promise<void> {
   return apiRequest(() => api.delete(`/municipios/${id}/`));
+}
+
+/**
+ * Assisted municipio lookup for Admin DAT forms (UF + name + IBGE hints)
+ * @param params - q (required), optional uf and limit
+ */
+export async function autocompleteMunicipiosAdmin(
+  params: MunicipioAutocompleteParams
+): Promise<MunicipioAutocompleteItem[]> {
+  const response = await apiRequest<{ results: MunicipioAutocompleteItem[] }>(() =>
+    api.get('/municipios/autocomplete/', { params })
+  );
+  return response.results || [];
 }
 
 // ========== PROJETOS ==========

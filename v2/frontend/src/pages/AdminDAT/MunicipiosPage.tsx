@@ -5,12 +5,19 @@
  * Fase 1 Iteração 2 - Plano DAT/GCal 2025-10-29
  */
 
-import { useState, useEffect } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message, Select, Modal, Form, Checkbox } from 'antd';
+import { useEffect, useRef, useState } from 'react';
+import { Table, Button, Input, Space, Tag, Typography, Card, message, Select, Modal, Form, Checkbox, AutoComplete } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
-import { listMunicipios, createMunicipio, updateMunicipio, deleteMunicipio } from '../../api/adminDAT';
+import {
+  listMunicipios,
+  createMunicipio,
+  updateMunicipio,
+  deleteMunicipio,
+  autocompleteMunicipiosAdmin,
+} from '../../api/adminDAT';
+import type { MunicipioAutocompleteItem } from '../../api/adminDAT';
 import { importMunicipios } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
 import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
@@ -27,7 +34,7 @@ interface MunicipioRecord {
   id: ID;
   nome: string;
   uf: string;
-  ibge_code: string;
+  ibge_code: string | null;
   ativo: boolean;
 }
 
@@ -72,8 +79,15 @@ export default function MunicipiosPage(): JSX.Element {
   const [ufFilter, setUfFilter] = useState<string | undefined>(undefined);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingMunicipio, setEditingMunicipio] = useState<MunicipioRecord | null>(null);
+  const [lookupOptions, setLookupOptions] = useState<MunicipioAutocompleteItem[]>([]);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [ibgeLocked, setIbgeLocked] = useState(false);
 
   const [form] = Form.useForm<MunicipioFormValues>();
+  const watchedNome = Form.useWatch('nome', form);
+  const watchedUf = Form.useWatch('uf', form);
+  const lookupRequestRef = useRef(0);
+  const selectingSuggestionRef = useRef(false);
 
   const fetchMunicipios = async (): Promise<void> => {
     setLoading(true);
@@ -95,18 +109,64 @@ export default function MunicipiosPage(): JSX.Element {
     fetchMunicipios();
   }, [searchText, ufFilter]);
 
+  useEffect(() => {
+    if (!modalVisible) {
+      setLookupOptions([]);
+      setLookupLoading(false);
+      return;
+    }
+
+    const nome = (watchedNome || '').trim();
+    const uf = (watchedUf || '').trim().toUpperCase();
+
+    if (nome.length < 2 || uf.length !== 2) {
+      setLookupOptions([]);
+      setLookupLoading(false);
+      return;
+    }
+
+    const requestId = lookupRequestRef.current + 1;
+    lookupRequestRef.current = requestId;
+
+    const timerId = window.setTimeout(async () => {
+      setLookupLoading(true);
+      try {
+        const results = await autocompleteMunicipiosAdmin({ q: nome, uf, limit: 20 });
+        if (lookupRequestRef.current === requestId) {
+          setLookupOptions(results);
+        }
+      } catch {
+        if (lookupRequestRef.current === requestId) {
+          setLookupOptions([]);
+        }
+      } finally {
+        if (lookupRequestRef.current === requestId) {
+          setLookupLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [modalVisible, watchedNome, watchedUf]);
+
   const handleCreate = (): void => {
     setEditingMunicipio(null);
+    setLookupOptions([]);
+    setIbgeLocked(false);
     form.resetFields();
     setModalVisible(true);
   };
 
   const handleEdit = (municipio: MunicipioRecord): void => {
     setEditingMunicipio(municipio);
+    setLookupOptions([]);
+    setIbgeLocked(false);
     form.setFieldsValue({
       nome: municipio.nome,
       uf: municipio.uf,
-      ibge_code: municipio.ibge_code,
+      ibge_code: municipio.ibge_code || '',
       ativo: municipio.ativo,
     });
     setModalVisible(true);
@@ -122,11 +182,55 @@ export default function MunicipiosPage(): JSX.Element {
         message.success('Município criado com sucesso');
       }
       setModalVisible(false);
+      setLookupOptions([]);
+      setIbgeLocked(false);
       form.resetFields();
       fetchMunicipios();
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
+  };
+
+  const handleMunicipioSearch = (value: string): void => {
+    if (selectingSuggestionRef.current) {
+      selectingSuggestionRef.current = false;
+      return;
+    }
+
+    if (!value) {
+      setLookupOptions([]);
+    }
+
+    if (ibgeLocked) {
+      setIbgeLocked(false);
+      form.setFieldValue('ibge_code', '');
+    }
+  };
+
+  const handleMunicipioSelect = (value: string): void => {
+    const currentUf = String(form.getFieldValue('uf') || '').toUpperCase();
+    const selectedOption =
+      lookupOptions.find((item) => item.nome === value && item.uf === currentUf)
+      || lookupOptions.find((item) => item.nome === value);
+
+    if (!selectedOption) {
+      return;
+    }
+
+    selectingSuggestionRef.current = true;
+    form.setFieldsValue({
+      nome: selectedOption.nome,
+      uf: selectedOption.uf,
+    });
+
+    if (selectedOption.ibge_code) {
+      form.setFieldValue('ibge_code', selectedOption.ibge_code);
+      setIbgeLocked(true);
+      return;
+    }
+
+    setIbgeLocked(false);
+    form.setFieldValue('ibge_code', '');
   };
 
   const handleDelete = (municipio: MunicipioRecord): void => {
@@ -152,7 +256,7 @@ export default function MunicipiosPage(): JSX.Element {
     { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
     { title: 'Nome', dataIndex: 'nome', key: 'nome', width: 300 },
     { title: 'UF', dataIndex: 'uf', key: 'uf', width: 80, render: (uf: string) => <Tag color="blue">{uf}</Tag> },
-    { title: 'IBGE', dataIndex: 'ibge_code', key: 'ibge_code', width: 120 },
+    { title: 'IBGE', dataIndex: 'ibge_code', key: 'ibge_code', width: 120, render: (ibgeCode: string | null) => ibgeCode || '-' },
     {
       title: 'Ativo',
       dataIndex: 'ativo',
@@ -249,7 +353,11 @@ export default function MunicipiosPage(): JSX.Element {
       <Modal
         title={editingMunicipio ? 'Editar Município' : 'Novo Município'}
         open={modalVisible}
-        onCancel={() => setModalVisible(false)}
+        onCancel={() => {
+          setModalVisible(false);
+          setLookupOptions([]);
+          setIbgeLocked(false);
+        }}
         onOk={() => form.submit()}
         okText="Salvar"
         cancelText="Cancelar"
@@ -265,7 +373,19 @@ export default function MunicipiosPage(): JSX.Element {
             label="Nome do Município"
             rules={[{ required: true, message: 'Nome é obrigatório' }]}
           >
-            <Input placeholder="Ex: Salvador" />
+            <AutoComplete
+              options={lookupOptions.map((item) => ({
+                value: item.nome,
+                label: `${item.nome} - ${item.uf}${item.ibge_code ? ` (${item.ibge_code})` : ''}`,
+              }))}
+              onSearch={handleMunicipioSearch}
+              onSelect={handleMunicipioSelect}
+              filterOption={false}
+              notFoundContent={lookupLoading ? 'Buscando...' : 'Sem correspondências'}
+              disabled={!watchedUf}
+            >
+              <Input placeholder={watchedUf ? 'Digite ao menos 2 letras (autocomplete)' : 'Selecione a UF primeiro'} />
+            </AutoComplete>
           </Form.Item>
 
           <Form.Item
@@ -276,15 +396,28 @@ export default function MunicipiosPage(): JSX.Element {
             <Select
               placeholder="Selecione a UF"
               options={UF_NORDESTE_OPTIONS}
+              onChange={() => {
+                setLookupOptions([]);
+                setIbgeLocked(false);
+                form.setFieldValue('ibge_code', '');
+              }}
             />
           </Form.Item>
 
           <Form.Item
             name="ibge_code"
             label="Código IBGE"
-            rules={[{ required: true, message: 'Código IBGE é obrigatório' }]}
+            rules={[
+              { required: true, message: 'Código IBGE é obrigatório' },
+              { pattern: /^\d{7}$/, message: 'Código IBGE deve conter 7 dígitos numéricos' },
+            ]}
+            extra={
+              ibgeLocked
+                ? 'Preenchido automaticamente por correspondência confiável.'
+                : 'Preencha manualmente quando não houver correspondência confiável.'
+            }
           >
-            <Input placeholder="Ex: 2927408" maxLength={7} />
+            <Input placeholder="Ex: 2927408" maxLength={7} disabled={ibgeLocked} />
           </Form.Item>
 
           <Form.Item name="ativo" valuePropName="checked" initialValue={true}>

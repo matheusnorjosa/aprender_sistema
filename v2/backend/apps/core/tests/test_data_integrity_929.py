@@ -18,9 +18,9 @@ from datetime import timedelta
 from django.db import IntegrityError, connection
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 import pytest
-from rest_framework.test import APIClient
 
 from apps.core.models import (
     AvailabilityBlock,

@@ -59,6 +59,8 @@ class AvailabilityBlock(models.Model):
             models.Index(fields=["usuario", "inicio"]),
             models.Index(fields=["usuario", "fim"]),
             models.Index(fields=["status"]),
+            # #929: Indice para conflict detection (RD-02/RD-03) com filtro de status
+            models.Index(fields=["usuario", "status", "inicio"], name="idx_avblock_usr_st_ini"),
         ]
         constraints = [
             models.CheckConstraint(

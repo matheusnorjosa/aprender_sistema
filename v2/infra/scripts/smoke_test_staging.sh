@@ -179,7 +179,10 @@ echo ""
 # ── [5/8] Celery worker ─────────────────────────────────────────
 echo -n "[5/${TOTAL}] Celery worker: "
 worker_ping() {
-  compose_cmd exec -T worker celery -A config inspect ping --timeout=10 2>/dev/null | grep -q "pong"
+  # Avoid pipefail + grep -q SIGPIPE false negatives by checking buffered output.
+  local output
+  output="$(compose_cmd exec -T worker celery -A config inspect ping --timeout=10 2>/dev/null)" || return 1
+  [[ "$output" == *"pong"* ]]
 }
 if retry 12 5 worker_ping; then
   pass "Celery worker"

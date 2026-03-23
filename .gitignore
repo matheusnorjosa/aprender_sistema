@@ -592,3 +592,7 @@ nul
 
 # Git worktrees (local development)
 .worktrees/
+
+# Code Review Graph (development tool)
+.code-review-graph/
+.code-review-graphignore

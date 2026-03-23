@@ -251,13 +251,13 @@ class EquipeGerencia(models.Model):
 
     gerencia = models.ForeignKey(  # type: ignore[misc]
         Gerencia,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="equipes",
         help_text="Gerencia/setor ao qual o usuario pertence",
     )
     usuario = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="equipes",
         help_text="Usuario membro da equipe",
     )

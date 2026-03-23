@@ -133,6 +133,8 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             "password",
             "first_name",
             "last_name",
+            "telefone",
+            "cargo",
             "cpf",  # Full CPF (write-only for create/update)
             "cpf_masked",  # Masked CPF for display (LGPD)
             "is_active",

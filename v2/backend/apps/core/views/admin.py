@@ -23,7 +23,17 @@ from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
-from apps.core.models import AuditLog, Compra, Gerencia, Municipio, PermissaoFuncional, Produto, Projeto, Usuario
+from apps.core.models import (
+    AuditLog,
+    Compra,
+    Gerencia,
+    Municipio,
+    MunicipioReferencia,
+    PermissaoFuncional,
+    Produto,
+    Projeto,
+    Usuario,
+)
 from apps.core.permissions import IsControleOrDAT, IsDAT
 from apps.core.serializers import (
     AuditLogSerializer,
@@ -58,6 +68,96 @@ class MunicipioViewSet(viewsets.ModelViewSet):
     search_fields = ["nome", "ibge_code"]
     ordering_fields = ["nome", "uf", "id"]
     ordering = ["nome"]
+
+    @action(detail=False, methods=["get"], url_path="autocomplete")
+    def autocomplete(self, request: Request) -> Response:
+        """
+        Autocomplete assistido para Admin DAT (nome + UF + IBGE).
+
+        Query params:
+        - q: termo de busca (mínimo 2 chars)
+        - uf: filtro opcional de UF
+        - limit: quantidade máxima (default=20, max=50)
+        """
+
+        q = str(request.query_params.get("q", "")).strip()
+        uf = str(request.query_params.get("uf", "")).strip().upper()
+        raw_limit = str(request.query_params.get("limit", "20")).strip()
+
+        try:
+            limit = int(raw_limit)
+        except ValueError as exc:
+            raise ValidationError({"limit": "limit deve ser um inteiro válido."}) from exc
+
+        limit = max(1, min(limit, 50))
+        if uf and len(uf) != 2:
+            raise ValidationError({"uf": "UF deve ter exatamente 2 caracteres."})
+
+        if len(q) < 2:
+            return Response({"results": []}, status=status.HTTP_200_OK)
+
+        ref_qs = MunicipioReferencia.objects.filter(ativo=True, nome__icontains=q)
+        cad_qs = Municipio.objects.filter(ativo=True, nome__icontains=q)
+        if uf:
+            ref_qs = ref_qs.filter(uf__iexact=uf)
+            cad_qs = cad_qs.filter(uf__iexact=uf)
+
+        # Fallback de IBGE para referências sem código confiável.
+        fallback_ibge: dict[tuple[str, str], str] = {}
+        for nome, municipio_uf, ibge_code in cad_qs.filter(ibge_code__isnull=False).values_list("nome", "uf", "ibge_code"):
+            if not ibge_code:
+                continue
+            fallback_ibge[(nome.casefold(), municipio_uf.upper())] = ibge_code
+
+        by_key: dict[tuple[str, str], dict[str, str | None]] = {}
+
+        def upsert(item: dict[str, str | None]) -> None:
+            key = (str(item["nome"]).casefold(), str(item["uf"]).upper())
+            current = by_key.get(key)
+            if current is None:
+                by_key[key] = item
+                return
+
+            current_score = (
+                1 if current.get("ibge_code") else 0,
+                1 if current.get("source") == "referencia" else 0,
+            )
+            new_score = (
+                1 if item.get("ibge_code") else 0,
+                1 if item.get("source") == "referencia" else 0,
+            )
+            if new_score > current_score:
+                by_key[key] = item
+
+        for ref in ref_qs.order_by("nome", "uf")[: limit * 2]:
+            ref_code = (ref.codigo_externo or "").strip()
+            ibge_code = ref_code if ref_code.isdigit() and len(ref_code) == 7 else None
+            if ibge_code is None:
+                ibge_code = fallback_ibge.get((ref.nome.casefold(), ref.uf.upper()))
+
+            upsert(
+                {
+                    "nome": ref.nome,
+                    "uf": ref.uf.upper(),
+                    "ibge_code": ibge_code,
+                    "source": "referencia",
+                    "confidence": "high" if ibge_code else "low",
+                }
+            )
+
+        for municipio in cad_qs.order_by("nome", "uf")[: limit * 2]:
+            upsert(
+                {
+                    "nome": municipio.nome,
+                    "uf": municipio.uf.upper(),
+                    "ibge_code": municipio.ibge_code,
+                    "source": "cadastro",
+                    "confidence": "high" if municipio.ibge_code else "low",
+                }
+            )
+
+        results = sorted(by_key.values(), key=lambda item: (str(item["nome"]), str(item["uf"])))[:limit]
+        return Response({"results": results}, status=status.HTTP_200_OK)
 
 
 class ProjetoViewSet(viewsets.ModelViewSet):

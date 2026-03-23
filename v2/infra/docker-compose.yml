@@ -1,4 +1,21 @@
 name: ${COMPOSE_PROJECT_NAME:-aprender_dev}
+
+# ================================================================
+# Shared configuration (YAML anchors to avoid duplication)
+# ================================================================
+x-backend-env: &backend-env
+  ENVIRONMENT: ${ENVIRONMENT:-staging}
+  DEBUG: ${DEBUG:-False}
+  REQUIRE_DOCKER: 1
+  DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+  FEATURE_AUTO_APPLY_ENABLED: ${FEATURE_AUTO_APPLY_ENABLED:-False}
+  GCAL_CLIENT: ${GCAL_CLIENT:-fake}
+
+x-backend-volumes: &backend-volumes
+  - ../data/csv-import:/app/data/csv-import:ro
+  - backup_data:/backups # MP5: Database backups storage
+  - ./scripts:/app/infra/scripts:ro # MP5: Backup scripts
+
 services:
   db:
     image: postgres:15-alpine
@@ -16,6 +33,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
   redis:
     image: redis:7-alpine
     ports:
@@ -31,50 +49,31 @@ services:
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data
+
   web:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
     command: gunicorn config.wsgi:application --config /app/infra/gunicorn.conf.py
     env_file:
       - ${APP_ENV_FILE:-.env}
     environment:
-      # ================================================================
-      # Environment & Security (CP-01)
-      # ================================================================
-      ENVIRONMENT: ${ENVIRONMENT:-staging}
-      DEBUG: ${DEBUG:-False}
-      REQUIRE_DOCKER: 1
-      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+      <<: *backend-env
       SERVICE_NAME: web
 
-      # ================================================================
       # Session Configuration (2 hours timeout)
-      # ================================================================
       SESSION_COOKIE_AGE: 7200
       SESSION_COOKIE_NAME: asv2sid
       SESSION_SAVE_EVERY_REQUEST: "True"
       SESSION_EXPIRE_AT_BROWSER_CLOSE: "True"
 
-      # ================================================================
       # Security: Account Lockout (Security Audit 2025)
-      # ================================================================
       ACCOUNT_LOCKOUT_THRESHOLD: 10
       ACCOUNT_LOCKOUT_DURATION: 900
 
-      # ================================================================
       # Business Rules (RD-04, RD-05)
-      # ================================================================
       AVAILABILITY_DAILY_LIMIT_HOURS: ${AVAILABILITY_DAILY_LIMIT_HOURS:-8}
       TRAVEL_BUFFER_MINUTES: ${TRAVEL_BUFFER_MINUTES:-60}
 
-      # ================================================================
-      # Feature Flags
-      # ================================================================
-      FEATURE_AUTO_APPLY_ENABLED: ${FEATURE_AUTO_APPLY_ENABLED:-False}
-      GCAL_CLIENT: ${GCAL_CLIENT:-fake}
-
-      # ================================================================
       # Gunicorn Configuration (CP1 - Performance Optimization)
-      # ================================================================
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
       GUNICORN_THREADS: ${GUNICORN_THREADS:-2}
       GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
@@ -86,10 +85,7 @@ services:
       - redis
     ports:
       - "${BACKEND_HOST_PORT:-8002}:8000"
-    volumes:
-      - ../data/csv-import:/app/data/csv-import:ro
-      - backup_data:/backups # MP5: Database backups storage
-      - ./scripts:/app/infra/scripts:ro # MP5: Backup scripts
+    volumes: *backend-volumes
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/readyz/"]
@@ -104,23 +100,13 @@ services:
     env_file:
       - ${APP_ENV_FILE:-.env}
     environment:
-      # Environment
-      ENVIRONMENT: ${ENVIRONMENT:-staging}
-      DEBUG: ${DEBUG:-False}
-      REQUIRE_DOCKER: 1
-      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+      <<: *backend-env
       SERVICE_NAME: worker
-      # Feature Flags
-      FEATURE_AUTO_APPLY_ENABLED: ${FEATURE_AUTO_APPLY_ENABLED:-False}
-      GCAL_CLIENT: ${GCAL_CLIENT:-fake}
     depends_on:
       - db
       - redis
     restart: unless-stopped
-    volumes:
-      - ../data/csv-import:/app/data/csv-import:ro
-      - backup_data:/backups # MP5: Database backups storage (C-05)
-      - ./scripts:/app/infra/scripts:ro # MP5: Backup scripts (C-05)
+    volumes: *backend-volumes
     healthcheck:
       test:
         [
@@ -138,22 +124,13 @@ services:
     env_file:
       - ${APP_ENV_FILE:-.env}
     environment:
-      # Environment
-      ENVIRONMENT: ${ENVIRONMENT:-staging}
-      DEBUG: ${DEBUG:-False}
-      REQUIRE_DOCKER: 1
-      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+      <<: *backend-env
       SERVICE_NAME: beat
-      # Feature Flags
-      FEATURE_AUTO_APPLY_ENABLED: ${FEATURE_AUTO_APPLY_ENABLED:-False}
     depends_on:
       - db
       - redis
     restart: unless-stopped
-    volumes:
-      - ../data/csv-import:/app/data/csv-import:ro
-      - backup_data:/backups # MP5: Database backups storage (C-05)
-      - ./scripts:/app/infra/scripts:ro # MP5: Backup scripts (C-05)
+    volumes: *backend-volumes
     healthcheck:
       test:
         [

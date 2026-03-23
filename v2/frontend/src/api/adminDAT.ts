@@ -20,10 +20,14 @@ export interface AdminUser {
   first_name: string;
   last_name: string;
   cpf?: string;
+  cpf_masked?: string;
+  telefone?: string;
+  cargo?: string;
   is_active: boolean;
   is_staff: boolean;
   is_superuser: boolean;
-  groups: Group[];
+  groups: string[];
+  group_ids_display?: ID[];
   date_joined: string;
   last_login: string | null;
 }
@@ -38,9 +42,12 @@ export interface UserPayload {
   first_name?: string;
   last_name?: string;
   cpf?: string;
+  telefone?: string;
+  cargo?: string;
   is_active?: boolean;
   is_staff?: boolean;
   is_superuser?: boolean;
+  group_ids?: ID[];
 }
 
 /**

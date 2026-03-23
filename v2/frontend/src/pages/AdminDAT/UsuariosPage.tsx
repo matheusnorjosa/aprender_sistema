@@ -8,14 +8,32 @@
  * GAP-001 (resolvido): Endpoint /api/usuarios-admin/ reativado
  */
 
-import { useState, useEffect } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Select, Divider, Radio } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Table,
+  Button,
+  Input,
+  Space,
+  Tag,
+  Typography,
+  Card,
+  message,
+  Modal,
+  Form,
+  Select,
+  Divider,
+  Radio,
+  Checkbox,
+  Alert,
+} from 'antd';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 import type { FilterValue, SorterResult } from 'antd/es/table/interface';
 import type { RadioChangeEvent } from 'antd/es/radio';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
-import { listUsers, createUser, updateUser, deleteUser, listGroups } from '../../api/adminDAT';
+import { checkAuth } from '../../api/auth';
+import { listUsers, createUser, updateUser, deleteUser, listGroups, getRBACMeta } from '../../api/adminDAT';
+import type { PermissaoFuncional, RBACMetaPayload } from '../../api/adminDAT';
 import { importUsuarios } from '../../api/ops';
 import type { ImportResult } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
@@ -57,13 +75,6 @@ function toApplyResult(result: ImportResult): ApplyResult {
 const { Title, Text } = Typography;
 const { Search } = Input;
 
-// Grupos de SETOR e FUNÇÃO para RBAC (sincronizado com backend)
-const SETOR_GROUPS = [
-  'Superintendência', 'Vidas', 'Fluir', 'ACerta', 'Brincando', 'Sou da Paz',
-  'DAT', 'Controle', 'Gerência'
-];
-const FUNCAO_GROUPS = ['Formador', 'Coordenador', 'Apoio de Coordenação', 'Gerente'];
-
 /**
  * User record interface
  */
@@ -74,7 +85,11 @@ interface UserRecord {
   first_name?: string;
   last_name?: string;
   cpf?: string;
+  cpf_masked?: string;
+  telefone?: string;
+  cargo?: string;
   is_active: boolean;
+  is_superuser: boolean;
   groups?: string[];
   group_ids_display?: ID[];
 }
@@ -85,6 +100,8 @@ interface UserRecord {
 interface GroupRecord {
   id: ID;
   name: string;
+  permissions?: string[];
+  permissoes_funcionais?: PermissaoFuncional[];
 }
 
 /**
@@ -96,6 +113,10 @@ interface UserFormValues {
   first_name?: string;
   last_name?: string;
   cpf?: string;
+  telefone?: string;
+  cargo?: string;
+  is_active: boolean;
+  is_superuser: boolean;
   setor_ids: ID[];
   funcao_ids: ID[];
   password?: string;
@@ -131,9 +152,22 @@ export default function UsuariosPage(): JSX.Element {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [grupos, setGrupos] = useState<GroupRecord[]>([]);
+  const [rbacMeta, setRbacMeta] = useState<RBACMetaPayload | null>(null);
+  const [currentIsSuperuser, setCurrentIsSuperuser] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('lista');
 
   const [form] = Form.useForm<UserFormValues>();
+  const selectedSetorIds = Form.useWatch('setor_ids', form) || [];
+  const selectedFuncaoIds = Form.useWatch('funcao_ids', form) || [];
+
+  const setorGroupsSet = useMemo(
+    () => new Set(rbacMeta?.setor_groups || []),
+    [rbacMeta]
+  );
+  const funcaoGroupsSet = useMemo(
+    () => new Set(rbacMeta?.funcao_groups || []),
+    [rbacMeta]
+  );
 
   /**
    * Fetch users from API
@@ -178,19 +212,28 @@ export default function UsuariosPage(): JSX.Element {
     }
   };
 
-  // Fetch groups on mount
-  const fetchGrupos = async (): Promise<void> => {
+  // Fetch RBAC metadata and groups for dynamic classification
+  const fetchRbacContext = async (): Promise<void> => {
     try {
-      const data = await listGroups();
-      setGrupos(data.results as GroupRecord[]);
+      const [groupsData, meta] = await Promise.all([
+        listGroups({ ordering: 'name', page_size: PAGE_SIZES.ALL }),
+        getRBACMeta(),
+      ]);
+      setGrupos(groupsData.results as GroupRecord[]);
+      setRbacMeta(meta);
     } catch (error) {
-      logger.error('Erro ao carregar grupos:', error);
+      logger.error('Erro ao carregar contexto RBAC:', error);
+      message.error('Erro ao carregar metadados RBAC');
     }
   };
 
-  // Load groups only on mount
+  // Load RBAC context and current auth profile on mount
   useEffect(() => {
-    fetchGrupos();
+    void fetchRbacContext();
+    void (async () => {
+      const auth = await checkAuth();
+      setCurrentIsSuperuser(Boolean(auth.user?.is_superuser));
+    })();
   }, []);
 
   // Load users on mount and search change (reset to page 1)
@@ -220,6 +263,12 @@ export default function UsuariosPage(): JSX.Element {
   const handleCreate = (): void => {
     setEditingUser(null);
     form.resetFields();
+    form.setFieldsValue({
+      is_active: true,
+      is_superuser: false,
+      setor_ids: [],
+      funcao_ids: [],
+    });
     setModalVisible(true);
   };
 
@@ -228,10 +277,10 @@ export default function UsuariosPage(): JSX.Element {
     // Separar IDs de grupos por tipo
     const userGroupIds = user.group_ids_display || [];
     const setorIds = grupos
-      .filter(g => SETOR_GROUPS.includes(g.name) && userGroupIds.includes(g.id))
+      .filter((g) => setorGroupsSet.has(g.name) && userGroupIds.includes(g.id))
       .map(g => g.id);
     const funcaoIds = grupos
-      .filter(g => FUNCAO_GROUPS.includes(g.name) && userGroupIds.includes(g.id))
+      .filter((g) => funcaoGroupsSet.has(g.name) && userGroupIds.includes(g.id))
       .map(g => g.id);
 
     form.setFieldsValue({
@@ -240,6 +289,10 @@ export default function UsuariosPage(): JSX.Element {
       first_name: user.first_name,
       last_name: user.last_name,
       cpf: user.cpf,
+      telefone: user.telefone,
+      cargo: user.cargo,
+      is_active: user.is_active,
+      is_superuser: user.is_superuser,
       setor_ids: setorIds,
       funcao_ids: funcaoIds,
     });
@@ -268,9 +321,10 @@ export default function UsuariosPage(): JSX.Element {
   const handleSave = async (values: UserFormValues): Promise<void> => {
     try {
       // Combinar setor_ids e funcao_ids em group_ids
-      const { setor_ids = [], funcao_ids = [], ...rest } = values;
+      const { setor_ids = [], funcao_ids = [], is_superuser, ...rest } = values;
       const payload = {
         ...rest,
+        ...(currentIsSuperuser ? { is_superuser } : {}),
         group_ids: [...setor_ids, ...funcao_ids],
       };
 
@@ -319,16 +373,30 @@ export default function UsuariosPage(): JSX.Element {
     },
     {
       title: 'CPF',
-      dataIndex: 'cpf',
+      dataIndex: 'cpf_masked',
       key: 'cpf',
       width: 150,
-      render: (cpf: string | undefined) => cpf || <Tag color="orange">Sem CPF</Tag>,
+      render: (cpfMasked: string | undefined) => cpfMasked || <Tag color="orange">Sem CPF</Tag>,
+    },
+    {
+      title: 'Telefone',
+      dataIndex: 'telefone',
+      key: 'telefone',
+      width: 150,
+      render: (telefone: string | undefined) => telefone || <Text type="secondary">-</Text>,
+    },
+    {
+      title: 'Cargo',
+      dataIndex: 'cargo',
+      key: 'cargo',
+      width: 180,
+      render: (cargo: string | undefined) => cargo || <Text type="secondary">-</Text>,
     },
     {
       title: 'Setor',
       key: 'setor',
       render: (_, record) => {
-        const setores = (record.groups || []).filter(g => SETOR_GROUPS.includes(g));
+        const setores = (record.groups || []).filter((g) => setorGroupsSet.has(g));
         return setores.length > 0 ? (
           setores.map((g) => (
             <Tag key={g} color="purple">{g}</Tag>
@@ -343,7 +411,7 @@ export default function UsuariosPage(): JSX.Element {
       title: 'Função',
       key: 'funcao',
       render: (_, record) => {
-        const funcoes = (record.groups || []).filter(g => FUNCAO_GROUPS.includes(g));
+        const funcoes = (record.groups || []).filter((g) => funcaoGroupsSet.has(g));
         return funcoes.length > 0 ? (
           funcoes.map((g) => (
             <Tag key={g} color={g === 'Gerente' ? 'gold' : 'blue'}>{g}</Tag>
@@ -358,9 +426,12 @@ export default function UsuariosPage(): JSX.Element {
       title: 'Status',
       dataIndex: 'is_active',
       key: 'is_active',
-      width: 100,
-      render: (is_active: boolean) => (
-        <Tag color={is_active ? 'green' : 'red'}>{is_active ? 'Ativo' : 'Inativo'}</Tag>
+      width: 180,
+      render: (is_active: boolean, record: UserRecord) => (
+        <Space>
+          <Tag color={is_active ? 'green' : 'red'}>{is_active ? 'Ativo' : 'Inativo'}</Tag>
+          {record.is_superuser ? <Tag color="gold">Superuser</Tag> : null}
+        </Space>
       ),
     },
     {
@@ -520,6 +591,35 @@ export default function UsuariosPage(): JSX.Element {
             <Input placeholder="12345678901 (apenas números)" maxLength={11} />
           </Form.Item>
 
+          <Form.Item name="telefone" label="Telefone">
+            <Input placeholder="Ex: 85999990000" maxLength={20} />
+          </Form.Item>
+
+          <Form.Item name="cargo" label="Cargo">
+            <Input placeholder="Ex: Coordenador Pedagógico" maxLength={100} />
+          </Form.Item>
+
+          <Space size={24} className="mb-4">
+            <Form.Item name="is_active" valuePropName="checked" style={{ marginBottom: 0 }}>
+              <Checkbox>Usuário ativo</Checkbox>
+            </Form.Item>
+
+            {currentIsSuperuser ? (
+              <Form.Item name="is_superuser" valuePropName="checked" style={{ marginBottom: 0 }}>
+                <Checkbox>Superusuário</Checkbox>
+              </Form.Item>
+            ) : null}
+          </Space>
+
+          {!currentIsSuperuser ? (
+            <Alert
+              type="info"
+              showIcon
+              className="mb-4"
+              message="Somente superusuários podem alterar privilégio de superusuário."
+            />
+          ) : null}
+
           <Divider orientation="left">Grupos RBAC</Divider>
 
           <Form.Item
@@ -532,7 +632,7 @@ export default function UsuariosPage(): JSX.Element {
               mode="multiple"
               placeholder="Selecione o(s) setor(es)"
               options={grupos
-                .filter((g) => SETOR_GROUPS.includes(g.name))
+                .filter((g) => setorGroupsSet.has(g.name))
                 .map((g) => ({ label: g.name, value: g.id }))}
             />
           </Form.Item>
@@ -547,14 +647,45 @@ export default function UsuariosPage(): JSX.Element {
               mode="multiple"
               placeholder="Selecione a(s) função(ões)"
               options={grupos
-                .filter((g) => FUNCAO_GROUPS.includes(g.name))
+                .filter((g) => funcaoGroupsSet.has(g.name))
                 .map((g) => ({ label: g.name, value: g.id }))}
             />
           </Form.Item>
 
-          <Text type="secondary" className="block mb-4">
-            Nota: Apenas <Tag color="gold">Gerente</Tag> + <Tag color="purple">Superintendência</Tag> pode aprovar solicitações SUPER.
-          </Text>
+          <Card size="small" title="Resumo de grupos e permissões efetivas" className="mb-4">
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <div>
+                <Text strong>Grupos vinculados: </Text>
+                {[...selectedSetorIds, ...selectedFuncaoIds].length > 0 ? (
+                  grupos
+                    .filter((group) => [...selectedSetorIds, ...selectedFuncaoIds].includes(group.id))
+                    .map((group) => (
+                      <Tag key={group.id}>{group.name}</Tag>
+                    ))
+                ) : (
+                  <Text type="secondary">nenhum selecionado</Text>
+                )}
+              </div>
+              <div>
+                <Text strong>Permissões funcionais efetivas: </Text>
+                {(() => {
+                  const selectedGroups = grupos.filter((group) =>
+                    [...selectedSetorIds, ...selectedFuncaoIds].includes(group.id)
+                  );
+                  const labels = new Set<string>();
+                  selectedGroups.forEach((group) => {
+                    (group.permissoes_funcionais || []).forEach((permissao) => labels.add(permissao.label));
+                  });
+                  if (labels.size === 0) {
+                    return <Text type="secondary">sem permissões funcionais explícitas</Text>;
+                  }
+                  return Array.from(labels).sort().map((label) => (
+                    <Tag key={label} color="blue">{label}</Tag>
+                  ));
+                })()}
+              </div>
+            </Space>
+          </Card>
 
           {!editingUser && (
             <Form.Item

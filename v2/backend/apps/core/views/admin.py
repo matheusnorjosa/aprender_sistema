@@ -46,6 +46,7 @@ from apps.core.serializers import (
     ProjetoSerializer,
     UsuarioAdminSerializer,
 )
+from apps.core.services.rbac_service import get_assignable_group_names
 
 
 class MunicipioViewSet(viewsets.ModelViewSet):
@@ -344,8 +345,6 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
         GAP-003 (resolvido): Endpoint para vincular usuários a grupos.
         Iteração 3 - Fase 1 Plano DAT/GCal.
         """
-        from django.conf import settings as django_settings
-
         usuario = self.get_object()
         group_ids = request.data.get("group_ids", [])
 
@@ -385,8 +384,8 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Security (C-04): Validate groups against whitelist (P1.1)
-        allowed_groups: set[str] = getattr(django_settings, "ALLOWED_USER_GROUPS", set())
+        # Security (C-04): Validate groups against dynamic whitelist (P1.1/#832)
+        allowed_groups = get_assignable_group_names()
         for group in groups:
             if group.name not in allowed_groups:
                 allowed_list = ", ".join(sorted(allowed_groups))

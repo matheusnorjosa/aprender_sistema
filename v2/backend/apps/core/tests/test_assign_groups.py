@@ -17,7 +17,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Usuario
+from apps.core.models import PermissaoFuncional, Usuario
 
 
 @pytest.fixture
@@ -316,3 +316,34 @@ class TestAssignGroups:
         # Verificar que nenhum grupo foi alterado (operação atômica)
         usuario_formador.refresh_from_db()
         assert usuario_formador.groups.count() == 0
+
+    def test_assign_groups_allows_dynamic_group_with_functional_permission(
+        self, api_client, usuario_dat, usuario_formador
+    ):
+        """
+        #832 - Grupo fora do fallback estatico deve ser permitido se tiver permissao funcional vinculada.
+        """
+
+        grupo_dinamico, _ = Group.objects.get_or_create(name="GrupoDinamicoRBAC")
+        permissao, _ = PermissaoFuncional.objects.get_or_create(
+            codename="pode_operar_grupo_dinamico",
+            defaults={
+                "label": "Pode operar grupo dinâmico",
+                "description": "Permissão para validar whitelist dinâmica.",
+                "category": "admin_dat",
+                "is_system": False,
+            },
+        )
+        permissao.groups.add(grupo_dinamico)
+
+        api_client.force_authenticate(usuario_dat)
+
+        response = api_client.post(
+            f"/api/usuarios-admin/{usuario_formador.id}/assign_groups/",
+            {"group_ids": [grupo_dinamico.id]},
+            format="json",
+        )
+
+        assert response.status_code == 200
+        usuario_formador.refresh_from_db()
+        assert set(usuario_formador.groups.values_list("name", flat=True)) == {"GrupoDinamicoRBAC"}

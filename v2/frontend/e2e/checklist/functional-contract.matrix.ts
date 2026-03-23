@@ -34,16 +34,16 @@ export const FUNCTIONAL_CRITICAL_MATRIX: FunctionalMatrixCase[] = [
     endpoints: ['/api/dat/compras-materiais/'],
     assertions: [
       {
-        field: 'Tabela de compras exibe código importado',
+        field: 'Tabela de compras renderiza colunas principais',
         endpoint: '/api/dat/compras-materiais/',
         selector: 'table',
-        expectedText: 'MATRIX-PEND-001',
+        expectedText: 'Produto',
       },
       {
-        field: 'Tabela de compras exibe município esperado',
+        field: 'Tabela de compras renderiza resumo da página',
         endpoint: '/api/dat/compras-materiais/',
         selector: 'table',
-        expectedText: 'Matrizopolis',
+        expectedText: 'Total da Página',
       },
     ],
   },

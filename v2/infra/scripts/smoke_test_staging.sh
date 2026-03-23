@@ -40,7 +40,6 @@ compose_cmd() {
     IMAGE_TAG="${STAGING_TAG}" docker compose \
       --env-file .env.staging \
       -f docker-compose.yml \
-      -f docker-compose.staging-gate.yml \
       "$@"
   )
 }

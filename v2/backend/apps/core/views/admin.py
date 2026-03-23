@@ -104,7 +104,9 @@ class MunicipioViewSet(viewsets.ModelViewSet):
 
         # Fallback de IBGE para referências sem código confiável.
         fallback_ibge: dict[tuple[str, str], str] = {}
-        for nome, municipio_uf, ibge_code in cad_qs.filter(ibge_code__isnull=False).values_list("nome", "uf", "ibge_code"):
+        for nome, municipio_uf, ibge_code in cad_qs.filter(ibge_code__isnull=False).values_list(
+            "nome", "uf", "ibge_code"
+        ):
             if not ibge_code:
                 continue
             fallback_ibge[(nome.casefold(), municipio_uf.upper())] = ibge_code

@@ -38,8 +38,8 @@ class TestRBACServiceWhitelist:
                 "is_system": False,
             },
         )
-        permission_groups = cast(Any, permission.groups)
-        permission_groups.add(group)
+        permission_any = cast(Any, permission)
+        permission_any.groups.add(group)
 
         names = get_assignable_group_names()
         assert "GrupoDinamicoService" in names
@@ -59,8 +59,8 @@ class TestRBACServiceWhitelist:
         names_before = get_assignable_group_names()
         assert "GrupoCacheInvalidation" not in names_before
 
-        permission_groups = cast(Any, permission.groups)
-        permission_groups.add(group)
+        permission_any = cast(Any, permission)
+        permission_any.groups.add(group)
 
         names_after = get_assignable_group_names()
         assert "GrupoCacheInvalidation" in names_after

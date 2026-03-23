@@ -34,7 +34,6 @@ from apps.core.models import (
 )
 from apps.core.models.organizacao import EquipeGerencia
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────
 
 
@@ -217,8 +216,8 @@ class TestQueryCountRegression:
         assert response.status_code == 200
         # With select_related + prefetch_related, query count should be bounded
         # Auth(1-2) + count(1) + main query(1) + prefetch participations(1) + session(1-2) = ~5-8
-        assert len(context.captured_queries) <= 12, (
-            f"Too many queries ({len(context.captured_queries)}), "
-            f"possible N+1. Queries:\n"
-            + "\n".join(q["sql"][:120] for q in context.captured_queries)
+        assert (
+            len(context.captured_queries) <= 12
+        ), f"Too many queries ({len(context.captured_queries)}), " f"possible N+1. Queries:\n" + "\n".join(
+            q["sql"][:120] for q in context.captured_queries
         )

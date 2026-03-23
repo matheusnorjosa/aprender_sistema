@@ -197,9 +197,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             self.request.user.is_superuser
             or self.request.user.groups.filter(name__in=["Superintendência", "Controle", "DAT"]).exists()
         ):
-            qs = Solicitacao.objects.select_related("usuario", "municipio", "tipo_evento", "projeto", "coordenador").prefetch_related(
-                "participations__usuario"
-            )
+            qs = Solicitacao.objects.select_related(
+                "usuario", "municipio", "tipo_evento", "projeto", "coordenador"
+            ).prefetch_related("participations__usuario")
         else:
             qs = (
                 Solicitacao.objects.filter(usuario=self.request.user)

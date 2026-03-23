@@ -14,6 +14,7 @@ import {
   Form,
   Input,
   Modal,
+  Select,
   Space,
   Table,
   Tag,
@@ -28,7 +29,6 @@ import {
   PlusOutlined,
   ReloadOutlined,
   TeamOutlined,
-  UserAddOutlined,
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import {
@@ -68,6 +68,7 @@ interface UserRecord {
 interface GroupFormValues {
   name: string;
   permissao_funcional_ids: ID[];
+  member_ids: ID[];
 }
 
 export default function GruposPage(): JSX.Element {
@@ -79,21 +80,36 @@ export default function GruposPage(): JSX.Element {
   const [savingGroup, setSavingGroup] = useState(false);
   const [deletingGroupId, setDeletingGroupId] = useState<ID | null>(null);
 
-  const [membersModalVisible, setMembersModalVisible] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<GroupRecord | null>(null);
   const [usuarios, setUsuarios] = useState<UserRecord[]>([]);
-  const [selectedUsers, setSelectedUsers] = useState<ID[]>([]);
-  const [savingMembers, setSavingMembers] = useState(false);
 
   const [permissoesDisponiveis, setPermissoesDisponiveis] = useState<PermissaoFuncional[]>([]);
   const [rbacMeta, setRbacMeta] = useState<RBACMetaPayload | null>(null);
 
   const [form] = Form.useForm<GroupFormValues>();
+  const selectedPermissionIds = Form.useWatch('permissao_funcional_ids', form) || [];
+  const selectedMemberIds = Form.useWatch('member_ids', form) || [];
 
   const reservedGroupNames = useMemo(
     () => new Set([...(rbacMeta?.setor_groups || []), ...(rbacMeta?.funcao_groups || [])]),
     [rbacMeta]
   );
+
+  const currentMemberIds = useMemo(() => {
+    if (!editingGroup) {
+      return [];
+    }
+    return usuarios
+      .filter((usuario) => (usuario.group_ids_display || []).includes(editingGroup.id))
+      .map((usuario) => usuario.id);
+  }, [editingGroup, usuarios]);
+
+  const membershipDelta = useMemo(() => {
+    const current = new Set(currentMemberIds);
+    const selected = new Set(selectedMemberIds);
+    const added = selectedMemberIds.filter((id) => !current.has(id)).length;
+    const removed = currentMemberIds.filter((id) => !selected.has(id)).length;
+    return { added, removed };
+  }, [currentMemberIds, selectedMemberIds]);
 
   const permissionsByCategory = useMemo(() => {
     const grouped = new Map<string, PermissaoFuncional[]>();
@@ -164,7 +180,7 @@ export default function GruposPage(): JSX.Element {
   const handleCreate = (): void => {
     setEditingGroup(null);
     form.resetFields();
-    form.setFieldsValue({ name: '', permissao_funcional_ids: [] });
+    form.setFieldsValue({ name: '', permissao_funcional_ids: [], member_ids: [] });
     setModalVisible(true);
   };
 
@@ -172,9 +188,13 @@ export default function GruposPage(): JSX.Element {
     try {
       const groupDetail = (await getGroup(group.id)) as GroupRecord;
       setEditingGroup(groupDetail);
+      const memberIds = usuarios
+        .filter((usuario) => (usuario.group_ids_display || []).includes(group.id))
+        .map((usuario) => usuario.id);
       form.setFieldsValue({
         name: groupDetail.name,
         permissao_funcional_ids: (groupDetail.permissoes_funcionais || []).map((permissao) => permissao.id),
+        member_ids: memberIds,
       });
       setModalVisible(true);
     } catch (error) {
@@ -188,16 +208,28 @@ export default function GruposPage(): JSX.Element {
   ): Promise<void> => {
     setSavingGroup(true);
     try {
+      const { member_ids = [], ...groupPayload } = values;
+      let groupId: ID;
+
       if (editingGroup) {
-        await updateGroup(editingGroup.id, values, options);
-        message.success('Grupo atualizado com sucesso');
+        await updateGroup(editingGroup.id, groupPayload, options);
+        groupId = editingGroup.id;
       } else {
-        await createGroup(values);
-        message.success('Grupo criado com sucesso');
+        const createdGroup = await createGroup(groupPayload);
+        groupId = createdGroup.id;
+      }
+
+      const syncResult = await syncGroupMembers(groupId, { user_ids: member_ids });
+      if (editingGroup) {
+        message.success(
+          `Grupo atualizado com sucesso (+${syncResult.added}/-${syncResult.removed} membros)`
+        );
+      } else {
+        message.success(`Grupo criado com sucesso (${syncResult.members_count} membros vinculados)`);
       }
       setModalVisible(false);
       form.resetFields();
-      await fetchGrupos();
+      await Promise.all([fetchGrupos(), fetchUsuarios()]);
     } catch (error) {
       message.error(`Erro ao salvar grupo: ${(error as Error).message}`);
     } finally {
@@ -246,34 +278,6 @@ export default function GruposPage(): JSX.Element {
         }
       },
     });
-  };
-
-  const handleManageMembers = async (group: GroupRecord): Promise<void> => {
-    setSelectedGroup(group);
-    setMembersModalVisible(true);
-
-    const usersInGroup = usuarios.filter((usuario) =>
-      (usuario.group_ids_display || []).includes(group.id)
-    );
-    setSelectedUsers(usersInGroup.map((user) => user.id));
-  };
-
-  const handleSaveMembers = async (): Promise<void> => {
-    if (!selectedGroup) return;
-
-    setSavingMembers(true);
-    try {
-      const result = await syncGroupMembers(selectedGroup.id, { user_ids: selectedUsers });
-      message.success(
-        `Membros atualizados com sucesso (${result.members_count} total, +${result.added}/-${result.removed})`
-      );
-      setMembersModalVisible(false);
-      await Promise.all([fetchGrupos(), fetchUsuarios()]);
-    } catch (error) {
-      message.error(`Erro ao atualizar membros: ${(error as Error).message}`);
-    } finally {
-      setSavingMembers(false);
-    }
   };
 
   const columns: ColumnsType<GroupRecord> = [
@@ -329,21 +333,13 @@ export default function GruposPage(): JSX.Element {
     {
       title: 'Ações',
       key: 'acoes',
-      width: 320,
+      width: 220,
       render: (_, record) => {
         const reserved = isReservedGroup(record.name);
         return (
           <Space>
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => void handleEdit(record)}>
               Editar
-            </Button>
-            <Button
-              type="link"
-              size="small"
-              icon={<UserAddOutlined />}
-              onClick={() => void handleManageMembers(record)}
-            >
-              Gerenciar Membros
             </Button>
             <Button
               type="link"
@@ -452,34 +448,43 @@ export default function GruposPage(): JSX.Element {
               </Checkbox.Group>
             )}
           </Form.Item>
+
+          <Form.Item
+            name="member_ids"
+            label="Membros do grupo"
+            tooltip="Selecione os usuários que devem pertencer a este grupo"
+          >
+            <Select
+              mode="multiple"
+              allowClear
+              showSearch
+              placeholder="Selecione os membros"
+              optionFilterProp="label"
+              options={usuarios.map((usuario) => ({
+                label: `${usuario.username} (${usuario.email})`,
+                value: usuario.id,
+              }))}
+            />
+          </Form.Item>
+
+          <Card size="small" title="Resumo antes de salvar" className="mb-2">
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Text>
+                Permissões selecionadas: <Tag color="purple">{selectedPermissionIds.length}</Tag>
+              </Text>
+              <Text>
+                Membros selecionados: <Tag color="blue">{selectedMemberIds.length}</Tag>
+              </Text>
+              {editingGroup ? (
+                <Text type="secondary">
+                  Alterações de membros: +{membershipDelta.added} / -{membershipDelta.removed}
+                </Text>
+              ) : (
+                <Text type="secondary">Novo grupo: os membros serão vinculados no mesmo salvamento.</Text>
+              )}
+            </Space>
+          </Card>
         </Form>
-      </Modal>
-
-      <Modal
-        title={`Gerenciar Membros - ${selectedGroup?.name}`}
-        open={membersModalVisible}
-        onCancel={() => setMembersModalVisible(false)}
-        onOk={() => void handleSaveMembers()}
-        okText="Salvar"
-        cancelText="Cancelar"
-        confirmLoading={savingMembers}
-        width={620}
-      >
-        <div className="mb-4">
-          <Text type="secondary">Selecione os usuários que devem pertencer a este grupo:</Text>
-        </div>
-
-        <Checkbox.Group
-          className="w-full flex flex-col gap-2"
-          value={selectedUsers}
-          onChange={(values) => setSelectedUsers(values as ID[])}
-        >
-          {usuarios.map((usuario) => (
-            <Checkbox key={String(usuario.id)} value={usuario.id}>
-              {usuario.username} ({usuario.email})
-            </Checkbox>
-          ))}
-        </Checkbox.Group>
       </Modal>
     </section>
   );

@@ -26,7 +26,7 @@ export const selectors = {
     menuSolicitacoes: 'a[href*="/solicitacoes"]',
     menuAprovacoes: 'a[href="/aprovacoes"]',
     menuPreAgenda: 'a[href="/pre-agenda"]',
-    menuAdminDAT: 'a[href="/admin-dat"]',
+    menuAdminDAT: 'a[href="/dat/admin"]',
   },
 
   /**

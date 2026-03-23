@@ -275,17 +275,7 @@ export default function MunicipiosPage(): JSX.Element {
           >
             <Select
               placeholder="Selecione a UF"
-              options={[
-                { label: 'BA', value: 'BA' },
-                { label: 'CE', value: 'CE' },
-                { label: 'PE', value: 'PE' },
-                { label: 'RN', value: 'RN' },
-                { label: 'SE', value: 'SE' },
-                { label: 'AL', value: 'AL' },
-                { label: 'PB', value: 'PB' },
-                { label: 'PI', value: 'PI' },
-                { label: 'MA', value: 'MA' },
-              ]}
+              options={UF_NORDESTE_OPTIONS}
             />
           </Form.Item>
 

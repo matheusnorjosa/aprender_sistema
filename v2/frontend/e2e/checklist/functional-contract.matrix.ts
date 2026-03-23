@@ -31,17 +31,17 @@ export const FUNCTIONAL_CRITICAL_MATRIX: FunctionalMatrixCase[] = [
     id: 'controle-compras-core-compra',
     route: '/controle/compras',
     user: { username: 'controle_e2e@test.com', password: 'testpass123' },
-    endpoints: ['/api/controle/compras/'],
+    endpoints: ['/api/dat/compras-materiais/'],
     assertions: [
       {
         field: 'Tabela de compras exibe código importado',
-        endpoint: '/api/controle/compras/',
+        endpoint: '/api/dat/compras-materiais/',
         selector: 'table',
         expectedText: 'MATRIX-PEND-001',
       },
       {
         field: 'Tabela de compras exibe município esperado',
-        endpoint: '/api/controle/compras/',
+        endpoint: '/api/dat/compras-materiais/',
         selector: 'table',
         expectedText: 'Matrizopolis',
       },

@@ -20,7 +20,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Municipio, PermissaoFuncional, Projeto, Usuario
+from apps.core.models import Compra, Municipio, MunicipioReferencia, PermissaoFuncional, Projeto, Usuario
 
 
 @pytest.fixture
@@ -179,6 +179,66 @@ class TestMunicipioAPI:
         response = api_client.get("/api/municipios/?search=Fortal")
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data["results"]) == 1
+
+    def test_autocomplete_municipios_prefers_reference_with_ibge(self, api_client, usuario_dat):
+        """Autocomplete retorna referência interna com IBGE quando disponível."""
+        MunicipioReferencia.objects.create(
+            nome="Fortaleza",
+            uf="CE",
+            codigo_externo="2304400",
+            fonte="sistemasaprender",
+            ativo=True,
+        )
+        Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code="2304400")
+
+        api_client.force_authenticate(user=usuario_dat)
+        response = api_client.get("/api/municipios/autocomplete/?q=Fort&uf=CE")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data["results"]) >= 1
+        fortaleza = next(item for item in response.data["results"] if item["nome"] == "Fortaleza")
+        assert fortaleza["uf"] == "CE"
+        assert fortaleza["ibge_code"] == "2304400"
+        assert fortaleza["source"] == "referencia"
+        assert fortaleza["confidence"] == "high"
+
+    def test_autocomplete_municipios_fallbacks_to_existing_cadastro(self, api_client, usuario_dat):
+        """Sem referência confiável, endpoint usa fallback de municípios já cadastrados."""
+        Municipio.objects.create(nome="Maranguape", uf="CE", ibge_code="2307705")
+
+        api_client.force_authenticate(user=usuario_dat)
+        response = api_client.get("/api/municipios/autocomplete/?q=Maran&uf=CE")
+
+        assert response.status_code == status.HTTP_200_OK
+        maranguape = next(item for item in response.data["results"] if item["nome"] == "Maranguape")
+        assert maranguape["uf"] == "CE"
+        assert maranguape["ibge_code"] == "2307705"
+        assert maranguape["source"] == "cadastro"
+        assert maranguape["confidence"] == "high"
+
+    def test_autocomplete_municipios_no_confident_ibge_returns_low_confidence(self, api_client, usuario_dat):
+        """Quando não há IBGE confiável, retorna item com confidence low e ibge_code nulo."""
+        MunicipioReferencia.objects.create(
+            nome="Nova Esperança",
+            uf="CE",
+            codigo_externo="EXT-001",
+            fonte="sistemasaprender",
+            ativo=True,
+        )
+
+        api_client.force_authenticate(user=usuario_dat)
+        response = api_client.get("/api/municipios/autocomplete/?q=Nova&uf=CE")
+
+        assert response.status_code == status.HTTP_200_OK
+        item = next(item for item in response.data["results"] if item["nome"] == "Nova Esperança")
+        assert item["ibge_code"] is None
+        assert item["confidence"] == "low"
+
+    def test_non_dat_cannot_use_municipios_autocomplete(self, api_client, usuario_formador):
+        """Usuário sem DAT não pode usar autocomplete de municípios do Admin DAT."""
+        api_client.force_authenticate(user=usuario_formador)
+        response = api_client.get("/api/municipios/autocomplete/?q=Fort&uf=CE")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 # ==========================

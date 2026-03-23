@@ -529,6 +529,7 @@ jobs:
           fi
 
       - name: Deploy via Portainer CE API (update IMAGE_TAG)
+        id: deploy-stack-update
         env:
           TARGET_ENV: ${{ needs.prepare.outputs.target_environment }}
           STAGING_PORTAINER_ACCESS_TOKEN: ${{ secrets.STAGING_PORTAINER_ACCESS_TOKEN || '' }}
@@ -701,6 +702,9 @@ jobs:
           done
 
           cp /tmp/portainer-stack-update-attempts.log portainer-stack-update-attempts.txt || true
+          {
+            echo "previous_image_tag=${previous_image_tag}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Post-deploy verification (version-aware polling)
         id: post-deploy-verification
@@ -874,6 +878,129 @@ jobs:
           printf '%s\n' "${last_version_response:-no response}" > post-deploy-version-response.txt
           exit 1
 
+      - name: Cleanup old deploy images on target endpoint (keep current + previous)
+        if: steps.post-deploy-verification.outcome == 'success'
+        env:
+          TARGET_ENV: ${{ needs.prepare.outputs.target_environment }}
+          STAGING_PORTAINER_ACCESS_TOKEN: ${{ secrets.STAGING_PORTAINER_ACCESS_TOKEN || '' }}
+          PRODUCTION_PORTAINER_ACCESS_TOKEN: ${{ secrets.PRODUCTION_PORTAINER_ACCESS_TOKEN || '' }}
+          PORTAINER_ACCESS_TOKEN_DEFAULT: ${{ secrets.PORTAINER_ACCESS_TOKEN || '' }}
+          PORTAINER_URL: ${{ steps.resolve.outputs.portainer_url }}
+          PORTAINER_ENDPOINT_ID: ${{ steps.resolve.outputs.portainer_endpoint_id }}
+          PORTAINER_SKIP_TLS_VERIFY: ${{ steps.resolve.outputs.portainer_skip_tls_verify }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
+          PREVIOUS_IMAGE_TAG: ${{ steps.deploy-stack-update.outputs.previous_image_tag }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+        run: |
+          set -euo pipefail
+
+          : > post-deploy-image-cleanup.txt
+
+          log() {
+            echo "$1"
+            echo "$1" >> post-deploy-image-cleanup.txt
+          }
+
+          portainer_access_token="$PORTAINER_ACCESS_TOKEN_DEFAULT"
+          if [ "$TARGET_ENV" = "staging" ] && [ -n "$STAGING_PORTAINER_ACCESS_TOKEN" ]; then
+            portainer_access_token="$STAGING_PORTAINER_ACCESS_TOKEN"
+          elif [ "$TARGET_ENV" = "production" ] && [ -n "$PRODUCTION_PORTAINER_ACCESS_TOKEN" ]; then
+            portainer_access_token="$PRODUCTION_PORTAINER_ACCESS_TOKEN"
+          fi
+
+          if [ -z "${portainer_access_token:-}" ]; then
+            log "Image cleanup skipped: missing Portainer token."
+            exit 0
+          fi
+
+          portainer_url="${PORTAINER_URL:-}"
+          if [ -z "$portainer_url" ] || [ -z "${PORTAINER_ENDPOINT_ID:-}" ]; then
+            log "Image cleanup skipped: missing Portainer URL or endpoint ID."
+            exit 0
+          fi
+          portainer_url="${portainer_url%/}"
+
+          curl_opts=(--silent --show-error --location --max-time 120)
+          if [ "${PORTAINER_SKIP_TLS_VERIFY:-false}" = "true" ]; then
+            curl_opts+=(--insecure)
+          fi
+
+          docker_api_base="${portainer_url}/api/endpoints/${PORTAINER_ENDPOINT_ID}/docker"
+
+          containers_json="$(curl "${curl_opts[@]}" \
+            -H "X-API-KEY: ${portainer_access_token}" \
+            "${docker_api_base}/containers/json?all=1" || true)"
+          images_json="$(curl "${curl_opts[@]}" \
+            -H "X-API-KEY: ${portainer_access_token}" \
+            "${docker_api_base}/images/json?all=1" || true)"
+
+          if [ -z "$containers_json" ] || [ -z "$images_json" ]; then
+            log "Image cleanup skipped: could not fetch Docker API data from Portainer endpoint."
+            exit 0
+          fi
+
+          in_use_refs="$(printf '%s' "$containers_json" | jq -r '.[].Image // empty' | sort -u || true)"
+          removed_count=0
+          kept_count=0
+          failed_count=0
+
+          log "cleanup_target_env=${TARGET_ENV}"
+          log "keep_release_tag=${RELEASE_VERSION}"
+          log "keep_previous_tag=${PREVIOUS_IMAGE_TAG:-none}"
+          log "---"
+
+          for repo in "$BACKEND_IMAGE" "$FRONTEND_IMAGE"; do
+            repo_refs="$(printf '%s' "$images_json" | jq -r --arg repo "$repo" '
+              [.[] | (.RepoTags // [])[]? | select(startswith($repo + ":"))] | unique | .[]
+            ' || true)"
+
+            if [ -z "$repo_refs" ]; then
+              log "repo=${repo} no tagged images found on endpoint."
+              continue
+            fi
+
+            while IFS= read -r ref; do
+              [ -z "$ref" ] && continue
+              tag="${ref##*:}"
+
+              keep_reason=""
+              if [ "$tag" = "$RELEASE_VERSION" ]; then
+                keep_reason="current_release"
+              elif [ -n "${PREVIOUS_IMAGE_TAG:-}" ] && [ "$tag" = "$PREVIOUS_IMAGE_TAG" ]; then
+                keep_reason="previous_release"
+              elif printf '%s\n' "$in_use_refs" | grep -Fxq "$ref"; then
+                keep_reason="in_use_by_container"
+              fi
+
+              if [ -n "$keep_reason" ]; then
+                kept_count=$((kept_count + 1))
+                log "keep ${ref} (${keep_reason})"
+                continue
+              fi
+
+              encoded_ref="$(jq -rn --arg ref "$ref" '$ref|@uri')"
+              http_code="$(curl "${curl_opts[@]}" \
+                -o /tmp/portainer-image-delete-response.json \
+                -w '%{http_code}' \
+                -X DELETE \
+                -H "X-API-KEY: ${portainer_access_token}" \
+                "${docker_api_base}/images/${encoded_ref}?force=false&noprune=false" || true)"
+
+              if [[ "$http_code" =~ ^[0-9]+$ ]] && [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+                removed_count=$((removed_count + 1))
+                log "removed ${ref} (HTTP ${http_code})"
+              else
+                failed_count=$((failed_count + 1))
+                body="$(cat /tmp/portainer-image-delete-response.json 2>/dev/null || true)"
+                log "failed_remove ${ref} (HTTP ${http_code}) ${body}"
+              fi
+            done <<< "$repo_refs"
+          done
+
+          log "---"
+          log "cleanup_summary kept=${kept_count} removed=${removed_count} failed=${failed_count}"
+
       - name: Generate deploy evidence
         if: always()
         env:
@@ -920,6 +1047,7 @@ jobs:
             post-deploy-health-response.txt
             post-deploy-version-response.txt
             post-deploy-debug.txt
+            post-deploy-image-cleanup.txt
             portainer-stack-update-attempts.txt
           if-no-files-found: warn
           retention-days: 30

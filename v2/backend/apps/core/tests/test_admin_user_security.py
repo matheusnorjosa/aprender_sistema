@@ -17,7 +17,7 @@ from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory
 
-from apps.core.models import Usuario
+from apps.core.models import PermissaoFuncional, Usuario
 from apps.core.serializers import UsuarioAdminSerializer
 
 
@@ -315,6 +315,40 @@ class AdminUserSecurityTests(TestCase):
         # Verificar que Gerência foi atribuído
         group_names = set(usuario.groups.values_list("name", flat=True))
         self.assertEqual(group_names, {"Gerência"})
+
+    def test_dynamic_group_with_functional_permission_is_whitelisted(self):
+        """
+        #832 - Grupo fora do fallback estatico passa a ser valido quando vinculado a permissao funcional.
+        """
+
+        dynamic_group, _ = Group.objects.get_or_create(name="GrupoDinamicSerializer")
+        permissao, _ = PermissaoFuncional.objects.get_or_create(
+            codename="pode_usar_grupo_dinamico_serializer",
+            defaults={
+                "label": "Pode usar grupo dinâmico no serializer",
+                "description": "Teste de whitelist dinâmica no serializer.",
+                "category": "admin_dat",
+                "is_system": False,
+            },
+        )
+        permissao.groups.add(dynamic_group)
+
+        data = {
+            "group_ids": [dynamic_group.id],
+        }
+        request = self.factory.patch(f"/api/usuarios/{self.user_comum.id}/", data)
+        request.user = self.user_dat
+
+        serializer = UsuarioAdminSerializer(
+            instance=self.user_comum,
+            data=data,
+            partial=True,
+            context={"request": request},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        usuario = serializer.save()
+        self.assertEqual(set(usuario.groups.values_list("name", flat=True)), {"GrupoDinamicSerializer"})
 
     def test_superuser_can_set_is_superuser_for_other_user(self):
         """

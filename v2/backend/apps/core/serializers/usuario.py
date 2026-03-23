@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
@@ -20,6 +19,7 @@ from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.constants import RESERVED_GROUPS
 from apps.core.models import PermissaoFuncional
+from apps.core.services.rbac_service import get_assignable_group_names
 
 
 class UserSlimSerializer(serializers.ModelSerializer):
@@ -120,10 +120,6 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         # Keep only last 6 characters visible
         return f"***.***.{cpf[-6:]}"
 
-    # Whitelist of allowed groups (P1.1) - configurável via settings (Issue #254)
-    # Fallback para set vazio se não configurado (todos os grupos bloqueados)
-    ALLOWED_GROUPS: set[str] = set(getattr(settings, "ALLOWED_USER_GROUPS", set()))
-
     class Meta:
         model = get_user_model()
         fields = [
@@ -222,10 +218,12 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         if instance and request and instance.id == request.user.id:
             raise serializers.ValidationError("Você não pode modificar seus próprios grupos.")
 
-        # Validate groups against whitelist (P1.1)
+        allowed_groups = get_assignable_group_names()
+
+        # Validate groups against dynamic whitelist (P1.1/#832)
         for group in value:
-            if group.name not in self.ALLOWED_GROUPS:
-                allowed_list = ", ".join(sorted(self.ALLOWED_GROUPS))
+            if group.name not in allowed_groups:
+                allowed_list = ", ".join(sorted(allowed_groups))
                 raise serializers.ValidationError(f"Grupo '{group.name}' não permitido. Grupos válidos: {allowed_list}")
 
         return value

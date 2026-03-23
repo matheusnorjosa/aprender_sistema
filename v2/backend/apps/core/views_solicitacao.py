@@ -144,7 +144,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     PR 8/N: Apenas Coordenador ou DAT podem criar solicitações.
     """
 
-    queryset = Solicitacao.objects.select_related("usuario", "municipio", "tipo_evento", "projeto")
+    queryset = Solicitacao.objects.select_related("usuario", "municipio", "tipo_evento", "projeto", "coordenador")
     serializer_class = SolicitacaoSerializer
     permission_classes = [IsAuthenticated]
 
@@ -190,20 +190,20 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             # Forçar filtro por usuário atual
             qs = (
                 Solicitacao.objects.filter(usuario=self.request.user)
-                .select_related("usuario", "municipio", "tipo_evento", "projeto")
+                .select_related("usuario", "municipio", "tipo_evento", "projeto", "coordenador")
                 .prefetch_related("participations__usuario")
             )
         elif (
             self.request.user.is_superuser
             or self.request.user.groups.filter(name__in=["Superintendência", "Controle", "DAT"]).exists()
         ):
-            qs = Solicitacao.objects.select_related("usuario", "municipio", "tipo_evento", "projeto").prefetch_related(
+            qs = Solicitacao.objects.select_related("usuario", "municipio", "tipo_evento", "projeto", "coordenador").prefetch_related(
                 "participations__usuario"
             )
         else:
             qs = (
                 Solicitacao.objects.filter(usuario=self.request.user)
-                .select_related("usuario", "municipio", "tipo_evento", "projeto")
+                .select_related("usuario", "municipio", "tipo_evento", "projeto", "coordenador")
                 .prefetch_related("participations__usuario")
             )
 

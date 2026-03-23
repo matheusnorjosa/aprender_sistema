@@ -18,6 +18,7 @@ from apps.core.services.rbac_permissions import (
     invalidate_group_functional_permissions_cache,
     invalidate_user_functional_permissions_cache,
 )
+from apps.core.services.rbac_service import invalidate_assignable_groups_cache
 
 User = get_user_model()
 
@@ -43,6 +44,7 @@ def _invalidate_funcperm_on_permission_groups_change(
     pk_set: set[int] | None = None,
     **kwargs: Any,
 ) -> None:
+    invalidate_assignable_groups_cache()
     if action == "pre_clear":
         existing_group_ids = list(instance.groups.values_list("id", flat=True))
         invalidate_group_functional_permissions_cache(existing_group_ids)
@@ -58,6 +60,7 @@ def _invalidate_funcperm_on_permission_save(
     instance: PermissaoFuncional,
     **kwargs: Any,
 ) -> None:
+    invalidate_assignable_groups_cache()
     group_ids = list(instance.groups.values_list("id", flat=True))
     if group_ids:
         invalidate_group_functional_permissions_cache(group_ids)
@@ -72,6 +75,7 @@ def _invalidate_funcperm_on_permission_delete(
     **kwargs: Any,
 ) -> None:
     # Relações M2M podem já ter sido removidas; invalidação global protege contra stale cache.
+    invalidate_assignable_groups_cache()
     bump_functional_permissions_cache_version()
 
 
@@ -82,6 +86,7 @@ def _invalidate_funcperm_on_group_change(
     instance: Group,
     **kwargs: Any,
 ) -> None:
+    invalidate_assignable_groups_cache()
     group_id = getattr(instance, "id", None)
     if isinstance(group_id, int):
         invalidate_group_functional_permissions_cache([group_id])

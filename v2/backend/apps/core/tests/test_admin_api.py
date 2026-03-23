@@ -417,11 +417,38 @@ class TestUsuarioAdminAPI:
             "cpf": "98765432100",
             "first_name": "Novo",
             "last_name": "Usuário",
+            "telefone": "85999990000",
+            "cargo": "Coordenador Operacional",
             "is_active": True,
         }
         response = api_client.post("/api/usuarios-admin/", payload, format="json")
         assert response.status_code == status.HTTP_201_CREATED
-        assert Usuario.objects.filter(username="novo_usuario").exists()
+        created = Usuario.objects.get(username="novo_usuario")
+        assert created.telefone == "85999990000"
+        assert created.cargo == "Coordenador Operacional"
+
+    def test_dat_can_update_usuario_telefone_cargo_and_active(self, api_client, usuario_dat, db):
+        """DAT pode atualizar telefone/cargo e status ativo de usuários comuns."""
+        target = Usuario.objects.create_user(
+            username="usuario_perfil",
+            email="perfil@example.com",
+            password="SecurePass123!",
+            cpf="10987654321",
+        )
+
+        api_client.force_authenticate(user=usuario_dat)
+        payload = {
+            "telefone": "85911112222",
+            "cargo": "Gerente Regional",
+            "is_active": False,
+        }
+        response = api_client.patch(f"/api/usuarios-admin/{target.id}/", payload, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        target.refresh_from_db()
+        assert target.telefone == "85911112222"
+        assert target.cargo == "Gerente Regional"
+        assert target.is_active is False
 
     def test_usuario_password_is_hashed(self, api_client, usuario_dat):
         """Senha deve ser hasheada ao criar usuário"""

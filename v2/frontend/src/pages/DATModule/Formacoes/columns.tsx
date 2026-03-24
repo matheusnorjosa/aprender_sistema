@@ -31,8 +31,6 @@ export interface FormacaoRecord {
   coordenador_nome?: string;
   formador_nome?: string;
   modalidade?: string;
-  quantidade_prevista?: number;
-  quantidade_presente?: number;
   status?: string;
   lista_presenca_enviada?: boolean;
   relatorio_enviado?: boolean;
@@ -114,21 +112,6 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<Fo
       key: 'modalidade',
       width: 110,
       render: (modalidade: string | undefined) => renderModalidadeTag(modalidade),
-    },
-    {
-      title: 'Participantes',
-      key: 'participantes',
-      width: 120,
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <Text type="secondary" className="text-[11px]">
-            Prev: {record.quantidade_prevista || 0}
-          </Text>
-          <Text className="text-[11px]">
-            Pres: <Text strong>{record.quantidade_presente || 0}</Text>
-          </Text>
-        </Space>
-      ),
     },
     {
       title: 'Status',

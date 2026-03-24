@@ -16,7 +16,7 @@ import gzip
 import json
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Mapping, cast
 from urllib.request import Request, urlopen
 
 from django.core.management.base import BaseCommand
@@ -39,7 +39,7 @@ class IBGEMunicipioRow:
     uf: str
 
 
-def _extract_row(payload: dict[str, Any]) -> IBGEMunicipioRow | None:
+def _extract_row(payload: Mapping[str, object]) -> IBGEMunicipioRow | None:
     """
     Extrai (codigo, nome, uf) de dois formatos de payload:
     - Nivelado: municipio-id, municipio-nome, UF-sigla
@@ -50,10 +50,16 @@ def _extract_row(payload: dict[str, Any]) -> IBGEMunicipioRow | None:
 
     uf = str(payload.get("UF-sigla") or "").strip().upper()
     if not uf:
-        microrregiao = payload.get("microrregiao") or {}
-        mesorregiao = microrregiao.get("mesorregiao") if isinstance(microrregiao, dict) else {}
-        uf_obj = mesorregiao.get("UF") if isinstance(mesorregiao, dict) else {}
-        uf = str(uf_obj.get("sigla") if isinstance(uf_obj, dict) else "").strip().upper()
+        microrregiao_obj = payload.get("microrregiao")
+        mesorregiao_obj: object | None = None
+        uf_obj: object | None = None
+
+        if isinstance(microrregiao_obj, Mapping):
+            mesorregiao_obj = microrregiao_obj.get("mesorregiao")
+        if isinstance(mesorregiao_obj, Mapping):
+            uf_obj = mesorregiao_obj.get("UF")
+        if isinstance(uf_obj, Mapping):
+            uf = str(uf_obj.get("sigla") or "").strip().upper()
 
     if not codigo or not nome or len(uf) != 2:
         return None
@@ -106,7 +112,7 @@ class Command(BaseCommand):
             if not isinstance(payload, dict):
                 invalid_rows += 1
                 continue
-            row = _extract_row(payload)
+            row = _extract_row(cast(dict[str, object], payload))
             if row is None:
                 invalid_rows += 1
                 continue
@@ -230,7 +236,8 @@ class Command(BaseCommand):
                 "User-Agent": "aprender-sistema/1.0",
             },
         )
-        with urlopen(req, timeout=timeout) as response:
+        # nosec B310 - URL fixa e confiável (API oficial IBGE em HTTPS).
+        with urlopen(req, timeout=timeout) as response:  # nosec B310
             raw = response.read()
             if (response.headers.get("Content-Encoding") or "").lower() == "gzip":
                 raw = gzip.decompress(raw)

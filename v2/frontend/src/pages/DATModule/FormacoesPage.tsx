@@ -20,7 +20,6 @@ import {
   Select,
   Modal,
   Form,
-  InputNumber,
   DatePicker,
   TimePicker,
   Divider,
@@ -39,7 +38,6 @@ import {
   ClearOutlined,
   CalendarOutlined,
   TableOutlined,
-  TeamOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   DeleteOutlined,
@@ -111,7 +109,6 @@ interface FormacoesStats {
   total: number;
   este_mes: number;
   realizadas: number;
-  total_participantes: number;
 }
 
 interface PaginationState {
@@ -388,7 +385,7 @@ export default function FormacoesPage(): JSX.Element {
       {/* Stats Cards */}
       {stats && (
         <Row gutter={16} className="mb-4">
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8}>
             <Card>
               <Statistic
                 title="Total Formações"
@@ -397,7 +394,7 @@ export default function FormacoesPage(): JSX.Element {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8}>
             <Card>
               <Statistic
                 title="Este Mês"
@@ -407,23 +404,13 @@ export default function FormacoesPage(): JSX.Element {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8}>
             <Card>
               <Statistic
                 title="Realizadas"
                 value={stats.realizadas || 0}
                 valueStyle={{ color: '#52c41a' }}
                 prefix={<CheckCircleOutlined />}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <Card>
-              <Statistic
-                title="Participantes"
-                value={stats.total_participantes || 0}
-                prefix={<TeamOutlined />}
-                formatter={(value) => value.toLocaleString('pt-BR')}
               />
             </Card>
           </Col>
@@ -819,27 +806,6 @@ export default function FormacoesPage(): JSX.Element {
             <Form.Item name="link_online" label="Link da Reunião (para formações online/híbridas)">
               <Input placeholder="https://meet.google.com/..." />
             </Form.Item>
-          </Card>
-
-          {/* Participantes */}
-          <Card size="small" title="Participantes" className="mb-4">
-            <Row gutter={16}>
-              <Col xs={8}>
-                <Form.Item name="quantidade_prevista" label="Prevista">
-                  <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
-                </Form.Item>
-              </Col>
-              <Col xs={8}>
-                <Form.Item name="quantidade_confirmada" label="Confirmada">
-                  <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
-                </Form.Item>
-              </Col>
-              <Col xs={8}>
-                <Form.Item name="quantidade_presente" label="Presente">
-                  <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
-                </Form.Item>
-              </Col>
-            </Row>
           </Card>
 
           {/* Status e Documentação */}

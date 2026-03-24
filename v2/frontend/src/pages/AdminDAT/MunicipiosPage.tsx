@@ -48,6 +48,15 @@ interface MunicipioFormValues {
   ativo: boolean;
 }
 
+function normalizeMunicipioName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 function toValidationResult(report: Record<string, unknown>): ValidationResult {
   const stats = (report.stats as Record<string, number | undefined>) || {};
   return {
@@ -150,6 +159,42 @@ export default function MunicipiosPage(): JSX.Element {
       window.clearTimeout(timerId);
     };
   }, [modalVisible, watchedNome, watchedUf]);
+
+  useEffect(() => {
+    if (!modalVisible) {
+      return;
+    }
+
+    const nome = String(watchedNome || '').trim();
+    const uf = String(watchedUf || '').trim().toUpperCase();
+
+    if (nome.length < 2 || uf.length !== 2 || lookupLoading) {
+      return;
+    }
+
+    const normalizedNome = normalizeMunicipioName(nome);
+    const exactMatches = lookupOptions.filter((item) => (
+      item.uf.toUpperCase() === uf
+      && normalizeMunicipioName(item.nome) === normalizedNome
+    ));
+
+    if (exactMatches.length !== 1) {
+      return;
+    }
+
+    const match = exactMatches[0];
+    if (!(match.ibge_code && match.confidence === 'high')) {
+      return;
+    }
+
+    const currentIbge = String(form.getFieldValue('ibge_code') || '').trim();
+    if (currentIbge !== match.ibge_code) {
+      form.setFieldValue('ibge_code', match.ibge_code);
+    }
+    if (!ibgeLocked) {
+      setIbgeLocked(true);
+    }
+  }, [modalVisible, watchedNome, watchedUf, lookupOptions, lookupLoading, form, ibgeLocked]);
 
   const handleCreate = (): void => {
     setEditingMunicipio(null);

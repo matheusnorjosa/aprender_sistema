@@ -242,7 +242,6 @@ function AppContent(): JSX.Element {
         <OfflineBanner />
         <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
           <AppSidebar
-            user={user}
             permissions={permissions}
             gcalErrorCount={alerts.errors}
             unreadNotifications={unreadNotifications}

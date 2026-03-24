@@ -8,7 +8,6 @@ import type { CurrentUser } from '../types';
 const DisponibilidadeBlocks = lazy(() => import('../pages/Disponibilidade'));
 const MonthlyPage = lazy(() => import('../pages/Disponibilidade/MonthlyPage'));
 const ControlePage = lazy(() => import('../pages/Controle/ControlePage'));
-const EtlReportsPage = lazy(() => import('../pages/Controle/EtlReportsPage'));
 const DATPage = lazy(() => import('../pages/DAT/DATPage'));
 const NewSolicitacaoWizard = lazy(() => import('../pages/Solicitacoes/NewSolicitacaoWizard'));
 const EditSolicitacaoPage = lazy(() => import('../pages/Solicitacoes/EditSolicitacaoPage'));
@@ -106,7 +105,6 @@ export function AppRoutes({ user, permissions }: AppRoutesProps): JSX.Element {
         <Route path="/acoes-notificacao" element={canAcoesInternas ? <AcoesNotificacaoPage /> : <Forbidden />} />
         <Route path="/acoes-notificacao/timeline" element={canAcoesInternas ? <AcoesTimelinePage /> : <Forbidden />} />
         <Route path="/notificacoes-internas" element={canAcoesInternas ? <NotificacoesInternasPage /> : <Forbidden />} />
-        <Route path="/dat/etl-reports" element={canDAT ? <EtlReportsPage /> : <Forbidden />} />
 
         {/* DAT Module */}
         <Route path="/dat/admin" element={canDAT ? <AdminDATHomePage /> : <Forbidden />} />

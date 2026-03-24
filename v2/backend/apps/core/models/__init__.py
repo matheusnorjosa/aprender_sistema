@@ -27,6 +27,7 @@ Estrutura:
     ├── dat_formacao.py      # DATFormacao
     ├── plano_formacoes.py   # PlanoFormacoes
     ├── permissao_funcional.py # PermissaoFuncional
+    ├── group_classificacao.py # GroupClassificacao
     ├── formacao.py          # Formacao
     ├── acompanhamento.py    # Acompanhamento
     └── prova.py             # Prova
@@ -59,6 +60,7 @@ from apps.core.models.dat_coordenador import DATArea, DATCoordenador
 from apps.core.models.dat_formacao import DATFormacao
 from apps.core.models.dat_registro import DATRegistro
 from apps.core.models.formacao import Formacao
+from apps.core.models.group_classificacao import GroupClassificacao
 from apps.core.models.integracao import GoogleOAuthCredential
 from apps.core.models.organizacao import (
     Colecao,
@@ -115,6 +117,7 @@ __all__ = [
     # Plano Formacoes (novo modelo estruturado)
     "PlanoFormacoes",
     "PermissaoFuncional",
+    "GroupClassificacao",
     "Formacao",
     "Acompanhamento",
     "Prova",

@@ -13,6 +13,7 @@ from django.core.cache import cache
 from django.db.models import Q
 
 from apps.core.constants import ALLOWED_USER_GROUPS
+from apps.core.models.group_classificacao import GroupClassificacao
 
 ASSIGNABLE_GROUPS_CACHE_KEY = "as2:rbac:assignable-groups:v1"
 ASSIGNABLE_GROUPS_CACHE_TTL_SECONDS = 300
@@ -39,7 +40,9 @@ def get_assignable_group_names() -> set[str]:
     fallback = set(getattr(settings, "ALLOWED_USER_GROUPS", ALLOWED_USER_GROUPS))
     dynamic = set(
         Group.objects.filter(
-            Q(name__in=fallback) | Q(permissoes_funcionais__isnull=False),
+            Q(name__in=fallback)
+            | Q(permissoes_funcionais__isnull=False)
+            | Q(rbac_classificacao__tipo__in=[GroupClassificacao.Tipo.SETOR, GroupClassificacao.Tipo.FUNCAO]),
         )
         .values_list("name", flat=True)
         .distinct()

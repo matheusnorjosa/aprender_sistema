@@ -122,4 +122,5 @@ export interface LoginResponse {
 export interface Group {
   id: ID;
   name: string;
+  group_type?: 'setor' | 'funcao' | null;
 }

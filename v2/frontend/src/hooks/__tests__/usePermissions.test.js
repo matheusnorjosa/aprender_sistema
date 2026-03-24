@@ -32,6 +32,7 @@ function makeUser(overrides = {}) {
     is_superuser: false,
     is_superintendencia: false,
     can_approve_super: false,
+    permissions: [],
     ...overrides,
   }
 }
@@ -141,6 +142,11 @@ describe('computePermissions', () => {
   test('can_approve_super passthrough from user', () => {
     const perms = computePermissions(makeUser({ can_approve_super: true }))
     expect(perms.canApproveSuper).toBe(true)
+  })
+
+  test('Formador role grants canBloqueios via role flag', () => {
+    const perms = computePermissions(makeUser({ funcoes: ['Formador'] }))
+    expect(perms.isFormador).toBe(true)
   })
 
   test('canDisponibilidade is true for non-Controle users', () => {

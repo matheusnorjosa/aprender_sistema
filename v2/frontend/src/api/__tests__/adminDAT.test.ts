@@ -19,6 +19,7 @@ vi.mock('../../api', () => ({
 import {
   assignGroups,
   autocompleteMunicipiosAdmin,
+  createGroup,
   createUser,
   deleteGroup,
   getRBACMeta,
@@ -66,6 +67,17 @@ describe('adminDAT API wrappers', () => {
 
     expect(postMock).toHaveBeenCalledWith('/usuarios-admin/10/assign_groups/', {
       group_ids: [1, 2, 3],
+    });
+  });
+
+  test('createGroup accepts group_type_input payload for dynamic setor/funcao classification', async () => {
+    postMock.mockResolvedValue({ data: { id: 21, name: 'Analista de Campo', group_type: 'funcao' } });
+
+    await createGroup({ name: 'Analista de Campo', group_type_input: 'funcao' });
+
+    expect(postMock).toHaveBeenCalledWith('/grupos/', {
+      name: 'Analista de Campo',
+      group_type_input: 'funcao',
     });
   });
 

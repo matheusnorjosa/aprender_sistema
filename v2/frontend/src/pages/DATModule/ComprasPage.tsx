@@ -42,7 +42,6 @@ import {
   ShoppingCartOutlined,
   InboxOutlined,
   CheckCircleOutlined,
-  DollarOutlined,
 } from '@ant-design/icons';
 import type { RadioChangeEvent } from 'antd/es/radio';
 import {
@@ -89,7 +88,6 @@ interface CompraRecord {
   municipio_nome: string;
   quantidade: number;
   quantidade_utilizada: number | null;
-  valor_unitario: number | null;
   [key: string]: any;
 }
 
@@ -107,7 +105,6 @@ interface ComprasStats {
   total_itens: number;
   total_produtos: number;
   total_disponivel: number;
-  valor_total: number;
 }
 
 interface MunicipioOption {
@@ -457,37 +454,6 @@ export default function ComprasPage(): JSX.Element {
       },
     },
     {
-      title: 'Valor Unit.',
-      dataIndex: 'valor_unitario',
-      key: 'valor_unitario',
-      width: 100,
-      align: 'right' as const,
-      render: (val: number | null) =>
-        val ? (
-          <Text type="secondary">
-            R$ {val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </Text>
-        ) : (
-          '-'
-        ),
-    },
-    {
-      title: 'Valor Total',
-      key: 'valor_total',
-      width: 120,
-      align: 'right' as const,
-      render: (_: unknown, record: CompraRecord) => {
-        const total = (record.quantidade || 0) * (record.valor_unitario || 0);
-        return total > 0 ? (
-          <Text strong>
-            R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </Text>
-        ) : (
-          '-'
-        );
-      },
-    },
-    {
       title: 'Ações',
       key: 'acoes',
       width: 100,
@@ -560,7 +526,7 @@ export default function ComprasPage(): JSX.Element {
       {/* Stats Cards */}
       {stats && (
         <Row gutter={16} className="mb-4">
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8}>
             <Card>
               <Statistic
                 title="Total de Itens"
@@ -570,7 +536,7 @@ export default function ComprasPage(): JSX.Element {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8}>
             <Card>
               <Statistic
                 title="Produtos Diferentes"
@@ -580,7 +546,7 @@ export default function ComprasPage(): JSX.Element {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8}>
             <Card>
               <Statistic
                 title="Disponíveis"
@@ -588,18 +554,6 @@ export default function ComprasPage(): JSX.Element {
                 valueStyle={{ color: '#52c41a' }}
                 prefix={<CheckCircleOutlined />}
                 formatter={(value) => value.toLocaleString('pt-BR')}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <Card>
-              <Statistic
-                title="Valor Total"
-                value={stats.valor_total || 0}
-                valueStyle={{ color: '#722ed1' }}
-                prefix={<DollarOutlined />}
-                precision={2}
-                formatter={(value) => `R$ ${value.toLocaleString('pt-BR')}`}
               />
             </Card>
           </Col>
@@ -784,10 +738,6 @@ export default function ComprasPage(): JSX.Element {
             const totalQtd = pageData.reduce((sum: number, r: any) => sum + (r.quantidade || 0), 0);
             const totalUtilizado = pageData.reduce((sum: number, r: any) => sum + (r.quantidade_utilizada || 0), 0);
             const totalDisponivel = totalQtd - totalUtilizado;
-            const totalValor = pageData.reduce(
-              (sum: number, r: any) => sum + (r.quantidade || 0) * (r.valor_unitario || 0),
-              0
-            );
 
             return (
               <Table.Summary fixed>
@@ -806,11 +756,7 @@ export default function ComprasPage(): JSX.Element {
                       {totalDisponivel.toLocaleString('pt-BR')}
                     </Text>
                   </Table.Summary.Cell>
-                  <Table.Summary.Cell index={7} colSpan={2} />
-                  <Table.Summary.Cell index={9} align="right">
-                    R$ {totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={10} />
+                  <Table.Summary.Cell index={7} colSpan={4} />
                 </Table.Summary.Row>
               </Table.Summary>
             );
@@ -1050,17 +996,6 @@ export default function ComprasPage(): JSX.Element {
               <Col xs={12} sm={6}>
                 <Form.Item name="data_entrega" label="Data Entrega">
                   <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-                </Form.Item>
-              </Col>
-              <Col xs={12} sm={6}>
-                <Form.Item name="valor_unitario" label="Valor Unitário">
-                  <InputNumber
-                    min={0}
-                    precision={2}
-                    style={{ width: '100%' }}
-                    formatter={(value) => `R$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                    parser={(value) => (value?.replace(/R\$\s?|\.(?=\d{3})/g, '').replace(',', '.') || '0') as unknown as 0}
-                  />
                 </Form.Item>
               </Col>
               <Col xs={12} sm={6}>

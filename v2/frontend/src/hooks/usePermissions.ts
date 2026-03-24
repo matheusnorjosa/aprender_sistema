@@ -1,20 +1,6 @@
 import { useMemo } from 'react';
 import type { CurrentUser } from '../types';
 
-const FUNCTIONAL_PERMISSIONS = {
-  APROVAR_SUPERINTENDENCIA: 'pode_aprovar_superintendencia',
-  CRIAR_SOLICITACAO_COORD_DAT: 'pode_criar_solicitacao_coord_dat',
-  IMPORTAR_CONTROLE_SUPER: 'pode_importar_controle_super',
-  OPERAR_DAT: 'pode_operar_dat',
-  OPERAR_DAT_EXCLUSIVO: 'pode_operar_dat_exclusivo',
-  OPERAR_CONTROLE_DAT: 'pode_operar_controle_dat',
-  OPERAR_CONTROLE: 'pode_operar_controle',
-  OPERAR_GERENCIA: 'pode_operar_gerencia',
-  ACESSAR_DASHBOARD_OVERVIEW: 'pode_acessar_dashboard_overview',
-  ACESSAR_DASHBOARD_COMPRAS: 'pode_acessar_dashboard_compras',
-  ACESSAR_MAP_METRICS: 'pode_acessar_map_metrics',
-} as const;
-
 export interface Permissions {
   // Role flags
   isCoordenador: boolean;
@@ -38,7 +24,6 @@ export interface Permissions {
   canDashboardCompras: boolean;
   canMapaBrasil: boolean;
   canDashboardsMenu: boolean;
-  canBloqueios: boolean;
   canDisponibilidade: boolean;
 }
 
@@ -62,119 +47,39 @@ const EMPTY_PERMISSIONS: Permissions = {
   canDashboardCompras: false,
   canMapaBrasil: false,
   canDashboardsMenu: false,
-  canBloqueios: false,
   canDisponibilidade: false,
 };
 
-function hasAnyPermission(permissionSet: Set<string>, ...codenames: string[]): boolean {
-  return codenames.some((codename) => permissionSet.has(codename));
-}
-
-function buildPermissionSet(user: CurrentUser): Set<string> {
-  return new Set(user.permissions || []);
-}
-
 function computePermissionsInternal(user: CurrentUser): Permissions {
-  const permissionSet = buildPermissionSet(user);
   const setores = user.setores || [];
   const funcoes = user.funcoes || [];
 
-  // Legacy fallback (kept for compatibility while RBAC functional rollout is completed)
-  const isCoordenadorLegacy = funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação');
-  const isFormadorLegacy = funcoes.includes('Formador');
-  const isGerenteLegacy = funcoes.includes('Gerente');
-  const inSuperintendenciaLegacy = setores.includes('Superintendência');
-  const inGerenciaLegacy = setores.includes('Gerência');
-  const inDATLegacy = setores.includes('DAT');
-  const inControleLegacy = setores.includes('Controle');
-  const inDiretoriaLegacy = setores.includes('Diretoria');
-
   // Role flags
-  const isCoordenador = user.is_superuser
-    || hasAnyPermission(permissionSet, FUNCTIONAL_PERMISSIONS.CRIAR_SOLICITACAO_COORD_DAT)
-    || isCoordenadorLegacy;
-  const isFormador = isFormadorLegacy;
-  const isGerente = user.is_superuser
-    || hasAnyPermission(permissionSet, FUNCTIONAL_PERMISSIONS.OPERAR_GERENCIA)
-    || isGerenteLegacy;
+  const isCoordenador = funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação');
+  const isFormador = funcoes.includes('Formador');
+  const isGerente = funcoes.includes('Gerente');
 
-  // Sector flags (display/compat)
-  const inSuperintendencia = inSuperintendenciaLegacy;
-  const inGerencia = inGerenciaLegacy;
-  const inDAT = inDATLegacy;
-  const inControle = inControleLegacy;
-  const inDiretoria = inDiretoriaLegacy;
+  // Sector flags
+  const inSuperintendencia = setores.includes('Superintendência');
+  const inGerencia = setores.includes('Gerência');
+  const inDAT = setores.includes('DAT');
+  const inControle = setores.includes('Controle');
+  const inDiretoria = setores.includes('Diretoria');
 
-  // Capability flags (permission-first, with legacy fallback)
-  const canApproveSuper = user.can_approve_super || hasAnyPermission(
-    permissionSet,
-    FUNCTIONAL_PERMISSIONS.APROVAR_SUPERINTENDENCIA,
-  );
-  const canCoordenador = user.is_superuser
-    || hasAnyPermission(permissionSet, FUNCTIONAL_PERMISSIONS.CRIAR_SOLICITACAO_COORD_DAT)
-    || isCoordenadorLegacy
-    || inDATLegacy;
-  const canControle = user.is_superuser
-    || hasAnyPermission(
-      permissionSet,
-      FUNCTIONAL_PERMISSIONS.OPERAR_CONTROLE,
-      FUNCTIONAL_PERMISSIONS.OPERAR_CONTROLE_DAT,
-      FUNCTIONAL_PERMISSIONS.IMPORTAR_CONTROLE_SUPER,
-    )
-    || inControleLegacy;
-  const canDAT = user.is_superuser
-    || hasAnyPermission(
-      permissionSet,
-      FUNCTIONAL_PERMISSIONS.OPERAR_DAT,
-      FUNCTIONAL_PERMISSIONS.OPERAR_DAT_EXCLUSIVO,
-    )
-    || inDATLegacy;
-  const canAcoesInternas = user.is_superuser
-    || hasAnyPermission(
-      permissionSet,
-      FUNCTIONAL_PERMISSIONS.CRIAR_SOLICITACAO_COORD_DAT,
-      FUNCTIONAL_PERMISSIONS.OPERAR_GERENCIA,
-      FUNCTIONAL_PERMISSIONS.OPERAR_DAT,
-      FUNCTIONAL_PERMISSIONS.OPERAR_DAT_EXCLUSIVO,
-    )
-    || inDATLegacy
-    || isCoordenadorLegacy
-    || isGerenteLegacy;
-  const canDashboardOverview = user.is_superuser
-    || hasAnyPermission(permissionSet, FUNCTIONAL_PERMISSIONS.ACESSAR_DASHBOARD_OVERVIEW)
-    || inSuperintendenciaLegacy
-    || inGerenciaLegacy
-    || inDiretoriaLegacy;
-  const canDashboardEquipe = user.is_superuser
-    || hasAnyPermission(
-      permissionSet,
-      FUNCTIONAL_PERMISSIONS.OPERAR_CONTROLE,
-      FUNCTIONAL_PERMISSIONS.OPERAR_CONTROLE_DAT,
-      FUNCTIONAL_PERMISSIONS.OPERAR_GERENCIA,
-    )
-    || inControleLegacy
-    || inGerenciaLegacy
-    || inSuperintendenciaLegacy
-    || inDiretoriaLegacy;
-  const canDashboardGcal = user.is_superuser
-    || hasAnyPermission(permissionSet, FUNCTIONAL_PERMISSIONS.IMPORTAR_CONTROLE_SUPER)
-    || inControleLegacy
-    || inSuperintendenciaLegacy;
-  const canDashboardCompras = user.is_superuser
-    || hasAnyPermission(permissionSet, FUNCTIONAL_PERMISSIONS.ACESSAR_DASHBOARD_COMPRAS)
-    || inDiretoriaLegacy
-    || inDATLegacy;
-  const canMapaBrasil = user.is_superuser
-    || hasAnyPermission(permissionSet, FUNCTIONAL_PERMISSIONS.ACESSAR_MAP_METRICS)
-    || inControleLegacy
-    || inDATLegacy
-    || inSuperintendenciaLegacy
-    || inGerenciaLegacy
-    || inDiretoriaLegacy;
+  // Capability flags
+  const canApproveSuper = user.can_approve_super || false;
+  const canCoordenador = user.is_superuser || isCoordenador || inDAT;
+  const canControle = user.is_superuser || inControle;
+  const canDAT = user.is_superuser || inDAT;
+  const canAcoesInternas = user.is_superuser || inDAT || isCoordenador || isGerente;
+  const canDashboardOverview = user.is_superuser || inSuperintendencia || inGerencia || inDiretoria;
+  const canDashboardEquipe = user.is_superuser || inControle || inGerencia || inSuperintendencia || inDiretoria;
+  const canDashboardGcal = user.is_superuser || inControle || inSuperintendencia;
+  const canDashboardCompras = user.is_superuser || inDiretoria || inDAT;
+  const canMapaBrasil = user.is_superuser || inControle || inDAT || inSuperintendencia || inGerencia || inDiretoria;
   const canDashboardsMenu =
     canDashboardOverview || canDashboardCompras || canDashboardEquipe || canDashboardGcal || canMapaBrasil;
-  const canBloqueios = canControle || canCoordenador || isFormador;
-  const canDisponibilidade = user.is_superuser || !inControleLegacy;
+  const canDisponibilidade = user.is_superuser || !inControle;
 
   return {
     isCoordenador,
@@ -196,7 +101,6 @@ function computePermissionsInternal(user: CurrentUser): Permissions {
     canDashboardCompras,
     canMapaBrasil,
     canDashboardsMenu,
-    canBloqueios,
     canDisponibilidade,
   };
 }

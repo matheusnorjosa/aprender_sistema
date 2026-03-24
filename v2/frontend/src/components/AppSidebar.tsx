@@ -184,10 +184,11 @@ export function AppSidebar({
   const { openKeys, onOpenChange, closeAllSubmenus } = useMenuOpenKeys();
 
   const {
-    canApproveSuper, canCoordenador, canControle, canDAT, canAcoesInternas, canBloqueios,
+    canApproveSuper, canCoordenador, canControle, canDAT, canAcoesInternas, isFormador,
     canDashboardOverview, canDashboardEquipe, canDashboardGcal, canDashboardCompras,
     canMapaBrasil, canDashboardsMenu, canDisponibilidade,
   } = permissions;
+  const canBloqueios = canControle || canCoordenador || isFormador;
 
   return (
     <>

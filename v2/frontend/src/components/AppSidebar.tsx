@@ -13,7 +13,6 @@ import {
   TableOutlined,
 } from '@ant-design/icons';
 import type { Permissions } from '../hooks/usePermissions';
-import type { CurrentUser } from '../types';
 import { LAYOUT } from '../constants';
 
 const { Sider } = Layout;
@@ -161,7 +160,6 @@ function SidebarMenu({ openKeys, onOpenChange, onItemClick, children }: SidebarM
 // ============================================================================
 
 interface AppSidebarProps {
-  user: CurrentUser;
   permissions: Permissions;
   gcalErrorCount: number;
   unreadNotifications: number;
@@ -175,7 +173,6 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({
-  user,
   permissions,
   gcalErrorCount,
   unreadNotifications,
@@ -187,7 +184,7 @@ export function AppSidebar({
   const { openKeys, onOpenChange, closeAllSubmenus } = useMenuOpenKeys();
 
   const {
-    canApproveSuper, canCoordenador, canControle, canDAT, canAcoesInternas,
+    canApproveSuper, canCoordenador, canControle, canDAT, canAcoesInternas, canBloqueios,
     canDashboardOverview, canDashboardEquipe, canDashboardGcal, canDashboardCompras,
     canMapaBrasil, canDashboardsMenu, canDisponibilidade,
   } = permissions;
@@ -266,7 +263,7 @@ export function AppSidebar({
               </Menu.Item>
             )}
 
-            {(canControle || canCoordenador || user.groups?.includes('Formador')) && (
+            {canBloqueios && (
               <Menu.Item key="bloqueios" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/bloqueios">Bloqueios</Link>
               </Menu.Item>

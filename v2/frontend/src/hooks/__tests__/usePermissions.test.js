@@ -32,6 +32,7 @@ function makeUser(overrides = {}) {
     is_superuser: false,
     is_superintendencia: false,
     can_approve_super: false,
+    permissions: [],
     ...overrides,
   }
 }
@@ -44,6 +45,7 @@ describe('computePermissions', () => {
     expect(perms.canDAT).toBe(false)
     expect(perms.canAcoesInternas).toBe(false)
     expect(perms.canDashboardsMenu).toBe(false)
+    expect(perms.canBloqueios).toBe(false)
     expect(perms.canDisponibilidade).toBe(false)
   })
 
@@ -59,6 +61,7 @@ describe('computePermissions', () => {
     expect(perms.canDashboardCompras).toBe(true)
     expect(perms.canMapaBrasil).toBe(true)
     expect(perms.canDashboardsMenu).toBe(true)
+    expect(perms.canBloqueios).toBe(true)
     expect(perms.canDisponibilidade).toBe(true)
   })
 
@@ -67,6 +70,7 @@ describe('computePermissions', () => {
     expect(perms.isCoordenador).toBe(true)
     expect(perms.canCoordenador).toBe(true)
     expect(perms.canAcoesInternas).toBe(true)
+    expect(perms.canBloqueios).toBe(true)
   })
 
   test('Apoio de Coordenação maps to isCoordenador', () => {
@@ -82,6 +86,7 @@ describe('computePermissions', () => {
     expect(perms.canCoordenador).toBe(true)
     expect(perms.canAcoesInternas).toBe(true)
     expect(perms.canDashboardCompras).toBe(true)
+    expect(perms.canBloqueios).toBe(true)
   })
 
   test('Controle sector grants canControle, dashboard permissions', () => {
@@ -102,6 +107,7 @@ describe('computePermissions', () => {
     // Gerente alone has no sector-based permissions
     expect(perms.canControle).toBe(false)
     expect(perms.canDAT).toBe(false)
+    expect(perms.canBloqueios).toBe(false)
   })
 
   test('canAcoesInternas: Coordenador without DAT/superuser', () => {
@@ -141,6 +147,33 @@ describe('computePermissions', () => {
   test('can_approve_super passthrough from user', () => {
     const perms = computePermissions(makeUser({ can_approve_super: true }))
     expect(perms.canApproveSuper).toBe(true)
+  })
+
+  test('functional permissions grant canDAT without hardcoded sectors', () => {
+    const perms = computePermissions(makeUser({
+      permissions: ['pode_operar_dat'],
+      setores: [],
+      funcoes: [],
+    }))
+    expect(perms.canDAT).toBe(true)
+    expect(perms.canAcoesInternas).toBe(true)
+  })
+
+  test('functional permissions grant dashboard capabilities without hardcoded sectors', () => {
+    const perms = computePermissions(makeUser({
+      permissions: ['pode_acessar_dashboard_overview', 'pode_acessar_map_metrics'],
+      setores: [],
+      funcoes: [],
+    }))
+    expect(perms.canDashboardOverview).toBe(true)
+    expect(perms.canMapaBrasil).toBe(true)
+    expect(perms.canDashboardsMenu).toBe(true)
+  })
+
+  test('Formador role grants canBloqueios via role flag', () => {
+    const perms = computePermissions(makeUser({ funcoes: ['Formador'] }))
+    expect(perms.isFormador).toBe(true)
+    expect(perms.canBloqueios).toBe(true)
   })
 
   test('canDisponibilidade is true for non-Controle users', () => {

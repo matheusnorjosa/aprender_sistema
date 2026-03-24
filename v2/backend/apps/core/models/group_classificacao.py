@@ -37,5 +37,13 @@ class GroupClassificacao(models.Model):
         verbose_name_plural = "Classificações de Grupo"
         ordering = ["group__name"]
 
+    @property
+    def tipo_label(self) -> str:
+        """Rótulo legível do tipo, sem depender de método dinâmico do Django."""
+        for value, label in self.Tipo.choices:
+            if value == self.tipo:
+                return label
+        return self.tipo
+
     def __str__(self) -> str:
-        return f"{self.group.name} ({self.get_tipo_display()})"
+        return f"{self.group.name} ({self.tipo_label})"

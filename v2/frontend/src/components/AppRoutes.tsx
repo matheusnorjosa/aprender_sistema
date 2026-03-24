@@ -94,6 +94,7 @@ export function AppRoutes({ user, permissions }: AppRoutesProps): JSX.Element {
         <Route path="/controle" element={canControle ? <ControlePage /> : <Forbidden />} />
         <Route path="/controle/acoes" element={canControle ? <AcoesPage /> : <Forbidden />} />
         <Route path="/controle/compras" element={(canControle || canDAT) ? <DATComprasPage /> : <Forbidden />} />
+        <Route path="/controle/coordenadores" element={canControle ? <CoordenadoresPage /> : <Forbidden />} />
         <Route path="/compras-materiais" element={(canControle || canDAT) ? <DATComprasPage /> : <Forbidden />} />
         <Route path="/deslocamentos" element={(canControle || canCoordenador || canDAT) ? <DeslocamentosPage /> : <Forbidden />} />
         <Route path="/controle/formacoes" element={canControle ? <FormacoesPage /> : <Forbidden />} />
@@ -118,7 +119,7 @@ export function AppRoutes({ user, permissions }: AppRoutesProps): JSX.Element {
         <Route path="/dat/admin/equipe-gerencia" element={canDAT ? <EquipeGerenciaImportPage /> : <Forbidden />} />
         <Route path="/dat/cadastros" element={canDAT ? <CadastrosPage /> : <Forbidden />} />
         <Route path="/dat/compras-materiais" element={(canControle || canDAT) ? <DATComprasPage /> : <Forbidden />} />
-        <Route path="/dat/coordenadores" element={canDAT ? <CoordenadoresPage /> : <Forbidden />} />
+        <Route path="/dat/coordenadores" element={canControle ? <CoordenadoresPage /> : <Forbidden />} />
         <Route path="/dat/importacao" element={canDAT ? <DATPage /> : <Forbidden />} />
         <Route path="/dat/registros" element={canDAT ? <DATRegistrosPage /> : <Forbidden />} />
       </Routes>

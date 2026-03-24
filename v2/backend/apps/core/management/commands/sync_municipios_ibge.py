@@ -59,7 +59,9 @@ def _extract_row(payload: Mapping[str, object]) -> IBGEMunicipioRow | None:
         if isinstance(mesorregiao_obj, Mapping):
             uf_obj = mesorregiao_obj.get("UF")
         if isinstance(uf_obj, Mapping):
-            uf = str(uf_obj.get("sigla") or "").strip().upper()
+            uf_map = cast(Mapping[str, object], uf_obj)
+            sigla = uf_map.get("sigla")
+            uf = str(sigla if sigla is not None else "").strip().upper()
 
     if not codigo or not nome or len(uf) != 2:
         return None

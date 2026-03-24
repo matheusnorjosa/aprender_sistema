@@ -30,6 +30,7 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/controle': 'controle-ops',
   '/controle/acoes': 'controle-acoes',
   '/controle/compras': 'controle-compras',
+  '/controle/coordenadores': 'controle-coordenadores',
   '/controle/formacoes': 'controle-formacoes',
   '/controle/plano-formacoes': 'controle-plano-formacoes',
   '/controle/pre-agenda': 'controle-pre-agenda',
@@ -50,7 +51,7 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/dat/admin/equipe-gerencia': 'dat-admin-equipe-gerencia',
   '/dat/cadastros': 'dat-cadastros',
   '/dat/compras-materiais': 'controle-compras',
-  '/dat/coordenadores': 'dat-coordenadores',
+  '/dat/coordenadores': 'controle-coordenadores',
   '/dat/importacao': 'dat-importacao',
   '/dat/registros': 'dat-registros',
   '/disponibilidade': 'grade-mensal',
@@ -62,6 +63,7 @@ const MENU_KEY_TO_PARENT: Record<string, string> = {
   'controle-ops': 'controle-submenu',
   'controle-acoes': 'controle-submenu',
   'controle-compras': 'controle-submenu',
+  'controle-coordenadores': 'controle-submenu',
   'controle-formacoes': 'controle-submenu',
   'controle-plano-formacoes': 'controle-submenu',
   'controle-pre-agenda': 'controle-submenu',
@@ -77,7 +79,6 @@ const MENU_KEY_TO_PARENT: Record<string, string> = {
   'dat-admin-colecoes': 'dat-submenu',
   'dat-admin-equipe-gerencia': 'dat-submenu',
   'dat-cadastros': 'dat-submenu',
-  'dat-coordenadores': 'dat-submenu',
   'dat-etl-reports': 'dat-submenu',
   'dat-importacao': 'dat-submenu',
   'dat-registros': 'dat-submenu',
@@ -274,6 +275,7 @@ export function AppSidebar({
               <SubMenu key="controle-submenu" icon={<CheckCircleOutlined />} title="Controle">
                 <Menu.Item key="controle-acoes"><Link to="/controle/acoes">Ações</Link></Menu.Item>
                 <Menu.Item key="controle-compras"><Link to="/controle/compras">Compras</Link></Menu.Item>
+                <Menu.Item key="controle-coordenadores"><Link to="/controle/coordenadores">Coordenadores</Link></Menu.Item>
                 <Menu.Item key="controle-formacoes"><Link to="/controle/formacoes">Formações</Link></Menu.Item>
                 <Menu.Item key="controle-ops"><Link to="/controle">Painel de Controle</Link></Menu.Item>
                 <Menu.Item key="controle-plano-formacoes"><Link to="/controle/plano-formacoes">Plano Anual</Link></Menu.Item>
@@ -329,7 +331,6 @@ export function AppSidebar({
                 <Menu.Item key="dat-admin-colecoes"><Link to="/dat/admin/colecoes">Importar Coleções</Link></Menu.Item>
                 <Menu.Item key="dat-admin-equipe-gerencia"><Link to="/dat/admin/equipe-gerencia">Importar Vínculos</Link></Menu.Item>
                 <Menu.Item key="dat-cadastros"><Link to="/dat/cadastros">Cadastros</Link></Menu.Item>
-                <Menu.Item key="dat-coordenadores"><Link to="/dat/coordenadores">Coordenadores</Link></Menu.Item>
                 <Menu.Item key="dat-importacao"><Link to="/dat/importacao">Importação</Link></Menu.Item>
                 <Menu.Item key="dat-registros"><Link to="/dat/registros">Registros de Turmas</Link></Menu.Item>
                 <Menu.Item key="dat-etl-reports"><Link to="/dat/etl-reports">Relatórios ETL</Link></Menu.Item>

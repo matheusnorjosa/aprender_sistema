@@ -162,7 +162,10 @@ export interface ListParams {
  * Axios error with response
  */
 interface AxiosErrorWithResponse extends AxiosError {
-  response?: AxiosResponse<{ detail?: string }>;
+  response?: AxiosResponse<{
+    detail?: string;
+    errors?: Record<string, string[] | string>;
+  }>;
 }
 
 /**
@@ -181,7 +184,16 @@ async function apiRequest<T>(requestFn: () => Promise<AxiosResponse<T>>): Promis
     } else if (axiosError.response?.status === 404) {
       message = 'Recurso não encontrado.';
     } else {
-      message = axiosError.response?.data?.detail || axiosError.message || `Erro HTTP ${axiosError.response?.status}`;
+      const backendErrors = axiosError.response?.data?.errors;
+      const firstBackendError = backendErrors
+        ? Object.values(backendErrors).flatMap((value) => (Array.isArray(value) ? value : [value]))[0]
+        : null;
+      message = String(
+        firstBackendError
+        || axiosError.response?.data?.detail
+        || axiosError.message
+        || `Erro HTTP ${axiosError.response?.status}`
+      );
     }
 
     throw new Error(message);

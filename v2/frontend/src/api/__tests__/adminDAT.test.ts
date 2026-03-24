@@ -153,4 +153,19 @@ describe('adminDAT API wrappers', () => {
 
     await expect(createUser({ username: 'dup' })).rejects.toThrow('Email já existe');
   });
+
+  test('apiRequest exposes field-level validation errors when backend sends errors payload', async () => {
+    postMock.mockRejectedValue({
+      response: {
+        status: 400,
+        data: {
+          code: 'INVALID',
+          detail: 'Erro de validação.',
+          errors: { cpf: ['Este campo é obrigatório.'] },
+        },
+      },
+    });
+
+    await expect(createUser({ username: 'sem-cpf' })).rejects.toThrow('Este campo é obrigatório.');
+  });
 });

@@ -17,7 +17,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import PermissaoFuncional, Usuario
+from apps.core.models import GroupClassificacao, PermissaoFuncional, Usuario
 
 pytestmark = pytest.mark.django_db
 
@@ -159,3 +159,28 @@ def test_me_returns_effective_functional_permissions():
     data = res.json()
     assert "permissions" in data
     assert "acoes.notificacao.manage" in data["permissions"]
+
+
+def test_me_classifies_dynamic_funcao_group():
+    """
+    Grupo classificado dinamicamente como função deve aparecer em funcoes.
+    """
+    user = Usuario.objects.create_user(username="u6", email="u6@x.com", password="x", cpf="77777777777")
+    dynamic_group, _ = Group.objects.get_or_create(name="Analista de Campo")
+    GroupClassificacao.objects.update_or_create(
+        group=dynamic_group,
+        defaults={"tipo": GroupClassificacao.Tipo.FUNCAO},
+    )
+    user.groups.add(dynamic_group)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("core:current-user")
+    res = client.get(url)
+
+    assert res.status_code == 200
+    data = res.json()
+    assert "Analista de Campo" in data["groups"]
+    assert "Analista de Campo" in data["funcoes"]
+    assert "Analista de Campo" not in data["setores"]

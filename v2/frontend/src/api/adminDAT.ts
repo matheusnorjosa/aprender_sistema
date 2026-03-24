@@ -80,6 +80,7 @@ export interface SyncGroupMembersResponse {
  */
 export interface GroupPayload {
   name: string;
+  group_type_input?: 'setor' | 'funcao' | null;
   permissao_funcional_ids?: ID[];
 }
 

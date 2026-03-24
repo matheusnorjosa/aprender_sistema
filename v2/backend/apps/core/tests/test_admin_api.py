@@ -20,7 +20,15 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Municipio, MunicipioReferencia, PermissaoFuncional, Projeto, Usuario
+from apps.core.models import (
+    Compra,
+    GroupClassificacao,
+    Municipio,
+    MunicipioReferencia,
+    PermissaoFuncional,
+    Projeto,
+    Usuario,
+)
 
 
 @pytest.fixture
@@ -677,6 +685,40 @@ class TestRbacFunctionalAPI:
         assert "DAT" in response.data["setor_groups"]
         assert "Gerente" in response.data["funcao_groups"]
         assert "governanca" in response.data["categories"]
+
+    def test_dat_can_create_group_as_funcao_and_meta_reflects(self, api_client, usuario_dat):
+        """Grupo criado como função aparece em funcao_groups do /rbac/meta/."""
+        api_client.force_authenticate(user=usuario_dat)
+
+        create_response = api_client.post(
+            "/api/grupos/",
+            {"name": "Analista de Campo", "group_type_input": "funcao"},
+            format="json",
+        )
+
+        assert create_response.status_code == status.HTTP_201_CREATED
+        assert create_response.data["group_type"] == "funcao"
+
+        group = Group.objects.get(name="Analista de Campo")
+        classificacao = GroupClassificacao.objects.get(group=group)
+        assert classificacao.tipo == GroupClassificacao.Tipo.FUNCAO
+
+        meta_response = api_client.get("/api/rbac/meta/")
+        assert meta_response.status_code == status.HTTP_200_OK
+        assert "Analista de Campo" in meta_response.data["funcao_groups"]
+
+    def test_dat_create_group_rejects_invalid_group_type(self, api_client, usuario_dat):
+        """Criação de grupo rejeita tipo inválido."""
+        api_client.force_authenticate(user=usuario_dat)
+
+        response = api_client.post(
+            "/api/grupos/",
+            {"name": "Grupo Invalido Tipo", "group_type_input": "perfil"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "group_type_input" in response.data["errors"]
 
     def test_dat_can_patch_group_permissoes_funcionais(self, api_client, usuario_dat):
         """DAT pode vincular permissões funcionais a um grupo."""

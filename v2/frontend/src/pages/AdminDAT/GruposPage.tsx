@@ -52,6 +52,7 @@ const { Search } = Input;
 interface GroupRecord {
   id: ID;
   name: string;
+  group_type?: 'setor' | 'funcao' | null;
   user_count?: number;
   permissions?: string[];
   permissoes_funcionais?: PermissaoFuncional[];
@@ -67,6 +68,7 @@ interface UserRecord {
 
 interface GroupFormValues {
   name: string;
+  group_type_input: 'setor' | 'funcao';
   permissao_funcional_ids: ID[];
   member_ids: ID[];
 }
@@ -130,6 +132,19 @@ export default function GruposPage(): JSX.Element {
 
   const isReservedGroup = (groupName: string): boolean => reservedGroupNames.has(groupName);
 
+  const inferGroupType = (group: GroupRecord): 'setor' | 'funcao' | undefined => {
+    if (group.group_type === 'setor' || group.group_type === 'funcao') {
+      return group.group_type;
+    }
+    if (rbacMeta?.setor_groups.includes(group.name)) {
+      return 'setor';
+    }
+    if (rbacMeta?.funcao_groups.includes(group.name)) {
+      return 'funcao';
+    }
+    return undefined;
+  };
+
   const fetchGrupos = async (): Promise<void> => {
     setLoading(true);
     try {
@@ -180,7 +195,12 @@ export default function GruposPage(): JSX.Element {
   const handleCreate = (): void => {
     setEditingGroup(null);
     form.resetFields();
-    form.setFieldsValue({ name: '', permissao_funcional_ids: [], member_ids: [] });
+    form.setFieldsValue({
+      name: '',
+      group_type_input: 'setor',
+      permissao_funcional_ids: [],
+      member_ids: [],
+    });
     setModalVisible(true);
   };
 
@@ -191,8 +211,10 @@ export default function GruposPage(): JSX.Element {
       const memberIds = usuarios
         .filter((usuario) => (usuario.group_ids_display || []).includes(group.id))
         .map((usuario) => usuario.id);
+      const groupType = inferGroupType(groupDetail);
       form.setFieldsValue({
         name: groupDetail.name,
+        group_type_input: groupType || 'setor',
         permissao_funcional_ids: (groupDetail.permissoes_funcionais || []).map((permissao) => permissao.id),
         member_ids: memberIds,
       });
@@ -297,6 +319,22 @@ export default function GruposPage(): JSX.Element {
           ) : null}
         </Space>
       ),
+    },
+    {
+      title: 'Tipo',
+      dataIndex: 'group_type',
+      key: 'group_type',
+      width: 120,
+      render: (_: GroupRecord['group_type'], record: GroupRecord) => {
+        const type = inferGroupType(record);
+        if (type === 'funcao') {
+          return <Tag color="geekblue">Função</Tag>;
+        }
+        if (type === 'setor') {
+          return <Tag color="green">Setor</Tag>;
+        }
+        return <Text type="secondary">-</Text>;
+      },
     },
     {
       title: 'Usuários',
@@ -417,6 +455,19 @@ export default function GruposPage(): JSX.Element {
             rules={[{ required: true, message: 'Nome é obrigatório' }]}
           >
             <Input placeholder="Ex: DAT, Superintendência, Coordenador" />
+          </Form.Item>
+
+          <Form.Item
+            name="group_type_input"
+            label="Tipo do Grupo"
+            rules={[{ required: true, message: 'Tipo do grupo é obrigatório' }]}
+          >
+            <Select
+              options={[
+                { label: 'Setor (onde o usuário trabalha)', value: 'setor' },
+                { label: 'Função (o que o usuário pode fazer)', value: 'funcao' },
+              ]}
+            />
           </Form.Item>
 
           <Form.Item name="permissao_funcional_ids" label="Permissões funcionais">

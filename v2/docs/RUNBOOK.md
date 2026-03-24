@@ -1509,3 +1509,42 @@ docker compose exec -T web python manage.py backfill_external_hash_v2 --apply
 **Observação:** Dry-run **nunca** é bloqueado por quality gates. Use para diagnóstico sem risco.
 
 ---
+
+## Municípios IBGE — Operação Contínua
+
+### Objetivo
+Manter a base de referência nacional (`core_municipio_referencia`) atualizada e preencher `ibge_code` faltante no cadastro principal (`core_municipio`) com segurança.
+
+### Comandos
+
+1. **Sincronizar referência IBGE** (API oficial -> `core_municipio_referencia`)
+
+```bash
+cd v2/backend
+python manage.py sync_municipios_ibge
+python manage.py sync_municipios_ibge --apply
+```
+
+2. **Backfill de IBGE no cadastro principal** (`core_municipio`)
+
+```bash
+cd v2/backend
+python manage.py backfill_municipios_ibge --fonte=ibge
+python manage.py backfill_municipios_ibge --fonte=ibge --apply --verbose
+```
+
+### Ordem recomendada (produção)
+
+1. Rodar `sync_municipios_ibge --apply`
+2. Rodar `backfill_municipios_ibge --fonte=ibge --apply`
+
+### Frequência sugerida
+
+- Mensal (ex.: 1º dia útil, madrugada)
+- Sempre executar primeiro em `dry-run` após mudança de versão/ambiente
+
+### Segurança operacional
+
+- `sync_municipios_ibge` e `backfill_municipios_ibge` são idempotentes
+- O backfill só atualiza municípios sem `ibge_code`
+- Matches ambíguos/conflitantes são reportados e não são aplicados automaticamente

@@ -39,7 +39,6 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/acoes-notificacao': 'acoes-notificacao-ciclo',
   '/acoes-notificacao/timeline': 'acoes-notificacao-timeline',
   '/notificacoes-internas': 'acoes-notificacao-inbox',
-  '/dat/etl-reports': 'dat-etl-reports',
   '/deslocamentos': 'deslocamentos',
   '/dashboards': 'dashboard-geral',
   '/dashboards/compras': 'dashboard-compras',
@@ -79,7 +78,6 @@ const MENU_KEY_TO_PARENT: Record<string, string> = {
   'dat-admin-colecoes': 'dat-submenu',
   'dat-admin-equipe-gerencia': 'dat-submenu',
   'dat-cadastros': 'dat-submenu',
-  'dat-etl-reports': 'dat-submenu',
   'dat-importacao': 'dat-submenu',
   'dat-registros': 'dat-submenu',
   'minhas-solicitacoes': 'solicitacoes-submenu',
@@ -333,7 +331,6 @@ export function AppSidebar({
                 <Menu.Item key="dat-cadastros"><Link to="/dat/cadastros">Cadastros</Link></Menu.Item>
                 <Menu.Item key="dat-importacao"><Link to="/dat/importacao">Importação</Link></Menu.Item>
                 <Menu.Item key="dat-registros"><Link to="/dat/registros">Registros de Turmas</Link></Menu.Item>
-                <Menu.Item key="dat-etl-reports"><Link to="/dat/etl-reports">Relatórios ETL</Link></Menu.Item>
               </SubMenu>
             )}
 

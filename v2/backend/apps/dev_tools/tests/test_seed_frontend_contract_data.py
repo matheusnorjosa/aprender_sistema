@@ -6,12 +6,11 @@ from __future__ import annotations
 
 from io import StringIO
 
-from django.contrib.auth.models import Group
 from django.core.management import call_command
 
 import pytest
 
-from apps.core.models import Compra, DATCompra, Municipio, Projeto, Usuario
+from apps.core.models import Compra, DATCompra, Municipio, PermissaoFuncional, Projeto, Usuario
 
 SEED_EXTERNAL_HASH = "9" * 64
 SEED_COMPRA_CODE = "MATRIX-PEND-001"
@@ -27,10 +26,6 @@ def clean_contract_seed_state(db):
     Compra.objects.filter(external_hash=SEED_EXTERNAL_HASH).delete()
     Municipio.objects.filter(nome="Matrizopolis", uf="BA").delete()
     Usuario.objects.filter(username__in=[SEED_DAT_USERNAME, SEED_CONTROLE_USERNAME]).delete()
-    from apps.core.models.acoes_notificacao import AcaoTemplateExecutor
-
-    AcaoTemplateExecutor.objects.filter(group__name="DAT").delete()
-    Group.objects.filter(name="DAT").delete()
     yield
     DATCompra.objects.filter(descricao_produto=SEED_DAT_DESCRICAO, ano_uso=2026).delete()
     Compra.objects.filter(external_hash=SEED_EXTERNAL_HASH).delete()
@@ -85,5 +80,8 @@ class TestSeedFrontendContractDataCommand:
         dat_user = Usuario.objects.get(username=SEED_DAT_USERNAME)
         assert dat_user.check_password("testpass123")
         assert set(dat_user.groups.values_list("name", flat=True)) == {"DAT"}
+        assert (
+            PermissaoFuncional.objects.get(codename="pode_acessar_dashboard_compras").groups.filter(name="DAT").exists()
+        )
 
         assert Usuario.objects.filter(username=SEED_CONTROLE_USERNAME).exists()

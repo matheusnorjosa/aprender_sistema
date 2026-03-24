@@ -71,8 +71,11 @@ class TestSeedGerentesCommand:
 
     def test_seed_gerentes_creates_group_if_not_exists(self, clean_gerencias, clean_gerentes):
         """Test that command creates 'Gerência' group if it doesn't exist."""
-        # Ensure group doesn't exist
-        Group.objects.filter(name="Gerência").delete()
+        # Simula ausência do grupo sem deletar registro referenciado por FKs auxiliares.
+        existing = Group.objects.filter(name="Gerência").first()
+        if existing is not None:
+            existing.name = "Gerência (temp)"
+            existing.save(update_fields=["name"])
 
         # Run command
         out = StringIO()

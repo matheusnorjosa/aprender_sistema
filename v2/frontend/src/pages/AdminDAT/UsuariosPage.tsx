@@ -582,6 +582,7 @@ export default function UsuariosPage(): JSX.Element {
             name="cpf"
             label="CPF"
             rules={[
+              { required: true, message: 'CPF é obrigatório' },
               {
                 pattern: /^[0-9]{11}$/,
                 message: 'CPF deve conter exatamente 11 dígitos numéricos',

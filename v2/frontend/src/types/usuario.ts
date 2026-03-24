@@ -48,6 +48,7 @@ export interface CurrentUser {
   is_superuser: boolean;
   is_superintendencia: boolean;
   can_approve_super: boolean;
+  permissions: string[];
 }
 
 /**
@@ -76,6 +77,7 @@ export function isCurrentUserPayload(value: unknown): value is CurrentUser {
     && typeof payload.is_superuser === 'boolean'
     && typeof payload.is_superintendencia === 'boolean'
     && typeof payload.can_approve_super === 'boolean'
+    && isStringArray(payload.permissions)
   );
 }
 

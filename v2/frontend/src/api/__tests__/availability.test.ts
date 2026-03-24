@@ -25,6 +25,7 @@ const validCurrentUserPayload = {
   is_superuser: true,
   is_superintendencia: false,
   can_approve_super: true,
+  permissions: ['pode_operar_dat'],
 }
 
 describe('availability API - current user contract', () => {

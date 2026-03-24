@@ -17,8 +17,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework import serializers  # type: ignore[attr-defined]
 
-from apps.core.constants import RESERVED_GROUPS
-from apps.core.models import PermissaoFuncional
+from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
+from apps.core.models import GroupClassificacao, PermissaoFuncional
 from apps.core.services.rbac_service import get_assignable_group_names
 
 
@@ -292,6 +292,13 @@ class GroupSerializer(serializers.ModelSerializer):
     permissions = serializers.SerializerMethodField(read_only=True)
     user_count = serializers.SerializerMethodField(read_only=True)
     permissoes_funcionais = serializers.SerializerMethodField(read_only=True)
+    group_type = serializers.SerializerMethodField(read_only=True)
+    group_type_input = serializers.ChoiceField(
+        choices=GroupClassificacao.Tipo.choices,
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
     permissao_funcional_ids = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=PermissaoFuncional.objects.all(),
@@ -309,6 +316,8 @@ class GroupSerializer(serializers.ModelSerializer):
             "permissions",
             "user_count",
             "permissoes_funcionais",
+            "group_type",
+            "group_type_input",
             "permissao_funcional_ids",
         ]
         read_only_fields = ["id", "permissions", "user_count"]
@@ -332,6 +341,16 @@ class GroupSerializer(serializers.ModelSerializer):
             for permissao in obj.permissoes_funcionais.all().order_by("category", "label")
         ]
 
+    def get_group_type(self, obj: Group) -> str | None:
+        classificacao = getattr(obj, "rbac_classificacao", None)
+        if classificacao is not None:
+            return cast(str, classificacao.tipo)
+        if obj.name in SETOR_GROUPS:
+            return GroupClassificacao.Tipo.SETOR
+        if obj.name in FUNCAO_GROUPS:
+            return GroupClassificacao.Tipo.FUNCAO
+        return None
+
     def validate_name(self, value: str) -> str:
         instance = self.instance
         if instance and instance.name in RESERVED_GROUPS and value != instance.name:
@@ -346,15 +365,21 @@ class GroupSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data: dict[str, Any]) -> Group:
+        group_type = validated_data.pop("group_type_input", None)
         permissoes_funcionais = validated_data.pop("permissoes_funcionais", [])
         instance = super().create(validated_data)
+        if group_type:
+            GroupClassificacao.objects.update_or_create(group=instance, defaults={"tipo": group_type})
         if permissoes_funcionais:
             instance.permissoes_funcionais.set(permissoes_funcionais)
         return instance
 
     def update(self, instance: Group, validated_data: dict[str, Any]) -> Group:
+        group_type = validated_data.pop("group_type_input", None)
         permissoes_funcionais = validated_data.pop("permissoes_funcionais", None)
         instance = super().update(instance, validated_data)
+        if group_type:
+            GroupClassificacao.objects.update_or_create(group=instance, defaults={"tipo": group_type})
         if permissoes_funcionais is not None:
             instance.permissoes_funcionais.set(permissoes_funcionais)
         return instance

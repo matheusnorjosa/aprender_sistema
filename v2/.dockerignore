@@ -22,6 +22,7 @@ OAUTH_ENV_VARIABLES.md
 Makefile
 
 # Backend local artifacts
+backend/.venv/
 backend/.pytest_cache/
 backend/.mypy_cache/
 backend/.ruff_cache/
@@ -33,6 +34,12 @@ backend/.agents/
 backend/tmpclaude-*
 backend/celerybeat-schedule
 backend/__pycache__/
+
+# Backend test/dev files (not needed in production image)
+backend/apps/*/tests/
+backend/conftest.py
+backend/pytest.ini
+backend/pyproject.toml
 
 # Infra local artifacts
 infra/tmpclaude-*

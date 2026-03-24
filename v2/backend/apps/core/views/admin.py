@@ -27,6 +27,7 @@ from apps.core.models import (
     AuditLog,
     Compra,
     Gerencia,
+    GroupClassificacao,
     Municipio,
     MunicipioReferencia,
     PermissaoFuncional,
@@ -525,11 +526,19 @@ class RBACMetaView(APIView):
     permission_classes = [IsDAT]
 
     def get(self, request: Request, *args: object, **kwargs: object) -> Response:
+        classificacoes = list(GroupClassificacao.objects.select_related("group").values_list("group__name", "tipo"))
+        dynamic_setor_groups = {
+            group_name for group_name, tipo in classificacoes if tipo == GroupClassificacao.Tipo.SETOR
+        }
+        dynamic_funcao_groups = {
+            group_name for group_name, tipo in classificacoes if tipo == GroupClassificacao.Tipo.FUNCAO
+        }
+
         categories = list(PermissaoFuncional.objects.values_list("category", flat=True).distinct().order_by("category"))
         return Response(
             {
-                "setor_groups": SETOR_GROUPS,
-                "funcao_groups": FUNCAO_GROUPS,
+                "setor_groups": sorted(set(SETOR_GROUPS) | dynamic_setor_groups),
+                "funcao_groups": sorted(set(FUNCAO_GROUPS) | dynamic_funcao_groups),
                 "categories": categories,
             },
             status=status.HTTP_200_OK,

@@ -27,7 +27,6 @@ import {
   Divider,
   Row,
   Col,
-  Statistic,
   Progress,
   Radio,
 } from 'antd';
@@ -40,8 +39,6 @@ import {
   FilterOutlined,
   ClearOutlined,
   ShoppingCartOutlined,
-  InboxOutlined,
-  CheckCircleOutlined,
 } from '@ant-design/icons';
 import type { RadioChangeEvent } from 'antd/es/radio';
 import {
@@ -49,7 +46,6 @@ import {
   createCompra,
   updateCompra,
   deleteCompra,
-  getComprasStats,
   getMunicipiosOptions,
   getProjetosOptions,
   getProdutosOptions,
@@ -99,12 +95,6 @@ interface CompraFormValues {
   municipio: number;
   quantidade: number;
   [key: string]: any;
-}
-
-interface ComprasStats {
-  total_itens: number;
-  total_produtos: number;
-  total_disponivel: number;
 }
 
 interface MunicipioOption {
@@ -180,8 +170,6 @@ export default function ComprasPage(): JSX.Element {
     pageSize: 15,
   });
 
-  const [stats, setStats] = useState<ComprasStats | null>(null);
-
   // Filter states
   const [filters, setFilters] = useState({
     search: '',
@@ -241,13 +229,7 @@ export default function ComprasPage(): JSX.Element {
     if (filters.ano_uso) params.ano_uso = filters.ano_uso;
     if (filters.tipo_compra) params.tipo_compra = filters.tipo_compra;
 
-    // Fetch data and stats in parallel
-    const [, statsData] = await Promise.all([
-      crud.fetchData(params),
-      getComprasStats(params).catch((): null => null),
-    ]);
-
-    setStats(statsData as unknown as ComprasStats);
+    await crud.fetchData(params);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
@@ -523,43 +505,6 @@ export default function ComprasPage(): JSX.Element {
 
       {viewMode === 'lista' ? (
         <>
-      {/* Stats Cards */}
-      {stats && (
-        <Row gutter={16} className="mb-4">
-          <Col xs={24} sm={12} md={8}>
-            <Card>
-              <Statistic
-                title="Total de Itens"
-                value={stats.total_itens || 0}
-                prefix={<InboxOutlined />}
-                formatter={(value) => value.toLocaleString('pt-BR')}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8}>
-            <Card>
-              <Statistic
-                title="Produtos Diferentes"
-                value={stats.total_produtos || 0}
-                valueStyle={{ color: '#1890ff' }}
-                prefix={<ShoppingCartOutlined />}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8}>
-            <Card>
-              <Statistic
-                title="Disponíveis"
-                value={stats.total_disponivel || 0}
-                valueStyle={{ color: '#52c41a' }}
-                prefix={<CheckCircleOutlined />}
-                formatter={(value) => value.toLocaleString('pt-BR')}
-              />
-            </Card>
-          </Col>
-        </Row>
-      )}
-
       {/* Filters Card */}
       <nav aria-label="Filtros de busca">
       <Card className="mb-4" bodyStyle={{ paddingBottom: 12 }}>

@@ -25,6 +25,8 @@ const UsuariosPage = lazy(() => import('../pages/AdminDAT/UsuariosPage'));
 const MunicipiosPage = lazy(() => import('../pages/AdminDAT/MunicipiosPage'));
 const ProjetosPage = lazy(() => import('../pages/AdminDAT/ProjetosPage'));
 const GruposPage = lazy(() => import('../pages/AdminDAT/GruposPage'));
+const SetoresPage = lazy(() => import('../pages/AdminDAT/SetoresPage'));
+const FuncoesPage = lazy(() => import('../pages/AdminDAT/FuncoesPage'));
 const ConfiguracoesPage = lazy(() => import('../pages/AdminDAT/ConfiguracoesPage'));
 const ColecoesImportPage = lazy(() => import('../pages/AdminDAT/ColecoesImportPage'));
 const EquipeGerenciaImportPage = lazy(() => import('../pages/AdminDAT/EquipeGerenciaImportPage'));
@@ -105,13 +107,14 @@ export function AppRoutes({ user, permissions }: AppRoutesProps): JSX.Element {
         <Route path="/acoes-notificacao" element={canAcoesInternas ? <AcoesNotificacaoPage /> : <Forbidden />} />
         <Route path="/acoes-notificacao/timeline" element={canAcoesInternas ? <AcoesTimelinePage /> : <Forbidden />} />
         <Route path="/notificacoes-internas" element={canAcoesInternas ? <NotificacoesInternasPage /> : <Forbidden />} />
-
         {/* DAT Module */}
         <Route path="/dat/admin" element={canDAT ? <AdminDATHomePage /> : <Forbidden />} />
         <Route path="/dat/admin/usuarios" element={canDAT ? <UsuariosPage /> : <Forbidden />} />
         <Route path="/dat/admin/municipios" element={canDAT ? <MunicipiosPage /> : <Forbidden />} />
         <Route path="/dat/admin/projetos" element={canDAT ? <ProjetosPage /> : <Forbidden />} />
         <Route path="/dat/admin/grupos" element={canDAT ? <GruposPage /> : <Forbidden />} />
+        <Route path="/dat/admin/setores" element={canDAT ? <SetoresPage /> : <Forbidden />} />
+        <Route path="/dat/admin/funcoes" element={canDAT ? <FuncoesPage /> : <Forbidden />} />
         <Route path="/dat/admin/configuracoes" element={canDAT ? <ConfiguracoesPage /> : <Forbidden />} />
         <Route path="/dat/admin/colecoes" element={canDAT ? <ColecoesImportPage /> : <Forbidden />} />
         <Route path="/dat/admin/equipe-gerencia" element={canDAT ? <EquipeGerenciaImportPage /> : <Forbidden />} />

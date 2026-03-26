@@ -78,8 +78,17 @@ def test_seed_functional_permissions_idempotent():
     assert second["permissions_updated"] == 14
 
 
-def test_seed_functional_permissions_mapping_matches_configuration():
+def test_seed_functional_permissions_has_no_default_group_links():
     seed_functional_permissions()
+
+    for item in FUNCTIONAL_PERMISSIONS_SEED:
+        perm = PermissaoFuncional.objects.get(codename=item.codename)
+        groups = tuple(sorted(perm.groups.values_list("name", flat=True)))
+        assert groups == ()
+
+
+def test_seed_functional_permissions_can_assign_groups_in_legacy_mode():
+    seed_functional_permissions(assign_default_groups=True)
 
     for item in FUNCTIONAL_PERMISSIONS_SEED:
         perm = PermissaoFuncional.objects.get(codename=item.codename)

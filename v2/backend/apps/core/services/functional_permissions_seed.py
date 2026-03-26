@@ -135,9 +135,16 @@ def _validate_seed() -> None:
         seen.add(item.codename)
 
 
-def seed_functional_permissions(*, verbose: bool = False) -> dict[str, int]:
+def seed_functional_permissions(
+    *,
+    verbose: bool = False,
+    assign_default_groups: bool = False,
+) -> dict[str, int]:
     """
-    Aplica seed idempotente de permissoes funcionais e grupos associados.
+    Aplica seed idempotente de permissoes funcionais.
+
+    Por padrão, não atribui permissões a grupos automaticamente.
+    Para cenários de teste/migração legada, use assign_default_groups=True.
     """
 
     _validate_seed()
@@ -146,18 +153,20 @@ def seed_functional_permissions(*, verbose: bool = False) -> dict[str, int]:
         "groups_created": 0,
         "permissions_created": 0,
         "permissions_updated": 0,
+        "permissions_unlinked": 0,
     }
 
     with transaction.atomic():
         groups_by_name: dict[str, Group] = {}
-        for item in FUNCTIONAL_PERMISSIONS_SEED:
-            for group_name in item.group_names:
-                if group_name in groups_by_name:
-                    continue
-                group, created = Group.objects.get_or_create(name=group_name)
-                groups_by_name[group_name] = group
-                if created:
-                    stats["groups_created"] += 1
+        if assign_default_groups:
+            for item in FUNCTIONAL_PERMISSIONS_SEED:
+                for group_name in item.group_names:
+                    if group_name in groups_by_name:
+                        continue
+                    group, created = Group.objects.get_or_create(name=group_name)
+                    groups_by_name[group_name] = group
+                    if created:
+                        stats["groups_created"] += 1
 
         for item in FUNCTIONAL_PERMISSIONS_SEED:
             perm, created = PermissaoFuncional.objects.update_or_create(
@@ -174,10 +183,18 @@ def seed_functional_permissions(*, verbose: bool = False) -> dict[str, int]:
             else:
                 stats["permissions_updated"] += 1
 
-            perm.groups.set([groups_by_name[name] for name in item.group_names])
+            if assign_default_groups:
+                perm.groups.set([groups_by_name[name] for name in item.group_names])
+            else:
+                if perm.groups.exists():
+                    stats["permissions_unlinked"] += 1
+                perm.groups.clear()
 
             if verbose:
-                print(f"[seed_functional_permissions] {item.codename}: {item.group_names}")
+                if assign_default_groups:
+                    print(f"[seed_functional_permissions] {item.codename}: {item.group_names}")
+                else:
+                    print(f"[seed_functional_permissions] {item.codename}: sem vinculo automatico")
 
     return stats
 

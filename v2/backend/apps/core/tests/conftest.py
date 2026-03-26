@@ -72,4 +72,4 @@ def seed_functional_permissions_fixture(django_db_setup, django_db_blocker):
     """
 
     with django_db_blocker.unblock():
-        seed_functional_permissions()
+        seed_functional_permissions(assign_default_groups=True)

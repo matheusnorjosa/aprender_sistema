@@ -621,19 +621,32 @@ export default function UsuariosPage(): JSX.Element {
             />
           ) : null}
 
-          <Divider orientation="left">Grupos RBAC</Divider>
+          <Divider orientation="left">Perfil de Acesso</Divider>
+
+          <Alert
+            type="info"
+            showIcon
+            className="mb-4"
+            message="Como configurar"
+            description="Setor define onde a pessoa atua. Função define o que a pessoa pode fazer no sistema."
+          />
 
           <Form.Item
             name="setor_ids"
             label="Setor (onde trabalha)"
-            tooltip="Gerência ou departamento do usuário"
+            tooltip="Unidade/área de atuação da pessoa"
             rules={[{ required: true, message: 'Selecione pelo menos um setor' }]}
           >
             <Select
               mode="multiple"
-              placeholder="Selecione o(s) setor(es)"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              maxTagCount="responsive"
+              placeholder="Selecione um ou mais setores"
               options={grupos
                 .filter((g) => setorGroupsSet.has(g.name))
+                .sort((a, b) => a.name.localeCompare(b.name))
                 .map((g) => ({ label: g.name, value: g.id }))}
             />
           </Form.Item>
@@ -641,34 +654,51 @@ export default function UsuariosPage(): JSX.Element {
           <Form.Item
             name="funcao_ids"
             label="Função (o que pode fazer)"
-            tooltip="Papel/cargo que define permissões"
+            tooltip="Papel da pessoa no processo"
             rules={[{ required: true, message: 'Selecione pelo menos uma função' }]}
           >
             <Select
               mode="multiple"
-              placeholder="Selecione a(s) função(ões)"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              maxTagCount="responsive"
+              placeholder="Selecione uma ou mais funções"
               options={grupos
                 .filter((g) => funcaoGroupsSet.has(g.name))
+                .sort((a, b) => a.name.localeCompare(b.name))
                 .map((g) => ({ label: g.name, value: g.id }))}
             />
           </Form.Item>
 
-          <Card size="small" title="Resumo de grupos e permissões efetivas" className="mb-4">
+          <Card size="small" title="Resumo do perfil de acesso" className="mb-4">
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
               <div>
-                <Text strong>Grupos vinculados: </Text>
-                {[...selectedSetorIds, ...selectedFuncaoIds].length > 0 ? (
+                <Text strong>Setores selecionados: </Text>
+                {selectedSetorIds.length > 0 ? (
                   grupos
-                    .filter((group) => [...selectedSetorIds, ...selectedFuncaoIds].includes(group.id))
+                    .filter((group) => selectedSetorIds.includes(group.id))
                     .map((group) => (
-                      <Tag key={group.id}>{group.name}</Tag>
+                      <Tag key={group.id} color="green">{group.name}</Tag>
                     ))
                 ) : (
-                  <Text type="secondary">nenhum selecionado</Text>
+                  <Text type="secondary">nenhum setor selecionado</Text>
                 )}
               </div>
               <div>
-                <Text strong>Permissões funcionais efetivas: </Text>
+                <Text strong>Funções selecionadas: </Text>
+                {selectedFuncaoIds.length > 0 ? (
+                  grupos
+                    .filter((group) => selectedFuncaoIds.includes(group.id))
+                    .map((group) => (
+                      <Tag key={group.id} color="blue">{group.name}</Tag>
+                    ))
+                ) : (
+                  <Text type="secondary">nenhuma função selecionada</Text>
+                )}
+              </div>
+              <div>
+                <Text strong>Permissões efetivas: </Text>
                 {(() => {
                   const selectedGroups = grupos.filter((group) =>
                     [...selectedSetorIds, ...selectedFuncaoIds].includes(group.id)
@@ -678,11 +708,17 @@ export default function UsuariosPage(): JSX.Element {
                     (group.permissoes_funcionais || []).forEach((permissao) => labels.add(permissao.label));
                   });
                   if (labels.size === 0) {
-                    return <Text type="secondary">sem permissões funcionais explícitas</Text>;
+                    return <Text type="secondary">sem permissões específicas definidas</Text>;
                   }
-                  return Array.from(labels).sort().map((label) => (
-                    <Tag key={label} color="blue">{label}</Tag>
-                  ));
+                  return (
+                    <>
+                      <Tag color="purple">{labels.size} permissão(ões)</Tag>
+                      {Array.from(labels).sort().slice(0, 6).map((label) => (
+                        <Tag key={label} color="purple">{label}</Tag>
+                      ))}
+                      {labels.size > 6 ? <Tag>+{labels.size - 6}</Tag> : null}
+                    </>
+                  );
                 })()}
               </div>
             </Space>

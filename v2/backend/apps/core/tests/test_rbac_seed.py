@@ -21,7 +21,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Municipio, PermissaoFuncional, Projeto, Solicitacao, TipoEvento, Usuario
 
 pytestmark = pytest.mark.django_db
 
@@ -201,6 +201,7 @@ def test_endpoint_municipios_dat_allowed(run_seed_rbac):
     """DAT tem acesso CRUD a /api/municipios/."""
     user = Usuario.objects.create_user(username="dat1", email="dat@x.com", password="x", cpf="11111111111")
     dat = Group.objects.get(name="DAT")
+    PermissaoFuncional.objects.get(codename="pode_operar_dat_exclusivo").groups.add(dat)
     user.groups.add(dat)
 
     client = APIClient()
@@ -243,6 +244,7 @@ def test_endpoint_import_compras_controle_allowed(run_seed_rbac):
     """Controle tem acesso ao endpoint de import compras."""
     user = Usuario.objects.create_user(username="controle1", email="controle@x.com", password="x", cpf="66666666666")
     controle = Group.objects.get(name="Controle")
+    PermissaoFuncional.objects.get(codename="pode_importar_controle_super").groups.add(controle)
     user.groups.add(controle)
 
     client = APIClient()

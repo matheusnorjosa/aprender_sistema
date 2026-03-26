@@ -14,7 +14,7 @@ from typing import Any
 from django.contrib.auth.models import Group
 from django.core.management import BaseCommand, call_command
 
-from apps.core.models import Compra, DATCompra, Municipio, Projeto, Solicitacao, Usuario
+from apps.core.models import Compra, DATCompra, Municipio, PermissaoFuncional, Projeto, Solicitacao, Usuario
 
 
 class Command(BaseCommand):
@@ -29,6 +29,10 @@ class Command(BaseCommand):
         call_command("seed_e2e_users")
 
         dat_group, _ = Group.objects.get_or_create(name="DAT")
+        dashboard_perm = PermissaoFuncional.objects.filter(codename="pode_acessar_dashboard_compras").first()
+        if dashboard_perm is not None:
+            dashboard_perm.groups.add(dat_group)
+
         dat_user, created = Usuario.objects.update_or_create(
             username="dat_matrix@test.com",
             defaults={

@@ -35,11 +35,13 @@ backend/tmpclaude-*
 backend/celerybeat-schedule
 backend/__pycache__/
 
-# Backend test/dev files (not needed in production image)
-backend/apps/*/tests/
-backend/conftest.py
-backend/pytest.ini
-backend/pyproject.toml
+# Backend test/dev files — NOT excluded here because CI docker-parity
+# job builds Dockerfile.prod and then runs pytest inside the container.
+# Tests are stripped at runtime in production via INCLUDE_DEV_TOOLS=false.
+# backend/apps/*/tests/
+# backend/conftest.py
+# backend/pytest.ini
+# backend/pyproject.toml
 
 # Infra local artifacts
 infra/tmpclaude-*

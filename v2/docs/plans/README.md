@@ -15,6 +15,7 @@ Esta pasta concentra planos tecnicos ativos (nao arquivados).
 - `PLAN_import_pages.md`
 - `PLAN_import_usuarios_produtos.md`
 - `PLAN_mobile_responsiveness.md`
+- `PLAN_remove_etl_backend_2026-03-24.md`
 - `PLAN_remediation_phases_01_07.md`
 - `PLAN_system_stabilization_2026-02-23.md`
 

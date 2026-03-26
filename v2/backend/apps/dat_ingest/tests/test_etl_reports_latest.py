@@ -19,6 +19,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
+from apps.core.models import PermissaoFuncional
 from apps.dat_ingest.services.etl_observability import get_report_path, list_latest_reports
 
 User = get_user_model()
@@ -237,9 +238,25 @@ class TestEtlReportsLatestEndpoint:
         return APIClient()
 
     @pytest.fixture
+    def permissao_controle_super(self):
+        """Permissão funcional exigida por IsControleOrSuper."""
+        permissao, _ = PermissaoFuncional.objects.get_or_create(
+            codename="pode_importar_controle_super",
+            defaults={
+                "label": "Importação (Controle/Superintendência)",
+                "description": "Permite acesso às rotinas de importação e observabilidade ETL.",
+                "category": "importacao",
+                "is_system": True,
+            },
+        )
+        return permissao
+
+    @pytest.fixture
     def usuario_controle(self):
         """Usuário com grupo Controle (tem permissão)"""
         group_controle, _ = Group.objects.get_or_create(name="Controle")
+        permissao = PermissaoFuncional.objects.get(codename="pode_importar_controle_super")
+        permissao.groups.add(group_controle)
         user = User.objects.create_user(
             username="controle_test",
             email="controle@test.com",
@@ -253,6 +270,8 @@ class TestEtlReportsLatestEndpoint:
     def usuario_super(self):
         """Usuário com grupo Superintendência (tem permissão)"""
         group_super, _ = Group.objects.get_or_create(name="Superintendência")
+        permissao = PermissaoFuncional.objects.get(codename="pode_importar_controle_super")
+        permissao.groups.add(group_super)
         user = User.objects.create_user(
             username="super_test",
             email="super@test.com",
@@ -287,7 +306,7 @@ class TestEtlReportsLatestEndpoint:
             response = api_client.get("/api/etl/reports/latest/")
             assert response.status_code == http_status.HTTP_403_FORBIDDEN
 
-    def test_controle_can_access(self, api_client, usuario_controle, tmp_path):
+    def test_controle_can_access(self, api_client, permissao_controle_super, usuario_controle, tmp_path):
         """Usuário Controle pode acessar"""
         api_client.force_authenticate(user=usuario_controle)
 
@@ -295,7 +314,7 @@ class TestEtlReportsLatestEndpoint:
             response = api_client.get("/api/etl/reports/latest/")
             assert response.status_code == http_status.HTTP_200_OK
 
-    def test_super_can_access(self, api_client, usuario_super, tmp_path):
+    def test_super_can_access(self, api_client, permissao_controle_super, usuario_super, tmp_path):
         """Usuário Superintendência pode acessar"""
         api_client.force_authenticate(user=usuario_super)
 
@@ -303,7 +322,13 @@ class TestEtlReportsLatestEndpoint:
             response = api_client.get("/api/etl/reports/latest/")
             assert response.status_code == http_status.HTTP_200_OK
 
-    def test_returns_reports_list(self, api_client, usuario_controle, tmp_path):
+    def test_returns_reports_list(
+        self,
+        api_client,
+        permissao_controle_super,
+        usuario_controle,
+        tmp_path,
+    ):
         """Deve retornar lista de relatórios"""
         # Criar arquivos de teste
         (tmp_path / "report1.json").write_text("{}")
@@ -325,7 +350,13 @@ class TestEtlReportsLatestEndpoint:
             assert data["limit"] == 20
             assert len(data["reports"]) == 2
 
-    def test_accepts_limit_parameter(self, api_client, usuario_controle, tmp_path):
+    def test_accepts_limit_parameter(
+        self,
+        api_client,
+        permissao_controle_super,
+        usuario_controle,
+        tmp_path,
+    ):
         """Deve aceitar parâmetro limit"""
         # Criar 5 arquivos
         for i in range(5):
@@ -344,7 +375,13 @@ class TestEtlReportsLatestEndpoint:
             assert data["limit"] == 3
             assert len(data["reports"]) == 3
 
-    def test_validates_limit_parameter_type(self, api_client, usuario_controle, tmp_path):
+    def test_validates_limit_parameter_type(
+        self,
+        api_client,
+        permissao_controle_super,
+        usuario_controle,
+        tmp_path,
+    ):
         """Deve validar que limit é um número"""
         api_client.force_authenticate(user=usuario_controle)
 
@@ -357,7 +394,13 @@ class TestEtlReportsLatestEndpoint:
             assert "detail" in data
             assert "número inteiro" in data["detail"]
 
-    def test_validates_limit_parameter_range(self, api_client, usuario_controle, tmp_path):
+    def test_validates_limit_parameter_range(
+        self,
+        api_client,
+        permissao_controle_super,
+        usuario_controle,
+        tmp_path,
+    ):
         """Deve validar que limit está entre 1 e 100"""
         api_client.force_authenticate(user=usuario_controle)
 
@@ -372,7 +415,13 @@ class TestEtlReportsLatestEndpoint:
             assert response.status_code == http_status.HTTP_400_BAD_REQUEST
             assert "entre 1 e 100" in response.json()["detail"]
 
-    def test_handles_empty_directory_gracefully(self, api_client, usuario_controle, tmp_path):
+    def test_handles_empty_directory_gracefully(
+        self,
+        api_client,
+        permissao_controle_super,
+        usuario_controle,
+        tmp_path,
+    ):
         """Deve lidar com diretório vazio sem erro"""
         api_client.force_authenticate(user=usuario_controle)
 
@@ -385,7 +434,13 @@ class TestEtlReportsLatestEndpoint:
             assert data["count"] == 0
             assert data["reports"] == []
 
-    def test_handles_nonexistent_directory_gracefully(self, api_client, usuario_controle, tmp_path):
+    def test_handles_nonexistent_directory_gracefully(
+        self,
+        api_client,
+        permissao_controle_super,
+        usuario_controle,
+        tmp_path,
+    ):
         """Deve lidar com diretório inexistente sem erro (degradação graciosa)"""
         nonexistent = tmp_path / "does_not_exist"
 

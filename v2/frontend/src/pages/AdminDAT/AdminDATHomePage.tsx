@@ -13,7 +13,7 @@
 
 import type { ReactNode } from 'react';
 import { Card, Row, Col, Typography } from 'antd';
-import { UserOutlined, EnvironmentOutlined, TeamOutlined, ProjectOutlined, SettingOutlined } from '@ant-design/icons';
+import { UserOutlined, EnvironmentOutlined, TeamOutlined, ProjectOutlined, SettingOutlined, SafetyOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
@@ -51,11 +51,19 @@ export default function AdminDATHomePage(): JSX.Element {
       status: 'Disponível',
     },
     {
-      key: 'grupos',
-      title: 'Grupos/Setores',
-      description: 'Gerenciar grupos e vínculos usuário↔setor',
+      key: 'setores',
+      title: 'Setores',
+      description: 'Gerenciar setores (onde cada usuário atua)',
       icon: <TeamOutlined className="text-5xl text-yellow-500" />,
-      path: '/dat/admin/grupos',
+      path: '/dat/admin/setores',
+      status: 'Disponível',
+    },
+    {
+      key: 'funcoes',
+      title: 'Funções',
+      description: 'Gerenciar funções (o que cada usuário pode fazer)',
+      icon: <SafetyOutlined className="text-5xl text-amber-500" />,
+      path: '/dat/admin/funcoes',
       status: 'Disponível',
     },
     {

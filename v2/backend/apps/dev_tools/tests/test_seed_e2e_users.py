@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from io import StringIO
 
-from django.contrib.auth.models import Group
 from django.core.management import call_command
 
 import pytest
@@ -27,11 +26,6 @@ def clean_seed_e2e_state(db):
     Usuario.objects.filter(username__in=SEED_USERNAMES).delete()
     Projeto.objects.filter(nome="TESTE E2E").delete()
     Municipio.objects.filter(nome="Salvador", uf="BA").delete()
-    from apps.core.models.acoes_notificacao import AcaoTemplateExecutor
-
-    groups_to_clean = ["Coordenador", "Superintendência", "Controle", "Formador", "Gerente"]
-    AcaoTemplateExecutor.objects.filter(group__name__in=groups_to_clean).delete()
-    Group.objects.filter(name__in=groups_to_clean).delete()
     yield
     Usuario.objects.filter(username__in=SEED_USERNAMES).delete()
     Projeto.objects.filter(nome="TESTE E2E").delete()

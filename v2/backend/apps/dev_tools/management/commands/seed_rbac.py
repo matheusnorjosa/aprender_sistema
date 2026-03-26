@@ -147,13 +147,14 @@ class Command(BaseCommand):
                     if verbose:
                         self.stdout.write(self.style.WARNING(f"  ⚠️  Permissão não encontrada: {code}"))
 
-        fp_stats = seed_functional_permissions(verbose=verbose)
+        fp_stats = seed_functional_permissions(verbose=verbose, assign_default_groups=False)
         if verbose:
             self.stdout.write(
-                "  ✅ Permissões funcionais: created={created} updated={updated} groups_created={groups}".format(
+                "  ✅ Permissões funcionais: created={created} updated={updated} groups_created={groups} unlinked={unlinked}".format(
                     created=fp_stats["permissions_created"],
                     updated=fp_stats["permissions_updated"],
                     groups=fp_stats["groups_created"],
+                    unlinked=fp_stats["permissions_unlinked"],
                 )
             )
 

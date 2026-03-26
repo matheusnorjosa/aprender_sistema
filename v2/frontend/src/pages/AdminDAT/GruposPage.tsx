@@ -52,7 +52,7 @@ const { Search } = Input;
 interface GroupRecord {
   id: ID;
   name: string;
-  group_type?: 'setor' | 'funcao' | null;
+  group_type?: string | null;
   user_count?: number;
   permissions?: string[];
   permissoes_funcionais?: PermissaoFuncional[];
@@ -73,7 +73,45 @@ interface GroupFormValues {
   member_ids: ID[];
 }
 
-export default function GruposPage(): JSX.Element {
+interface GruposPageProps {
+  forcedType?: 'setor' | 'funcao';
+}
+
+const CATEGORY_LABELS: Record<string, { title: string; help: string }> = {
+  admin_dat: {
+    title: 'Administração DAT',
+    help: 'Permissões para operar cadastros e configurações administrativas.',
+  },
+  dashboard: {
+    title: 'Dashboards',
+    help: 'Permissões para visualizar indicadores e painéis analíticos.',
+  },
+  gerencia: {
+    title: 'Gerência',
+    help: 'Permissões de atuação gerencial e supervisão operacional.',
+  },
+  importacao: {
+    title: 'Importações',
+    help: 'Permissões para importar dados de planilhas e arquivos.',
+  },
+  operacao: {
+    title: 'Operações',
+    help: 'Permissões de operação do dia a dia no sistema.',
+  },
+};
+
+const TYPE_UI: Record<'setor' | 'funcao', { title: string; create: string; singular: string }> = {
+  setor: { title: 'Setores', create: 'Novo Setor', singular: 'Setor' },
+  funcao: { title: 'Funções', create: 'Nova Função', singular: 'Função' },
+};
+
+function humanizeCategory(category: string): string {
+  return category
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.Element {
   const [grupos, setGrupos] = useState<GroupRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -90,6 +128,8 @@ export default function GruposPage(): JSX.Element {
   const [form] = Form.useForm<GroupFormValues>();
   const selectedPermissionIds = Form.useWatch('permissao_funcional_ids', form) || [];
   const selectedMemberIds = Form.useWatch('member_ids', form) || [];
+  const selectedGroupType = Form.useWatch('group_type_input', form) || forcedType || 'setor';
+  const pageTypeMeta = forcedType ? TYPE_UI[forcedType] : null;
 
   const reservedGroupNames = useMemo(
     () => new Set([...(rbacMeta?.setor_groups || []), ...(rbacMeta?.funcao_groups || [])]),
@@ -126,6 +166,8 @@ export default function GruposPage(): JSX.Element {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([category, perms]) => ({
         category,
+        categoryTitle: CATEGORY_LABELS[category]?.title || humanizeCategory(category),
+        categoryHelp: CATEGORY_LABELS[category]?.help || 'Permissões relacionadas a este módulo.',
         permissions: perms.sort((a, b) => a.label.localeCompare(b.label)),
       }));
   }, [permissoesDisponiveis]);
@@ -153,7 +195,22 @@ export default function GruposPage(): JSX.Element {
         ordering: 'name',
         page_size: PAGE_SIZES.ALL,
       });
-      setGrupos(data.results as GroupRecord[]);
+      const loaded = data.results as GroupRecord[];
+      if (!forcedType) {
+        setGrupos(loaded);
+        return;
+      }
+
+      const fallbackTypes = new Set(
+        forcedType === 'setor' ? (rbacMeta?.setor_groups || []) : (rbacMeta?.funcao_groups || [])
+      );
+      const filtered = loaded.filter((group) => {
+        if (group.group_type) {
+          return group.group_type === forcedType;
+        }
+        return fallbackTypes.has(group.name);
+      });
+      setGrupos(filtered);
     } catch (error) {
       message.error(`Erro ao carregar grupos: ${(error as Error).message}`);
     } finally {
@@ -185,7 +242,7 @@ export default function GruposPage(): JSX.Element {
 
   useEffect(() => {
     fetchGrupos();
-  }, [searchText]);
+  }, [searchText, forcedType, rbacMeta]);
 
   useEffect(() => {
     fetchUsuarios();
@@ -260,19 +317,20 @@ export default function GruposPage(): JSX.Element {
   };
 
   const handleSave = async (values: GroupFormValues): Promise<void> => {
-    if (editingGroup && isReservedGroup(editingGroup.name) && values.name !== editingGroup.name) {
+    const payload = forcedType ? { ...values, group_type_input: forcedType } : values;
+    if (editingGroup && isReservedGroup(editingGroup.name) && payload.name !== editingGroup.name) {
       Modal.confirm({
         title: 'Grupo reservado',
         content:
           'Você está renomeando um grupo reservado. Confirma que deseja continuar com essa alteração?',
         okText: 'Confirmar renomeação',
         cancelText: 'Cancelar',
-        onOk: () => persistGroup(values, { confirmReserved: true }),
+        onOk: () => persistGroup(payload, { confirmReserved: true }),
       });
       return;
     }
 
-    await persistGroup(values);
+    await persistGroup(payload);
   };
 
   const handleDelete = (group: GroupRecord): void => {
@@ -409,11 +467,11 @@ export default function GruposPage(): JSX.Element {
       <Card>
         <header className="flex justify-between items-center mb-4">
           <Title level={3} className="m-0" id="grupos-title">
-            <TeamOutlined aria-hidden="true" /> Grupos ({grupos.length})
+            <TeamOutlined aria-hidden="true" /> {pageTypeMeta ? pageTypeMeta.title : 'Grupos RBAC'} ({grupos.length})
           </Title>
           <Space>
             <Search
-              placeholder="Buscar por nome"
+              placeholder={pageTypeMeta ? `Buscar ${pageTypeMeta.singular.toLowerCase()} por nome` : 'Buscar por nome'}
               allowClear
               style={{ width: 250 }}
               onSearch={setSearchText}
@@ -423,7 +481,7 @@ export default function GruposPage(): JSX.Element {
               Atualizar
             </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              Novo Grupo
+              {pageTypeMeta ? pageTypeMeta.create : 'Novo Grupo'}
             </Button>
           </Space>
         </header>
@@ -439,7 +497,11 @@ export default function GruposPage(): JSX.Element {
       </Card>
 
       <Modal
-        title={editingGroup ? 'Editar Grupo' : 'Novo Grupo'}
+        title={
+          editingGroup
+            ? `Editar ${pageTypeMeta ? pageTypeMeta.singular : 'Grupo'}`
+            : (pageTypeMeta ? pageTypeMeta.create : 'Novo Grupo')
+        }
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         onOk={() => form.submit()}
@@ -451,26 +513,32 @@ export default function GruposPage(): JSX.Element {
         <Form form={form} layout="vertical" onFinish={(values) => void handleSave(values)}>
           <Form.Item
             name="name"
-            label="Nome do Grupo"
+            label={`Nome do ${pageTypeMeta ? pageTypeMeta.singular : 'Grupo'}`}
             rules={[{ required: true, message: 'Nome é obrigatório' }]}
           >
-            <Input placeholder="Ex: DAT, Superintendência, Coordenador" />
+            <Input placeholder={pageTypeMeta ? `Ex: ${pageTypeMeta.singular} Pedagógico` : 'Ex: DAT, Superintendência, Coordenador'} />
           </Form.Item>
+
+          {!forcedType ? (
+            <Form.Item
+              name="group_type_input"
+              label="Tipo do Grupo"
+              rules={[{ required: true, message: 'Tipo do grupo é obrigatório' }]}
+            >
+              <Select
+                options={[
+                  { label: 'Setor (onde o usuário trabalha)', value: 'setor' },
+                  { label: 'Função (o que o usuário pode fazer)', value: 'funcao' },
+                ]}
+              />
+            </Form.Item>
+          ) : null}
 
           <Form.Item
-            name="group_type_input"
-            label="Tipo do Grupo"
-            rules={[{ required: true, message: 'Tipo do grupo é obrigatório' }]}
+            name="permissao_funcional_ids"
+            label={selectedGroupType === 'funcao' ? 'Permissões de acesso da Função' : 'Permissões de acesso'}
+            extra="Use termos de negócio: selecione apenas o necessário para este perfil."
           >
-            <Select
-              options={[
-                { label: 'Setor (onde o usuário trabalha)', value: 'setor' },
-                { label: 'Função (o que o usuário pode fazer)', value: 'funcao' },
-              ]}
-            />
-          </Form.Item>
-
-          <Form.Item name="permissao_funcional_ids" label="Permissões funcionais">
             {permissionsByCategory.length === 0 ? (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -479,16 +547,27 @@ export default function GruposPage(): JSX.Element {
             ) : (
               <Checkbox.Group className="w-full">
                 <Space direction="vertical" className="w-full" size="middle">
-                  {permissionsByCategory.map(({ category, permissions }) => (
-                    <Card key={category} size="small" title={category}>
+                  {permissionsByCategory.map(({ category, categoryTitle, categoryHelp, permissions }) => (
+                    <Card
+                      key={category}
+                      size="small"
+                      title={
+                        <Space direction="vertical" size={0}>
+                          <Text strong>{categoryTitle}</Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>{categoryHelp}</Text>
+                        </Space>
+                      }
+                    >
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {permissions.map((permissao) => (
                           <Checkbox key={permissao.id} value={permissao.id}>
                             <Space direction="vertical" size={0}>
                               <Text>{permissao.label}</Text>
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                {permissao.codename}
-                              </Text>
+                              {permissao.description ? (
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  {permissao.description}
+                                </Text>
+                              ) : null}
                             </Space>
                           </Checkbox>
                         ))}

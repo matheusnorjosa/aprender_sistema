@@ -43,9 +43,7 @@ class TestRequestIDMiddleware:
 
             captured_ids.append(req.request_id)  # type: ignore[attr-defined]
             # Também verificar thread-local
-            captured_ids.append(
-                getattr(threading.current_thread(), "request_id", "MISSING")
-            )
+            captured_ids.append(getattr(threading.current_thread(), "request_id", "MISSING"))
             return HttpResponse("OK")
 
         middleware = RequestIDMiddleware(get_response)
@@ -64,9 +62,7 @@ class TestRequestIDMiddleware:
         assert req1_id != req2_id, "Bug #580: request IDs must differ between requests"
         # thread-local DEVE acompanhar o request atual
         assert thread1_id == req1_id
-        assert thread2_id == req2_id, (
-            "Bug #580: thread-local request_id must update on each request"
-        )
+        assert thread2_id == req2_id, "Bug #580: thread-local request_id must update on each request"
 
     def test_cleans_thread_local_after_response(self) -> None:
         """Bug #580: thread-local deve ser limpo após response."""
@@ -81,9 +77,9 @@ class TestRequestIDMiddleware:
         middleware(factory.get("/api/solicitacoes/"))
 
         # Após a response, thread-local NÃO deve ter request_id
-        assert not hasattr(threading.current_thread(), "request_id"), (
-            "Bug #580: thread-local must be cleaned after response"
-        )
+        assert not hasattr(
+            threading.current_thread(), "request_id"
+        ), "Bug #580: thread-local must be cleaned after response"
 
     def test_cleans_thread_local_on_exception(self) -> None:
         """Bug #580: thread-local deve ser limpo mesmo se view lançar exceção."""
@@ -98,9 +94,9 @@ class TestRequestIDMiddleware:
             middleware(factory.get("/api/solicitacoes/"))
 
         # Mesmo com exceção, thread-local DEVE estar limpo
-        assert not hasattr(threading.current_thread(), "request_id"), (
-            "Bug #580: thread-local must be cleaned even on exception"
-        )
+        assert not hasattr(
+            threading.current_thread(), "request_id"
+        ), "Bug #580: thread-local must be cleaned even on exception"
 
     def test_adds_request_id_to_request(self) -> None:
         """Testa que request_id é adicionado ao request object."""

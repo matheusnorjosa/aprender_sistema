@@ -109,7 +109,8 @@ services:
 
   beat:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
-    command: celery -A config beat -l info
+    # --schedule /tmp/celerybeat-schedule: write schedule to tmpfs (read_only filesystem)
+    command: celery -A config beat -l info --schedule /tmp/celerybeat-schedule
     env_file:
       - ${APP_ENV_FILE:-stack.env}
     environment:

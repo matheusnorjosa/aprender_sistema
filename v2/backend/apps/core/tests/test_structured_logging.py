@@ -32,6 +32,76 @@ if TYPE_CHECKING:
 class TestRequestIDMiddleware:
     """Testa RequestIDMiddleware (correlation ID)."""
 
+    def test_generates_new_id_per_request(self) -> None:
+        """Bug #580: segunda request na mesma thread DEVE gerar novo request_id."""
+        factory = RequestFactory()
+
+        captured_ids: list[str] = []
+
+        def get_response(req: HttpRequest) -> HttpResponse:
+            from django.http import HttpResponse
+
+            captured_ids.append(req.request_id)  # type: ignore[attr-defined]
+            # Também verificar thread-local
+            captured_ids.append(
+                getattr(threading.current_thread(), "request_id", "MISSING")
+            )
+            return HttpResponse("OK")
+
+        middleware = RequestIDMiddleware(get_response)
+
+        # Primeira request
+        middleware(factory.get("/api/solicitacoes/"))
+        req1_id = captured_ids[0]
+        thread1_id = captured_ids[1]
+
+        # Segunda request na mesma thread (simula Gunicorn reuse)
+        middleware(factory.get("/api/solicitacoes/"))
+        req2_id = captured_ids[2]
+        thread2_id = captured_ids[3]
+
+        # request_id do request object DEVE ser diferente
+        assert req1_id != req2_id, "Bug #580: request IDs must differ between requests"
+        # thread-local DEVE acompanhar o request atual
+        assert thread1_id == req1_id
+        assert thread2_id == req2_id, (
+            "Bug #580: thread-local request_id must update on each request"
+        )
+
+    def test_cleans_thread_local_after_response(self) -> None:
+        """Bug #580: thread-local deve ser limpo após response."""
+        factory = RequestFactory()
+
+        def get_response(req: HttpRequest) -> HttpResponse:
+            from django.http import HttpResponse
+
+            return HttpResponse("OK")
+
+        middleware = RequestIDMiddleware(get_response)
+        middleware(factory.get("/api/solicitacoes/"))
+
+        # Após a response, thread-local NÃO deve ter request_id
+        assert not hasattr(threading.current_thread(), "request_id"), (
+            "Bug #580: thread-local must be cleaned after response"
+        )
+
+    def test_cleans_thread_local_on_exception(self) -> None:
+        """Bug #580: thread-local deve ser limpo mesmo se view lançar exceção."""
+        factory = RequestFactory()
+
+        def get_response(req: HttpRequest) -> HttpResponse:
+            raise ValueError("Simulated error")
+
+        middleware = RequestIDMiddleware(get_response)
+
+        with pytest.raises(ValueError, match="Simulated error"):
+            middleware(factory.get("/api/solicitacoes/"))
+
+        # Mesmo com exceção, thread-local DEVE estar limpo
+        assert not hasattr(threading.current_thread(), "request_id"), (
+            "Bug #580: thread-local must be cleaned even on exception"
+        )
+
     def test_adds_request_id_to_request(self) -> None:
         """Testa que request_id é adicionado ao request object."""
         factory = RequestFactory()
@@ -55,22 +125,29 @@ class TestRequestIDMiddleware:
         assert "X-Request-ID" in response
         assert len(response["X-Request-ID"]) == 36
 
-    def test_request_id_in_thread_local(self) -> None:
-        """Testa que request_id é armazenado em thread-local."""
+    def test_request_id_in_thread_local_during_request(self) -> None:
+        """Testa que request_id está em thread-local DURANTE o processamento."""
         factory = RequestFactory()
         request: HttpRequest = factory.get("/api/solicitacoes/")
+
+        captured_thread_id: list[str] = []
 
         def get_response(req: HttpRequest) -> HttpResponse:
             from django.http import HttpResponse
 
-            # Verificar que thread-local tem request_id
+            # DURANTE o request, thread-local DEVE ter request_id
             assert hasattr(threading.current_thread(), "request_id")
-            assert threading.current_thread().request_id  # type: ignore[attr-defined]
+            tid = threading.current_thread().request_id  # type: ignore[attr-defined]
+            assert tid
+            captured_thread_id.append(tid)
 
             return HttpResponse("OK")
 
         middleware = RequestIDMiddleware(get_response)
         middleware(request)
+
+        # Verificar que o ID capturado durante o request era válido
+        assert len(captured_thread_id[0]) == 36  # UUID4 format
 
 
 class TestRequestIDFilter:

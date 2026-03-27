@@ -47,19 +47,13 @@ jobs:
           echo "status=${status}" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Setup Node.js 20.x
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: "20.x"
-          cache: npm
-          cache-dependency-path: v2/frontend/package-lock.json
+      - uses: ./.github/actions/setup-node-deps
 
       - name: Run frontend architecture guard (dependency-cruiser)
         id: frontend_guard
         run: |
           set +e
           cd v2/frontend
-          npm ci
           npm run deps:check | tee "${GITHUB_WORKSPACE}/architecture-frontend.log"
           status=${PIPESTATUS[0]}
           echo "status=${status}" >> "$GITHUB_OUTPUT"
@@ -67,6 +61,7 @@ jobs:
 
       - name: Upload architecture logs
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: architecture-guardrails-logs

@@ -11,7 +11,9 @@ if (!Number.isFinite(minScore)) {
   process.exit(2);
 }
 
-const doctorArgs = ["-y", "react-doctor@latest", targetDir, "--score", "--yes"];
+// react-doctor is a devDependency (pinned in package.json).
+// No "-y" or "@latest" — avoids 30-65s registry download on every CI run.
+const doctorArgs = ["react-doctor", targetDir, "--score", "--yes"];
 const run =
   process.platform === "win32"
     ? spawnSync("cmd.exe", ["/d", "/s", "/c", "npx", ...doctorArgs], {

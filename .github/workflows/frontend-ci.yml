@@ -27,8 +27,8 @@ env:
 jobs:
   react-doctor:
     name: "[required] react doctor quality gate"
-    # Job lightweight (lint-like), apto para runner econômico 1 vCPU.
-    runs-on: ubuntu-slim
+    # npm ci + react-doctor are CPU-intensive; ubuntu-slim (1 vCPU) caused 2.5x slowdown.
+    runs-on: ubuntu-latest
     timeout-minutes: 12
 
     steps:

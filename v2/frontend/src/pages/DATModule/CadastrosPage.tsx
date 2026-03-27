@@ -650,23 +650,6 @@ export default function CadastrosPage(): JSX.Element {
                 </Form.Item>
               </Col>
             </Row>
-            <Row gutter={16}>
-              <Col xs={8}>
-                <Form.Item name="quantidade_alunos" label="Alunos">
-                  <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
-                </Form.Item>
-              </Col>
-              <Col xs={8}>
-                <Form.Item name="quantidade_professores" label="Professores">
-                  <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
-                </Form.Item>
-              </Col>
-              <Col xs={8}>
-                <Form.Item name="quantidade_codigos" label="Códigos">
-                  <InputNumber min={0} style={{ width: '100%' }} placeholder="Auto" />
-                </Form.Item>
-              </Col>
-            </Row>
           </Card>
 
           {/* Status FORMAR */}

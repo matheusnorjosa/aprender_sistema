@@ -1,0 +1,34 @@
+# Composite action: Setup Node.js with cached node_modules
+# Follows Sentry pattern — caches node_modules directly to skip npm ci on hit.
+# Used by: frontend-ci.yml, security-scan.yml, architecture-guardrails.yml,
+#          agent-browser-smoke.yml, dependency-review-scorecard.yml
+name: 'Setup Node.js with cached dependencies'
+description: 'Install Node.js and npm dependencies with node_modules caching'
+
+inputs:
+  node-version:
+    description: 'Node.js version'
+    default: '20.x'
+  working-directory:
+    description: 'Directory containing package.json'
+    default: 'v2/frontend'
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Cache node_modules
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      id: npm-cache
+      with:
+        path: ${{ inputs.working-directory }}/node_modules
+        key: ${{ runner.os }}-node-modules-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}
+
+    - name: Install dependencies
+      if: steps.npm-cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npm ci

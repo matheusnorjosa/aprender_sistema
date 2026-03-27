@@ -36,22 +36,28 @@ class RequestIDMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
+        import threading
+
         # Gerar request_id único (UUID4)
         request_id = str(uuid.uuid4())
 
         # Armazenar no request object
         request.request_id = request_id  # type: ignore[attr-defined]
 
-        # Adicionar ao thread-local para logging
-        import threading
+        # Sempre atualizar thread-local (fix #580: threads são reutilizadas)
+        threading.current_thread().request_id = request_id  # type: ignore[attr-defined]
 
-        if not hasattr(threading.current_thread(), "request_id"):
-            threading.current_thread().request_id = request_id  # type: ignore[attr-defined]
+        try:
+            # Processar request
+            response = self.get_response(request)
 
-        # Processar request
-        response = self.get_response(request)
+            # Adicionar header X-Request-ID na response
+            response["X-Request-ID"] = request_id
 
-        # Adicionar header X-Request-ID na response
-        response["X-Request-ID"] = request_id
-
-        return response
+            return response
+        finally:
+            # Limpar thread-local para evitar vazamento entre requests
+            try:
+                delattr(threading.current_thread(), "request_id")
+            except AttributeError:
+                pass

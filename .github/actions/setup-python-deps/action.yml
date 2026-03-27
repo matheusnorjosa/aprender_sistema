@@ -1,0 +1,36 @@
+# Composite action: Setup Python with pip cache
+# Uses setup-python's built-in cache (caches pip download cache).
+# pip install still runs but downloads from local cache on hit.
+# Used by: ci.yaml, security-scan.yml, architecture-guardrails.yml,
+#          backend-xdist-canary.yml, docs.yml
+name: 'Setup Python with cached dependencies'
+description: 'Install Python and pip dependencies with download caching'
+
+inputs:
+  python-version:
+    description: 'Python version'
+    default: '3.12'
+  requirements:
+    description: 'Space-separated list of requirements files to install'
+    default: 'requirements.txt'
+  working-directory:
+    description: 'Directory containing requirements files'
+    default: 'v2/backend'
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: 'pip'
+        cache-dependency-path: |
+          ${{ inputs.working-directory }}/requirements*.txt
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        for req in ${{ inputs.requirements }}; do
+          pip install --no-cache-dir -r "$req"
+        done

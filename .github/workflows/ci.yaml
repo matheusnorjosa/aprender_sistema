@@ -263,6 +263,7 @@ jobs:
     - name: Upload core coverage artifact
       if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      continue-on-error: true
       with:
         name: backend-coverage-core
         path: v2/backend/.coverage.core
@@ -385,6 +386,7 @@ jobs:
     - name: Upload ingest/devtools coverage artifact
       if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      continue-on-error: true
       with:
         name: backend-coverage-ingest-devtools
         path: v2/backend/.coverage.ingest_devtools
@@ -597,9 +599,12 @@ jobs:
           -e GCAL_CLIENT \
           -e GCAL_SEND_UPDATES \
           aprender-backend:ci-parity-${{ github.sha }} \
-          bash -lc '
+          bash -c '
             set -euo pipefail
             # Use project baseline to avoid CI drift with hardcoded tool versions.
+            # Note: bash -c (not -lc) preserves the ENV PATH from the Dockerfile,
+            # which includes /opt/venv/bin. Login shell (-l) resets PATH via
+            # /etc/profile, breaking venv-installed commands.
             pip install --no-cache-dir -r requirements.txt
             if [ -f requirements-dev.txt ]; then
               pip install --no-cache-dir -r requirements-dev.txt

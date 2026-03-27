@@ -90,6 +90,7 @@ jobs:
       - name: Upload security reports
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
+        continue-on-error: true
         with:
           name: python-security-reports
           path: |
@@ -190,6 +191,7 @@ jobs:
       - name: Upload Trivy report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
+        continue-on-error: true
         with:
           name: trivy-reports
           path: |
@@ -279,6 +281,7 @@ jobs:
       - name: Upload npm audit report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
+        continue-on-error: true # Artifact upload is informational; 403 from GH infra should not fail the gate
         with:
           name: npm-audit-report
           path: |
@@ -380,6 +383,7 @@ jobs:
       - name: Upload secret scan reports
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
+        continue-on-error: true
         with:
           name: secret-scan-reports
           path: |

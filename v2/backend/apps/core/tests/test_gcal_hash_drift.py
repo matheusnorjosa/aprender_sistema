@@ -13,14 +13,12 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-import pytest
 from django.utils import timezone
 
+import pytest
+
 from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
-from apps.core.services.gcal.payload import (
-    build_event_payload,
-    compute_payload_hash,
-)
+from apps.core.services.gcal.payload import build_event_payload, compute_payload_hash
 
 
 @pytest.fixture

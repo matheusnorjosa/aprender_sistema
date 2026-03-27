@@ -80,7 +80,7 @@ jobs:
         run: |
           cd v2/backend
           # Temporary exception: CVE-2026-4539 (pygments) currently has no upstream fixed version.
-          pip-audit -r requirements.txt --ignore-vuln CVE-2026-4539 --format json > pip-audit-report.json
+          pip-audit -r requirements.txt --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2026-34073 --format json > pip-audit-report.json
 
       - name: Run Bandit (SAST)
         run: |

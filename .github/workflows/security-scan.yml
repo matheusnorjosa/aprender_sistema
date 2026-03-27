@@ -202,8 +202,8 @@ jobs:
   # ================================================================
   frontend-security:
     name: "[required] Frontend Dependencies"
-    # npm audit de dependências de produção é workload leve de CPU.
-    runs-on: ubuntu-slim
+    # npm ci is CPU-intensive; ubuntu-slim (1 vCPU) caused 81% slowdown.
+    runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - name: Checkout code

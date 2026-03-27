@@ -74,7 +74,7 @@ class Command(BaseCommand):
 
 ### Logger Condicional
 
-O frontend usa `src/utils/logger.js` que só loga em desenvolvimento.
+O frontend usa `src/utils/logger.ts` que só loga em desenvolvimento.
 
 ```javascript
 import logger from '@/utils/logger';
@@ -91,7 +91,7 @@ logger.api('Request', { url, method });
 ### Implementação
 
 ```javascript
-// src/utils/logger.js
+// src/utils/logger.ts
 const isDev = import.meta.env.DEV;
 
 const logger = {

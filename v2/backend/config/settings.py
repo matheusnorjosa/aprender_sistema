@@ -741,42 +741,53 @@ if SENTRY_DSN:
 # ================================================================
 # Gap 5: Query Profiling tools for N+1 detection and performance analysis
 
-# Django Debug Toolbar (DEBUG mode only)
-if DEBUG:
-    INSTALLED_APPS += ["debug_toolbar"]
-    MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
-    INTERNAL_IPS = ["127.0.0.1", "localhost", "0.0.0.0"]
-    DEBUG_TOOLBAR_CONFIG: dict[str, object] = {
-        # Disable toolbar during tests to avoid NoReverseMatch errors
-        "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG and not TESTING,  # type: ignore[misc]
-        "DISABLE_PANELS": {
-            "debug_toolbar.panels.redirects.RedirectsPanel",
-            "debug_toolbar.panels.profiling.ProfilingPanel",
-        },
-        "SHOW_TEMPLATE_CONTEXT": True,
-    }
+# Django Debug Toolbar (DEBUG mode only, must be installed)
+try:
+    import debug_toolbar  # noqa: F401
 
-# Django Silk (Staging profiler)
-if ENVIRONMENT == "staging":
-    INSTALLED_APPS += ["silk"]
-    MIDDLEWARE += ["silk.middleware.SilkyMiddleware"]
-    SILKY_PYTHON_PROFILER = True
-    SILKY_PYTHON_PROFILER_BINARY = True
-    SILKY_META = True
-    SILKY_MAX_REQUEST_BODY_SIZE = -1  # Unlimited
-    SILKY_MAX_RESPONSE_BODY_SIZE = 1024  # 1KB
-    SILKY_INTERCEPT_PERCENT = 100  # Profile all requests
+    if DEBUG:
+        INSTALLED_APPS += ["debug_toolbar"]
+        MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
+        INTERNAL_IPS = ["127.0.0.1", "localhost", "0.0.0.0"]
+        DEBUG_TOOLBAR_CONFIG: dict[str, object] = {
+            # Disable toolbar during tests to avoid NoReverseMatch errors
+            "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG and not TESTING,  # type: ignore[misc]
+            "DISABLE_PANELS": {
+                "debug_toolbar.panels.redirects.RedirectsPanel",
+                "debug_toolbar.panels.profiling.ProfilingPanel",
+            },
+            "SHOW_TEMPLATE_CONTEXT": True,
+        }
+except ImportError:
+    pass  # Not installed in production image
 
-# NPlusOne (N+1 query detection in dev/test)
-# TESTING is defined earlier in file (line 34)
-if DEBUG or TESTING:
-    INSTALLED_APPS += ["nplusone.ext.django"]
-    MIDDLEWARE += ["nplusone.ext.django.NPlusOneMiddleware"]
-    # Log N+1 issues but don't break tests (many existing issues need fixing)
-    # Set NPLUSONE_RAISE=True only when actively fixing N+1 issues
-    NPLUSONE_RAISE = False
-    NPLUSONE_LOG = True
-    NPLUSONE_WHITELIST = [
-        # Whitelist known N+1 patterns that are acceptable
-        {"model": "auth.Group"},  # Groups are always fetched with user
-    ]
+# Django Silk (Staging profiler, must be installed)
+try:
+    import silk  # noqa: F401
+
+    if ENVIRONMENT == "staging":
+        INSTALLED_APPS += ["silk"]
+        MIDDLEWARE += ["silk.middleware.SilkyMiddleware"]
+        SILKY_PYTHON_PROFILER = True
+        SILKY_PYTHON_PROFILER_BINARY = True
+        SILKY_META = True
+        SILKY_MAX_REQUEST_BODY_SIZE = -1  # Unlimited
+        SILKY_MAX_RESPONSE_BODY_SIZE = 1024  # 1KB
+        SILKY_INTERCEPT_PERCENT = 100  # Profile all requests
+except ImportError:
+    pass  # Not installed in production image
+
+# NPlusOne (N+1 query detection in dev/test, must be installed)
+try:
+    import nplusone  # noqa: F401
+
+    if DEBUG or TESTING:
+        INSTALLED_APPS += ["nplusone.ext.django"]
+        MIDDLEWARE += ["nplusone.ext.django.NPlusOneMiddleware"]
+        NPLUSONE_RAISE = False
+        NPLUSONE_LOG = True
+        NPLUSONE_WHITELIST = [
+            {"model": "auth.Group"},
+        ]
+except ImportError:
+    pass  # Not installed in production image

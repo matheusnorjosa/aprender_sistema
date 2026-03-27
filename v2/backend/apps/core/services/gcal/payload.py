@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 from datetime import timezone as dt_timezone
-from uuid import uuid4
 
 from django.conf import settings
 
@@ -228,9 +227,9 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
     # RF06: Google Meet conferenceData
     conference_data = None
     if enable_meet:
-        # Gera requestId único e determinístico para idempotência
-        # Formato: meet-{solicitation_id}-{random_8chars}
-        request_id = f"meet-{s.id}-{uuid4().hex[:8]}"
+        # requestId determinístico para idempotência (fix #573: era uuid4 aleatório)
+        # Google usa requestId para deduplicar createRequest — mesmo ID = mesmo Meet link
+        request_id = f"meet-asv2-{s.id}"
         conference_data = {
             "createRequest": {
                 "requestId": request_id,

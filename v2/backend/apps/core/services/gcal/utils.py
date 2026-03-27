@@ -145,13 +145,19 @@ def _payload_hash(payload: JsonDict) -> PayloadHash:
     """
     Calcula SHA1 hash determinístico do payload (PR14).
 
+    Exclui ``conferenceData`` do cálculo porque contém metadata
+    da API Google (requestId) que não representa dados do evento.
+    Fix #573: evita falsos positivos de drift em eventos online.
+
     Args:
         payload: Dicionário com dados do evento
 
     Returns:
         str: Hash SHA1 hex (40 chars)
     """
-    serialized: str = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    # Excluir conferenceData do hash (fix #573)
+    hashable = {k: v for k, v in payload.items() if k != "conferenceData"}
+    serialized: str = json.dumps(hashable, sort_keys=True, separators=(",", ":"))
     return hashlib.sha1(serialized.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 

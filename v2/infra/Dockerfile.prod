@@ -64,6 +64,11 @@ RUN find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; \
     find /app -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; \
     true
 
+# SEC-006: Non-root user for runtime (OWASP Docker Security)
+RUN groupadd --gid 1000 appuser \
+ && useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser \
+ && chown -R appuser:appuser /app
+
 # Build metadata
 ARG GIT_SHA=unknown
 ARG BUILD_DATE=unknown
@@ -87,5 +92,7 @@ with open("/app/BUILD_INFO.json", "w", encoding="utf-8") as f:
     )
 print("Wrote /app/BUILD_INFO.json")
 PY2
+
+USER appuser
 
 CMD ["gunicorn", "config.wsgi:application", "--config", "/app/infra/gunicorn.conf.py"]

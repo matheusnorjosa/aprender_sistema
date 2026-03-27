@@ -18,6 +18,17 @@
 
 name: ${COMPOSE_PROJECT_NAME:-aprender_prod}
 
+  # ================================================================
+  # SEC-006: Container Runtime Hardening (OWASP Docker Security)
+  # ================================================================
+  # All services apply:
+  #   - security_opt: no-new-privileges (prevent privilege escalation)
+  #   - cap_drop: ALL (drop all Linux capabilities)
+  #   - read_only: true (immutable root filesystem)
+  #   - tmpfs for /tmp and /run (writable temp dirs in memory)
+  # Backend Dockerfiles run as non-root (USER appuser / USER nginx)
+  # ================================================================
+
 services:
   web:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -40,6 +51,15 @@ services:
       retries: 3
       start_period: 40s
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M
+      - /run:size=10M
+      - /home/appuser:size=10M
 
   redis:
     image: redis:7-alpine
@@ -50,6 +70,13 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=10M
 
   worker:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -70,6 +97,15 @@ services:
       retries: 3
       start_period: 60s
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M
+      - /run:size=10M
+      - /home/appuser:size=10M
 
   beat:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -90,6 +126,15 @@ services:
       retries: 3
       start_period: 30s
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=50M
+      - /run:size=10M
+      - /home/appuser:size=10M
 
   frontend:
     image: norjosamatheus/aprender-frontend:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -107,6 +152,15 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=10M
+      - /var/cache/nginx:size=50M
+      - /var/run:size=10M
 
 # Rede externa compartilhada com NPM (Nginx Proxy Manager).
 # Deve ser criada uma vez na VM01: docker network create shared_proxy

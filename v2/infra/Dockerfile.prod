@@ -35,7 +35,7 @@ WORKDIR /app
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/opt/venv/bin:$PATH"
+    PATH="/home/appuser/.local/bin:/opt/venv/bin:$PATH"
 
 # Runtime OS packages only (NO compilers, NO headers)
 # - postgresql-client: required for backup scripts (Issue #562 C-05)

@@ -65,13 +65,11 @@ RUN find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; \
     true
 
 # SEC-006: Non-root user for runtime (OWASP Docker Security)
-# - chown /opt/venv so pip install works inside venv as non-root (CI docker-parity)
-# - .bashrc ensures PATH survives login shell (bash -lc in CI)
+# chown /opt/venv so CI docker-parity can pip install as non-root into the venv.
 RUN groupadd --gid 1000 appuser \
  && useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser \
  && chown -R appuser:appuser /app \
- && chown -R appuser:appuser /opt/venv \
- && echo 'export PATH="/opt/venv/bin:/home/appuser/.local/bin:$PATH"' >> /home/appuser/.bashrc
+ && chown -R appuser:appuser /opt/venv
 
 # Build metadata
 ARG GIT_SHA=unknown

@@ -1,28 +1,55 @@
-FROM python:3.12-slim
+# =============================================================================
+# Backend Production Dockerfile — Multi-stage build
+# =============================================================================
+# Stage 1 (builder): compile C extensions with build-essential
+# Stage 2 (runtime): lean image with only runtime deps
+#
+# Requires: requirements-prod.txt (no dev/test packages)
+# =============================================================================
 
-WORKDIR /app
+# ── Stage 1: Builder ─────────────────────────────────────────────────────────
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Copy runtime requirements first for better layer caching.
-COPY backend/requirements.txt /app/requirements.txt
+# Build-time OS dependencies (compilers, headers) — NOT in final image
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+    build-essential libpq-dev libffi-dev \
+ && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies, then remove explicit developer-only packages.
-RUN pip install --no-cache-dir -r /app/requirements.txt \
- && for pkg in \
-    bandit black factory-boy faker flake8 ipdb ipython isort locust mypy \
-    pgcli pylint pytest pytest-cov pytest-django pytest-watch pytest-xdist; do \
-      if pip show "$pkg" > /dev/null 2>&1; then pip uninstall -y "$pkg"; fi; \
-    done
+# Isolated virtualenv so we can COPY it as a single directory
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Runtime OS packages only (no editor/CLI dev stack).
+# Install production dependencies only
+COPY backend/requirements-prod.txt /build/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+ && pip install --no-cache-dir -r /build/requirements.txt
+
+# ── Stage 2: Runtime ─────────────────────────────────────────────────────────
+FROM python:3.12-slim AS runtime
+
+WORKDIR /app
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Runtime OS packages only (NO compilers, NO headers)
 # - postgresql-client: required for backup scripts (Issue #562 C-05)
-# - libmagic1: required by python-magic at runtime.
+# - libmagic1: required by python-magic at runtime
 RUN apt-get update \
  && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends \
     curl tzdata ca-certificates libpq5 postgresql-client libmagic1 \
  && rm -rf /var/lib/apt/lists/*
 
+# Pre-built virtualenv from builder stage
+COPY --from=builder /opt/venv /opt/venv
+
+# Application code (.venv, tests excluded via .dockerignore)
 COPY backend /app
 
 RUN mkdir -p /app/infra
@@ -30,6 +57,14 @@ COPY infra/gunicorn.conf.py /app/infra/gunicorn.conf.py
 COPY infra/scripts /app/infra/scripts
 RUN chmod +x /app/infra/scripts/*.sh
 
+# Cleanup: remove __pycache__ and .pyc files
+# Note: do NOT remove "test"/"tests" dirs — django.test is a runtime module
+RUN find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; \
+    find /opt/venv -name "*.pyc" -delete 2>/dev/null; \
+    find /app -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; \
+    true
+
+# Build metadata
 ARG GIT_SHA=unknown
 ARG BUILD_DATE=unknown
 ARG APP_VERSION=dev
@@ -45,7 +80,7 @@ with open("/app/BUILD_INFO.json", "w", encoding="utf-8") as f:
             "git_sha": os.environ.get("GIT_SHA", "unknown"),
             "build_date": os.environ.get("BUILD_DATE", "unknown"),
             "profile": "prod",
-            "note": "Production runtime image (lean).",
+            "note": "Production runtime image (multi-stage, lean).",
         },
         f,
         indent=2,

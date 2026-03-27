@@ -91,6 +91,7 @@ jobs:
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      continue-on-error: true
       with:
         name: frontend-build
         path: v2/frontend/dist
@@ -197,6 +198,7 @@ jobs:
     - name: Upload test results
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
+      continue-on-error: true
       with:
         name: checklist-test-results
         path: v2/frontend/test-results
@@ -253,6 +255,7 @@ jobs:
     - name: Upload Lighthouse results
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
+      continue-on-error: true
       with:
         name: lighthouse-results
         path: v2/frontend/.lighthouseci

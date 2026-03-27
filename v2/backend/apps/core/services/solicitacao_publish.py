@@ -370,6 +370,9 @@ def cancel_from_gcal(
     """
     from apps.core.tasks import task_cancel_solicitacao_from_gcal
 
+    # Check OAuth credentials (fix #572)
+    operator_user_id = _check_google_oauth(user)
+
     # Validate that event was published
     if not solicitacao.external_event_id and solicitacao.gcal_status != Solicitacao.GCalStatus.PUBLISHED:
         raise ConflictError(
@@ -387,8 +390,15 @@ def cancel_from_gcal(
         error="",
     )
 
-    # Dispatch Celery task
-    task = task_cancel_solicitacao_from_gcal.delay(solicitacao.id)
+    # Dispatch Celery task (pass operator_user_id for OAuth mode)
+    auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
+    if auth_mode == "oauth":
+        task = task_cancel_solicitacao_from_gcal.delay(
+            solicitacao.id,
+            operator_user_id=operator_user_id,
+        )
+    else:
+        task = task_cancel_solicitacao_from_gcal.delay(solicitacao.id)
 
     # AuditLog
     client_ip = _get_client_ip(request)

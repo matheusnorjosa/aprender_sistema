@@ -181,14 +181,16 @@ class MonthlyAvailabilityView(APIView):
                     ).values_list("gerencia_id", flat=True)
                 )
                 if user_gerencia_ids:
-                    allowed_user_ids = list(
-                        EquipeGerencia.objects.filter(
+                    allowed_user_ids = [
+                        uid
+                        for uid in EquipeGerencia.objects.filter(
                             gerencia_id__in=user_gerencia_ids,
                             ativo=True,
                         )
                         .values_list("usuario_id", flat=True)
                         .distinct()
-                    )
+                        if uid is not None
+                    ]
                 else:
                     # Usuário sem vínculo explícito: restringe ao próprio usuário
                     allowed_user_ids = [request.user.id]

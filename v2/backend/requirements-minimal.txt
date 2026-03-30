@@ -13,7 +13,7 @@ django-cors-headers==4.6.0
 django-redis==5.4.0
 
 # Django Extensions
-djangorestframework==3.15.2
+djangorestframework==3.16.1
 
 # Production Server
 gunicorn==23.0.0

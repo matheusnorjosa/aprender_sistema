@@ -3,7 +3,7 @@
 ## Stack
 
 - **Python 3.12** com PEP 695 (type hints modernos)
-- **Django 5.1** com DRF
+- **Django 5.2 LTS** com DRF
 - **Celery** para tarefas assíncronas
 - **Pyright** para type checking (strict mode)
 

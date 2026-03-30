@@ -258,3 +258,67 @@ def test_resync_oauth_mode_com_credencial_retorna_202(
     mock_task.assert_called_once_with(
         solicitacao_aprovada.id, dry_run=False, apply_blocked=False, operator_user_id=usuario_controle.id
     )
+
+
+# ============================================================================
+# TESTES - CANCEL SEM/COM CREDENCIAL (fix #572)
+# ============================================================================
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
+@patch("apps.core.tasks.task_cancel_solicitacao_from_gcal.delay")
+def test_cancel_oauth_mode_sem_credencial_retorna_403(mock_task, solicitacao_aprovada, usuario_controle):
+    """
+    Fix #572: Cancel sem credencial OAuth → 403 Forbidden
+
+    Valida:
+    - Status 403
+    - Payload contém code='google_not_connected'
+    - Task NÃO é chamada
+    """
+    # Marcar como PUBLISHED para permitir cancel
+    solicitacao_aprovada.gcal_status = Solicitacao.GCalStatus.PUBLISHED
+    solicitacao_aprovada.external_event_id = "asv2-cancel-test"
+    solicitacao_aprovada.save()
+
+    client = APIClient()
+    client.force_authenticate(user=usuario_controle)
+
+    response = client.post(f"/api/solicitacoes/{solicitacao_aprovada.id}/cancel-gcal/", format="json")
+
+    assert response.status_code == http_status.HTTP_403_FORBIDDEN
+    assert response.data["code"] == "google_not_connected"
+    mock_task.assert_not_called()
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
+@patch("apps.core.tasks.task_cancel_solicitacao_from_gcal.delay")
+def test_cancel_oauth_mode_com_credencial_retorna_202(
+    mock_task, solicitacao_aprovada, usuario_controle, google_oauth_credential
+):
+    """
+    Fix #572: Cancel com credencial OAuth → 202 Accepted (task com operator_user_id)
+
+    Valida:
+    - Status 202
+    - Task chamada com operator_user_id
+    """
+    # Marcar como PUBLISHED para permitir cancel
+    solicitacao_aprovada.gcal_status = Solicitacao.GCalStatus.PUBLISHED
+    solicitacao_aprovada.external_event_id = "asv2-cancel-test"
+    solicitacao_aprovada.save()
+
+    mock_task.return_value.id = "fake-cancel-task-789"
+
+    client = APIClient()
+    client.force_authenticate(user=usuario_controle)
+
+    response = client.post(f"/api/solicitacoes/{solicitacao_aprovada.id}/cancel-gcal/", format="json")
+
+    assert response.status_code == http_status.HTTP_202_ACCEPTED
+    mock_task.assert_called_once_with(
+        solicitacao_aprovada.id,
+        operator_user_id=usuario_controle.id,
+    )

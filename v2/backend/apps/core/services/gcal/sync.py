@@ -400,7 +400,11 @@ def resync_solicitacao(s: Solicitacao, *, apply_blocked: bool = False) -> SyncOu
     return apply_one_solicitacao(s, dry_run=False, apply_blocked=apply_blocked)
 
 
-def cancel_solicitacao(s: Solicitacao) -> SyncOutcome:
+def cancel_solicitacao(
+    s: Solicitacao,
+    *,
+    client: CalendarClientAdapter | None = None,
+) -> SyncOutcome:
     """
     Cancelar evento no Google Calendar e limpar campos - Fase 4.
 
@@ -409,6 +413,7 @@ def cancel_solicitacao(s: Solicitacao) -> SyncOutcome:
 
     Args:
         s: Solicitacao com evento publicado
+        client: Optional pre-built client (OAuth mode). Falls back to service account.
 
     Returns:
         SyncOutcome com action="DELETE"
@@ -419,9 +424,14 @@ def cancel_solicitacao(s: Solicitacao) -> SyncOutcome:
     if not s.external_event_id and s.gcal_status != Solicitacao.GCalStatus.PUBLISHED:
         raise ValueError("Solicitação não possui evento publicado no Google Calendar")
 
-    from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
+    if client is None:
+        from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
 
-    client, calendar_id = get_gcal_client_and_calendar_id()
+        client, calendar_id = get_gcal_client_and_calendar_id()
+    else:
+        from django.conf import settings
+
+        calendar_id = getattr(settings, "GCAL_CALENDAR_ID", "primary")
 
     # Usar external_event_id ou gerar determinístico
     event_id = s.external_event_id or _event_id_for(s)

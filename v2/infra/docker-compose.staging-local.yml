@@ -1,0 +1,180 @@
+# =============================================================================
+# Staging-Local: prod-like stack on local machine
+# =============================================================================
+# Uses locally-built prod images (multi-stage, non-root) with
+# local DB/Redis from the dev stack. Separate ports to coexist with dev.
+#
+# Usage:
+#   docker compose -f infra/docker-compose.staging-local.yml up -d
+#   docker compose -f infra/docker-compose.staging-local.yml down
+#
+# Requires: dev stack running (for db + redis on default network)
+#   OR standalone db/redis (uncomment services below)
+# =============================================================================
+
+name: aprender_staging
+
+services:
+  web:
+    image: aprender-backend:staging-local
+    command: gunicorn config.wsgi:application --config /app/infra/gunicorn.conf.py
+    environment:
+      ENVIRONMENT: staging
+      DEBUG: "False"
+      REQUIRE_DOCKER: "1"
+      SERVICE_NAME: web
+      SECRET_KEY: staging-local-key-not-for-production
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: aprender_db
+      DB_USER: aprender
+      DB_PASSWORD: aprender
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      GCAL_CLIENT: fake
+      TZ: America/Fortaleza
+    ports:
+      - "8003:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/readyz/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M
+      - /run:size=10M
+      - /home/appuser:size=10M
+      - /app/out_etl:size=50M
+
+  worker:
+    image: aprender-backend:staging-local
+    command: celery -A config worker -l info
+    environment:
+      ENVIRONMENT: staging
+      DEBUG: "False"
+      REQUIRE_DOCKER: "1"
+      SERVICE_NAME: worker
+      SECRET_KEY: staging-local-key-not-for-production
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: aprender_db
+      DB_USER: aprender
+      DB_PASSWORD: aprender
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      GCAL_CLIENT: fake
+      TZ: America/Fortaleza
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M
+      - /run:size=10M
+      - /home/appuser:size=10M
+      - /app/out_etl:size=50M
+
+  beat:
+    image: aprender-backend:staging-local
+    command: celery -A config beat -l info --schedule /tmp/celerybeat-schedule
+    environment:
+      ENVIRONMENT: staging
+      DEBUG: "False"
+      REQUIRE_DOCKER: "1"
+      SERVICE_NAME: beat
+      SECRET_KEY: staging-local-key-not-for-production
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: aprender_db
+      DB_USER: aprender
+      DB_PASSWORD: aprender
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      GCAL_CLIENT: fake
+      TZ: America/Fortaleza
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=50M
+      - /run:size=10M
+      - /home/appuser:size=10M
+      - /app/out_etl:size=10M
+
+  frontend:
+    image: aprender-frontend:staging-local
+    ports:
+      - "8081:80"
+    depends_on:
+      - web
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:80/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Note: nginx needs writable /var/cache/nginx and /etc/nginx/conf.d at runtime.
+    # Hardening via non-root (USER nginx) + cap_drop + no-new-privileges.
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: aprender_db
+      POSTGRES_USER: aprender
+      POSTGRES_PASSWORD: aprender
+    volumes:
+      - staging_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aprender"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - staging_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  staging_db_data:
+  staging_redis_data:

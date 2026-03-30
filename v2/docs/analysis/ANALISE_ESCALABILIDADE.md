@@ -13,7 +13,7 @@
 O **Aprender Sistema v2** é uma aplicação enterprise de gestão de eventos com integração Google Calendar, verificação automática de conflitos e workflow de aprovações. O sistema substitui processos manuais baseados em planilhas Excel por uma solução automatizada, escalável e auditável.
 
 ### Stack Tecnológica
-- **Backend**: Python 3.12.12 + Django 5.1.x + DRF 3.15.2
+- **Backend**: Python 3.12.12 + Django 5.2.1 LTS + DRF 3.16.1
 - **Frontend**: React 18.3.1 + Vite 7.1.7 + Ant Design 5.27.4
 - **Infraestrutura**: Docker + PostgreSQL 15 + Redis 7 + Celery 5.5.3
 - **CI/CD**: GitHub Actions com 5 workflows

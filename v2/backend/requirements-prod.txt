@@ -35,7 +35,7 @@ django-crispy-forms==2.3
 crispy-bootstrap5==2024.2
 
 # Storage & Files
-django-storages==1.14.4
+django-storages==1.14.6
 python-magic==0.4.27
 boto3==1.35.9
 
@@ -65,12 +65,12 @@ python-decouple==3.8
 pytz==2024.1
 rapidfuzz==3.6.1
 requests==2.33.0
-django-environ==0.11.2
+django-environ==0.13.0
 
 # Resiliency
 pybreaker==1.2.0
 
 # Monitoring & Logging (production)
-django-prometheus==2.3.1
+django-prometheus==2.4.1
 python-json-logger==2.0.7
 sentry-sdk==2.13.0

@@ -19,6 +19,8 @@ Cobertura:
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth.models import Group
 from django.test import TestCase, override_settings
@@ -27,7 +29,6 @@ from rest_framework import status as http_status
 from rest_framework.test import APIClient
 
 import pytest
-import pytz
 
 from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 from apps.core.services.gcal_sync_service import build_event_payload, build_preview_for_solicitacao
@@ -80,9 +81,9 @@ class GCalTemplateFase3Tests(TestCase):
         self.tipo_evento = TipoEvento.objects.create(nome="Formação Presencial")
 
         # Datas (America/Fortaleza)
-        fortaleza_tz = pytz.timezone("America/Fortaleza")
-        self.inicio = fortaleza_tz.localize(datetime(2025, 12, 15, 9, 0, 0))
-        self.fim = fortaleza_tz.localize(datetime(2025, 12, 15, 12, 0, 0))
+        fortaleza_tz = ZoneInfo("America/Fortaleza")
+        self.inicio = datetime(2025, 12, 15, 9, 0, 0, tzinfo=fortaleza_tz)
+        self.fim = datetime(2025, 12, 15, 12, 0, 0, tzinfo=fortaleza_tz)
 
         self.client = APIClient()
 
@@ -274,8 +275,8 @@ class GCalTemplateFase3Tests(TestCase):
         Expected: Data formatada com timezone de Fortaleza (UTC-3)
         """
         # Criar solicitação com datetime UTC
-        inicio_utc = timezone.make_aware(datetime(2025, 12, 15, 12, 0, 0), timezone=pytz.UTC)
-        fim_utc = timezone.make_aware(datetime(2025, 12, 15, 15, 0, 0), timezone=pytz.UTC)
+        inicio_utc = timezone.make_aware(datetime(2025, 12, 15, 12, 0, 0), timezone=dt_timezone.utc)
+        fim_utc = timezone.make_aware(datetime(2025, 12, 15, 15, 0, 0), timezone=dt_timezone.utc)
 
         solicitacao = Solicitacao.objects.create(
             usuario=self.coord,

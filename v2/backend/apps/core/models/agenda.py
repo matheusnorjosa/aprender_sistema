@@ -64,17 +64,17 @@ class AvailabilityBlock(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(fim__gt=models.F("inicio")),
+                condition=models.Q(fim__gt=models.F("inicio")),
                 name="availability_block_fim_gt_inicio",
             ),
             # Issue #136: Check constraint for status choices
             models.CheckConstraint(
-                check=models.Q(status__in=["pendente", "aprovado", "reprovado"]),
+                condition=models.Q(status__in=["pendente", "aprovado", "reprovado"]),
                 name="availability_block_status_valid",
             ),
             # Issue #136: Check constraint for tipo choices
             models.CheckConstraint(
-                check=models.Q(tipo__in=["T", "P"]),
+                condition=models.Q(tipo__in=["T", "P"]),
                 name="availability_block_tipo_valid",
             ),
         ]

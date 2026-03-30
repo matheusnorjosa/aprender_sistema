@@ -333,19 +333,18 @@ class TestAvailabilityServiceRules:
         - Evento é corretamente associado ao dia no timezone Fortaleza
         """
         from datetime import datetime, time
-
-        import pytz
+        from zoneinfo import ZoneInfo
 
         # Timezone do projeto
-        fortaleza_tz = pytz.timezone("America/Fortaleza")
+        fortaleza_tz = ZoneInfo("America/Fortaleza")
 
         # Criar um dia específico para o teste
         test_date = timezone.now().date()
 
         # Evento existente às 23:30 Fortaleza (que seria 02:30 UTC do dia seguinte)
         # Nota: America/Fortaleza é UTC-3
-        event_start_local = fortaleza_tz.localize(datetime.combine(test_date, time(23, 30)))
-        event_end_local = fortaleza_tz.localize(datetime.combine(test_date, time(23, 59)))
+        event_start_local = datetime.combine(test_date, time(23, 30), tzinfo=fortaleza_tz)
+        event_end_local = datetime.combine(test_date, time(23, 59), tzinfo=fortaleza_tz)
 
         # Criar evento aprovado às 23:30 Fortaleza
         existing = Solicitacao.objects.create(
@@ -359,8 +358,8 @@ class TestAvailabilityServiceRules:
 
         # Verificar conflito com outro evento no MESMO dia local (Fortaleza)
         # Novo evento às 22:00-23:00 Fortaleza (mesmo dia)
-        new_start_local = fortaleza_tz.localize(datetime.combine(test_date, time(22, 0)))
-        new_end_local = fortaleza_tz.localize(datetime.combine(test_date, time(23, 0)))
+        new_start_local = datetime.combine(test_date, time(22, 0), tzinfo=fortaleza_tz)
+        new_end_local = datetime.combine(test_date, time(23, 0), tzinfo=fortaleza_tz)
 
         result = check_conflicts(
             usuario=usuario_test,

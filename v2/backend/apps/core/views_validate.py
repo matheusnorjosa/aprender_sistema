@@ -44,6 +44,7 @@ from __future__ import annotations
 
 from datetime import datetime, time
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from django.db.models import QuerySet
 from django.utils import timezone
@@ -51,8 +52,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-import pytz
 
 from apps.core.services.resolvers import resolve_municipio, resolve_projeto, resolve_tipo_evento, resolve_user_by_email
 
@@ -129,7 +128,7 @@ class SolicitationValidateView(APIView):
         else:
             try:
                 # Converter para datetime com timezone America/Fortaleza
-                tz = pytz.timezone("America/Fortaleza")
+                tz = ZoneInfo("America/Fortaleza")
 
                 # Parse date
                 date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -142,8 +141,8 @@ class SolicitationValidateView(APIView):
                 inicio_naive = datetime.combine(date_obj, start_time)
                 fim_naive = datetime.combine(date_obj, end_time)
 
-                inicio_aware = tz.localize(inicio_naive)
-                fim_aware = tz.localize(fim_naive)
+                inicio_aware = inicio_naive.replace(tzinfo=tz)
+                fim_aware = fim_naive.replace(tzinfo=tz)
 
                 # Validar que fim > inicio
                 if fim_aware <= inicio_aware:

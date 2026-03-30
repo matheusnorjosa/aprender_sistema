@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth.models import Group
 from django.core.cache import cache
@@ -22,7 +23,6 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
-import pytz
 
 from apps.core.models import AvailabilityBlock, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 from apps.core.services.availability_service import check_conflicts
@@ -121,7 +121,7 @@ def test_cache_invalidated_on_solicitacao_create(clear_cache, usuario_formador, 
     2. Criar solicitação aprovada
     3. Terceira chamada: cache foi invalidado → resultado com conflitos
     """
-    tz = pytz.timezone("America/Fortaleza")
+    tz = ZoneInfo("America/Fortaleza")
     inicio = timezone.now()
     fim = inicio + timedelta(hours=2)
 
@@ -157,7 +157,7 @@ def test_cache_invalidated_on_solicitacao_update(clear_cache, usuario_formador, 
     3. Aprovar solicitação
     4. Verificar que cache foi invalidado
     """
-    tz = pytz.timezone("America/Fortaleza")
+    tz = ZoneInfo("America/Fortaleza")
     inicio = timezone.now()
     fim = inicio + timedelta(hours=2)
 
@@ -196,7 +196,7 @@ def test_cache_invalidated_on_solicitacao_delete(clear_cache, usuario_formador, 
     3. Deletar solicitação
     4. Verificar que cache foi invalidado e não há mais conflito
     """
-    tz = pytz.timezone("America/Fortaleza")
+    tz = ZoneInfo("America/Fortaleza")
     inicio = timezone.now()
     fim = inicio + timedelta(hours=2)
 
@@ -233,7 +233,7 @@ def test_cache_invalidated_on_availability_block_create(clear_cache, usuario_for
     2. Criar bloqueio total aprovado
     3. Verificar que cache foi invalidado e agora há conflito
     """
-    tz = pytz.timezone("America/Fortaleza")
+    tz = ZoneInfo("America/Fortaleza")
     inicio = timezone.now()
     fim = inicio + timedelta(hours=2)
 

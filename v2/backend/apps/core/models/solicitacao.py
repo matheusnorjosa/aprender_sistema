@@ -232,17 +232,17 @@ class Solicitacao(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(fim__gt=models.F("inicio")),
+                condition=models.Q(fim__gt=models.F("inicio")),
                 name="solicitacao_fim_gt_inicio",
             ),
             # Issue #136: Check constraint for status choices
             models.CheckConstraint(
-                check=models.Q(status__in=["pendente", "aprovado", "reprovado"]),
+                condition=models.Q(status__in=["pendente", "aprovado", "reprovado"]),
                 name="solicitacao_status_valid",
             ),
             # Issue #136: Check constraint for gcal_status choices
             models.CheckConstraint(
-                check=models.Q(gcal_status__in=["NONE", "PENDING", "PUBLISHED", "ERROR"]),
+                condition=models.Q(gcal_status__in=["NONE", "PENDING", "PUBLISHED", "ERROR"]),
                 name="solicitacao_gcal_status_valid",
             ),
         ]
@@ -358,7 +358,7 @@ class Participation(models.Model):
             # Pelo menos um entre usuario ou guest_email deve estar preenchido
             models.CheckConstraint(
                 name="core_participation_user_or_email",
-                check=(models.Q(usuario__isnull=False) | models.Q(guest_email__isnull=False)),
+                condition=(models.Q(usuario__isnull=False) | models.Q(guest_email__isnull=False)),
             ),
             # Unicidade por usuario (quando usuario existe)
             models.UniqueConstraint(

@@ -138,7 +138,9 @@ def approve_solicitacao(
                 "solicitacao_id": solicitacao.id,
                 "prev_status": prev_status,
                 "new_status": solicitacao.status,
+                "justificativa": justificativa,
                 "ip_address": client_ip,
+                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
             },
         )
 
@@ -208,6 +210,7 @@ def reject_solicitacao(
                 "new_status": solicitacao.status,
                 "justificativa": justificativa,
                 "ip_address": client_ip,
+                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
             },
         )
 
@@ -296,6 +299,7 @@ def batch_approve_solicitacoes(
                     "new_status": "aprovado",
                     "batch": True,
                     "ip_address": client_ip,
+                    "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
                 },
             )
 
@@ -382,6 +386,7 @@ def batch_reject_solicitacoes(
                     "new_status": "reprovado",
                     "batch": True,
                     "ip_address": client_ip,
+                    "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
                 },
             )
 

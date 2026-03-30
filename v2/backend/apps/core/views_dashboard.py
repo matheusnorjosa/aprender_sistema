@@ -72,8 +72,13 @@ def dashboard_overview(request: Request) -> Response:
     eventos_futuros = qs_aprovadas.filter(inicio__date__gte=hoje).count()
     eventos_aprovados = qs_aprovadas.count()
 
-    # Total formadores participantes (conta Participation de solicitacoes aprovadas)
-    total_formadores = Participation.objects.filter(solicitacao__status="aprovado").count()
+    # Total formadores distintos em solicitações aprovadas (fix #594)
+    total_formadores = (
+        Participation.objects.filter(solicitacao__status="aprovado", usuario__isnull=False)
+        .values("usuario_id")
+        .distinct()
+        .count()
+    )
 
     aprovacoes_pendentes = qs_all.filter(status="pendente").count()
 

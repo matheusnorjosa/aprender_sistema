@@ -29,7 +29,6 @@ ipython==8.26.0
 django-debug-toolbar==4.4.6
 django-extensions==3.2.3
 django-silk==5.1.0
-nplusone==1.0.0
 watchdog==4.0.2
 
 # Data Processing (dev extras)
@@ -41,7 +40,7 @@ import-linter==2.6
 
 # Type Checking (Python 3.12 + PEP 695)
 pyright==1.1.382
-django-types==0.19.1
+django-types==0.23.0
 djangorestframework-types==0.8.0
 types-requests==2.32.0.20240914
 types-redis==4.6.0.20240903

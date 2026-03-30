@@ -10,8 +10,8 @@ from __future__ import annotations
 from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
-import pytz
 from openpyxl import load_workbook
 
 from .normalizers import normalize_str
@@ -43,7 +43,7 @@ def parse_bloqueios(filepath: Path) -> list[dict[str, Any]]:
 
     ws = wb["Bloqueios"]
     bloqueios = []
-    tz = pytz.timezone("America/Fortaleza")
+    tz = ZoneInfo("America/Fortaleza")
 
     for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not row or len(row) < 4:
@@ -80,16 +80,16 @@ def parse_bloqueios(filepath: Path) -> list[dict[str, Any]]:
 
             # Localizar para America/Fortaleza se naive
             if inicio.tzinfo is None:
-                inicio = tz.localize(inicio)
+                inicio = inicio.replace(tzinfo=tz)
             if fim.tzinfo is None:
-                fim = tz.localize(fim)
+                fim = fim.replace(tzinfo=tz)
 
             # Garantir que fim > inicio (constraint do banco)
             # Alguns bloqueios vêm com inicio == fim (00:00:00)
             if fim <= inicio:
                 # Se fim veio como 00:00, mudar para 23:59:59 do mesmo dia
                 if isinstance(fim_raw, datetime) and fim_raw.time() == time(0, 0):
-                    fim = tz.localize(datetime.combine(fim_raw.date(), time(23, 59, 59)))
+                    fim = datetime.combine(fim_raw.date(), time(23, 59, 59), tzinfo=tz)
                 else:
                     # Caso geral: adicionar 1 segundo
                     fim = fim + timedelta(seconds=1)

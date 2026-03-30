@@ -10,8 +10,8 @@ from __future__ import annotations
 from datetime import datetime, time
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
-import pytz
 from openpyxl import load_workbook
 
 from .normalizers import normalize_str
@@ -56,7 +56,7 @@ def parse_deslocamentos(filepath: Path) -> list[dict[str, Any]]:
 
     ws = wb[aba_name]
     deslocamentos = []
-    tz = pytz.timezone("America/Fortaleza")
+    tz = ZoneInfo("America/Fortaleza")
 
     for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not row or len(row) < 5:
@@ -82,7 +82,7 @@ def parse_deslocamentos(filepath: Path) -> list[dict[str, Any]]:
 
             # Localizar para America/Fortaleza se naive
             if data_aware.tzinfo is None:
-                data_aware = tz.localize(data_aware)
+                data_aware = data_aware.replace(tzinfo=tz)
 
         except Exception:
             continue

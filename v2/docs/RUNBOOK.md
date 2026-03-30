@@ -493,7 +493,7 @@ docker compose -p aprender_v2 exec web python manage.py shell
 
 **Autor:** Equipe Aprender Sistema
 **Projeto:** `aprender_v2`
-**Stack:** Django 5.1.2 + PostgreSQL 15 + Redis 7 + Celery 5.4.0
+**Stack:** Django 5.2.1 LTS + PostgreSQL 15 + Redis 7 + Celery 5.5.3
 
 ---
 

@@ -16,7 +16,7 @@ O **Aprender Sistema (AS) v2** substitui planilhas Google/Excel por uma platafor
 
 | Camada | Tecnologias |
 |--------|-------------|
-| **Backend** | Python 3.12, Django 5.1, DRF, Celery |
+| **Backend** | Python 3.12, Django 5.2 LTS, DRF 3.16, Celery |
 | **Frontend** | React (Vite), Tailwind CSS, Ant Design |
 | **Banco de Dados** | PostgreSQL 15 |
 | **Cache/Filas** | Redis 7 |

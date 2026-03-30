@@ -22,7 +22,7 @@ psycopg[binary]==3.2.3
 
 # Testing (minimal)
 pytest==8.3.4
-pytest-django==4.9.0
+pytest-django==4.10.0
 
 # Utils
 python-dateutil==2.9.0.post0

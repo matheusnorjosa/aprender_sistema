@@ -31,6 +31,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
+from apps.core.views.utils import _get_client_ip
+
 from .models import AuditLog
 
 
@@ -191,7 +193,7 @@ def login(request: Request) -> Response:
             model_name="Usuario",
             details={
                 "username": username,
-                "ip_address": request.META.get("REMOTE_ADDR", ""),
+                "ip_address": _get_client_ip(request),
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
                 "reason": "account_locked",
                 "attempts": attempts,
@@ -214,7 +216,7 @@ def login(request: Request) -> Response:
             model_name="Usuario",
             details={
                 "username": username,
-                "ip_address": request.META.get("REMOTE_ADDR", ""),
+                "ip_address": _get_client_ip(request),
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
                 "reason": "invalid_credentials",
                 "attempts": attempts,
@@ -234,7 +236,7 @@ def login(request: Request) -> Response:
             model_name="Usuario",
             details={
                 "username": username,
-                "ip_address": request.META.get("REMOTE_ADDR", ""),
+                "ip_address": _get_client_ip(request),
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
                 "reason": "inactive_user",
                 "attempts": attempts,
@@ -255,7 +257,7 @@ def login(request: Request) -> Response:
         action="LOGIN",
         model_name="Usuario",
         details={
-            "ip_address": request.META.get("REMOTE_ADDR", ""),
+            "ip_address": _get_client_ip(request),
             "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
         },
     )
@@ -297,7 +299,7 @@ def logout(request: Request) -> Response:
         action="LOGOUT",
         model_name="Usuario",
         details={
-            "ip_address": request.META.get("REMOTE_ADDR", ""),
+            "ip_address": _get_client_ip(request),
             "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
         },
     )

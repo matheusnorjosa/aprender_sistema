@@ -73,7 +73,7 @@ log_info "Step 1: Creating test backup..."
 mkdir -p "${BACKUP_DIR}"
 
 BACKUP_FILE="${BACKUP_DIR}/dr_test.sql.gz"
-docker compose exec -T db pg_dump -U postgres aprender_sistema | gzip > "${BACKUP_FILE}"
+docker compose exec -T db pg_dump -U postgres aprender_db | gzip > "${BACKUP_FILE}"
 
 if [ ! -f "${BACKUP_FILE}" ]; then
     log_error "Backup file not created!"
@@ -176,7 +176,7 @@ echo ""
 # Step 7: Compare with production (optional)
 log_info "Step 7: Comparing with production database..."
 
-PROD_COUNT=$(docker compose exec -T db psql -U postgres -d aprender_sistema -t -c \
+PROD_COUNT=$(docker compose exec -T db psql -U postgres -d aprender_db -t -c \
     "SELECT COUNT(*) FROM core_solicitacao;")
 TEST_COUNT=$(docker compose exec -T db psql -U postgres -d "${TEST_DB_NAME}" -t -c \
     "SELECT COUNT(*) FROM core_solicitacao;")

@@ -76,7 +76,7 @@ up:  ## Iniciar todos os serviços
 	@echo "✅ Serviços iniciados!"
 	@echo "🌐 Web: http://localhost:8002"
 	@echo "📊 Admin: http://localhost:8002/admin"
-	@echo "🔍 API Health: http://localhost:8002/api/health/"
+	@echo "🔍 API Health: http://localhost:8002/api/readyz/"
 
 up-obs:  ## Iniciar com stack de observabilidade (Prometheus + Grafana)
 	@echo "🚀 Iniciando serviços com observabilidade..."
@@ -366,7 +366,7 @@ format:  ## Formatar código (Black)
 health:  ## Verificar health dos serviços
 	@echo "❤️  Verificando health dos serviços..."
 	@echo "Web:"
-	@curl -s http://localhost:8002/api/health/ | python -m json.tool || echo "❌ Web não está respondendo"
+	@curl -s http://localhost:8002/api/readyz/ | python -m json.tool || echo "❌ Web não está respondendo"
 	@echo ""
 	@echo "Database:"
 	@$(DEV_COMPOSE) exec $(SERVICE_DB) pg_isready -U aprender_user || echo "❌ DB não está pronto"

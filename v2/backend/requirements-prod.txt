@@ -14,7 +14,7 @@ django-allauth==65.14.1
 
 # Task Queue
 celery==5.5.3
-django-celery-beat==2.7.0
+django-celery-beat==2.9.0
 django-celery-results==2.5.1
 
 # Cache & Sessions

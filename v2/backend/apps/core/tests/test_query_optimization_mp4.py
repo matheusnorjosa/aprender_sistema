@@ -36,7 +36,7 @@ def grupos(db: None) -> dict[str, Group]:
 
 
 @pytest.fixture
-def usuario_controle(db: None, grupos: dict[str, Group]) -> User:
+def usuario_controle(db: None, grupos: dict[str, Group]) -> Usuario:
     """Cria usuário com perfil Controle."""
     usuario = Usuario.objects.create_user(
         username="controle_test",
@@ -49,7 +49,7 @@ def usuario_controle(db: None, grupos: dict[str, Group]) -> User:
 
 
 @pytest.fixture
-def usuario_super(db: None, grupos: dict[str, Group]) -> User:
+def usuario_super(db: None, grupos: dict[str, Group]) -> Usuario:
     """Cria usuário com perfil Superintendência."""
     usuario = Usuario.objects.create_user(
         username="super_test",

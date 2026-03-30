@@ -26,10 +26,9 @@ from __future__ import annotations
 
 from datetime import datetime, time
 from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
 
 from django.test import TestCase
-
-import pytz
 
 from apps.dat_ingest.services.parse_acompanhamento import combine_datetime, parse_acompanhamento_aba
 
@@ -104,9 +103,9 @@ class TestSuperDateParsing(TestCase):
             self.assertIsNotNone(sol["fim"])
 
             # Data deve ser 2025-03-10 (do mock)
-            tz = pytz.timezone("America/Fortaleza")
+            tz = ZoneInfo("America/Fortaleza")
             expected_date = datetime(2025, 3, 10, 8, 0)
-            expected_inicio = tz.localize(expected_date)
+            expected_inicio = expected_date.replace(tzinfo=tz)
 
             self.assertEqual(sol["inicio"], expected_inicio)
 

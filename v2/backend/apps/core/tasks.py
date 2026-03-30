@@ -226,7 +226,10 @@ def task_publish_solicitacao_to_gcal(
 
 
 @shared_task(name="apps.core.tasks.task_cancel_solicitacao_from_gcal")
-def task_cancel_solicitacao_from_gcal(solicitation_id: int) -> dict[str, Any]:
+def task_cancel_solicitacao_from_gcal(
+    solicitation_id: int,
+    operator_user_id: int | None = None,
+) -> dict[str, Any]:
     """
     Cancela evento de uma Solicitacao no Google Calendar (via Celery) - Fase 4.
 
@@ -235,6 +238,7 @@ def task_cancel_solicitacao_from_gcal(solicitation_id: int) -> dict[str, Any]:
 
     Args:
         solicitation_id: ID da Solicitacao a cancelar
+        operator_user_id: ID do usuário operador (OAuth mode, fix #572)
 
     Returns:
         dict: {
@@ -245,15 +249,36 @@ def task_cancel_solicitacao_from_gcal(solicitation_id: int) -> dict[str, Any]:
             "error": str | None
         }
     """
-    from apps.core.models import AuditLog, Solicitacao
+    from django.conf import settings
+
+    from apps.core.models import AuditLog, Solicitacao, Usuario
     from apps.core.services.gcal_sync_service import cancel_solicitacao
+
+    # OAuth: create OAuth client if needed (fix #572)
+    auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
+    client = None
+
+    if auth_mode == "oauth" and operator_user_id is not None:
+        try:
+            operator = Usuario.objects.get(id=operator_user_id)
+            from apps.core.services.gcal_client_factory import get_oauth_client_for_user
+
+            client, _ = get_oauth_client_for_user(operator)
+        except (Usuario.DoesNotExist, ValueError) as e:
+            return {
+                "action": "ERROR",
+                "solicitation_id": solicitation_id,
+                "external_event_id": None,
+                "summary": f"OAuth credential error: {e}",
+                "error": str(e)[:500],
+            }
 
     try:
         # Buscar solicitação
         s = Solicitacao.objects.get(id=solicitation_id)
 
         # Cancelar evento no Calendar e limpar campos
-        outcome = cancel_solicitacao(s)
+        outcome = cancel_solicitacao(s, client=client)
 
         # Criar AuditLog
         AuditLog.objects.create(

@@ -193,7 +193,8 @@ class MonthlyAvailabilityView(APIView):
                     ]
                 else:
                     # Usuário sem vínculo explícito: restringe ao próprio usuário
-                    allowed_user_ids = [request.user.id]
+                    user_id: int = request.user.id  # type: ignore[assignment]
+                    allowed_user_ids = [user_id]
                 cache_scope = f"user:{request.user.id}"
         else:
             cache_scope = f"gerencia:{gerencia_id}"

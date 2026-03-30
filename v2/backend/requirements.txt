@@ -38,13 +38,13 @@ django-filter==24.3
 # ================================================================
 django-storages==1.14.4
 python-magic==0.4.27
-djangorestframework==3.15.2
+djangorestframework==3.16.1
 
 # ================================================================
 # API & Serialization
 # ================================================================
 djangorestframework-simplejwt==5.5.1
-drf-spectacular==0.27.2
+drf-spectacular==0.29.0
 drf-spectacular-sidecar==2026.3.1
 factory-boy==3.3.1
 faker==28.4.1

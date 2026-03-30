@@ -31,7 +31,7 @@
 
 ### Backend (`v2/backend/`)
 
-- **Django 5.1**: Framework web principal
+- **Django 5.2 LTS**: Framework web principal
 - **DRF**: API REST
 - **Celery**: Tarefas assíncronas (sync GCal, ETL)
 - **PostgreSQL**: Banco de dados relacional

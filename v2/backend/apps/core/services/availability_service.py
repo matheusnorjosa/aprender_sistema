@@ -20,12 +20,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
-
-import pytz
 
 from apps.core.models import AvailabilityBlock, Municipio, Solicitacao, Usuario
 from apps.core.services.config_service import get_cfg
@@ -74,7 +73,7 @@ def to_local(dt: datetime) -> datetime:
         datetime convertido para America/Fortaleza
     """
     tz_name: str = getattr(settings, "TZ_PROJECT", "America/Fortaleza")
-    tz: pytz.BaseTzInfo = pytz.timezone(tz_name)
+    tz = ZoneInfo(tz_name)
 
     # Se naive, assume UTC
     if timezone.is_naive(dt):
@@ -269,11 +268,11 @@ def check_conflicts(
     # problemas de timezone (RD-06). Eventos próximos da meia-noite podem
     # ter data diferente em UTC vs America/Fortaleza.
     tz_name: str = getattr(settings, "TZ_PROJECT", "America/Fortaleza")
-    local_tz: pytz.BaseTzInfo = pytz.timezone(tz_name)
+    local_tz = ZoneInfo(tz_name)
 
     # Início e fim do dia no timezone local, convertidos para UTC para query
-    day_start: datetime = local_tz.localize(datetime.combine(inicio_date, time.min))
-    day_end: datetime = local_tz.localize(datetime.combine(inicio_date, time.max))
+    day_start: datetime = datetime.combine(inicio_date, time.min, tzinfo=local_tz)
+    day_end: datetime = datetime.combine(inicio_date, time.max, tzinfo=local_tz)
 
     # Seleção ampla: eventos que tocam o dia do início (usando ranges UTC)
     same_day_events = events_qs.filter(inicio__lt=day_end, fim__gt=day_start).distinct()

@@ -5,8 +5,9 @@
  */
 
 export const TIMING = {
-  // Polling intervals
-  ALERT_POLL_INTERVAL_MS: 30000, // 30 seconds
+  // Polling intervals (separated by domain for independent tuning)
+  GCAL_POLL_INTERVAL_MS: 30_000, // 30 seconds
+  NOTIF_POLL_INTERVAL_MS: 30_000, // 30 seconds
 
   // Cooldowns
   TOAST_COOLDOWN_MS: 120000, // 2 minutes

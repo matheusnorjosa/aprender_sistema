@@ -27,8 +27,16 @@ FRONTEND_URL="${FRONTEND_URL:-http://localhost:15173}"
 MAX_WAIT="${MAX_WAIT:-120}"
 STAGING_TAG="${STAGING_TAG:-staging-local}"
 
-# Python interpreter (Windows has 'python', Linux has 'python3')
-PYTHON="${PYTHON:-$(command -v python3 2>/dev/null || command -v python 2>/dev/null || true)}"
+# Python interpreter: verify it actually works (Windows python3 alias may be a Store stub)
+if [ -z "${PYTHON:-}" ]; then
+  for _candidate in python3 python; do
+    if command -v "$_candidate" > /dev/null 2>&1 && "$_candidate" -c "pass" > /dev/null 2>&1; then
+      PYTHON="$_candidate"
+      break
+    fi
+  done
+fi
+PYTHON="${PYTHON:-python3}"
 
 # Backend curl: -s silent, -f fail on HTTP errors, X-Forwarded-Proto for SECURE_SSL_REDIRECT
 BACKEND_CURL="curl -sf -H X-Forwarded-Proto:https"
@@ -138,8 +146,8 @@ fi
 echo -n "[2/${TOTAL}] Backend version: "
 VERSION_BODY="$($BACKEND_CURL "${BACKEND_URL}/api/version/" 2>/dev/null || true)"
 if [ -n "$VERSION_BODY" ]; then
-  APP_VER="$($PYTHON -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('version','unknown'))" <<< "$VERSION_BODY" 2>/dev/null || echo "unknown")"
-  GIT_SHA="$($PYTHON -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('git_sha','unknown'))" <<< "$VERSION_BODY" 2>/dev/null || echo "unknown")"
+  APP_VER="$(echo "$VERSION_BODY" | $PYTHON -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('version','unknown'))" 2>/dev/null || echo "unknown")"
+  GIT_SHA="$(echo "$VERSION_BODY" | $PYTHON -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('git_sha','unknown'))" 2>/dev/null || echo "unknown")"
   if [ "$APP_VER" != "unknown" ]; then
     pass "Backend version" "v=${APP_VER}, sha=${GIT_SHA}"
   else

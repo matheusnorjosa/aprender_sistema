@@ -62,7 +62,9 @@ class Prova(models.Model):
         ]
         constraints = [
             models.UniqueConstraint(fields=["plano", "numero_prova"], name="unique_prova_plano_numero"),
-            models.CheckConstraint(condition=models.Q(numero_prova__gte=1, numero_prova__lte=3), name="prova_numero_range"),
+            models.CheckConstraint(
+                condition=models.Q(numero_prova__gte=1, numero_prova__lte=3), name="prova_numero_range"
+            ),
         ]
 
     def __str__(self) -> str:

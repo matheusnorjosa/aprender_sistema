@@ -11,8 +11,8 @@ from __future__ import annotations
 from datetime import datetime, time
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
-import pytz
 from openpyxl import load_workbook
 
 from .normalizers import normalize_str, parse_bool
@@ -36,8 +36,8 @@ def combine_datetime(data, hora, tz_name="America/Fortaleza"):
     dt = datetime.combine(data, hora)
 
     # Localizar no timezone
-    tz = pytz.timezone(tz_name)
-    return tz.localize(dt)
+    tz = ZoneInfo(tz_name)
+    return dt.replace(tzinfo=tz)
 
 
 def parse_acompanhamento_aba(filepath: Path, aba_name: str) -> list[dict[str, Any]]:

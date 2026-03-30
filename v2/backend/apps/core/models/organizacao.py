@@ -109,11 +109,11 @@ class Municipio(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["nome", "uf"], name="unique_municipio_nome_uf"),
             models.CheckConstraint(
-                check=models.Q(latitude__gte=-90, latitude__lte=90) | models.Q(latitude__isnull=True),
+                condition=models.Q(latitude__gte=-90, latitude__lte=90) | models.Q(latitude__isnull=True),
                 name="latitude_range",
             ),
             models.CheckConstraint(
-                check=models.Q(longitude__gte=-180, longitude__lte=180) | models.Q(longitude__isnull=True),
+                condition=models.Q(longitude__gte=-180, longitude__lte=180) | models.Q(longitude__isnull=True),
                 name="longitude_range",
             ),
         ]
@@ -293,7 +293,7 @@ class EquipeGerencia(models.Model):
                 name="unique_equipe_gerencia_usuario_papel",
             ),
             models.CheckConstraint(
-                check=(~models.Q(papel="APOIO") | models.Q(coordenador_supervisor__isnull=False)),
+                condition=(~models.Q(papel="APOIO") | models.Q(coordenador_supervisor__isnull=False)),
                 name="apoio_requires_supervisor",
                 violation_error_message="Apoio de Coordenacao deve ter um coordenador supervisor",
             ),
@@ -369,7 +369,7 @@ class Projeto(models.Model):
             ),
             # Issue #136: Check constraint for fluxo choices
             models.CheckConstraint(
-                check=models.Q(fluxo__in=["SUPER", "NAO_SUPER"]),
+                condition=models.Q(fluxo__in=["SUPER", "NAO_SUPER"]),
                 name="projeto_fluxo_valid",
             ),
         ]

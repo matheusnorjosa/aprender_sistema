@@ -168,9 +168,9 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
             description_lines.append(f"🎯 Tipo: {tipo_nome}")
 
     # Seção 4: Data/Horário (formatado em America/Fortaleza)
-    import pytz
+    from zoneinfo import ZoneInfo
 
-    fortaleza_tz = pytz.timezone("America/Fortaleza")
+    fortaleza_tz = ZoneInfo("America/Fortaleza")
     inicio_local = s.inicio.astimezone(fortaleza_tz)
     fim_local = s.fim.astimezone(fortaleza_tz)
     data_format = "%d/%m/%Y %H:%M"

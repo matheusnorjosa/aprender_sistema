@@ -115,18 +115,18 @@ class AcaoTemplate(models.Model):
         verbose_name_plural = "Acoes Template"
         ordering = ["ordem"]
         constraints = [
-            models.CheckConstraint(check=models.Q(ordem__gt=0), name="acao_template_ordem_gt_zero"),
+            models.CheckConstraint(condition=models.Q(ordem__gt=0), name="acao_template_ordem_gt_zero"),
             models.CheckConstraint(
-                check=models.Q(dias_prazo_uteis__gt=0),
+                condition=models.Q(dias_prazo_uteis__gt=0),
                 name="acao_template_prazo_gt_zero",
             ),
             models.CheckConstraint(
-                check=(~models.Q(tipo_ancora=TipoAncoraChoices.ACAO_ANTERIOR))
+                condition=(~models.Q(tipo_ancora=TipoAncoraChoices.ACAO_ANTERIOR))
                 | models.Q(ref_acao_template__isnull=False),
                 name="acao_template_ancora_acao_requer_ref",
             ),
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(tipo_ancora__in=[TipoAncoraChoices.ACAO_ANTERIOR, TipoAncoraChoices.MARCO_CALENDARIO])
                     | ~models.Q(ref_evento_externo="")
                 ),
@@ -215,7 +215,7 @@ class CicloAcoes(models.Model):
                 fields=["projeto", "municipio", "semestre", "ano"],
                 name="unique_ciclo_acoes_contexto",
             ),
-            models.CheckConstraint(check=models.Q(ano__gte=2020), name="ciclo_acoes_ano_min_2020"),
+            models.CheckConstraint(condition=models.Q(ano__gte=2020), name="ciclo_acoes_ano_min_2020"),
         ]
 
     def __str__(self) -> str:
@@ -275,13 +275,13 @@ class AcaoInstancia(models.Model):
                 fields=["ciclo", "template"],
                 name="unique_acao_instancia_ciclo_template",
             ),
-            models.CheckConstraint(check=models.Q(ordem__gt=0), name="acao_instancia_ordem_gt_zero"),
+            models.CheckConstraint(condition=models.Q(ordem__gt=0), name="acao_instancia_ordem_gt_zero"),
             models.CheckConstraint(
-                check=(~models.Q(estado=EstadoAcaoChoices.CONCLUIDA)) | models.Q(data_realizacao__isnull=False),
+                condition=(~models.Q(estado=EstadoAcaoChoices.CONCLUIDA)) | models.Q(data_realizacao__isnull=False),
                 name="acao_instancia_concluida_requer_data_realizacao",
             ),
             models.CheckConstraint(
-                check=(~models.Q(estado=EstadoAcaoChoices.CONCLUIDA)) | (~models.Q(observacao_conclusao="")),
+                condition=(~models.Q(estado=EstadoAcaoChoices.CONCLUIDA)) | (~models.Q(observacao_conclusao="")),
                 name="acao_instancia_concluida_requer_observacao",
             ),
         ]

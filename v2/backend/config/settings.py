@@ -776,18 +776,3 @@ try:
         SILKY_INTERCEPT_PERCENT = 100  # Profile all requests
 except ImportError:
     pass  # Not installed in production image
-
-# NPlusOne (N+1 query detection in dev/test, must be installed)
-try:
-    import nplusone  # noqa: F401
-
-    if DEBUG or TESTING:
-        INSTALLED_APPS += ["nplusone.ext.django"]
-        MIDDLEWARE += ["nplusone.ext.django.NPlusOneMiddleware"]
-        NPLUSONE_RAISE = False
-        NPLUSONE_LOG = True
-        NPLUSONE_WHITELIST = [
-            {"model": "auth.Group"},
-        ]
-except ImportError:
-    pass  # Not installed in production image

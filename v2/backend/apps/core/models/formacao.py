@@ -97,7 +97,7 @@ class Formacao(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["plano", "numero_formacao"], name="unique_formacao_plano_numero"),
             models.CheckConstraint(
-                check=models.Q(numero_formacao__gte=1, numero_formacao__lte=15), name="formacao_numero_range"
+                condition=models.Q(numero_formacao__gte=1, numero_formacao__lte=15), name="formacao_numero_range"
             ),
         ]
 

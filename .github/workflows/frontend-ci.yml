@@ -193,10 +193,11 @@ jobs:
         chrome-version: stable
 
     - name: Download build artifacts
-      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
       with:
         name: frontend-build
         path: v2/frontend/dist
+        digest-mismatch: warn
 
     - name: Run Lighthouse CI
       run: npm run lighthouse:ci

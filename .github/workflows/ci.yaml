@@ -404,10 +404,11 @@ jobs:
         echo "Split backend test jobs passed."
 
     - name: Download backend coverage artifacts
-      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
       with:
         pattern: backend-coverage-*
         path: /tmp/backend-coverage
+        digest-mismatch: warn
 
     - name: Combine coverage and enforce threshold
       run: |

@@ -650,7 +650,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         </nav>
 
         {/* Conteudo do passo atual */}
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" autoComplete="off">
           <section aria-label={`Passo ${currentStep + 1}: ${steps[currentStep].title}`} style={{ minHeight: '400px' }}>
             {steps[currentStep].content}
           </section>

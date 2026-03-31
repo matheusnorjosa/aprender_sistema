@@ -169,6 +169,22 @@ export default function UsuariosPage(): JSX.Element {
     [rbacMeta]
   );
 
+  const setorOptions = useMemo(
+    () => grupos
+      .filter((g) => setorGroupsSet.has(g.name))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((g) => ({ label: g.name, value: g.id })),
+    [grupos, setorGroupsSet]
+  );
+
+  const funcaoOptions = useMemo(
+    () => grupos
+      .filter((g) => funcaoGroupsSet.has(g.name))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((g) => ({ label: g.name, value: g.id })),
+    [grupos, funcaoGroupsSet]
+  );
+
   /**
    * Fetch users from API
    */
@@ -644,10 +660,7 @@ export default function UsuariosPage(): JSX.Element {
               optionFilterProp="label"
               maxTagCount="responsive"
               placeholder="Selecione um ou mais setores"
-              options={grupos
-                .filter((g) => setorGroupsSet.has(g.name))
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((g) => ({ label: g.name, value: g.id }))}
+              options={setorOptions}
             />
           </Form.Item>
 
@@ -664,10 +677,7 @@ export default function UsuariosPage(): JSX.Element {
               optionFilterProp="label"
               maxTagCount="responsive"
               placeholder="Selecione uma ou mais funções"
-              options={grupos
-                .filter((g) => funcaoGroupsSet.has(g.name))
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((g) => ({ label: g.name, value: g.id }))}
+              options={funcaoOptions}
             />
           </Form.Item>
 

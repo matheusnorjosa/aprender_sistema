@@ -117,8 +117,8 @@ export default function ConfiguracoesPage(): JSX.Element {
       children: (
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           <Alert
-            message="Regras de Disponibilidade (RD-04, RD-05)"
-            description="Configure parâmetros de validação de conflitos e capacidade diária dos formadores."
+            message="Disponibilidade"
+            description="Configure os limites de horário e deslocamento dos formadores."
             type="info"
             showIcon
           />
@@ -126,7 +126,7 @@ export default function ConfiguracoesPage(): JSX.Element {
           <Form.Item
             label="Buffer de Deslocamento (minutos)"
             name="TRAVEL_BUFFER_MINUTES"
-            tooltip="Tempo mínimo entre eventos em municípios diferentes (RD-04)"
+            tooltip="Tempo mínimo entre eventos em municípios diferentes"
             rules={[
               { required: true, message: 'Campo obrigatório' },
               { type: 'number', min: 0, message: 'Valor deve ser ≥ 0' }
@@ -143,7 +143,7 @@ export default function ConfiguracoesPage(): JSX.Element {
           <Form.Item
             label="Limite Diário de Horas"
             name="AVAILABILITY_DAILY_LIMIT_HOURS"
-            tooltip="Máximo de horas de eventos por dia por formador (RD-05)"
+            tooltip="Máximo de horas de eventos por dia por formador"
             rules={[
               { required: true, message: 'Campo obrigatório' },
               { type: 'number', min: 1, max: 12, message: 'Valor deve estar entre 1 e 12' }
@@ -162,7 +162,7 @@ export default function ConfiguracoesPage(): JSX.Element {
             label="Permitir Eventos Adjacentes"
             name="ALLOW_ADJACENT_EVENTS"
             valuePropName="checked"
-            tooltip="Se true, eventos com fim==início de outro são permitidos (sem overlap)"
+            tooltip="Quando ativado, permite eventos consecutivos sem intervalo entre eles"
           >
             <Switch checkedChildren="Sim" unCheckedChildren="Não" />
           </Form.Item>
@@ -171,7 +171,7 @@ export default function ConfiguracoesPage(): JSX.Element {
             label="Bloquear Auto-Aprovação"
             name="BLOCK_AUTO_APPROVE"
             valuePropName="checked"
-            tooltip="Se true, nenhuma solicitação é auto-aprovada (PA-01)"
+            tooltip="Quando ativado, todas as solicitações precisam de aprovação manual"
           >
             <Switch checkedChildren="Sim" unCheckedChildren="Não" />
           </Form.Item>
@@ -189,16 +189,16 @@ export default function ConfiguracoesPage(): JSX.Element {
       children: (
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           <Alert
-            message="Integração Google Calendar (RF05/RF06)"
-            description="Configure parâmetros de sincronização e publicação de eventos."
+            message="Google Calendar"
+            description="Configure a sincronização e publicação de eventos no Google Calendar."
             type="info"
             showIcon
           />
 
           <Form.Item
-            label="Batch Size"
+            label="Eventos por Lote"
             name="BATCH_SIZE"
-            tooltip="Quantidade de eventos processados por lote"
+            tooltip="Quantidade de eventos enviados ao Google Calendar por vez"
             rules={[
               { required: true, message: 'Campo obrigatório' },
               { type: 'number', min: 50, max: 500, message: 'Valor deve estar entre 50 e 500' }
@@ -214,9 +214,9 @@ export default function ConfiguracoesPage(): JSX.Element {
           </Form.Item>
 
           <Form.Item
-            label="Lock TTL (segundos)"
+            label="Tempo Máximo de Processamento"
             name="LOCK_TTL_SECONDS"
-            tooltip="Tempo de vida do lock Redis para operações GCal"
+            tooltip="Tempo máximo que uma sincronização pode levar antes de ser cancelada"
             rules={[
               { required: true, message: 'Campo obrigatório' },
               { type: 'number', min: 60, max: 600, message: 'Valor deve estar entre 60 e 600' }
@@ -235,7 +235,7 @@ export default function ConfiguracoesPage(): JSX.Element {
             label="Auto-Retry em Erro"
             name="AUTO_RETRY_ON_ERROR"
             valuePropName="checked"
-            tooltip="Se true, tenta novamente automaticamente em caso de erro"
+            tooltip="Quando ativado, tenta novamente automaticamente em caso de erro"
           >
             <Switch checkedChildren="Sim" unCheckedChildren="Não" />
           </Form.Item>
@@ -260,13 +260,13 @@ export default function ConfiguracoesPage(): JSX.Element {
           <Form.Item
             label="Enviar Notificações"
             name="SEND_UPDATES"
-            tooltip="Define se/como enviar notificações do Google Calendar"
+            tooltip="Controla o envio de notificações ao criar ou alterar eventos"
             rules={[{ required: true, message: 'Campo obrigatório' }]}
           >
             <Select style={{ width: '100%' }}>
-              <Option value="none">Nenhuma (none)</Option>
-              <Option value="all">Todas (all)</Option>
-              <Option value="externalOnly">Apenas externas (externalOnly)</Option>
+              <Option value="none">Nenhuma</Option>
+              <Option value="all">Todas</Option>
+              <Option value="externalOnly">Apenas externas</Option>
             </Select>
           </Form.Item>
         </Space>
@@ -283,8 +283,8 @@ export default function ConfiguracoesPage(): JSX.Element {
       children: (
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           <Alert
-            message="Configurações de Sessão e Experiência do Usuário"
-            description="Configure timeouts de sessão e parâmetros de interface."
+            message="Sessões e Interface"
+            description="Configure o tempo de sessão e o comportamento da interface."
             type="info"
             showIcon
           />
@@ -324,9 +324,9 @@ export default function ConfiguracoesPage(): JSX.Element {
           </Form.Item>
 
           <Form.Item
-            label="Debounce Autocomplete"
+            label="Tempo de Espera do Autocomplete"
             name="AUTOCOMPLETE_DEBOUNCE_MS"
-            tooltip="Delay antes de buscar opções em campos autocomplete (milissegundos)"
+            tooltip="Tempo de espera antes de buscar sugestões nos campos de pesquisa"
             rules={[
               { required: true, message: 'Campo obrigatório' },
               { type: 'number', min: 100, max: 1000, message: 'Valor deve estar entre 100 e 1000' }
@@ -348,14 +348,14 @@ export default function ConfiguracoesPage(): JSX.Element {
       label: (
         <span>
           <FlagOutlined />
-          Feature Flags
+          Experimental
         </span>
       ),
       children: (
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           <Alert
-            message="Feature Flags (Funcionalidades Experimentais)"
-            description="Ative/desative features em desenvolvimento ou beta."
+            message="Funcionalidades Experimentais"
+            description="Ative ou desative funcionalidades em fase de testes."
             type="warning"
             showIcon
           />
@@ -364,7 +364,7 @@ export default function ConfiguracoesPage(): JSX.Element {
             label="Multi-Calendar"
             name="ENABLE_MULTI_CALENDAR"
             valuePropName="checked"
-            tooltip="Permite publicar eventos em múltiplos calendários Google (BETA)"
+            tooltip="Permite publicar eventos em múltiplos calendários Google"
           >
             <Switch checkedChildren="Habilitado" unCheckedChildren="Desabilitado" />
           </Form.Item>
@@ -373,7 +373,7 @@ export default function ConfiguracoesPage(): JSX.Element {
             label="Ações em Lote"
             name="ENABLE_BATCH_ACTIONS"
             valuePropName="checked"
-            tooltip="Permite operações em lote na interface (BETA)"
+            tooltip="Permite executar ações em vários itens de uma vez"
           >
             <Switch checkedChildren="Habilitado" unCheckedChildren="Desabilitado" />
           </Form.Item>
@@ -382,7 +382,7 @@ export default function ConfiguracoesPage(): JSX.Element {
             label="Filtros Avançados"
             name="ENABLE_ADVANCED_FILTERS"
             valuePropName="checked"
-            tooltip="Habilita filtros avançados em listas e tabelas (BETA)"
+            tooltip="Habilita filtros avançados em listas e tabelas"
           >
             <Switch checkedChildren="Habilitado" unCheckedChildren="Desabilitado" />
           </Form.Item>
@@ -399,7 +399,7 @@ export default function ConfiguracoesPage(): JSX.Element {
             <SettingOutlined aria-hidden="true" /> Configurações do Sistema
           </Title>
           <Text type="secondary">
-            Ajuste parâmetros operacionais sem necessidade de deploy. Mudanças são aplicadas imediatamente.
+            Ajuste as configurações do sistema. As mudanças são aplicadas imediatamente.
           </Text>
         </header>
 

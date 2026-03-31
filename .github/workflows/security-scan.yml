@@ -88,7 +88,7 @@ jobs:
           bandit -r apps/ -f json -o bandit-report.json --skip B101,B601 -ll
 
       - name: Upload security reports
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
         if: always()
         continue-on-error: true
         with:
@@ -189,7 +189,7 @@ jobs:
           PY
 
       - name: Upload Trivy report
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
         if: always()
         continue-on-error: true
         with:
@@ -271,7 +271,7 @@ jobs:
           done
 
       - name: Upload npm audit report
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
         if: always()
         continue-on-error: true # Artifact upload is informational; 403 from GH infra should not fail the gate
         with:
@@ -373,7 +373,7 @@ jobs:
           fi
 
       - name: Upload secret scan reports
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
         if: always()
         continue-on-error: true
         with:

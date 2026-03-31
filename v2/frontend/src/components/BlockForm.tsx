@@ -91,6 +91,7 @@ export default function BlockForm({ onSubmit }: BlockFormProps): JSX.Element {
     <Form
         form={form}
         layout="vertical"
+        autoComplete="off"
         onFinish={handleSubmit}
         initialValues={{
           tipo: 'T',

@@ -387,7 +387,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
           className="mt-4 mb-6"
         />
 
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" autoComplete="off">
           <Form.Item
             label="Projeto"
             rules={[{ required: true, message: 'Por favor selecione um projeto' }]}

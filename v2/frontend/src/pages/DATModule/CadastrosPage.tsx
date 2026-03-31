@@ -613,7 +613,7 @@ export default function CadastrosPage(): JSX.Element {
         width={900}
         styles={{ body: { maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' } }}
       >
-        <Form form={form} layout="vertical" onFinish={handleSave}>
+        <Form form={form} layout="vertical" autoComplete="off" onFinish={handleSave}>
           <Form.Item name="plataforma" hidden>
             <Input />
           </Form.Item>

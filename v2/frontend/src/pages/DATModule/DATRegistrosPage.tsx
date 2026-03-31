@@ -555,7 +555,7 @@ export default function DATRegistrosPage(): JSX.Element {
         width={1100}
         styles={{ body: { maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' } }}
       >
-        <Form form={form} layout="vertical" onFinish={handleSave}>
+        <Form form={form} layout="vertical" autoComplete="off" onFinish={handleSave}>
           {/* Dados Básicos */}
           <Card
             size="small"

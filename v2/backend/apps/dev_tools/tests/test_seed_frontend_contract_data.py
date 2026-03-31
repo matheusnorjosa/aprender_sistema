@@ -21,7 +21,16 @@ SEED_CONTROLE_USERNAME = "controle_e2e@test.com"
 
 @pytest.fixture
 def clean_contract_seed_state(db):
-    """Keep seed_frontend_contract_data tests deterministic and independent."""
+    """Keep seed_frontend_contract_data tests deterministic and independent.
+
+    Also ensures RBAC seed data exists (xdist-safe: PermissaoFuncional
+    may not have been created in this worker's DB state).
+    """
+    from django.core.management import call_command as _call
+
+    # Ensure RBAC baseline exists (creates PermissaoFuncional records)
+    _call("seed_rbac", verbosity=0)
+
     DATCompra.objects.filter(descricao_produto=SEED_DAT_DESCRICAO, ano_uso=2026).delete()
     Compra.objects.filter(external_hash=SEED_EXTERNAL_HASH).delete()
     Municipio.objects.filter(nome="Matrizopolis", uf="BA").delete()

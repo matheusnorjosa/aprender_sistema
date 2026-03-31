@@ -221,6 +221,7 @@ export default function ProjetosPage(): JSX.Element {
         <Form
           form={form}
           layout="vertical"
+          autoComplete="off"
           onFinish={handleSave}
         >
           <Form.Item
@@ -246,8 +247,8 @@ export default function ProjetosPage(): JSX.Element {
             initialValue="NAO_SUPER"
           >
             <Radio.Group>
-              <Radio value="SUPER">SUPER (Aprovação Manual pela Superintendência)</Radio>
-              <Radio value="NAO_SUPER">NAO_SUPER (Auto-aprovado)</Radio>
+              <Radio value="SUPER">Aprovação Manual</Radio>
+              <Radio value="NAO_SUPER">Auto-aprovado</Radio>
             </Radio.Group>
           </Form.Item>
 

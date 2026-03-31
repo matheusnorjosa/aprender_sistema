@@ -37,12 +37,15 @@ def grupos(db: None) -> dict[str, Group]:
 
 @pytest.fixture
 def usuario_controle(db: None, grupos: dict[str, Group]) -> Usuario:
-    """Cria usuário com perfil Controle."""
+    """Cria usuário com perfil Controle (xdist-safe: unique IDs)."""
+    import uuid
+
+    uid = uuid.uuid4().hex[:8]
     usuario = Usuario.objects.create_user(
-        username="controle_test",
-        email="controle@test.com",
+        username=f"controle_qopt_{uid}",
+        email=f"controle_qopt_{uid}@test.com",
         password="senha123",
-        cpf="11111111111",  # CPF único para evitar constraint violation
+        cpf=f"111{uid.ljust(8, '0')}",
     )
     usuario.groups.add(grupos["controle"])
     return usuario
@@ -50,12 +53,15 @@ def usuario_controle(db: None, grupos: dict[str, Group]) -> Usuario:
 
 @pytest.fixture
 def usuario_super(db: None, grupos: dict[str, Group]) -> Usuario:
-    """Cria usuário com perfil Superintendência."""
+    """Cria usuário com perfil Superintendência (xdist-safe: unique IDs)."""
+    import uuid
+
+    uid = uuid.uuid4().hex[:8]
     usuario = Usuario.objects.create_user(
-        username="super_test",
-        email="super@test.com",
+        username=f"super_qopt_{uid}",
+        email=f"super_qopt_{uid}@test.com",
         password="senha123",
-        cpf="22222222222",  # CPF único para evitar constraint violation
+        cpf=f"222{uid.ljust(8, '0')}",
     )
     usuario.groups.add(grupos["superintendencia"])
     return usuario

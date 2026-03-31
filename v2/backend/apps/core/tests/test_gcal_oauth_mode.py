@@ -41,13 +41,16 @@ from apps.core.services.google_oauth import _encrypt_token
 
 @pytest.fixture
 def usuario_controle(db):
-    """Cria usuário do grupo Controle"""
+    """Cria usuário do grupo Controle (xdist-safe: unique IDs)."""
+    import uuid
+
+    uid = uuid.uuid4().hex[:8]
     controle_group, _ = Group.objects.get_or_create(name="Controle")
     user = Usuario.objects.create_user(
-        username="controle_oauth_test",
-        email="controle@aprendereditora.com.br",
+        username=f"controle_oauth_{uid}",
+        email=f"controle_{uid}@aprendereditora.com.br",
         password="testpass123",
-        cpf="11111111111",
+        cpf=f"111{uid.ljust(8, '0')}",
     )
     user.groups.add(controle_group)
     return user
@@ -55,10 +58,13 @@ def usuario_controle(db):
 
 @pytest.fixture
 def solicitacao_aprovada(usuario_controle):
-    """Cria solicitação aprovada para testes de publish/resync"""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Projeto OAuth Test", codigo="POT", fluxo="SUPER", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formação OAuth Test")
+    """Cria solicitação aprovada para testes de publish/resync (xdist-safe)."""
+    import uuid
+
+    uid = uuid.uuid4().hex[:8]
+    municipio = Municipio.objects.create(nome=f"Fortaleza_oauth_{uid}", uf="CE", ativo=True)
+    projeto = Projeto.objects.create(nome=f"Projeto OAuth {uid}", codigo=f"PO{uid[:3]}", fluxo="SUPER", ativo=True)
+    tipo_evento = TipoEvento.objects.create(nome=f"Formação OAuth {uid}")
 
     now = timezone.now()
     return Solicitacao.objects.create(

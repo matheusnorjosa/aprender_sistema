@@ -748,7 +748,7 @@ export default function CoordenadoresPage(): JSX.Element {
         width={700}
         styles={{ body: { maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' } }}
       >
-        <Form form={form} layout="vertical" onFinish={handleSave}>
+        <Form form={form} layout="vertical" autoComplete="off" onFinish={handleSave}>
           {/* Dados Pessoais */}
           <Card size="small" title="Dados Pessoais" className="mb-4">
             <Row gutter={16}>

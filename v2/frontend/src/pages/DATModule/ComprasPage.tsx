@@ -811,7 +811,7 @@ export default function ComprasPage(): JSX.Element {
         width={800}
         styles={{ body: { maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' } }}
       >
-        <Form form={form} layout="vertical" onFinish={handleSave}>
+        <Form form={form} layout="vertical" autoComplete="off" onFinish={handleSave}>
           {/* Identificação */}
           <Card size="small" title="Identificação do Material" className="mb-4">
             <Row gutter={16}>

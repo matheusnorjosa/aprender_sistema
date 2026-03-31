@@ -654,7 +654,7 @@ export default function DeslocamentosPage(): JSX.Element {
         cancelText="Cancelar"
         width={600}
       >
-        <Form form={form} layout="vertical" className="mt-4">
+        <Form form={form} layout="vertical" autoComplete="off" className="mt-4">
           <Form.Item
             name="usuario"
             label="Formador"

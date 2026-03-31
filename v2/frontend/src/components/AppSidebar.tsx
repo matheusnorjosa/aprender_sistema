@@ -46,8 +46,6 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/dashboards/gcal': 'gcal-dashboard',
   '/mapa-brasil': 'mapa-brasil',
   '/dat/admin': 'dat-admin',
-  '/dat/admin/setores': 'dat-admin-setores',
-  '/dat/admin/funcoes': 'dat-admin-funcoes',
   '/dat/admin/colecoes': 'dat-admin-colecoes',
   '/dat/admin/equipe-gerencia': 'dat-admin-equipe-gerencia',
   '/dat/cadastros': 'dat-cadastros',
@@ -77,8 +75,6 @@ const MENU_KEY_TO_PARENT: Record<string, string> = {
   'gcal-dashboard': 'dashboards-submenu',
   'mapa-brasil': 'dashboards-submenu',
   'dat-admin': 'dat-submenu',
-  'dat-admin-setores': 'dat-submenu',
-  'dat-admin-funcoes': 'dat-submenu',
   'dat-admin-colecoes': 'dat-submenu',
   'dat-admin-equipe-gerencia': 'dat-submenu',
   'dat-cadastros': 'dat-submenu',
@@ -330,8 +326,6 @@ export function AppSidebar({
             {canDAT && (
               <SubMenu key="dat-submenu" icon={<SolutionOutlined />} title="DAT">
                 <Menu.Item key="dat-admin"><Link to="/dat/admin">Administração</Link></Menu.Item>
-                <Menu.Item key="dat-admin-setores"><Link to="/dat/admin/setores">Setores</Link></Menu.Item>
-                <Menu.Item key="dat-admin-funcoes"><Link to="/dat/admin/funcoes">Funções</Link></Menu.Item>
                 <Menu.Item key="dat-admin-colecoes"><Link to="/dat/admin/colecoes">Importar Coleções</Link></Menu.Item>
                 <Menu.Item key="dat-admin-equipe-gerencia"><Link to="/dat/admin/equipe-gerencia">Importar Vínculos</Link></Menu.Item>
                 <Menu.Item key="dat-cadastros"><Link to="/dat/cadastros">Cadastros</Link></Menu.Item>

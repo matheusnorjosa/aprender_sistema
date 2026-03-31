@@ -213,12 +213,13 @@ def check_conflicts(
 
     # Verificar buffer anterior
     if prev_ev:
-        # RD-04: municipio=None é tratado como cidade diferente
-        # Compara IDs de município. Se um é None e outro não, ou IDs diferentes → requer buffer.
+        # RD-04: municipio=None é tratado como cidade diferente (fix #588)
+        # Se qualquer lado é None, não podemos afirmar que são na mesma cidade → requer buffer.
         municipio_id: int | None = municipio.id if municipio else None
         prev_municipio_id: int | None = prev_ev.municipio_id
 
-        prev_diff_city: bool = municipio_id != prev_municipio_id
+        same_city: bool = municipio_id is not None and municipio_id == prev_municipio_id
+        prev_diff_city: bool = not same_city
 
         if prev_diff_city:
             delta: timedelta = inicio - prev_ev.fim
@@ -237,10 +238,11 @@ def check_conflicts(
 
     # Verificar buffer posterior
     if next_ev:
-        municipio_id: int | None = municipio.id if municipio else None
+        municipio_id = municipio.id if municipio else None
         next_municipio_id: int | None = next_ev.municipio_id
 
-        next_diff_city: bool = municipio_id != next_municipio_id
+        same_city = municipio_id is not None and municipio_id == next_municipio_id
+        next_diff_city: bool = not same_city
 
         if next_diff_city:
             delta: timedelta = next_ev.inicio - fim

@@ -510,7 +510,7 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
         confirmLoading={savingGroup}
         width={820}
       >
-        <Form form={form} layout="vertical" onFinish={(values) => void handleSave(values)}>
+        <Form form={form} layout="vertical" autoComplete="off" onFinish={(values) => void handleSave(values)}>
           <Form.Item
             name="name"
             label={`Nome do ${pageTypeMeta ? pageTypeMeta.singular : 'Grupo'}`}

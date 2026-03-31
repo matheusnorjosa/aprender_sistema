@@ -95,6 +95,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
           name="login"
           onFinish={handleSubmit}
           layout="vertical"
+          autoComplete="off"
           size="large"
         >
           <Form.Item

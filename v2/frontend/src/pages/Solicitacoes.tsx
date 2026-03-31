@@ -470,7 +470,7 @@ function Solicitacoes(): JSX.Element {
         cancelText="Cancelar"
         okButtonProps={{ danger: true }}
       >
-        <Form form={rejectForm} onFinish={handleReject} layout="vertical">
+        <Form form={rejectForm} onFinish={handleReject} layout="vertical" autoComplete="off">
           <Form.Item
             name="justificativa"
             label="Justificativa (opcional)"

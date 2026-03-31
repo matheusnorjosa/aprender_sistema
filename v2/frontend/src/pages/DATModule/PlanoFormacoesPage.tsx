@@ -786,7 +786,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
         }
         width={600}
       >
-        <Form form={form} layout="vertical" onFinish={handleSave}>
+        <Form form={form} layout="vertical" autoComplete="off" onFinish={handleSave}>
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
@@ -856,7 +856,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
         }
         width={400}
       >
-        <Form form={formacaoForm} layout="vertical" onFinish={handleFormacaoSave}>
+        <Form form={formacaoForm} layout="vertical" autoComplete="off" onFinish={handleFormacaoSave}>
           <Form.Item name="data_formacao" label="Data">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>

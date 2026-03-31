@@ -408,6 +408,7 @@ export default function ConfiguracoesPage(): JSX.Element {
         <Form
           form={form}
           layout="vertical"
+          autoComplete="off"
           initialValues={(config as unknown as ConfigFormValues) || {}}
         >
           <Tabs items={tabItems} />

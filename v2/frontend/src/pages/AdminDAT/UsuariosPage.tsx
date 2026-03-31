@@ -565,6 +565,7 @@ export default function UsuariosPage(): JSX.Element {
         <Form
           form={form}
           layout="vertical"
+          autoComplete="off"
           onFinish={handleSave}
         >
           <Form.Item

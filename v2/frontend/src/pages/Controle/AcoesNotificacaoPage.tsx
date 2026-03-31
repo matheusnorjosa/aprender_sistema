@@ -235,7 +235,7 @@ export default function AcoesNotificacaoPage(): JSX.Element {
         confirmLoading={saving}
         okText="Salvar"
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" autoComplete="off">
           {modalMode === 'ancora' ? (
             <Form.Item name="data_ancora" label="Data da âncora" rules={[{ required: true, message: 'Campo obrigatório' }]}>
               <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />

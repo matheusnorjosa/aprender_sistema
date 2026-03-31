@@ -221,6 +221,7 @@ export default function ProjetosPage(): JSX.Element {
         <Form
           form={form}
           layout="vertical"
+          autoComplete="off"
           onFinish={handleSave}
         >
           <Form.Item

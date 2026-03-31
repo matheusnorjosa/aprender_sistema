@@ -411,6 +411,7 @@ export default function MunicipiosPage(): JSX.Element {
         <Form
           form={form}
           layout="vertical"
+          autoComplete="off"
           onFinish={handleSave}
         >
           <Form.Item

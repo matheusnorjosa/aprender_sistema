@@ -689,7 +689,7 @@ export default function FormacoesPage(): JSX.Element {
         width={900}
         styles={{ body: { maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' } }}
       >
-        <Form form={form} layout="vertical" onFinish={handleSave}>
+        <Form form={form} layout="vertical" autoComplete="off" onFinish={handleSave}>
           {/* Identificação */}
           <Card size="small" title="Identificação" className="mb-4">
             <Row gutter={16}>

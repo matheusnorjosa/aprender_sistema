@@ -24,12 +24,15 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def super_user():
-    """Cria usuário com permissões de Superintendência."""
+    """Cria usuário com permissões de Superintendência (xdist-safe)."""
+    import uuid
+
+    uid = uuid.uuid4().hex[:8]
     user = Usuario.objects.create_user(
-        username="sup",
-        email="sup@test.com",
+        username=f"sup_audit_{uid}",
+        email=f"sup_audit_{uid}@test.com",
         password="testpass",
-        cpf="99999999901",
+        cpf=f"999{uid.ljust(8, '0')}",
     )
     group, _ = Group.objects.get_or_create(name="Superintendência")
     user.groups.add(group)
@@ -92,22 +95,20 @@ def test_approve_persists_audit(super_user, solicitacao_pendente):
     client = APIClient()
     client.force_authenticate(user=super_user)
 
-    # Limpar AuditLogs anteriores
-    AuditLog.objects.all().delete()
+    # Snapshot count antes (xdist-safe: não deletar logs de outros testes)
+    count_before = AuditLog.objects.filter(action="APPROVE", model_name="Solicitacao").count()
 
     response = client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/approve/")
     assert response.status_code in (200, 204), f"Unexpected status: {response.status_code}"
 
-    # Verificar AuditLog
-    audit_logs = AuditLog.objects.filter(
+    # Verificar AuditLog criado para ESTA solicitação
+    audit_log = AuditLog.objects.filter(
         model_name="Solicitacao",
         action="APPROVE",
-    )
-    assert audit_logs.exists(), "AuditLog não foi criado"
-
-    audit_log = audit_logs.first()
+        details__solicitacao_id=solicitacao_pendente.id,
+    ).first()
+    assert audit_log is not None, "AuditLog não foi criado"
     assert audit_log.usuario == super_user
-    assert audit_log.details["solicitacao_id"] == solicitacao_pendente.id
     assert audit_log.details["prev_status"] == "pendente"
     assert audit_log.details["new_status"] == "aprovado"
     assert "ip_address" in audit_log.details
@@ -126,25 +127,20 @@ def test_reject_persists_audit(super_user, solicitacao_pendente):
     client = APIClient()
     client.force_authenticate(user=super_user)
 
-    # Limpar AuditLogs anteriores
-    AuditLog.objects.all().delete()
-
     response = client.patch(
         f"/api/solicitacoes/{solicitacao_pendente.id}/reject/",
         {"justificativa": "Teste de rejeição"},
     )
     assert response.status_code in (200, 204), f"Unexpected status: {response.status_code}"
 
-    # Verificar AuditLog
-    audit_logs = AuditLog.objects.filter(
+    # Verificar AuditLog criado para ESTA solicitação (xdist-safe)
+    audit_log = AuditLog.objects.filter(
         model_name="Solicitacao",
         action="REJECT",
-    )
-    assert audit_logs.exists(), "AuditLog não foi criado"
-
-    audit_log = audit_logs.first()
+        details__solicitacao_id=solicitacao_pendente.id,
+    ).first()
+    assert audit_log is not None, "AuditLog não foi criado"
     assert audit_log.usuario == super_user
-    assert audit_log.details["solicitacao_id"] == solicitacao_pendente.id
     assert audit_log.details["prev_status"] == "pendente"
     assert audit_log.details["new_status"] == "reprovado"
     assert audit_log.details["justificativa"] == "Teste de rejeição"

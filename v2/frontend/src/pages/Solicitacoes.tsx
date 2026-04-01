@@ -7,7 +7,7 @@
  * - Vejam detalhes completos de cada solicitação
  */
 
-import { useState, useEffect, useCallback, ChangeEvent, JSX } from 'react';
+import { useState, useEffect, useCallback, useRef, ChangeEvent, JSX } from 'react';
 import {
   Table,
   Tag,
@@ -40,6 +40,9 @@ import {
 } from '../api/solicitacoes';
 import { getMe } from '../api/availability';
 import { MeetLink } from '../components/MeetLink';
+import { TIMING } from '../constants/timing';
+import { usePolling } from '../hooks/usePolling';
+import { syncChannel } from '../services/syncChannel';
 import logger from '../utils/logger';
 import type { ID, Solicitacao, SolicitacaoStatus, PaginatedResponse } from '../types';
 
@@ -148,6 +151,22 @@ function Solicitacoes(): JSX.Element {
    */
   useEffect(() => {
     fetchSolicitacoes(1);
+  }, [fetchSolicitacoes]);
+
+  // RT-02: Polling 5s for cross-device sync (#1032)
+  const fetchRef = useRef(fetchSolicitacoes);
+  fetchRef.current = fetchSolicitacoes;
+  usePolling(() => fetchRef.current(), {
+    enabled: true,
+    intervalMs: TIMING.SYNC_POLL_INTERVAL_MS,
+    events: ['solicitacoes:refresh'],
+  });
+
+  // RT-02: BroadcastChannel for instant cross-tab sync
+  useEffect(() => {
+    return syncChannel.subscribe('solicitacoes', () => {
+      fetchSolicitacoes();
+    });
   }, [fetchSolicitacoes]);
 
   /**

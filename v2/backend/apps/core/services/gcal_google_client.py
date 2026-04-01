@@ -284,6 +284,58 @@ class GoogleCalendarClient(CalendarClientAdapter):
 
         return self._retry_with_backoff(_list_calendars)
 
+    def list_events(
+        self,
+        calendar_id: str,
+        *,
+        time_min: str | None = None,
+        time_max: str | None = None,
+        max_results: int = 100,
+    ) -> list[JsonDict]:
+        """
+        Lista eventos de um calendário via Google Calendar API.
+
+        Args:
+            calendar_id: ID do calendário
+            time_min: Início do intervalo (RFC3339)
+            time_max: Fim do intervalo (RFC3339)
+            max_results: Máximo de eventos (default 100, max 2500)
+
+        Returns:
+            Lista de eventos formatados
+        """
+
+        def _list_events():
+            params: dict[str, object] = {
+                "calendarId": calendar_id,
+                "maxResults": min(max_results, 2500),
+                "singleEvents": True,
+                "orderBy": "startTime",
+            }
+            if time_min:
+                params["timeMin"] = time_min
+            if time_max:
+                params["timeMax"] = time_max
+
+            result = self.service.events().list(**params).execute()
+            items = result.get("items", [])
+
+            return [
+                {
+                    "id": evt.get("id", ""),
+                    "summary": evt.get("summary", "(sem título)"),
+                    "start": evt.get("start", {}).get("dateTime") or evt.get("start", {}).get("date", ""),
+                    "end": evt.get("end", {}).get("dateTime") or evt.get("end", {}).get("date", ""),
+                    "status": evt.get("status", ""),
+                    "htmlLink": evt.get("htmlLink", ""),
+                    "location": evt.get("location", ""),
+                    "creator": evt.get("creator", {}).get("email", ""),
+                }
+                for evt in items
+            ]
+
+        return self._retry_with_backoff(_list_events)
+
     def health_check(self) -> JsonDict:
         """
         Verifica saúde da integração com Google Calendar API.

@@ -30,6 +30,9 @@ import {
   Divider,
   List,
   Avatar,
+  Segmented,
+  Empty,
+  Spin,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { TableRowSelection } from 'antd/es/table/interface';
@@ -50,9 +53,11 @@ import {
   GlobalOutlined,
   UserOutlined,
   CodeOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
+import { fetchAPI } from '../../api/config';
 import {
   listSolicitacoes,
   previewSolicitacao,
@@ -82,6 +87,20 @@ const GCAL_STATUS_COLORS: Record<string, string> = {
   PUBLISHED: 'success',
   ERROR: 'error',
 };
+
+/** Google Calendar event from API */
+interface GoogleCalendarEvent {
+  id: string;
+  summary: string;
+  start: string;
+  end: string;
+  status: string;
+  htmlLink: string;
+  location: string;
+  creator: string;
+}
+
+type ViewMode = 'preagenda' | 'gcal-events';
 
 /** Preview data type */
 interface PreviewDataType {
@@ -121,6 +140,11 @@ export default function PreAgendaPage(): JSX.Element {
   // Issue #95: Batch operations - Row selection
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
   const [batchLoading, setBatchLoading] = useState<boolean>(false);
+
+  // View mode: pré-agenda (solicitações) ou eventos Google Calendar
+  const [viewMode, setViewMode] = useState<ViewMode>('preagenda');
+  const [gcalEvents, setGcalEvents] = useState<GoogleCalendarEvent[]>([]);
+  const [loadingGcalEvents, setLoadingGcalEvents] = useState(false);
 
   // OAuth Phase 5: Estado do usuário e integração Google
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -486,6 +510,95 @@ export default function PreAgendaPage(): JSX.Element {
     },
   ], [handlePreview, handlePublish, handleResync, handleCancel]);
 
+  // Google Calendar events loader
+  const loadGcalEvents = useCallback(async (): Promise<void> => {
+    try {
+      setLoadingGcalEvents(true);
+      const params = new URLSearchParams();
+      if (dateRange[0]) params.set('time_min', dateRange[0].format('YYYY-MM-DD'));
+      if (dateRange[1]) params.set('time_max', dateRange[1].format('YYYY-MM-DD'));
+      params.set('max_results', '250');
+
+      const data = await fetchAPI<{ events: GoogleCalendarEvent[]; count: number }>(
+        `/integrations/google/events/?${params.toString()}`
+      );
+      setGcalEvents(data.events || []);
+    } catch (error) {
+      message.error('Erro ao carregar eventos do Google Calendar');
+      logger.error('Erro ao carregar eventos GCal:', error);
+    } finally {
+      setLoadingGcalEvents(false);
+    }
+  }, [dateRange]);
+
+  // Carregar eventos GCal quando mudar para a aba
+  useEffect(() => {
+    if (viewMode === 'gcal-events' && googleStatus?.connected) {
+      loadGcalEvents();
+    }
+  }, [viewMode, googleStatus?.connected, loadGcalEvents]);
+
+  const formatGcalDate = (dateStr: string): string => {
+    if (!dateStr) return '-';
+    try {
+      return dayjs(dateStr).format('DD/MM/YYYY HH:mm');
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const gcalEventsColumns: ColumnsType<GoogleCalendarEvent> = [
+    {
+      title: 'Evento',
+      dataIndex: 'summary',
+      key: 'summary',
+      ellipsis: true,
+      filterSearch: true,
+    },
+    {
+      title: 'Início',
+      dataIndex: 'start',
+      key: 'start',
+      width: 160,
+      render: (val: string) => formatGcalDate(val),
+      sorter: (a: GoogleCalendarEvent, b: GoogleCalendarEvent) => a.start.localeCompare(b.start),
+      defaultSortOrder: 'ascend',
+    },
+    {
+      title: 'Fim',
+      dataIndex: 'end',
+      key: 'end',
+      width: 160,
+      render: (val: string) => formatGcalDate(val),
+    },
+    {
+      title: 'Local',
+      dataIndex: 'location',
+      key: 'location',
+      ellipsis: true,
+      render: (val: string) => val || '-',
+    },
+    {
+      title: 'Criador',
+      dataIndex: 'creator',
+      key: 'creator',
+      ellipsis: true,
+      width: 200,
+    },
+    {
+      title: 'Link',
+      dataIndex: 'htmlLink',
+      key: 'htmlLink',
+      width: 70,
+      render: (val: string) =>
+        val ? (
+          <a href={val} target="_blank" rel="noopener noreferrer">
+            <LinkOutlined />
+          </a>
+        ) : '-',
+    },
+  ];
+
   // OAuth Phase 5: RBAC - verificar se é Controle ou Super
   const canControle = user?.is_superuser || user?.groups?.includes('Controle');
   const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
@@ -526,9 +639,21 @@ export default function PreAgendaPage(): JSX.Element {
       <Space direction="vertical" style={{ width: '100%' }} size="large">
         {/* Header */}
         <Card>
-          <Title level={2} className="m-0">
-            Pré-agenda
-          </Title>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={2} className="m-0">
+              Pré-agenda
+            </Title>
+            {googleStatus?.connected && (
+              <Segmented
+                value={viewMode}
+                onChange={(val) => setViewMode(val as ViewMode)}
+                options={[
+                  { label: 'Solicitações', value: 'preagenda', icon: <UnorderedListOutlined /> },
+                  { label: 'Eventos Google Calendar', value: 'gcal-events', icon: <CalendarOutlined /> },
+                ]}
+              />
+            )}
+          </div>
         </Card>
 
         {/* OAuth Phase 5: Google Integration Card (Controle/Super apenas) */}
@@ -540,125 +665,183 @@ export default function PreAgendaPage(): JSX.Element {
           />
         )}
 
-        {/* Resumo GCal */}
-        <Card title="Resumo de Status GCal" size="small">
-          <Row gutter={16}>
-            <Col span={6}>
-              <Statistic title="Não Publicados" value={summary.counts?.NONE || 0} />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="Pendentes"
-                value={summary.counts?.PENDING || 0}
-                valueStyle={{ color: '#faad14' }}
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="Publicados"
-                value={summary.counts?.PUBLISHED || 0}
-                valueStyle={{ color: '#52c41a' }}
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="Erros"
-                value={summary.counts?.ERROR || 0}
-                valueStyle={{ color: '#ff4d4f' }}
-              />
-            </Col>
-          </Row>
-        </Card>
+        {/* View: Solicitações (Pré-agenda) */}
+        {viewMode === 'preagenda' && (
+          <>
+            {/* Resumo GCal */}
+            <Card title="Resumo de Status GCal" size="small">
+              <Row gutter={16}>
+                <Col span={6}>
+                  <Statistic title="Não Publicados" value={summary.counts?.NONE || 0} />
+                </Col>
+                <Col span={6}>
+                  <Statistic
+                    title="Pendentes"
+                    value={summary.counts?.PENDING || 0}
+                    valueStyle={{ color: '#faad14' }}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Statistic
+                    title="Publicados"
+                    value={summary.counts?.PUBLISHED || 0}
+                    valueStyle={{ color: '#52c41a' }}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Statistic
+                    title="Erros"
+                    value={summary.counts?.ERROR || 0}
+                    valueStyle={{ color: '#ff4d4f' }}
+                  />
+                </Col>
+              </Row>
+            </Card>
 
-        {/* Filtros */}
-        <Card size="small">
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Space>
-              <Input.Search
-                placeholder="Buscar por município, projeto..."
-                value={searchTerm}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                onSearch={loadData}
-                style={{ width: 300 }}
-                allowClear
-              />
-              <Input
-                placeholder="Filtrar por setor/projeto"
-                value={sectorFilter}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setSectorFilter(e.target.value)}
-                onPressEnter={loadData}
-                style={{ width: 200 }}
-                allowClear
-              />
-              <RangePicker
-                value={dateRange}
-                onChange={(dates) => setDateRange(dates || [null, null])}
-                format="DD/MM/YYYY"
-                placeholder={['Data inicial', 'Data final']}
-              />
-            </Space>
-          </Space>
-        </Card>
-
-        {/* Tabela */}
-        <Card>
-          {/* Issue #95: Toolbar de Ações em Massa */}
-          {selectedRowKeys.length > 0 && (
-            <div className="mb-4 p-3 bg-blue-50 rounded">
-              <Space>
-                <Text strong>{selectedRowKeys.length} evento(s) selecionado(s)</Text>
-                <Button
-                  type="default"
-                  icon={<SyncOutlined />}
-                  onClick={handleBatchReapply}
-                  loading={batchLoading}
-                  style={{ color: '#faad14', borderColor: '#faad14' }}
-                >
-                  Reapply Selecionados
-                </Button>
-                <Button
-                  danger
-                  icon={<SyncOutlined />}
-                  onClick={handleBatchResync}
-                  loading={batchLoading}
-                >
-                  Resync Selecionados
-                </Button>
-                <Button
-                  type="link"
-                  onClick={() => setSelectedRowKeys([])}
-                >
-                  Limpar Seleção
-                </Button>
+            {/* Filtros */}
+            <Card size="small">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Space>
+                  <Input.Search
+                    placeholder="Buscar por município, projeto..."
+                    value={searchTerm}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                    onSearch={loadData}
+                    style={{ width: 300 }}
+                    allowClear
+                  />
+                  <Input
+                    placeholder="Filtrar por setor/projeto"
+                    value={sectorFilter}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setSectorFilter(e.target.value)}
+                    onPressEnter={loadData}
+                    style={{ width: 200 }}
+                    allowClear
+                  />
+                  <RangePicker
+                    value={dateRange}
+                    onChange={(dates) => setDateRange(dates || [null, null])}
+                    format="DD/MM/YYYY"
+                    placeholder={['Data inicial', 'Data final']}
+                  />
+                </Space>
               </Space>
-            </div>
-          )}
-          <Table
-            columns={columns}
-            dataSource={rows}
-            loading={loading}
-            rowKey="id"
-            rowSelection={rowSelection}
-            pagination={{
-              total,
-              pageSize: 20,
-              showTotal: (total) => `Total: ${total} eventos aprovados`,
-            }}
-          />
-        </Card>
+            </Card>
 
-        {/* Rodapé */}
-        <Alert
-          message="Operações em Lote"
-          description={
-            <Text>
-              Selecione múltiplos eventos na tabela para atualizar ou republicar no Google Calendar.
-            </Text>
-          }
-          type="info"
-          icon={<InfoCircleOutlined />}
-          showIcon
-        />
+            {/* Tabela */}
+            <Card>
+              {/* Issue #95: Toolbar de Ações em Massa */}
+              {selectedRowKeys.length > 0 && (
+                <div className="mb-4 p-3 bg-blue-50 rounded">
+                  <Space>
+                    <Text strong>{selectedRowKeys.length} evento(s) selecionado(s)</Text>
+                    <Button
+                      type="default"
+                      icon={<SyncOutlined />}
+                      onClick={handleBatchReapply}
+                      loading={batchLoading}
+                      style={{ color: '#faad14', borderColor: '#faad14' }}
+                    >
+                      Reapply Selecionados
+                    </Button>
+                    <Button
+                      danger
+                      icon={<SyncOutlined />}
+                      onClick={handleBatchResync}
+                      loading={batchLoading}
+                    >
+                      Resync Selecionados
+                    </Button>
+                    <Button
+                      type="link"
+                      onClick={() => setSelectedRowKeys([])}
+                    >
+                      Limpar Seleção
+                    </Button>
+                  </Space>
+                </div>
+              )}
+              <Table
+                columns={columns}
+                dataSource={rows}
+                loading={loading}
+                rowKey="id"
+                rowSelection={rowSelection}
+                pagination={{
+                  total,
+                  pageSize: 20,
+                  showTotal: (total) => `Total: ${total} eventos aprovados`,
+                }}
+              />
+            </Card>
+
+            {/* Rodapé */}
+            <Alert
+              message="Operações em Lote"
+              description={
+                <Text>
+                  Selecione múltiplos eventos na tabela para atualizar ou republicar no Google Calendar.
+                </Text>
+              }
+              type="info"
+              icon={<InfoCircleOutlined />}
+              showIcon
+            />
+          </>
+        )}
+
+        {/* View: Eventos Google Calendar */}
+        {viewMode === 'gcal-events' && (
+          <>
+            <Card size="small">
+              <Space>
+                <RangePicker
+                  value={dateRange}
+                  onChange={(dates) => setDateRange(dates || [null, null])}
+                  format="DD/MM/YYYY"
+                  placeholder={['Data inicial', 'Data final']}
+                />
+                <Button
+                  type="primary"
+                  icon={<SyncOutlined />}
+                  onClick={loadGcalEvents}
+                  loading={loadingGcalEvents}
+                >
+                  Atualizar
+                </Button>
+                <Tag color="blue">{gcalEvents.length} eventos</Tag>
+              </Space>
+            </Card>
+
+            <Card>
+              {loadingGcalEvents ? (
+                <div style={{ textAlign: 'center', padding: 40 }}>
+                  <Spin size="large" />
+                  <div style={{ marginTop: 16 }}>
+                    <Text type="secondary">Carregando eventos do Google Calendar...</Text>
+                  </div>
+                </div>
+              ) : gcalEvents.length === 0 ? (
+                <Empty
+                  description="Nenhum evento encontrado neste calendário"
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                />
+              ) : (
+                <Table
+                  columns={gcalEventsColumns}
+                  dataSource={gcalEvents}
+                  rowKey="id"
+                  size="small"
+                  pagination={{
+                    pageSize: 20,
+                    showSizeChanger: true,
+                    showTotal: (total) => `${total} eventos`,
+                  }}
+                />
+              )}
+            </Card>
+          </>
+        )}
       </Space>
 
       {/* Modal Preview */}

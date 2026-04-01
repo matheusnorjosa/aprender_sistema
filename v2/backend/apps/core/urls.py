@@ -87,6 +87,7 @@ from .views_oauth import (
     google_oauth_callback,
     google_oauth_disconnect,
     google_oauth_list_calendars,
+    google_oauth_list_events,
     google_oauth_select_calendar,
     google_oauth_start,
     google_oauth_status,
@@ -170,6 +171,7 @@ urlpatterns = [
     path("integrations/google/disconnect/", google_oauth_disconnect, name="google-oauth-disconnect"),
     path("integrations/google/calendars/", google_oauth_list_calendars, name="google-oauth-list-calendars"),
     path("integrations/google/select-calendar/", google_oauth_select_calendar, name="google-oauth-select-calendar"),
+    path("integrations/google/events/", google_oauth_list_events, name="google-oauth-list-events"),
     path(
         "availability/check/",
         AvailabilityCheckView.as_view(),

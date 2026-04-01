@@ -446,6 +446,63 @@ def google_oauth_disconnect(request: Request) -> Response:
 
 @api_view(["GET"])
 @permission_classes([IsControleOrSuper])
+def google_oauth_list_events(request: Request) -> Response:
+    """
+    Lista eventos de um calendário Google do usuário.
+
+    **Permissão**: IsControleOrSuper
+
+    Query Params:
+        calendar_id (str, opcional): ID do calendário (default: default_calendar_id ou "primary")
+        time_min (str, opcional): Data início ISO 8601 (ex: 2026-04-01)
+        time_max (str, opcional): Data fim ISO 8601 (ex: 2026-04-30)
+        max_results (int, opcional): Máximo de eventos (default: 100)
+
+    Returns:
+        200 OK: Lista de eventos
+        404 Not Found: Nenhuma conexão encontrada
+        500 Error: Erro ao listar eventos
+    """
+    try:
+        credential = GoogleOAuthCredential.objects.get(user=request.user)
+
+        from apps.core.services.gcal_oauth_client import OAuthCalendarClient
+
+        client = OAuthCalendarClient(credential)
+
+        calendar_id = request.query_params.get("calendar_id") or credential.default_calendar_id or "primary"
+
+        # Converter datas ISO para RFC3339 se fornecidas
+        time_min = request.query_params.get("time_min")
+        time_max = request.query_params.get("time_max")
+        if time_min and "T" not in time_min:
+            time_min = f"{time_min}T00:00:00-03:00"
+        if time_max and "T" not in time_max:
+            time_max = f"{time_max}T23:59:59-03:00"
+
+        max_results = min(int(request.query_params.get("max_results", "100")), 2500)
+
+        events = client.list_events(
+            calendar_id,
+            time_min=time_min,
+            time_max=time_max,
+            max_results=max_results,
+        )
+
+        logger.info(f"📅 Listed {len(events)} events from {calendar_id} for {request.user.username}")
+
+        return Response({"events": events, "calendar_id": calendar_id, "count": len(events)})
+
+    except GoogleOAuthCredential.DoesNotExist:
+        return Response({"error": "Nenhuma conexão Google encontrada"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"❌ Erro ao listar eventos: {e}")
+        return Response(
+            {"error": "Erro ao listar eventos", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(["GET"])
+@permission_classes([IsControleOrSuper])
 def google_oauth_list_calendars(request: Request) -> Response:
     """
     Lista calendários disponíveis do usuário OAuth.

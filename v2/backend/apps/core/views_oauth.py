@@ -501,6 +501,7 @@ def google_oauth_list_events(request: Request) -> Response:
             {"error": "Erro ao listar eventos", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
 @api_view(["GET"])
 @permission_classes([IsControleOrSuper])
 def google_oauth_list_calendars(request: Request) -> Response:

@@ -3,11 +3,11 @@
  *
  * GAP-001/002 resolved: Endpoints reactivated/created in Phase 1 Iteration 2
  *
- * Issue #135: Uses axios instance with CSRF token handling for all requests
+ * Migrated from axios to fetchAPI (Epic #1039)
  */
 
-import type { AxiosResponse, AxiosError } from 'axios';
-import api from '../api';
+import { fetchAPI, fetchWithErrorMapping, buildUrl, type QueryParams } from './config';
+import { syncChannel } from '../services/syncChannel';
 import type { ID, PaginatedResponse, Municipio, Projeto, Group } from '../types';
 
 /**
@@ -159,275 +159,179 @@ export interface ListParams {
   page_size?: number;
 }
 
-/**
- * Axios error with response
- */
-interface AxiosErrorWithResponse extends AxiosError {
-  response?: AxiosResponse<{
-    detail?: string;
-    errors?: Record<string, string[] | string>;
-  }>;
-}
-
-/**
- * Helper to handle axios responses and errors
- */
-async function apiRequest<T>(requestFn: () => Promise<AxiosResponse<T>>): Promise<T> {
-  try {
-    const response = await requestFn();
-    return response.data;
-  } catch (error) {
-    // Extract error message from axios error
-    const axiosError = error as AxiosErrorWithResponse;
-    let message: string;
-    if (axiosError.response?.status === 403) {
-      message = 'Você não tem permissão para realizar esta ação.';
-    } else if (axiosError.response?.status === 404) {
-      message = 'Recurso não encontrado.';
-    } else {
-      const backendErrors = axiosError.response?.data?.errors;
-      const firstBackendError = backendErrors
-        ? Object.values(backendErrors).flatMap((value) => (Array.isArray(value) ? value : [value]))[0]
-        : null;
-      message = String(
-        firstBackendError
-        || axiosError.response?.data?.detail
-        || axiosError.message
-        || `Erro HTTP ${axiosError.response?.status}`
-      );
-    }
-
-    throw new Error(message);
-  }
-}
+// Common error mapping for admin endpoints
+const ADMIN_ERROR_MAP: Record<number, string> = {
+  403: 'Você não tem permissão para realizar esta ação.',
+  404: 'Recurso não encontrado.',
+};
 
 // ========== USUARIOS ==========
 
-/**
- * List all users (admin)
- * @param params - Query parameters (search, is_active, ordering, page)
- */
 export async function listUsers(params: ListParams = {}): Promise<PaginatedResponse<AdminUser>> {
-  return apiRequest(() => api.get('/usuarios-admin/', { params }));
+  return fetchWithErrorMapping(buildUrl('/usuarios-admin/', params as QueryParams), {}, ADMIN_ERROR_MAP);
 }
 
-/**
- * Get single user
- * @param id - User ID
- */
 export async function getUser(id: ID): Promise<AdminUser> {
-  return apiRequest(() => api.get(`/usuarios-admin/${id}/`));
+  return fetchWithErrorMapping(`/usuarios-admin/${id}/`, {}, ADMIN_ERROR_MAP);
 }
 
-/**
- * Create new user
- * @param data - User data (username, email, password, first_name, last_name, cpf, etc.)
- */
 export async function createUser(data: UserPayload): Promise<AdminUser> {
-  return apiRequest(() => api.post('/usuarios-admin/', data));
+  const result = await fetchWithErrorMapping<AdminUser>(
+    '/usuarios-admin/',
+    { method: 'POST', body: JSON.stringify(data) },
+    ADMIN_ERROR_MAP,
+  );
+  syncChannel.publish('usuarios', { action: 'created' });
+  return result;
 }
 
-/**
- * Update user
- * @param id - User ID
- * @param data - Updated fields
- */
 export async function updateUser(id: ID, data: UserPayload): Promise<AdminUser> {
-  return apiRequest(() => api.patch(`/usuarios-admin/${id}/`, data));
+  const result = await fetchWithErrorMapping<AdminUser>(
+    `/usuarios-admin/${id}/`,
+    { method: 'PATCH', body: JSON.stringify(data) },
+    ADMIN_ERROR_MAP,
+  );
+  syncChannel.publish('usuarios', { action: 'updated' });
+  return result;
 }
 
-/**
- * Delete user
- * @param id - User ID
- */
 export async function deleteUser(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/usuarios-admin/${id}/`));
+  await fetchWithErrorMapping(`/usuarios-admin/${id}/`, { method: 'DELETE' }, ADMIN_ERROR_MAP);
+  syncChannel.publish('usuarios', { action: 'deleted' });
 }
 
-/**
- * Assign groups to user
- * @param userId - User ID
- * @param data - {group_ids: [1, 2, 3]}
- *
- * GAP-003 (resolved): Endpoint for assigning groups to users.
- * Phase 1 Iteration 3 - DAT/GCal Plan.
- */
 export async function assignGroups(userId: ID, data: AssignGroupsPayload): Promise<AdminUser> {
-  return apiRequest(() => api.post(`/usuarios-admin/${userId}/assign_groups/`, data));
+  const result = await fetchWithErrorMapping<AdminUser>(
+    `/usuarios-admin/${userId}/assign_groups/`,
+    { method: 'POST', body: JSON.stringify(data) },
+    ADMIN_ERROR_MAP,
+  );
+  syncChannel.publish('usuarios', { action: 'groups_assigned' });
+  return result;
 }
 
 // ========== GRUPOS ==========
 
-/**
- * List all groups
- * @param params - Query parameters (search, ordering, page)
- */
 export async function listGroups(params: ListParams = {}): Promise<PaginatedResponse<Group>> {
-  return apiRequest(() => api.get('/grupos/', { params }));
+  return fetchWithErrorMapping(buildUrl('/grupos/', params as QueryParams), {}, ADMIN_ERROR_MAP);
 }
 
-/**
- * Get single group
- * @param id - Group ID
- */
 export async function getGroup(id: ID): Promise<Group> {
-  return apiRequest(() => api.get(`/grupos/${id}/`));
+  return fetchWithErrorMapping(`/grupos/${id}/`, {}, ADMIN_ERROR_MAP);
 }
 
-/**
- * Create new group
- * @param data - Group data (name)
- */
 export async function createGroup(data: GroupPayload): Promise<Group> {
-  return apiRequest(() => api.post('/grupos/', data));
+  const result = await fetchWithErrorMapping<Group>(
+    '/grupos/',
+    { method: 'POST', body: JSON.stringify(data) },
+    ADMIN_ERROR_MAP,
+  );
+  syncChannel.publish('grupos', { action: 'created' });
+  return result;
 }
 
-/**
- * Update group
- * @param id - Group ID
- * @param data - Updated fields
- */
 export async function updateGroup(
   id: ID,
   data: GroupPayload,
-  options: { confirmReserved?: boolean } = {}
+  options: { confirmReserved?: boolean } = {},
 ): Promise<Group> {
-  const params = options.confirmReserved ? { confirm_reserved: true } : undefined;
-  return apiRequest(() => api.patch(`/grupos/${id}/`, data, { params }));
+  const url = options.confirmReserved ? `/grupos/${id}/?confirm_reserved=true` : `/grupos/${id}/`;
+  const result = await fetchWithErrorMapping<Group>(
+    url,
+    { method: 'PATCH', body: JSON.stringify(data) },
+    ADMIN_ERROR_MAP,
+  );
+  syncChannel.publish('grupos', { action: 'updated' });
+  return result;
 }
 
-/**
- * Delete group
- * @param id - Group ID
- */
 export async function deleteGroup(id: ID, options: { confirmReserved?: boolean } = {}): Promise<void> {
-  const params = options.confirmReserved ? { confirm_reserved: true } : undefined;
-  return apiRequest(() => api.delete(`/grupos/${id}/`, { params }));
+  const url = options.confirmReserved ? `/grupos/${id}/?confirm_reserved=true` : `/grupos/${id}/`;
+  await fetchWithErrorMapping(url, { method: 'DELETE' }, ADMIN_ERROR_MAP);
+  syncChannel.publish('grupos', { action: 'deleted' });
 }
 
-/**
- * Sync group members in one request
- * @param groupId - Group ID
- * @param data - {user_ids: [...]}
- */
 export async function syncGroupMembers(
   groupId: ID,
-  data: SyncGroupMembersPayload
+  data: SyncGroupMembersPayload,
 ): Promise<SyncGroupMembersResponse> {
-  return apiRequest(() => api.post(`/grupos/${groupId}/sync-members/`, data));
+  return fetchWithErrorMapping(`/grupos/${groupId}/sync-members/`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, ADMIN_ERROR_MAP);
 }
 
-/**
- * List functional permissions
- */
 export async function listPermissoesFuncionais(
-  params: { category?: string; search?: string; ordering?: string; page_size?: number } = {}
+  params: { category?: string; search?: string; ordering?: string; page_size?: number } = {},
 ): Promise<PaginatedResponse<PermissaoFuncional>> {
-  return apiRequest(() => api.get('/permissoes-funcionais/', { params }));
+  return fetchAPI(buildUrl('/permissoes-funcionais/', params as QueryParams));
 }
 
-/**
- * RBAC metadata for admin UI
- */
 export async function getRBACMeta(): Promise<RBACMetaPayload> {
-  return apiRequest(() => api.get('/rbac/meta/'));
+  return fetchAPI('/rbac/meta/');
 }
 
 // ========== MUNICIPIOS ==========
 
-/**
- * List all municipalities
- * @param params - Query parameters (uf, ativo, search, ordering, page)
- */
 export async function listMunicipios(params: ListParams = {}): Promise<PaginatedResponse<Municipio>> {
-  return apiRequest(() => api.get('/municipios/', { params }));
+  return fetchWithErrorMapping(buildUrl('/municipios/', params as QueryParams), {}, ADMIN_ERROR_MAP);
 }
 
-/**
- * Get single municipality
- * @param id - Municipality ID
- */
 export async function getMunicipio(id: ID): Promise<Municipio> {
-  return apiRequest(() => api.get(`/municipios/${id}/`));
+  return fetchWithErrorMapping(`/municipios/${id}/`, {}, ADMIN_ERROR_MAP);
 }
 
-/**
- * Create new municipality
- * @param data - Municipality data (nome, uf, ibge_code, ativo)
- */
 export async function createMunicipio(data: MunicipioPayload): Promise<Municipio> {
-  return apiRequest(() => api.post('/municipios/', data));
+  return fetchWithErrorMapping('/municipios/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, ADMIN_ERROR_MAP);
 }
 
-/**
- * Update municipality
- * @param id - Municipality ID
- * @param data - Updated fields
- */
 export async function updateMunicipio(id: ID, data: MunicipioPayload): Promise<Municipio> {
-  return apiRequest(() => api.patch(`/municipios/${id}/`, data));
+  return fetchWithErrorMapping(`/municipios/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, ADMIN_ERROR_MAP);
 }
 
-/**
- * Delete municipality
- * @param id - Municipality ID
- */
 export async function deleteMunicipio(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/municipios/${id}/`));
+  await fetchWithErrorMapping(`/municipios/${id}/`, { method: 'DELETE' }, ADMIN_ERROR_MAP);
 }
 
-/**
- * Assisted municipio lookup for Admin DAT forms (UF + name + IBGE hints)
- * @param params - q (required), optional uf and limit
- */
 export async function autocompleteMunicipiosAdmin(
-  params: MunicipioAutocompleteParams
+  params: MunicipioAutocompleteParams,
 ): Promise<MunicipioAutocompleteItem[]> {
-  const response = await apiRequest<{ results: MunicipioAutocompleteItem[] }>(() =>
-    api.get('/municipios/autocomplete/', { params })
+  const response = await fetchAPI<{ results: MunicipioAutocompleteItem[] }>(
+    buildUrl('/municipios/autocomplete/', params as unknown as QueryParams),
   );
   return response.results || [];
 }
 
 // ========== PROJETOS ==========
 
-/**
- * List all projects
- * @param params - Query parameters (ativo, search, ordering, page)
- */
 export async function listProjetos(params: ListParams = {}): Promise<PaginatedResponse<Projeto>> {
-  return apiRequest(() => api.get('/projetos/', { params }));
+  return fetchWithErrorMapping(buildUrl('/projetos/', params as QueryParams), {}, ADMIN_ERROR_MAP);
 }
 
-/**
- * Get single project
- * @param id - Project ID
- */
 export async function getProjeto(id: ID): Promise<Projeto> {
-  return apiRequest(() => api.get(`/projetos/${id}/`));
+  return fetchWithErrorMapping(`/projetos/${id}/`, {}, ADMIN_ERROR_MAP);
 }
 
-/**
- * Create new project
- * @param data - Project data (nome, codigo, fluxo, ativo)
- */
 export async function createProjeto(data: ProjetoPayload): Promise<Projeto> {
-  return apiRequest(() => api.post('/projetos/', data));
+  return fetchWithErrorMapping('/projetos/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, ADMIN_ERROR_MAP);
 }
 
-/**
- * Update project
- * @param id - Project ID
- * @param data - Updated fields
- */
 export async function updateProjeto(id: ID, data: ProjetoPayload): Promise<Projeto> {
-  return apiRequest(() => api.patch(`/projetos/${id}/`, data));
+  return fetchWithErrorMapping(`/projetos/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, ADMIN_ERROR_MAP);
 }
 
-/**
- * Delete project
- * @param id - Project ID
- */
 export async function deleteProjeto(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/projetos/${id}/`));
+  await fetchWithErrorMapping(`/projetos/${id}/`, { method: 'DELETE' }, ADMIN_ERROR_MAP);
 }

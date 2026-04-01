@@ -245,7 +245,10 @@ export async function initCsrfToken(): Promise<void> {
 
 // Inicializar CSRF token automaticamente quando o módulo carrega
 // Isso garante que o token está disponível assim que o app iniciar
-initCsrfToken();
+// Skip em ambiente de teste (Vitest/jsdom não tem servidor real)
+if (typeof import.meta.env?.VITEST === 'undefined') {
+  initCsrfToken();
+}
 
 /**
  * Fetch binary data (Blob) for file downloads.

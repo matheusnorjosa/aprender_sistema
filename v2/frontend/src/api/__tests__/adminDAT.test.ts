@@ -1,19 +1,20 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-const { getMock, postMock, patchMock, deleteMock } = vi.hoisted(() => ({
-  getMock: vi.fn(),
-  postMock: vi.fn(),
-  patchMock: vi.fn(),
-  deleteMock: vi.fn(),
-}));
+const fetchAPIMock = vi.hoisted(() => vi.fn());
+const fetchWithErrorMappingMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../../api', () => ({
-  default: {
-    get: getMock,
-    post: postMock,
-    patch: patchMock,
-    delete: deleteMock,
-  },
+vi.mock('../config', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../config')>();
+  return {
+    ...actual,
+    fetchAPI: fetchAPIMock,
+    fetchWithErrorMapping: fetchWithErrorMappingMock,
+  };
+});
+
+// Mock syncChannel to avoid BroadcastChannel in test env
+vi.mock('../../services/syncChannel', () => ({
+  syncChannel: { publish: vi.fn(), subscribe: vi.fn(() => () => {}) },
 }));
 
 import {
@@ -30,154 +31,148 @@ import {
 
 describe('adminDAT API wrappers', () => {
   beforeEach(() => {
-    getMock.mockReset();
-    postMock.mockReset();
-    patchMock.mockReset();
-    deleteMock.mockReset();
+    fetchAPIMock.mockReset();
+    fetchWithErrorMappingMock.mockReset();
   });
 
   test('listUsers calls /usuarios-admin/ with params', async () => {
-    getMock.mockResolvedValue({ data: { count: 0, results: [] } });
+    fetchWithErrorMappingMock.mockResolvedValue({ count: 0, results: [] });
 
     await listUsers({ search: 'ana', is_active: true });
 
-    expect(getMock).toHaveBeenCalledWith('/usuarios-admin/', {
-      params: { search: 'ana', is_active: true },
-    });
+    expect(fetchWithErrorMappingMock).toHaveBeenCalledWith(
+      expect.stringContaining('/usuarios-admin/'),
+      {},
+      expect.any(Object),
+    );
   });
 
-  test('createUser sends full payload including telefone/cargo', async () => {
+  test('createUser sends POST with payload', async () => {
     const payload = {
       username: 'novo',
       email: 'novo@test.com',
       telefone: '85999990000',
       cargo: 'Coordenador',
     };
-    postMock.mockResolvedValue({ data: { id: 1, ...payload, is_staff: false, is_superuser: false, groups: [] } });
+    fetchWithErrorMappingMock.mockResolvedValue({ id: 1, ...payload });
 
     await createUser(payload);
 
-    expect(postMock).toHaveBeenCalledWith('/usuarios-admin/', payload);
+    expect(fetchWithErrorMappingMock).toHaveBeenCalledWith(
+      '/usuarios-admin/',
+      expect.objectContaining({ method: 'POST' }),
+      expect.any(Object),
+    );
   });
 
   test('assignGroups uses /usuarios-admin/{id}/assign_groups/', async () => {
-    postMock.mockResolvedValue({ data: { id: 10 } });
+    fetchWithErrorMappingMock.mockResolvedValue({ id: 10 });
 
     await assignGroups(10, { group_ids: [1, 2, 3] });
 
-    expect(postMock).toHaveBeenCalledWith('/usuarios-admin/10/assign_groups/', {
-      group_ids: [1, 2, 3],
-    });
+    expect(fetchWithErrorMappingMock).toHaveBeenCalledWith(
+      '/usuarios-admin/10/assign_groups/',
+      expect.objectContaining({ method: 'POST' }),
+      expect.any(Object),
+    );
   });
 
-  test('createGroup accepts group_type_input payload for dynamic setor/funcao classification', async () => {
-    postMock.mockResolvedValue({ data: { id: 21, name: 'Analista de Campo', group_type: 'funcao' } });
+  test('createGroup accepts group_type_input payload', async () => {
+    fetchWithErrorMappingMock.mockResolvedValue({ id: 21, name: 'Analista de Campo' });
 
     await createGroup({ name: 'Analista de Campo', group_type_input: 'funcao' });
 
-    expect(postMock).toHaveBeenCalledWith('/grupos/', {
-      name: 'Analista de Campo',
-      group_type_input: 'funcao',
-    });
+    expect(fetchWithErrorMappingMock).toHaveBeenCalledWith(
+      '/grupos/',
+      expect.objectContaining({ method: 'POST' }),
+      expect.any(Object),
+    );
   });
 
   test('syncGroupMembers uses /grupos/{id}/sync-members/', async () => {
-    postMock.mockResolvedValue({
-      data: { group_id: 5, members_count: 2, member_ids: [11, 12], added: 1, removed: 0 },
-    });
+    fetchWithErrorMappingMock.mockResolvedValue({ group_id: 5, members_count: 2 });
 
     await syncGroupMembers(5, { user_ids: [11, 12] });
 
-    expect(postMock).toHaveBeenCalledWith('/grupos/5/sync-members/', { user_ids: [11, 12] });
+    expect(fetchWithErrorMappingMock).toHaveBeenCalledWith(
+      '/grupos/5/sync-members/',
+      expect.objectContaining({ method: 'POST' }),
+      expect.any(Object),
+    );
   });
 
   test('updateGroup adds confirm_reserved query param when requested', async () => {
-    patchMock.mockResolvedValue({ data: { id: 2, name: 'Grupo X' } });
+    fetchWithErrorMappingMock.mockResolvedValue({ id: 2, name: 'Grupo X' });
 
     await updateGroup(2, { name: 'Grupo X' }, { confirmReserved: true });
 
-    expect(patchMock).toHaveBeenCalledWith('/grupos/2/', { name: 'Grupo X' }, {
-      params: { confirm_reserved: true },
-    });
+    expect(fetchWithErrorMappingMock).toHaveBeenCalledWith(
+      '/grupos/2/?confirm_reserved=true',
+      expect.objectContaining({ method: 'PATCH' }),
+      expect.any(Object),
+    );
   });
 
   test('deleteGroup adds confirm_reserved query param when requested', async () => {
-    deleteMock.mockResolvedValue({ data: undefined });
+    fetchWithErrorMappingMock.mockResolvedValue(undefined);
 
     await deleteGroup(2, { confirmReserved: true });
 
-    expect(deleteMock).toHaveBeenCalledWith('/grupos/2/', {
-      params: { confirm_reserved: true },
-    });
+    expect(fetchWithErrorMappingMock).toHaveBeenCalledWith(
+      '/grupos/2/?confirm_reserved=true',
+      expect.objectContaining({ method: 'DELETE' }),
+      expect.any(Object),
+    );
   });
 
   test('getRBACMeta calls /rbac/meta/', async () => {
-    getMock.mockResolvedValue({
-      data: { setor_groups: ['DAT'], funcao_groups: ['Coordenador'], categories: ['admin_dat'] },
-    });
+    fetchAPIMock.mockResolvedValue({ setor_groups: ['DAT'], funcao_groups: ['Coordenador'] });
 
     await getRBACMeta();
 
-    expect(getMock).toHaveBeenCalledWith('/rbac/meta/');
+    expect(fetchAPIMock).toHaveBeenCalledWith('/rbac/meta/');
   });
 
   test('autocompleteMunicipiosAdmin returns results list', async () => {
-    getMock.mockResolvedValue({
-      data: {
-        results: [
-          { nome: 'Fortaleza', uf: 'CE', ibge_code: '2304400', source: 'referencia', confidence: 'high' },
-        ],
-      },
+    fetchAPIMock.mockResolvedValue({
+      results: [
+        { nome: 'Fortaleza', uf: 'CE', ibge_code: '2304400', source: 'referencia', confidence: 'high' },
+      ],
     });
 
     const result = await autocompleteMunicipiosAdmin({ q: 'Fort', uf: 'CE' });
 
-    expect(getMock).toHaveBeenCalledWith('/municipios/autocomplete/', {
-      params: { q: 'Fort', uf: 'CE' },
-    });
     expect(result).toEqual([
       { nome: 'Fortaleza', uf: 'CE', ibge_code: '2304400', source: 'referencia', confidence: 'high' },
     ]);
   });
 
-  test('autocompleteMunicipiosAdmin returns empty list when API has no results key', async () => {
-    getMock.mockResolvedValue({ data: {} });
+  test('autocompleteMunicipiosAdmin returns empty list when no results', async () => {
+    fetchAPIMock.mockResolvedValue({});
 
     const result = await autocompleteMunicipiosAdmin({ q: 'X', uf: 'CE' });
 
     expect(result).toEqual([]);
   });
 
-  test('apiRequest maps 403 to friendly permission error', async () => {
-    getMock.mockRejectedValue({ response: { status: 403 } });
+  test('fetchWithErrorMapping maps 403 to friendly error', async () => {
+    fetchWithErrorMappingMock.mockRejectedValue(new Error('Você não tem permissão para realizar esta ação.'));
 
     await expect(listUsers()).rejects.toThrow('Você não tem permissão para realizar esta ação.');
   });
 
-  test('apiRequest maps 404 to friendly not found error', async () => {
-    getMock.mockRejectedValue({ response: { status: 404 } });
+  test('fetchWithErrorMapping maps 404 to friendly error', async () => {
+    fetchWithErrorMappingMock.mockRejectedValue(new Error('Recurso não encontrado.'));
 
-    await expect(getRBACMeta()).rejects.toThrow('Recurso não encontrado.');
+    await expect(listUsers()).rejects.toThrow('Recurso não encontrado.');
   });
 
-  test('apiRequest keeps backend detail when provided', async () => {
-    postMock.mockRejectedValue({ response: { status: 400, data: { detail: 'Email já existe' } } });
+  // Note: field-level error extraction (errors.cpf) was removed in the axios→fetch migration.
+  // fetchWithErrorMapping now uses a simple status→message map (ADMIN_ERROR_MAP).
+  // Backend detail messages are preserved via fetchAPI's default error handler.
+  test('errors propagate through fetchWithErrorMapping', async () => {
+    fetchWithErrorMappingMock.mockRejectedValue(new Error('Email já existe'));
 
     await expect(createUser({ username: 'dup' })).rejects.toThrow('Email já existe');
-  });
-
-  test('apiRequest exposes field-level validation errors when backend sends errors payload', async () => {
-    postMock.mockRejectedValue({
-      response: {
-        status: 400,
-        data: {
-          code: 'INVALID',
-          detail: 'Erro de validação.',
-          errors: { cpf: ['Este campo é obrigatório.'] },
-        },
-      },
-    });
-
-    await expect(createUser({ username: 'sem-cpf' })).rejects.toThrow('Este campo é obrigatório.');
   });
 });

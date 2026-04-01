@@ -87,12 +87,12 @@ def encrypt_token(token: str) -> bytes:
     return fernet.encrypt(token.encode("utf-8"))
 
 
-def decrypt_token(encrypted: bytes) -> str:
+def decrypt_token(encrypted: bytes | memoryview) -> str:
     """
     Descriptografa token criptografado com Fernet.
 
     Args:
-        encrypted: Token criptografado (bytes)
+        encrypted: Token criptografado (bytes ou memoryview do PostgreSQL)
 
     Returns:
         str: Token em plaintext
@@ -100,6 +100,8 @@ def decrypt_token(encrypted: bytes) -> str:
     Raises:
         InvalidToken: Se token estiver corrompido ou chave incorreta
     """
+    if isinstance(encrypted, memoryview):
+        encrypted = bytes(encrypted)
     fernet: Fernet = Fernet(_get_fernet_key())
     return fernet.decrypt(encrypted).decode("utf-8")
 

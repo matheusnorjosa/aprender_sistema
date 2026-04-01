@@ -248,6 +248,75 @@ export async function initCsrfToken(): Promise<void> {
 initCsrfToken();
 
 /**
+ * Fetch binary data (Blob) for file downloads.
+ *
+ * Used by CSV/Excel export endpoints that return non-JSON responses.
+ * Handles CSRF token injection for mutation methods.
+ *
+ * @param url - API path (relative or absolute)
+ * @param options - Fetch options
+ * @returns Blob with file content
+ *
+ * @example
+ * const blob = await fetchBlob('/dat/compras/export/');
+ * const url = URL.createObjectURL(blob);
+ */
+export async function fetchBlob(url: string, options: FetchOptions = {}): Promise<Blob> {
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
+  const headers: Record<string, string> = { ...options.headers };
+
+  const method = options.method?.toUpperCase() || 'GET';
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const csrfToken = await ensureCsrfToken();
+    if (csrfToken) headers['X-CSRFToken'] = csrfToken;
+  }
+
+  const response = await fetch(fullUrl, {
+    ...options,
+    headers,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Export failed: HTTP ${response.status}`);
+  }
+
+  return response.blob();
+}
+
+/**
+ * Fetch with per-endpoint error message mapping.
+ *
+ * Wraps fetchAPI and maps HTTP status codes to user-friendly messages.
+ * Used by modules that need custom error messages per endpoint.
+ *
+ * @param url - API path
+ * @param options - Fetch options
+ * @param errorMap - Map of HTTP status → error message
+ *
+ * @example
+ * await fetchWithErrorMapping('/dat/registros/', { method: 'POST', body }, {
+ *   400: 'Dados inválidos. Verifique os campos.',
+ *   409: 'Registro duplicado.',
+ * });
+ */
+export async function fetchWithErrorMapping<T = unknown>(
+  url: string,
+  options: FetchOptions = {},
+  errorMap: Record<number, string> = {},
+): Promise<T> {
+  try {
+    return await fetchAPI<T>(url, options);
+  } catch (error) {
+    const status = (error as { status?: number }).status;
+    if (status && errorMap[status]) {
+      throw new Error(errorMap[status]);
+    }
+    throw error;
+  }
+}
+
+/**
  * Helper para construir URL com query params.
  *
  * @param path - Caminho relativo (ex: '/solicitacoes/')

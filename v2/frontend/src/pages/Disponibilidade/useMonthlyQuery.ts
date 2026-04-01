@@ -36,6 +36,7 @@ interface UseMonthlyQueryResult {
   data: MonthlyGridData | null;
   loading: boolean;
   error: string | null;
+  lastUpdated: number | null;
   refetch: () => Promise<void>;
 }
 
@@ -57,6 +58,7 @@ export default function useMonthlyQuery(
   const [data, setData] = useState<MonthlyGridData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
   // Desestruturar params para evitar loop infinito
   const { year, month, role, sector, q, gerenciaId } = params;
@@ -76,6 +78,7 @@ export default function useMonthlyQuery(
       };
       const result = await getMonthlyAvailability(queryParams);
       setData(result);
+      setLastUpdated(Date.now());
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Erro ao carregar grade mensal';
@@ -109,6 +112,7 @@ export default function useMonthlyQuery(
     data,
     loading,
     error,
+    lastUpdated,
     refetch: fetchData,
   };
 }

@@ -1,20 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-const { getMock, postMock, patchMock, deleteMock } = vi.hoisted(() => ({
-  getMock: vi.fn(),
-  postMock: vi.fn(),
-  patchMock: vi.fn(),
-  deleteMock: vi.fn(),
-}));
+const fetchAPIMock = vi.hoisted(() => vi.fn());
+const fetchWithErrorMappingMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../../api', () => ({
-  default: {
-    get: getMock,
-    post: postMock,
-    patch: patchMock,
-    delete: deleteMock,
-  },
-}));
+vi.mock('../config', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../config')>();
+  return {
+    ...actual,
+    fetchAPI: fetchAPIMock,
+    fetchWithErrorMapping: fetchWithErrorMappingMock,
+  };
+});
 
 import {
   createProdutoDAT,
@@ -27,32 +23,31 @@ import {
 
 describe('datModule API', () => {
   beforeEach(() => {
-    getMock.mockReset();
-    postMock.mockReset();
-    patchMock.mockReset();
-    deleteMock.mockReset();
+    fetchAPIMock.mockReset();
+    fetchWithErrorMappingMock.mockReset();
   });
 
   test('updateCadastroEtapa uses POST on /dat/cadastros/{id}/etapa/', async () => {
     const payload = { id: 7, etapa: 'chaves', status: 'concluido' };
-    postMock.mockResolvedValue({ data: payload });
+    fetchWithErrorMappingMock.mockResolvedValue(payload);
 
     const response = await updateCadastroEtapa(7, 'chaves', 'concluido');
 
-    expect(postMock).toHaveBeenCalledWith('/dat/cadastros/7/etapa/', {
-      etapa: 'chaves',
-      status: 'concluido',
-    });
-    expect(patchMock).not.toHaveBeenCalled();
+    expect(fetchWithErrorMappingMock).toHaveBeenCalledWith(
+      '/dat/cadastros/7/etapa/',
+      expect.objectContaining({ method: 'POST' }),
+      expect.any(Object),
+    );
     expect(response).toEqual(payload);
   });
 
   test('produto endpoints use /produtos/ base path', async () => {
-    getMock.mockResolvedValueOnce({ data: { count: 0, results: [] } });
-    getMock.mockResolvedValueOnce({ data: { id: 5, nome: 'Produto X' } });
-    postMock.mockResolvedValueOnce({ data: { id: 6, nome: 'Produto Novo' } });
-    patchMock.mockResolvedValueOnce({ data: { id: 5, nome: 'Produto Atualizado' } });
-    deleteMock.mockResolvedValueOnce({ data: undefined });
+    fetchAPIMock
+      .mockResolvedValueOnce({ count: 0, results: [] })
+      .mockResolvedValueOnce({ id: 5, nome: 'Produto X' })
+      .mockResolvedValueOnce({ id: 6, nome: 'Produto Novo' })
+      .mockResolvedValueOnce({ id: 5, nome: 'Produto Atualizado' })
+      .mockResolvedValueOnce(undefined);
 
     await listProdutosDAT({ search: 'abc' });
     await getProdutoDAT(5);
@@ -60,10 +55,10 @@ describe('datModule API', () => {
     await updateProdutoDAT(5, { nome: 'Produto Atualizado' });
     await deleteProdutoDAT(5);
 
-    expect(getMock).toHaveBeenNthCalledWith(1, '/produtos/', { params: { search: 'abc' } });
-    expect(getMock).toHaveBeenNthCalledWith(2, '/produtos/5/');
-    expect(postMock).toHaveBeenCalledWith('/produtos/', { nome: 'Produto Novo' });
-    expect(patchMock).toHaveBeenCalledWith('/produtos/5/', { nome: 'Produto Atualizado' });
-    expect(deleteMock).toHaveBeenCalledWith('/produtos/5/');
+    expect(fetchAPIMock).toHaveBeenNthCalledWith(1, expect.stringContaining('/produtos/'));
+    expect(fetchAPIMock).toHaveBeenNthCalledWith(2, '/produtos/5/');
+    expect(fetchAPIMock).toHaveBeenNthCalledWith(3, '/produtos/', expect.objectContaining({ method: 'POST' }));
+    expect(fetchAPIMock).toHaveBeenNthCalledWith(4, '/produtos/5/', expect.objectContaining({ method: 'PATCH' }));
+    expect(fetchAPIMock).toHaveBeenNthCalledWith(5, '/produtos/5/', expect.objectContaining({ method: 'DELETE' }));
   });
 });

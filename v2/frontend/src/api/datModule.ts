@@ -3,20 +3,14 @@
  *
  * Ref: v2/docs/SPEC_DAT_REGISTROS.md
  *
- * Endpoints:
- * - /api/dat/registros/ - DATRegistro CRUD
- * - /api/projetos-gerais/ - ProjetoGeral CRUD
+ * Migrated from axios to fetchAPI (Epic #1039)
  */
 
-import type { AxiosResponse, AxiosError } from 'axios';
-import api from '../api';
+import { fetchAPI, fetchBlob, fetchWithErrorMapping, buildUrl, type QueryParams } from './config';
 import type { ID, PaginatedResponse, MunicipioOption, ProjetoOption, Projeto } from '../types';
 
 // ========== TYPE DEFINITIONS ==========
 
-/**
- * DAT Registro record
- */
 export interface DATRegistro {
   id: ID;
   municipio: ID;
@@ -32,9 +26,6 @@ export interface DATRegistro {
   updated_at: string;
 }
 
-/**
- * DAT Registro stats
- */
 export interface DATRegistroStats {
   total: number;
   completos_formar: number;
@@ -43,9 +34,6 @@ export interface DATRegistroStats {
   por_uf: Record<string, number>;
 }
 
-/**
- * Projeto Geral record
- */
 export interface ProjetoGeral {
   id: ID;
   nome: string;
@@ -56,33 +44,21 @@ export interface ProjetoGeral {
   ativo: boolean;
 }
 
-/**
- * Projeto Geral option for dropdown
- */
 export interface ProjetoGeralOption {
   id: ID;
   nome: string;
   usa_avaliar: boolean;
 }
 
-/**
- * Generic record type for CRUD operations
- */
 export interface GenericRecord {
   id: ID;
   [key: string]: unknown;
 }
 
-/**
- * Generic stats response
- */
 export interface GenericStats {
   [key: string]: number | Record<string, number>;
 }
 
-/**
- * Generic filter params
- */
 export interface FilterParams {
   search?: string;
   page?: number;
@@ -90,226 +66,156 @@ export interface FilterParams {
   [key: string]: string | number | boolean | undefined;
 }
 
-/**
- * Axios error with response
- */
-interface AxiosErrorWithResponse extends AxiosError {
-  response?: AxiosResponse<{ detail?: string }>;
-}
-
-/**
- * Helper to handle axios responses and errors
- */
-async function apiRequest<T>(requestFn: () => Promise<AxiosResponse<T>>): Promise<T> {
-  try {
-    const response = await requestFn();
-    return response.data;
-  } catch (error) {
-    const axiosError = error as AxiosErrorWithResponse;
-    let message: string;
-    if (axiosError.response?.status === 403) {
-      message = 'Acesso restrito ao setor DAT.';
-    } else if (axiosError.response?.status === 404) {
-      message = 'Registro nao encontrado.';
-    } else {
-      message = axiosError.response?.data?.detail || axiosError.message || `Erro HTTP ${axiosError.response?.status}`;
-    }
-    throw new Error(message);
-  }
-}
+// Common error mapping for DAT endpoints
+const DAT_ERROR_MAP: Record<number, string> = {
+  403: 'Acesso restrito ao setor DAT.',
+  404: 'Registro nao encontrado.',
+};
 
 // ========== DAT REGISTROS ==========
 
-/**
- * List DATRegistro records
- * @param params - Query parameters
- */
 export async function listDATRegistros(params: FilterParams = {}): Promise<PaginatedResponse<DATRegistro>> {
-  return apiRequest(() => api.get('/dat/registros/', { params }));
+  return fetchWithErrorMapping(buildUrl('/dat/registros/', params as QueryParams), {}, DAT_ERROR_MAP);
 }
 
-/**
- * Get single DATRegistro
- * @param id - DATRegistro ID
- */
 export async function getDATRegistro(id: ID): Promise<DATRegistro> {
-  return apiRequest(() => api.get(`/dat/registros/${id}/`));
+  return fetchWithErrorMapping(`/dat/registros/${id}/`, {}, DAT_ERROR_MAP);
 }
 
-/**
- * Create new DATRegistro
- * @param data - DATRegistro data
- */
 export async function createDATRegistro(data: Partial<DATRegistro>): Promise<DATRegistro> {
-  return apiRequest(() => api.post('/dat/registros/', data));
+  return fetchWithErrorMapping('/dat/registros/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
-/**
- * Update DATRegistro
- * @param id - DATRegistro ID
- * @param data - Updated fields
- */
 export async function updateDATRegistro(id: ID, data: Partial<DATRegistro>): Promise<DATRegistro> {
-  return apiRequest(() => api.patch(`/dat/registros/${id}/`, data));
+  return fetchWithErrorMapping(`/dat/registros/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
-/**
- * Delete DATRegistro (requires Superintendencia)
- * @param id - DATRegistro ID
- */
 export async function deleteDATRegistro(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/dat/registros/${id}/`));
+  await fetchWithErrorMapping(`/dat/registros/${id}/`, { method: 'DELETE' }, DAT_ERROR_MAP);
 }
 
-/**
- * Get DATRegistro stats
- */
 export async function getDATRegistroStats(): Promise<DATRegistroStats> {
-  return apiRequest(() => api.get('/dat/registros/stats/'));
+  return fetchAPI('/dat/registros/stats/');
 }
 
-/**
- * Export DATRegistros to CSV
- * @param params - Filter parameters
- */
 export async function exportDATRegistros(params: FilterParams = {}): Promise<Blob> {
-  const response = await api.get('/dat/registros/export/', {
-    params,
-    responseType: 'blob',
-  });
-  return response.data;
+  return fetchBlob(buildUrl('/dat/registros/export/', params as QueryParams));
 }
 
 // ========== PROJETOS GERAIS ==========
 
-/**
- * List ProjetoGeral records
- * @param params - Query parameters
- */
 export async function listProjetosGerais(params: FilterParams = {}): Promise<PaginatedResponse<ProjetoGeral>> {
-  return apiRequest(() => api.get('/projetos-gerais/', { params }));
+  return fetchWithErrorMapping(buildUrl('/projetos-gerais/', params as QueryParams), {}, DAT_ERROR_MAP);
 }
 
-/**
- * Get single ProjetoGeral
- * @param id - ProjetoGeral ID
- */
 export async function getProjetoGeral(id: ID): Promise<ProjetoGeral> {
-  return apiRequest(() => api.get(`/projetos-gerais/${id}/`));
+  return fetchWithErrorMapping(`/projetos-gerais/${id}/`, {}, DAT_ERROR_MAP);
 }
 
-/**
- * Create new ProjetoGeral
- * @param data - ProjetoGeral data
- */
 export async function createProjetoGeral(data: Partial<ProjetoGeral>): Promise<ProjetoGeral> {
-  return apiRequest(() => api.post('/projetos-gerais/', data));
+  return fetchWithErrorMapping('/projetos-gerais/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
-/**
- * Update ProjetoGeral
- * @param id - ProjetoGeral ID
- * @param data - Updated fields
- */
 export async function updateProjetoGeral(id: ID, data: Partial<ProjetoGeral>): Promise<ProjetoGeral> {
-  return apiRequest(() => api.patch(`/projetos-gerais/${id}/`, data));
+  return fetchWithErrorMapping(`/projetos-gerais/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
-/**
- * Delete ProjetoGeral (requires Superintendencia)
- * @param id - ProjetoGeral ID
- */
 export async function deleteProjetoGeral(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/projetos-gerais/${id}/`));
+  await fetchWithErrorMapping(`/projetos-gerais/${id}/`, { method: 'DELETE' }, DAT_ERROR_MAP);
 }
 
-/**
- * Get Projetos linked to a ProjetoGeral
- * @param id - ProjetoGeral ID
- */
 export async function getProjetosForProjetoGeral(id: ID): Promise<Projeto[]> {
-  return apiRequest(() => api.get(`/projetos-gerais/${id}/projetos/`));
+  return fetchAPI(`/projetos-gerais/${id}/projetos/`);
 }
 
 // ========== OPTIONS (for dropdowns) ==========
 
-/**
- * Get minimal list of ProjetosGerais for dropdown
- */
 export async function getProjetosGeraisOptions(): Promise<ProjetoGeralOption[]> {
-  return apiRequest(() => api.get('/projetos-gerais/', { params: { minimal: 'true' } }));
+  return fetchAPI(buildUrl('/projetos-gerais/', { minimal: 'true' }));
 }
 
-/**
- * Get Municipios options for dropdown
- */
 export async function getMunicipiosOptions(): Promise<MunicipioOption[]> {
-  return apiRequest(() => api.get('/options/municipios/'));
+  return fetchAPI('/options/municipios/');
 }
 
-/**
- * Get Projetos options for dropdown
- */
 export async function getProjetosOptions(): Promise<ProjetoOption[]> {
-  return apiRequest(() => api.get('/options/projetos/'));
+  return fetchAPI('/options/projetos/');
 }
 
 // ========== AÇÕES (Ciclo de Vida de Projetos) ==========
 
-/**
- * Listar ações com filtros
- */
 export async function listAcoes(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
-  return apiRequest(() => api.get('/dat/acoes-ciclo/', { params }));
+  return fetchWithErrorMapping(buildUrl('/dat/acoes-ciclo/', params as QueryParams), {}, DAT_ERROR_MAP);
 }
 
 export async function getAcao(id: ID): Promise<GenericRecord> {
-  return apiRequest(() => api.get(`/dat/acoes-ciclo/${id}/`));
+  return fetchWithErrorMapping(`/dat/acoes-ciclo/${id}/`, {}, DAT_ERROR_MAP);
 }
 
 export async function createAcao(data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.post('/dat/acoes-ciclo/', data));
+  return fetchWithErrorMapping('/dat/acoes-ciclo/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
 export async function updateAcao(id: ID, data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.patch(`/dat/acoes-ciclo/${id}/`, data));
+  return fetchWithErrorMapping(`/dat/acoes-ciclo/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
 export async function deleteAcao(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/dat/acoes-ciclo/${id}/`));
+  await fetchWithErrorMapping(`/dat/acoes-ciclo/${id}/`, { method: 'DELETE' }, DAT_ERROR_MAP);
 }
 
 export async function getAcoesStats(params: FilterParams = {}): Promise<GenericStats> {
-  return apiRequest(() => api.get('/dat/acoes-ciclo/stats/', { params }));
+  return fetchAPI(buildUrl('/dat/acoes-ciclo/stats/', params as QueryParams));
 }
 
 // ========== COMPRAS (Controle de Materiais) ==========
 
-/**
- * Listar compras com filtros
- */
 export async function listCompras(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
-  return apiRequest(() => api.get('/dat/compras-materiais/', { params }));
+  return fetchWithErrorMapping(buildUrl('/dat/compras-materiais/', params as QueryParams), {}, DAT_ERROR_MAP);
 }
 
 export async function getCompra(id: ID): Promise<GenericRecord> {
-  return apiRequest(() => api.get(`/dat/compras-materiais/${id}/`));
+  return fetchWithErrorMapping(`/dat/compras-materiais/${id}/`, {}, DAT_ERROR_MAP);
 }
 
 export async function createCompra(data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.post('/dat/compras-materiais/', data));
+  return fetchWithErrorMapping('/dat/compras-materiais/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
 export async function updateCompra(id: ID, data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.patch(`/dat/compras-materiais/${id}/`, data));
+  return fetchWithErrorMapping(`/dat/compras-materiais/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
 export async function deleteCompra(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/dat/compras-materiais/${id}/`));
+  await fetchWithErrorMapping(`/dat/compras-materiais/${id}/`, { method: 'DELETE' }, DAT_ERROR_MAP);
 }
 
 export async function getComprasStats(params: FilterParams = {}): Promise<GenericStats> {
-  return apiRequest(() => api.get('/dat/compras-materiais/stats/', { params }));
+  return fetchAPI(buildUrl('/dat/compras-materiais/stats/', params as QueryParams));
 }
 
 // Dashboard de Compras
@@ -340,7 +246,7 @@ export interface ComprasDashboardData {
 }
 
 export async function getComprasDashboard(params: FilterParams = {}): Promise<ComprasDashboardData> {
-  return apiRequest(() => api.get('/dat/compras-materiais/dashboard/', { params }));
+  return fetchAPI(buildUrl('/dat/compras-materiais/dashboard/', params as QueryParams));
 }
 
 export interface CompraPendenteItem {
@@ -363,235 +269,215 @@ export interface ComprasPendenciasResponse {
 }
 
 export async function getComprasPendencias(params: FilterParams = {}): Promise<ComprasPendenciasResponse> {
-  return apiRequest(() => api.get('/dat/compras-materiais/pendencias/', { params }));
+  return fetchAPI(buildUrl('/dat/compras-materiais/pendencias/', params as QueryParams));
 }
 
 // ========== CADASTROS (Workflow FORMAR/AVALIAR) ==========
 
-/**
- * Listar cadastros com filtros
- */
 export async function listCadastros(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
-  return apiRequest(() => api.get('/dat/cadastros/', { params }));
+  return fetchWithErrorMapping(buildUrl('/dat/cadastros/', params as QueryParams), {}, DAT_ERROR_MAP);
 }
 
 export async function getCadastro(id: ID): Promise<GenericRecord> {
-  return apiRequest(() => api.get(`/dat/cadastros/${id}/`));
+  return fetchWithErrorMapping(`/dat/cadastros/${id}/`, {}, DAT_ERROR_MAP);
 }
 
 export async function createCadastro(data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.post('/dat/cadastros/', data));
+  return fetchWithErrorMapping('/dat/cadastros/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
 export async function updateCadastro(id: ID, data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.patch(`/dat/cadastros/${id}/`, data));
+  return fetchWithErrorMapping(`/dat/cadastros/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
 export async function deleteCadastro(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/dat/cadastros/${id}/`));
+  await fetchWithErrorMapping(`/dat/cadastros/${id}/`, { method: 'DELETE' }, DAT_ERROR_MAP);
 }
 
 export async function updateCadastroEtapa(id: ID, etapa: string, status: string): Promise<GenericRecord> {
-  return apiRequest(() => api.post(`/dat/cadastros/${id}/etapa/`, { etapa, status }));
+  return fetchWithErrorMapping(`/dat/cadastros/${id}/etapa/`, {
+    method: 'POST',
+    body: JSON.stringify({ etapa, status }),
+  }, DAT_ERROR_MAP);
 }
 
 export async function getCadastrosStats(params: FilterParams = {}): Promise<GenericStats> {
-  return apiRequest(() => api.get('/dat/cadastros/stats/', { params }));
+  return fetchAPI(buildUrl('/dat/cadastros/stats/', params as QueryParams));
 }
 
 // ========== FORMAÇÕES (Calendário de Treinamentos) ==========
 
-/**
- * Listar formações com filtros
- */
 export async function listFormacoes(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
-  return apiRequest(() => api.get('/dat/formacoes/', { params }));
+  return fetchWithErrorMapping(buildUrl('/dat/formacoes/', params as QueryParams), {}, DAT_ERROR_MAP);
 }
 
 export async function getFormacao(id: ID): Promise<GenericRecord> {
-  return apiRequest(() => api.get(`/dat/formacoes/${id}/`));
+  return fetchWithErrorMapping(`/dat/formacoes/${id}/`, {}, DAT_ERROR_MAP);
 }
 
 export async function createFormacao(data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.post('/dat/formacoes/', data));
+  return fetchWithErrorMapping('/dat/formacoes/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
 export async function updateFormacao(id: ID, data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.patch(`/dat/formacoes/${id}/`, data));
+  return fetchWithErrorMapping(`/dat/formacoes/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
 export async function deleteFormacao(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/dat/formacoes/${id}/`));
+  await fetchWithErrorMapping(`/dat/formacoes/${id}/`, { method: 'DELETE' }, DAT_ERROR_MAP);
 }
 
 export async function getFormacoesStats(params: FilterParams = {}): Promise<GenericStats> {
-  return apiRequest(() => api.get('/dat/formacoes/stats/', { params }));
+  return fetchAPI(buildUrl('/dat/formacoes/stats/', params as QueryParams));
 }
 
 export async function getFormacoesCalendario(params: FilterParams = {}): Promise<GenericRecord[]> {
-  return apiRequest(() => api.get('/dat/formacoes/calendario/', { params }));
+  return fetchAPI(buildUrl('/dat/formacoes/calendario/', params as QueryParams));
 }
 
 // ========== COORDENADORES ==========
 
-/**
- * Listar coordenadores com filtros
- */
 export async function listCoordenadoresDAT(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
-  return apiRequest(() => api.get('/dat/coordenadores/', { params }));
+  return fetchWithErrorMapping(buildUrl('/dat/coordenadores/', params as QueryParams), {}, DAT_ERROR_MAP);
 }
 
 export async function getCoordenadorDAT(id: ID): Promise<GenericRecord> {
-  return apiRequest(() => api.get(`/dat/coordenadores/${id}/`));
+  return fetchWithErrorMapping(`/dat/coordenadores/${id}/`, {}, DAT_ERROR_MAP);
 }
 
 export async function createCoordenadorDAT(data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.post('/dat/coordenadores/', data));
+  return fetchWithErrorMapping('/dat/coordenadores/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
 export async function updateCoordenadorDAT(id: ID, data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.patch(`/dat/coordenadores/${id}/`, data));
+  return fetchWithErrorMapping(`/dat/coordenadores/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
 export async function deleteCoordenadorDAT(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/dat/coordenadores/${id}/`));
+  await fetchWithErrorMapping(`/dat/coordenadores/${id}/`, { method: 'DELETE' }, DAT_ERROR_MAP);
 }
 
 export async function getCoordenadorAlocacoes(id: ID): Promise<GenericRecord[]> {
-  return apiRequest(() => api.get(`/dat/coordenadores/${id}/alocacoes/`));
+  return fetchAPI(`/dat/coordenadores/${id}/alocacoes/`);
 }
 
 // ========== PRODUTOS ==========
 
 export async function listProdutosDAT(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
-  return apiRequest(() => api.get('/produtos/', { params }));
+  return fetchAPI(buildUrl('/produtos/', params as QueryParams));
 }
 
 export async function getProdutoDAT(id: ID): Promise<GenericRecord> {
-  return apiRequest(() => api.get(`/produtos/${id}/`));
+  return fetchAPI(`/produtos/${id}/`);
 }
 
 export async function createProdutoDAT(data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.post('/produtos/', data));
+  return fetchAPI('/produtos/', { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function updateProdutoDAT(id: ID, data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.patch(`/produtos/${id}/`, data));
+  return fetchAPI(`/produtos/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 
 export async function deleteProdutoDAT(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/produtos/${id}/`));
+  await fetchAPI(`/produtos/${id}/`, { method: 'DELETE' });
 }
 
 // ========== ÁREAS ==========
 
 export async function listAreasDAT(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
-  return apiRequest(() => api.get('/dat/areas/', { params }));
+  return fetchAPI(buildUrl('/dat/areas/', params as QueryParams));
 }
 
 // ========== COORDENADORES OPTIONS ==========
 
 export async function getCoordenadoresOptions(): Promise<GenericRecord[]> {
-  return apiRequest(() => api.get('/options/coordenadores/'));
+  return fetchAPI('/options/coordenadores/');
 }
 
 export async function getAreasOptions(): Promise<GenericRecord[]> {
-  return apiRequest(() => api.get('/options/areas/'));
+  return fetchAPI('/options/areas/');
 }
 
 export async function getProdutosOptions(): Promise<GenericRecord[]> {
-  return apiRequest(() => api.get('/options/produtos/'));
+  return fetchAPI('/options/produtos/');
 }
 
 // ========== PLANO FORMAÇÕES ==========
 
-/**
- * List PlanoFormacoes records
- */
 export async function listPlanoFormacoes(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
-  return apiRequest(() => api.get('/dat/plano-formacoes/', { params }));
+  return fetchWithErrorMapping(buildUrl('/dat/plano-formacoes/', params as QueryParams), {}, DAT_ERROR_MAP);
 }
 
-/**
- * Get single PlanoFormacoes
- * @param id - PlanoFormacoes ID
- */
 export async function getPlanoFormacoes(id: ID): Promise<GenericRecord> {
-  return apiRequest(() => api.get(`/dat/plano-formacoes/${id}/`));
+  return fetchWithErrorMapping(`/dat/plano-formacoes/${id}/`, {}, DAT_ERROR_MAP);
 }
 
-/**
- * Create new PlanoFormacoes
- * @param data - PlanoFormacoes data
- */
 export async function createPlanoFormacoes(data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.post('/dat/plano-formacoes/', data));
+  return fetchWithErrorMapping('/dat/plano-formacoes/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
-/**
- * Update PlanoFormacoes
- * @param id - PlanoFormacoes ID
- * @param data - Updated fields
- */
 export async function updatePlanoFormacoes(id: ID, data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.patch(`/dat/plano-formacoes/${id}/`, data));
+  return fetchWithErrorMapping(`/dat/plano-formacoes/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
-/**
- * Delete PlanoFormacoes (requires Superintendencia)
- * @param id - PlanoFormacoes ID
- */
 export async function deletePlanoFormacoes(id: ID): Promise<void> {
-  return apiRequest(() => api.delete(`/dat/plano-formacoes/${id}/`));
+  await fetchWithErrorMapping(`/dat/plano-formacoes/${id}/`, { method: 'DELETE' }, DAT_ERROR_MAP);
 }
 
-/**
- * Get PlanoFormacoes stats
- */
 export async function getPlanoFormacoesStats(params: FilterParams = {}): Promise<GenericStats> {
-  return apiRequest(() => api.get('/dat/plano-formacoes/stats/', { params }));
+  return fetchAPI(buildUrl('/dat/plano-formacoes/stats/', params as QueryParams));
 }
 
-/**
- * Get PlanoFormacoes calendar data
- */
 export async function getPlanoFormacoesCalendario(params: FilterParams = {}): Promise<GenericRecord[]> {
-  return apiRequest(() => api.get('/dat/plano-formacoes/calendario/', { params }));
+  return fetchAPI(buildUrl('/dat/plano-formacoes/calendario/', params as QueryParams));
 }
 
-/**
- * Get PlanoFormacoes summary by project
- */
 export async function getPlanoFormacoesResumoProjeto(params: FilterParams = {}): Promise<GenericRecord[]> {
-  return apiRequest(() => api.get('/dat/plano-formacoes/resumo-projeto/', { params }));
+  return fetchAPI(buildUrl('/dat/plano-formacoes/resumo-projeto/', params as QueryParams));
 }
 
-/**
- * Update a specific formacao inline
- * @param planoId - PlanoFormacoes ID
- * @param numero - Formacao number (1-15)
- * @param data - Updated fields
- */
 export async function updateFormacaoInline(planoId: ID, numero: number, data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.patch(`/dat/plano-formacoes/${planoId}/formacao/${numero}/`, data));
+  return fetchWithErrorMapping(`/dat/plano-formacoes/${planoId}/formacao/${numero}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
-/**
- * Update a specific acompanhamento inline
- * @param planoId - PlanoFormacoes ID
- * @param tipo - 'primeiro' or 'segundo'
- * @param data - Updated fields
- */
 export async function updateAcompanhamentoInline(planoId: ID, tipo: 'primeiro' | 'segundo', data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.patch(`/dat/plano-formacoes/${planoId}/acompanhamento/${tipo}/`, data));
+  return fetchWithErrorMapping(`/dat/plano-formacoes/${planoId}/acompanhamento/${tipo}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }
 
-/**
- * Update a specific prova inline
- * @param planoId - PlanoFormacoes ID
- * @param numero - Prova number (1-3)
- * @param data - Updated fields
- */
 export async function updateProvaInline(planoId: ID, numero: number, data: Record<string, unknown>): Promise<GenericRecord> {
-  return apiRequest(() => api.patch(`/dat/plano-formacoes/${planoId}/prova/${numero}/`, data));
+  return fetchWithErrorMapping(`/dat/plano-formacoes/${planoId}/prova/${numero}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, DAT_ERROR_MAP);
 }

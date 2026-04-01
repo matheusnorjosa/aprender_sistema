@@ -10,6 +10,7 @@
 
 import { useState, useMemo, JSX } from 'react';
 import useMonthlyQuery from './useMonthlyQuery';
+import SyncIndicator from '../../components/SyncIndicator';
 import FiltersBar from './FiltersBar';
 import Legend from './Legend';
 import Grid from './Grid';
@@ -102,6 +103,13 @@ export default function MonthlyPage(): JSX.Element {
             Visualize a disponibilidade mensal de formadores e coordenadores.
             Clique em uma célula para ver detalhes dos eventos.
           </p>
+          <div className="mt-2">
+            <SyncIndicator
+              lastUpdated={formadores.lastUpdated}
+              loading={formadores.loading}
+              onRefresh={formadores.refetch}
+            />
+          </div>
         </header>
 
         {/* Filtros compartilhados */}

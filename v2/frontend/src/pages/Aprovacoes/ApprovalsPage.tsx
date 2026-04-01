@@ -13,7 +13,7 @@
  * - Conformidade ISO 9241-110: Controle explícito (usuário vê apenas ações permitidas)
  */
 
-import { useState, useEffect, useCallback, useMemo, ChangeEvent, Key, JSX } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, Key, JSX } from 'react';
 import {
   Table,
   Card,
@@ -52,6 +52,9 @@ import {
   rejectSolicitacoesBatch,
 } from '../../api/solicitacoes';
 import { getMe } from '../../api/availability';
+import { TIMING } from '../../constants/timing';
+import { usePolling } from '../../hooks/usePolling';
+import { syncChannel } from '../../services/syncChannel';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, SolicitacaoStatus, PaginatedResponse, Participation, BatchOperationResult } from '../../types';
 
@@ -125,6 +128,22 @@ export default function ApprovalsPage(): JSX.Element {
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  // RT-02: Polling 5s for cross-device sync (#1032)
+  const loadDataRef = useRef(loadData);
+  loadDataRef.current = loadData;
+  usePolling(() => loadDataRef.current(), {
+    enabled: true,
+    intervalMs: TIMING.SYNC_POLL_INTERVAL_MS,
+    events: ['solicitacoes:refresh', 'aprovacoes:refresh'],
+  });
+
+  // RT-02: BroadcastChannel for instant cross-tab sync
+  useEffect(() => {
+    const unsub1 = syncChannel.subscribe('solicitacoes', () => { loadData(); });
+    const unsub2 = syncChannel.subscribe('aprovacoes', () => { loadData(); });
+    return () => { unsub1(); unsub2(); };
   }, [loadData]);
 
   // PA-06: Carregar dados do usuário e verificar permissão

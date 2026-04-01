@@ -9,7 +9,7 @@
  * - Operações em lote (Reapply/Resync) via seleção múltipla
  */
 
-import { useState, useEffect, useCallback, useMemo, ChangeEvent, Key, JSX } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, Key, JSX } from 'react';
 import {
   Table,
   Card,
@@ -66,6 +66,9 @@ import { getMe } from '../../api/availability';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
 import useGoogleGuard from '../../hooks/useGoogleGuard';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
+import { TIMING } from '../../constants/timing';
+import { usePolling } from '../../hooks/usePolling';
+import { syncChannel } from '../../services/syncChannel';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, GCalStatus, CurrentUser, PaginatedResponse } from '../../types';
 
@@ -176,6 +179,22 @@ export default function PreAgendaPage(): JSX.Element {
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  // RT-02: Polling 5s for cross-device sync (#1032)
+  const loadDataRef = useRef(loadData);
+  loadDataRef.current = loadData;
+  usePolling(() => loadDataRef.current(), {
+    enabled: true,
+    intervalMs: TIMING.SYNC_POLL_INTERVAL_MS,
+    events: ['preagenda:refresh', 'solicitacoes:refresh'],
+  });
+
+  // RT-02: BroadcastChannel for instant cross-tab sync
+  useEffect(() => {
+    const unsub1 = syncChannel.subscribe('preagenda', () => { loadData(); });
+    const unsub2 = syncChannel.subscribe('solicitacoes', () => { loadData(); });
+    return () => { unsub1(); unsub2(); };
   }, [loadData]);
 
   // Issue #260: Memoizar handlers para evitar re-renderização desnecessária

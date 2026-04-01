@@ -6,6 +6,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getMonthlyAvailability } from '../../api/availability';
+import { TIMING } from '../../constants/timing';
+import { usePolling } from '../../hooks/usePolling';
+import { syncChannel } from '../../services/syncChannel';
 
 /**
  * Parameters for the monthly query hook
@@ -85,6 +88,21 @@ export default function useMonthlyQuery(
 
   useEffect(() => {
     fetchData();
+  }, [fetchData]);
+
+  // RT-02: Polling 5s for cross-device sync (#1032)
+  usePolling(fetchData, {
+    enabled: true,
+    intervalMs: TIMING.SYNC_POLL_INTERVAL_MS,
+    events: ['availability:refresh'],
+  });
+
+  // RT-02: BroadcastChannel for instant cross-tab sync
+  useEffect(() => {
+    const unsub = syncChannel.subscribe('availability', () => {
+      fetchData();
+    });
+    return unsub;
   }, [fetchData]);
 
   return {

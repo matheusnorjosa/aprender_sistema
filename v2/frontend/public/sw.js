@@ -5,7 +5,7 @@
  * and network-first with cache fallback for API requests.
  */
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const STATIC_CACHE_NAME = `aprender-v2-static-${CACHE_VERSION}`;
 const API_CACHE_NAME = `aprender-v2-api-${CACHE_VERSION}`;
 
@@ -77,7 +77,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets: cache-first with network fallback
+  // Navigation requests (HTML pages): network-first to always get latest index.html
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirstWithCache(request));
+    return;
+  }
+
+  // Static assets (JS, CSS, images): cache-first with network fallback
   event.respondWith(cacheFirstWithNetwork(request));
 });
 

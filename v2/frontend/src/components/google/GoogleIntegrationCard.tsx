@@ -40,6 +40,7 @@ interface CalendarItem {
   primary?: boolean;
 }
 
+
 /**
  * Google integration status interface
  */
@@ -66,7 +67,6 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegr
   const [loadingCalendars, setLoadingCalendars] = useState(false);
   const [selectedCalendar, setSelectedCalendar] = useState<string | null>(null);
   const [savingCalendar, setSavingCalendar] = useState(false);
-
   // Extrair valores de status (ou usar defaults se status for null)
   const { connected, googleEmail, tokenExpiry, expiresInDays, isExpired, defaultCalendarId } = status || {};
 

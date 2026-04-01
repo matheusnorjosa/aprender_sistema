@@ -21,4 +21,8 @@ export const TIMING = {
 
   // Delays
   GCAL_DETAIL_LOAD_DELAY_MS: 2000,
+
+  // Real-time sync (Epic #1032)
+  SYNC_POLL_INTERVAL_MS: 5_000, // 5s for critical pages (cross-device)
+  SYNC_POLL_BACKGROUND_MS: 30_000, // 30s when tab is hidden
 } as const;

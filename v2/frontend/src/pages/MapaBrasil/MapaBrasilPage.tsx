@@ -44,7 +44,7 @@ import { MapContainer, GeoJSON, useMap } from 'react-leaflet';
 import type { Map as LeafletMap, Layer, GeoJSON as LeafletGeoJSON, PathOptions, LatLngBounds } from 'leaflet';
 import type { Feature, Geometry, FeatureCollection } from 'geojson';
 import 'leaflet/dist/leaflet.css';
-import api from '../../api';
+import { fetchAPI, buildUrl, type QueryParams } from '../../api/config';
 import logger from '../../utils/logger';
 import type { ID } from '../../types';
 import {
@@ -221,8 +221,8 @@ export default function MapaBrasilPage(): JSX.Element {
   useEffect(() => {
     const fetchProjetos = async (): Promise<void> => {
       try {
-        const response = await api.get('/projetos/', { params: { page_size: 100 } });
-        setProjetos([{ id: null, nome: 'Todos os Projetos' }, ...(response.data.results || [])]);
+        const data = await fetchAPI<{ results: Array<{ id: ID | null; nome: string }> }>(buildUrl('/projetos/', { page_size: 100 }));
+        setProjetos([{ id: null, nome: 'Todos os Projetos' }, ...(data.results || [])]);
       } catch (err) {
         logger.error('Erro ao carregar projetos:', err);
       }
@@ -250,8 +250,8 @@ export default function MapaBrasilPage(): JSX.Element {
     try {
       const params = forcedParams ?? buildCurrentMapParams();
 
-      const response = await api.get('/metrics/map/', { params });
-      const normalized = normalizeMapMetricsResponse(response.data as MapMetricsResponse);
+      const data = await fetchAPI<MapMetricsResponse>(buildUrl('/metrics/map/', params as QueryParams));
+      const normalized = normalizeMapMetricsResponse(data);
 
       setAppliedMapFilters(params);
       setMunicipiosData(normalized.municipios);
@@ -277,8 +277,8 @@ export default function MapaBrasilPage(): JSX.Element {
 
     setLoadingCoordinators(true);
     try {
-      const response = await api.get('/metrics/map/coordinators/', { params: { uf, ...filters } });
-      setCoordenadoresData(response.data.coordenadores || []);
+      const data = await fetchAPI<{ coordenadores: CoordenadorDataType[] }>(buildUrl('/metrics/map/coordinators/', { uf, ...filters } as QueryParams));
+      setCoordenadoresData(data.coordenadores || []);
     } catch (err) {
       logger.error('Erro ao buscar coordenadores:', err);
       setCoordenadoresData([]);

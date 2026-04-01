@@ -22,7 +22,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '../api';
+import { fetchAPI } from '../api/config';
 import logger from '../utils/logger';
 
 /**
@@ -74,8 +74,8 @@ const useGoogleIntegration = (): UseGoogleIntegrationReturn => {
     setError(null);
 
     try {
-      const response = await api.get<GoogleIntegrationStatus>('/integrations/google/status/');
-      setStatus(response.data);
+      const data = await fetchAPI<GoogleIntegrationStatus>('/integrations/google/status/');
+      setStatus(data);
     } catch (err) {
       logger.error('Erro ao carregar status Google:', err);
       const axiosError = err as { response?: { data?: { error?: string } } };
@@ -93,7 +93,7 @@ const useGoogleIntegration = (): UseGoogleIntegrationReturn => {
     setError(null);
 
     try {
-      await api.post('/integrations/google/disconnect/');
+      await fetchAPI('/integrations/google/disconnect/', { method: 'POST' });
 
       // Atualizar estado local
       setStatus({

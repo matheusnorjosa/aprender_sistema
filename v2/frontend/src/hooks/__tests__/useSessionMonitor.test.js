@@ -1,15 +1,19 @@
 /**
  * Tests for useSessionMonitor hook.
- *
- * @see useSessionMonitor.js
+ * Migrated from axios mock to fetchAPI mock (Epic #1039)
  */
 
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import useSessionMonitor from '../useSessionMonitor';
-import api from '../../api';
 
-vi.mock('../../api');
+const fetchAPIMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../api/config', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, fetchAPI: fetchAPIMock };
+});
+
+import useSessionMonitor from '../useSessionMonitor';
 
 describe('useSessionMonitor', () => {
   beforeEach(() => {
@@ -32,15 +36,12 @@ describe('useSessionMonitor', () => {
   it('calculates timeLeft correctly', () => {
     const { result } = renderHook(() => useSessionMonitor());
 
-    // Initial timeLeft should be close to sessionAge (7200s)
     expect(result.current.timeLeft).toBeLessThanOrEqual(7200);
     expect(result.current.timeLeft).toBeGreaterThan(7100);
   });
 
   it('renewSession updates session and returns true on success', async () => {
-    api.post.mockResolvedValue({
-      data: { session_age: 7200 },
-    });
+    fetchAPIMock.mockResolvedValue({ session_age: 7200 });
 
     const { result } = renderHook(() => useSessionMonitor());
 
@@ -50,12 +51,12 @@ describe('useSessionMonitor', () => {
     });
 
     expect(success).toBe(true);
-    expect(api.post).toHaveBeenCalledWith('/auth/ping/');
+    expect(fetchAPIMock).toHaveBeenCalledWith('/auth/ping/', { method: 'POST' });
     expect(result.current.showWarning).toBe(false);
   });
 
   it('renewSession returns false on API error', async () => {
-    api.post.mockRejectedValue(new Error('Network error'));
+    fetchAPIMock.mockRejectedValue(new Error('Network error'));
 
     const { result } = renderHook(() => useSessionMonitor());
 
@@ -72,9 +73,7 @@ describe('useSessionMonitor', () => {
     delete window.location;
     window.location = { href: '' };
 
-    api.post.mockRejectedValue({
-      response: { status: 401 },
-    });
+    fetchAPIMock.mockRejectedValue({ response: { status: 401 } });
 
     const { result } = renderHook(() => useSessionMonitor());
 
@@ -90,12 +89,10 @@ describe('useSessionMonitor', () => {
   it('shows warning when time left is below threshold', async () => {
     const { result } = renderHook(() => useSessionMonitor());
 
-    // Advance time to near expiration (7200 - 300 = 6900 seconds + 60s for interval)
     await act(async () => {
-      vi.advanceTimersByTime((6900 + 60) * 1000);
+      vi.advanceTimersByTime(6960 * 1000);
     });
 
-    // Assertion direta após os timers serem processados
     expect(result.current.showWarning).toBe(true);
   });
 });

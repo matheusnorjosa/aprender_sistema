@@ -26,7 +26,7 @@ import {
   DisconnectOutlined,
   CalendarOutlined,
 } from '@ant-design/icons';
-import api from '../../api';
+import { fetchAPI } from '../../api/config';
 import logger from '../../utils/logger';
 
 const { Text, Title } = Typography;
@@ -95,8 +95,8 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegr
   const loadCalendars = async (): Promise<void> => {
     try {
       setLoadingCalendars(true);
-      const response = await api.get<{ calendars: CalendarItem[] }>('/integrations/google/calendars/');
-      setCalendars(response.data.calendars || []);
+      const data = await fetchAPI<{ calendars: CalendarItem[] }>('/integrations/google/calendars/');
+      setCalendars(data.calendars || []);
     } catch (error) {
       logger.error('Erro ao carregar calendários:', error);
       message.error('Não foi possível carregar seus calendários');
@@ -108,8 +108,9 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegr
   const handleCalendarChange = async (calendarId: string): Promise<void> => {
     try {
       setSavingCalendar(true);
-      await api.post('/integrations/google/select-calendar/', {
-        calendar_id: calendarId,
+      await fetchAPI('/integrations/google/select-calendar/', {
+        method: 'POST',
+        body: JSON.stringify({ calendar_id: calendarId }),
       });
       setSelectedCalendar(calendarId);
       message.success('Calendário selecionado com sucesso');

@@ -25,7 +25,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import api from '../api';
+import { fetchAPI, buildUrl, type QueryParams } from '../api/config';
 import { TIMING } from '../constants';
 
 const CACHE_TTL = 300000; // 5 minutos em ms (sincronizado com backend)
@@ -133,8 +133,7 @@ const useDebouncedOptions = <T = unknown>(
     setError(null);
 
     try {
-      const response = await api.get<T[]>(endpoint, { params });
-      const data = response.data;
+      const data = await fetchAPI<T[]>(buildUrl(endpoint, params as QueryParams));
 
       setOptions(data);
       saveToCache(cacheKey, data);

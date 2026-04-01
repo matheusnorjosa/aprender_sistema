@@ -13,7 +13,7 @@
  * ```
  */
 
-import api from '../api';
+import { fetchAPI } from '../api/config';
 import { searchIndex } from './searchIndex';
 
 /** Stats returned from preload operation */
@@ -47,30 +47,31 @@ export async function preloadSearchData(force: boolean = false): Promise<Preload
   try {
     // Load data in parallel for performance
     // Note: api instance already has baseURL '/api', so we use relative paths
+    type R = Record<string, unknown>;
     const [municipios, projetos, usuarios, tiposEvento] = await Promise.all([
-      api.get('/options/municipios/').catch(() => ({ data: [] as unknown[] })),
-      api.get('/options/projetos/').catch(() => ({ data: [] as unknown[] })),
-      api.get('/options/usuarios/').catch(() => ({ data: [] as unknown[] })),
-      api.get('/options/tipos-evento/').catch(() => ({ data: [] as unknown[] })),
+      fetchAPI<R[]>('/options/municipios/').catch(() => [] as R[]),
+      fetchAPI<R[]>('/options/projetos/').catch(() => [] as R[]),
+      fetchAPI<R[]>('/options/usuarios/').catch(() => [] as R[]),
+      fetchAPI<R[]>('/options/tipos-evento/').catch(() => [] as R[]),
     ]);
 
     // Index for instant search
-    await searchIndex.index('municipios', municipios.data, {
+    await searchIndex.index('municipios', municipios, {
       keys: ['nome', 'uf'],
       threshold: 0.2,
     });
 
-    await searchIndex.index('projetos', projetos.data, {
+    await searchIndex.index('projetos', projetos, {
       keys: ['nome', 'codigo'],
       threshold: 0.2,
     });
 
-    await searchIndex.index('usuarios', usuarios.data, {
+    await searchIndex.index('usuarios', usuarios, {
       keys: ['nome', 'email', 'username'],
       threshold: 0.3,
     });
 
-    await searchIndex.index('tiposEvento', tiposEvento.data, {
+    await searchIndex.index('tiposEvento', tiposEvento, {
       keys: ['nome'],
       threshold: 0.2,
     });
@@ -78,10 +79,10 @@ export async function preloadSearchData(force: boolean = false): Promise<Preload
     lastLoadTime = now;
 
     const stats: PreloadStats = {
-      municipios: municipios.data.length,
-      projetos: projetos.data.length,
-      usuarios: usuarios.data.length,
-      tiposEvento: tiposEvento.data.length,
+      municipios: Array.isArray(municipios) ? municipios.length : 0,
+      projetos: Array.isArray(projetos) ? projetos.length : 0,
+      usuarios: Array.isArray(usuarios) ? usuarios.length : 0,
+      tiposEvento: Array.isArray(tiposEvento) ? tiposEvento.length : 0,
     };
 
     console.log('[SearchIndex] Preloaded:', stats);

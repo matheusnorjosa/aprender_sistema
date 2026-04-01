@@ -23,7 +23,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '../api';
+import { fetchAPI } from '../api/config';
 
 const WARNING_THRESHOLD = 300; // 5 minutos em segundos
 const CHECK_INTERVAL = 60000; // Verificar a cada 60 segundos
@@ -64,8 +64,8 @@ const useSessionMonitor = (): UseSessionMonitorReturn => {
    */
   const renewSession = useCallback(async (): Promise<boolean> => {
     try {
-      const response = await api.post<PingResponse>('/auth/ping/');
-      const { session_age } = response.data;
+      const data = await fetchAPI<PingResponse>('/auth/ping/', { method: 'POST' });
+      const { session_age } = data;
 
       setSessionAge(session_age);
       setLastActivity(Date.now());

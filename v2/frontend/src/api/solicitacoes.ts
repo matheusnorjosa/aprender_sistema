@@ -5,6 +5,7 @@
  */
 
 import { fetchAPI, buildUrl, type QueryParams } from './config';
+import { syncChannel } from '../services/syncChannel';
 import logger from '../utils/logger';
 import type {
   ID,
@@ -74,10 +75,13 @@ export async function createSolicitacao(body: SolicitacaoPayload): Promise<Solic
   logger.debug('Body enviado:', body);
   logger.debug('JSON stringificado:', JSON.stringify(body));
 
-  return await fetchAPI('/solicitacoes/', {
+  const result = await fetchAPI<Solicitacao>('/solicitacoes/', {
     method: 'POST',
     body: JSON.stringify(body),
   });
+  syncChannel.publish('solicitacoes', { action: 'created' });
+  syncChannel.publish('availability', { action: 'changed' });
+  return result;
 }
 
 /**
@@ -87,10 +91,14 @@ export async function createSolicitacao(body: SolicitacaoPayload): Promise<Solic
  * @param reason - Motivo/justificativa (opcional)
  */
 export async function approveSolicitacao(id: ID, reason: string = ''): Promise<Solicitacao> {
-  return await fetchAPI(`/solicitacoes/${id}/approve/`, {
+  const result = await fetchAPI<Solicitacao>(`/solicitacoes/${id}/approve/`, {
     method: 'PATCH',
     body: JSON.stringify(reason ? { reason } : {}),
   });
+  syncChannel.publish('solicitacoes', { action: 'approved' });
+  syncChannel.publish('aprovacoes', { action: 'changed' });
+  syncChannel.publish('preagenda', { action: 'changed' });
+  return result;
 }
 
 /**
@@ -100,10 +108,13 @@ export async function approveSolicitacao(id: ID, reason: string = ''): Promise<S
  * @param reason - Motivo/justificativa (opcional)
  */
 export async function rejectSolicitacao(id: ID, reason: string = ''): Promise<Solicitacao> {
-  return await fetchAPI(`/solicitacoes/${id}/reject/`, {
+  const result = await fetchAPI<Solicitacao>(`/solicitacoes/${id}/reject/`, {
     method: 'PATCH',
     body: JSON.stringify(reason ? { reason } : {}),
   });
+  syncChannel.publish('solicitacoes', { action: 'rejected' });
+  syncChannel.publish('aprovacoes', { action: 'changed' });
+  return result;
 }
 
 /**
@@ -131,10 +142,13 @@ export async function updateSolicitacao(id: ID, data: Partial<SolicitacaoPayload
   logger.debug('ID:', id);
   logger.debug('Data:', data);
 
-  return await fetchAPI(`/solicitacoes/${id}/`, {
+  const result = await fetchAPI<Solicitacao>(`/solicitacoes/${id}/`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
+  syncChannel.publish('solicitacoes', { action: 'updated' });
+  syncChannel.publish('availability', { action: 'changed' });
+  return result;
 }
 
 /**
@@ -150,9 +164,11 @@ export async function deleteSolicitacao(id: ID): Promise<void> {
   logger.debug('=== deleteSolicitacao ===');
   logger.debug('ID:', id);
 
-  return await fetchAPI(`/solicitacoes/${id}/`, {
+  await fetchAPI(`/solicitacoes/${id}/`, {
     method: 'DELETE',
   });
+  syncChannel.publish('solicitacoes', { action: 'deleted' });
+  syncChannel.publish('availability', { action: 'changed' });
 }
 
 /**
@@ -174,10 +190,13 @@ export async function previewSolicitacao(id: ID): Promise<GCalPreviewPayload> {
  * @param body - Opções (dry_run, apply_blocked, etc.)
  */
 export async function publishSolicitacao(id: ID, body: PublishOptions = {}): Promise<PublishResult> {
-  return await fetchAPI(`/solicitacoes/${id}/publish/`, {
+  const result = await fetchAPI<PublishResult>(`/solicitacoes/${id}/publish/`, {
     method: 'POST',
     body: JSON.stringify(body),
   });
+  syncChannel.publish('preagenda', { action: 'published' });
+  syncChannel.publish('solicitacoes', { action: 'updated' });
+  return result;
 }
 
 /**
@@ -189,10 +208,12 @@ export async function publishSolicitacao(id: ID, body: PublishOptions = {}): Pro
  * @param id - ID da solicitação aprovada
  */
 export async function resyncSolicitacao(id: ID): Promise<PublishResult> {
-  return await fetchAPI(`/solicitacoes/${id}/resync-gcal/`, {
+  const result = await fetchAPI<PublishResult>(`/solicitacoes/${id}/resync-gcal/`, {
     method: 'POST',
     body: JSON.stringify({}),
   });
+  syncChannel.publish('preagenda', { action: 'resynced' });
+  return result;
 }
 
 /**
@@ -204,10 +225,13 @@ export async function resyncSolicitacao(id: ID): Promise<PublishResult> {
  * @param id - ID da solicitação com evento publicado
  */
 export async function cancelSolicitacao(id: ID): Promise<PublishResult> {
-  return await fetchAPI(`/solicitacoes/${id}/cancel-gcal/`, {
+  const result = await fetchAPI<PublishResult>(`/solicitacoes/${id}/cancel-gcal/`, {
     method: 'POST',
     body: JSON.stringify({}),
   });
+  syncChannel.publish('preagenda', { action: 'cancelled' });
+  syncChannel.publish('solicitacoes', { action: 'updated' });
+  return result;
 }
 
 // ========================================
@@ -255,10 +279,14 @@ export async function listUsuariosOptions(params: QueryParams = {}): Promise<Usu
  * @param ids - IDs das solicitações a aprovar
  */
 export async function approveSolicitacoesBatch(ids: ID[]): Promise<BatchOperationResult> {
-  return await fetchAPI('/solicitacoes/batch-approve/', {
+  const result = await fetchAPI<BatchOperationResult>('/solicitacoes/batch-approve/', {
     method: 'POST',
     body: JSON.stringify({ ids }),
   });
+  syncChannel.publish('solicitacoes', { action: 'batch_approved' });
+  syncChannel.publish('aprovacoes', { action: 'changed' });
+  syncChannel.publish('preagenda', { action: 'changed' });
+  return result;
 }
 
 /**
@@ -267,10 +295,13 @@ export async function approveSolicitacoesBatch(ids: ID[]): Promise<BatchOperatio
  * @param ids - IDs das solicitações a reprovar
  */
 export async function rejectSolicitacoesBatch(ids: ID[]): Promise<BatchOperationResult> {
-  return await fetchAPI('/solicitacoes/batch-reject/', {
+  const result = await fetchAPI<BatchOperationResult>('/solicitacoes/batch-reject/', {
     method: 'POST',
     body: JSON.stringify({ ids }),
   });
+  syncChannel.publish('solicitacoes', { action: 'batch_rejected' });
+  syncChannel.publish('aprovacoes', { action: 'changed' });
+  return result;
 }
 
 // Re-exportar checkAvailability de availability

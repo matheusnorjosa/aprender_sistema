@@ -6,6 +6,7 @@
 
 import { fetchAPI, buildUrl, type QueryParams } from './config';
 import { API_BASE } from './config';
+import { syncChannel } from '../services/syncChannel';
 import type { ID, PaginatedResponse, GCalDashboardEvent } from '../types';
 
 /**
@@ -251,10 +252,12 @@ export async function publishBatch(body: BatchPublishRequest): Promise<BatchOper
  * @param body - { ids: [...], dry_run?: bool, apply_blocked?: bool }
  */
 export async function reapplyBatch(body: BatchIdsRequest): Promise<BatchOperationResponse> {
-  return await fetchAPI('/gcal/dashboard/batch/reapply/', {
+  const result = await fetchAPI<BatchOperationResponse>('/gcal/dashboard/batch/reapply/', {
     method: 'POST',
     body: JSON.stringify(body),
   });
+  syncChannel.publish('preagenda', { action: 'batch_reapplied' });
+  return result;
 }
 
 /**
@@ -263,10 +266,12 @@ export async function reapplyBatch(body: BatchIdsRequest): Promise<BatchOperatio
  * @param body - { ids: [...], dry_run?: bool, apply_blocked?: bool }
  */
 export async function resyncBatch(body: BatchIdsRequest): Promise<BatchOperationResponse> {
-  return await fetchAPI('/gcal/dashboard/batch/resync/', {
+  const result = await fetchAPI<BatchOperationResponse>('/gcal/dashboard/batch/resync/', {
     method: 'POST',
     body: JSON.stringify(body),
   });
+  syncChannel.publish('preagenda', { action: 'batch_resynced' });
+  return result;
 }
 
 /**

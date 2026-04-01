@@ -5,6 +5,7 @@
  */
 
 import { fetchAPI, buildUrl, type QueryParams } from './config';
+import { syncChannel } from '../services/syncChannel';
 import type {
   ID,
   CurrentUser,
@@ -83,10 +84,12 @@ export async function getBlocks(params: BlockFilters = { owner: 'me' }): Promise
  * @param data - Dados do bloqueio
  */
 export async function createBlock(data: AvailabilityBlockPayload): Promise<AvailabilityBlock> {
-  return await fetchAPI('/availability-blocks/', {
+  const result = await fetchAPI<AvailabilityBlock>('/availability-blocks/', {
     method: 'POST',
     body: JSON.stringify(data),
   });
+  syncChannel.publish('availability', { action: 'block_created' });
+  return result;
 }
 
 /**
@@ -98,6 +101,7 @@ export async function deleteBlock(id: ID): Promise<void> {
   await fetchAPI(`/availability-blocks/${id}/`, {
     method: 'DELETE',
   });
+  syncChannel.publish('availability', { action: 'block_deleted' });
 }
 
 /**

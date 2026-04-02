@@ -74,10 +74,10 @@ const useSessionMonitor = (): UseSessionMonitorReturn => {
       return true;
     } catch (err) {
       // Erro ao renovar sessão - pode ser 401/403 (sessão expirada)
-      const axiosError = err as { response?: { status?: number } };
+      const httpError = err as { response?: { status?: number } };
 
       // Se retornar 401/403, sessão expirou
-      if (axiosError.response?.status === 401 || axiosError.response?.status === 403) {
+      if (httpError.response?.status === 401 || httpError.response?.status === 403) {
         window.location.href = '/login'; // Redirecionar para login
       }
 

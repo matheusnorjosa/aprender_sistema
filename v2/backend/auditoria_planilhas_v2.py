@@ -16,11 +16,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
-import pytz
+from zoneinfo import ZoneInfo
 import requests
 
 # Configuração
-TZ = pytz.timezone("America/Fortaleza")
+TZ = ZoneInfo("America/Fortaleza")
 OUTPUT_DIR = Path("/app/.agents/outbox") if Path("/.dockerenv").exists() else Path("v2/.agents/outbox")
 TEMP_DIR = Path("/tmp/auditoria_sheets")
 

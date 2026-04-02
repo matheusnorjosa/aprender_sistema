@@ -316,9 +316,9 @@ Failures are sent to Sentry when `SENTRY_DSN` is configured:
 
 ### Recovery Point Objective (RPO)
 
-- **Expected RPO**: 24 hours (daily backups)
-- **Data loss**: Up to 24 hours of transactions since last backup
-- **Mitigation**: Consider hourly incremental backups (future enhancement)
+- **Expected RPO**: 5 minutes (WAL archiving + daily full dump)
+- **Data loss**: Up to 5 minutes of transactions (WAL archive_timeout=300)
+- **Daily dump**: Full pg_dump backup as baseline for PITR
 
 ## Testing
 

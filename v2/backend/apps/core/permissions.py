@@ -255,8 +255,8 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
         try:
             gerencia_id = int(gerencia_id_raw)
         except (TypeError, ValueError):
-            # Deixar o view validar e retornar 400 quando aplicável
-            return True
+            self.message = "gerencia_id deve ser um número inteiro."
+            return False
 
         # Com gerencia_id = verificar se usuário pertence à gerência
         from apps.core.models import EquipeGerencia

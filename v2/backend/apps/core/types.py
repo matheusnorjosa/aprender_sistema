@@ -132,7 +132,7 @@ PayloadHash: TypeAlias = str
 """Hash SHA1 hex (40 chars) de payload GCal para drift detection."""
 
 ExternalHash: TypeAlias = str
-"""Hash SHA1 hex para idempotência de ETL (external_hash)."""
+"""Hash SHA256 hex (64 chars) para idempotência de ETL e imports."""
 
 # ==============================================================================
 # 6. Handlers e Callbacks

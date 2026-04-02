@@ -2,8 +2,6 @@
  * API Client for DAT Module endpoints
  *
  * Ref: v2/docs/SPEC_DAT_REGISTROS.md
- *
- * Migrated from axios to fetchAPI (Epic #1039)
  */
 
 import { fetchAPI, fetchBlob, fetchWithErrorMapping, buildUrl, type QueryParams } from './config';

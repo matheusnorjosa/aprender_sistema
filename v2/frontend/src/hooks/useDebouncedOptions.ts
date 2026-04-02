@@ -138,8 +138,8 @@ const useDebouncedOptions = <T = unknown>(
       setOptions(data);
       saveToCache(cacheKey, data);
     } catch (err) {
-      const axiosError = err as { response?: { data?: { error?: string } } };
-      setError(axiosError.response?.data?.error || 'Erro ao carregar opções');
+      const httpError = err as { response?: { data?: { error?: string } } };
+      setError(httpError.response?.data?.error || 'Erro ao carregar opções');
       setOptions([]);
     } finally {
       setLoading(false);

@@ -50,9 +50,8 @@ Mensagens devem incluir:
 
 | Código | Significado |
 |--------|-------------|
-| E | Evento existente (overlap) |
-| M | Mais de um evento (capacidade) |
+| X | Sobreposição de eventos (overlap) |
+| M | Capacidade diária excedida |
 | D | Deslocamento insuficiente |
 | P | Bloqueio parcial |
 | T | Bloqueio total |
-| X | Outro conflito |

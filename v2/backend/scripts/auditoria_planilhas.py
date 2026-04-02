@@ -13,9 +13,9 @@ from collections import defaultdict
 from datetime import date, datetime, time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
 import pandas as pd
-from zoneinfo import ZoneInfo
 import requests
 
 # Configuração

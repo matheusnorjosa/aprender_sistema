@@ -3,7 +3,7 @@
  */
 
 /**
- * Extract HTTP status code from various error shapes (axios, fetch, custom).
+ * Extract HTTP status code from various error shapes (fetch, custom).
  */
 export function getErrorStatus(error: unknown): number | undefined {
   if (typeof error === 'object' && error !== null) {

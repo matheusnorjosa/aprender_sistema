@@ -129,10 +129,10 @@ JsonList: TypeAlias = list[JsonDict]
 """Lista de dicionários JSON."""
 
 PayloadHash: TypeAlias = str
-"""Hash SHA256 de payload (ex: gcal_payload_hash para idempotência)."""
+"""Hash SHA1 hex (40 chars) de payload GCal para drift detection."""
 
 ExternalHash: TypeAlias = str
-"""Hash SHA1/SHA256 para idempotência de ETL (external_hash)."""
+"""Hash SHA1 hex para idempotência de ETL (external_hash)."""
 
 # ==============================================================================
 # 6. Handlers e Callbacks

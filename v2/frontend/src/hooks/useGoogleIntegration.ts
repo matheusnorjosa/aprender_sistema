@@ -78,8 +78,8 @@ const useGoogleIntegration = (): UseGoogleIntegrationReturn => {
       setStatus(data);
     } catch (err) {
       logger.error('Erro ao carregar status Google:', err);
-      const axiosError = err as { response?: { data?: { error?: string } } };
-      setError(axiosError.response?.data?.error || 'Erro ao carregar status da integração');
+      const httpError = err as { response?: { data?: { error?: string } } };
+      setError(httpError.response?.data?.error || 'Erro ao carregar status da integração');
     } finally {
       setLoading(false);
     }
@@ -107,8 +107,8 @@ const useGoogleIntegration = (): UseGoogleIntegrationReturn => {
       return { success: true };
     } catch (err) {
       logger.error('Erro ao desconectar Google:', err);
-      const axiosError = err as { response?: { data?: { error?: string } } };
-      const errorMessage = axiosError.response?.data?.error || 'Erro ao desconectar conta Google';
+      const httpError = err as { response?: { data?: { error?: string } } };
+      const errorMessage = httpError.response?.data?.error || 'Erro ao desconectar conta Google';
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {

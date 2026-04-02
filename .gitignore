@@ -596,3 +596,9 @@ nul
 # Code Review Graph (development tool)
 .code-review-graph/
 .code-review-graphignore
+
+# VS Code Background Shell extension
+.bg-shell/
+
+# GSD-2 state (local orchestration)
+.gsd/

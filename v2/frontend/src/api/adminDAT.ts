@@ -2,8 +2,6 @@
  * API Client for Admin DAT endpoints
  *
  * GAP-001/002 resolved: Endpoints reactivated/created in Phase 1 Iteration 2
- *
- * Migrated from axios to fetchAPI (Epic #1039)
  */
 
 import { fetchAPI, fetchWithErrorMapping, buildUrl, type QueryParams } from './config';

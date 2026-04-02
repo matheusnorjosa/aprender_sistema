@@ -4,8 +4,8 @@
 
 | Métrica | Valor |
 |---------|-------|
-| **RPO** (Recovery Point Objective) | ~5 minutos |
-| **RTO** (Recovery Time Objective) | ~30 minutos |
+| **RPO** (Recovery Point Objective) | 5 minutos |
+| **RTO** (Recovery Time Objective) | 1 hora |
 | **Retenção** | 7 dias |
 | **Frequência** | Diário às 3h |
 

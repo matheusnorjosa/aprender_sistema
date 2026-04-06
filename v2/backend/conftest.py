@@ -1,12 +1,11 @@
 """
-conftest.py - Auto-inject default test user for Solicitacao (Fix for NOT NULL usuario_id constraint)
+conftest.py — Test fixtures for Aprender Sistema v2.
 
-This conftest ensures all Solicitacao instances have a valid usuario_id, preventing
-IntegrityError: null value in column "usuario_id" violates not-null constraint.
+Provides a per-test user that auto-injects into Solicitacao instances
+missing usuario_id. Uses pre_save signal scoped to test lifetime
+(connected on setup, disconnected on teardown).
 
-Applied to:
-- pytest test suite (36 failing tests)
-- ETL imports (missing coordenador/usuario in planilhas)
+Refactored from #847: signal now properly disconnects after each test.
 """
 
 from uuid import uuid4
@@ -18,42 +17,39 @@ import pytest
 
 
 @pytest.fixture(autouse=True, scope="function")
-def _ensure_default_test_user(django_db_setup, django_db_blocker, faker):
+def default_test_user(db):
     """
-    Create default test user and auto-inject into Solicitacao instances missing usuario_id.
+    Create unique test user and auto-inject into Solicitacao.
 
-    Runs once per test function with unique CPF to avoid IntegrityError.
+    - Connected via pre_save signal (scoped to this test only)
+    - Disconnected in teardown (no leaking between tests)
+    - Unique CPF/username via uuid4 (xdist-safe)
+
+    Available as explicit fixture: `def test_x(default_test_user):`
     """
     from apps.core.models import Solicitacao, Usuario
 
-    with django_db_blocker.unblock():
-        # Create default test user with Python uuid4() (truly random, not seeded)
-        # CRITICAL: faker.uuid4() is seeded and generates duplicates across tests!
-        # Python's uuid4() uses os.urandom() and is cryptographically secure
-        uid = uuid4().hex  # 32 chars hex (no hyphens), 128-bit entropy
-        user = Usuario.objects.create(
-            username=f"test_{uid}",
-            email=f"test_{uid}@example.com",
-            first_name=faker.first_name(),
-            last_name=faker.last_name(),
-            cpf=str(uuid4().int % 10**11).zfill(11),  # 11-digit CPF from UUID int
-            is_active=True,
-        )
+    uid = uuid4().hex
+    user = Usuario.objects.create(
+        username=f"test_{uid}",
+        email=f"test_{uid}@example.com",
+        first_name="Test",
+        last_name="User",
+        cpf=str(uuid4().int % 10**11).zfill(11),
+        is_active=True,
+    )
 
-        # Get existing Coordenador group (created by seed_rbac)
-        try:
-            coordenador_group = Group.objects.get(name="Coordenador")
-            user.groups.add(coordenador_group)
-        except Group.DoesNotExist:
-            # Fallback: create if doesn't exist (shouldn't happen)
-            coordenador_group = Group.objects.create(name="Coordenador")
-            user.groups.add(coordenador_group)
+    coordenador_group, _ = Group.objects.get_or_create(name="Coordenador")
+    user.groups.add(coordenador_group)
 
-        # Auto-inject user into Solicitacao instances missing usuario_id
-        def _auto_inject_user(sender, instance, **kwargs):
-            """Pre-save signal: inject default user if usuario_id is None"""
-            if isinstance(instance, Solicitacao) and not instance.usuario_id:
-                instance.usuario = user
+    # Scoped signal: inject user into Solicitacao missing usuario_id
+    def _auto_inject_user(sender, instance, **kwargs):
+        if isinstance(instance, Solicitacao) and not instance.usuario_id:
+            instance.usuario = user
 
-        # Connect signal (weak=False ensures it persists for the session)
-        pre_save.connect(_auto_inject_user, sender=Solicitacao, weak=False)
+    pre_save.connect(_auto_inject_user, sender=Solicitacao)
+
+    yield user
+
+    # Teardown: disconnect signal to prevent leaking
+    pre_save.disconnect(_auto_inject_user, sender=Solicitacao)

@@ -11,7 +11,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: './src/setupTests.js',
+    setupFiles: './src/test/setup.js',
+    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
     pool: 'threads',
     poolOptions: {
@@ -22,14 +23,16 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
+      include: ['src/**/*.{js,jsx,ts,tsx}'],
       exclude: [
         'node_modules/',
-        'src/setupTests.js',
-        '**/*.config.js',
+        'src/test/**',
+        '**/*.config.{js,ts}',
         '**/dist/**',
         '**/*.test.{js,jsx,ts,tsx}',
-        '**/test/**',
+        '**/*.spec.{js,jsx,ts,tsx}',
         '**/e2e/**',
+        'src/main.tsx',
       ],
       thresholds: {
         statements: 70,

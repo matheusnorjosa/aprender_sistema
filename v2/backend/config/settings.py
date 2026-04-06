@@ -285,6 +285,28 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# S3 storage for media files (horizontal scaling ready)
+# When AWS_STORAGE_BUCKET_NAME is set, media files go to S3 instead of local disk.
+# Currently no models use FileField/ImageField — all uploads are temp CSV/XLSX
+# processed and deleted. This config prepares for future persistent uploads.
+_s3_bucket = os.getenv("AWS_STORAGE_BUCKET_NAME", "")
+if _s3_bucket:
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+            "OPTIONS": {
+                "bucket_name": _s3_bucket,
+                "region_name": os.getenv("AWS_S3_REGION_NAME", "us-east-1"),
+                "default_acl": "private",
+                "file_overwrite": False,
+                "querystring_auth": True,
+            },
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+
 # ================================================================
 # DEFAULT PRIMARY KEY
 # ================================================================

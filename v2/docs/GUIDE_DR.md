@@ -1,5 +1,7 @@
 # Backup e Recovery - Aprender Sistema v2
 
+**Ambiente**: VM de produção (systemd + PostgreSQL nativo). Para Docker Compose, ver [DISASTER_RECOVERY.md](./DISASTER_RECOVERY.md).
+
 ## Visão Geral
 
 | Métrica | Valor |

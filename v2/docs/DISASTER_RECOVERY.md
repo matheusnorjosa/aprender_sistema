@@ -1,8 +1,9 @@
 # Disaster Recovery Runbook
 
-**Data**: 2026-01-12
+**Data**: 2026-04-06
 **Status**: Ativo
 **Referência**: PLAN_maturity_gaps.md (Gap 9)
+**Ambiente**: Docker Compose (dev/staging). Para procedimentos em VM de produção, ver [GUIDE_DR.md](./GUIDE_DR.md).
 
 ---
 
@@ -163,13 +164,13 @@ set -e
 
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
-BACKUP_FILE="${BACKUP_DIR}/as_v2_${TIMESTAMP}.sql.gz"
+BACKUP_FILE="${BACKUP_DIR}/backup_full_${TIMESTAMP}.sql.gz"
 
 # Criar diretório se não existir
 mkdir -p "$BACKUP_DIR"
 
 # Dump com pg_dump
-docker compose exec -T db pg_dump -U postgres aprender_sistema | gzip > "$BACKUP_FILE"
+docker compose exec -T db pg_dump -U aprender_user aprender_db | gzip > "$BACKUP_FILE"
 
 # Verificar tamanho mínimo (proteção contra backup vazio)
 SIZE=$(stat -f%z "$BACKUP_FILE" 2>/dev/null || stat -c%s "$BACKUP_FILE")
@@ -182,7 +183,7 @@ fi
 echo "Backup criado: $BACKUP_FILE ($SIZE bytes)"
 
 # Limpar backups antigos (manter últimos 30)
-ls -t "$BACKUP_DIR"/as_v2_*.sql.gz | tail -n +31 | xargs -r rm
+ls -t "$BACKUP_DIR"/backup_full_*.sql.gz | tail -n +31 | xargs -r rm
 
 # Upload para S3 (opcional)
 if [ -n "$S3_BUCKET" ]; then
@@ -220,7 +221,7 @@ docker compose stop web celery
 
 # Restaurar banco
 echo "Restaurando banco..."
-gunzip -c "$BACKUP_FILE" | docker compose exec -T db psql -U postgres -d aprender_sistema
+gunzip -c "$BACKUP_FILE" | docker compose exec -T db psql -U aprender_user -d aprender_db
 
 echo "Restauração completa!"
 echo "Reinicie a aplicação com: docker compose up -d"

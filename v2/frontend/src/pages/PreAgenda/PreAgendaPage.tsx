@@ -707,7 +707,7 @@ export default function PreAgendaPage(): JSX.Element {
                     value={searchTerm}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                     onSearch={loadData}
-                    style={{ width: 300 }}
+                    style={{ width: '100%', maxWidth: 300 }}
                     allowClear
                   />
                   <Input
@@ -715,7 +715,7 @@ export default function PreAgendaPage(): JSX.Element {
                     value={sectorFilter}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => setSectorFilter(e.target.value)}
                     onPressEnter={loadData}
-                    style={{ width: 200 }}
+                    style={{ width: '100%', maxWidth: 200 }}
                     allowClear
                   />
                   <RangePicker
@@ -762,6 +762,7 @@ export default function PreAgendaPage(): JSX.Element {
                 </div>
               )}
               <Table
+                scroll={{ x: "max-content" }}
                 columns={columns}
                 dataSource={rows}
                 loading={loading}
@@ -828,6 +829,7 @@ export default function PreAgendaPage(): JSX.Element {
                 />
               ) : (
                 <Table
+                  scroll={{ x: "max-content" }}
                   columns={gcalEventsColumns}
                   dataSource={gcalEvents}
                   rowKey="id"

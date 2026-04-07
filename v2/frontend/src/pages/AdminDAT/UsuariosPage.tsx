@@ -505,7 +505,7 @@ export default function UsuariosPage(): JSX.Element {
               <Search
                 placeholder="Buscar por username, email, nome, CPF"
                 allowClear
-                style={{ width: 300 }}
+                style={{ width: '100%', maxWidth: 300 }}
                 onSearch={(value) => setSearchText(value)}
                 onChange={(e) => {
                   if (!e.target.value) setSearchText('');

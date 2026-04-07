@@ -201,7 +201,7 @@ export default function EquipeDashboardPage(): JSX.Element {
           <Select
             value={days}
             onChange={setDays}
-            style={{ width: 150 }}
+            style={{ width: '100%', maxWidth: 150 }}
             disabled={loading}
           >
             <Option value={7}>Últimos 7 dias</Option>
@@ -329,6 +329,7 @@ export default function EquipeDashboardPage(): JSX.Element {
             <Col xs={24} md={12}>
               <Card title="Detalhamento" bordered={false}>
                 <Table
+                  scroll={{ x: "max-content" }}
                   dataSource={formadoresData?.formadores || []}
                   rowKey="id"
                   pagination={{ pageSize: 5, size: 'small' }}

@@ -374,13 +374,13 @@ function Solicitacoes(): JSX.Element {
             prefix={<SearchOutlined />}
             value={searchTerm}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-            style={{ width: 300 }}
+            style={{ width: '100%', maxWidth: 300 }}
             allowClear
           />
           <Select
             value={statusFilter}
             onChange={setStatusFilter}
-            style={{ width: 150 }}
+            style={{ width: '100%', maxWidth: 150 }}
             options={[
               { label: 'Pendente', value: 'pendente' },
               { label: 'Aprovado', value: 'aprovado' },
@@ -392,6 +392,7 @@ function Solicitacoes(): JSX.Element {
 
         {/* Tabela */}
         <Table
+          scroll={{ x: "max-content" }}
           columns={columns}
           dataSource={solicitacoes}
           rowKey="id"

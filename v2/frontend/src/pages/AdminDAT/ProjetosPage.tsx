@@ -185,7 +185,7 @@ export default function ProjetosPage(): JSX.Element {
             <Search
               placeholder="Buscar por nome ou código"
               allowClear
-              style={{ width: 250 }}
+              style={{ width: '100%', maxWidth: 250 }}
               onSearch={setSearchText}
               onChange={(e) => !e.target.value && setSearchText('')}
             />

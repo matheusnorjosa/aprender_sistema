@@ -937,6 +937,7 @@ export default function MapaBrasilPage(): JSX.Element {
                     Eventos por Coordenador
                   </Title>
                   <Table
+                    scroll={{ x: "max-content" }}
                     size="small"
                     loading={loadingCoordinators}
                     pagination={false}
@@ -968,6 +969,7 @@ export default function MapaBrasilPage(): JSX.Element {
                     Detalhes por Município
                   </Title>
                   <Table
+                    scroll={{ x: "max-content" }}
                     size="small"
                     pagination={false}
                     dataSource={municipiosData.filter(m => m.uf === selectedState)}
@@ -1034,6 +1036,7 @@ export default function MapaBrasilPage(): JSX.Element {
             <Col xs={24} lg={12}>
               <Card title="Detalhes por Estado" bordered={false} loading={loading} style={{ borderRadius: '12px' }}>
                 <Table
+                  scroll={{ x: "max-content" }}
                   dataSource={Object.values(estadosData)}
                   rowKey="uf"
                   pagination={false}

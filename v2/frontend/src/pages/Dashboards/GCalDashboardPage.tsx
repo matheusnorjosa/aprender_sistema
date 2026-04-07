@@ -497,7 +497,7 @@ export default function GCalDashboardPage(): JSX.Element {
               Status:
             </Text>
             <Select
-              style={{ width: 180 }}
+              style={{ width: '100%', maxWidth: 180 }}
               placeholder="Todos os status"
               allowClear
               value={statusFilter}
@@ -665,7 +665,7 @@ export default function GCalDashboardPage(): JSX.Element {
                   size="small"
                   value={topMetric}
                   onChange={setTopMetric}
-                  style={{ width: 130 }}
+                  style={{ width: '100%', maxWidth: 130 }}
                   options={[
                     { value: 'municipios', label: 'Municípios' },
                     { value: 'projetos', label: 'Projetos' },
@@ -677,6 +677,7 @@ export default function GCalDashboardPage(): JSX.Element {
             className="mb-6"
           >
             <Table
+              scroll={{ x: "max-content" }}
               dataSource={topInsights?.items || []}
               columns={topInsightsColumns}
               rowKey="name"

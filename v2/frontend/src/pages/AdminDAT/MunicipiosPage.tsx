@@ -352,14 +352,14 @@ export default function MunicipiosPage(): JSX.Element {
             <Search
               placeholder="Buscar por nome ou IBGE"
               allowClear
-              style={{ width: 250 }}
+              style={{ width: '100%', maxWidth: 250 }}
               onSearch={setSearchText}
               onChange={(e) => !e.target.value && setSearchText('')}
             />
             <Select
               placeholder="Filtrar por UF"
               allowClear
-              style={{ width: 100 }}
+              style={{ width: '100%', maxWidth: 100 }}
               onChange={setUfFilter}
               options={UF_NORDESTE_OPTIONS}
             />

@@ -284,7 +284,7 @@ export default function MySolicitacoesPage(): JSX.Element {
               <Select
                 value={statusFilter}
                 onChange={setStatusFilter}
-                style={{ width: 200 }}
+                style={{ width: '100%', maxWidth: 200 }}
                 placeholder="Status"
                 aria-label="Filtrar por status"
               >
@@ -300,7 +300,7 @@ export default function MySolicitacoesPage(): JSX.Element {
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 onSearch={loadData}
                 enterButton={<SearchOutlined />}
-                style={{ width: 300 }}
+                style={{ width: '100%', maxWidth: 300 }}
                 allowClear
                 aria-label="Buscar solicitacoes"
               />
@@ -310,6 +310,7 @@ export default function MySolicitacoesPage(): JSX.Element {
           {/* Tabela */}
           <section aria-label="Lista de solicitacoes">
             <Table
+              scroll={{ x: "max-content" }}
               columns={columns}
               dataSource={rows}
               loading={loading}

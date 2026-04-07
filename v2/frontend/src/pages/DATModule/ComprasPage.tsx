@@ -405,7 +405,7 @@ export default function ComprasPage(): JSX.Element {
               size="small"
               showInfo={false}
               strokeColor={percent > 20 ? '#52c41a' : percent > 10 ? '#faad14' : '#ff4d4f'}
-              style={{ width: 60 }}
+              style={{ width: '100%', maxWidth: 60 }}
             />
           </Space>
         );

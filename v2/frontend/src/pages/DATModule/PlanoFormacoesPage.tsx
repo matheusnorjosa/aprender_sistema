@@ -890,6 +890,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
                 label: 'Formacoes',
                 children: (
                   <Table
+                    scroll={{ x: "max-content" }}
                     dataSource={detailPlano.formacoes_list || []}
                     rowKey="id"
                     size="small"
@@ -909,6 +910,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
                 label: 'Acompanhamentos',
                 children: (
                   <Table
+                    scroll={{ x: "max-content" }}
                     dataSource={detailPlano.acompanhamentos_list || []}
                     rowKey="id"
                     size="small"
@@ -926,6 +928,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
                 label: 'Provas',
                 children: (
                   <Table
+                    scroll={{ x: "max-content" }}
                     dataSource={detailPlano.provas_list || []}
                     rowKey="id"
                     size="small"

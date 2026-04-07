@@ -619,6 +619,7 @@ export default function ComprasDashboardPage(): JSX.Element {
               {' '}({pendencias.percentual_pendentes}%)
             </Text>
             <Table
+              scroll={{ x: "max-content" }}
               dataSource={pendencias.pendentes}
               columns={pendenciasColumns}
               rowKey={(record) => `${record.municipio_id}-${record.projeto_id}`}
@@ -677,6 +678,7 @@ export default function ComprasDashboardPage(): JSX.Element {
             </Space>
           )}>
             <Table
+              scroll={{ x: "max-content" }}
               dataSource={data.top_municipios}
               columns={topMunicipiosColumns}
               rowKey={(record) => `${record.municipio}-${record.uf}`}

@@ -69,6 +69,10 @@ services:
       - /run:size=10M
       - /home/appuser:size=10M
       - /app/out_etl:size=50M
+    # SEC-015: web needs backend (redis) + frontend-proxy (nginx→web)
+    networks:
+      - backend-internal
+      - frontend-proxy
 
   redis:
     image: redis:7-alpine
@@ -104,6 +108,9 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=10M
+    # SEC-015: Redis only accessible from backend services
+    networks:
+      - backend-internal
 
   worker:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -142,6 +149,9 @@ services:
       - /run:size=10M
       - /home/appuser:size=10M
       - /app/out_etl:size=50M
+    # SEC-015: Worker only needs backend services
+    networks:
+      - backend-internal
 
   beat:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -181,6 +191,9 @@ services:
       - /run:size=10M
       - /home/appuser:size=10M
       - /app/out_etl:size=10M
+    # SEC-015: Beat only needs backend services
+    networks:
+      - backend-internal
 
   frontend:
     image: norjosamatheus/aprender-frontend:${IMAGE_TAG:?IMAGE_TAG is required}
@@ -191,8 +204,9 @@ services:
       - "${FRONTEND_PORT:-81}:80"
     depends_on:
       - web
+    # SEC-015: Frontend only reaches web (proxy) + NPM (external)
     networks:
-      - default
+      - frontend-proxy
       - shared_proxy
     healthcheck:
       test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:80/health || exit 1"]
@@ -219,6 +233,14 @@ services:
 volumes:
   redis_data:
 
+# SEC-015: Network segmentation
+# backend-internal: web ↔ redis ↔ worker ↔ beat (internal, no egress)
+# frontend-proxy: frontend ↔ web only (internal)
+# shared_proxy: frontend ↔ Nginx Proxy Manager (external)
 networks:
+  backend-internal:
+    internal: true
+  frontend-proxy:
+    internal: true
   shared_proxy:
     external: true

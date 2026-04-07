@@ -17,3 +17,87 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ============================================================
+   Mobile Responsiveness (Epic #538)
+   ============================================================ */
+
+/* #541: Drawer/Modal full-width on mobile */
+@media (max-width: 768px) {
+  .ant-drawer .ant-drawer-content-wrapper {
+    width: 100% !important;
+  }
+
+  .ant-modal {
+    max-width: calc(100vw - 32px) !important;
+    margin: 16px auto !important;
+  }
+
+  .ant-modal .ant-modal-content {
+    padding: 16px !important;
+  }
+}
+
+/* #542: Container padding responsive */
+@media (max-width: 768px) {
+  .p-6 {
+    padding: 12px !important;
+  }
+
+  .p-10, .md\:p-10 {
+    padding: 12px !important;
+  }
+}
+
+/* #543: Responsive title sizes */
+@media (max-width: 768px) {
+  h1.text-3xl, .text-3xl {
+    font-size: 1.25rem !important;
+  }
+
+  h2.text-2xl, .text-2xl {
+    font-size: 1.125rem !important;
+  }
+}
+
+/* #544: Stack form items vertically on mobile */
+@media (max-width: 768px) {
+  .ant-space-horizontal {
+    flex-wrap: wrap !important;
+  }
+
+  .ant-space-horizontal > .ant-space-item {
+    width: 100% !important;
+  }
+
+  .ant-form-horizontal .ant-form-item-label {
+    text-align: left !important;
+  }
+}
+
+/* #546: Login page padding on mobile */
+@media (max-width: 768px) {
+  .ant-card-body {
+    padding: 16px !important;
+  }
+}
+
+/* #548: Horizontal scroll indicator for tables */
+@media (max-width: 768px) {
+  .ant-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ant-table-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 20px;
+    height: 100%;
+    background: linear-gradient(to left, rgba(0, 0, 0, 0.05), transparent);
+    pointer-events: none;
+    z-index: 1;
+  }
+}

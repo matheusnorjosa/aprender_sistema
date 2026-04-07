@@ -9,8 +9,10 @@ export const LAYOUT = {
   SIDEBAR_WIDTH: 250,
   SIDEBAR_COLLAPSED_WIDTH: 80,
 
-  // Mobile breakpoint
+  // Responsive breakpoints (aligned with Tailwind defaults)
   MOBILE_BREAKPOINT: 768,
+  TABLET_BREAKPOINT: 1024,
+  DESKTOP_BREAKPOINT: 1280,
 
   // Input widths
   INPUT_WIDTH_SMALL: 200,

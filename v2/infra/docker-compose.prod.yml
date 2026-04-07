@@ -33,6 +33,9 @@ services:
   web:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
     command: gunicorn config.wsgi:application --config /app/infra/gunicorn.conf.py
+    # SEC-014: Resource limits (VM01: 16GB/4vCPU)
+    mem_limit: 4g
+    cpus: 1.5
     env_file:
       - ${APP_ENV_FILE:-stack.env}
     environment:
@@ -51,6 +54,11 @@ services:
       retries: 3
       start_period: 40s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -64,8 +72,26 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --requirepass "${REDIS_PASSWORD}"
+    # SEC-013: AOF persistence + maxmemory to prevent OOM
+    command: >-
+      redis-server
+      --requirepass "${REDIS_PASSWORD}"
+      --maxmemory 1536mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --save 60 1
+    # SEC-014: Resource limits (VM01: 16GB/4vCPU)
+    mem_limit: 2g
+    cpus: 0.5
+    volumes:
+      - redis_data:/data
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 30s
@@ -82,6 +108,9 @@ services:
   worker:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
     command: celery -A config worker -l info
+    # SEC-014: Resource limits (VM01: 16GB/4vCPU)
+    mem_limit: 3g
+    cpus: 1.0
     env_file:
       - ${APP_ENV_FILE:-stack.env}
     environment:
@@ -98,6 +127,11 @@ services:
       retries: 3
       start_period: 60s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -113,6 +147,9 @@ services:
     image: norjosamatheus/aprender-backend:${IMAGE_TAG:?IMAGE_TAG is required}
     # --schedule /tmp/celerybeat-schedule: write schedule to tmpfs (read_only filesystem)
     command: celery -A config beat -l info --schedule /tmp/celerybeat-schedule
+    # SEC-014: Resource limits
+    mem_limit: 512m
+    cpus: 0.5
     env_file:
       - ${APP_ENV_FILE:-stack.env}
     environment:
@@ -129,6 +166,11 @@ services:
       retries: 3
       start_period: 30s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -142,6 +184,9 @@ services:
 
   frontend:
     image: norjosamatheus/aprender-frontend:${IMAGE_TAG:?IMAGE_TAG is required}
+    # SEC-014: Resource limits (VM01: 16GB/4vCPU)
+    mem_limit: 256m
+    cpus: 0.25
     ports:
       - "${FRONTEND_PORT:-81}:80"
     depends_on:
@@ -156,6 +201,11 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -166,6 +216,9 @@ services:
 
 # Rede externa compartilhada com NPM (Nginx Proxy Manager).
 # Deve ser criada uma vez na VM01: docker network create shared_proxy
+volumes:
+  redis_data:
+
 networks:
   shared_proxy:
     external: true

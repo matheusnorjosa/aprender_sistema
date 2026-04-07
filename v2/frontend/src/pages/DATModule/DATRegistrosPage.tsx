@@ -676,13 +676,13 @@ export default function DATRegistrosPage(): JSX.Element {
                       <Select
                         placeholder="Status"
                         options={STATUS_OPTIONS}
-                        style={{ width: 140 }}
+                        style={{ width: '100%', maxWidth: 140 }}
                         allowClear
                       />
                     </Form.Item>
                     <Text>Chaves de Inscrição</Text>
                     <Form.Item name="chaves_inscricao_data" noStyle>
-                      <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: 130 }} />
+                      <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: '100%', maxWidth: 130 }} />
                     </Form.Item>
                   </div>
 
@@ -691,13 +691,13 @@ export default function DATRegistrosPage(): JSX.Element {
                       <Select
                         placeholder="Status"
                         options={STATUS_OPTIONS}
-                        style={{ width: 140 }}
+                        style={{ width: '100%', maxWidth: 140 }}
                         allowClear
                       />
                     </Form.Item>
                     <Text>Instruções</Text>
                     <Form.Item name="instrucoes_data" noStyle>
-                      <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: 130 }} />
+                      <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: '100%', maxWidth: 130 }} />
                     </Form.Item>
                   </div>
 
@@ -706,13 +706,13 @@ export default function DATRegistrosPage(): JSX.Element {
                       <Select
                         placeholder="Status"
                         options={STATUS_OPTIONS}
-                        style={{ width: 140 }}
+                        style={{ width: '100%', maxWidth: 140 }}
                         allowClear
                       />
                     </Form.Item>
                     <Text>Envio de Códigos</Text>
                     <Form.Item name="envio_codigos_data" noStyle>
-                      <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: 130 }} />
+                      <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: '100%', maxWidth: 130 }} />
                     </Form.Item>
                   </div>
                 </div>
@@ -751,14 +751,14 @@ export default function DATRegistrosPage(): JSX.Element {
                           <Select
                             placeholder="Status"
                             options={STATUS_OPTIONS}
-                            style={{ width: 140 }}
+                            style={{ width: '100%', maxWidth: 140 }}
                             allowClear
                           />
                         </Form.Item>
                         <Text strong>Alunos Recebidos</Text>
                       </Space>
                       <Form.Item name="alunos_recebidos_data" noStyle>
-                        <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: 130 }} />
+                        <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: '100%', maxWidth: 130 }} />
                       </Form.Item>
                     </div>
                   </Card>
@@ -771,14 +771,14 @@ export default function DATRegistrosPage(): JSX.Element {
                           <Select
                             placeholder="Status"
                             options={STATUS_OPTIONS}
-                            style={{ width: 140 }}
+                            style={{ width: '100%', maxWidth: 140 }}
                             allowClear
                           />
                         </Form.Item>
                         <Text strong>Alunos Validados</Text>
                       </Space>
                       <Form.Item name="alunos_validados_data" noStyle>
-                        <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: 130 }} />
+                        <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: '100%', maxWidth: 130 }} />
                       </Form.Item>
                     </div>
                   </Card>
@@ -791,14 +791,14 @@ export default function DATRegistrosPage(): JSX.Element {
                           <Select
                             placeholder="Status"
                             options={STATUS_OPTIONS}
-                            style={{ width: 140 }}
+                            style={{ width: '100%', maxWidth: 140 }}
                             allowClear
                           />
                         </Form.Item>
                         <Text strong>Alunos Importados</Text>
                       </Space>
                       <Form.Item name="alunos_importados_data" noStyle>
-                        <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: 130 }} />
+                        <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: '100%', maxWidth: 130 }} />
                       </Form.Item>
                     </div>
                   </Card>

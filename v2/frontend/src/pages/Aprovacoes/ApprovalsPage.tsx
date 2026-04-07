@@ -418,7 +418,7 @@ export default function ApprovalsPage(): JSX.Element {
               <Select
                 value={statusFilter}
                 onChange={setStatusFilter}
-                style={{ width: 200 }}
+                style={{ width: '100%', maxWidth: 200 }}
                 placeholder="Status"
                 aria-label="Filtrar por status"
               >
@@ -432,7 +432,7 @@ export default function ApprovalsPage(): JSX.Element {
                 value={searchTerm}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 onSearch={loadData}
-                style={{ width: 400 }}
+                style={{ width: '100%', maxWidth: 400 }}
                 allowClear
                 aria-label="Buscar solicitacoes"
               />

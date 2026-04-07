@@ -343,6 +343,7 @@ export default function DashboardsPage(): JSX.Element {
               <Empty description="Nenhum coordenador no periodo" />
             ) : (
               <Table
+                scroll={{ x: "max-content" }}
                 dataSource={top_coordenadores}
                 rowKey="nome"
                 pagination={false}

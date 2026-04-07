@@ -473,7 +473,7 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
             <Search
               placeholder={pageTypeMeta ? `Buscar ${pageTypeMeta.singular.toLowerCase()} por nome` : 'Buscar por nome'}
               allowClear
-              style={{ width: 250 }}
+              style={{ width: '100%', maxWidth: 250 }}
               onSearch={setSearchText}
               onChange={(event) => !event.target.value && setSearchText('')}
             />

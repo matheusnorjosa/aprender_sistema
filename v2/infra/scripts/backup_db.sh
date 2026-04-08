@@ -29,9 +29,15 @@ S3_BUCKET="${S3_BUCKET:-}"
 # Normalize bucket name if provided with scheme
 S3_BUCKET="${S3_BUCKET#s3://}"
 
-# Naming convention: backup_full_YYYYMMDD_HHMMSS.sql.gz
-# This matches what tasks_backup.py and verify_backup_health() expect
-BACKUP_FILE="$BACKUP_DIR/backup_full_$DATE.sql.gz"
+# SEC-017: Optional encryption via age (when BACKUP_AGE_RECIPIENT is set)
+BACKUP_AGE_RECIPIENT="${BACKUP_AGE_RECIPIENT:-}"
+
+# Naming convention: backup_full_YYYYMMDD_HHMMSS.sql.gz[.age]
+if [ -n "$BACKUP_AGE_RECIPIENT" ]; then
+    BACKUP_FILE="$BACKUP_DIR/backup_full_$DATE.sql.gz.age"
+else
+    BACKUP_FILE="$BACKUP_DIR/backup_full_$DATE.sql.gz"
+fi
 
 # Export password for pg_dump (if provided)
 if [ -n "$DB_PASSWORD" ]; then
@@ -43,9 +49,15 @@ mkdir -p "$BACKUP_DIR"
 
 echo "[$(date)] Starting backup of $DB_NAME from $DB_HOST:$DB_PORT..."
 
-# Create backup with compression
+# Create backup with compression (+ optional encryption)
 # Using -h $DB_HOST and -p $DB_PORT for Docker compatibility
-pg_dump -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME" | gzip > "$BACKUP_FILE"
+if [ -n "$BACKUP_AGE_RECIPIENT" ]; then
+    echo "[$(date)] Encryption enabled (age recipient: ${BACKUP_AGE_RECIPIENT:0:20}...)"
+    pg_dump -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME" \
+        | gzip | age -r "$BACKUP_AGE_RECIPIENT" > "$BACKUP_FILE"
+else
+    pg_dump -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME" | gzip > "$BACKUP_FILE"
+fi
 
 # Verify backup
 if [ -f "$BACKUP_FILE" ] && [ -s "$BACKUP_FILE" ]; then
@@ -68,6 +80,6 @@ fi
 
 # Cleanup old backups
 echo "[$(date)] Cleaning up backups older than $BACKUP_RETENTION_DAYS days..."
-find "$BACKUP_DIR" -name "backup_full_*.sql.gz" -mtime +"$BACKUP_RETENTION_DAYS" -delete 2>/dev/null || true
+find "$BACKUP_DIR" \( -name "backup_full_*.sql.gz" -o -name "backup_full_*.sql.gz.age" \) -mtime +"$BACKUP_RETENTION_DAYS" -delete 2>/dev/null || true
 
 echo "[$(date)] Backup process complete."

@@ -200,7 +200,7 @@ DATABASES = {
             # 30s query timeout em produção (evita queries lentas)
             "options": "-c statement_timeout=30000" if ENVIRONMENT == "production" else "",
             # SEC-016: TLS encryption for Django↔PostgreSQL (production only)
-            # Requires PostgreSQL configured with ssl=on on VM02
+            # Requires: PostgreSQL ssl=on on VM02, DB_SSLMODE=require in env
             # sslcert/sslkey/sslrootcert="" prevents psycopg2 from looking for
             # client certificates in ~/.postgresql/ (read-only container)
             **(

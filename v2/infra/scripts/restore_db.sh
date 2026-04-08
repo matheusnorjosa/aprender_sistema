@@ -107,7 +107,14 @@ psql -h $DB_HOST -U postgres -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;"
 
 # Step 4: Restore backup
 echo "[$(date)] Restoring backup (this may take a while)..."
-gunzip -c "$BACKUP_FILE" | psql -h $DB_HOST -U postgres -d $DB_NAME -q
+# SEC-017: Support encrypted backups (.age extension)
+if echo "$BACKUP_FILE" | grep -q '\.age$'; then
+    BACKUP_AGE_KEY="${BACKUP_AGE_KEY:-/etc/backup-key.txt}"
+    echo "[$(date)] Decrypting encrypted backup with age..."
+    age -d -i "$BACKUP_AGE_KEY" "$BACKUP_FILE" | gunzip | psql -h $DB_HOST -U postgres -d $DB_NAME -q
+else
+    gunzip -c "$BACKUP_FILE" | psql -h $DB_HOST -U postgres -d $DB_NAME -q
+fi
 
 # Step 5: Verify restore
 echo "[$(date)] Verifying restore..."

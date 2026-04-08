@@ -234,12 +234,13 @@ volumes:
   redis_data:
 
 # SEC-015: Network segmentation
-# backend-internal: web ↔ redis ↔ worker ↔ beat (internal, no egress)
-# frontend-proxy: frontend ↔ web only (internal)
+# backend-internal: web ↔ redis ↔ worker ↔ beat (needs egress to VM02 PostgreSQL)
+# frontend-proxy: frontend ↔ web only (internal, no egress)
 # shared_proxy: frontend ↔ Nginx Proxy Manager (external)
 networks:
   backend-internal:
-    internal: true
+    # Note: NOT internal — backend services need egress to VM02 (PostgreSQL)
+    driver: bridge
   frontend-proxy:
     internal: true
   shared_proxy:

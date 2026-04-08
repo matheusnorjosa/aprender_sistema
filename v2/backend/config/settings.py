@@ -201,13 +201,9 @@ DATABASES = {
             "options": "-c statement_timeout=30000" if ENVIRONMENT == "production" else "",
             # SEC-016: TLS encryption for Django↔PostgreSQL (production only)
             # Requires: PostgreSQL ssl=on on VM02, DB_SSLMODE=require in env
-            # sslcert/sslkey/sslrootcert="" prevents psycopg2 from looking for
-            # client certificates in ~/.postgresql/ (read-only container)
-            **(
-                {"sslmode": "require", "sslcert": "", "sslkey": "", "sslrootcert": ""}
-                if os.getenv("DB_SSLMODE") == "require"
-                else {}
-            ),
+            # Client cert paths handled by PGSSLCERT/PGSSLKEY/PGSSLROOTCERT env
+            # vars set in Dockerfile.prod (pointing to /app/.postgresql/)
+            **({"sslmode": os.getenv("DB_SSLMODE")} if os.getenv("DB_SSLMODE") else {}),
         },
     }
 }

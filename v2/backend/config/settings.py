@@ -199,6 +199,9 @@ DATABASES = {
             "connect_timeout": 10,
             # 30s query timeout em produção (evita queries lentas)
             "options": "-c statement_timeout=30000" if ENVIRONMENT == "production" else "",
+            # SEC-016: TLS encryption for Django↔PostgreSQL (production only)
+            # Requires PostgreSQL configured with ssl=on on VM02
+            **({"sslmode": "require"} if os.getenv("DB_SSLMODE") == "require" else {}),
         },
     }
 }

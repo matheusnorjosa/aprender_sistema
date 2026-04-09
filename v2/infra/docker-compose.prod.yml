@@ -235,13 +235,17 @@ volumes:
 
 # SEC-015: Network segmentation
 # backend-internal: web ↔ redis ↔ worker ↔ beat (needs egress to VM02 PostgreSQL)
-# frontend-proxy: frontend ↔ web only (internal, no egress)
+# frontend-proxy: frontend ↔ web (NPM routes traffic through this network)
 # shared_proxy: frontend ↔ Nginx Proxy Manager (external)
+#
+# Security model: Redis/worker/beat are isolated in backend-internal.
+# Frontend and web are in frontend-proxy (reachable by NPM via shared_proxy).
+# No container on frontend-proxy can reach Redis or Celery directly.
 networks:
   backend-internal:
     # Note: NOT internal — backend services need egress to VM02 (PostgreSQL)
     driver: bridge
   frontend-proxy:
-    internal: true
+    driver: bridge
   shared_proxy:
     external: true

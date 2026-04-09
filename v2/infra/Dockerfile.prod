@@ -71,19 +71,14 @@ RUN groupadd --gid 1000 appuser \
  && chown -R appuser:appuser /app \
  && chown -R appuser:appuser /opt/venv
 
-# SEC-016: Create empty client cert/key files for psycopg2/libpq TLS support
-# When sslmode=require, libpq looks for ~/.postgresql/postgresql.crt by default.
-# Since /home/appuser is tmpfs (read-only container), we place them in /app/.postgresql/
-# and point libpq via PGSSLCERT/PGSSLKEY env vars.
-# Note: PGSSLROOTCERT is intentionally NOT set — sslmode=require encrypts the
-# connection without verifying the server certificate (no CA cert needed).
-RUN mkdir -p /app/.postgresql \
- && touch /app/.postgresql/postgresql.crt /app/.postgresql/postgresql.key \
- && chmod 600 /app/.postgresql/postgresql.key \
- && chown -R appuser:appuser /app/.postgresql
-
-ENV PGSSLCERT=/app/.postgresql/postgresql.crt \
-    PGSSLKEY=/app/.postgresql/postgresql.key
+# SEC-016: Redirect libpq client cert paths to non-existent files.
+# When sslmode=require, libpq defaults to ~/.postgresql/postgresql.crt which
+# fails on our read-only container (tmpfs home + cap_drop ALL).
+# Per PostgreSQL docs: "If the file does not exist, client certificate
+# authentication will not be attempted" — exactly what we want.
+# sslmode=require only encrypts; no client certs needed.
+ENV PGSSLCERT=/nonexistent \
+    PGSSLKEY=/nonexistent
 
 # Build metadata
 ARG GIT_SHA=unknown

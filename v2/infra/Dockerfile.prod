@@ -71,18 +71,19 @@ RUN groupadd --gid 1000 appuser \
  && chown -R appuser:appuser /app \
  && chown -R appuser:appuser /opt/venv
 
-# SEC-016: Create empty client cert files for psycopg2/libpq TLS support
+# SEC-016: Create empty client cert/key files for psycopg2/libpq TLS support
 # When sslmode=require, libpq looks for ~/.postgresql/postgresql.crt by default.
 # Since /home/appuser is tmpfs (read-only container), we place them in /app/.postgresql/
-# and point libpq via PGSSLCERT/PGSSLKEY/PGSSLROOTCERT env vars.
+# and point libpq via PGSSLCERT/PGSSLKEY env vars.
+# Note: PGSSLROOTCERT is intentionally NOT set — sslmode=require encrypts the
+# connection without verifying the server certificate (no CA cert needed).
 RUN mkdir -p /app/.postgresql \
- && touch /app/.postgresql/postgresql.crt /app/.postgresql/postgresql.key /app/.postgresql/root.crt \
+ && touch /app/.postgresql/postgresql.crt /app/.postgresql/postgresql.key \
  && chmod 600 /app/.postgresql/postgresql.key \
  && chown -R appuser:appuser /app/.postgresql
 
 ENV PGSSLCERT=/app/.postgresql/postgresql.crt \
-    PGSSLKEY=/app/.postgresql/postgresql.key \
-    PGSSLROOTCERT=/app/.postgresql/root.crt
+    PGSSLKEY=/app/.postgresql/postgresql.key
 
 # Build metadata
 ARG GIT_SHA=unknown

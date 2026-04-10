@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { Form, Input, Button, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '../../api/auth';
-import logoLogin from '../../assets/logo-login.png';
+import logoLogin from '../../assets/logo-login.webp';
 import logger from '../../utils/logger';
 import { BRAND_COLORS } from '../../contexts/ThemeContext';
 

@@ -62,6 +62,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
         <img
           src={logoLogin}
           alt="Aprender Sistema"
+          width={140}
+          height={157}
+          // @ts-expect-error React 18 doesn't type fetchpriority yet
+          fetchpriority="high"
           style={{
             width: '140px',
             height: 'auto',

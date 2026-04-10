@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://aprendersistema.com.br/sitemap.xml

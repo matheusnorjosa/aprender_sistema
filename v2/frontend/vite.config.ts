@@ -45,14 +45,17 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          // Vendor chunks - separar bibliotecas pesadas
+          // Vendor chunks - separar bibliotecas pesadas para cache e paralelismo
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-antd': ['antd', '@ant-design/icons'],
+          'vendor-antd': ['antd'],
+          'vendor-antd-icons': ['@ant-design/icons'],
           'vendor-leaflet': ['leaflet', 'react-leaflet'],
         },
       },
     },
     // Aumentar limite de warning para 600kB (após splitting)
     chunkSizeWarningLimit: 600,
+    // CSS code splitting — carrega CSS por chunk em vez de inline
+    cssCodeSplit: true,
   },
 })

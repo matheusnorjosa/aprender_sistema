@@ -60,8 +60,9 @@ function AppContent(): JSX.Element {
       }
     } catch (error) {
       if (isMountedRef.current) {
-        const log = isAuthError(error) ? logger.warn : logger.error;
-        log('Erro ao carregar usuário:', error);
+        if (!isAuthError(error)) {
+          logger.error('Erro ao carregar usuário:', error);
+        }
         setUser(null);
       }
     } finally {

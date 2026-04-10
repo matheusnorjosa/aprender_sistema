@@ -57,5 +57,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     // CSS code splitting — carrega CSS por chunk em vez de inline
     cssCodeSplit: true,
+    // Source maps for production debugging (hidden from browser DevTools)
+    sourcemap: 'hidden',
   },
 })

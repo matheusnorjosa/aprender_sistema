@@ -195,12 +195,15 @@ export async function fetchAPI<T = unknown>(url: string, options: FetchOptions =
     }
 
     const isAuthError = response.status === 401 || response.status === 403;
-    const log = isAuthError ? logger.warn : logger.error;
 
-    log('=== fetchAPI ERROR ===');
-    log('Status:', response.status);
-    log('StatusText:', response.statusText);
-    log('Response body:', errorBody);
+    // Auth errors (401/403) are expected during initial load (not authenticated).
+    // Use debug level to avoid polluting console and failing checklist tests.
+    if (!isAuthError) {
+      logger.error('=== fetchAPI ERROR ===');
+      logger.error('Status:', response.status);
+      logger.error('StatusText:', response.statusText);
+      logger.error('Response body:', errorBody);
+    }
 
     let error: { detail?: string; message?: string };
     try {

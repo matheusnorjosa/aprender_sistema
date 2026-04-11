@@ -713,6 +713,10 @@ jobs:
           HEALTHCHECK_URL: ${{ steps.resolve.outputs.healthcheck_url }}
           VERSIONCHECK_URL: ${{ steps.resolve.outputs.versioncheck_url }}
           POST_DEPLOY_SKIP_TLS_VERIFY: ${{ steps.resolve.outputs.post_deploy_skip_tls_verify }}
+          PORTAINER_URL: ${{ steps.resolve.outputs.portainer_url }}
+          PORTAINER_ENDPOINT_ID: ${{ steps.resolve.outputs.portainer_endpoint_id }}
+          PORTAINER_ACCESS_TOKEN: ${{ secrets.PRODUCTION_PORTAINER_ACCESS_TOKEN || secrets.PORTAINER_ACCESS_TOKEN || '' }}
+          PORTAINER_SKIP_TLS_VERIFY: ${{ steps.resolve.outputs.portainer_skip_tls_verify }}
         run: |
           set -euo pipefail
 
@@ -861,6 +865,48 @@ jobs:
           if [ -n "$last_version_response" ]; then
             echo "Last version response:" >&2
             printf '%s\n' "$last_version_response" >&2
+          fi
+
+          # Fallback: when external health check is unreachable (network_unavailable),
+          # verify containers via Portainer API (which IS reachable from CI).
+          if [ "$failure_cause" = "network_unavailable" ] && [ -n "${PORTAINER_URL:-}" ] && [ -n "${PORTAINER_ACCESS_TOKEN:-}" ]; then
+            echo "External health check unreachable. Falling back to Portainer API verification..."
+            portainer_curl_opts=(--silent --show-error --location --max-time 30)
+            if [ "${PORTAINER_SKIP_TLS_VERIFY:-}" = "true" ]; then
+              portainer_curl_opts+=(--insecure)
+            fi
+
+            containers_json="$(curl "${portainer_curl_opts[@]}" \
+              -H "X-API-KEY: ${PORTAINER_ACCESS_TOKEN}" \
+              "${PORTAINER_URL}/api/endpoints/${PORTAINER_ENDPOINT_ID}/docker/containers/json?all=true&filters=%7B%22label%22%3A%5B%22com.docker.compose.project%3Daprender_prod%22%5D%7D" 2>/dev/null || echo "[]")"
+
+            web_state="$(printf '%s' "$containers_json" | jq -r '[.[] | select(.Names[] | contains("web"))] | .[0].State // "unknown"' 2>/dev/null || echo "unknown")"
+            web_health="$(printf '%s' "$containers_json" | jq -r '[.[] | select(.Names[] | contains("web"))] | .[0].Status // "unknown"' 2>/dev/null || echo "unknown")"
+            web_image="$(printf '%s' "$containers_json" | jq -r '[.[] | select(.Names[] | contains("web"))] | .[0].Image // "unknown"' 2>/dev/null || echo "unknown")"
+
+            echo "Portainer fallback: web_state=${web_state}, web_health=${web_health}, web_image=${web_image}"
+
+            if [ "$web_state" = "running" ] && printf '%s' "$web_health" | grep -qi "healthy"; then
+              echo "Portainer confirms web container is running and healthy."
+              if printf '%s' "$web_image" | grep -qF "${RELEASE_VERSION}"; then
+                echo "[Portainer] Version ${RELEASE_VERSION} is live and healthy (verified via Portainer API)."
+                printf '%s\n' "Verified via Portainer API fallback" > post-deploy-health-response.txt
+                printf '%s\n' "{\"source\": \"portainer\", \"web_state\": \"${web_state}\", \"web_image\": \"${web_image}\"}" > post-deploy-version-response.txt
+                {
+                  echo "result=success_portainer_fallback"
+                  echo "failure_cause=none"
+                  echo "attempts=${attempt}"
+                  echo "elapsed_seconds=${elapsed}"
+                  echo "portainer_web_state=${web_state}"
+                  echo "portainer_web_image=${web_image}"
+                } >> post-deploy-debug.txt
+                exit 0
+              else
+                echo "Portainer: web container running but image tag does not match ${RELEASE_VERSION}."
+              fi
+            else
+              echo "Portainer: web container not healthy (state=${web_state}, status=${web_health})."
+            fi
           fi
 
           {

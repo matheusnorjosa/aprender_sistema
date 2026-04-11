@@ -354,20 +354,24 @@ CELERY_CIRCUIT_BREAKER_COUNTDOWN = int(os.getenv("CELERY_CB_COUNTDOWN", 60))  # 
 FORMAR_PLATFORM_BASE_URL = os.getenv("FORMAR_PLATFORM_URL", "https://www.aprenderformar.com.br/plataforma")
 
 # ================================================================
-# CORS
+# CORS — SEC-009: strict allowlist per environment
 # ================================================================
+_CORS_DEV_DEFAULTS = "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:8000,http://localhost:8002"
+_CORS_PROD_DEFAULTS = "https://aprendersistema.com.br"
 CORS_ALLOWED_ORIGINS = os.getenv(
     "CORS_ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:8000,http://localhost:8002",
+    _CORS_PROD_DEFAULTS if ENVIRONMENT == "production" else _CORS_DEV_DEFAULTS,
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
 # ================================================================
-# CSRF
+# CSRF — SEC-009: strict allowlist per environment
 # ================================================================
+_CSRF_DEV_DEFAULTS = "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:8000,http://localhost:8002"
+_CSRF_PROD_DEFAULTS = "https://aprendersistema.com.br"
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",
-    "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:8000,http://localhost:8002",
+    _CSRF_PROD_DEFAULTS if ENVIRONMENT == "production" else _CSRF_DEV_DEFAULTS,
 ).split(",")
 CSRF_COOKIE_SAMESITE = "Lax"
 # Issue #135: XSS protection - JavaScript não pode ler o cookie diretamente
@@ -432,6 +436,12 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": "/api/",
+    # SEC-005: Restrict schema/docs to authenticated staff users in production
+    "SERVE_PERMISSIONS": [
+        "rest_framework.permissions.IsAdminUser"
+        if ENVIRONMENT == "production"
+        else "rest_framework.permissions.AllowAny"
+    ],
     # Contact info
     "CONTACT": {
         "name": "Equipe AS v2",
@@ -447,13 +457,13 @@ SPECTACULAR_SETTINGS = {
         {"name": "options", "description": "Opções para formulários"},
         {"name": "admin", "description": "Administração de entidades"},
     ],
-    # Swagger UI settings (Issue #415)
+    # SEC-008: Swagger UI settings — disable persistAuthorization in production
     "SWAGGER_UI_SETTINGS": {
         "deepLinking": True,
-        "persistAuthorization": True,
+        "persistAuthorization": ENVIRONMENT != "production",
         "displayOperationId": True,
         "filter": True,
-        "tryItOutEnabled": True,
+        "tryItOutEnabled": ENVIRONMENT != "production",
     },
 }
 

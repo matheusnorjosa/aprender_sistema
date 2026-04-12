@@ -438,9 +438,11 @@ SPECTACULAR_SETTINGS = {
     "SCHEMA_PATH_PREFIX": "/api/",
     # SEC-005: Restrict schema/docs to authenticated staff users in production
     "SERVE_PERMISSIONS": [
-        "rest_framework.permissions.IsAdminUser"
-        if ENVIRONMENT == "production"
-        else "rest_framework.permissions.AllowAny"
+        (
+            "rest_framework.permissions.IsAdminUser"
+            if ENVIRONMENT == "production"
+            else "rest_framework.permissions.AllowAny"
+        )
     ],
     # Contact info
     "CONTACT": {

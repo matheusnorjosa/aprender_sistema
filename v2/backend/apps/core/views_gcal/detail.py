@@ -144,7 +144,9 @@ class DashboardEventsExportView(APIView):
             ]
         )
 
-        # Escrever linhas (chunk_size required when using iterator() with prefetch_related)
+        from apps.core.utils.csv_sanitize import sanitize_csv_value
+
+        # SEC-007: Rows sanitized against CSV injection
         for s in qs.iterator(chunk_size=2000):
             # Determinar fluxo (SUPER ou NAO_SUPER)
             fluxo = s.projeto.fluxo if s.projeto else ""
@@ -152,18 +154,18 @@ class DashboardEventsExportView(APIView):
             writer.writerow(
                 [
                     s.id,
-                    s.municipio.nome if s.municipio else "",
-                    s.projeto.nome if s.projeto else "",
-                    s.tipo_evento.nome if s.tipo_evento else "",
+                    sanitize_csv_value(s.municipio.nome if s.municipio else ""),
+                    sanitize_csv_value(s.projeto.nome if s.projeto else ""),
+                    sanitize_csv_value(s.tipo_evento.nome if s.tipo_evento else ""),
                     s.inicio.isoformat() if s.inicio else "",
                     s.fim.isoformat() if s.fim else "",
-                    s.usuario.username if s.usuario else "",
-                    s.coordenador.username if s.coordenador else "",
-                    fluxo,
+                    sanitize_csv_value(s.usuario.username if s.usuario else ""),
+                    sanitize_csv_value(s.coordenador.username if s.coordenador else ""),
+                    sanitize_csv_value(fluxo),
                     s.gcal_status,
                     s.external_event_id or "",
                     s.gcal_last_sync_at.isoformat() if s.gcal_last_sync_at else "",
-                    s.gcal_last_error or "",
+                    sanitize_csv_value(s.gcal_last_error or ""),
                     s.meet_link or "",
                     s.gcal_payload_hash or "",
                     s.updated_at.isoformat() if s.updated_at else "",

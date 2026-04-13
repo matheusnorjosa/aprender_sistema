@@ -609,7 +609,8 @@ jobs:
           } >> /tmp/portainer-stack-update-attempts.log
 
           for attempt in $(seq 1 "$max_attempts"); do
-            http_code="$(curl "${curl_opts[@]}" \
+            # Stack update pulls images + recreates containers — override timeout to 300s
+            http_code="$(curl "${curl_opts[@]}" --max-time 300 \
               -o /tmp/portainer-stack-update-response.json \
               -w '%{http_code}' \
               -X PUT \

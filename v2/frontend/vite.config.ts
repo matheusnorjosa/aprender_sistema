@@ -42,20 +42,7 @@ export default defineConfig({
     },
   },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          // Vendor chunks — separate heavy libs for parallel download + caching
-          if (id.includes('node_modules/react-dom')) return 'vendor-react';
-          if (id.includes('node_modules/react-router')) return 'vendor-react';
-          if (id.includes('node_modules/react/')) return 'vendor-react';
-          if (id.includes('node_modules/antd') || id.includes('node_modules/@ant-design/icons')) return 'vendor-antd';
-          if (id.includes('node_modules/leaflet') || id.includes('node_modules/react-leaflet')) return 'vendor-leaflet';
-        },
-      },
-    },
-    // Aumentar limite de warning para 600kB (após splitting)
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 1500,
     // CSS code splitting — carrega CSS por chunk em vez de inline
     cssCodeSplit: true,
     // Source maps for production debugging (hidden from browser DevTools)

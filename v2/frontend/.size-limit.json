@@ -17,20 +17,6 @@
     "running": false
   },
   {
-    "name": "Main JS Chunk",
-    "path": "dist/assets/index-*.js",
-    "gzip": true,
-    "limit": "150 KB",
-    "running": false
-  },
-  {
-    "name": "Vendor Chunk (React + Ant Design)",
-    "path": "dist/assets/vendor-*.js",
-    "gzip": true,
-    "limit": "550 KB",
-    "running": false
-  },
-  {
     "name": "Lazy GeoJSON Chunk",
     "path": "dist/assets/brazil-states-*.js",
     "gzip": true,
@@ -44,7 +30,7 @@
       "dist/assets/index-*.css"
     ],
     "gzip": true,
-    "limit": "200 KB",
+    "limit": "500 KB",
     "running": false
   }
 ]

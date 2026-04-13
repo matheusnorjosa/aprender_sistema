@@ -562,7 +562,7 @@ jobs:
           fi
           portainer_url="${portainer_url%/}"
 
-          curl_opts=(--silent --show-error --location --max-time 120)
+          curl_opts=(--silent --show-error --location --max-time 300)
           if [ "$PORTAINER_SKIP_TLS_VERIFY" = "true" ]; then
             curl_opts+=(--insecure)
           fi
@@ -609,8 +609,7 @@ jobs:
           } >> /tmp/portainer-stack-update-attempts.log
 
           for attempt in $(seq 1 "$max_attempts"); do
-            # Stack update pulls images + recreates containers — override timeout to 300s
-            http_code="$(curl "${curl_opts[@]}" --max-time 300 \
+            http_code="$(curl "${curl_opts[@]}" \
               -o /tmp/portainer-stack-update-response.json \
               -w '%{http_code}' \
               -X PUT \
@@ -968,7 +967,7 @@ jobs:
           fi
           portainer_url="${portainer_url%/}"
 
-          curl_opts=(--silent --show-error --location --max-time 120)
+          curl_opts=(--silent --show-error --location --max-time 300)
           if [ "${PORTAINER_SKIP_TLS_VERIFY:-false}" = "true" ]; then
             curl_opts+=(--insecure)
           fi

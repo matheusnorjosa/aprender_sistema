@@ -177,6 +177,8 @@ class DATRegistroViewSet(viewsets.ModelViewSet):
 
         from django.http import HttpResponse
 
+        from apps.core.utils.csv_sanitize import sanitize_csv_value
+
         # Apply filters
         queryset = self.filter_queryset(self.get_queryset())
 
@@ -206,26 +208,26 @@ class DATRegistroViewSet(viewsets.ModelViewSet):
             ]
         )
 
-        # Rows
+        # SEC-007: Rows sanitized against CSV injection
         for r in queryset:
             writer.writerow(
                 [
-                    r.municipio.nome,
-                    r.municipio.uf,
-                    r.projeto_geral.nome,
-                    r.projeto.nome,
+                    sanitize_csv_value(r.municipio.nome),
+                    sanitize_csv_value(r.municipio.uf),
+                    sanitize_csv_value(r.projeto_geral.nome),
+                    sanitize_csv_value(r.projeto.nome),
                     r.aluno_qtde,
                     r.professor_qtde or "",
-                    r.reuniao_dat or "",
-                    r.turma_formar_id or "",
+                    sanitize_csv_value(r.reuniao_dat or ""),
+                    sanitize_csv_value(r.turma_formar_id or ""),
                     r.nr_codigos or "",
-                    r.chaves_inscricao_status,
-                    r.instrucoes_status,
-                    r.envio_codigos_status,
+                    sanitize_csv_value(r.chaves_inscricao_status),
+                    sanitize_csv_value(r.instrucoes_status),
+                    sanitize_csv_value(r.envio_codigos_status),
                     "Sim" if r.usa_avaliar else "Não",
-                    r.alunos_recebidos_status,
-                    r.alunos_validados_status,
-                    r.alunos_importados_status,
+                    sanitize_csv_value(r.alunos_recebidos_status),
+                    sanitize_csv_value(r.alunos_validados_status),
+                    sanitize_csv_value(r.alunos_importados_status),
                 ]
             )
 

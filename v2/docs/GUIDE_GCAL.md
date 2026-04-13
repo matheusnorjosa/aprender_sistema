@@ -647,7 +647,47 @@ logger.info(f"GCal response: {result}")
 - [Service Account Authentication](https://developers.google.com/identity/protocols/oauth2/service-account)
 - [GCAL_SEND_UPDATES.md](../backend/GCAL_SEND_UPDATES.md)
 
-## 8. Histórico
+## 8. Criptografia de Tokens OAuth (SEC-011)
+
+### Visão Geral
+
+Tokens OAuth (access/refresh) são criptografados em repouso usando **Fernet** (AES-128-CBC + HMAC-SHA256) via `GCAL_ENCRYPTION_KEY`.
+
+### Configuração por Ambiente
+
+| Ambiente       | Comportamento                                                             |
+| -------------- | ------------------------------------------------------------------------- |
+| **Produção**   | `GCAL_ENCRYPTION_KEY` obrigatória. Ausência causa `ValueError` (fail-fast) |
+| **Dev/Staging** | Fallback para chave derivada de `SECRET_KEY` com warning no log           |
+
+### Rotação de Chave
+
+A rotação é zero-downtime via management command:
+
+```bash
+# 1. Gerar nova chave Fernet
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+# 2. Executar rotação (descriptografa com antiga, re-criptografa com nova)
+python manage.py rotate_gcal_encryption_key \
+  --old-key="CHAVE_ATUAL" \
+  --new-key="CHAVE_NOVA_GERADA"
+
+# 3. Atualizar GCAL_ENCRYPTION_KEY no Portainer com a nova chave
+
+# 4. Reiniciar containers (web, worker, beat)
+```
+
+A rotação cria entrada no AuditLog com ação `GCAL_ENCRYPTION_KEY_ROTATION`.
+
+### Arquivos Relevantes
+
+- `apps/core/services/oauth/token_manager.py` — encrypt/decrypt/rotate
+- `apps/core/management/commands/rotate_gcal_encryption_key.py` — comando
+- `apps/core/models/integracao.py` — GoogleOAuthCredential (BinaryField)
+- `apps/core/tests/test_google_oauth.py` — testes de encrypt/decrypt/rotation
+
+## 9. Histórico
 
 - **PR19** (RF05/RF06): Implementação inicial (GCal + Meet integration)
 - **2025-10-23**: Guia criado

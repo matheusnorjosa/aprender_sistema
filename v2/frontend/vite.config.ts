@@ -49,9 +49,8 @@ export default defineConfig({
           if (id.includes('node_modules/react-dom')) return 'vendor-react';
           if (id.includes('node_modules/react-router')) return 'vendor-react';
           if (id.includes('node_modules/react/')) return 'vendor-react';
-          if (id.includes('node_modules/@ant-design/icons')) return 'vendor-antd-icons';
           if (id.includes('node_modules/antd/es/table') || id.includes('node_modules/antd/es/date-picker') || id.includes('node_modules/antd/es/calendar') || id.includes('node_modules/antd/es/upload') || id.includes('node_modules/antd/es/tree') || id.includes('node_modules/antd/es/transfer') || id.includes('node_modules/antd/es/color-picker') || id.includes('node_modules/antd/es/cascader')) return 'vendor-antd-heavy';
-          if (id.includes('node_modules/antd')) return 'vendor-antd-core';
+          if (id.includes('node_modules/antd') || id.includes('node_modules/@ant-design/icons')) return 'vendor-antd-core';
           if (id.includes('node_modules/leaflet') || id.includes('node_modules/react-leaflet')) return 'vendor-leaflet';
         },
       },

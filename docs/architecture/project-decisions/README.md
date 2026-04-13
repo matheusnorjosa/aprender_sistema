@@ -23,6 +23,7 @@ Cada ADR documenta: contexto (problema), decisão (o que foi escolhido e por qu�
 | [ADR-013](ADR-013-axios-pinning-fetch-migration.md) | Pin Axios + Migração Fetch API | Accepted | 2026-03-31 |
 | [ADR-014](ADR-014-stateless-horizontal-scaling.md) | Arquitetura Stateless para Scaling | Accepted | 2026-01-12 |
 | [ADR-015](ADR-015-testing-policy.md) | Política de Testes | Accepted | 2026-02-24 |
+| [ADR-016](ADR-016-asymmetric-crypto-strategy.md) | Estratégia de Criptografia Assimétrica | Accepted | 2026-04-13 |
 
 ## Como Adicionar um Novo ADR
 

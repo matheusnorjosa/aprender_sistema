@@ -12,6 +12,7 @@ POST /api/disponibilidade/import-bloqueios/
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from typing import Any
@@ -34,6 +35,8 @@ from apps.core.serializers.openapi_critical_contract import (
 )
 from apps.core.services.bloqueios_import import import_bloqueios_from_file
 from apps.core.upload_validators import validate_upload
+
+logger = logging.getLogger(__name__)
 
 
 class ImportBloqueiosView(APIView):
@@ -121,8 +124,9 @@ class ImportBloqueiosView(APIView):
             return Response(report, status=status.HTTP_200_OK)
 
         except Exception as e:
+            logger.exception("Erro ao processar arquivo de bloqueios: %s", e)
             return Response(
-                {"detail": f"Erro ao processar arquivo: {str(e)}"},
+                {"detail": "Erro ao processar arquivo. Verifique o formato e tente novamente."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         finally:

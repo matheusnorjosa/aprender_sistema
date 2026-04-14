@@ -358,5 +358,5 @@ class GoogleCalendarClient(CalendarClientAdapter):
             return {
                 "status": "unhealthy",
                 "client_type": "google",
-                "details": f"Error: {str(e)}",
+                "details": "Health check failed.",
             }

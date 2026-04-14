@@ -23,6 +23,7 @@ Cache Redis 5 minutos por (year, month, role, escopo, sector, q).
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from django.core.cache import cache
@@ -42,6 +43,8 @@ from apps.core.serializers.openapi_critical_contract import (
     MonthlyAvailabilityResponseSerializer,
 )
 from apps.core.services.monthly_grid_service import build_monthly_grid
+
+logger = logging.getLogger(__name__)
 
 
 class MonthlyAvailabilityView(APIView):
@@ -221,8 +224,9 @@ class MonthlyAvailabilityView(APIView):
                 allowed_user_ids=allowed_user_ids,
             )
         except Exception as e:
+            logger.exception("Erro ao compor grade mensal: %s", e)
             return Response(
-                {"error": f"Erro ao compor grade mensal: {str(e)}"},
+                {"error": "Erro ao compor grade mensal."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

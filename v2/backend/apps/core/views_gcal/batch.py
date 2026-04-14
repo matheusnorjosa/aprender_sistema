@@ -136,7 +136,7 @@ class GCalPublishBatchView(APIView):
                     logger.info(f"Batch publish queued: solicitacao_id={sol.id}, dry_run={dry_run}")
                 except Exception as e:
                     logger.error(f"Failed to queue solicitacao_id={sol.id}: {e}")
-                    errors.append({"id": sol.id, "detail": f"Erro ao enfileirar task: {str(e)}"})
+                    errors.append({"id": sol.id, "detail": "Erro ao enfileirar operação."})
             else:
                 # Dry-run: apenas simula
                 queued.append(sol.id)
@@ -269,7 +269,7 @@ class GCalBatchReapplyView(APIView):
                     logger.info(f"Batch reapply queued: id={sol.id}, operator={operator_user_id}")
                 except Exception as e:
                     logger.error(f"Failed to queue reapply id={sol.id}: {e}")
-                    errors.append({"id": sol.id, "detail": f"Erro ao enfileirar: {str(e)}"})
+                    errors.append({"id": sol.id, "detail": "Erro ao enfileirar operação."})
             else:
                 # Dry-run: apenas simula
                 queued_count += 1
@@ -406,7 +406,7 @@ class GCalBatchResyncView(APIView):
                     logger.info(f"Batch resync queued: id={sol.id}, operator={operator_user_id}")
                 except Exception as e:
                     logger.error(f"Failed to queue resync id={sol.id}: {e}")
-                    errors.append({"id": sol.id, "detail": f"Erro ao enfileirar: {str(e)}"})
+                    errors.append({"id": sol.id, "detail": "Erro ao enfileirar operação."})
             else:
                 # Dry-run: apenas simula
                 queued_count += 1

@@ -19,11 +19,9 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from django.conf import settings
-from django.db.models import QuerySet
 from django.shortcuts import redirect
 from django.utils import timezone
 from rest_framework import status
@@ -35,12 +33,12 @@ from rest_framework.throttling import UserRateThrottle
 from apps.core.models import AuditLog, GoogleOAuthCredential
 from apps.core.permissions import IsControleOrSuper
 from apps.core.services.google_oauth import (
-    _encrypt_token,
-    _is_safe_url,
     build_authorization_url,
     exchange_code_for_tokens,
     revoke_token,
 )
+from apps.core.services.oauth.oauth_flow import _is_safe_url as is_safe_url  # noqa: PLC2701
+from apps.core.services.oauth.token_manager import encrypt_token
 
 logger = logging.getLogger(__name__)
 
@@ -99,14 +97,14 @@ def _build_frontend_redirect_url(path: str) -> str:
 
     Security:
         - Caminhos relativos são convertidos para URL do frontend (CORS_ALLOWED_ORIGINS[0])
-        - URLs absolutas são preservadas (já validadas por _is_safe_url)
+        - URLs absolutas são preservadas (já validadas por is_safe_url)
     """
     import os
 
     # Se já for URL absoluta, validar antes de usar
     parsed = urlparse(path)
     if parsed.scheme and parsed.netloc:
-        if not _is_safe_url(path):
+        if not is_safe_url(path):
             logger.warning(f"URL absoluta rejeitada (open redirect): {path}")
             return "/pre-agenda?google=error&reason=invalid_redirect"
         return path
@@ -139,7 +137,7 @@ def _build_frontend_redirect_url(path: str) -> str:
         frontend_origin = f"http://localhost:{frontend_port}"
 
     # SECURITY: Validar origin antes de usar (previne env injection)
-    if not _is_safe_url(frontend_origin):
+    if not is_safe_url(frontend_origin):
         logger.error(f"Frontend origin não confiável, usando path relativo: {frontend_origin}")
         return path
 
@@ -204,7 +202,7 @@ def google_oauth_start(request: Request) -> Response:
     except ValueError as e:
         logger.error(f"❌ OAuth start falhou: {e}")
         return Response(
-            {"error": "Configuração OAuth incompleta. Contate o administrador.", "detail": str(e)},
+            {"error": "Configuração OAuth incompleta. Contate o administrador."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
@@ -285,12 +283,12 @@ def google_oauth_callback(request: Request) -> Response:
         tokens = exchange_code_for_tokens(code)
 
         # Criar ou atualizar credencial
-        credential, created = GoogleOAuthCredential.objects.update_or_create(
+        _, created = GoogleOAuthCredential.objects.update_or_create(
             user=request.user,
             defaults={
                 "google_email": tokens["email"],
-                "access_token_encrypted": _encrypt_token(tokens["access_token"]),
-                "refresh_token_encrypted": _encrypt_token(tokens["refresh_token"]),
+                "access_token_encrypted": encrypt_token(tokens["access_token"]),
+                "refresh_token_encrypted": encrypt_token(tokens["refresh_token"]),
                 "token_expiry": timezone.now() + timedelta(seconds=tokens["expires_in"]),
                 "scope": tokens["scope"],
             },
@@ -497,9 +495,7 @@ def google_oauth_list_events(request: Request) -> Response:
         return Response({"error": "Nenhuma conexão Google encontrada"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         logger.error(f"❌ Erro ao listar eventos: {e}")
-        return Response(
-            {"error": "Erro ao listar eventos", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return Response({"error": "Erro ao listar eventos"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["GET"])
@@ -556,9 +552,7 @@ def google_oauth_list_calendars(request: Request) -> Response:
         return Response({"error": "Nenhuma conexão Google encontrada"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         logger.error(f"❌ Erro ao listar calendários: {e}")
-        return Response(
-            {"error": "Erro ao listar calendários", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return Response({"error": "Erro ao listar calendários"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])

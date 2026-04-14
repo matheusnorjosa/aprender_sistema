@@ -11,7 +11,6 @@ import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant
 import { Link } from 'react-router-dom';
 import { listGerencias, createGerencia, updateGerencia, deleteGerencia } from '../../api/adminDAT';
 import type { GerenciaRecord, GerenciaPayload } from '../../api/adminDAT';
-import type { ID } from '../../types';
 
 const { Title } = Typography;
 const { Search } = Input;

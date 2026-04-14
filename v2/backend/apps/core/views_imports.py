@@ -18,6 +18,7 @@ POST /api/dat/import-cadastros/
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from typing import Any
@@ -42,6 +43,8 @@ from apps.core.serializers.openapi_critical_contract import (
 from apps.core.services.controle_acoes_import import import_acoes_controle
 from apps.core.services.dat_cadastros_import import import_dat_cadastros
 from apps.core.upload_validators import validate_upload
+
+logger = logging.getLogger(__name__)
 
 
 class ControleImportAcoesView(APIView):
@@ -126,8 +129,10 @@ class ControleImportAcoesView(APIView):
             return Response(report, status=status.HTTP_200_OK)
 
         except Exception as e:
+            logger.exception("Erro ao processar arquivo de acoes controle: %s", e)
             return Response(
-                {"detail": f"Erro ao processar arquivo: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"detail": "Erro ao processar arquivo. Verifique o formato e tente novamente."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         finally:
             # Sempre remover arquivo temporário
@@ -220,8 +225,10 @@ class DATImportCadastrosView(APIView):
             return Response(report, status=status.HTTP_200_OK)
 
         except Exception as e:
+            logger.exception("Erro ao processar arquivo de cadastros DAT: %s", e)
             return Response(
-                {"detail": f"Erro ao processar arquivo: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"detail": "Erro ao processar arquivo. Verifique o formato e tente novamente."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         finally:
             # Sempre remover arquivo temporário

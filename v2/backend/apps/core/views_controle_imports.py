@@ -11,6 +11,7 @@ POST /api/controle/import-compras/
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from typing import Any
@@ -31,6 +32,8 @@ from apps.core.serializers.openapi_critical_contract import (
     ImportOperationResponseSerializer,
 )
 from apps.core.services.controle_imports import import_compras_from_file
+
+logger = logging.getLogger(__name__)
 
 # Issue #569: Upload validation hardening (DoS/malicious file prevention)
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
@@ -132,8 +135,10 @@ class ImportComprasView(APIView):
             return Response(report, status=status.HTTP_200_OK)
 
         except Exception as e:
+            logger.exception("Erro ao processar arquivo de compras: %s", e)
             return Response(
-                {"detail": f"Erro ao processar arquivo: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"detail": "Erro ao processar arquivo. Verifique o formato e tente novamente."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         finally:
             # Sempre remover arquivo temporário

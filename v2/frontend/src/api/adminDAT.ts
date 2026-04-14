@@ -333,3 +333,92 @@ export async function updateProjeto(id: ID, data: ProjetoPayload): Promise<Proje
 export async function deleteProjeto(id: ID): Promise<void> {
   await fetchWithErrorMapping(`/projetos/${id}/`, { method: 'DELETE' }, ADMIN_ERROR_MAP);
 }
+
+// ========== GERENCIAS ==========
+
+export interface GerenciaRecord {
+  id: ID;
+  nome: string;
+  nome_setor: string;
+  gerente: ID | null;
+  gerente_nome: string;
+  ativo: boolean;
+  descricao: string;
+  projetos_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GerenciaPayload {
+  nome?: string;
+  nome_setor?: string;
+  gerente?: ID | null;
+  ativo?: boolean;
+  descricao?: string;
+}
+
+export async function listGerencias(params: ListParams = {}): Promise<PaginatedResponse<GerenciaRecord>> {
+  return fetchWithErrorMapping(buildUrl('/gerencias/', params as QueryParams), {}, ADMIN_ERROR_MAP);
+}
+
+export async function createGerencia(data: GerenciaPayload): Promise<GerenciaRecord> {
+  return fetchWithErrorMapping('/gerencias/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, ADMIN_ERROR_MAP);
+}
+
+export async function updateGerencia(id: ID, data: GerenciaPayload): Promise<GerenciaRecord> {
+  return fetchWithErrorMapping(`/gerencias/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, ADMIN_ERROR_MAP);
+}
+
+export async function deleteGerencia(id: ID): Promise<void> {
+  await fetchWithErrorMapping(`/gerencias/${id}/`, { method: 'DELETE' }, ADMIN_ERROR_MAP);
+}
+
+// ========== PRODUTOS ==========
+
+export interface ProdutoRecord {
+  id: ID;
+  codigo: string;
+  nome: string;
+  descricao: string;
+  projeto: ID;
+  projeto_nome: string;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProdutoPayload {
+  codigo?: string;
+  nome?: string;
+  descricao?: string;
+  projeto?: ID;
+  ativo?: boolean;
+}
+
+export async function listProdutos(params: ListParams = {}): Promise<PaginatedResponse<ProdutoRecord>> {
+  return fetchWithErrorMapping(buildUrl('/produtos/', params as QueryParams), {}, ADMIN_ERROR_MAP);
+}
+
+export async function createProduto(data: ProdutoPayload): Promise<ProdutoRecord> {
+  return fetchWithErrorMapping('/produtos/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, ADMIN_ERROR_MAP);
+}
+
+export async function updateProduto(id: ID, data: ProdutoPayload): Promise<ProdutoRecord> {
+  return fetchWithErrorMapping(`/produtos/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, ADMIN_ERROR_MAP);
+}
+
+export async function deleteProduto(id: ID): Promise<void> {
+  await fetchWithErrorMapping(`/produtos/${id}/`, { method: 'DELETE' }, ADMIN_ERROR_MAP);
+}

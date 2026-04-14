@@ -13,7 +13,7 @@
 
 import type { ReactNode } from 'react';
 import { Card, Row, Col, Typography } from 'antd';
-import { UserOutlined, EnvironmentOutlined, TeamOutlined, ProjectOutlined, SettingOutlined, SafetyOutlined } from '@ant-design/icons';
+import { UserOutlined, EnvironmentOutlined, TeamOutlined, ProjectOutlined, SettingOutlined, SafetyOutlined, BankOutlined, ShoppingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
@@ -64,6 +64,22 @@ export default function AdminDATHomePage(): JSX.Element {
       description: 'Gerenciar funções (o que cada usuário pode fazer)',
       icon: <SafetyOutlined className="text-5xl text-amber-500" />,
       path: '/dat/admin/funcoes',
+      status: 'Disponível',
+    },
+    {
+      key: 'gerencias',
+      title: 'Gerências',
+      description: 'Gerenciar gerências organizacionais',
+      icon: <BankOutlined className="text-5xl text-indigo-500" />,
+      path: '/dat/admin/gerencias',
+      status: 'Disponível',
+    },
+    {
+      key: 'produtos',
+      title: 'Produtos',
+      description: 'Gerenciar produtos por projeto',
+      icon: <ShoppingOutlined className="text-5xl text-orange-500" />,
+      path: '/dat/admin/produtos',
       status: 'Disponível',
     },
     {

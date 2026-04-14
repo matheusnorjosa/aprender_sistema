@@ -41,6 +41,8 @@ const CoordenadoresPage = lazy(() => import('../pages/DATModule/CoordenadoresPag
 const AcoesNotificacaoPage = lazy(() => import('../pages/Controle/AcoesNotificacaoPage'));
 const NotificacoesInternasPage = lazy(() => import('../pages/Controle/NotificacoesInternasPage'));
 const AcoesTimelinePage = lazy(() => import('../pages/Controle/AcoesTimelinePage'));
+const GerenciasPage = lazy(() => import('../pages/AdminDAT/GerenciasPage'));
+const ProdutosPage = lazy(() => import('../pages/AdminDAT/ProdutosPage'));
 
 function PageLoader(): JSX.Element {
   return (
@@ -115,6 +117,8 @@ export function AppRoutes({ user, permissions }: AppRoutesProps): JSX.Element {
         <Route path="/dat/admin/grupos" element={canDAT ? <GruposPage /> : <Forbidden />} />
         <Route path="/dat/admin/setores" element={canDAT ? <SetoresPage /> : <Forbidden />} />
         <Route path="/dat/admin/funcoes" element={canDAT ? <FuncoesPage /> : <Forbidden />} />
+        <Route path="/dat/admin/gerencias" element={canDAT ? <GerenciasPage /> : <Forbidden />} />
+        <Route path="/dat/admin/produtos" element={canDAT ? <ProdutosPage /> : <Forbidden />} />
         <Route path="/dat/admin/configuracoes" element={canDAT ? <ConfiguracoesPage /> : <Forbidden />} />
         <Route path="/dat/admin/colecoes" element={canDAT ? <ColecoesImportPage /> : <Forbidden />} />
         <Route path="/dat/admin/equipe-gerencia" element={canDAT ? <EquipeGerenciaImportPage /> : <Forbidden />} />

@@ -15,9 +15,14 @@ Refs:
 
 from __future__ import annotations
 
+import os
 from typing import Callable
 
 from django.http import HttpRequest, HttpResponse
+
+# SEC-004: CSP mode — "enforce" (default) or "report-only"
+# Use report-only in production to collect violation data before enforcing.
+CSP_MODE = os.getenv("CSP_MODE", "enforce")
 
 
 class SecurityHeadersMiddleware:
@@ -89,7 +94,8 @@ class SecurityHeadersMiddleware:
         if worker_src:
             csp_directives.insert(5, worker_src)
 
-        response["Content-Security-Policy"] = "; ".join(csp_directives)
+        csp_header = "Content-Security-Policy-Report-Only" if CSP_MODE == "report-only" else "Content-Security-Policy"
+        response[csp_header] = "; ".join(csp_directives)
 
         # ================================================================
         # Permissions-Policy (antiga Feature-Policy)

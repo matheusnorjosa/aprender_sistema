@@ -432,5 +432,5 @@ class OAuthCalendarClient(CalendarClientAdapter):
                 "client_type": "oauth",
                 "google_email": self.credential.google_email,
                 "user_id": self.credential.user_id,
-                "details": f"Error: {str(e)}",
+                "details": "Health check failed.",
             }

@@ -50,7 +50,7 @@ def gcal_calendars(request: Request) -> Response:
     except Exception as e:
         logger.error(f"Error listing calendars: {e}", exc_info=True)
         return Response(
-            {"error": "Failed to list calendars", "details": str(e)},
+            {"error": "Failed to list calendars"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
@@ -96,5 +96,4 @@ def gcal_health(request: Request) -> Response:
         logger.error(f"Error checking GCal health: {e}", exc_info=True)
         raise ServiceUnavailableError(
             service="Google Calendar",
-            details=str(e),
         )

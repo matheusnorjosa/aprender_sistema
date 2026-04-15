@@ -13,13 +13,24 @@
 ## 🧭 Política Canônica de Rotas
 
 - **Base path canônico oficial**: `/api/`
-- **Alias de compatibilidade temporário**: `/api/v1/`
+- **Alias deprecated**: `/api/v1/` (retorna headers `Deprecation: true` + `Sunset`)
 
 Regras:
 
 - Toda documentação nova deve usar `/api/*`.
 - Todo código novo (frontend/backend/tests/scripts) deve usar `/api/*`.
-- `/api/v1/*` existe apenas para compatibilidade e não deve ser usado em novas integrações.
+- CI bloqueia novas referências a `/api/v1/` fora do allowlist (#796).
+- `/api/v1/*` existe apenas para compatibilidade e será removido após a janela de deprecação.
+
+### Plano de corte do `/api/v1/` (#797)
+
+| Fase | Data | Ação |
+|------|------|------|
+| Deprecation headers | 2026-04-15 | Headers RFC 8594 em todas as respostas `/api/v1/` |
+| CI guard rail | 2026-04-15 | Bloqueia novo código com `/api/v1/` |
+| Service worker migrado | 2026-04-15 | SW usa `/api/` (cache v3 força refresh) |
+| Monitoramento | 2026-04-15 a 2026-06-14 | Observar se há tráfego residual em `/api/v1/` |
+| Remoção do alias | Após 2026-06-14 | Remover `path("api/v1/", ...)` de `config/urls.py` |
 
 Observação:
 

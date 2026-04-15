@@ -138,6 +138,7 @@ AUTHENTICATION_BACKENDS = [
 MIDDLEWARE = [
     "django_prometheus.middleware.PrometheusBeforeMiddleware",  # MP1: Metrics start
     "apps.core.middleware.RequestIDMiddleware",  # MP2: Correlation ID for structured logging
+    "apps.core.middleware.APIv1DeprecationMiddleware",  # #793: Deprecation headers on /api/v1/
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -419,11 +420,10 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
     # API Schema (drf-spectacular)
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    # API Versioning (#410)
-    "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.URLPathVersioning",
-    "DEFAULT_VERSION": "v1",
-    "ALLOWED_VERSIONS": ["v1"],
-    "VERSION_PARAM": "version",
+    # API Versioning — /api/ is canonical, /api/v1/ is deprecated alias (#792)
+    # URLPathVersioning removed: canonical path has no version prefix.
+    # The /api/v1/ alias remains in urls.py for backwards compatibility
+    # until the deprecation window closes (see API-006).
 }
 
 # ================================================================

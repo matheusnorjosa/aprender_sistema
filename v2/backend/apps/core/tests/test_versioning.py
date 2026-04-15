@@ -17,7 +17,6 @@ from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.test import APIClient
-from rest_framework.views import APIView
 
 from apps.core.deprecation import deprecated_endpoint
 from apps.core.models import Usuario
@@ -115,14 +114,45 @@ class TestDeprecationDecorator(TestCase):
 
 
 class TestVersioningConfiguration(TestCase):
-    """Tests for versioning DRF configuration."""
+    """Tests for versioning DRF configuration (#792)."""
 
-    def test_versioning_config_in_settings(self) -> None:
-        """Versioning configuration should be in REST_FRAMEWORK settings."""
+    def test_no_url_path_versioning(self) -> None:
+        """URLPathVersioning should NOT be configured — /api/ is canonical."""
         from django.conf import settings
 
         rf_settings = settings.REST_FRAMEWORK
 
-        self.assertEqual(rf_settings.get("DEFAULT_VERSIONING_CLASS"), "rest_framework.versioning.URLPathVersioning")
-        self.assertEqual(rf_settings.get("DEFAULT_VERSION"), "v1")
-        self.assertIn("v1", rf_settings.get("ALLOWED_VERSIONS", []))
+        self.assertNotIn("DEFAULT_VERSIONING_CLASS", rf_settings)
+        self.assertNotIn("DEFAULT_VERSION", rf_settings)
+        self.assertNotIn("ALLOWED_VERSIONS", rf_settings)
+
+    def test_v1_alias_still_works(self) -> None:
+        """The /api/v1/ alias must remain functional during deprecation window."""
+        client = APIClient()
+        response = client.get("/api/v1/csrf/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class TestAPIv1DeprecationMiddleware(TestCase):
+    """Tests for the /api/v1/ deprecation middleware (#793)."""
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+
+    def test_v1_returns_deprecation_headers(self) -> None:
+        """Requests to /api/v1/ should include Deprecation + Sunset headers."""
+        response = self.client.get("/api/v1/csrf/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Deprecation"], "true")
+        self.assertIn("Sunset", response)
+        self.assertIn("Link", response)
+        self.assertIn('/api/csrf/', response["Link"])
+
+    def test_canonical_api_has_no_deprecation_headers(self) -> None:
+        """Requests to /api/ should NOT have deprecation headers."""
+        response = self.client.get("/api/csrf/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("Deprecation", response)
+        self.assertNotIn("Sunset", response)

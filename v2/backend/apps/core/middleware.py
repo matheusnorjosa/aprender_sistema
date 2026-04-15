@@ -3,6 +3,7 @@ Middleware para AS v2.
 
 Inclui:
 - RequestIDMiddleware: Adiciona correlation ID (request_id) único por requisição
+- APIv1DeprecationMiddleware: Adds deprecation headers to /api/v1/ requests (#793)
 """
 
 from __future__ import annotations
@@ -61,3 +62,29 @@ class RequestIDMiddleware:
                 delattr(threading.current_thread(), "request_id")
             except AttributeError:
                 pass
+
+
+class APIv1DeprecationMiddleware:
+    """
+    Adds RFC 8594 Deprecation + Sunset headers to /api/v1/ requests.
+
+    Signals to clients that the /api/v1/ prefix is deprecated and will be
+    removed. The canonical path is /api/ (#793).
+    """
+
+    # Sunset date: 60 days from deployment (2026-06-15)
+    SUNSET_DATE = "Sun, 14 Jun 2026 23:59:59 GMT"
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        response = self.get_response(request)
+
+        if request.path.startswith("/api/v1/"):
+            response["Deprecation"] = "true"
+            response["Sunset"] = self.SUNSET_DATE
+            canonical = request.path.replace("/api/v1/", "/api/", 1)
+            response["Link"] = f'<{canonical}>; rel="successor-version"'
+
+        return response

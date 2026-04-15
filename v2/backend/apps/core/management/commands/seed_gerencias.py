@@ -21,7 +21,7 @@ GERENCIAS = [
     {
         "nome": "SUPERINTENDENCIA",
         "nome_setor": "Super",
-        "descricao": "Projetos SUPER que requerem aprovação manual (CIRANDAR, LENDO E ESCREVENDO, NOVO LENDO, TEMA, etc.)",
+        "descricao": "Projetos SUPER que requerem aprovação manual (CIRANDAR, LENDO E ESCREVENDO, NOVO LENDO, TEMA, UNI DUNI TÊ, etc.)",
     },
     {
         "nome": "GERENCIA 2",
@@ -49,18 +49,47 @@ GERENCIAS = [
         "descricao": "SOU DA PAZ",
     },
     {
-        "nome": "GERENCIA INDIVIDUAL",
-        "nome_setor": "Individual",
-        "descricao": "Projetos com gerência individual (A COR DA GENTE, ED FINANCEIRA, GESTÃO ESCOLAR, MY COMPANION, TRÂNSITO LEGAL, UNI DUNI TÊ)",
+        "nome": "INDIVIDUAL - A COR DA GENTE",
+        "nome_setor": "A Cor da Gente",
+        "descricao": "A COR DA GENTE",
+    },
+    {
+        "nome": "INDIVIDUAL - ED FINANCEIRA",
+        "nome_setor": "Ed Financeira",
+        "descricao": "ED FINANCEIRA",
+    },
+    {
+        "nome": "INDIVIDUAL - GESTÃO ESCOLAR",
+        "nome_setor": "Gestão Escolar",
+        "descricao": "GESTÃO ESCOLAR",
+    },
+    {
+        "nome": "INDIVIDUAL - MY COMPANION",
+        "nome_setor": "My Companion",
+        "descricao": "MY COMPANION",
+    },
+    {
+        "nome": "INDIVIDUAL - TRÂNSITO LEGAL",
+        "nome_setor": "Trânsito Legal",
+        "descricao": "TRÂNSITO LEGAL",
     },
 ]
 
+# Old unified record to remove when splitting
+DEPRECATED_GERENCIAS = ["GERENCIA INDIVIDUAL", "INDIVIDUAL - UNI DUNI TÊ"]
+
 
 class Command(BaseCommand):
-    help = "Seed de gerências organizacionais (7 registros, idempotente)"
+    help = "Seed de gerências organizacionais (11 registros, idempotente)"
 
     def handle(self, *args: str, **options: dict[str, Any]) -> None:
         self.stdout.write("Seeding gerências...")
+
+        # Remove deprecated unified records (safe only if no EquipeGerencia links)
+        for nome in DEPRECATED_GERENCIAS:
+            deleted, _ = Gerencia.objects.filter(nome=nome).delete()
+            if deleted:
+                self.stdout.write(self.style.WARNING(f"  ✗ Removed deprecated: {nome}"))
 
         created_count = 0
         updated_count = 0

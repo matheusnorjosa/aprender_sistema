@@ -70,7 +70,6 @@ def test_seed_rbac_creates_all_groups(run_seed_rbac):
         "Coordenador",
         "Formador",
         "Apoio de Coordenação",
-        "Gerência",
         "Diretoria",
     ]
 

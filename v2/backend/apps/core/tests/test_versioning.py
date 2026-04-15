@@ -147,7 +147,7 @@ class TestAPIv1DeprecationMiddleware(TestCase):
         self.assertEqual(response["Deprecation"], "true")
         self.assertIn("Sunset", response)
         self.assertIn("Link", response)
-        self.assertIn('/api/csrf/', response["Link"])
+        self.assertIn("/api/csrf/", response["Link"])
 
     def test_canonical_api_has_no_deprecation_headers(self) -> None:
         """Requests to /api/ should NOT have deprecation headers."""

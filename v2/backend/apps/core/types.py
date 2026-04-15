@@ -170,11 +170,24 @@ IMPORTANTE: Sempre usar timezone-aware datetimes.
 
 GroupName: TypeAlias = Literal[
     # Setores (SETOR_GROUPS)
-    "Superintendência", "Vidas", "Fluir", "ACerta", "Brincando", "Sou da Paz",
-    "DAT", "Controle", "Diretoria", "Comercial", "Relacionamento",
-    "Logística Viagens", "Logística Galpão",
+    "Superintendência",
+    "Vidas",
+    "Fluir",
+    "ACerta",
+    "Brincando",
+    "Sou da Paz",
+    "DAT",
+    "Controle",
+    "Diretoria",
+    "Comercial",
+    "Relacionamento",
+    "Logística Viagens",
+    "Logística Galpão",
     # Funções (FUNCAO_GROUPS)
-    "Formador", "Coordenador", "Apoio de Coordenação", "Gerente",
+    "Formador",
+    "Coordenador",
+    "Apoio de Coordenação",
+    "Gerente",
     # Legacy — grupo Django ativo, não é mais setor
     "Gerência",
 ]

@@ -563,7 +563,8 @@ jobs:
           portainer_url="${portainer_url%/}"
 
           # --- Curl base options ---
-          curl_opts=(--silent --show-error --location --max-time 60)
+          # 300s accommodates stack update (image pull + container recreate)
+          curl_opts=(--silent --show-error --location --max-time 300)
           if [ "$PORTAINER_SKIP_TLS_VERIFY" = "true" ]; then
             curl_opts+=(--insecure)
           fi

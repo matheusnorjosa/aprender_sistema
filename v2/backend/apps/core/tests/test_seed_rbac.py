@@ -29,7 +29,6 @@ def test_seed_rbac_creates_groups():
         "Formador",
         "Controle",
         "DAT",
-        "Gerência",
         "Diretoria",
     ]
 

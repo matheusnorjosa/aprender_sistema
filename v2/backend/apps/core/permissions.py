@@ -143,7 +143,7 @@ class IsGerencia(
     funcperm_factory(
         "IsGerencia",
         "pode_operar_gerencia",
-        "Apenas usuários de Gerência, Superintendência ou Diretoria podem realizar esta ação.",
+        "Apenas usuários com permissão gerencial (Gerência, Superintendência ou Diretoria) podem realizar esta ação.",
     )
 ):
     pass
@@ -153,7 +153,7 @@ class IsDashboardOverview(
     funcperm_factory(
         "IsDashboardOverview",
         "pode_acessar_dashboard_overview",
-        "Apenas usuários de Superintendência, Gerência ou Diretoria podem acessar o dashboard geral.",
+        "Apenas usuários com permissão de dashboard (Superintendência, Gerência ou Diretoria) podem acessar o dashboard geral.",
     )
 ):
     pass

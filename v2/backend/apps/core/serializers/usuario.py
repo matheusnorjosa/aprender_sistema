@@ -70,7 +70,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
     P1.1 Security Hardening:
     - is_staff remains read-only
-    - Groups whitelist: DAT, Controle, Superintendência, Coordenador, Formador, Gerência
+    - Groups whitelist: dynamic (SETOR_GROUPS + FUNCAO_GROUPS + functional permissions)
     - Users cannot modify their own groups
 
     RBAC funcional (Issue #829):

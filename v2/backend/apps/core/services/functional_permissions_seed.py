@@ -93,6 +93,8 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         category="operacao",
         group_names=("Controle",),
     ),
+    # Nota: "Gerência" é grupo Django legacy (não é mais setor RBAC),
+    # mas continua ativo para permissões funcionais de gerentes.
     FunctionalPermissionSeed(
         codename="pode_operar_gerencia",
         label="Operacao Gerencial",

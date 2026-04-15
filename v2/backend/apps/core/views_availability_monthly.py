@@ -172,6 +172,7 @@ class MonthlyAvailabilityView(APIView):
         if gerencia_id is None:
             has_wide_scope = bool(
                 getattr(request.user, "is_superuser", False)
+                # "Gerência" = grupo Django legacy (não é setor, mas dá acesso amplo a gerentes)
                 or request.user.groups.filter(name__in=["Superintendência", "Gerência", "Diretoria"]).exists()
             )
             if has_wide_scope:

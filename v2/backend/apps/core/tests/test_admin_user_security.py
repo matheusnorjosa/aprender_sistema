@@ -286,13 +286,14 @@ class AdminUserSecurityTests(TestCase):
 
     def test_gerencia_is_whitelisted(self):
         """
-        Whitelist - Grupo Gerência deve estar permitido
+        Whitelist - Grupo Gerência (legacy, não é setor) deve estar permitido
+        via functional_permissions_seed.
 
         Cenário:
         - DAT atribui grupo Gerência a um usuário
 
         Expectativa:
-        - Atribuição bem-sucedida (Gerência está na whitelist)
+        - Atribuição bem-sucedida (Gerência entra na whitelist dinâmica)
         - Usuário recebe o grupo Gerência
         """
         data = {

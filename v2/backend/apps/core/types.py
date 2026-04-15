@@ -168,8 +168,30 @@ IMPORTANTE: Sempre usar timezone-aware datetimes.
 # 8. RBAC (Grupos e Permissões)
 # ==============================================================================
 
-GroupName: TypeAlias = Literal["Superintendência", "Controle", "Coordenador", "Formador", "DAT", "Gerência"]
-"""Grupos de permissão Django (Usuario.groups)."""
+GroupName: TypeAlias = Literal[
+    # Setores (SETOR_GROUPS)
+    "Superintendência",
+    "Vidas",
+    "Fluir",
+    "ACerta",
+    "Brincando",
+    "Sou da Paz",
+    "DAT",
+    "Controle",
+    "Diretoria",
+    "Comercial",
+    "Relacionamento",
+    "Logística Viagens",
+    "Logística Galpão",
+    # Funções (FUNCAO_GROUPS)
+    "Formador",
+    "Coordenador",
+    "Apoio de Coordenação",
+    "Gerente",
+    # Legacy — grupo Django ativo, não é mais setor
+    "Gerência",
+]
+"""Grupos de permissão Django (Usuario.groups). Ref: constants.py"""
 
 ActionType: TypeAlias = Literal[
     "APPROVE",

@@ -139,6 +139,45 @@ jobs:
           cd v2/backend
           flake8 apps/ config/
 
+      - name: Guard rail — no new /api/v1/ references (#796)
+        run: |
+          # Allowlist: files that legitimately reference /api/v1/
+          ALLOWLIST=(
+            "v2/backend/config/urls.py"               # URL alias definition
+            "v2/backend/config/settings.py"           # Middleware registration + comments
+            "v2/backend/apps/core/tests/test_versioning.py"  # Tests for alias
+            "v2/backend/apps/core/deprecation.py"     # Decorator example
+            "v2/backend/apps/core/middleware.py"       # Deprecation middleware
+            "v2/backend/apps/core/api_schemas.py"     # Example URLs in docstrings
+            "v2/backend/apps/core/views_solicitacao.py"  # Curl example in docstring
+            "v2/backend/apps/core/management/commands/sync_municipios_ibge.py"  # IBGE external API
+            "v2/docs/"                                 # Documentation
+            ".claude/"                                 # AI context
+          )
+
+          PATTERN='/api/v1/'
+          violations=0
+
+          while IFS= read -r file; do
+            allowed=false
+            for entry in "${ALLOWLIST[@]}"; do
+              if [[ "$file" == "$entry"* ]]; then
+                allowed=true
+                break
+              fi
+            done
+            if [ "$allowed" = false ]; then
+              echo "::error file=$file::Found /api/v1/ reference — use /api/ instead (see #796)"
+              violations=$((violations + 1))
+            fi
+          done < <(grep -rl --include='*.py' --include='*.ts' --include='*.tsx' --include='*.js' "$PATTERN" v2/ .github/ || true)
+
+          if [ "$violations" -gt 0 ]; then
+            echo "::error::Found $violations file(s) with /api/v1/ outside allowlist. Use /api/ as canonical path."
+            exit 1
+          fi
+          echo "✓ No new /api/v1/ references found outside allowlist."
+
   # ----------------------------------------------------------------
   # Job 2a: Backend tests - core suite (serial)
   # ----------------------------------------------------------------

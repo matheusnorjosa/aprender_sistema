@@ -254,7 +254,7 @@ class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
     """
 
     queryset = Gerencia.objects.annotate(projetos_count=Count("projetos", filter=Q(projetos__ativo=True))).order_by(
-        "nome"
+        "nome_setor"
     )
     serializer_class = GerenciaSerializer
     permission_classes = [IsAuthenticated]
@@ -262,7 +262,7 @@ class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
     filterset_fields = ["ativo"]
     search_fields = ["nome", "nome_setor"]
     ordering_fields = ["nome", "nome_setor"]
-    ordering = ["nome"]
+    ordering = ["nome_setor"]
 
     def get_permissions(self) -> list:  # type: ignore[type-arg]
         """DAT pode criar/editar/deletar. Outros apenas leitura."""

@@ -11,7 +11,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-from django.db.models import Count, QuerySet
+from django.db.models import Count
+from django.db.models.functions import TruncWeek
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.request import Request
@@ -75,16 +76,19 @@ def reports_status_counts(request: Request) -> Response:
     counts = queryset.values("status").annotate(count=Count("id"))
     counts_dict = {item["status"]: item["count"] for item in counts}
 
+    # Derive total from already-fetched counts instead of extra COUNT query (#781)
+    counts_data = {
+        "pendente": counts_dict.get("pendente", 0),
+        "aprovado": counts_dict.get("aprovado", 0),
+        "reprovado": counts_dict.get("reprovado", 0),
+        "publicado": counts_dict.get("publicado", 0),
+    }
+
     # Response consistency (#411)
     return APIResponse.success(
         data={
-            "counts": {
-                "pendente": counts_dict.get("pendente", 0),
-                "aprovado": counts_dict.get("aprovado", 0),
-                "reprovado": counts_dict.get("reprovado", 0),
-                "publicado": counts_dict.get("publicado", 0),
-            },
-            "total": queryset.count(),
+            "counts": counts_data,
+            "total": sum(counts_data.values()),
         },
         meta={"range": {"start": str(start_date), "end": str(end_date)}},
     )
@@ -196,33 +200,27 @@ def reports_weekly_approved(request: Request) -> Response:
     end_date = timezone.now().date()
     start_date = end_date - timedelta(weeks=weeks)
 
-    # Query only approved - filtrar por data do evento (inicio)
-    queryset = Solicitacao.objects.filter(status="aprovado", inicio__date__gte=start_date, inicio__date__lte=end_date)
-
-    # Se não há nenhuma solicitação aprovada, retornar array vazio
-    if queryset.count() == 0:
-        return APIResponse.list(items=[], total=0, meta={"weeks": weeks})
-
-    # Group by week (simplified - use created_at week)
-    weeks_data = []
-    current_date = start_date
-
-    while current_date <= end_date:
-        week_end = current_date + timedelta(days=6)
-        if week_end > end_date:
-            week_end = end_date
-
-        week_count = queryset.filter(inicio__date__gte=current_date, inicio__date__lte=week_end).count()
-
-        weeks_data.append(
-            {
-                "week": f"{current_date.year}-W{current_date.isocalendar()[1]:02d}",
-                "count": week_count,
-                "start_date": str(current_date),
-            }
+    # Single aggregated query: GROUP BY week instead of N COUNT queries (#781)
+    weekly_counts = (
+        Solicitacao.objects.filter(
+            status="aprovado",
+            inicio__date__gte=start_date,
+            inicio__date__lte=end_date,
         )
+        .annotate(week_start=TruncWeek("inicio"))
+        .values("week_start")
+        .annotate(count=Count("id"))
+        .order_by("week_start")
+    )
 
-        current_date = week_end + timedelta(days=1)
+    weeks_data = [
+        {
+            "week": f"{row['week_start'].year}-W{row['week_start'].isocalendar()[1]:02d}",
+            "count": row["count"],
+            "start_date": str(row["week_start"].date()),
+        }
+        for row in weekly_counts
+    ]
 
     # Response consistency (#411)
     return APIResponse.list(items=weeks_data[-weeks:], meta={"weeks": weeks})  # Last N weeks

@@ -19,7 +19,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
-from apps.core.models import Participation, Usuario
+from apps.core.models import Participation
 from apps.core.permissions import IsControle, IsGerencia
 
 
@@ -66,9 +66,14 @@ def formadores_metrics(request: Request) -> Response:
         usuario__isnull=False,  # Exclude guest participations
     ).select_related("usuario", "solicitacao")
 
-    # Aggregate by usuario
+    # Aggregate by usuario — include username to avoid N+1 fallback (#781)
     formadores_stats = (
-        participations.values("usuario_id", "usuario__first_name", "usuario__last_name")
+        participations.values(
+            "usuario_id",
+            "usuario__first_name",
+            "usuario__last_name",
+            "usuario__username",
+        )
         .annotate(
             eventos=Count("solicitacao_id", distinct=True),
             # Calculate hours worked: sum of (solicitacao.fim - solicitacao.inicio)
@@ -89,15 +94,10 @@ def formadores_metrics(request: Request) -> Response:
         if stat["horas_trabalhadas"] is not None:
             horas = round(stat["horas_trabalhadas"].total_seconds() / 3600, 1)
 
-        # Build full name
+        # Build full name — use username from same query as fallback
         nome = f"{stat['usuario__first_name']} {stat['usuario__last_name']}".strip()
         if not nome:
-            # Fallback to username if no first/last name
-            try:
-                usuario = Usuario.objects.get(id=stat["usuario_id"])
-                nome = usuario.username
-            except Usuario.DoesNotExist:
-                nome = f"Usuário #{stat['usuario_id']}"
+            nome = stat["usuario__username"] or f"Usuário #{stat['usuario_id']}"
 
         formadores_list.append(
             {

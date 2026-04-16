@@ -71,29 +71,26 @@ def productivity_metrics(request: Request) -> Response:
     rejected = stats["rejected"] or 0
     approval_rate = (approved / total * 100) if total > 0 else 0.0
 
-    # Calculate average approval time (only for approved events)
+    # Approved-only stats in a single query: avg time + gcal counts (#781)
     approved_qs = qs.filter(status="aprovado")
-    avg_time_seconds = approved_qs.aggregate(
+    approved_stats = approved_qs.aggregate(
         avg_time=Avg(
             (F("updated_at") - F("created_at")),
             output_field=None,
-        )
-    )["avg_time"]
+        ),
+        published=Count(Case(When(gcal_status="PUBLISHED", then=1))),
+        errors=Count(Case(When(gcal_status="ERROR", then=1))),
+    )
 
     # Convert timedelta to hours (handle None case)
+    avg_time_seconds = approved_stats["avg_time"]
     if avg_time_seconds is not None:
         avg_approval_time_hours = round(avg_time_seconds.total_seconds() / 3600, 2)
     else:
         avg_approval_time_hours = 0.0
 
-    # GCal metrics
-    gcal_stats = approved_qs.aggregate(
-        published=Count(Case(When(gcal_status="PUBLISHED", then=1))),
-        errors=Count(Case(When(gcal_status="ERROR", then=1))),
-    )
-
-    gcal_published = gcal_stats["published"] or 0
-    gcal_errors = gcal_stats["errors"] or 0
+    gcal_published = approved_stats["published"] or 0
+    gcal_errors = approved_stats["errors"] or 0
     gcal_error_rate = (gcal_errors / approved * 100) if approved > 0 else 0.0
 
     return Response(
@@ -179,7 +176,7 @@ def quality_metrics(request: Request) -> Response:
         .values_list("details__solicitacao_id", flat=True)
         .distinct()
     )
-    reworked_count = len(list(reworked_ids))
+    reworked_count = reworked_ids.count()
     rework_rate = (reworked_count / total * 100) if total > 0 else 0.0
 
     # Average approval time (approved events only)

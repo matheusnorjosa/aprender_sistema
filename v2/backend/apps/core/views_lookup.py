@@ -205,10 +205,15 @@ class UsuarioLookup(APIView):
 
         # Aplicar filtro de busca
         if q:
-            name_filter = Q(first_name__icontains=q) | Q(last_name__icontains=q)
             if can_search_email:
-                name_filter |= Q(email__icontains=q) | Q(username__icontains=q)
-            qs = qs.filter(name_filter)
+                qs = qs.filter(
+                    Q(first_name__icontains=q)
+                    | Q(last_name__icontains=q)
+                    | Q(email__icontains=q)
+                    | Q(username__icontains=q)
+                )
+            else:
+                qs = qs.filter(Q(first_name__icontains=q) | Q(last_name__icontains=q))
 
         # Filtrar por role/group ANTES do slice
         if role:

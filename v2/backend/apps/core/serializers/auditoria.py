@@ -90,7 +90,7 @@ class AuditLogSerializer(serializers.ModelSerializer):
             return None
 
         request = self.context.get("request")
-        if request and hasattr(request, "user") and request.user.is_superuser:
+        if request and hasattr(request, "user") and request.user.is_superuser:  # type: ignore[union-attr]
             return raw  # Superuser sees everything
 
         return _redact_details(raw)

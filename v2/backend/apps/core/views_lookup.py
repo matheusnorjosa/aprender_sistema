@@ -181,10 +181,16 @@ class TipoEventoLookup(APIView):
 class UsuarioLookup(APIView):
     """
     GET /api/lookup/usuarios/?q=maria&role=formador
-    Retorna: [{id, label, kind: "usuario", email}]
+    Retorna: [{id, label, kind: "usuario"}]
+
+    SEC-ENUM-01: email removed from response to prevent user enumeration.
+    SEC-ENUM-02: email search restricted to Coordenador+ roles.
     """
 
     permission_classes = [IsAuthenticated]
+
+    # Roles allowed to search by email (SEC-ENUM-02)
+    _EMAIL_SEARCH_ROLES = {"Coordenador", "Gerente", "Superintendência", "Apoio"}
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         q = request.GET.get("q", "").strip()
@@ -193,14 +199,16 @@ class UsuarioLookup(APIView):
         # Começar com queryset base
         qs = Usuario.objects.filter(is_active=True)
 
+        # SEC-ENUM-02: only Coordenador+ can search by email/username
+        user_groups = set(request.user.groups.values_list("name", flat=True))
+        can_search_email = bool(request.user.is_superuser or user_groups & self._EMAIL_SEARCH_ROLES)
+
         # Aplicar filtro de busca
         if q:
-            qs = qs.filter(
-                Q(first_name__icontains=q)
-                | Q(last_name__icontains=q)
-                | Q(email__icontains=q)
-                | Q(username__icontains=q)
-            )
+            name_filter = Q(first_name__icontains=q) | Q(last_name__icontains=q)
+            if can_search_email:
+                name_filter |= Q(email__icontains=q) | Q(username__icontains=q)
+            qs = qs.filter(name_filter)
 
         # Filtrar por role/group ANTES do slice
         if role:
@@ -212,15 +220,11 @@ class UsuarioLookup(APIView):
         results = []
         for user in qs:
             label = user.get_full_name() or user.username
-            if user.email:
-                label = f"{label} <{user.email}>"
-
             results.append(
                 {
                     "id": user.id,
                     "label": label,
                     "kind": "usuario",
-                    "email": user.email or "",
                 }
             )
 

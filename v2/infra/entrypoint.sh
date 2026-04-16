@@ -42,7 +42,7 @@ log_error() {
 
 log_info "Aguardando PostgreSQL..."
 
-until pg_isready -h ${DB_HOST:-db} -p ${DB_PORT:-5432} -U ${DB_USER:-aprender_user}; do
+until pg_isready -h "${DB_HOST:-db}" -p "${DB_PORT:-5432}" -U "${DB_USER:-aprender_user}"; do
     log_warning "PostgreSQL indisponível - aguardando..."
     sleep 2
 done
@@ -55,7 +55,7 @@ log_success "PostgreSQL disponível!"
 
 log_info "Aguardando Redis..."
 
-until redis-cli -h ${REDIS_HOST:-redis} -p ${REDIS_PORT:-6379} ping | grep -q PONG; do
+until redis-cli -h "${REDIS_HOST:-redis}" -p "${REDIS_PORT:-6379}" ping | grep -q PONG; do
     log_warning "Redis indisponível - aguardando..."
     sleep 2
 done
@@ -109,6 +109,6 @@ fi
 # ================================================================
 
 log_info "Iniciando aplicação..."
-log_info "Comando: $@"
+log_info "Comando: $*"
 
 exec "$@"

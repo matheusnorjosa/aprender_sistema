@@ -8,31 +8,49 @@ from typing import Any
 
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import HttpRequest, JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.urls import include, path
 
 from apps.core.admin_site import admin_site  # Custom admin site (superusers only)
 
 
+def _metrics_gate(request: HttpRequest) -> HttpResponse:
+    """SEC-RECON-02: Proxy to django_prometheus only for staff or internal IPs."""
+    ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", ""))
+    if "," in ip:
+        ip = ip.split(",")[0].strip()
+    is_internal = ip.startswith(("127.", "10.", "172.", "192.168.", "::1"))
+    is_staff = hasattr(request, "user") and request.user.is_authenticated and request.user.is_staff  # type: ignore[union-attr]
+
+    if not is_internal and not is_staff:
+        return JsonResponse({"error": "Forbidden"}, status=403)
+
+    from django_prometheus.exports import ExportToDjangoView
+
+    return ExportToDjangoView(request)
+
+
 def healthz(request: HttpRequest) -> JsonResponse:
-    """Health check endpoint for Docker/K8s"""
-    return JsonResponse(
-        {
-            "status": "ok",
-            "environment": settings.ENVIRONMENT,
-            "debug": settings.DEBUG,
-            "timezone": settings.TIME_ZONE,
-        }
-    )
+    """Health check endpoint for Docker/K8s — minimal payload (no sensitive data)."""
+    return JsonResponse({"status": "ok"})
 
 
 def healthz_detailed(request: HttpRequest) -> JsonResponse:
     """
-    Detailed health check for monitoring (Gap 7 - PLAN_maturity_gaps.md).
+    Detailed health check for monitoring — requires superuser or internal IP.
 
     Checks database, Redis cache, and GCal circuit breaker status.
-    Use this endpoint for comprehensive health monitoring.
     """
+    # SEC-RECON-01: restrict to superuser or internal network
+    ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", ""))
+    if "," in ip:
+        ip = ip.split(",")[0].strip()
+    is_internal = ip.startswith(("127.", "10.", "172.", "192.168.", "::1"))
+    is_superuser = hasattr(request, "user") and request.user.is_authenticated and request.user.is_superuser  # type: ignore[union-attr]
+
+    if not is_internal and not is_superuser:
+        return JsonResponse({"error": "Forbidden"}, status=403)
+
     from django.core.cache import cache
     from django.db import connection
 
@@ -73,13 +91,7 @@ def healthz_detailed(request: HttpRequest) -> JsonResponse:
     else:
         status = "degraded"
 
-    return JsonResponse(
-        {
-            "status": status,
-            "environment": settings.ENVIRONMENT,
-            "checks": checks,
-        }
-    )
+    return JsonResponse({"status": status, "checks": checks})
 
 
 urlpatterns = [
@@ -88,8 +100,8 @@ urlpatterns = [
     # Health check
     path("healthz/", healthz, name="healthz"),
     path("healthz/detailed/", healthz_detailed, name="healthz_detailed"),
-    # Prometheus metrics (MP1) - django_prometheus.urls defines 'metrics' internally
-    path("", include("django_prometheus.urls")),
+    # Prometheus metrics (MP1) — SEC-RECON-02: protected by staff_member_required
+    path("metrics", _metrics_gate, name="prometheus-metrics"),
     # API canonical: /api/* (#792)
     path("api/", include("apps.core.urls")),
     # DEPRECATED alias — will be removed after deprecation window (#797)

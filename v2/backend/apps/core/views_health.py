@@ -9,38 +9,27 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any
 
 from django.core.cache import cache
 from django.db import connection
-from django.db.models import QuerySet
 from django.http import JsonResponse
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def readyz(request: Request) -> Response:
     """
     Health check: DB + Redis.
 
-    Returns 200 OK if database is responsive.
-    Returns 503 Service Unavailable if database check fails.
-    Cache failures are warnings only (don't cause 503).
+    SEC-RECON-03: Anonymous users get minimal payload; admin gets full details.
 
     GET /api/readyz/
-
-    Response format:
-    {
-        "status": "healthy" | "unhealthy",
-        "checks": {
-            "database": "ok" | "error: <message>",
-            "cache": "ok" | "warning: <message>"
-        }
-    }
     """
-    checks = {}
+    checks: dict[str, str] = {}
 
     # Database check (critical - causes 503 if fails)
     try:
@@ -68,26 +57,24 @@ def readyz(request: Request) -> Response:
     # Only database failures cause unhealthy status
     db_ok = checks["database"] == "ok"
     status_code = 200 if db_ok else 503
-    status = "healthy" if db_ok else "unhealthy"
+    health_status = "healthy" if db_ok else "unhealthy"
 
-    return JsonResponse({"status": status, "checks": checks}, status=status_code)
+    # Anonymous: minimal payload; admin: full details
+    is_admin = request.user and request.user.is_authenticated and request.user.is_staff
+    if is_admin:
+        return JsonResponse({"status": health_status, "checks": checks}, status=status_code)
+    return JsonResponse({"status": health_status}, status=status_code)
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def versionz(request: Request) -> JsonResponse:
     """
-    Returns the deployed version of the application.
+    Returns the deployed version.
 
-    Reads from BUILD_INFO.json baked into the image at build time.
-    Used by CI/CD (release.yaml) to verify the correct version is running.
+    SEC-RECON-03: anonymous gets only version tag; admin gets git_sha + build_date.
 
     GET /api/version/
-
-    Response format:
-    {
-        "version": "v2026.03.05-abc1234",
-        "git_sha": "abc1234",
-        "build_date": "2026-03-05"
-    }
     """
     build_info_path = Path("/app/BUILD_INFO.json")
     try:
@@ -96,13 +83,15 @@ def versionz(request: Request) -> JsonResponse:
     except (FileNotFoundError, json.JSONDecodeError):
         data = {"version": "unknown", "git_sha": "unknown", "build_date": "unknown"}
 
-    return JsonResponse(
-        {
-            "version": data.get("version", "unknown"),
-            "git_sha": data.get("git_sha", "unknown"),
-            "build_date": data.get("build_date", "unknown"),
-        }
-    )
+    payload: dict[str, str] = {"version": data.get("version", "unknown")}
+
+    # Admin gets full recon info (git SHA, build date)
+    is_admin = request.user and request.user.is_authenticated and request.user.is_staff
+    if is_admin:
+        payload["git_sha"] = data.get("git_sha", "unknown")
+        payload["build_date"] = data.get("build_date", "unknown")
+
+    return JsonResponse(payload)
 
 
 @api_view(["GET"])

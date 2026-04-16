@@ -98,9 +98,12 @@ class GCalPublishBatchView(APIView):
         queued = []
         errors = []
 
+        # PERF-SQL-01: O(1) lookup instead of O(N) linear search per iteration
+        sol_map = {s.id: s for s in solicitacoes}
+
         for sol_id in solicitacao_ids:
             # Verificar se existe
-            sol = next((s for s in solicitacoes if s.id == sol_id), None)
+            sol = sol_map.get(sol_id)
             if not sol:
                 errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
                 continue

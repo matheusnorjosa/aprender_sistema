@@ -334,23 +334,33 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # Sempre criar participação do coordenador (request.user)
         Participation.objects.get_or_create(solicitacao=solicitacao, usuario=self.request.user, role="COORDENADOR")
 
+        # PERF-SQL-02: Batch fetch all referenced users in 2 queries instead of N
+        all_ids = set()
+        all_ids.update(fid for fid in extra.get("formador_ids", []) if fid)
+        all_ids.update(cid for cid in extra.get("coord_acompanha_ids", []) if cid)
+        usuarios_by_id = {u.id: u for u in Usuario.objects.filter(id__in=all_ids)} if all_ids else {}
+
+        all_emails = set()
+        all_emails.update(e.strip().lower() for e in extra.get("formador_emails", []) if e and e.strip())
+        all_emails.update(e.strip().lower() for e in extra.get("coord_acompanha_emails", []) if e and e.strip())
+        usuarios_by_email = (
+            {u.email.lower(): u for u in Usuario.objects.filter(email__in=all_emails)} if all_emails else {}
+        )
+
         # Formadores por ID
         for formador_id in extra.get("formador_ids", []):
             if formador_id:
-                try:
-                    usuario = Usuario.objects.get(id=formador_id)
+                usuario = usuarios_by_id.get(formador_id)
+                if usuario:
                     Participation.objects.get_or_create(solicitacao=solicitacao, usuario=usuario, role="FORMADOR")
-                except Usuario.DoesNotExist:
-                    pass
 
         # Formadores por email (guest)
         for email in extra.get("formador_emails", []):
             if email and email.strip():
-                # Tentar resolver email → Usuario
-                try:
-                    usuario = Usuario.objects.get(email__iexact=email.strip())
+                usuario = usuarios_by_email.get(email.strip().lower())
+                if usuario:
                     Participation.objects.get_or_create(solicitacao=solicitacao, usuario=usuario, role="FORMADOR")
-                except Usuario.DoesNotExist:
+                else:
                     # Criar como guest_email mantendo role=FORMADOR para GCal
                     Participation.objects.get_or_create(
                         solicitacao=solicitacao, guest_email=email.strip().lower(), role="FORMADOR"
@@ -359,23 +369,21 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # Coordenadores acompanhantes por ID
         for coord_id in extra.get("coord_acompanha_ids", []):
             if coord_id:
-                try:
-                    usuario = Usuario.objects.get(id=coord_id)
+                usuario = usuarios_by_id.get(coord_id)
+                if usuario:
                     Participation.objects.get_or_create(
                         solicitacao=solicitacao, usuario=usuario, role="COORD_ACOMPANHA"
                     )
-                except Usuario.DoesNotExist:
-                    pass
 
         # Coordenadores acompanhantes por email (guest)
         for email in extra.get("coord_acompanha_emails", []):
             if email and email.strip():
-                try:
-                    usuario = Usuario.objects.get(email__iexact=email.strip())
+                usuario = usuarios_by_email.get(email.strip().lower())
+                if usuario:
                     Participation.objects.get_or_create(
                         solicitacao=solicitacao, usuario=usuario, role="COORD_ACOMPANHA"
                     )
-                except Usuario.DoesNotExist:
+                else:
                     # Criar como guest_email mantendo role=COORD_ACOMPANHA para GCal
                     Participation.objects.get_or_create(
                         solicitacao=solicitacao, guest_email=email.strip().lower(), role="COORD_ACOMPANHA"

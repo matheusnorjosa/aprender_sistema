@@ -296,6 +296,17 @@ def import_compras_from_file(
     return report
 
 
+_produto_cache: dict[str, Projeto] | None = None
+
+
+def _get_produto_cache() -> dict[str, Projeto]:
+    """PERF-SQL-03: Build normalized produto→projeto cache once per process."""
+    global _produto_cache  # noqa: PLW0603
+    if _produto_cache is None:
+        _produto_cache = {norm_text(p.nome): p.projeto for p in Produto.objects.select_related("projeto").all()}
+    return _produto_cache
+
+
 def _infer_projeto_from_produto(produto_norm: str) -> Projeto | None:
     """
     Infere projeto a partir do nome do produto normalizado.
@@ -308,11 +319,11 @@ def _infer_projeto_from_produto(produto_norm: str) -> Projeto | None:
 
     key: str = produto_norm.upper()
 
-    # Fallback: match exato com produtos cadastrados (normalizando nome)
+    # PERF-SQL-03: Use module-level cache instead of full table scan per call
     norm_key = norm_text(produto_norm)
-    for p in Produto.objects.all():
-        if norm_text(p.nome) == norm_key:
-            return p.projeto
+    produto_projeto = _get_produto_cache().get(norm_key)
+    if produto_projeto is not None:
+        return produto_projeto
 
     # Mapeamento de padrões → nomes de projeto no banco
     # Ordem: mais específico primeiro

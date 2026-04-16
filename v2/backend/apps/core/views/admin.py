@@ -375,10 +375,10 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
         # Remover duplicados
         group_ids = list(set(group_ids))
 
-        # Verificar se todos os grupos existem
+        # PERF-SQL-05: single query instead of count() + values_list()
         groups = Group.objects.filter(id__in=group_ids)
-        if groups.count() != len(group_ids):
-            found_ids = set(groups.values_list("id", flat=True))
+        found_ids = set(groups.values_list("id", flat=True))
+        if len(found_ids) != len(group_ids):
             missing_ids = set(group_ids) - found_ids
             return Response(
                 {"error": f"Groups not found with IDs: {sorted(missing_ids)}"},

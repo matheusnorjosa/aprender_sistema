@@ -191,7 +191,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15.13
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: test_aprender
@@ -204,7 +204,7 @@ jobs:
           - 5432:5432
 
       redis:
-        image: redis:7
+        image: redis:7.4
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -312,7 +312,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15.13
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: test_aprender
@@ -325,7 +325,7 @@ jobs:
           - 5432:5432
 
       redis:
-        image: redis:7
+        image: redis:7.4
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -531,7 +531,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15.13
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: test_aprender
@@ -544,7 +544,7 @@ jobs:
           - 5432:5432
 
       redis:
-        image: redis:7
+        image: redis:7.4
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s

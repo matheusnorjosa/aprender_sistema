@@ -47,7 +47,7 @@ SECRET_KEY = os.getenv(
 # ALLOWED HOSTS
 # ================================================================
 # MP1: Include 'web' for Prometheus internal scraping
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0,testserver,web").split(",")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,web").split(",")
 
 # ================================================================
 # PRODUCTION GUARD RAILS (P1.4)
@@ -66,10 +66,25 @@ if ENVIRONMENT == "production":
         print("   Configure ALLOWED_HOSTS com domínios específicos", file=sys.stderr)
         sys.exit(1)
 
-    # WARNING: SECRET_KEY muito curta
+    # SEC-AUTH-03: Block dev-only hosts in production
+    _dev_hosts = {"localhost", "127.0.0.1", "testserver", "web", "0.0.0.0"}  # nosec B104
+    if _dev_hosts.issuperset(ALLOWED_HOSTS):
+        print("❌ ERRO CRÍTICO: ALLOWED_HOSTS contém apenas hosts de desenvolvimento", file=sys.stderr)
+        print("   Configure ALLOWED_HOSTS com domínios reais de produção", file=sys.stderr)
+        sys.exit(1)
+
+    # SEC-AUTH-02: Block insecure SECRET_KEY in production
+    if SECRET_KEY.startswith("django-insecure"):
+        print("❌ ERRO CRÍTICO: SECRET_KEY default insegura em produção", file=sys.stderr)
+        print(
+            "   Gere uma chave segura: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     if len(SECRET_KEY) < 50:
-        print("⚠️  WARNING: SECRET_KEY muito curta (recomendado: 50+ caracteres)", file=sys.stderr)
-        print("   Gere uma chave mais segura para produção", file=sys.stderr)
+        print("❌ ERRO CRÍTICO: SECRET_KEY muito curta (mínimo: 50 caracteres)", file=sys.stderr)
+        sys.exit(1)
 
     # WARNING: GCAL_CLIENT=fake em produção
     if os.getenv("GCAL_CLIENT", "fake") == "fake":
@@ -789,7 +804,7 @@ try:
     if DEBUG:
         INSTALLED_APPS += ["debug_toolbar"]
         MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
-        INTERNAL_IPS = ["127.0.0.1", "localhost", "0.0.0.0"]
+        INTERNAL_IPS = ["127.0.0.1", "localhost", "0.0.0.0"]  # nosec B104
         DEBUG_TOOLBAR_CONFIG: dict[str, object] = {
             # Disable toolbar during tests to avoid NoReverseMatch errors
             "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG and not TESTING,  # type: ignore[misc]

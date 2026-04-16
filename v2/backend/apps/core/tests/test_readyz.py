@@ -9,6 +9,10 @@ Cobertura:
 
 Endpoint testado:
 - GET /readyz
+
+SEC-RECON-03: readyz now returns conditional payload:
+- Anonymous: {"status": "healthy"} (no checks)
+- Staff/admin: {"status": "healthy", "checks": {...}} (full details)
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
@@ -17,6 +21,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -24,15 +29,25 @@ import pytest
 
 pytestmark = pytest.mark.django_db
 
+User = get_user_model()
+
+
+def _staff_client() -> APIClient:
+    """Create an APIClient authenticated as staff (required for full readyz payload)."""
+    user = User.objects.create_user("readyz_staff", "rz@test.com", "pass1234", is_staff=True)
+    client = APIClient()
+    client.force_authenticate(user=user)
+    return client
+
 
 # ============================================================================
-# TESTES DE ESTRUTURA DA RESPOSTA
+# TESTES DE ESTRUTURA DA RESPOSTA (staff — full payload)
 # ============================================================================
 
 
 def test_readyz_returns_200_when_healthy():
     """GET /readyz retorna 200 quando sistema está healthy."""
-    client = APIClient()
+    client = _staff_client()
     url = reverse("core:readyz")
     res = client.get(url)
 
@@ -46,7 +61,7 @@ def test_readyz_returns_200_when_healthy():
 
 def test_readyz_checks_database():
     """Readyz verifica conexão com banco de dados."""
-    client = APIClient()
+    client = _staff_client()
     url = reverse("core:readyz")
     res = client.get(url)
 
@@ -59,7 +74,7 @@ def test_readyz_checks_database():
 
 def test_readyz_checks_cache():
     """Readyz verifica conexão com cache (Redis ou LocMem)."""
-    client = APIClient()
+    client = _staff_client()
     url = reverse("core:readyz")
     res = client.get(url)
 
@@ -72,19 +87,19 @@ def test_readyz_checks_cache():
 
 
 # ============================================================================
-# TESTES DE FALHAS
+# TESTES DE FALHAS (staff — needs full payload to verify check details)
 # ============================================================================
 
 
-@patch("django.db.connection.cursor")
-def test_readyz_returns_503_when_database_fails(mock_cursor):
+def test_readyz_returns_503_when_database_fails():
     """Readyz retorna 503 se banco de dados falhar."""
-    # Simular erro de conexão
-    mock_cursor.side_effect = Exception("Connection refused")
-
-    client = APIClient()
+    # Create staff user BEFORE mocking cursor (needs real DB)
+    client = _staff_client()
     url = reverse("core:readyz")
-    res = client.get(url)
+
+    with patch("django.db.connection.cursor") as mock_cursor:
+        mock_cursor.side_effect = Exception("Connection refused")
+        res = client.get(url)
 
     assert res.status_code == 503, "Readyz deve retornar 503 quando database falha"
 
@@ -99,7 +114,7 @@ def test_readyz_cache_failure_is_warning_not_503(mock_cache_set):
     # Simular erro no cache
     mock_cache_set.side_effect = Exception("Redis connection refused")
 
-    client = APIClient()
+    client = _staff_client()
     url = reverse("core:readyz")
     res = client.get(url)
 
@@ -112,7 +127,7 @@ def test_readyz_cache_failure_is_warning_not_503(mock_cache_set):
 
 
 # ============================================================================
-# TESTES DE AUTENTICAÇÃO
+# TESTES DE AUTENTICAÇÃO (SEC-RECON-03)
 # ============================================================================
 
 
@@ -126,8 +141,32 @@ def test_readyz_does_not_require_authentication():
     assert res.status_code in [200, 503], "Readyz não deve requerer autenticação"
 
 
+def test_readyz_anonymous_gets_minimal_payload():
+    """SEC-RECON-03: Anonymous users get only status, no checks."""
+    client = APIClient()
+    url = reverse("core:readyz")
+    res = client.get(url)
+
+    assert res.status_code == 200
+    data = res.json()
+    assert "status" in data
+    assert "checks" not in data
+
+
+def test_readyz_staff_gets_full_payload():
+    """SEC-RECON-03: Staff users get full payload with checks."""
+    client = _staff_client()
+    url = reverse("core:readyz")
+    res = client.get(url)
+
+    assert res.status_code == 200
+    data = res.json()
+    assert "status" in data
+    assert "checks" in data
+
+
 # ============================================================================
-# TESTES DE EDGE CASES
+# TESTES DE EDGE CASES (staff)
 # ============================================================================
 
 
@@ -137,7 +176,7 @@ def test_readyz_database_returns_unexpected_result():
         mock_cursor_instance = mock_cursor.return_value.__enter__.return_value
         mock_cursor_instance.fetchone.return_value = (999,)  # Não é 1
 
-        client = APIClient()
+        client = _staff_client()
         url = reverse("core:readyz")
         res = client.get(url)
 
@@ -150,7 +189,7 @@ def test_readyz_database_returns_unexpected_result():
 
 def test_readyz_json_format():
     """Readyz retorna JSON válido."""
-    client = APIClient()
+    client = _staff_client()
     url = reverse("core:readyz")
     res = client.get(url)
 
@@ -163,13 +202,13 @@ def test_readyz_json_format():
 
 
 # ============================================================================
-# TESTES DE INTEGRAÇÃO
+# TESTES DE INTEGRAÇÃO (staff)
 # ============================================================================
 
 
 def test_readyz_works_with_real_database():
     """Readyz funciona com banco de dados real (não mock)."""
-    client = APIClient()
+    client = _staff_client()
     url = reverse("core:readyz")
     res = client.get(url)
 
@@ -183,7 +222,7 @@ def test_readyz_works_with_real_database():
 
 def test_readyz_works_with_real_cache():
     """Readyz funciona com cache real (LocMem ou Redis)."""
-    client = APIClient()
+    client = _staff_client()
     url = reverse("core:readyz")
     res = client.get(url)
 

@@ -67,7 +67,7 @@ if ENVIRONMENT == "production":
         sys.exit(1)
 
     # SEC-AUTH-03: Block dev-only hosts in production
-    _dev_hosts = {"localhost", "127.0.0.1", "testserver", "web", "0.0.0.0"}
+    _dev_hosts = {"localhost", "127.0.0.1", "testserver", "web", "0.0.0.0"}  # nosec B104
     if _dev_hosts.issuperset(ALLOWED_HOSTS):
         print("❌ ERRO CRÍTICO: ALLOWED_HOSTS contém apenas hosts de desenvolvimento", file=sys.stderr)
         print("   Configure ALLOWED_HOSTS com domínios reais de produção", file=sys.stderr)
@@ -804,7 +804,7 @@ try:
     if DEBUG:
         INSTALLED_APPS += ["debug_toolbar"]
         MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
-        INTERNAL_IPS = ["127.0.0.1", "localhost", "0.0.0.0"]
+        INTERNAL_IPS = ["127.0.0.1", "localhost", "0.0.0.0"]  # nosec B104
         DEBUG_TOOLBAR_CONFIG: dict[str, object] = {
             # Disable toolbar during tests to avoid NoReverseMatch errors
             "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG and not TESTING,  # type: ignore[misc]

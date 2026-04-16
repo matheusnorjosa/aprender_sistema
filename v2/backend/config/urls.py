@@ -2,6 +2,8 @@
 URL configuration for AS v2 project.
 """
 
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportReturnType=false
+
 from __future__ import annotations
 
 from typing import Any

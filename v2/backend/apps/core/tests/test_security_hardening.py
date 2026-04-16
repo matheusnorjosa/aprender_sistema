@@ -14,8 +14,7 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import TestCase, override_settings
 
 from apps.core.views_auth import (
     _clear_failed_attempts,
@@ -217,13 +216,13 @@ class TestAllowedHostsProductionGuard(TestCase):
 
     def test_dev_hosts_detected(self):
         """Default hosts are all dev hosts."""
-        dev_hosts = {"localhost", "127.0.0.1", "testserver", "web", "0.0.0.0"}
+        dev_hosts = {"localhost", "127.0.0.1", "testserver", "web", "0.0.0.0"}  # nosec B104
         default_hosts = ["localhost", "127.0.0.1", "testserver", "web"]
         assert dev_hosts.issuperset(default_hosts)
 
     def test_production_hosts_accepted(self):
         """Real production hosts are not a subset of dev hosts."""
-        dev_hosts = {"localhost", "127.0.0.1", "testserver", "web", "0.0.0.0"}
+        dev_hosts = {"localhost", "127.0.0.1", "testserver", "web", "0.0.0.0"}  # nosec B104
         prod_hosts = ["aprender.example.com", "www.aprender.example.com"]
         assert not dev_hosts.issuperset(prod_hosts)
 
@@ -231,4 +230,4 @@ class TestAllowedHostsProductionGuard(TestCase):
         """0.0.0.0 should no longer be in default ALLOWED_HOSTS."""
         from django.conf import settings
 
-        assert "0.0.0.0" not in settings.ALLOWED_HOSTS
+        assert "0.0.0.0" not in settings.ALLOWED_HOSTS  # nosec B104

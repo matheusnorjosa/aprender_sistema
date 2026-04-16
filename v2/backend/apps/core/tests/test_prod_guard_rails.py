@@ -158,24 +158,24 @@ class ProductionGuardRailsTests(TestCase):
         # Aceitar exit code 0 (sucesso) ou != 1 (warnings OK, mas não critical errors)
         self.assertNotEqual(result.returncode, 1, f"Django check falhou inesperadamente. Stderr: {result.stderr}")
 
-    def test_startup_warns_with_short_secret_key(self):
+    def test_startup_fails_with_short_secret_key(self):
         """
-        P1.4 - Startup DEVE avisar (WARNING) se SECRET_KEY < 50 chars
+        SEC-AUTH-02 - Startup DEVE falhar se SECRET_KEY < 50 chars em produção
 
         Cenário:
         - ENVIRONMENT=production
         - SECRET_KEY com apenas 20 caracteres
 
         Expectativa:
-        - settings.py imprime WARNING no stderr
-        - Mas NÃO chama sys.exit() (apenas warning, não bloqueio)
-        - Django check pode passar (exit code 0 ou com warnings)
+        - settings.py detecta SECRET_KEY curta
+        - sys.exit(1) com mensagem de erro
+        - Processo termina com exit code 1
         """
         env = os.environ.copy()
         env["ENVIRONMENT"] = "production"
         env["DEBUG"] = "0"
         env["ALLOWED_HOSTS"] = "example.com"
-        env["SECRET_KEY"] = "a" * 20  # Apenas 20 chars (< 50 recomendado)
+        env["SECRET_KEY"] = "a" * 20  # Apenas 20 chars (< 50 mínimo)
         env["DB_NAME"] = "test_db"
         env["DB_USER"] = "test_user"
         env["DB_PASSWORD"] = "test_password"
@@ -183,19 +183,18 @@ class ProductionGuardRailsTests(TestCase):
         env["DB_PORT"] = "5434"
 
         # Rodar Django check em subprocess
-        # P1.4 FIX: Correct path - manage.py is at /app/manage.py (container root)
         result = subprocess.run(
             [sys.executable, "manage.py", "check", "--deploy"],
-            cwd=str(Path(settings.BASE_DIR)),  # Project root where manage.py is located
+            cwd=str(Path(settings.BASE_DIR)),
             env=env,
             capture_output=True,
             text=True,
             timeout=10,
         )
 
-        # Validar que NÃO falhou criticamente (exit code != 1)
-        self.assertNotEqual(result.returncode, 1)
+        # SEC-AUTH-02: Short SECRET_KEY now causes sys.exit(1)
+        self.assertEqual(result.returncode, 1)
 
-        # Validar que warning aparece no stderr
+        # Validar mensagem de erro no stderr
         self.assertIn("SECRET_KEY muito curta", result.stderr)
-        self.assertIn("WARNING", result.stderr)
+        self.assertIn("ERRO CRÍTICO", result.stderr)

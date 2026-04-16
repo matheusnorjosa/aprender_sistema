@@ -13,7 +13,7 @@ from pathlib import Path
 from django.core.cache import cache
 from django.db import connection
 from django.http import JsonResponse
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -21,6 +21,7 @@ from rest_framework.response import Response
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@throttle_classes([])  # Health check — no throttling
 def readyz(request: Request) -> Response:
     """
     Health check: DB + Redis.
@@ -68,6 +69,7 @@ def readyz(request: Request) -> Response:
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@throttle_classes([])  # Version check — no throttling
 def versionz(request: Request) -> JsonResponse:
     """
     Returns the deployed version.

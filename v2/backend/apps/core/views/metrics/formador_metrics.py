@@ -64,7 +64,7 @@ def formadores_metrics(request: Request) -> Response:
         solicitacao__status="aprovado",
         solicitacao__created_at__gte=cutoff,
         usuario__isnull=False,  # Exclude guest participations
-    ).select_related("usuario", "solicitacao")
+    )
 
     # Aggregate by usuario — include username to avoid N+1 fallback (#781)
     formadores_stats = (

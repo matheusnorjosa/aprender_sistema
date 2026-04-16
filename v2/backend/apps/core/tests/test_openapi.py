@@ -259,11 +259,11 @@ class TestOpenAPISchema(TestCase):
             ("/api/options/municipios/", ["id", "nome", "uf"]),
             ("/api/options/projetos/", ["id", "nome", "codigo"]),
             ("/api/options/tipos-evento/", ["id", "nome"]),
-            ("/api/options/usuarios/", ["id", "first_name", "last_name", "email"]),
+            ("/api/options/usuarios/", ["id", "first_name", "last_name"]),  # SEC-ENUM-01
             ("/api/options/produtos/", ["id", "nome", "codigo"]),
             ("/api/options/coordenadores/", ["id", "nome", "area", "ativo"]),
             ("/api/options/areas/", ["id", "nome", "cor"]),
-            ("/api/options/formadores-do-setor/", ["id", "first_name", "last_name", "email"]),
+            ("/api/options/formadores-do-setor/", ["id", "first_name", "last_name"]),  # SEC-ENUM-01
         ]
 
         for path, expected_fields in endpoints:

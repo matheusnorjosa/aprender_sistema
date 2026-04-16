@@ -32,7 +32,6 @@ export interface UserOption {
   id: ID;
   first_name: string;
   last_name: string;
-  email: string;
 }
 
 /**
@@ -158,7 +157,7 @@ export default function ParticipantsPicker({
                     (option?.label as string)?.toLowerCase().includes(input.toLowerCase()) ?? false
                   }
                   options={usuariosOptions.map((u) => ({
-                    label: `${u.first_name} ${u.last_name} (${u.email})`,
+                    label: `${u.first_name} ${u.last_name}`,
                     value: u.id,
                   }))}
                   onSelect={handleAddFormador}
@@ -222,7 +221,7 @@ export default function ParticipantsPicker({
                     (option?.label as string)?.toLowerCase().includes(input.toLowerCase()) ?? false
                   }
                   options={usuariosOptions.map((u) => ({
-                    label: `${u.first_name} ${u.last_name} (${u.email})`,
+                    label: `${u.first_name} ${u.last_name}`,
                     value: u.id,
                   }))}
                   onSelect={handleAddCoord}

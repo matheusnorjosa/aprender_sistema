@@ -19,11 +19,9 @@ export interface LookupItem {
 }
 
 /**
- * User lookup result with email
+ * User lookup result (SEC-ENUM-01: email removed)
  */
-export interface UserLookupItem extends LookupItem {
-  email: string;
-}
+export type UserLookupItem = LookupItem;
 
 /**
  * Validation payload for solicitacao

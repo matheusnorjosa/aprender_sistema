@@ -23,13 +23,12 @@ export interface UserSlim {
 
 /**
  * User option for dropdowns (UsuarioOptionSerializer)
+ * SEC-ENUM-01: email removed from backend serializer
  */
 export interface UsuarioOption {
   id: ID;
-  username: string;
   first_name: string;
   last_name: string;
-  email: string;
 }
 
 /**

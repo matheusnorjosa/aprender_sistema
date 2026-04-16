@@ -16,7 +16,6 @@ import type { ID } from '../types';
  */
 export interface PersonItem {
   id: ID;
-  email: string;
   label: string;
 }
 
@@ -36,7 +35,6 @@ interface UserOption {
   label: string;
   data: {
     id: ID;
-    email: string;
     label: string;
   };
 }
@@ -115,12 +113,11 @@ export default function PeoplePicker({
   const handleAddFormador = (_selectedValue: string, option: UserOption): void => {
     const newFormador: PersonItem = {
       id: option.data.id,
-      email: option.data.email,
       label: option.data.label,
     };
 
-    // Verificar se já existe
-    const exists = value.formadores.some(f => f.id === newFormador.id || f.email === newFormador.email);
+    // Verificar se já existe (by ID only — SEC-ENUM-01)
+    const exists = value.formadores.some(f => f.id === newFormador.id);
     if (exists) {
       return;
     }
@@ -142,12 +139,11 @@ export default function PeoplePicker({
   const handleAddCoord = (_selectedValue: string, option: UserOption): void => {
     const newCoord: PersonItem = {
       id: option.data.id,
-      email: option.data.email,
       label: option.data.label,
     };
 
-    // Verificar se já existe
-    const exists = value.coordAcompanha.some(c => c.id === newCoord.id || c.email === newCoord.email);
+    // Verificar se já existe (by ID only — SEC-ENUM-01)
+    const exists = value.coordAcompanha.some(c => c.id === newCoord.id);
     if (exists) {
       return;
     }
@@ -202,7 +198,7 @@ export default function PeoplePicker({
                   onClose={() => handleRemoveFormador(formador.id)}
                   color="blue"
                 >
-                  {formador.label || formador.email}
+                  {formador.label}
                 </Tag>
               </li>
             ))}
@@ -238,7 +234,7 @@ export default function PeoplePicker({
                   onClose={() => handleRemoveCoord(coord.id)}
                   color="green"
                 >
-                  {coord.label || coord.email}
+                  {coord.label}
                 </Tag>
               </li>
             ))}

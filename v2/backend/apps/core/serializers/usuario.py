@@ -56,11 +56,12 @@ class CurrentUserSerializer(serializers.Serializer):  # type: ignore[misc]
 class UsuarioOptionSerializer(serializers.ModelSerializer):
     """
     Minimal serializer for Usuario (dropdowns/selects).
+    SEC-ENUM-01: email removed to prevent user enumeration.
     """
 
     class Meta:
         model = get_user_model()
-        fields = ["id", "first_name", "last_name", "email"]
+        fields = ["id", "first_name", "last_name"]
 
 
 class UsuarioAdminSerializer(serializers.ModelSerializer):

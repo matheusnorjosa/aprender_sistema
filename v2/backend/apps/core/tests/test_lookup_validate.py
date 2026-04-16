@@ -244,7 +244,8 @@ class TestUsuarioLookup:
         assert isinstance(data, list)
         assert len(data) >= 1
         assert data[0]["kind"] == "usuario"
-        assert "email" in data[0]
+        # SEC-ENUM-01: email removed from lookup response
+        assert "email" not in data[0]
 
     def test_lookup_with_role_filter(self, api_client, authenticated_user, sample_data):
         """Lookup com filtro de role deve retornar apenas usuários do grupo"""

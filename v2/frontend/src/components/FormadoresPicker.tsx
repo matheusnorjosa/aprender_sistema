@@ -16,7 +16,6 @@ import type { ID } from '../types';
  */
 export interface FormadorItem {
   id: ID;
-  email: string;
   label: string;
   name?: string;
 }
@@ -29,7 +28,6 @@ interface UserOption {
   label: string;
   data: {
     id: ID;
-    email: string;
     label: string;
   };
 }
@@ -76,13 +74,12 @@ export default function FormadoresPicker({ value = [], onChange }: FormadoresPic
   const handleAdd = (_selectedValue: string, option: UserOption): void => {
     const newFormador: FormadorItem = {
       id: option.data.id,
-      email: option.data.email,
       label: option.data.label,
       name: option.data.label, // Alias para compatibilidade
     };
 
-    // Verificar se já existe
-    const exists = value.some(f => f.id === newFormador.id || f.email === newFormador.email);
+    // Verificar se já existe (by ID only — SEC-ENUM-01)
+    const exists = value.some(f => f.id === newFormador.id);
     if (exists) {
       return;
     }

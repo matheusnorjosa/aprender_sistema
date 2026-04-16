@@ -108,11 +108,14 @@ class TestUsuariosOptions:
         assert response.status_code == 200
         data = response.json()
 
-        # Should include active users only
-        emails = [u["email"] for u in data]
-        assert "formador1@test.com" in emails
-        assert "formador2@test.com" in emails
-        assert "inativo@test.com" not in emails
+        # Should include active users only (SEC-ENUM-01: use first_name, email removed)
+        names = [u["first_name"] for u in data]
+        assert "Ana" in names
+        assert "Bruno" in names
+        # Inactive user should not appear (has no first_name, but also check by id)
+        user_ids = [u["id"] for u in data]
+        assert user1.id in user_ids
+        assert user2.id in user_ids
 
     def test_requires_authentication(self, api_client):
         """Endpoint requires authentication."""

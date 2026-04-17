@@ -1,17 +1,18 @@
 """
 conftest.py — Test fixtures for Aprender Sistema v2.
 
-Provides a per-test user that auto-injects into Solicitacao instances
-missing usuario_id. Uses pre_save signal scoped to test lifetime
-(connected on setup, disconnected on teardown).
+Provides a per-test default user with Coordenador group.
+Available as explicit fixture: `def test_x(default_test_user):`
 
-Refactored from #847: signal now properly disconnects after each test.
+History:
+- PR #1062: Added signal auto-inject (scoped per test)
+- PR #1063: Removed signal — all Solicitacao.objects.create now pass
+  usuario= explicitly. Signal was no longer needed.
 """
 
 from uuid import uuid4
 
 from django.contrib.auth.models import Group
-from django.db.models.signals import pre_save
 
 import pytest
 
@@ -19,15 +20,15 @@ import pytest
 @pytest.fixture(autouse=True, scope="function")
 def default_test_user(db):
     """
-    Create unique test user and auto-inject into Solicitacao.
+    Create unique test user for each test function.
 
-    - Connected via pre_save signal (scoped to this test only)
-    - Disconnected in teardown (no leaking between tests)
     - Unique CPF/username via uuid4 (xdist-safe)
+    - Added to Coordenador group
+    - autouse=True ensures DB is available for all tests
 
     Available as explicit fixture: `def test_x(default_test_user):`
     """
-    from apps.core.models import Solicitacao, Usuario
+    from apps.core.models import Usuario
 
     uid = uuid4().hex
     user = Usuario.objects.create(
@@ -42,14 +43,4 @@ def default_test_user(db):
     coordenador_group, _ = Group.objects.get_or_create(name="Coordenador")
     user.groups.add(coordenador_group)
 
-    # Scoped signal: inject user into Solicitacao missing usuario_id
-    def _auto_inject_user(sender, instance, **kwargs):
-        if isinstance(instance, Solicitacao) and not instance.usuario_id:
-            instance.usuario = user
-
-    pre_save.connect(_auto_inject_user, sender=Solicitacao)
-
     yield user
-
-    # Teardown: disconnect signal to prevent leaking
-    pre_save.disconnect(_auto_inject_user, sender=Solicitacao)

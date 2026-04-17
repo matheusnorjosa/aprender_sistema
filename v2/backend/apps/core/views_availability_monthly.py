@@ -203,9 +203,13 @@ class MonthlyAvailabilityView(APIView):
         else:
             cache_scope = f"gerencia:{gerencia_id}"
 
-        # Cache key inclui escopo para impedir compartilhamento indevido entre perfis
+        # ASQ-007: Include monthly version in cache key for targeted invalidation
+        from apps.core.utils.cache_utils import get_monthly_cache_version
+
+        monthly_ver = get_monthly_cache_version(request.user.id)
         cache_key = (
-            f"monthly:v4:{year}:{month}:{role}:" f"{cache_scope}:{sector or '*'}:" f"{(q or '').strip().lower()}"
+            f"monthly:v5:{monthly_ver}:{year}:{month}:{role}:"
+            f"{cache_scope}:{sector or '*'}:{(q or '').strip().lower()}"
         )
 
         # Tentar buscar do cache
@@ -231,7 +235,9 @@ class MonthlyAvailabilityView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # Armazenar no cache (5 minutos = 300 segundos)
-        cache.set(cache_key, data, 300)
+        # ASQ-007: TTL with jitter to prevent cache stampede
+        from apps.core.utils.cache_utils import _ttl_with_jitter
+
+        cache.set(cache_key, data, _ttl_with_jitter())
 
         return Response(data)

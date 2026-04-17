@@ -85,6 +85,15 @@ interface AcaoFormValues {
   [key: string]: any;
 }
 
+interface AcoesFilters {
+  search: string;
+  uf: string | undefined;
+  municipio: number | undefined;
+  projeto: number | undefined;
+  coordenador: number | undefined;
+  status_geral: string | undefined;
+}
+
 interface AcoesStats {
   total: number;
   cartas_enviadas: number;
@@ -130,7 +139,7 @@ export default function AcoesPage(): JSX.Element {
   const [stats, setStats] = useState<AcoesStats | null>(null);
 
   // Filter states
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<AcoesFilters>({
     search: '',
     uf: undefined,
     municipio: undefined,
@@ -173,7 +182,7 @@ export default function AcoesPage(): JSX.Element {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: any = {
+      const params: Record<string, string | number> = {
         page,
         page_size: pagination.pageSize,
         ordering: '-updated_at',
@@ -575,7 +584,7 @@ export default function AcoesPage(): JSX.Element {
               placeholder="Município, projeto..."
               allowClear
               value={filters.search}
-              onChange={(e) => setFilters((prev: any) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
               onSearch={() => fetchData(1)}
             />
           </Col>
@@ -590,7 +599,7 @@ export default function AcoesPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.uf}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, uf: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, uf: val }))}
               options={UF_OPTIONS}
               showSearch
             />
@@ -608,7 +617,7 @@ export default function AcoesPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.municipio}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, municipio: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, municipio: val }))}
               options={municipios.map((m) => ({ label: `${m.nome} - ${m.uf}`, value: m.id }))}
             />
           </Col>
@@ -625,7 +634,7 @@ export default function AcoesPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.projeto}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, projeto: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, projeto: val }))}
               options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
@@ -642,7 +651,7 @@ export default function AcoesPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.coordenador}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, coordenador: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, coordenador: val }))}
               options={coordenadores.map((c) => ({ label: c.nome, value: c.id }))}
             />
           </Col>
@@ -657,7 +666,7 @@ export default function AcoesPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.status_geral}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, status_geral: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, status_geral: val }))}
               options={[
                 { label: 'Em Andamento', value: 'em_andamento' },
                 { label: 'Concluídos', value: 'concluido' },

@@ -97,6 +97,17 @@ interface CompraFormValues {
   [key: string]: any;
 }
 
+interface ComprasFilters {
+  search: string;
+  uf: string | undefined;
+  municipio: number | undefined;
+  projeto: number | undefined;
+  produto: number | undefined;
+  status: string | undefined;
+  ano_uso: number | undefined;
+  tipo_compra: string | undefined;
+}
+
 interface MunicipioOption {
   id: number;
   nome: string;
@@ -171,7 +182,7 @@ export default function ComprasPage(): JSX.Element {
   });
 
   // Filter states
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<ComprasFilters>({
     search: '',
     uf: undefined,
     municipio: undefined,
@@ -214,7 +225,7 @@ export default function ComprasPage(): JSX.Element {
 
   // Fetch data with filters (uses crud hook internally)
   const fetchData = useCallback(async (page = 1) => {
-    const params: any = {
+    const params: Record<string, string | number> = {
       page,
       ordering: '-updated_at',
     };
@@ -519,7 +530,7 @@ export default function ComprasPage(): JSX.Element {
               placeholder="Produto, código..."
               allowClear
               value={filters.search}
-              onChange={(e) => setFilters((prev: any) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
               onSearch={() => fetchData(1)}
             />
           </Col>
@@ -536,7 +547,7 @@ export default function ComprasPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.projeto}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, projeto: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, projeto: val }))}
               options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
@@ -553,7 +564,7 @@ export default function ComprasPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.produto}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, produto: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, produto: val }))}
               options={produtos.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
@@ -568,7 +579,7 @@ export default function ComprasPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.uf}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, uf: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, uf: val }))}
               options={UF_OPTIONS}
               showSearch
             />
@@ -586,7 +597,7 @@ export default function ComprasPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.municipio}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, municipio: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, municipio: val }))}
               options={municipios.map((m) => ({ label: `${m.nome} - ${m.uf}`, value: m.id }))}
             />
           </Col>
@@ -601,7 +612,7 @@ export default function ComprasPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.ano_uso}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, ano_uso: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, ano_uso: val }))}
               options={ANO_OPTIONS}
             />
           </Col>
@@ -616,7 +627,7 @@ export default function ComprasPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.status}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, status: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, status: val }))}
               options={STATUS_OPTIONS}
             />
           </Col>
@@ -631,7 +642,7 @@ export default function ComprasPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.tipo_compra}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, tipo_compra: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, tipo_compra: val }))}
               options={TIPO_COMPRA_OPTIONS}
             />
           </Col>

@@ -12,6 +12,7 @@
 import { useState, useEffect, useMemo, ChangeEvent, JSX } from 'react';
 import { getGerencias, getMe } from '../../api/availability';
 import type { ID, CurrentUser, Gerencia } from '../../types';
+import logger from '../../utils/logger';
 
 /** Filters change partial type */
 interface FiltersChangeType {
@@ -74,7 +75,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
           }
         }
       } catch (err) {
-        console.error('Erro ao carregar dados:', err);
+        logger.error('Erro ao carregar dados:', err);
       } finally {
         setLoading(false);
       }

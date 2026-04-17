@@ -57,7 +57,7 @@ def _invalidate_cache_on_solicitacao_change(
 
     ASQ-007: Scoped invalidation — only bumps version for the affected user.
     """
-    invalidate_availability_cache(usuario_id=instance.usuario_id)
+    invalidate_availability_cache(usuario_id=getattr(instance, "usuario_id", None))
 
 
 @receiver([post_save, post_delete], sender=AvailabilityBlock)
@@ -69,7 +69,7 @@ def _invalidate_cache_on_block_change(
 
     ASQ-007: Scoped invalidation — only bumps version for the affected user.
     """
-    invalidate_availability_cache(usuario_id=instance.usuario_id)
+    invalidate_availability_cache(usuario_id=getattr(instance, "usuario_id", None))
 
 
 # ================================================================

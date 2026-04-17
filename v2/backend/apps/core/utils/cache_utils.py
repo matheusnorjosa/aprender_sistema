@@ -156,8 +156,8 @@ def cache_static_endpoint(timeout: int = 300) -> Callable[[F], F]:
             result = func(*args, **kwargs)
 
             if isinstance(result, Response):
-                _ = result.data
-                cache.set(cache_key, result.data, timeout=timeout)
+                _ = result.data  # type: ignore[assignment]
+                cache.set(cache_key, result.data, timeout=timeout)  # type: ignore[arg-type]
             else:
                 cache.set(cache_key, result, timeout=timeout)
 

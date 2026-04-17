@@ -110,17 +110,6 @@ urlpatterns = [
     path("api/v1/", include("apps.core.urls", namespace="core-v1")),
 ]
 
-# Incluir URLs do ETL apenas se o app estiver instalado (INCLUDE_ETL=true)
-if "apps.dat_ingest" in settings.INSTALLED_APPS:
-    # DEPRECATED alias — will be removed after deprecation window (#797)
-    urlpatterns.append(
-        path("api/v1/", include("apps.dat_ingest.urls", namespace="dat-v1")),
-    )
-    # API canonical: /api/*
-    urlpatterns.append(
-        path("api/", include("apps.dat_ingest.urls")),  # Fase 5: ETL Observability
-    )
-
 # Static/Media files (development only)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

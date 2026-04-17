@@ -95,10 +95,11 @@ if ENVIRONMENT == "production":
 # ================================================================
 # INSTALLED APPS
 # ================================================================
-# ETL Module (dat_ingest) - Opcional em produção
-# Default: True (inclui ETL para manter compatibilidade)
-# Para excluir do deploy: INCLUDE_ETL=false
-INCLUDE_ETL = os.getenv("INCLUDE_ETL", "true").lower() == "true"
+# ETL Module (dat_ingest) - REMOVED (#967, #971)
+# Kept for backward compatibility: if env var is set, log warning and ignore.
+INCLUDE_ETL = False
+if os.getenv("INCLUDE_ETL", "false").lower() == "true":
+    print("⚠️  WARNING: INCLUDE_ETL=true ignored — apps.dat_ingest removed (#967)", file=sys.stderr)
 
 # Dev Tools Module (dev_tools) - Seeds, backfills, fixtures
 # Default: True (inclui para manter compatibilidade)
@@ -123,10 +124,6 @@ INSTALLED_APPS = [
     # AS v2 apps
     "apps.core",
 ]
-
-# Incluir ETL apenas se INCLUDE_ETL=true
-if INCLUDE_ETL:
-    INSTALLED_APPS.append("apps.dat_ingest")
 
 # Incluir Dev Tools apenas se INCLUDE_DEV_TOOLS=true
 if INCLUDE_DEV_TOOLS:
@@ -656,7 +653,7 @@ AVAILABILITY_DAILY_LIMIT_HOURS = int(os.getenv("AVAILABILITY_DAILY_LIMIT_HOURS",
 # RD-04: Buffer de deslocamento entre municípios distintos (minutos)
 TRAVEL_BUFFER_MINUTES = int(os.getenv("TRAVEL_BUFFER_MINUTES", "120"))
 
-# ETL: Diretórios configuráveis para importação/exportação
+# Import/Export directories (used by core admin audit + import services)
 ETL_OUTPUT_DIR = os.getenv("ETL_OUTPUT_DIR", str(BASE_DIR / "out_etl"))
 ETL_DATA_DIR = os.getenv("ETL_DATA_DIR", str(BASE_DIR / "data" / "csv-import"))
 

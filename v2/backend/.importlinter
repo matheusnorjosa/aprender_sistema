@@ -1,32 +1,21 @@
 [importlinter]
 root_packages =
     apps.core
-    apps.dat_ingest
     apps.dev_tools
     config
 
-[importlinter:contract:core_must_not_depend_on_ingest_or_devtools]
-name = Core must not depend on ETL or dev tools
+[importlinter:contract:core_must_not_depend_on_devtools]
+name = Core must not depend on dev tools
 type = forbidden
 source_modules =
     apps.core
 forbidden_modules =
-    apps.dat_ingest
-    apps.dev_tools
-
-[importlinter:contract:dat_ingest_must_not_depend_on_devtools]
-name = ETL must not depend on dev tools
-type = forbidden
-source_modules =
-    apps.dat_ingest
-forbidden_modules =
     apps.dev_tools
 
 [importlinter:contract:config_must_not_depend_on_non_runtime_apps]
-name = Config must not depend on ETL or dev tools
+name = Config must not depend on dev tools
 type = forbidden
 source_modules =
     config
 forbidden_modules =
-    apps.dat_ingest
     apps.dev_tools

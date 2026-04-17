@@ -1,10 +1,10 @@
 """
-Tests for optional ETL deployment (INCLUDE_ETL setting).
+Tests verifying ETL module removal (#967, #971).
 
 Verifies that:
-- INCLUDE_ETL defaults to True (backward compatibility)
-- dat_ingest is included when INCLUDE_ETL=true
-- URLs are conditionally registered
+- INCLUDE_ETL is always False (module removed)
+- dat_ingest is not in INSTALLED_APPS
+- Core services work independently
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
@@ -13,85 +13,30 @@ from __future__ import annotations
 
 from django.conf import settings
 
-import pytest
 
+class TestETLRemoved:
+    """Tests verifying ETL module is fully removed."""
 
-class TestIncludeETLSetting:
-    """Tests for INCLUDE_ETL configuration."""
+    def test_include_etl_is_false(self):
+        """INCLUDE_ETL must be False (module removed #971)."""
+        assert settings.INCLUDE_ETL is False
 
-    def test_include_etl_defaults_to_true(self):
-        """INCLUDE_ETL should default to True for backward compatibility."""
-        # The setting should exist
-        assert hasattr(settings, "INCLUDE_ETL")
-        # Default is True (we're running with default settings)
-        assert settings.INCLUDE_ETL is True
-
-    def test_dat_ingest_in_installed_apps_when_enabled(self):
-        """dat_ingest should be in INSTALLED_APPS when INCLUDE_ETL=true."""
-        # With default settings, dat_ingest should be included
-        if settings.INCLUDE_ETL:
-            assert "apps.dat_ingest" in settings.INSTALLED_APPS
+    def test_dat_ingest_not_in_installed_apps(self):
+        """dat_ingest must NOT be in INSTALLED_APPS."""
+        assert "apps.dat_ingest" not in settings.INSTALLED_APPS
 
     def test_core_always_in_installed_apps(self):
-        """core app should always be in INSTALLED_APPS regardless of INCLUDE_ETL."""
+        """core app must always be present."""
         assert "apps.core" in settings.INSTALLED_APPS
 
-    def test_core_services_available_without_dat_ingest(self):
-        """Core services (normalize, resolvers) should work without dat_ingest."""
-        # These imports should work regardless of INCLUDE_ETL
+    def test_core_services_work_without_dat_ingest(self):
+        """Core services (normalize, resolvers) work independently."""
         from apps.core.services import norm_text, resolve_municipio
 
-        # Basic functionality test
         assert norm_text("  Test  ") == "test"
         assert callable(resolve_municipio)
 
-
-class TestETLURLsConditional:
-    """Tests for conditional ETL URL registration."""
-
-    def test_etl_urls_registered_when_enabled(self, client):
-        """ETL endpoints should be accessible when INCLUDE_ETL=true."""
-        if not settings.INCLUDE_ETL:
-            pytest.skip("ETL not enabled")
-
-        # The etl/reports/latest/ endpoint exists in dat_ingest.urls
-        # It requires authentication, so we expect 403 (not 404)
+    def test_etl_endpoint_returns_404(self, client):
+        """ETL endpoints must return 404."""
         response = client.get("/api/etl/reports/latest/")
-        # 403 = endpoint exists but auth required
-        # 404 = endpoint doesn't exist
-        assert response.status_code in [403, 401], f"Expected 403/401 (auth required), got {response.status_code}"
-
-    def test_core_urls_always_registered(self, client):
-        """Core endpoints should always be accessible."""
-        # healthz is always available (no auth required)
-        response = client.get("/healthz/")
-        assert response.status_code == 200
-
-        # api root requires auth (but endpoint exists)
-        response = client.get("/api/")
-        assert response.status_code in [200, 403, 401]
-
-
-class TestETLExclusionDocumentation:
-    """Documentation tests for ETL exclusion."""
-
-    def test_include_etl_env_var_documented(self):
-        """Verify the expected behavior of INCLUDE_ETL."""
-        # This test documents the expected behavior:
-        #
-        # INCLUDE_ETL=true (default):
-        #   - apps.dat_ingest in INSTALLED_APPS
-        #   - ETL management commands available
-        #   - /api/etl-reports/ endpoint available
-        #
-        # INCLUDE_ETL=false:
-        #   - apps.dat_ingest NOT in INSTALLED_APPS
-        #   - ETL management commands NOT available
-        #   - /api/etl-reports/ returns 404
-        #   - Core functionality (normalize, resolvers) still works
-        #
-        # To deploy without ETL:
-        #   docker-compose.prod.yml:
-        #     environment:
-        #       - INCLUDE_ETL=false
-        pass
+        assert response.status_code == 404

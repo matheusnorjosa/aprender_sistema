@@ -245,7 +245,7 @@ jobs:
     - name: Validate test paths (no /app hardcoded)
       run: |
         cd v2/backend
-        if grep -R --line-number '"/app' apps/core/tests apps/dat_ingest/tests 2>/dev/null | grep -v "Binary file" | grep -v '"/api/'; then
+        if grep -R --line-number '"/app' apps/core/tests apps/dev_tools/tests 2>/dev/null | grep -v "Binary file" | grep -v '"/api/'; then
           echo "❌ Found '/app' hardcoded in tests. Use Path(settings.BASE_DIR) instead." >&2
           exit 1
         fi
@@ -385,7 +385,7 @@ jobs:
 
         set +e
         COVERAGE_FILE=".coverage.ingest_devtools" \
-        pytest -q --tb=short apps/dat_ingest/tests apps/dev_tools/tests --cov=apps --cov-report=term
+        pytest -q --tb=short apps/dev_tools/tests --cov=apps --cov-report=term
         TEST_EXIT=$?
         set -e
         ls -la .coverage* || true
@@ -508,7 +508,7 @@ jobs:
     - name: Type check with Pyright
       run: |
         cd v2/backend
-        pyright apps/core apps/dat_ingest config
+        pyright apps/core config
 
   # ----------------------------------------------------------------
   # Job 4: Docker parity (backend)

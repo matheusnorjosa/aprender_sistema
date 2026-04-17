@@ -175,7 +175,7 @@ export default function CoordenadoresPage(): JSX.Element {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: any = {
+      const params: Record<string, string | number | boolean> = {
         page,
         page_size: pagination.pageSize,
         ordering: 'nome',
@@ -588,7 +588,7 @@ export default function CoordenadoresPage(): JSX.Element {
               placeholder="Nome, email..."
               allowClear
               value={filters.search}
-              onChange={(e) => setFilters((prev: any) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
               onSearch={() => fetchData(1)}
             />
           </Col>
@@ -604,7 +604,7 @@ export default function CoordenadoresPage(): JSX.Element {
               allowClear
               showSearch
               value={filters.area}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, area: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, area: val }))}
               options={areas.map((a) => ({
                 label: typeof a === 'string' ? a : a.nome,
                 value: typeof a === 'string' ? a : a.nome,
@@ -622,7 +622,7 @@ export default function CoordenadoresPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.ativo}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, ativo: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, ativo: val }))}
               options={[
                 { label: 'Ativos', value: true },
                 { label: 'Inativos', value: false },

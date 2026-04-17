@@ -83,6 +83,14 @@ interface FormacaoItem {
   realizada: boolean;
 }
 
+interface PlanoFilters {
+  search: string;
+  uf: string | undefined;
+  municipio: number | undefined;
+  projeto: number | undefined;
+  coordenador: number | undefined;
+}
+
 interface AcompanhamentoItem {
   id?: number;
   tipo: string;
@@ -188,7 +196,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
   const [coordenadores, setCoordenadores] = useState<CoordenadorOption[]>([]);
 
   // Filter state
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<PlanoFilters>({
     search: '',
     uf: undefined,
     municipio: undefined,
@@ -240,7 +248,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: any = {
+      const params: Record<string, string | number> = {
         page,
         page_size: pagination.pageSize,
         ordering: 'municipio__nome,projeto__nome',
@@ -677,7 +685,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
               placeholder="Municipio, projeto..."
               allowClear
               value={filters.search}
-              onChange={(e) => setFilters((prev: any) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
               onSearch={() => fetchData(1)}
             />
           </Col>
@@ -692,7 +700,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.municipio}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, municipio: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, municipio: val }))}
               options={municipios.map((m) => ({ label: m.nome, value: m.id }))}
             />
           </Col>
@@ -707,7 +715,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.projeto}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, projeto: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, projeto: val }))}
               options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
@@ -722,7 +730,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.coordenador}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, coordenador: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, coordenador: val }))}
               options={coordenadores.map((c) => ({ label: c.nome, value: c.id }))}
             />
           </Col>

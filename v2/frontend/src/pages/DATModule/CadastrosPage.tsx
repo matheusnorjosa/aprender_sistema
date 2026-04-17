@@ -164,7 +164,7 @@ export default function CadastrosPage(): JSX.Element {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: any = {
+      const params: Record<string, string | number> = {
         page,
         page_size: pagination.pageSize,
         ordering: '-updated_at',
@@ -412,7 +412,7 @@ export default function CadastrosPage(): JSX.Element {
               placeholder="Município, projeto..."
               allowClear
               value={filters.search}
-              onChange={(e) => setFilters((prev: any) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
               onSearch={() => fetchData(1)}
             />
           </Col>
@@ -429,7 +429,7 @@ export default function CadastrosPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.projeto_geral}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, projeto_geral: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, projeto_geral: val }))}
               options={projetosGerais.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
@@ -444,7 +444,7 @@ export default function CadastrosPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.uf}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, uf: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, uf: val }))}
               options={UF_OPTIONS}
               showSearch
             />
@@ -462,7 +462,7 @@ export default function CadastrosPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.municipio}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, municipio: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, municipio: val }))}
               options={municipios.map((m) => ({ label: `${m.nome} - ${m.uf}`, value: m.id }))}
             />
           </Col>
@@ -477,7 +477,7 @@ export default function CadastrosPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.status_etapa}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, status_etapa: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, status_etapa: val }))}
               options={[
                 { label: 'Pendentes', value: 'pendente' },
                 { label: 'Em Andamento', value: 'em_andamento' },

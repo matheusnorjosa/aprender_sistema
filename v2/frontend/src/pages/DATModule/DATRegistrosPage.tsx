@@ -156,7 +156,7 @@ export default function DATRegistrosPage(): JSX.Element {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: any = {
+      const params: Record<string, string | number> = {
         page,
         page_size: pagination.pageSize,
         ordering: '-created_at',
@@ -189,7 +189,7 @@ export default function DATRegistrosPage(): JSX.Element {
 
   // Handle region filter change
   const handleRegiaoChange = (regiao: string | undefined) => {
-    setFilters((prev: any) => ({ ...prev, regiao, uf: undefined }));
+    setFilters((prev) => ({ ...prev, regiao, uf: undefined }));
     if (regiao && REGIAO_UFS[regiao]) {
       setFilteredUFs((UF_OPTIONS as UFOption[]).filter((uf) => (REGIAO_UFS as any)[regiao as string]?.includes(uf.value)));
     } else {
@@ -341,7 +341,7 @@ export default function DATRegistrosPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.uf}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, uf: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, uf: val }))}
               options={filteredUFs}
               showSearch
             />
@@ -359,7 +359,7 @@ export default function DATRegistrosPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.municipio}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, municipio: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, municipio: val }))}
               options={municipios.map((m) => ({ label: `${m.nome} - ${m.uf}`, value: m.id }))}
             />
           </Col>
@@ -374,7 +374,7 @@ export default function DATRegistrosPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.projeto_geral}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, projeto_geral: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, projeto_geral: val }))}
               options={projetosGerais.map((pg) => ({ label: pg.nome, value: pg.id }))}
             />
           </Col>
@@ -389,7 +389,7 @@ export default function DATRegistrosPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.usa_avaliar}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, usa_avaliar: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, usa_avaliar: val }))}
               options={[
                 { label: 'Sim', value: 'true' },
                 { label: 'Não', value: 'false' },
@@ -407,7 +407,7 @@ export default function DATRegistrosPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.status_formar}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, status_formar: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, status_formar: val }))}
               options={[
                 { label: 'Completo', value: 'completo' },
                 { label: 'Pendente', value: 'pendente' },

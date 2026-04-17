@@ -189,7 +189,7 @@ export default function FormacoesPage(): JSX.Element {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: any = {
+      const params: Record<string, string | number> = {
         page,
         page_size: pagination.pageSize,
         ordering: 'data_formacao',
@@ -431,7 +431,7 @@ export default function FormacoesPage(): JSX.Element {
               placeholder="Município, projeto..."
               allowClear
               value={filters.search}
-              onChange={(e) => setFilters((prev: any) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
               onSearch={() => fetchData(1)}
             />
           </Col>
@@ -448,7 +448,7 @@ export default function FormacoesPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.projeto}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, projeto: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, projeto: val }))}
               options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
@@ -463,7 +463,7 @@ export default function FormacoesPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.uf}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, uf: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, uf: val }))}
               options={UF_OPTIONS}
               showSearch
             />
@@ -481,7 +481,7 @@ export default function FormacoesPage(): JSX.Element {
               showSearch
               optionFilterProp="label"
               value={filters.coordenador}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, coordenador: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, coordenador: val }))}
               options={coordenadores.map((c) => ({ label: c.nome, value: c.id }))}
             />
           </Col>
@@ -496,7 +496,7 @@ export default function FormacoesPage(): JSX.Element {
               placeholder="Todos"
               allowClear
               value={filters.status}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, status: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, status: val }))}
               options={STATUS_OPTIONS}
             />
           </Col>
@@ -511,7 +511,7 @@ export default function FormacoesPage(): JSX.Element {
               placeholder="Todas"
               allowClear
               value={filters.modalidade}
-              onChange={(val) => setFilters((prev: any) => ({ ...prev, modalidade: val }))}
+              onChange={(val) => setFilters((prev) => ({ ...prev, modalidade: val }))}
               options={MODALIDADE_OPTIONS}
             />
           </Col>
@@ -526,7 +526,7 @@ export default function FormacoesPage(): JSX.Element {
               format="DD/MM/YYYY"
               value={[filters.data_inicio, filters.data_fim]}
               onChange={(dates) =>
-                setFilters((prev: any) => ({
+                setFilters((prev) => ({
                   ...prev,
                   data_inicio: dates?.[0] || undefined,
                   data_fim: dates?.[1] || undefined,

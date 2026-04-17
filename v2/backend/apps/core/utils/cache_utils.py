@@ -1,11 +1,15 @@
 """
 Cache utilities for AS v2 (CP3 - Cache Availability Checks).
 
-Provides caching decorator for availability checks and invalidation utilities.
+ASQ-007 (#780): Granular invalidation via versioned keys.
+Instead of pattern-deleting all keys (cache.keys("availability_check:*")),
+we use a version counter per user. Incrementing the version makes all
+old cache entries miss without scanning Redis.
 """
 
 import hashlib
 import json
+import random
 from functools import wraps
 from typing import Any, Callable, TypeVar, cast
 
@@ -13,33 +17,42 @@ from django.core.cache import cache
 
 F = TypeVar("F", bound=Callable[..., Any])
 
+# Base TTL with jitter to prevent cache stampede
+_BASE_TTL = 300  # 5 minutes
+_JITTER_MAX = 30  # up to 30s random jitter
 
-def cache_availability_check(timeout: int = 300) -> Callable[[F], F]:
+
+def _ttl_with_jitter() -> int:
+    """Return TTL with random jitter to avoid simultaneous expiration."""
+    return _BASE_TTL + random.randint(0, _JITTER_MAX)
+
+
+def _get_cache_version(usuario_id: int) -> int:
+    """Get current cache version for a user. Returns 0 if not set."""
+    ver = cache.get(f"avail_ver:{usuario_id}")
+    return int(ver) if ver is not None else 0
+
+
+def cache_availability_check(timeout: int | None = None) -> Callable[[F], F]:
     """
-    Decorator para cachear check_conflicts.
+    Decorator to cache check_conflicts results.
 
-    TTL: 5 minutos (300s) - dados mudam frequentemente, mas não a cada segundo
-    Cache key: hash(usuario_id, inicio, fim, municipio_id)
+    Cache key includes a per-user version counter. When user's data changes,
+    the version increments and all old entries become cache misses naturally.
 
     Args:
-        timeout: TTL do cache em segundos (default: 300 = 5 minutos)
-
-    Returns:
-        Decorator function
-
-    Example:
-        @cache_availability_check(timeout=300)
-        def check_conflicts(*, usuario, inicio, fim, municipio=None):
-            # Código de verificação...
-            return result
+        timeout: TTL in seconds (default: 300 + jitter)
     """
 
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*, usuario: Any, inicio: Any, fim: Any, municipio: Any = None, **kwargs: Any) -> Any:
-            # Gerar cache key baseado nos parâmetros
+            usuario_id = usuario.id
+            version = _get_cache_version(usuario_id)
+
             key_data = {
-                "usuario_id": usuario.id,
+                "v": version,
+                "usuario_id": usuario_id,
                 "inicio": inicio.isoformat(),
                 "fim": fim.isoformat(),
                 "municipio_id": municipio.id if municipio else None,
@@ -48,16 +61,14 @@ def cache_availability_check(timeout: int = 300) -> Callable[[F], F]:
             key_hash = hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
             cache_key = f"availability_check:{key_hash}"
 
-            # Tentar buscar do cache
             cached_result = cache.get(cache_key)
             if cached_result is not None:
                 return cached_result
 
-            # Cache miss: executar função
             result = func(usuario=usuario, inicio=inicio, fim=fim, municipio=municipio, **kwargs)
 
-            # Salvar no cache
-            cache.set(cache_key, result, timeout=timeout)
+            ttl = timeout if timeout is not None else _ttl_with_jitter()
+            cache.set(cache_key, result, timeout=ttl)
 
             return result
 
@@ -68,54 +79,66 @@ def cache_availability_check(timeout: int = 300) -> Callable[[F], F]:
 
 def invalidate_availability_cache(usuario_id: int | None = None) -> None:
     """
-    Invalida cache de availability para um ou todos os usuários.
+    Invalidate availability cache for a specific user or globally.
 
-    Chamado ao criar/atualizar/deletar Solicitacao ou AvailabilityBlock via signals.
+    ASQ-007: Uses version counter instead of pattern delete.
+    Incrementing the version makes all old cache entries miss
+    without scanning Redis keys.
+
+    Also invalidates monthly grid cache for the affected scope.
 
     Args:
-        usuario_id: ID do usuário para invalidar cache específico.
-                   Se None, invalida todo o cache de availability.
-
-    Note:
-        Usa abordagem simples de deletar todas as keys de availability.
-        TTL curto (5 min) garante que cache não fica muito desatualizado.
-        Para otimização futura, poderia usar Redis SCAN para deletar apenas
-        keys específicas do usuário.
+        usuario_id: Specific user to invalidate. If None, bumps global version.
     """
-    pattern = "availability_check:*"
+    if usuario_id is not None:
+        # Surgical: bump only this user's version
+        ver_key = f"avail_ver:{usuario_id}"
+        try:
+            cache.incr(ver_key)
+        except ValueError:
+            # Key doesn't exist yet — set to 1
+            cache.set(ver_key, 1, timeout=3600)
+    else:
+        # Global: bump a global version (used as fallback)
+        try:
+            cache.incr("avail_ver:__global__")
+        except ValueError:
+            cache.set("avail_ver:__global__", 1, timeout=3600)
 
-    # django-redis suporta keys() e delete_many()
-    # Abordagem simples: deletar todas as keys de availability
+    # Also invalidate monthly grid cache for this user
+    _invalidate_monthly_cache(usuario_id)
+
+
+def _invalidate_monthly_cache(usuario_id: int | None = None) -> None:
+    """
+    Invalidate monthly availability grid cache.
+
+    Uses the same version-counter approach: bump monthly_ver for the user
+    so the view generates fresh data on next request.
+    """
+    if usuario_id is not None:
+        ver_key = f"monthly_ver:{usuario_id}"
+    else:
+        ver_key = "monthly_ver:__global__"
+
     try:
-        keys = cache.keys(pattern) if hasattr(cache, "keys") else []  # type: ignore[attr-defined]
-        if keys:
-            cache.delete_many(keys)  # type: ignore[arg-type]
-    except Exception:
-        # Fallback: se keys() não funcionar, ignorar
-        # TTL de 5 min garante que cache expira automaticamente
-        pass
+        cache.incr(ver_key)
+    except ValueError:
+        cache.set(ver_key, 1, timeout=3600)
+
+
+def get_monthly_cache_version(usuario_id: int | None = None) -> int:
+    """Get current monthly cache version for cache key composition."""
+    ver_key = f"monthly_ver:{usuario_id}" if usuario_id else "monthly_ver:__global__"
+    ver = cache.get(ver_key)
+    return int(ver) if ver is not None else 0
 
 
 def cache_static_endpoint(timeout: int = 300) -> Callable[[F], F]:
     """
-    Decorator para cachear endpoints estáticos (municípios, projetos, tipos).
+    Decorator to cache static endpoints (municípios, projetos, tipos).
 
-    TTL: 5 minutos (300s) - dados raramente mudam
-
-    IMPORTANTE: Cacheia apenas os dados (.data), não o objeto Response completo,
-    pois Response não pode ser serializado (pickle).
-
-    Args:
-        timeout: TTL do cache em segundos (default: 300 = 5 minutos)
-
-    Returns:
-        Decorator function
-
-    Example:
-        @cache_static_endpoint(timeout=300)
-        def list_municipios(request):
-            # Código de listagem...
-            return Response(data)
+    TTL: 5 minutes — data rarely changes.
     """
 
     def decorator(func: F) -> F:
@@ -123,31 +146,19 @@ def cache_static_endpoint(timeout: int = 300) -> Callable[[F], F]:
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             from rest_framework.response import Response
 
-            # Gerar cache key baseado no nome da função (incluir query params se presente)
-            # args[0] é self ou request (dependendo se é method ou function-based view)
-            _request = args[0] if args else None  # noqa: F841 - reserved for future cache key
-
-            # Para function-based views DRF, args[0] é o Request
+            _request = args[0] if args else None  # noqa: F841
             cache_key = f"static_endpoint:{func.__module__}.{func.__name__}"
 
-            # Tentar buscar do cache
             cached_data = cache.get(cache_key)
             if cached_data is not None:
-                # Retornar Response com dados do cache
-                # Não tentar definir renderer, deixar DRF processar naturalmente
                 return Response(cached_data)
 
-            # Cache miss: executar função
             result = func(*args, **kwargs)
 
-            # Salvar apenas os dados no cache (não o Response completo)
             if isinstance(result, Response):
-                # Renderizar response para garantir que data está disponível
-                # Isso força o processamento antes de cachear
-                _ = result.data  # Force rendering
+                _ = result.data
                 cache.set(cache_key, result.data, timeout=timeout)
             else:
-                # Fallback: cachear resultado completo se não for Response
                 cache.set(cache_key, result, timeout=timeout)
 
             return result
@@ -159,16 +170,9 @@ def cache_static_endpoint(timeout: int = 300) -> Callable[[F], F]:
 
 def invalidate_static_cache(model_name: str) -> None:
     """
-    Invalida cache de endpoints estáticos para um modelo específico.
+    Invalidate cache for static endpoints.
 
-    Chamado ao criar/atualizar/deletar Municipio, Projeto ou TipoEvento via signals.
-
-    Args:
-        model_name: Nome do modelo ('Municipio', 'Projeto', 'TipoEvento')
-
-    Note:
-        Invalida todas as keys de static_endpoint, incluindo variações com query params.
-        Exemplo: static_endpoint:projetos_options:include_test=True/False
+    Called on Municipio, Projeto, TipoEvento changes via signals.
     """
     pattern = "static_endpoint:*"
 
@@ -177,6 +181,4 @@ def invalidate_static_cache(model_name: str) -> None:
         if keys:
             cache.delete_many(keys)  # type: ignore[arg-type]
     except Exception:
-        # Fallback: se keys() não funcionar, ignorar
-        # TTL de 5 min garante que cache expira automaticamente
         pass

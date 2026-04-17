@@ -48,8 +48,8 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/dat/admin': 'dat-admin',
   '/dat/admin/colecoes': 'dat-admin-colecoes',
   '/dat/admin/equipe-gerencia': 'dat-admin-equipe-gerencia',
-  '/dat/admin/gerencias': 'dat-admin-gerencias',
-  '/dat/admin/produtos': 'dat-admin-produtos',
+  '/dat/admin/gerencias': 'dat-admin',
+  '/dat/admin/produtos': 'dat-admin',
   '/dat/cadastros': 'dat-cadastros',
   '/dat/compras-materiais': 'controle-compras',
   '/dat/coordenadores': 'controle-coordenadores',
@@ -79,8 +79,6 @@ const MENU_KEY_TO_PARENT: Record<string, string> = {
   'dat-admin': 'dat-submenu',
   'dat-admin-colecoes': 'dat-submenu',
   'dat-admin-equipe-gerencia': 'dat-submenu',
-  'dat-admin-gerencias': 'dat-submenu',
-  'dat-admin-produtos': 'dat-submenu',
   'dat-cadastros': 'dat-submenu',
   'dat-importacao': 'dat-submenu',
   'dat-registros': 'dat-submenu',
@@ -330,8 +328,6 @@ export function AppSidebar({
             {canDAT && (
               <SubMenu key="dat-submenu" icon={<SolutionOutlined />} title="DAT">
                 <Menu.Item key="dat-admin"><Link to="/dat/admin">Administração</Link></Menu.Item>
-                <Menu.Item key="dat-admin-gerencias"><Link to="/dat/admin/gerencias">Gerências</Link></Menu.Item>
-                <Menu.Item key="dat-admin-produtos"><Link to="/dat/admin/produtos">Produtos</Link></Menu.Item>
                 <Menu.Item key="dat-admin-colecoes"><Link to="/dat/admin/colecoes">Importar Coleções</Link></Menu.Item>
                 <Menu.Item key="dat-admin-equipe-gerencia"><Link to="/dat/admin/equipe-gerencia">Importar Vínculos</Link></Menu.Item>
                 <Menu.Item key="dat-cadastros"><Link to="/dat/cadastros">Cadastros</Link></Menu.Item>

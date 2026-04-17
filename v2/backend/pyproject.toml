@@ -20,7 +20,6 @@ useLibraryCodeForTypes = true
 # Diretórios para verificar (100% coverage)
 include = [
     "apps/core",
-    "apps/dat_ingest",
     "apps/dev_tools",
     "config"
 ]

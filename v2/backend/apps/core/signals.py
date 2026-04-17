@@ -55,18 +55,9 @@ def _invalidate_cache_on_solicitacao_change(
     """
     Invalida cache de availability ao modificar Solicitacao.
 
-    Quando uma solicitação é criada/atualizada/deletada, o resultado de
-    check_conflicts() pode mudar, então invalidamos o cache.
-
-    Args:
-        sender: Model class (Solicitacao)
-        instance: Instância da Solicitacao modificada
-        **kwargs: Argumentos extras do signal
-
-    Side effects:
-        - Invalida cache de availability checks
+    ASQ-007: Scoped invalidation — only bumps version for the affected user.
     """
-    invalidate_availability_cache()
+    invalidate_availability_cache(usuario_id=getattr(instance, "usuario_id", None))
 
 
 @receiver([post_save, post_delete], sender=AvailabilityBlock)
@@ -74,20 +65,11 @@ def _invalidate_cache_on_block_change(
     sender: type[AvailabilityBlock], instance: AvailabilityBlock, **kwargs: Any
 ) -> None:  # pyright: ignore[reportUnusedFunction]
     """
-    Invalida cache de availability ao modificar AvailabilityBlock (bloqueio de agenda).
+    Invalida cache de availability ao modificar AvailabilityBlock.
 
-    Quando um bloqueio é criado/atualizado/deletado, o resultado de
-    check_conflicts() pode mudar, então invalidamos o cache.
-
-    Args:
-        sender: Model class (AvailabilityBlock)
-        instance: Instância do AvailabilityBlock modificado
-        **kwargs: Argumentos extras do signal
-
-    Side effects:
-        - Invalida cache de availability checks
+    ASQ-007: Scoped invalidation — only bumps version for the affected user.
     """
-    invalidate_availability_cache()
+    invalidate_availability_cache(usuario_id=getattr(instance, "usuario_id", None))
 
 
 # ================================================================

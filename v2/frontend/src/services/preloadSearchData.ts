@@ -14,6 +14,7 @@
  */
 
 import { fetchAPI } from '../api/config';
+import logger from '../utils/logger';
 import { searchIndex } from './searchIndex';
 
 /** Stats returned from preload operation */
@@ -40,7 +41,7 @@ export async function preloadSearchData(force: boolean = false): Promise<Preload
 
   // Skip if recently loaded (unless forced)
   if (!force && lastLoadTime && now - lastLoadTime < MIN_RELOAD_INTERVAL) {
-    console.log('[SearchIndex] Skipping preload - recently loaded');
+    logger.log('[SearchIndex] Skipping preload - recently loaded');
     return { skipped: true };
   }
 
@@ -85,10 +86,10 @@ export async function preloadSearchData(force: boolean = false): Promise<Preload
       tiposEvento: Array.isArray(tiposEvento) ? tiposEvento.length : 0,
     };
 
-    console.log('[SearchIndex] Preloaded:', stats);
+    logger.log('[SearchIndex] Preloaded:', stats);
     return stats;
   } catch (error) {
-    console.error('[SearchIndex] Preload failed:', error);
+    logger.error('[SearchIndex] Preload failed:', error);
     return { error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }

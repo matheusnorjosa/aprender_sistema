@@ -18,6 +18,7 @@ from __future__ import annotations
 import os
 from typing import Callable
 
+from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 
 # SEC-004: CSP mode — "enforce" (default) or "report-only"
@@ -63,7 +64,10 @@ class SecurityHeadersMiddleware:
         # - 'unsafe-inline': Necessário para Ant Design inline styles
         # - data:: Necessário para imagens base64 (ícones, avatars)
         # - blob:: Necessário para download de arquivos
-        script_src = "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+        # SEC-CSP-01: only allow unsafe-eval in development (React hot reload needs it)
+        script_src = "script-src 'self' 'unsafe-inline'"
+        if settings.ENVIRONMENT != "production":
+            script_src += " 'unsafe-eval'"
         style_src = "style-src 'self' 'unsafe-inline'"
         font_src = "font-src 'self' data:"
         img_src = "img-src 'self' data: blob: https:"

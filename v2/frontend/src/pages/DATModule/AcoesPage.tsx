@@ -9,6 +9,8 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
+import type { PaginatedResponse } from '../../types';
 import {
   Table,
   Button,
@@ -101,12 +103,6 @@ interface AcoesStats {
   entregas_concluidas: number;
 }
 
-interface PaginationState {
-  current: number;
-  pageSize: number;
-  total: number;
-}
-
 interface MunicipioOption {
   id: number;
   nome: string;
@@ -132,20 +128,43 @@ const STATUS_OPTIONS = [
   { label: 'N/A', value: 'na' },
 ];
 
-export default function AcoesPage(): JSX.Element {
-  const [acoes, setAcoes] = useState<AcaoRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [pagination, setPagination] = useState<PaginationState>({ current: 1, pageSize: 15, total: 0 });
-  const [stats, setStats] = useState<AcoesStats | null>(null);
+const DEFAULT_FILTERS: AcoesFilters = {
+  search: '',
+  uf: undefined,
+  municipio: undefined,
+  projeto: undefined,
+  coordenador: undefined,
+  status_geral: undefined,
+};
 
-  // Filter states
-  const [filters, setFilters] = useState<AcoesFilters>({
-    search: '',
-    uf: undefined,
-    municipio: undefined,
-    projeto: undefined,
-    coordenador: undefined,
-    status_geral: undefined,
+const buildAcoesParams = (f: AcoesFilters): TableFilterParams => ({
+  ...(f.search && { search: f.search }),
+  ...(f.uf && { uf: f.uf }),
+  ...(f.municipio !== undefined && { municipio_id: f.municipio }),
+  ...(f.projeto !== undefined && { projeto_id: f.projeto }),
+  ...(f.coordenador !== undefined && { coordenador_id: f.coordenador }),
+  ...(f.status_geral && { status_geral: f.status_geral }),
+});
+
+export default function AcoesPage(): JSX.Element {
+  const {
+    data: acoes,
+    stats,
+    loading,
+    filters,
+    setFilters,
+    pagination,
+    fetchData,
+    handleClearFilters,
+    handleTableChange,
+    refresh,
+  } = useTableFilters<AcoesFilters, AcaoRecord, AcoesStats>({
+    defaultFilters: DEFAULT_FILTERS,
+    listFn: listAcoes as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<AcaoRecord>>,
+    statsFn: getAcoesStats as unknown as (params: TableFilterParams) => Promise<AcoesStats>,
+    buildParams: buildAcoesParams,
+    defaultOrdering: '-updated_at',
+    entityName: 'ações',
   });
 
   // Options for dropdowns
@@ -177,59 +196,6 @@ export default function AcoesPage(): JSX.Element {
     };
     loadOptions();
   }, []);
-
-  // Fetch data with filters
-  const fetchData = useCallback(async (page = 1) => {
-    setLoading(true);
-    try {
-      const params: Record<string, string | number> = {
-        page,
-        page_size: pagination.pageSize,
-        ordering: '-updated_at',
-      };
-
-      // Apply filters
-      if (filters.search) params.search = filters.search;
-      if (filters.uf) params.uf = filters.uf;
-      if (filters.municipio) params.municipio_id = filters.municipio;
-      if (filters.projeto) params.projeto_id = filters.projeto;
-      if (filters.coordenador) params.coordenador_id = filters.coordenador;
-      if (filters.status_geral) params.status_geral = filters.status_geral;
-
-      const [data, statsData] = await Promise.all([
-        listAcoes(params),
-        getAcoesStats(params),
-      ]);
-
-      setAcoes((data as any).results || data || []);
-      setPagination((prev) => ({
-        ...prev,
-        current: page,
-        total: data.count || ((data as any).results || data || []).length,
-      }));
-      setStats(statsData as unknown as AcoesStats);
-    } catch (error) {
-      message.error(`Erro ao carregar dados: ${(error as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, pagination.pageSize]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Clear all filters
-  const handleClearFilters = () => {
-    setFilters({
-      search: '',
-      uf: undefined,
-      municipio: undefined,
-      projeto: undefined,
-      coordenador: undefined,
-      status_geral: undefined,
-    });
-  };
 
   // CRUD handlers
   const handleCreate = () => {
@@ -270,7 +236,7 @@ export default function AcoesPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchData(pagination.current);
+      void refresh();
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -287,13 +253,13 @@ export default function AcoesPage(): JSX.Element {
         try {
           await deleteAcao(record.id);
           message.success('Ação excluída com sucesso');
-          fetchData(pagination.current);
+          void refresh();
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
       },
     });
-  }, [fetchData, pagination.current]);
+  }, [refresh]);
 
   // Status icon renderer - memoized (§3 Epic #459)
   const renderStatusIcon = useCallback((status: string | null) => {
@@ -746,10 +712,7 @@ export default function AcoesPage(): JSX.Element {
             ...pagination,
             showSizeChanger: true,
             showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} ações`,
-            onChange: (page, pageSize) => {
-              setPagination((prev) => ({ ...prev, current: page, pageSize }));
-              fetchData(page);
-            },
+            onChange: handleTableChange,
           }}
           size="middle"
         />

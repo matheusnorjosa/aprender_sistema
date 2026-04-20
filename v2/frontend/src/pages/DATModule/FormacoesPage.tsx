@@ -7,7 +7,9 @@
  * Agendamentos, formadores, locais e acompanhamento.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
+import type { PaginatedResponse } from '../../types';
 import {
   Table,
   Button,
@@ -111,12 +113,6 @@ interface FormacoesStats {
   realizadas: number;
 }
 
-interface PaginationState {
-  current: number;
-  pageSize: number;
-  total: number;
-}
-
 interface MunicipioOption {
   id: number;
   nome: string;
@@ -144,16 +140,21 @@ interface CalendarFormacaoItem {
 }
 
 
+const buildFormacoesParams = (f: FormacoesFilters): TableFilterParams => ({
+  ...(f.search && { search: f.search }),
+  ...(f.uf && { uf: f.uf }),
+  ...(f.municipio !== undefined && { municipio_id: f.municipio }),
+  ...(f.projeto !== undefined && { projeto_id: f.projeto }),
+  ...(f.coordenador !== undefined && { coordenador_id: f.coordenador }),
+  ...(f.status && { status: f.status }),
+  ...(f.modalidade && { modalidade: f.modalidade }),
+  ...(f.data_inicio && { data_inicio: f.data_inicio.format('YYYY-MM-DD') }),
+  ...(f.data_fim && { data_fim: f.data_fim.format('YYYY-MM-DD') }),
+});
+
 export default function FormacoesPage(): JSX.Element {
-  const [formacoes, setFormacoes] = useState<FormacaoRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [pagination, setPagination] = useState<PaginationState>({ current: 1, pageSize: 15, total: 0 });
-  const [stats, setStats] = useState<FormacoesStats | null>(null);
   const [viewMode, setViewMode] = useState<string>(VIEW_MODES.TABLE);
   const [calendarData, setCalendarData] = useState<CalendarFormacaoItem[]>([]);
-
-  // Filter states - using DEFAULT_FILTERS from constants
-  const [filters, setFilters] = useState<FormacoesFilters>(DEFAULT_FILTERS as FormacoesFilters);
 
   // Options for dropdowns
   const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
@@ -165,6 +166,38 @@ export default function FormacoesPage(): JSX.Element {
   const [editingFormacao, setEditingFormacao] = useState<FormacaoRecord | null>(null);
 
   const [form] = Form.useForm<FormacaoFormValues>();
+
+  const {
+    data: formacoes,
+    stats,
+    loading,
+    filters,
+    setFilters,
+    pagination,
+    fetchData,
+    handleClearFilters,
+    handleTableChange,
+    refresh,
+  } = useTableFilters<FormacoesFilters, FormacaoRecord, FormacoesStats>({
+    defaultFilters: DEFAULT_FILTERS as FormacoesFilters,
+    listFn: listFormacoes as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<FormacaoRecord>>,
+    statsFn: getFormacoesStats as unknown as (params: TableFilterParams) => Promise<FormacoesStats>,
+    buildParams: buildFormacoesParams,
+    defaultOrdering: 'data_formacao',
+    entityName: 'formações',
+  });
+
+  // Load calendar data when in calendar view (mirrors original inline fetch).
+  useEffect(() => {
+    if (viewMode !== VIEW_MODES.CALENDAR) return;
+    const params: TableFilterParams = {
+      ...(buildFormacoesParams(filters) as TableFilterParams),
+      ordering: 'data_formacao',
+    };
+    getFormacoesCalendario(params)
+      .then((calData) => setCalendarData((calData as any).results || calData || []))
+      .catch((error) => message.error(`Erro ao carregar calendário: ${(error as Error).message}`));
+  }, [viewMode, filters]);
 
   // Load options on mount
   useEffect(() => {
@@ -184,61 +217,6 @@ export default function FormacoesPage(): JSX.Element {
     };
     loadOptions();
   }, []);
-
-  // Fetch data with filters
-  const fetchData = useCallback(async (page = 1) => {
-    setLoading(true);
-    try {
-      const params: Record<string, string | number> = {
-        page,
-        page_size: pagination.pageSize,
-        ordering: 'data_formacao',
-      };
-
-      // Apply filters
-      if (filters.search) params.search = filters.search;
-      if (filters.uf) params.uf = filters.uf;
-      if (filters.municipio) params.municipio_id = filters.municipio;
-      if (filters.projeto) params.projeto_id = filters.projeto;
-      if (filters.coordenador) params.coordenador_id = filters.coordenador;
-      if (filters.status) params.status = filters.status;
-      if (filters.modalidade) params.modalidade = filters.modalidade;
-      if (filters.data_inicio) params.data_inicio = filters.data_inicio.format('YYYY-MM-DD');
-      if (filters.data_fim) params.data_fim = filters.data_fim.format('YYYY-MM-DD');
-
-      const [data, statsData] = await Promise.all([
-        listFormacoes(params),
-        getFormacoesStats(params),
-      ]);
-
-      setFormacoes((data as any).results || data || []);
-      setPagination((prev) => ({
-        ...prev,
-        current: page,
-        total: data.count || ((data as any).results || data || []).length,
-      }));
-      setStats(statsData as unknown as FormacoesStats);
-
-      // Load calendar data if in calendar view
-      if (viewMode === VIEW_MODES.CALENDAR) {
-        const calData = await getFormacoesCalendario(params);
-        setCalendarData((calData as any).results || calData || []);
-      }
-    } catch (error) {
-      message.error(`Erro ao carregar dados: ${(error as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, pagination.pageSize, viewMode]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Clear all filters
-  const handleClearFilters = () => {
-    setFilters(DEFAULT_FILTERS);
-  };
 
   // CRUD handlers
   const handleCreate = () => {
@@ -276,7 +254,7 @@ export default function FormacoesPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchData(pagination.current);
+      void refresh();
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -293,7 +271,7 @@ export default function FormacoesPage(): JSX.Element {
         try {
           await deleteFormacao(record.id);
           message.success('Formação excluída com sucesso');
-          fetchData(pagination.current);
+          void refresh();
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
@@ -573,10 +551,7 @@ export default function FormacoesPage(): JSX.Element {
               ...pagination,
               showSizeChanger: true,
               showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} formações`,
-              onChange: (page, pageSize) => {
-                setPagination((prev) => ({ ...prev, current: page, pageSize }));
-                fetchData(page);
-              },
+              onChange: handleTableChange,
             }}
             size="middle"
           />

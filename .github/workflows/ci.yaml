@@ -467,13 +467,13 @@ jobs:
         cp "$INGEST_COV" .coverage.ingest_devtools
 
         coverage combine .coverage.core .coverage.ingest_devtools
-        coverage report --fail-under=80
+        coverage report --fail-under=85
         coverage xml -o coverage.xml
 
         {
           echo "### Backend Coverage Combine"
           echo "- Source artifacts: core + ingest/devtools"
-          echo "- Threshold enforced: 80%"
+          echo "- Threshold enforced: 85%"
           echo "- Output XML: v2/backend/coverage.xml"
         } >> "${GITHUB_STEP_SUMMARY}"
 

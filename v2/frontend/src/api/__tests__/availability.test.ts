@@ -1,16 +1,18 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
-
-const { fetchAPIMock, buildUrlMock } = vi.hoisted(() => ({
-  fetchAPIMock: vi.fn(),
-  buildUrlMock: vi.fn(),
-}))
-
-vi.mock('../config', () => ({
-  fetchAPI: fetchAPIMock,
-  buildUrl: buildUrlMock,
-}))
-
-import { getMe } from '../availability'
+/**
+ * Pilot for MSW-based API tests (#849).
+ *
+ * Instead of mocking `fetchAPI`/`buildUrl` at module level, we let the real
+ * `fetchAPI` run and intercept the HTTP call with MSW. The test then asserts
+ * on observable behavior (request URL hit, response shape honored) rather
+ * than on implementation details (how many times `fetchAPI` was called).
+ *
+ * See v2/docs/TESTING_MSW.md for the rollout guidance.
+ */
+import { beforeEach, describe, expect, test } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { server } from '../../test/mocks/server';
+import { apiUrl } from '../../test/mocks/handlers';
+import { getMe } from '../availability';
 
 const validCurrentUserPayload = {
   id: 1,
@@ -26,31 +28,35 @@ const validCurrentUserPayload = {
   is_superintendencia: false,
   can_approve_super: true,
   permissions: ['pode_operar_dat'],
-}
+};
 
-describe('availability API - current user contract', () => {
+describe('availability API — getMe (MSW)', () => {
   beforeEach(() => {
-    fetchAPIMock.mockReset()
-    buildUrlMock.mockReset()
-    buildUrlMock.mockImplementation((path: string) => path)
-  })
+    // Each test registers its own /me/ handler, so resetHandlers() between
+    // tests (wired in setup.js) keeps scenarios isolated.
+  });
 
-  test('getMe returns data when /api/me payload matches contract', async () => {
-    fetchAPIMock.mockResolvedValue(validCurrentUserPayload)
+  test('returns parsed user when /api/me/ payload matches contract', async () => {
+    server.use(
+      http.get(apiUrl('/me/'), () => HttpResponse.json(validCurrentUserPayload)),
+    );
 
-    const user = await getMe()
+    const user = await getMe();
 
-    expect(fetchAPIMock).toHaveBeenCalledWith('/me/')
-    expect(user).toEqual(validCurrentUserPayload)
-  })
+    expect(user).toEqual(validCurrentUserPayload);
+  });
 
-  test('getMe throws when /api/me payload drifts from expected shape', async () => {
-    fetchAPIMock.mockResolvedValue({
-      id: 1,
-      username: 'admin',
-      // missing mandatory contract fields
-    })
+  test('throws when /api/me/ payload drifts from expected shape', async () => {
+    server.use(
+      http.get(apiUrl('/me/'), () =>
+        HttpResponse.json({
+          id: 1,
+          username: 'admin',
+          // missing mandatory contract fields
+        }),
+      ),
+    );
 
-    await expect(getMe()).rejects.toThrow('Invalid /api/me payload shape')
-  })
-})
+    await expect(getMe()).rejects.toThrow('Invalid /api/me payload shape');
+  });
+});

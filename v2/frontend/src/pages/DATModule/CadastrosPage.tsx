@@ -7,7 +7,9 @@
  * Workflow AVALIAR: Recebidos → Validados → Importados
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
+import type { PaginatedResponse } from '../../types';
 import {
   Table,
   Button,
@@ -118,20 +120,7 @@ interface ProjetoGeralOption {
 
 
 export default function CadastrosPage(): JSX.Element {
-  // Issue #303: State management - this page has complex logic (stats, tabs, filters)
-  // that doesn't fit useCrudOperations hook. Constants extracted to ./Cadastros/constants.js
-  const [cadastros, setCadastros] = useState<CadastroRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 15,
-    total: 0,
-  });
-  const [stats, setStats] = useState<CadastrosStats | null>(null);
   const [activeTab, setActiveTab] = useState<'FORMAR' | 'AVALIAR'>('FORMAR');
-
-  // Filter states - using DEFAULT_FILTERS from constants
-  const [filters, setFilters] = useState<CadastrosFilters>(DEFAULT_FILTERS as CadastrosFilters);
 
   // Options for dropdowns
   const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
@@ -142,6 +131,39 @@ export default function CadastrosPage(): JSX.Element {
   const [editingCadastro, setEditingCadastro] = useState<CadastroRecord | null>(null);
 
   const [form] = Form.useForm<CadastroFormValues>();
+
+  const {
+    data: cadastros,
+    stats,
+    loading,
+    filters,
+    setFilters,
+    pagination,
+    fetchData,
+    handleClearFilters,
+    handleTableChange,
+    refresh,
+  } = useTableFilters<CadastrosFilters, CadastroRecord, CadastrosStats>({
+    defaultFilters: DEFAULT_FILTERS as CadastrosFilters,
+    listFn: listCadastros as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<CadastroRecord>>,
+    statsFn: getCadastrosStats as unknown as (params: TableFilterParams) => Promise<CadastrosStats>,
+    buildParams: (f) => ({
+      ...(f.search && { search: f.search }),
+      ...(f.uf && { uf: f.uf }),
+      ...(f.municipio !== undefined && { municipio_id: f.municipio }),
+      ...(f.projeto_geral !== undefined && { projeto_geral_id: f.projeto_geral }),
+      ...(f.status_etapa && { status_etapa: f.status_etapa }),
+      plataforma: activeTab,
+    }),
+    defaultOrdering: '-updated_at',
+    entityName: 'cadastros',
+  });
+
+  // Refetch when tab changes (activeTab lives outside filters to avoid being cleared).
+  useEffect(() => {
+    void fetchData(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   // Load options on mount
   useEffect(() => {
@@ -159,52 +181,6 @@ export default function CadastrosPage(): JSX.Element {
     };
     loadOptions();
   }, []);
-
-  // Fetch data with filters
-  const fetchData = useCallback(async (page = 1) => {
-    setLoading(true);
-    try {
-      const params: Record<string, string | number> = {
-        page,
-        page_size: pagination.pageSize,
-        ordering: '-updated_at',
-        plataforma: activeTab,
-      };
-
-      // Apply filters
-      if (filters.search) params.search = filters.search;
-      if (filters.uf) params.uf = filters.uf;
-      if (filters.municipio) params.municipio_id = filters.municipio;
-      if (filters.projeto_geral) params.projeto_geral_id = filters.projeto_geral;
-      if (filters.status_etapa) params.status_etapa = filters.status_etapa;
-
-      const [data, statsData] = await Promise.all([
-        listCadastros(params),
-        getCadastrosStats(params),
-      ]);
-
-      setCadastros((data as any).results || data || []);
-      setPagination((prev) => ({
-        ...prev,
-        current: page,
-        total: data.count || ((data as any).results || data || []).length,
-      }));
-      setStats(statsData as unknown as CadastrosStats);
-    } catch (error) {
-      message.error(`Erro ao carregar dados: ${(error as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, pagination.pageSize, activeTab]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Clear all filters
-  const handleClearFilters = () => {
-    setFilters(DEFAULT_FILTERS);
-  };
 
   // CRUD handlers
   const handleCreate = () => {
@@ -251,7 +227,7 @@ export default function CadastrosPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchData(pagination.current);
+      void refresh();
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -268,7 +244,7 @@ export default function CadastrosPage(): JSX.Element {
         try {
           await deleteCadastro(record.id);
           message.success('Cadastro excluído com sucesso');
-          fetchData(pagination.current);
+          void refresh();
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
@@ -281,7 +257,7 @@ export default function CadastrosPage(): JSX.Element {
     try {
       await updateCadastroEtapa(record.id, etapa, newStatus);
       message.success('Status atualizado');
-      fetchData(pagination.current);
+      void refresh();
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -534,10 +510,7 @@ export default function CadastrosPage(): JSX.Element {
             ...pagination,
             showSizeChanger: true,
             showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} cadastros`,
-            onChange: (page, pageSize) => {
-              setPagination((prev) => ({ ...prev, current: page, pageSize }));
-              fetchData(page);
-            },
+            onChange: handleTableChange,
           }}
           size="middle"
         />

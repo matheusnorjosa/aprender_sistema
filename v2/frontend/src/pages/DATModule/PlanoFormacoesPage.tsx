@@ -12,7 +12,9 @@
  * Ref: prompt-pagina-formacoes.md
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
+import type { PaginatedResponse } from '../../types';
 import {
   Table,
   Card,
@@ -179,29 +181,46 @@ const MODALIDADE_OPTIONS = [
 // COMPONENT
 // ============================================================
 
-export default function PlanoFormacoesPage(): JSX.Element {
-  // Data state
-  const [planos, setPlanos] = useState<PlanoFormacaoRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 15,
-    total: 0,
-  });
-  const [stats, setStats] = useState<PlanoFormacoesStats | null>(null);
+const DEFAULT_PLANO_FILTERS: PlanoFilters = {
+  search: '',
+  uf: undefined,
+  municipio: undefined,
+  projeto: undefined,
+  coordenador: undefined,
+};
 
+const buildPlanoParams = (f: PlanoFilters): TableFilterParams => ({
+  ...(f.search && { search: f.search }),
+  ...(f.uf && { uf: f.uf }),
+  ...(f.municipio !== undefined && { municipio: f.municipio }),
+  ...(f.projeto !== undefined && { projeto: f.projeto }),
+  ...(f.coordenador !== undefined && { coordenador: f.coordenador }),
+});
+
+export default function PlanoFormacoesPage(): JSX.Element {
   // Options state
   const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
   const [projetos, setProjetos] = useState<ProjetoOption[]>([]);
   const [coordenadores, setCoordenadores] = useState<CoordenadorOption[]>([]);
 
-  // Filter state
-  const [filters, setFilters] = useState<PlanoFilters>({
-    search: '',
-    uf: undefined,
-    municipio: undefined,
-    projeto: undefined,
-    coordenador: undefined,
+  const {
+    data: planos,
+    stats,
+    loading,
+    filters,
+    setFilters,
+    pagination,
+    fetchData,
+    handleClearFilters,
+    handleTableChange,
+    refresh,
+  } = useTableFilters<PlanoFilters, PlanoFormacaoRecord, PlanoFormacoesStats>({
+    defaultFilters: DEFAULT_PLANO_FILTERS,
+    listFn: listPlanoFormacoes as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<PlanoFormacaoRecord>>,
+    statsFn: getPlanoFormacoesStats as unknown as (params: TableFilterParams) => Promise<PlanoFormacoesStats>,
+    buildParams: buildPlanoParams,
+    defaultOrdering: 'municipio__nome,projeto__nome',
+    entityName: 'planos',
   });
 
   // View mode
@@ -244,58 +263,9 @@ export default function PlanoFormacoesPage(): JSX.Element {
     loadOptions();
   }, []);
 
-  // Fetch data
-  const fetchData = useCallback(async (page = 1) => {
-    setLoading(true);
-    try {
-      const params: Record<string, string | number> = {
-        page,
-        page_size: pagination.pageSize,
-        ordering: 'municipio__nome,projeto__nome',
-      };
-
-      if (filters.search) params.search = filters.search;
-      if (filters.uf) params.uf = filters.uf;
-      if (filters.municipio) params.municipio = filters.municipio;
-      if (filters.projeto) params.projeto = filters.projeto;
-      if (filters.coordenador) params.coordenador = filters.coordenador;
-
-      const [data, statsData] = await Promise.all([
-        listPlanoFormacoes(params),
-        getPlanoFormacoesStats(params),
-      ]);
-
-      setPlanos((data as any).results || data || []);
-      setPagination((prev) => ({
-        ...prev,
-        current: page,
-        total: data.count || ((data as any).results || data || []).length,
-      }));
-      setStats(statsData as unknown as PlanoFormacoesStats);
-    } catch (error) {
-      message.error(`Erro ao carregar dados: ${(error as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, pagination.pageSize]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
   // ============================================================
   // HANDLERS
   // ============================================================
-
-  const handleClearFilters = () => {
-    setFilters({
-      search: '',
-      uf: undefined,
-      municipio: undefined,
-      projeto: undefined,
-      coordenador: undefined,
-    });
-  };
 
   const handleCreate = () => {
     setEditingPlano(null);
@@ -326,7 +296,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
         try {
           await deletePlanoFormacoes(record.id);
           message.success('Plano excluido com sucesso');
-          fetchData(pagination.current);
+          void refresh();
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
@@ -345,7 +315,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchData(pagination.current);
+      void refresh();
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -378,7 +348,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
       await updateFormacaoInline(editingFormacao.plano.id, editingFormacao.formacao.numero, payload);
       message.success('Formacao atualizada');
       setFormacaoModalVisible(false);
-      fetchData(pagination.current);
+      void refresh();
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -758,10 +728,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
               ...pagination,
               showSizeChanger: true,
               showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total}`,
-              onChange: (page, pageSize) => {
-                setPagination((prev) => ({ ...prev, current: page, pageSize }));
-                fetchData(page);
-              },
+              onChange: handleTableChange,
             }}
             size="small"
           />

@@ -8,7 +8,7 @@
  * 1.798 registros, 502.771 itens, 307 produtos, 94 municípios
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Table,
   Button,
@@ -49,7 +49,6 @@ import {
   getMunicipiosOptions,
   getProjetosOptions,
   getProdutosOptions,
-  type GenericRecord,
 } from '../../api/datModule';
 import {
   importCompras,
@@ -59,7 +58,7 @@ import {
   type ImportResult as OpsImportResult,
 } from '../../api/ops';
 import type { PaginatedResponse } from '../../types';
-import { useCrudOperations } from '../../hooks/useCrudOperations';
+import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import ImportUploader from '../../components/ImportUploader';
 import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
 import dayjs from 'dayjs';
@@ -168,30 +167,30 @@ const ANO_OPTIONS = [currentYear - 1, currentYear, currentYear + 1].map(
   (year) => ({ label: String(year), value: year })
 );
 
+const DEFAULT_COMPRAS_FILTERS: ComprasFilters = {
+  search: '',
+  uf: undefined,
+  municipio: undefined,
+  projeto: undefined,
+  produto: undefined,
+  status: undefined,
+  ano_uso: undefined,
+  tipo_compra: undefined,
+};
+
+const buildComprasParams = (f: ComprasFilters): TableFilterParams => ({
+  ...(f.search && { search: f.search }),
+  ...(f.uf && { uf: f.uf }),
+  ...(f.municipio !== undefined && { municipio_id: f.municipio }),
+  ...(f.projeto !== undefined && { projeto_id: f.projeto }),
+  ...(f.produto !== undefined && { produto_id: f.produto }),
+  ...(f.status && { status: f.status }),
+  ...(f.ano_uso !== undefined && { ano_uso: f.ano_uso }),
+  ...(f.tipo_compra && { tipo_compra: f.tipo_compra }),
+});
+
 export default function ComprasPage(): JSX.Element {
   const [viewMode, setViewMode] = useState<ViewMode>('lista');
-
-  // Issue #302: Use useCrudOperations hook for standardized CRUD
-  const crud = useCrudOperations({
-    listFn: listCompras as unknown as (params: { page?: number; pageSize?: number; [key: string]: unknown }) => Promise<PaginatedResponse<GenericRecord>>,
-    createFn: createCompra,
-    updateFn: updateCompra,
-    deleteFn: deleteCompra,
-    entityName: 'Compra',
-    pageSize: 15,
-  });
-
-  // Filter states
-  const [filters, setFilters] = useState<ComprasFilters>({
-    search: '',
-    uf: undefined,
-    municipio: undefined,
-    projeto: undefined,
-    produto: undefined,
-    status: undefined,
-    ano_uso: undefined,
-    tipo_compra: undefined,
-  });
 
   // Options for dropdowns
   const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
@@ -203,6 +202,24 @@ export default function ComprasPage(): JSX.Element {
   const [editingCompra, setEditingCompra] = useState<CompraRecord | null>(null);
 
   const [form] = Form.useForm<CompraFormValues>();
+
+  const {
+    data: compras,
+    loading,
+    filters,
+    setFilters,
+    pagination,
+    fetchData,
+    handleClearFilters,
+    handleTableChange,
+    refresh,
+  } = useTableFilters<ComprasFilters, CompraRecord>({
+    defaultFilters: DEFAULT_COMPRAS_FILTERS,
+    listFn: listCompras as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<CompraRecord>>,
+    buildParams: buildComprasParams,
+    defaultOrdering: '-updated_at',
+    entityName: 'compras',
+  });
 
   // Load options on mount
   useEffect(() => {
@@ -223,47 +240,6 @@ export default function ComprasPage(): JSX.Element {
     loadOptions();
   }, []);
 
-  // Fetch data with filters (uses crud hook internally)
-  const fetchData = useCallback(async (page = 1) => {
-    const params: Record<string, string | number> = {
-      page,
-      ordering: '-updated_at',
-    };
-
-    // Apply filters
-    if (filters.search) params.search = filters.search;
-    if (filters.uf) params.uf = filters.uf;
-    if (filters.municipio) params.municipio_id = filters.municipio;
-    if (filters.projeto) params.projeto_id = filters.projeto;
-    if (filters.produto) params.produto_id = filters.produto;
-    if (filters.status) params.status = filters.status;
-    if (filters.ano_uso) params.ano_uso = filters.ano_uso;
-    if (filters.tipo_compra) params.tipo_compra = filters.tipo_compra;
-
-    await crud.fetchData(params);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
-
-  // Initial load only
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Clear all filters
-  const handleClearFilters = () => {
-    setFilters({
-      search: '',
-      uf: undefined,
-      municipio: undefined,
-      projeto: undefined,
-      produto: undefined,
-      status: undefined,
-      ano_uso: undefined,
-      tipo_compra: undefined,
-    });
-  };
-
   // CRUD handlers
   const handleCreate = () => {
     setEditingCompra(null);
@@ -281,7 +257,6 @@ export default function ComprasPage(): JSX.Element {
     setModalVisible(true);
   };
 
-  // Issue #302: Simplified handleSave using crud hook
   const handleSave = async (values: CompraFormValues) => {
     const payload = {
       ...values,
@@ -289,20 +264,38 @@ export default function ComprasPage(): JSX.Element {
       data_entrega: values.data_entrega ? values.data_entrega.format('YYYY-MM-DD') : null,
     };
 
-    const result = await crud.handleSave(payload, editingCompra?.id);
-
-    if (result.success) {
+    try {
+      if (editingCompra) {
+        await updateCompra(editingCompra.id, payload);
+        message.success('Compra atualizada com sucesso');
+      } else {
+        await createCompra(payload);
+        message.success('Compra criada com sucesso');
+      }
       setModalVisible(false);
       form.resetFields();
-      fetchData(crud.pagination.current);
+      void refresh();
+    } catch (error) {
+      message.error(`Erro: ${(error as Error).message}`);
     }
   };
 
-  // Issue #302: Simplified handleDelete using crud hook
   const handleDelete = (record: CompraRecord) => {
-    crud.confirmDelete(record, {
-      nameField: 'produto_nome',
-      onSuccess: () => fetchData(crud.pagination.current),
+    Modal.confirm({
+      title: 'Excluir Compra?',
+      content: `Deseja excluir "${record.produto_nome}"? Esta ação não pode ser desfeita.`,
+      okText: 'Sim, excluir',
+      okType: 'danger',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          await deleteCompra(record.id);
+          message.success('Compra excluída com sucesso');
+          void refresh();
+        } catch (error) {
+          message.error(`Erro ao excluir: ${(error as Error).message}`);
+        }
+      },
     });
   };
 
@@ -652,7 +645,7 @@ export default function ComprasPage(): JSX.Element {
           <Button icon={<ClearOutlined />} onClick={handleClearFilters}>
             Limpar
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={() => fetchData(1)} loading={crud.loading}>
+          <Button icon={<ReloadOutlined />} onClick={() => fetchData(1)} loading={loading}>
             Atualizar
           </Button>
           <Button type="primary" icon={<FilterOutlined />} onClick={() => fetchData(1)}>
@@ -669,25 +662,22 @@ export default function ComprasPage(): JSX.Element {
         title={
           <Space>
             <Text strong>Resultados:</Text>
-            <Text type="danger" strong>{crud.pagination.total}</Text>
+            <Text type="danger" strong>{pagination.total}</Text>
             <Text>registros</Text>
           </Space>
         }
       >
         <Table
           columns={columns as any}
-          dataSource={crud.data}
+          dataSource={compras}
           rowKey="id"
-          loading={crud.loading}
+          loading={loading}
           scroll={{ x: 1400 }}
           pagination={{
-            ...crud.pagination,
+            ...pagination,
             showSizeChanger: true,
             showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
-            onChange: (page, pageSize) => {
-              crud.setPagination((prev) => ({ ...prev, current: page, pageSize }));
-              fetchData(page);
-            },
+            onChange: handleTableChange,
           }}
           size="middle"
           summary={(pageData) => {

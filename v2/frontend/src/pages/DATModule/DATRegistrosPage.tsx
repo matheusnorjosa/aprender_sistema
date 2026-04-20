@@ -7,7 +7,9 @@
  * tabela com cabeçalhos agrupados e legenda de status.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
+import type { PaginatedResponse } from '../../types';
 import {
   Table,
   Button,
@@ -84,12 +86,6 @@ interface DATRegistroFormValues {
   [key: string]: any;
 }
 
-interface PaginationState {
-  current: number;
-  pageSize: number;
-  total: number;
-}
-
 interface ProjetoGeralOption {
   id: number;
   nome: string;
@@ -113,14 +109,15 @@ interface UFOption {
 }
 
 
+const buildRegistrosParams = (f: DATRegistrosFilters): TableFilterParams => ({
+  ...(f.uf && { uf: f.uf }),
+  ...(f.municipio !== undefined && { municipio: f.municipio }),
+  ...(f.projeto_geral !== undefined && { projeto_geral: f.projeto_geral }),
+  ...(f.usa_avaliar !== undefined && { usa_avaliar: f.usa_avaliar }),
+  ...(f.status_formar && { status_formar: f.status_formar }),
+});
+
 export default function DATRegistrosPage(): JSX.Element {
-  const [registros, setRegistros] = useState<DATRegistroRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [pagination, setPagination] = useState<PaginationState>({ current: 1, pageSize: 15, total: 0 });
-
-  // Filter states - using DEFAULT_FILTERS from constants
-  const [filters, setFilters] = useState<DATRegistrosFilters>(DEFAULT_FILTERS as unknown as DATRegistrosFilters);
-
   // Options for dropdowns
   const [projetosGerais, setProjetosGerais] = useState<ProjetoGeralOption[]>([]);
   const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
@@ -132,6 +129,24 @@ export default function DATRegistrosPage(): JSX.Element {
   const [editingRegistro, setEditingRegistro] = useState<DATRegistroRecord | null>(null);
 
   const [form] = Form.useForm<DATRegistroFormValues>();
+
+  const {
+    data: registros,
+    loading,
+    filters,
+    setFilters,
+    pagination,
+    fetchData,
+    handleClearFilters: clearFilterState,
+    handleTableChange,
+    refresh,
+  } = useTableFilters<DATRegistrosFilters, DATRegistroRecord>({
+    defaultFilters: DEFAULT_FILTERS as unknown as DATRegistrosFilters,
+    listFn: listDATRegistros as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<DATRegistroRecord>>,
+    buildParams: buildRegistrosParams,
+    defaultOrdering: '-created_at',
+    entityName: 'registros',
+  });
 
   // Load options on mount
   useEffect(() => {
@@ -152,41 +167,6 @@ export default function DATRegistrosPage(): JSX.Element {
     loadOptions();
   }, []);
 
-  // Fetch data with filters
-  const fetchData = useCallback(async (page = 1) => {
-    setLoading(true);
-    try {
-      const params: Record<string, string | number> = {
-        page,
-        page_size: pagination.pageSize,
-        ordering: '-created_at',
-      };
-
-      // Apply filters
-      if (filters.uf) params.uf = filters.uf;
-      if (filters.municipio) params.municipio = filters.municipio;
-      if (filters.projeto_geral) params.projeto_geral = filters.projeto_geral;
-      if (filters.usa_avaliar !== undefined) params.usa_avaliar = filters.usa_avaliar;
-      if (filters.status_formar) params.status_formar = filters.status_formar;
-
-      const data = await listDATRegistros(params);
-      setRegistros((data as any).results || data || []);
-      setPagination((prev) => ({
-        ...prev,
-        current: page,
-        total: data.count || ((data as any).results || data || []).length,
-      }));
-    } catch (error) {
-      message.error(`Erro ao carregar dados: ${(error as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, pagination.pageSize]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
   // Handle region filter change
   const handleRegiaoChange = (regiao: string | undefined) => {
     setFilters((prev) => ({ ...prev, regiao, uf: undefined }));
@@ -197,9 +177,9 @@ export default function DATRegistrosPage(): JSX.Element {
     }
   };
 
-  // Clear all filters
+  // Clear all filters (also resets cascading UF list)
   const handleClearFilters = () => {
-    setFilters(DEFAULT_FILTERS as any);
+    clearFilterState();
     setFilteredUFs(UF_OPTIONS as UFOption[]);
   };
 
@@ -256,7 +236,7 @@ export default function DATRegistrosPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchData(pagination.current);
+      void refresh();
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -273,7 +253,7 @@ export default function DATRegistrosPage(): JSX.Element {
         try {
           await deleteDATRegistro(record.id);
           message.success('Registro excluído com sucesso');
-          fetchData(pagination.current);
+          void refresh();
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
@@ -477,10 +457,7 @@ export default function DATRegistrosPage(): JSX.Element {
             ...pagination,
             showSizeChanger: true,
             showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
-            onChange: (page, pageSize) => {
-              setPagination((prev) => ({ ...prev, current: page, pageSize }));
-              fetchData(page);
-            },
+            onChange: handleTableChange,
           }}
           size="middle"
         />

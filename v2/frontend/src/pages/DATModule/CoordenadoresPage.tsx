@@ -8,6 +8,8 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
+import type { PaginatedResponse } from '../../types';
 import {
   Table,
   Button,
@@ -99,11 +101,6 @@ interface CoordenadoresStats {
   media_projetos: string | number;
 }
 
-interface PaginationState {
-  current: number;
-  pageSize: number;
-  total: number;
-}
 
 interface AreaOption {
   id: number;
@@ -122,14 +119,44 @@ interface AlocacaoRecord {
 const { Panel } = Collapse;
 
 export default function CoordenadoresPage(): JSX.Element {
-  const [coordenadores, setCoordenadores] = useState<CoordenadorRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [pagination, setPagination] = useState<PaginationState>({ current: 1, pageSize: 15, total: 0 });
-  const [stats, setStats] = useState<CoordenadoresStats | null>(null);
   const [viewMode, setViewMode] = useState<string>(VIEW_MODES.CARDS);
 
-  // Filter states - using DEFAULT_FILTERS from constants
-  const [filters, setFilters] = useState<CoordenadoresFilters>(DEFAULT_FILTERS as CoordenadoresFilters);
+  const {
+    data: coordenadores,
+    loading,
+    filters,
+    setFilters,
+    pagination,
+    fetchData,
+    handleClearFilters,
+    handleTableChange,
+    refresh,
+  } = useTableFilters<CoordenadoresFilters, CoordenadorRecord>({
+    defaultFilters: DEFAULT_FILTERS as CoordenadoresFilters,
+    listFn: listCoordenadoresDAT as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<CoordenadorRecord>>,
+    buildParams: (f) => ({
+      ...(f.search && { search: f.search }),
+      ...(f.area && { area: f.area }),
+      ...(f.ativo !== undefined && { ativo: f.ativo }),
+    }),
+    defaultOrdering: 'nome',
+    entityName: 'coordenadores',
+  });
+
+  // Stats derived from current page (no API for stats on this entity).
+  const stats = useMemo<CoordenadoresStats>(() => {
+    const results = coordenadores;
+    const ativos = results.filter((c) => (c as any).ativo !== false).length;
+    const areasUnicas = [...new Set(results.map((c) => (c as any).area))].filter(Boolean).length;
+    const totalProjetos = results.reduce((sum, c) => sum + ((c as any).total_projetos || 0), 0);
+    const mediaProjetos = results.length > 0 ? (totalProjetos / results.length).toFixed(1) : 0;
+    return {
+      total: pagination.total,
+      ativos,
+      areas: areasUnicas,
+      media_projetos: mediaProjetos,
+    } as CoordenadoresStats;
+  }, [coordenadores, pagination.total]);
 
   // Options for dropdowns (projetos/municipios reserved for future use)
   const [areas, setAreas] = useState<(AreaOption | string)[]>([]);
@@ -170,59 +197,6 @@ export default function CoordenadoresPage(): JSX.Element {
     };
     loadOptions();
   }, []);
-
-  // Fetch data with filters
-  const fetchData = useCallback(async (page = 1) => {
-    setLoading(true);
-    try {
-      const params: Record<string, string | number | boolean> = {
-        page,
-        page_size: pagination.pageSize,
-        ordering: 'nome',
-      };
-
-      // Apply filters
-      if (filters.search) params.search = filters.search;
-      if (filters.area) params.area = filters.area;
-      if (filters.ativo !== undefined) params.ativo = filters.ativo;
-
-      const data = await listCoordenadoresDAT(params);
-
-      const results = (data as any).results || data || [];
-      setCoordenadores((results as any) as CoordenadorRecord[]);
-      setPagination((prev) => ({
-        ...prev,
-        current: page,
-        total: (data as any).count || (results as any[]).length,
-      }));
-
-      // Calculate stats
-      const ativos = (results as any[]).filter((c) => c.ativo !== false).length;
-      const areasUnicas = [...new Set((results as any[]).map((c) => c.area))].filter(Boolean).length;
-      const totalProjetos = (results as any[]).reduce((sum, c) => sum + (c.total_projetos || 0), 0);
-      const mediaProjetos = (results as any[]).length > 0 ? (totalProjetos / (results as any[]).length).toFixed(1) : 0;
-
-      setStats({
-        total: (data as any).count || (results as any[]).length,
-        ativos,
-        areas: areasUnicas,
-        media_projetos: mediaProjetos,
-      });
-    } catch (error) {
-      message.error(`Erro ao carregar dados: ${(error as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, pagination.pageSize]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Clear all filters
-  const handleClearFilters = () => {
-    setFilters(DEFAULT_FILTERS);
-  };
 
   // Load alocações for detail view
   const loadAlocacoes = async (coordenadorId: number) => {
@@ -278,7 +252,7 @@ export default function CoordenadoresPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchData(pagination.current);
+      void refresh();
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -304,23 +278,23 @@ export default function CoordenadoresPage(): JSX.Element {
         try {
           await deleteCoordenadorDAT(record.id);
           message.success('Coordenador excluído com sucesso');
-          fetchData(pagination.current);
+          void refresh();
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
       },
     });
-  }, [fetchData, pagination.current]);
+  }, [refresh]);
 
   const handleToggleAtivo = useCallback(async (record: CoordenadorRecord) => {
     try {
       await updateCoordenadorDAT(record.id, { ativo: !record.ativo });
       message.success(`Coordenador ${record.ativo ? 'desativado' : 'ativado'}`);
-      fetchData(pagination.current);
+      void refresh();
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
-  }, [fetchData, pagination.current]);
+  }, [refresh]);
 
   // Issue #303: Helper functions extracted to ./Coordenadores/helpers.js
   // Group coordenadores by area using extracted helper - memoized (§2 Epic #459)
@@ -669,10 +643,7 @@ export default function CoordenadoresPage(): JSX.Element {
               ...pagination,
               showSizeChanger: true,
               showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} coordenadores`,
-              onChange: (page, pageSize) => {
-                setPagination((prev) => ({ ...prev, current: page, pageSize }));
-                fetchData(page);
-              },
+              onChange: handleTableChange,
             }}
             size="middle"
           />

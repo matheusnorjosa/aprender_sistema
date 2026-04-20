@@ -4,9 +4,20 @@
  * Configures testing environment with:
  * - jest-dom matchers for DOM assertions
  * - Global mocks for browser APIs not available in jsdom
+ * - MSW server for intercepting HTTP traffic (see src/test/mocks/)
  */
 import '@testing-library/jest-dom'
-import { vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, vi } from 'vitest'
+import { server } from './mocks/server'
+
+// --- MSW lifecycle --------------------------------------------------------
+// `onUnhandledRequest: 'bypass'` during rollout so tests that still rely on
+// module-level mocks (vi.mock('../config'), injected callbacks) keep working
+// without forcing every file to declare a handler. Flip to 'error' once
+// coverage is broad enough. See v2/docs/TESTING_MSW.md.
+beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }))
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())
 
 // Mock matchMedia for Ant Design components
 // This must be defined before any Ant Design components are imported

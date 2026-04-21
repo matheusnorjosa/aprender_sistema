@@ -8,17 +8,20 @@ Covers:
 - `/api/gcal/circuit-breaker/` endpoint (state + counters + RBAC)
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false, reportPrivateUsage=false
+
 from __future__ import annotations
 
 from unittest import mock
 
-import pybreaker
-import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
+
+import pybreaker
+import pytest
 
 from apps.core.services.gcal.circuit_breaker import (
     CircuitBreakerError,

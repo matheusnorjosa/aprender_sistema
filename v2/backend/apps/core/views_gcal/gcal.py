@@ -11,12 +11,11 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.request import Request
 from rest_framework.response import Response
-
-from django.conf import settings
 
 from apps.core.exceptions import ServiceUnavailableError
 from apps.core.permissions import IsControleOrSuper

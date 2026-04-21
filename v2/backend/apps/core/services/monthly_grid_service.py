@@ -20,10 +20,11 @@ Details_index para dias com E/2/X/D1 (lista de eventos).
 
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from django.db.models import Prefetch, Q
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.core.models import AvailabilityBlock, Deslocamento, EquipeGerencia, Participation, Solicitacao, Usuario
@@ -158,15 +159,24 @@ def build_monthly_grid(
     # mas exibimos TODOS os seus eventos (de qualquer projeto) para ter visão
     # completa da disponibilidade.
 
-    # Prefetch participations do role específico
-    events_q = events_q.prefetch_related(
-        Prefetch(
-            "participations",
-            queryset=Participation.objects.filter(role=role, usuario_id__in=user_ids).select_related("usuario"),
-        )
-    ).select_related("municipio", "tipo_evento")
-
+    # Select FKs directly but skip prefetch of Participations. We will
+    # fetch participant ids in a single batched values_list query below,
+    # which is cheaper than materializing the RelatedManager for each
+    # event (#777 phase 2).
+    events_q = events_q.select_related("municipio", "tipo_evento")
     events = list(events_q)
+
+    # Batch fetch participants for every event in one query. Returns a flat
+    # list of (solicitacao_id, usuario_id) tuples, indexed below.
+    event_ids = [e.id for e in events]
+    event_to_users: dict[int, list[int]] = defaultdict(list)
+    if event_ids:
+        for sol_id, uid in Participation.objects.filter(
+            solicitacao_id__in=event_ids,
+            role=role,
+            usuario_id__in=user_ids,
+        ).values_list("solicitacao_id", "usuario_id"):
+            event_to_users[sol_id].append(uid)
 
     # 3. Bloqueios aprovados
     blocks = list(
@@ -187,105 +197,100 @@ def build_monthly_grid(
         ).select_related("usuario")
     )
 
-    # 4. Estruturas para acumular dados por user_id
-    user_data = {uid: _init_user_data(year, month, days_in_month) for uid in user_ids}
+    # 4. Acumuladores — dicts flat, chaveados por (uid, day_num). Cheaper
+    # than triple-nested dict access, especially on hot paths (#777 phase 2).
+    user_ids_set = set(user_ids)
+    events_by_user_day: dict[tuple[int, int], list[Any]] = defaultdict(list)
+    blocks_by_user_day: dict[tuple[int, int], list[Any]] = defaultdict(list)
+    desloc_by_user_day: dict[tuple[int, int], list[Any]] = defaultdict(list)
+    ch_month_by_user: dict[int, float] = defaultdict(float)
+    ch_year_by_user: dict[int, float] = defaultdict(float)
 
-    # 5. Distribuir eventos por dia/pessoa
+    month_last_day = last_day  # local date, end-of-month clamp
+
+    # 5. Distribuir eventos por dia/pessoa. Pré-filtramos o intervalo por dia
+    # para o mês corrente uma única vez, eliminando o `if current.month == month`
+    # do inner loop.
     for event in events:
-        # Converter para TZ local
-        event_start_local = event.inicio.astimezone(tz)
-        event_end_local = event.fim.astimezone(tz)
+        event_start_local = event.inicio.astimezone(tz).date()
+        event_end_local = event.fim.astimezone(tz).date()
 
-        # Dias tocados pelo evento (loop por dias)
-        current = event_start_local.date()
-        end_date = event_end_local.date()
+        # Clamp no intervalo do mês.
+        day_start = event_start_local if event_start_local > first_day else first_day
+        day_end = event_end_local if event_end_local < month_last_day else month_last_day
+        if day_start > day_end:
+            # Evento que toca apenas meses adjacentes — sem distribuição.
+            continue
 
-        # Encontrar usuários desse evento com o role específico
-        event_users = [p.usuario_id for p in event.participations.all() if p.role == role]
-
-        while current <= end_date:
+        event_users = event_to_users.get(event.id, ())
+        current = day_start
+        while current <= day_end:
             day_num = current.day
-
-            # Verificar se o dia está dentro do mês atual
-            if current.month == month and current.year == year:
-                for uid in event_users:
-                    if uid in user_data:
-                        user_data[uid]["events_by_day"][day_num].append(event)
-
+            for uid in event_users:
+                events_by_user_day[(uid, day_num)].append(event)
             current += timedelta(days=1)
 
-        # Calcular CH mês/ano para este evento
+        # CH mês/ano por usuário. Calcula uma vez por evento e soma pra
+        # cada participant.
+        ch_month_hours = _calc_hours_in_range(event.inicio, event.fim, month_start, month_end)
+        ch_year_hours = _calc_hours_in_range(event.inicio, event.fim, year_start_dt, year_end_dt)
         for uid in event_users:
-            if uid not in user_data:
-                continue
-
-            # CH mês: interseção com mês
-            ch_month_hours = _calc_hours_in_range(event.inicio, event.fim, month_start, month_end)
-            user_data[uid]["ch_month"] += ch_month_hours
-
-            # CH ano: interseção com ano
-            ch_year_hours = _calc_hours_in_range(event.inicio, event.fim, year_start_dt, year_end_dt)
-            user_data[uid]["ch_year"] += ch_year_hours
+            if uid in user_ids_set:
+                ch_month_by_user[uid] += ch_month_hours
+                ch_year_by_user[uid] += ch_year_hours
 
     # 6. Distribuir bloqueios por dia/pessoa
     for block in blocks:
         uid = block.usuario_id
-        if uid not in user_data:
+        if uid not in user_ids_set:
             continue
 
-        # Converter para TZ local
-        block_start_local = block.inicio.astimezone(tz)
-        block_end_local = block.fim.astimezone(tz)
+        block_start_local = block.inicio.astimezone(tz).date()
+        block_end_local = block.fim.astimezone(tz).date()
 
-        # Dias tocados pelo bloqueio
-        current = block_start_local.date()
-        end_date = block_end_local.date()
+        day_start = block_start_local if block_start_local > first_day else first_day
+        day_end = block_end_local if block_end_local < month_last_day else month_last_day
+        if day_start > day_end:
+            continue
 
-        while current <= end_date:
-            day_num = current.day
-
-            # Verificar se o dia está dentro do mês atual
-            if current.month == month and current.year == year:
-                user_data[uid]["blocks_by_day"][day_num].append(block)
-
+        current = day_start
+        while current <= day_end:
+            blocks_by_user_day[(uid, current.day)].append(block)
             current += timedelta(days=1)
 
     # 6.5. Distribuir deslocamentos por dia/pessoa
     for desloc in deslocamentos:
         uid = desloc.usuario_id
-        if uid not in user_data:
+        if uid not in user_ids_set:
             continue
 
-        # Dias tocados pelo deslocamento (start_date até end_date)
-        current = desloc.start_date
-        end_date = desloc.end_date
+        day_start = desloc.start_date if desloc.start_date > first_day else first_day
+        day_end = desloc.end_date if desloc.end_date < month_last_day else month_last_day
+        if day_start > day_end:
+            continue
 
-        while current <= end_date:
-            day_num = current.day
-
-            # Verificar se o dia está dentro do mês atual
-            if current.month == month and current.year == year:
-                user_data[uid]["deslocamentos_by_day"][day_num].append(desloc)
-
+        current = day_start
+        while current <= day_end:
+            desloc_by_user_day[(uid, current.day)].append(desloc)
             current += timedelta(days=1)
 
-    # 7. People com CH mês/ano (ordenar PRIMEIRO)
-    users = Usuario.objects.filter(id__in=user_ids)
-    user_map = {u.id: u for u in users}
+    # 7. People com CH mês/ano. Usar values() evita hidratação completa do
+    # modelo Usuario (os únicos campos usados são nome/email).
+    user_rows = Usuario.objects.filter(id__in=user_ids).values("id", "first_name", "last_name", "email", "username")
 
     people = []
-    for uid in user_ids:
-        user = user_map.get(uid)
-        if not user:
-            continue
-
+    for row in user_rows:
+        uid = row["id"]
+        # Replica get_full_name(): join de first+last, com fallback no username.
+        full = f"{row['first_name']} {row['last_name']}".strip()
+        name = full or row["username"]
         people.append(
             {
                 "id": uid,
-                "name": user.get_full_name() or user.username,
-                "email": user.email,
-                "ch_month": round(user_data[uid]["ch_month"], 2),
-                "ch_year": round(user_data[uid]["ch_year"], 2),
+                "name": name,
+                "email": row["email"],
+                "ch_month": round(ch_month_by_user.get(uid, 0.0), 2),
+                "ch_year": round(ch_year_by_user.get(uid, 0.0), 2),
             }
         )
 
@@ -295,53 +300,48 @@ def build_monthly_grid(
     # 8. Derivar user_id_to_row DE people (já ordenado)
     user_id_to_row = {p["id"]: idx for idx, p in enumerate(people)}
 
-    # 9. Gerar códigos por dia/pessoa (precedência) - MATRIZ 2D
+    # 9. Gerar códigos por dia/pessoa (precedência) - MATRIZ 2D.
+    # Iteramos somente sobre os users que efetivamente têm algum evento/bloqueio/
+    # deslocamento naquele dia; o resto permanece "" (já pré-alocado).
     num_rows = len(people)
-    cells = [["" for _ in range(days_in_month)] for _ in range(num_rows)]
-    details_index = {}
+    cells: list[list[str]] = [["" for _ in range(days_in_month)] for _ in range(num_rows)]
+    details_index: dict[str, Any] = {}
 
-    for uid, data in user_data.items():
+    for p in people:
+        uid = p["id"]
         row_idx = user_id_to_row[uid]
 
         for day_num in range(1, days_in_month + 1):
-            col_idx = day_num - 1  # Dia 1 → coluna 0
-            events_day = data["events_by_day"][day_num]
-            blocks_day = data["blocks_by_day"][day_num]
-            deslocamentos_day = data["deslocamentos_by_day"][day_num]
+            events_day = events_by_user_day.get((uid, day_num), [])
+            blocks_day = blocks_by_user_day.get((uid, day_num), [])
+            deslocamentos_day = desloc_by_user_day.get((uid, day_num), [])
 
-            has_event = len(events_day) > 0
-            has_block = len(blocks_day) > 0
-            has_desloc = len(deslocamentos_day) > 0
+            n_events = len(events_day)
+            has_event = n_events > 0
+            has_block = bool(blocks_day)
+            has_desloc = bool(deslocamentos_day)
 
             # Precedência: X > D1 > 2 > E > T/P > D
-            code = ""
             if has_event and has_block:
-                # X: evento + bloqueio (com ou sem deslocamento)
                 code = "X"
             elif has_event and has_desloc:
-                # D1: evento + deslocamento (sem bloqueio)
                 code = "D1"
-            elif len(events_day) >= 2:
-                # 2: múltiplos eventos
+            elif n_events >= 2:
                 code = "2"
-            elif len(events_day) == 1:
-                # E: 1 evento
+            elif n_events == 1:
                 code = "E"
             elif has_block:
-                # T/P: bloqueio apenas (sem evento, sem deslocamento)
-                # Se qualquer bloqueio for T, código é T; senão P
-                has_total = any(b.tipo == "T" for b in blocks_day)
-                code = "T" if has_total else "P"
+                code = "T" if any(b.tipo == "T" for b in blocks_day) else "P"
             elif has_desloc:
-                # D: deslocamento apenas (sem evento, sem bloqueio)
                 code = "D"
+            else:
+                continue  # cell already ""
 
+            col_idx = day_num - 1
             cells[row_idx][col_idx] = code
 
-            # Details para E/2/X/D1 com chave "row:col" (0-based)
-            if code in ["E", "2", "X", "D1"]:
-                detail_key = f"{row_idx}:{col_idx}"
-                details_index[detail_key] = [_event_to_detail(e, tz) for e in events_day]
+            if code in ("E", "2", "X", "D1"):
+                details_index[f"{row_idx}:{col_idx}"] = [_event_to_detail(e, tz) for e in events_day]
 
     # 10. Ranking denso por CH mês (desc).
     # `sorted()` retorna os mesmos objetos dict — a atribuição abaixo já mutua
@@ -362,17 +362,6 @@ def build_monthly_grid(
         "people": people,
         "cells": cells,
         "details_index": details_index,
-    }
-
-
-def _init_user_data(year: int, month: int, days_in_month: int) -> dict[str, Any]:
-    """Inicializa estrutura de dados por usuário."""
-    return {
-        "ch_month": 0.0,
-        "ch_year": 0.0,
-        "events_by_day": {day: [] for day in range(1, days_in_month + 1)},
-        "blocks_by_day": {day: [] for day in range(1, days_in_month + 1)},
-        "deslocamentos_by_day": {day: [] for day in range(1, days_in_month + 1)},
     }
 
 

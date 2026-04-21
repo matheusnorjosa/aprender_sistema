@@ -123,9 +123,11 @@ def build_monthly_grid(
 
         user_ids = list(set(participations_qs.values_list("usuario_id", flat=True)))
 
-    # Filtrar por IDs permitidos (se fornecido)
+    # Filtrar por IDs permitidos (se fornecido). Converter para set torna a
+    # intersecção O(U) ao invés de O(U × len(allowed)).
     if allowed_user_ids is not None:
-        user_ids = [uid for uid in user_ids if uid in allowed_user_ids]
+        allowed_set = set(allowed_user_ids)
+        user_ids = [uid for uid in user_ids if uid in allowed_set]
 
     if not user_ids:
         # Sem usuários, retorna vazio
@@ -341,7 +343,10 @@ def build_monthly_grid(
                 detail_key = f"{row_idx}:{col_idx}"
                 details_index[detail_key] = [_event_to_detail(e, tz) for e in events_day]
 
-    # 10. Ranking denso por CH mês (desc)
+    # 10. Ranking denso por CH mês (desc).
+    # `sorted()` retorna os mesmos objetos dict — a atribuição abaixo já mutua
+    # os dicts referenciados por `people`, então não precisamos re-aplicar o
+    # rank num segundo loop O(U²) (ASQ-004).
     people_sorted_by_ch = sorted(people, key=lambda p: p["ch_month"], reverse=True)
     rank = 0
     last_ch = None
@@ -350,13 +355,6 @@ def build_monthly_grid(
             rank += 1
             last_ch = p["ch_month"]
         p["position_month"] = rank
-
-    # Re-indexar por id para facilitar lookup
-    for p in people:
-        for p2 in people_sorted_by_ch:
-            if p["id"] == p2["id"]:
-                p["position_month"] = p2["position_month"]
-                break
 
     return {
         "days": list(range(1, days_in_month + 1)),

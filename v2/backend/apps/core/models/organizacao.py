@@ -298,6 +298,16 @@ class EquipeGerencia(models.Model):
                 violation_error_message="Apoio de Coordenacao deve ter um coordenador supervisor",
             ),
         ]
+        indexes = [
+            # ASQ-004: hot path do grid mensal filtra por (gerencia, papel, ativo).
+            # O UniqueConstraint em (gerencia, usuario, papel) cobre lookups
+            # compostos mas não começa por (gerencia, papel) — este índice
+            # evita o seq scan com centenas de membros.
+            models.Index(
+                fields=["gerencia", "papel", "ativo"],
+                name="idx_equipe_ger_papel_ativo",
+            ),
+        ]
 
     def __str__(self) -> str:
         papel = self.get_papel_display()  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]

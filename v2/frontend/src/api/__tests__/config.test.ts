@@ -8,7 +8,10 @@
  */
 
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { getCsrfToken, clearCsrfCache, buildUrl } from '../config'
+import { http, HttpResponse } from 'msw'
+import { server } from '../../test/mocks/server'
+import { apiUrl } from '../../test/mocks/handlers'
+import { fetchAPI, getCsrfToken, clearCsrfCache, buildUrl } from '../config'
 
 // Helper para limpar cookies
 function clearAllCookies() {
@@ -119,6 +122,45 @@ describe('API Config', () => {
       const result = buildUrl('/items/', { page: 1, limit: 10 })
       expect(result).toContain('page=1')
       expect(result).toContain('limit=10')
+    })
+  })
+
+  // ============================================================================
+  // TESTES DE fetchAPI (regression: 204 / empty body handling)
+  // ============================================================================
+
+  describe('fetchAPI — empty body responses', () => {
+    test('returns undefined for 204 No Content without parsing body', async () => {
+      server.use(
+        http.get(apiUrl('/noop/'), () => new HttpResponse(null, { status: 204 })),
+      )
+
+      const result = await fetchAPI('/noop/')
+
+      expect(result).toBeUndefined()
+    })
+
+    test('returns undefined when content-length is 0', async () => {
+      server.use(
+        http.get(
+          apiUrl('/empty/'),
+          () => new HttpResponse(null, { status: 200, headers: { 'content-length': '0' } }),
+        ),
+      )
+
+      const result = await fetchAPI('/empty/')
+
+      expect(result).toBeUndefined()
+    })
+
+    test('parses JSON body for 200 with content', async () => {
+      server.use(
+        http.get(apiUrl('/ok/'), () => HttpResponse.json({ ok: true })),
+      )
+
+      const result = await fetchAPI('/ok/')
+
+      expect(result).toEqual({ ok: true })
     })
   })
 })

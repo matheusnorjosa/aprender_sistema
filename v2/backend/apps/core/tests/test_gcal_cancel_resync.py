@@ -184,7 +184,7 @@ class TestCancelHelper:
             cancel_solicitacao(solicitacao_aprovada)
 
     @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
-    @patch("apps.core.services.gcal.sync._retry_with_backoff")
+    @patch("apps.core.services.gcal.sync._retry_with_circuit_breaker")
     def test_cancel_deletes_and_clears_fields(self, mock_retry, mock_get_client, solicitacao_publicada):
         """Cancel deleta evento e limpa campos."""
         # Configurar mocks
@@ -362,7 +362,7 @@ class TestCancelEndpoint:
         assert response.status_code == 403
 
     @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
-    @patch("apps.core.services.gcal.sync._retry_with_backoff")
+    @patch("apps.core.services.gcal.sync._retry_with_circuit_breaker")
     def test_cancel_endpoint_idempotent_404(
         self, mock_retry, mock_get_client, api_client, usuario_controle, solicitacao_publicada
     ):

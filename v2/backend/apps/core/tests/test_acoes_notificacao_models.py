@@ -120,9 +120,13 @@ def test_acao_template_executor_unique_mapping(acao_template):
 
 @pytest.mark.django_db
 def test_registrar_ancora_transita_para_em_andamento(acao_instancia, usuario_factory):
+    # Anchor from today so the 21 business-day deadline is always in the
+    # future — a hardcoded 2026-03 date would surface as ATRASADA once the
+    # wall clock passed the deadline.
+    data_ancora_recente = date.today()
     user = usuario_factory("ancora")
     registro = acao_instancia.registrar_ancora(
-        data_ancora=date(2026, 3, 16),
+        data_ancora=data_ancora_recente,
         usuario=user,
         observacao="Material recebido",
     )
@@ -131,7 +135,7 @@ def test_registrar_ancora_transita_para_em_andamento(acao_instancia, usuario_fac
 
     assert isinstance(registro, RegistroAncora)
     assert acao_instancia.estado == "EM_ANDAMENTO"
-    assert acao_instancia.data_ancora == date(2026, 3, 16)
+    assert acao_instancia.data_ancora == data_ancora_recente
     assert RegistroAncora.objects.filter(acao_instancia=acao_instancia).count() == 1
 
 

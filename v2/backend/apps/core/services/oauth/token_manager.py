@@ -28,6 +28,7 @@ import requests
 from cryptography.fernet import Fernet, InvalidToken
 
 from apps.core.models import AuditLog, GoogleOAuthCredential, Usuario
+from apps.core.services.db_retry import retry_on_deadlock
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -116,6 +117,7 @@ _decrypt_token = decrypt_token
 # ============================================================================
 
 
+@retry_on_deadlock(operation="oauth.refresh_access_token")
 def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthCredential:
     """
     Atualiza access_token usando refresh_token (thread-safe).

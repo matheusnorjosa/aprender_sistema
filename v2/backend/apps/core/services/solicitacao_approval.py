@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from apps.core.exceptions import ValidationAPIError
 from apps.core.models import AuditLog, Solicitacao, Usuario
+from apps.core.services.db_retry import retry_on_deadlock
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,7 @@ def _build_batch_status_errors(ids: list[int], found_ids: set[int]) -> list[dict
     return errors
 
 
+@retry_on_deadlock(operation="solicitacao.approve")
 def approve_solicitacao(
     solicitacao: Solicitacao,
     user: Usuario,
@@ -168,6 +170,7 @@ def approve_solicitacao(
     )
 
 
+@retry_on_deadlock(operation="solicitacao.reject")
 def reject_solicitacao(
     solicitacao: Solicitacao,
     user: Usuario,
@@ -238,6 +241,7 @@ def reject_solicitacao(
     )
 
 
+@retry_on_deadlock(operation="solicitacao.batch_approve")
 def batch_approve_solicitacoes(
     ids: list[int],
     user: Usuario,
@@ -325,6 +329,7 @@ def batch_approve_solicitacoes(
     )
 
 
+@retry_on_deadlock(operation="solicitacao.batch_reject")
 def batch_reject_solicitacoes(
     ids: list[int],
     user: Usuario,

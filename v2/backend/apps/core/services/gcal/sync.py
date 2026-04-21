@@ -20,7 +20,7 @@ from apps.core.types import CalendarId, EventId, JsonDict
 from .client import CalendarClientAdapter
 from .payload import _build_payload, build_event_payload
 from .types import Action, SyncOutcome
-from .utils import _payload_hash, _retry_with_backoff
+from .utils import _payload_hash, _retry_with_circuit_breaker
 from .validation import _event_id_for
 
 logger = logging.getLogger(__name__)
@@ -201,7 +201,7 @@ def upsert_one(
                 if not dry_run:
                     try:
                         # RF05: Retry com backoff exponencial (PR19)
-                        _retry_with_backoff(
+                        _retry_with_circuit_breaker(
                             lambda: client.delete(calendar_id, eid),
                             operation_name=f"GCal DELETE #{s.id}",
                         )
@@ -267,7 +267,7 @@ def upsert_one(
                         f"event_id={deterministic_eid}, payload={payload}"
                     )
                     # RF05: Retry com backoff exponencial (PR19)
-                    created = _retry_with_backoff(
+                    created = _retry_with_circuit_breaker(
                         lambda: client.insert(calendar_id, deterministic_eid, payload),
                         operation_name=f"GCal INSERT #{s.id}",
                     )
@@ -320,7 +320,7 @@ def upsert_one(
             if not dry_run:
                 try:
                     # RF05: Retry com backoff exponencial (PR19)
-                    updated = _retry_with_backoff(
+                    updated = _retry_with_circuit_breaker(
                         lambda: client.update(calendar_id, deterministic_eid, payload),
                         operation_name=f"GCal UPDATE #{s.id}",
                     )
@@ -438,7 +438,7 @@ def cancel_solicitacao(
 
     try:
         # Tentar deletar com retry/backoff
-        _retry_with_backoff(
+        _retry_with_circuit_breaker(
             lambda: client.delete(calendar_id, event_id),
             operation_name=f"GCal CANCEL #{s.id}",
         )

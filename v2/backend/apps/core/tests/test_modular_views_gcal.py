@@ -132,7 +132,9 @@ class TestViewsGCalModuleStructure:
         import apps.core.views_gcal as views_gcal
 
         assert hasattr(views_gcal, "__all__")
-        assert len(views_gcal.__all__) == 18  # 2 core + 3 helpers + 4 summary + 3 batch + 4 detail + 2 insights
+        assert (
+            len(views_gcal.__all__) == 19
+        )  # 3 core (calendars/health/circuit-breaker) + 3 helpers + 4 summary + 3 batch + 4 detail + 2 insights
 
     def test_submodules_exist(self):
         """All submodules should be importable."""

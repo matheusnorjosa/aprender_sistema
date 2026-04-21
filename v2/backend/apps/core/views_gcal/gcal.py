@@ -16,8 +16,11 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from django.conf import settings
+
 from apps.core.exceptions import ServiceUnavailableError
 from apps.core.permissions import IsControleOrSuper
+from apps.core.services.gcal.circuit_breaker import gcal_breaker, get_circuit_state
 from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
 
 logger = logging.getLogger(__name__)
@@ -97,3 +100,36 @@ def gcal_health(request: Request) -> Response:
         raise ServiceUnavailableError(
             service="Google Calendar",
         )
+
+
+@api_view(["GET"])
+@permission_classes([IsControleOrSuper])
+def gcal_circuit_breaker_state(request: Request) -> Response:
+    """
+    GET /api/gcal/circuit-breaker/
+
+    Expose the current state of the Google Calendar circuit breaker so
+    operators can correlate sync errors with breaker transitions without
+    having to tail logs.
+
+    Autenticação: Obrigatória
+    Permissões: Controle, Superintendência ou superuser
+
+    Response format:
+        {
+            "state": "closed" | "open" | "half-open",
+            "fail_counter": int,
+            "fail_max": int,
+            "reset_timeout_seconds": int
+        }
+    """
+    del request  # unused
+    return Response(
+        {
+            "state": get_circuit_state(),
+            "fail_counter": gcal_breaker.fail_counter,
+            "fail_max": getattr(settings, "GCAL_CIRCUIT_BREAKER_FAIL_MAX", 5),
+            "reset_timeout_seconds": getattr(settings, "GCAL_CIRCUIT_BREAKER_RESET_TIMEOUT", 60),
+        },
+        status=status.HTTP_200_OK,
+    )

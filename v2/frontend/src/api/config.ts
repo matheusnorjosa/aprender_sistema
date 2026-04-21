@@ -227,6 +227,12 @@ export async function fetchAPI<T = unknown>(url: string, options: FetchOptions =
     throw err;
   }
 
+  // 204 No Content responses have no body. Calling response.json() on them
+  // throws SyntaxError on modern fetch implementations (undici, browsers).
+  // Callers for DELETE endpoints expect undefined, so honor that contract.
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return undefined as T;
+  }
   return response.json();
 }
 

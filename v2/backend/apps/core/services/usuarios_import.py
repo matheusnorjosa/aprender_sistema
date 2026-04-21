@@ -62,11 +62,14 @@ def import_usuarios_from_file(*, path: str, dry_run: bool = True) -> dict[str, A
     # Carregar arquivo
     rows = _load_file(path)
 
-    # Processar linhas
+    # Processar linhas.
+    # ASQ-016: savepoint-per-row. Outer atomic still owns the dry-run
+    # rollback; inner atomic isolates one bad row from the rest.
     with transaction.atomic():
         for idx, row in enumerate(rows, start=1):
             try:
-                _process_row(row, idx, stats, pendencias, dry_run)
+                with transaction.atomic():  # savepoint
+                    _process_row(row, idx, stats, pendencias, dry_run)
             except Exception as e:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(

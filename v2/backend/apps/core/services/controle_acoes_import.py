@@ -64,13 +64,16 @@ def import_acoes_controle(file_path: str, dry_run: bool = False) -> dict[str, An
     # Carregar arquivo
     rows: list[dict[str, Any]] = _load_file(file_path)
 
-    # Processar linhas
+    # Processar linhas.
+    # ASQ-016: savepoint-per-row. Outer atomic still owns the dry-run
+    # rollback; inner atomic isolates one bad row from the rest.
     with transaction.atomic():
         for idx, row in enumerate(rows, start=1):
             try:
-                result: str | None = _process_row(row, idx, stats, pendencias)
-                if result == "skip":
-                    continue
+                with transaction.atomic():  # savepoint
+                    result: str | None = _process_row(row, idx, stats, pendencias)
+                    if result == "skip":
+                        continue
             except Exception as e:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(

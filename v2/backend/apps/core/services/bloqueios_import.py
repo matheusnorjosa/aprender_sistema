@@ -61,11 +61,15 @@ def import_bloqueios_from_file(*, path: str, dry_run: bool = True) -> dict[str, 
     # Carregar arquivo
     rows = _load_file(path)
 
-    # Processar linhas
+    # Processar linhas.
+    # ASQ-016: each row runs inside a nested atomic (savepoint) so a single
+    # bad row only rolls back its own insert/update, not the whole file.
+    # The outer atomic still gives us an all-or-nothing dry-run.
     with transaction.atomic():
         for idx, row in enumerate(rows, start=1):
             try:
-                _process_row(row, idx, stats, pendencias)
+                with transaction.atomic():  # savepoint
+                    _process_row(row, idx, stats, pendencias)
             except Exception as e:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(

@@ -64,9 +64,7 @@ describe('datModule API (MSW)', () => {
       }),
       http.delete(apiUrl('/produtos/5/'), ({ request }) => {
         requests.push({ url: request.url, method: 'DELETE' });
-        // NOTE: see adminDAT.test.ts — fetchAPI doesn't handle 204 empty body,
-        // so return {} with 200 for now.
-        return HttpResponse.json({});
+        return new HttpResponse(null, { status: 204 });
       }),
     );
 

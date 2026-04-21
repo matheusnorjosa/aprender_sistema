@@ -155,11 +155,8 @@ describe('adminDAT API wrappers (MSW)', () => {
   });
 
   test('deleteGroup adds confirm_reserved query param when requested', async () => {
-    // NOTE: fetchAPI always tries response.json() even on 204, so return {} with 200.
-    // Prod backends that return 204 empty would surface a JSON parse error — that is
-    // a gap worth fixing separately (out of scope for #849).
     server.use(
-      spyHandler(http.delete, apiUrl('/grupos/2/'), { json: {} }, calls),
+      spyHandler(http.delete, apiUrl('/grupos/2/'), { status: 204, text: '' }, calls),
     );
 
     await deleteGroup(2, { confirmReserved: true });

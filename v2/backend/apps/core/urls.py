@@ -63,6 +63,7 @@ from .views_gcal import (  # Core GCal; Dashboard views
     GCalPublishBatchView,
     GCalStatusSummaryView,
     gcal_calendars,
+    gcal_circuit_breaker_state,
     gcal_health,
 )
 from .views_health import features, readyz, versionz
@@ -288,6 +289,7 @@ urlpatterns = [
     # GCal Endpoints (Sprint 2 - Issue #65)
     path("gcal/calendars/", gcal_calendars, name="gcal-calendars"),
     path("gcal/health/", gcal_health, name="gcal-health"),
+    path("gcal/circuit-breaker/", gcal_circuit_breaker_state, name="gcal-circuit-breaker-state"),
     # Metrics and Reports
     path("metrics/map/", metrics_map, name="metrics-map"),
     path("metrics/map/coordinators/", metrics_map_coordinators, name="metrics-map-coordinators"),

@@ -24,7 +24,7 @@ from apps.core.views_gcal.detail import (
 )
 
 # Core GCal views (from old views_gcal.py)
-from apps.core.views_gcal.gcal import gcal_calendars, gcal_health
+from apps.core.views_gcal.gcal import gcal_calendars, gcal_circuit_breaker_state, gcal_health
 
 # Helpers
 from apps.core.views_gcal.helpers import DashboardEventsPagination, _apply_common_filters, _filter_events_queryset
@@ -38,6 +38,7 @@ from apps.core.views_gcal.summary import AlertsSummaryView, DashboardMetricsView
 __all__ = [
     # Core GCal
     "gcal_calendars",
+    "gcal_circuit_breaker_state",
     "gcal_health",
     # Helpers
     "DashboardEventsPagination",

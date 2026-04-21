@@ -15,6 +15,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from apps.core.models import Solicitacao
+from apps.core.services.db_retry import retry_on_deadlock
 from apps.core.types import CalendarId, EventId, JsonDict
 
 from .client import CalendarClientAdapter
@@ -26,6 +27,7 @@ from .validation import _event_id_for
 logger = logging.getLogger(__name__)
 
 
+@retry_on_deadlock(operation="gcal.apply_one_solicitacao")
 def apply_one_solicitacao(
     s: Solicitacao,
     *,

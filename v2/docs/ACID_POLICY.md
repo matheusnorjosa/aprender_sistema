@@ -29,8 +29,7 @@ Formal transactional policy for the critical flows. Tracks issue [#866](https://
 | **OAuth refresh** | `services/oauth/token_manager.py :: refresh_access_token_safe` | Function body | `GoogleOAuthCredential.objects.select_for_update().get(id=...)` + double-check `token_expiry` after lock | Second caller short-circuits if token is still valid | ✅ `@retry_on_deadlock("oauth.refresh_access_token")` |
 | **GCal publish (entry point)** | `services/gcal/sync.py :: apply_one_solicitacao` | Function body wraps DB writes via `s.mark_gcal` / `s.save`; HTTP call to Google happens outside the tx | Caller (Celery task / management command) is responsible for `select_for_update` on the batch; single-item callers use `@retry_on_deadlock` as the safety net | Deterministic event id + payload hash on `Solicitacao`; duplicate dispatches collapse via `client.get(...)` existence check | ✅ `@retry_on_deadlock("gcal.apply_one_solicitacao")` |
 | **GCal low-level upsert** | `services/gcal/sync.py :: upsert_one` | Each `s.save(update_fields=...)` is atomic on its own; HTTP call happens between saves | Caller contract: wrap in `transaction.atomic()` + `select_for_update` for batch sync | Same — event id + hash | Inherits retry via `apply_one_solicitacao`; circuit breaker at HTTP layer (#779) |
-| **Import/ETL** — `bloqueios_import` | `services/bloqueios_import.py :: import_bloqueios_from_file` | Outer `transaction.atomic` for dry-run rollback + **savepoint-per-row** via nested `transaction.atomic` | No explicit row locks — idempotency via uniqueness check before create | One bad row only aborts itself (savepoint); dry-run still discards the whole batch | ❌ Not yet — imports run offline. |
-| **Import/ETL** — *other 10 services* | `services/*_import.py` | One `transaction.atomic` per import call with `set_rollback(dry_run)` | No explicit row locks — idempotency via unique constraints + `external_hash` | Duplicate rows handled by `IntegrityError`; dry-run discards writes | ❌ Not yet — savepoint-per-row rollout planned. |
+| **Import/ETL** — all 10 services | `services/*_import.py` (`bloqueios`, `colecoes`, `controle_acoes`, `dat_cadastros`, `deslocamentos`, `equipe_gerencia`, `eventos`, `municipios`, `produtos`, `usuarios`) | Outer `transaction.atomic` for dry-run rollback + **savepoint-per-row** via nested `transaction.atomic` | No explicit row locks — idempotency via unique constraints + `external_hash` | One bad row only aborts itself (savepoint); dry-run still discards the whole batch | ❌ Not yet — imports run offline. |
 
 ## Lock ordering convention
 
@@ -75,13 +74,12 @@ Structured log events:
 Phase 2 (#866) closed the following:
 
 - ✅ **GCal publish retry** — `apply_one_solicitacao` carries `@retry_on_deadlock`; the caller contract for `upsert_one` is documented.
-- ✅ **Savepoint-per-row in imports** — pilot landed in `bloqueios_import`; the other 10 import services follow the same template.
+- ✅ **Savepoint-per-row in imports** — rolled out to all 10 import services (bloqueios, colecoes, controle_acoes, dat_cadastros, deslocamentos, equipe_gerencia, eventos, municipios, produtos, usuarios).
 - ✅ **Concurrency regression tests** — race coverage added for OAuth refresh, GCal publish, and import savepoint behavior in `test_concurrency_regressions_asq016.py`.
 - ✅ **Runbook** — see [`RUNBOOK_concurrency.md`](RUNBOOK_concurrency.md).
 
 Still open, deliberately out of scope:
 
-- **Savepoint rollout** to the 10 remaining import services (colecoes, eventos, dat_cadastros, deslocamentos, equipe_gerencia, produtos, municipios, usuarios, controle_acoes). Template in `bloqueios_import` is ready; propagation is mechanical.
 - **"Count only transient errors" filter** on the GCal circuit breaker (tracked in #779 notes).
 - **Distributed tracing span** for each retry attempt — today we have structured logs but no trace context.
 

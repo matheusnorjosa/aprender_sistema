@@ -48,13 +48,21 @@ Symptoms: `Solicitacao.gcal_status = PUBLISHED` but `external_event_id = NULL`, 
 3. As a safety net, `apply_one_solicitacao` is decorated with `@retry_on_deadlock`. A torn state should not be possible from a single dispatch — it requires two parallel dispatches.
 4. Recover: either wait for the circuit-breaker retry task to re-sync, or manually re-apply via the Django admin action.
 
-## Triage — "import took 30 min and then rolled everything back"
+## Triage — "import took 30 min and then only some rows were saved"
 
-This is the shape that savepoint-per-item solves, but only `bloqueios_import.py` has it enabled right now. For the other imports:
-1. Find the row that failed in the `pendencias.outros` array of the response.
-2. Fix the row or mark it to skip.
-3. Re-run with `dry_run=True` first, then `dry_run=False`.
-4. File a ticket referencing the remaining GAP in `ACID_POLICY.md` so the follow-up PR that widens savepoint coverage gets prioritized for that service.
+All 10 import services now use **savepoint-per-row**, so a single bad row
+aborts its own insert/update only — the outer `transaction.atomic()` still
+commits the valid rows (or rolls the whole file back if `dry_run=True`).
+If you see an import finish with fewer rows persisted than expected:
+1. The rejected rows are reported in `pendencias.*` sections of the response
+   (`usuarios`, `dates`, `outros`, etc.). Each entry carries `linha` and
+   `erro`.
+2. Fix the offending rows in the source file and re-run — re-importing the
+   same valid rows is idempotent (unique constraints / `external_hash`
+   dedupe).
+3. If you see an IntegrityError *inside* the savepoint that looks like a
+   constraint change (e.g. a new `NOT NULL` after a migration), that is a
+   schema regression, not a data issue — open an incident.
 
 ## Escalation
 

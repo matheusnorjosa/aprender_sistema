@@ -54,10 +54,13 @@ def import_municipios_from_file(*, path: str, dry_run: bool = True) -> dict[str,
 
     rows = _load_file(path)
 
+    # ASQ-016: savepoint-per-row. Outer atomic still owns the dry-run
+    # rollback; inner atomic isolates one bad row from the rest.
     with transaction.atomic():
         for idx, row in enumerate(rows, start=1):
             try:
-                _process_row(row, idx, stats, pendencias)
+                with transaction.atomic():  # savepoint
+                    _process_row(row, idx, stats, pendencias)
             except Exception as e:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(

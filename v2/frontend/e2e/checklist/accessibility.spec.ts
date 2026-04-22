@@ -64,7 +64,7 @@ test.describe('Checklist: Acessibilidade (axe-core)', () => {
     page,
   }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const accessibilityScanResults = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
@@ -96,7 +96,7 @@ test.describe('Checklist: Acessibilidade (axe-core)', () => {
 
   test('🔴 formulários devem ter labels associados', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const results = await new AxeBuilder({ page })
       .include('form, [role="form"], input, select, textarea')
@@ -115,7 +115,7 @@ test.describe('Checklist: Acessibilidade (axe-core)', () => {
 
   test('🔴 imagens devem ter alt text', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const results = await new AxeBuilder({ page })
       .include('img')
@@ -130,7 +130,7 @@ test.describe('Checklist: Acessibilidade (axe-core)', () => {
 
   test('🔴 contraste de cores deve ser adequado', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await waitForLoadingOverlayToDisappear(page);
 
     const results = await new AxeBuilder({ page })
@@ -163,7 +163,7 @@ test.describe('Checklist: Acessibilidade (axe-core)', () => {
 test.describe('Checklist: Navegação por Teclado', () => {
   test('🔴 elementos interativos devem ser focáveis', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Tab através dos primeiros elementos
     const focusedElements: string[] = [];
@@ -193,7 +193,7 @@ test.describe('Checklist: Navegação por Teclado', () => {
 
   test('🔴 focus deve ser visível', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Tab para o primeiro elemento focável
     await page.keyboard.press('Tab');
@@ -249,7 +249,7 @@ test.describe('Checklist: Navegação por Teclado', () => {
 
   test('🟡 focus trap em modais', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Tenta encontrar e abrir um modal
     const modalTrigger = page.locator(
@@ -293,7 +293,7 @@ test.describe('Checklist: Navegação por Teclado', () => {
 test.describe('Checklist: Estrutura Semântica', () => {
   test('🟡 deve ter landmarks apropriados', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const landmarks = await page.evaluate(() => {
       return {
@@ -314,7 +314,7 @@ test.describe('Checklist: Estrutura Semântica', () => {
 
   test('🟡 headings devem estar em ordem', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const headingOrder = await page.evaluate(() => {
       const headings = Array.from(
@@ -349,7 +349,7 @@ test.describe('Checklist: Estrutura Semântica', () => {
 
   test('🔴 página deve ter h1', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const h1Count = await page.locator('h1').count();
 
@@ -360,7 +360,7 @@ test.describe('Checklist: Estrutura Semântica', () => {
 test.describe('Checklist: Formulários Acessíveis', () => {
   test('🔴 campos obrigatórios devem estar marcados', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const requiredInputs = await page.locator('input[required], select[required], textarea[required]').all();
 
@@ -377,7 +377,7 @@ test.describe('Checklist: Formulários Acessíveis', () => {
 
   test('🟡 inputs devem ter autocomplete apropriado', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const commonInputs = await page.evaluate(() => {
       const inputs = Array.from(

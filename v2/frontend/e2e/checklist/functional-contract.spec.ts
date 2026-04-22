@@ -43,7 +43,7 @@ async function runCase(page: Page, matrixCase: FunctionalMatrixCase): Promise<vo
 
   await loginByApi(page, matrixCase.user.username, matrixCase.user.password);
   await page.goto(matrixCase.route);
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('load');
 
   for (const endpoint of matrixCase.endpoints) {
     await expect

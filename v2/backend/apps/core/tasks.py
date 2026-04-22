@@ -11,7 +11,7 @@ Agendamento via CELERY_BEAT_SCHEDULE no settings.py:
   - Janela padrão: 90 dias atrás até 180 dias à frente
 """
 
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
 
@@ -535,6 +535,143 @@ def preview_then_apply_gcal() -> dict[str, Any]:
         details=result,
     )
     return result
+
+
+@shared_task(
+    bind=True,
+    name="apps.core.tasks.task_run_import_job",
+    acks_late=True,
+)
+def task_run_import_job(self: Any, import_job_id: int) -> dict[str, Any]:
+    """
+    Executa um ImportJob assincronamente (ASQ-005 fase 1).
+
+    Reentrance-safe via guard de status: se o job nao estiver em QUEUED,
+    retorna SKIPPED sem reexecutar o service. Isso protege contra re-enqueues
+    apos crash de worker (acks_late=True).
+
+    Args:
+        import_job_id: ID do ImportJob a executar
+
+    Returns:
+        dict com:
+            - action: "SUCCESS" | "FAILED" | "SKIPPED" | "NOT_FOUND"
+            - import_job_id: int
+            - import_type: str (quando aplicavel)
+            - status: str (estado final do job)
+            - stats: dict (quando SUCCESS)
+            - error: str | None
+    """
+    import traceback
+
+    from django.db import transaction
+
+    from apps.core.models import AuditLog, ImportJob
+    from apps.core.services.bloqueios_import import import_bloqueios_from_file
+
+    # ================================================================
+    # GUARDA: Job existe?
+    # ================================================================
+    try:
+        job = ImportJob.objects.get(id=import_job_id)
+    except ImportJob.DoesNotExist:
+        logger.warning(f"task_run_import_job: ImportJob #{import_job_id} nao encontrado")
+        return {
+            "action": "NOT_FOUND",
+            "import_job_id": import_job_id,
+            "error": "DoesNotExist",
+        }
+
+    # ================================================================
+    # GUARDA: idempotencia (previne duplo-run apos re-enqueue)
+    # ================================================================
+    with transaction.atomic():
+        locked = ImportJob.objects.select_for_update().get(id=import_job_id)
+        if locked.status != ImportJob.Status.QUEUED:
+            logger.info(f"task_run_import_job: job #{import_job_id} ja estava em status={locked.status}, skipping")
+            return {
+                "action": "SKIPPED",
+                "import_job_id": import_job_id,
+                "status": locked.status,
+                "reason": f"status={locked.status}",
+            }
+        # Transicao QUEUED -> RUNNING atomica
+        locked.mark_running(celery_task_id=self.request.id or "")
+        job = locked
+
+    # ================================================================
+    # EXECUCAO: despacho por tipo
+    # ================================================================
+    try:
+        file_path = job.file.path
+
+        if job.import_type == ImportJob.ImportType.BLOQUEIOS:
+            report = import_bloqueios_from_file(path=file_path, dry_run=job.dry_run)
+        else:
+            # Fase 2 adicionara: usuarios, compras, etc.
+            raise NotImplementedError(f"import_type={job.import_type} nao suportado nesta fase")
+
+        stats = report.get("stats", {})
+        pendencias = report.get("pendencias", {})
+
+        job.mark_success(stats=stats, pendencias=pendencias)
+
+        AuditLog.objects.create(
+            usuario=job.user,
+            action="IMPORT_JOB_COMPLETED",
+            model_name="ImportJob",
+            details={
+                "import_job_id": job.id,
+                "import_type": job.import_type,
+                "dry_run": job.dry_run,
+                "stats": stats,
+                "pendencias_counts": {k: len(v) for k, v in pendencias.items() if isinstance(v, list)},
+            },
+        )
+
+        return {
+            "action": "SUCCESS",
+            "import_job_id": job.id,
+            "import_type": job.import_type,
+            "status": job.status,
+            "stats": stats,
+            "error": None,
+        }
+
+    except Exception as exc:
+        tb = traceback.format_exc()
+        err_msg = str(exc)
+        logger.exception(f"task_run_import_job: erro ao executar job #{import_job_id}")
+
+        try:
+            job.refresh_from_db()
+            job.mark_failed(error_message=err_msg, error_traceback=tb)
+        except Exception:
+            # Se falhar ate marcar o job, pelo menos registra no AuditLog abaixo
+            logger.exception(f"task_run_import_job: falha ao marcar job #{import_job_id} como FAILED")
+
+        try:
+            AuditLog.objects.create(
+                usuario=job.user if job.user_id else None,
+                action="IMPORT_JOB_FAILED",
+                model_name="ImportJob",
+                details={
+                    "import_job_id": import_job_id,
+                    "import_type": job.import_type,
+                    "dry_run": job.dry_run,
+                    "error": err_msg[:500],
+                },
+            )
+        except Exception:
+            logger.exception(f"task_run_import_job: falha ao criar AuditLog para #{import_job_id}")
+
+        return {
+            "action": "FAILED",
+            "import_job_id": import_job_id,
+            "import_type": job.import_type,
+            "status": ImportJob.Status.FAILED,
+            "error": err_msg[:500],
+        }
 
 
 @shared_task(

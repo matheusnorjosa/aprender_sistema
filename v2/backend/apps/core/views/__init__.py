@@ -31,6 +31,7 @@ from apps.core.views.dat_module import (
     DATCoordenadorViewSet,
     DATFormacaoViewSet,
 )
+from apps.core.views.imports import ImportJobBloqueiosUploadView, ImportJobDetailView, ImportJobListView
 from apps.core.views.options import (
     CoordenadorOptionViewSet,
     FormadorOptionViewSet,
@@ -91,4 +92,8 @@ __all__ = [
     "TipoEventoOptionViewSet",
     # Stats
     "HomeStatsView",
+    # Imports (ASQ-005)
+    "ImportJobBloqueiosUploadView",
+    "ImportJobDetailView",
+    "ImportJobListView",
 ]

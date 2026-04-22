@@ -75,3 +75,6 @@ Proprietario - Todos os direitos reservados.
 ---
 
 **Autor**: Matheus Norjosa
+
+
+<!-- Fix #1180 -->

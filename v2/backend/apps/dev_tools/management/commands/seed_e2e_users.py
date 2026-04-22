@@ -193,6 +193,17 @@ class Command(BaseCommand):
                 "groups": [grupos["Gerente"], grupos["Vidas"]],
                 "is_superuser": False,
             },
+            # === DAT puro (jornada J18 — regra PO: DAT acesso total no frontend) ===
+            {
+                "username": "dat_e2e@test.com",
+                "email": "dat_e2e@test.com",
+                "first_name": "Daniel",
+                "last_name": "DATPuro",
+                "cpf": "99900000040",
+                "password": "testpass123",
+                "groups": [grupos["DAT"]],
+                "is_superuser": False,
+            },
             # === Gerente + Superintendência (PA-02 quorum composto) ===
             {
                 "username": "super_geral@test.com",

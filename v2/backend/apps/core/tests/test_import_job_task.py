@@ -62,7 +62,7 @@ class TestTaskHappyPath:
             "stats": {"created": 4, "updated": 1, "unchanged": 0, "skipped": {"usuario": 0}},
             "pendencias": {"usuarios": [], "dates": [], "outros": []},
             "dry_run": True,
-            "file": "/tmp/ignored",
+            "file": "ignored-by-mock",
         }
         with patch(
             "apps.core.services.bloqueios_import.import_bloqueios_from_file", return_value=fake_report

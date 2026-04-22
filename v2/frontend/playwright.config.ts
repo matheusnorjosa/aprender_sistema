@@ -17,11 +17,17 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : 4,
-  reporter: 'list',
+  reporter: process.env.CI
+    ? [['list'], ['github'], ['html', { open: 'never' }], ['junit', { outputFile: 'results.xml' }]]
+    : [['list']],
   timeout: 30000,
   use: {
     baseURL,
-    trace: 'on-first-retry',
+    locale: 'pt-BR',
+    timezoneId: 'America/Fortaleza',
+    trace: 'retain-on-failure',
+    video: 'retain-on-failure',
+    screenshot: 'only-on-failure',
   },
   projects: [
     // Setup project - faz login e salva estado

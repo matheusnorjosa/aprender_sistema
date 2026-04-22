@@ -1,21 +1,19 @@
 """
 Seed RBAC — Criar grupos e permissões mínimas (idempotente).
 
-Grupos criados:
-- Superintendência
-- Coordenador
-- Apoio de Coordenação
-- Formador
-- Controle
-- DAT
-- Gerência
-- Diretoria
+Grupos criados: união de SETOR_GROUPS (13) + FUNCAO_GROUPS (4), conforme
+apps.core.constants. Setores de projeto (Vidas, Fluir, etc.) não recebem
+permissões Django CRUD — servem como marca de filtro RBAC via
+EquipeGerencia. Setores administrativos (DAT, Controle, Superintendência,
+Diretoria) e funções (Coordenador, Formador, Apoio, Gerente) recebem as
+Django permissions em PERMS_BY_GROUP abaixo.
 
-Permissões atribuídas por grupo conforme PR 12/N.
+Atualizado em 2026-04-22: passou a usar SETOR_GROUPS + FUNCAO_GROUPS como
+SSOT (antes a lista estava hardcoded com 8 entradas e divergia).
 Atualizado em 2025-12-01: Adicionado grupo "Apoio de Coordenação".
 """
 
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
 from typing import Any
@@ -24,21 +22,12 @@ from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandParser
 
+from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
 from apps.core.models import AvailabilityBlock, Compra, Municipio, Projeto, Solicitacao, Usuario
 from apps.core.services.functional_permissions_seed import seed_functional_permissions
 
-# Subconjunto de grupos que recebem Django model permissions via seed.
-# Lista canônica completa: apps.core.constants.SETOR_GROUPS + FUNCAO_GROUPS
-GROUPS = [
-    "Superintendência",
-    "Coordenador",
-    "Apoio de Coordenação",
-    "Formador",
-    "Controle",
-    "DAT",
-    "Gerência",
-    "Diretoria",
-]
+# Lista canônica completa: todos os grupos seedados (setor + função).
+GROUPS: list[str] = SETOR_GROUPS + [f for f in FUNCAO_GROUPS if f not in SETOR_GROUPS]
 
 PERMS_BY_GROUP = {
     # DAT: Admin completo em Usuario, Municipio; view+add em Solicitacao

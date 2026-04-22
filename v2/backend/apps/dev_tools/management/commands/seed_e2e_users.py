@@ -20,7 +20,7 @@ Dados criados:
 Fase 2 - Testes E2E (Playwright) - Plano DAT/GCal 2025-10-29
 """
 
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportGeneralTypeIssues=false
 from __future__ import annotations
 
 from typing import Any
@@ -30,6 +30,7 @@ from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 from django.db import IntegrityError, transaction
 
+from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
 from apps.core.models import Municipio, Projeto
 
 User = get_user_model()
@@ -43,10 +44,11 @@ class Command(BaseCommand):
         self.stdout.write("SEED E2E USERS — Testes Playwright")
         self.stdout.write("=" * 80)
 
-        # 1. Criar grupos
+        # 1. Criar grupos (união de SETOR_GROUPS + FUNCAO_GROUPS — SSOT em apps.core.constants)
         self.stdout.write("\n1. Criando grupos necessários...")
-        grupos = {}
-        for nome_grupo in ["Coordenador", "Superintendência", "Controle", "Formador", "Gerente"]:
+        grupos: dict[str, Group] = {}
+        todos_grupos = list({*SETOR_GROUPS, *FUNCAO_GROUPS})
+        for nome_grupo in todos_grupos:
             grupo, created = Group.objects.get_or_create(name=nome_grupo)
             grupos[nome_grupo] = grupo
             status = "✅ Criado" if created else "⏭️  Já existe"
@@ -82,14 +84,27 @@ class Command(BaseCommand):
         self.stdout.write("=" * 80)
 
     def _create_users(self, grupos: dict[str, Group]) -> list[Any]:
-        """Cria 4 usuários para testes E2E."""
+        """Cria usuários para testes E2E cobrindo combinações setor × função.
+
+        Usuários criados:
+
+        Legacy (back-compat com specs existentes):
+        - coord_e2e, super_e2e, controle_e2e, formador_e2e
+
+        Por combinação setor × função (jornadas J01-J19 do plano QA 2026-04-22):
+        - coord_vidas, coord_fluir, coord_acerta (Coordenador + setor)
+        - gerente_vidas (Gerente + setor — jornada J14, issue #1165)
+        - super_geral (Gerente + Superintendência — PA-02 quorum composto)
+        - formador_vidas, formador_fluir (Formador + setor — jornadas J06, J11, J13)
+        """
         users_data = [
+            # === Legacy — manter compat com specs atuais ===
             {
                 "username": "coord_e2e@test.com",
                 "email": "coord_e2e@test.com",
                 "first_name": "Coordenador",
                 "last_name": "E2E",
-                "cpf": "00000000001",  # Placeholder CPF
+                "cpf": "99900000001",
                 "password": "testpass123",
                 "groups": [grupos["Coordenador"]],
                 "is_superuser": False,
@@ -99,7 +114,7 @@ class Command(BaseCommand):
                 "email": "super_e2e@test.com",
                 "first_name": "Superintendência",
                 "last_name": "E2E",
-                "cpf": "00000000002",
+                "cpf": "99900000002",
                 "password": "testpass123",
                 "groups": [grupos["Superintendência"], grupos["Gerente"]],
                 "is_superuser": False,
@@ -109,7 +124,7 @@ class Command(BaseCommand):
                 "email": "controle_e2e@test.com",
                 "first_name": "Controle",
                 "last_name": "E2E",
-                "cpf": "00000000003",
+                "cpf": "99900000003",
                 "password": "testpass123",
                 "groups": [grupos["Controle"]],
                 "is_superuser": False,
@@ -119,9 +134,83 @@ class Command(BaseCommand):
                 "email": "formador_e2e@test.com",
                 "first_name": "Formador",
                 "last_name": "E2E",
-                "cpf": "00000000004",
+                "cpf": "99900000004",
                 "password": "testpass123",
                 "groups": [grupos["Formador"]],
+                "is_superuser": False,
+            },
+            # === Coordenadores por setor ===
+            {
+                "username": "coord_vidas@test.com",
+                "email": "coord_vidas@test.com",
+                "first_name": "Ana",
+                "last_name": "Vidas",
+                "cpf": "99900000010",
+                "password": "testpass123",
+                "groups": [grupos["Coordenador"], grupos["Vidas"]],
+                "is_superuser": False,
+            },
+            {
+                "username": "coord_fluir@test.com",
+                "email": "coord_fluir@test.com",
+                "first_name": "Carlos",
+                "last_name": "Fluir",
+                "cpf": "99900000011",
+                "password": "testpass123",
+                "groups": [grupos["Coordenador"], grupos["Fluir"]],
+                "is_superuser": False,
+            },
+            {
+                "username": "coord_acerta@test.com",
+                "email": "coord_acerta@test.com",
+                "first_name": "Diana",
+                "last_name": "ACerta",
+                "cpf": "99900000012",
+                "password": "testpass123",
+                "groups": [grupos["Coordenador"], grupos["ACerta"]],
+                "is_superuser": False,
+            },
+            # === Gerente por setor (jornada J14 — issue #1165) ===
+            {
+                "username": "gerente_vidas@test.com",
+                "email": "gerente_vidas@test.com",
+                "first_name": "Joao",
+                "last_name": "GerenteVidas",
+                "cpf": "99900000020",
+                "password": "testpass123",
+                "groups": [grupos["Gerente"], grupos["Vidas"]],
+                "is_superuser": False,
+            },
+            # === Gerente + Superintendência (PA-02 quorum composto) ===
+            {
+                "username": "super_geral@test.com",
+                "email": "super_geral@test.com",
+                "first_name": "Maria",
+                "last_name": "SuperGeral",
+                "cpf": "99900000021",
+                "password": "testpass123",
+                "groups": [grupos["Gerente"], grupos["Superintendência"]],
+                "is_superuser": False,
+            },
+            # === Formadores por setor (jornadas J06, J11, J13) ===
+            {
+                "username": "formador_vidas@test.com",
+                "email": "formador_vidas@test.com",
+                "first_name": "Rafael",
+                "last_name": "FormadorVidas",
+                "cpf": "99900000030",
+                "password": "testpass123",
+                "groups": [grupos["Formador"], grupos["Vidas"]],
+                "is_superuser": False,
+            },
+            {
+                "username": "formador_fluir@test.com",
+                "email": "formador_fluir@test.com",
+                "first_name": "Luiza",
+                "last_name": "FormadorFluir",
+                "cpf": "99900000031",
+                "password": "testpass123",
+                "groups": [grupos["Formador"], grupos["Fluir"]],
                 "is_superuser": False,
             },
         ]

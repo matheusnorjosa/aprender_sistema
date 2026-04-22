@@ -106,6 +106,11 @@ if os.getenv("INCLUDE_ETL", "false").lower() == "true":
 # Para excluir do deploy: INCLUDE_DEV_TOOLS=false
 INCLUDE_DEV_TOOLS = os.getenv("INCLUDE_DEV_TOOLS", "true").lower() == "true"
 
+# Debug E2E — habilita middlewares auxiliares para testes Playwright
+# (ex: FreezeTimeMiddleware). Gate duplo com INCLUDE_DEV_TOOLS garante que
+# nunca vaza para produção. CP-08: INCLUDE_DEV_TOOLS=false em prod.
+DEBUG_E2E = os.getenv("DEBUG_E2E", "false").lower() == "true"
+
 INSTALLED_APPS = [
     # Django core
     "django.contrib.admin.apps.SimpleAdminConfig",  # Disables autodiscover (custom admin site)
@@ -163,6 +168,12 @@ MIDDLEWARE = [
     "apps.core.middleware_security.SecurityHeadersMiddleware",  # Security Audit 2025-01: CSP + Permissions-Policy
     "django_prometheus.middleware.PrometheusAfterMiddleware",  # MP1: Metrics end
 ]
+
+# FreezeTimeMiddleware — habilitado APENAS quando DEBUG_E2E + INCLUDE_DEV_TOOLS.
+# Congela timezone.now() quando request envia header X-E2E-Frozen-Time.
+# Gate duplo garante que nunca vaza para produção (CP-08: INCLUDE_DEV_TOOLS=false em prod).
+if DEBUG_E2E and INCLUDE_DEV_TOOLS:
+    MIDDLEWARE.insert(0, "apps.dev_tools.middleware.FreezeTimeMiddleware")
 
 # ================================================================
 # ROOT URL CONF

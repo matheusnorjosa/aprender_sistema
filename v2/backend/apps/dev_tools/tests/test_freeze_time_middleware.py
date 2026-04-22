@@ -7,16 +7,19 @@ Gate duplo:
 Sem ambos, o middleware recusa inicialização — proteção explícita contra
 vazamento em produção.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 from typing import Callable, Generator
 
-import pytest
 from django.http import HttpRequest, HttpResponse
 from django.test import override_settings
 from django.utils import timezone
+
+import pytest
 
 
 @pytest.fixture(autouse=True)

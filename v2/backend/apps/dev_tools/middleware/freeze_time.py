@@ -26,6 +26,7 @@ Implementação:
 - Monkey-patch ocorre apenas quando o middleware é efetivamente carregado,
   ou seja, com `DEBUG_E2E=true + INCLUDE_DEV_TOOLS=true`.
 """
+
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
@@ -84,9 +85,7 @@ class FreezeTimeMiddleware:
                 " This middleware must not be registered in production."
             )
         if not getattr(settings, "INCLUDE_DEV_TOOLS", False):
-            raise RuntimeError(
-                "FreezeTimeMiddleware requires settings.INCLUDE_DEV_TOOLS=True."
-            )
+            raise RuntimeError("FreezeTimeMiddleware requires settings.INCLUDE_DEV_TOOLS=True.")
         _apply_monkey_patch()
         self.get_response = get_response
 

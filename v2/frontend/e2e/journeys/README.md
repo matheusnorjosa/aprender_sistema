@@ -29,11 +29,11 @@ Jornadas que dependem de aprovação têm duas variantes (J01a/J01b).
 | J01b | NAO_SUPER happy path: coord cria → auto-aprovado | `@critical @rf01 @fluxo-nao-super` | ✅ | — |
 | J02 | Wizard bloqueia submit com campo obrigatório vazio | `@ux @rf01` | ⏳ | — |
 | J03 | Conflito RD-06 (deslocamento inviável) | `@critical @rd-06` | ⏳ | time-freeze |
-| J04 | Reprovação com motivo obrigatório (PA-04) | `@pa-04` | ⏳ | — |
+| J04 | Reprovação: fluxo completo + AuditLog (PA-05) | `@critical @pa-02 @pa-05 @fluxo-super` | ✅ | — |
 | J05 | Visão individual vs setor (/solicitacoes vs /disponibilidade) | `@critical @rbac` | ✅ | — |
 | J06 | Formador fora de janela → RD-01 | `@critical @rd-01` | ⏳ | time-freeze |
 | J07 | Bloqueio pontual impede RD-04 | `@rd-04` | ⏳ | — |
-| J08 | Aprovação concorrente (dois super) | `@race @pa-07` | ⏳ | — |
+| J08 | Aprovação concorrente (select_for_update integridade) | `@critical @race @pa-07` | ✅ | — |
 | J09 | Cancelamento pós-publicação re-sincroniza GCal | `@rf07` | ⏳ | GCal client |
 | J10 | Coord tenta aprovar própria solicitação → 403 | `@critical @rbac @pa-02` | ✅ | — |
 | J11 | E-mail ao formador após aprovação | `@rf-email` | ⏳ | SMTP mock |

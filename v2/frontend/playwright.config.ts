@@ -5,7 +5,10 @@ import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const authFile = join(__dirname, 'e2e/.auth/user.json');
+// Storage state default para o project `chromium` — role `coord_e2e`
+// (legacy, mantém specs antigos funcionando). Specs que precisam de outra
+// role usam a fixture `authedPage(role)` de `e2e/fixtures/roles.ts`.
+const authFile = join(__dirname, 'e2e/.auth/coord_e2e.json');
 const isDocker = process.env.E2E_DOCKER === '1' || existsSync('/.dockerenv');
 const defaultBaseURL = process.env.SKIP_WEBSERVER && isDocker ? 'http://frontend:5173' : 'http://localhost:5173';
 const baseURL = process.env.BASE_URL || defaultBaseURL;

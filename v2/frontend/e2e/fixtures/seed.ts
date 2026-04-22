@@ -141,6 +141,31 @@ async function findProjetoId(api: APIRequestContext, nome: string): Promise<numb
   return exact!.id;
 }
 
+/**
+ * Busca o ID de um município pelo nome. Exportado para uso direto em specs
+ * que precisam de múltiplos municípios (ex: J03 testa deslocamento entre
+ * Salvador e Fortaleza).
+ */
+export async function lookupMunicipioId(api: APIRequestContext, nome: string): Promise<number> {
+  return findMunicipioId(api, nome);
+}
+
+/**
+ * Busca o ID de um usuário pelo username/email. Útil para specs que
+ * precisam passar `usuario_id` em endpoints de disponibilidade.
+ */
+export async function lookupUsuarioId(api: APIRequestContext, usernameOrEmail: string): Promise<number> {
+  const res = await api.get(`/api/lookup/usuarios/?q=${encodeURIComponent(usernameOrEmail)}`);
+  expect(res.ok(), `[seed] lookup usuarios falhou (${res.status()})`).toBeTruthy();
+  const data = (await res.json()) as
+    | { results?: Array<{ id: number; username: string; email?: string }> }
+    | Array<{ id: number; username: string; email?: string }>;
+  const list = Array.isArray(data) ? data : (data.results ?? []);
+  const match = list.find((u) => u.username === usernameOrEmail || u.email === usernameOrEmail) ?? list[0];
+  expect(match, `[seed] usuario "${usernameOrEmail}" nao encontrado`).toBeTruthy();
+  return match!.id;
+}
+
 async function findMunicipioId(api: APIRequestContext, nome: string): Promise<number> {
   const res = await api.get(`/api/lookup/municipios/?q=${encodeURIComponent(nome)}`);
   expect(res.ok(), `[seed] lookup municipios falhou (${res.status()})`).toBeTruthy();

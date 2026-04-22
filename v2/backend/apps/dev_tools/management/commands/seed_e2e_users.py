@@ -58,9 +58,11 @@ class Command(BaseCommand):
         self.stdout.write("\n2. Criando usuários de teste...")
         usuarios = self._create_users(grupos)
 
-        # 3. Criar município
-        self.stdout.write("\n3. Criando município de teste...")
-        municipio = self._create_municipio()
+        # 3. Criar municípios (Salvador + Fortaleza para testes de deslocamento RD-04)
+        self.stdout.write("\n3. Criando municípios de teste...")
+        municipio_salvador = self._upsert_municipio(nome="Salvador", uf="BA", ibge_code="2927408")
+        municipio_fortaleza = self._upsert_municipio(nome="Fortaleza", uf="CE", ibge_code="2304400")
+        municipio = municipio_salvador  # compat com resumo abaixo
 
         # 4. Criar projetos (SUPER e NAO_SUPER para cobrir ambos os fluxos em E2E)
         self.stdout.write("\n4. Criando projetos de teste...")
@@ -82,7 +84,9 @@ class Command(BaseCommand):
         self.stdout.write("✅ SEED E2E concluído com sucesso!")
         self.stdout.write("\n📋 Resumo:")
         self.stdout.write(f"   Usuários criados: {len(usuarios)}")
-        self.stdout.write(f"   Município: {municipio.nome} ({municipio.uf})")
+        self.stdout.write(
+            f"   Municípios: {municipio_salvador.nome} ({municipio_salvador.uf}), {municipio_fortaleza.nome} ({municipio_fortaleza.uf})"
+        )
         self.stdout.write(f"   Projeto SUPER: {projeto_super.nome} (fluxo: {projeto_super.fluxo})")
         self.stdout.write(f"   Projeto NAO_SUPER: {projeto_nao_super.nome} (fluxo: {projeto_nao_super.fluxo})")
         self.stdout.write("\n🔑 Credenciais (todas com senha: testpass123):")
@@ -265,11 +269,15 @@ class Command(BaseCommand):
 
         return usuarios_criados
 
-    def _create_municipio(self) -> Municipio:
-        """Cria município para testes E2E."""
-        target_nome = "Salvador"
-        target_uf = "BA"
-        target_ibge_code = "2927408"
+    def _upsert_municipio(self, *, nome: str, uf: str, ibge_code: str) -> Municipio:
+        """Upsert idempotente de município para testes E2E.
+
+        Prioriza chave natural (nome+uf) para evitar violar unique constraint
+        quando o município já existe sem ibge_code.
+        """
+        target_nome = nome
+        target_uf = uf
+        target_ibge_code = ibge_code
 
         # Prioriza chave natural (nome+uf) para evitar violar unique constraint
         # quando o município já existe sem ibge_code.

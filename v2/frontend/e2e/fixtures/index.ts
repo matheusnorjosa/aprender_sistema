@@ -17,6 +17,8 @@ export { freezeTime, unfreezeTime } from './time';
 export {
   createApiContext,
   seedSolicitacao,
+  lookupMunicipioId,
+  lookupUsuarioId,
 } from './seed';
 export type {
   ApiContextOptions,

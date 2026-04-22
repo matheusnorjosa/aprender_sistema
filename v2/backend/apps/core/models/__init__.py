@@ -61,6 +61,7 @@ from apps.core.models.dat_formacao import DATFormacao
 from apps.core.models.dat_registro import DATRegistro
 from apps.core.models.formacao import Formacao
 from apps.core.models.group_classificacao import GroupClassificacao
+from apps.core.models.import_job import ImportJob
 from apps.core.models.integracao import GoogleOAuthCredential
 from apps.core.models.organizacao import (
     Colecao,
@@ -127,6 +128,8 @@ __all__ = [
     "AuditLog",
     # Integracao
     "GoogleOAuthCredential",
+    # Imports (ASQ-005)
+    "ImportJob",
     # Acoes/Notificacoes Internas
     "AcaoTemplate",
     "AcaoTemplateExecutor",

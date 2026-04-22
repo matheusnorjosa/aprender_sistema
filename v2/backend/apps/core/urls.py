@@ -19,7 +19,7 @@ from .views import ProdutoViewSet  # Issue #146
 from .views import ProjetoGeralViewSet  # DAT Registros module
 from .views import RBACMetaView  # Issue #829
 from .views import UsuarioAdminViewSet  # Reativado (Fase 1 Iteração 2, GAP-001)
-from .views import (  # DAT Module ViewSets; Plano Formacoes (novo modelo estruturado)
+from .views import (  # ASQ-005: async imports; DAT Module ViewSets; Plano Formacoes (novo modelo estruturado)
     AcaoInstanciaViewSet,
     AuditLogViewSet,
     CicloAcoesViewSet,
@@ -30,6 +30,9 @@ from .views import (  # DAT Module ViewSets; Plano Formacoes (novo modelo estrut
     DATCompraViewSet,
     DATCoordenadorViewSet,
     DATFormacaoViewSet,
+    ImportJobBloqueiosUploadView,
+    ImportJobDetailView,
+    ImportJobListView,
     MunicipioViewSet,
     NotificacaoInternaViewSet,
     PlanoFormacoesViewSet,
@@ -258,6 +261,22 @@ urlpatterns = [
         "equipe-gerencia/import/",
         ImportEquipeGerenciaView.as_view(),
         name="import-equipe-gerencia",
+    ),
+    # ASQ-005: Async imports infrastructure (#778)
+    path(
+        "imports/bloqueios/",
+        ImportJobBloqueiosUploadView.as_view(),
+        name="imports-async-bloqueios",
+    ),
+    path(
+        "imports/",
+        ImportJobListView.as_view(),
+        name="imports-async-list",
+    ),
+    path(
+        "imports/<int:pk>/",
+        ImportJobDetailView.as_view(),
+        name="imports-async-detail",
     ),
     path(
         "dat/acoes/",

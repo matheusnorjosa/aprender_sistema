@@ -62,9 +62,20 @@ class Command(BaseCommand):
         self.stdout.write("\n3. Criando município de teste...")
         municipio = self._create_municipio()
 
-        # 4. Criar projeto
-        self.stdout.write("\n4. Criando projeto de teste...")
-        projeto = self._create_projeto(municipio)
+        # 4. Criar projetos (SUPER e NAO_SUPER para cobrir ambos os fluxos em E2E)
+        self.stdout.write("\n4. Criando projetos de teste...")
+        projeto_super = self._upsert_projeto(
+            codigo="E2E",
+            nome="TESTE E2E",
+            fluxo="SUPER",
+            gerencia_setor=None,
+        )
+        projeto_nao_super = self._upsert_projeto(
+            codigo="E2E_NS",
+            nome="TESTE E2E NAO_SUPER",
+            fluxo="NAO_SUPER",
+            gerencia_setor="Vidas",
+        )
 
         # 5. Resumo
         self.stdout.write("\n" + "=" * 80)
@@ -72,7 +83,8 @@ class Command(BaseCommand):
         self.stdout.write("\n📋 Resumo:")
         self.stdout.write(f"   Usuários criados: {len(usuarios)}")
         self.stdout.write(f"   Município: {municipio.nome} ({municipio.uf})")
-        self.stdout.write(f"   Projeto: {projeto.nome} (fluxo: {projeto.fluxo})")
+        self.stdout.write(f"   Projeto SUPER: {projeto_super.nome} (fluxo: {projeto_super.fluxo})")
+        self.stdout.write(f"   Projeto NAO_SUPER: {projeto_nao_super.nome} (fluxo: {projeto_nao_super.fluxo})")
         self.stdout.write("\n🔑 Credenciais (todas com senha: testpass123):")
         for usuario in usuarios:
             grupos_str = ", ".join([g.name for g in usuario.groups.all()])
@@ -310,32 +322,59 @@ class Command(BaseCommand):
         self.stdout.write(f"   ✅ Criado: {municipio.nome} ({municipio.uf})")
         return municipio
 
-    def _create_projeto(self, municipio: Municipio) -> Projeto:
-        """Cria projeto para testes E2E."""
-        target_codigo = "E2E"
-        target_nome = "TESTE E2E"
-        target_fluxo = "SUPER"
+    def _upsert_projeto(
+        self,
+        *,
+        codigo: str,
+        nome: str,
+        fluxo: str,
+        gerencia_setor: str | None = None,
+    ) -> Projeto:
+        """Upsert idempotente de projeto para testes E2E.
 
-        projeto = Projeto.objects.filter(codigo=target_codigo).first()
+        Quando `gerencia_setor` é passado, vincula o projeto à primeira
+        `Gerencia` com `nome_setor` correspondente. Se a gerência não existir
+        (seed dev local incompleto), o projeto é criado sem vínculo.
+        """
+        gerencia = None
+        if gerencia_setor:
+            from django.core.management import call_command
+
+            from apps.core.models import Gerencia
+
+            gerencia = Gerencia.objects.filter(nome_setor=gerencia_setor, ativo=True).first()
+            if not gerencia:
+                # Fallback idempotente: roda seed_gerencias para garantir que a
+                # gerência exista. Evita exigir ordem manual dos seeds em dev.
+                self.stdout.write(
+                    f"   ⚠️  Gerência '{gerencia_setor}' ausente — rodando seed_gerencias automaticamente..."
+                )
+                call_command("seed_gerencias", verbosity=0)
+                gerencia = Gerencia.objects.filter(nome_setor=gerencia_setor, ativo=True).first()
+
+        projeto = Projeto.objects.filter(codigo=codigo).first()
         if not projeto:
-            projeto = Projeto.objects.filter(nome=target_nome).first()
+            projeto = Projeto.objects.filter(nome=nome).first()
 
         if projeto:
-            updated_fields = []
+            updated_fields: list[str] = []
             original_codigo = projeto.codigo
 
-            if projeto.nome != target_nome:
-                projeto.nome = target_nome
+            if projeto.nome != nome:
+                projeto.nome = nome
                 updated_fields.append("nome")
-            if projeto.fluxo != target_fluxo:
-                projeto.fluxo = target_fluxo
+            if projeto.fluxo != fluxo:
+                projeto.fluxo = fluxo
                 updated_fields.append("fluxo")
             if not projeto.ativo:
                 projeto.ativo = True
                 updated_fields.append("ativo")
-            if projeto.codigo != target_codigo:
-                projeto.codigo = target_codigo
+            if projeto.codigo != codigo:
+                projeto.codigo = codigo
                 updated_fields.append("codigo")
+            if gerencia and projeto.gerencia_id != gerencia.id:
+                projeto.gerencia = gerencia
+                updated_fields.append("gerencia")
 
             if updated_fields:
                 try:
@@ -350,7 +389,7 @@ class Command(BaseCommand):
                         with transaction.atomic():
                             projeto.save(update_fields=retry_fields)
                     self.stdout.write(
-                        "   ⚠️  Código E2E já está em uso por outro projeto. "
+                        f"   ⚠️  Código {codigo} já está em uso por outro projeto. "
                         "Mantendo o código atual do projeto existente."
                     )
 
@@ -360,17 +399,20 @@ class Command(BaseCommand):
         try:
             with transaction.atomic():
                 projeto = Projeto.objects.create(
-                    codigo=target_codigo,
-                    nome=target_nome,
-                    fluxo=target_fluxo,
+                    codigo=codigo,
+                    nome=nome,
+                    fluxo=fluxo,
+                    gerencia=gerencia,
                     ativo=True,
                 )
         except IntegrityError:
-            projeto = Projeto.objects.filter(nome=target_nome).first() or Projeto.objects.get(codigo=target_codigo)
-            projeto.fluxo = target_fluxo
+            projeto = Projeto.objects.filter(nome=nome).first() or Projeto.objects.get(codigo=codigo)
+            projeto.fluxo = fluxo
             projeto.ativo = True
+            if gerencia and projeto.gerencia_id != gerencia.id:
+                projeto.gerencia = gerencia
             with transaction.atomic():
-                projeto.save(update_fields=["fluxo", "ativo"])
+                projeto.save(update_fields=["fluxo", "ativo", "gerencia"])
             self.stdout.write(f"   ⏭️  Já existe: {projeto.nome} (fluxo: {projeto.fluxo})")
             return projeto
 

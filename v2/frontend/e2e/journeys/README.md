@@ -18,9 +18,15 @@ em três camadas de asserção:
 
 ## Matriz atual
 
+**Observação sobre 2 fluxos de aprovação**: projetos têm `fluxo` SUPER ou NAO_SUPER
+([`solicitacao_create.py`](../../../backend/apps/core/services/solicitacao_create.py)).
+SUPER requer aprovação manual (PA-02); NAO_SUPER é auto-aprovado na criação.
+Jornadas que dependem de aprovação têm duas variantes (J01a/J01b).
+
 | ID | Jornada | Tags | Status | Depende de |
 |----|---------|------|--------|-----------|
-| J01 | Happy path: coord cria → super aprova | `@critical @rf01 @pa-02` | ✅ | — |
+| J01a | SUPER happy path: coord cria → super aprova | `@critical @rf01 @pa-02 @fluxo-super` | ✅ | — |
+| J01b | NAO_SUPER happy path: coord cria → auto-aprovado | `@critical @rf01 @fluxo-nao-super` | ✅ | — |
 | J02 | Wizard bloqueia submit com campo obrigatório vazio | `@ux @rf01` | ⏳ | — |
 | J03 | Conflito RD-06 (deslocamento inviável) | `@critical @rd-06` | ⏳ | time-freeze |
 | J04 | Reprovação com motivo obrigatório (PA-04) | `@pa-04` | ⏳ | — |

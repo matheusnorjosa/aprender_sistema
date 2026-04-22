@@ -50,9 +50,20 @@ export async function createApiContext(options: ApiContextOptions): Promise<APIR
  * defaults que correspondem ao projeto "TESTE E2E" seedado por
  * `seed_e2e_users.py`.
  */
+/** Fluxo do projeto — define status inicial. */
+export type ProjetoFluxo = 'SUPER' | 'NAO_SUPER';
+
 export interface SeedSolicitacaoInput {
-  /** ID do projeto. Default: busca projeto "TESTE E2E" via API. */
+  /**
+   * ID do projeto. Default: resolve por `fluxo` — `SUPER` → "TESTE E2E",
+   * `NAO_SUPER` → "TESTE E2E NAO_SUPER".
+   */
   projetoId?: number;
+  /**
+   * Fluxo a usar quando `projetoId` não é passado. Default: `SUPER`.
+   * `NAO_SUPER` usa o projeto vinculado à gerência Vidas (auto-aprovado na criação).
+   */
+  fluxo?: ProjetoFluxo;
   /** ID do município. Default: busca "Salvador" via API. */
   municipioId?: number;
   /** ID do tipo de evento. Default: primeiro tipo ativo. */
@@ -82,7 +93,8 @@ export async function seedSolicitacao(
   api: APIRequestContext,
   input: SeedSolicitacaoInput = {}
 ): Promise<SeededSolicitacao> {
-  const projetoId = input.projetoId ?? (await findProjetoId(api, 'TESTE E2E'));
+  const projetoNome = input.fluxo === 'NAO_SUPER' ? 'TESTE E2E NAO_SUPER' : 'TESTE E2E';
+  const projetoId = input.projetoId ?? (await findProjetoId(api, projetoNome));
   const municipioId = input.municipioId ?? (await findMunicipioId(api, 'Salvador'));
   const tipoEventoId = input.tipoEventoId ?? (await findFirstTipoEventoId(api));
 
@@ -119,11 +131,14 @@ export async function seedSolicitacao(
 async function findProjetoId(api: APIRequestContext, nome: string): Promise<number> {
   const res = await api.get(`/api/lookup/projetos/?q=${encodeURIComponent(nome)}`);
   expect(res.ok(), `[seed] lookup projetos falhou (${res.status()})`).toBeTruthy();
-  const data = (await res.json()) as { results?: Array<{ id: number; nome: string }> } | Array<{ id: number; nome: string }>;
-  const list = Array.isArray(data) ? data : data.results ?? [];
-  const match = list.find((p) => p.nome === nome) ?? list[0];
-  expect(match, `[seed] projeto "${nome}" nao encontrado`).toBeTruthy();
-  return match!.id;
+  const data = (await res.json()) as
+    | { results?: Array<{ id: number; nome: string }> }
+    | Array<{ id: number; nome: string }>;
+  const list = Array.isArray(data) ? data : (data.results ?? []);
+  // Match exato por nome; fallback no primeiro — mas aviso se desambiguou assim.
+  const exact = list.find((p) => p.nome === nome);
+  expect(exact, `[seed] projeto "${nome}" nao encontrado (rode manage.py seed_e2e_users)`).toBeTruthy();
+  return exact!.id;
 }
 
 async function findMunicipioId(api: APIRequestContext, nome: string): Promise<number> {

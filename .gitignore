@@ -602,3 +602,6 @@ nul
 
 # GSD-2 state (local orchestration)
 .gsd/
+
+# RTK (Rust Token Killer) local filters
+.rtk/

@@ -20,6 +20,7 @@ export {
 } from './seed';
 export type {
   ApiContextOptions,
+  ProjetoFluxo,
   SeedSolicitacaoInput,
   SeededSolicitacao,
 } from './seed';

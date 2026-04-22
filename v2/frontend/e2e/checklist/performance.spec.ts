@@ -285,7 +285,7 @@ test.describe('Checklist: Caching', () => {
 test.describe('Checklist: Lazy Loading', () => {
   test('🟡 imagens abaixo do fold devem ter lazy loading', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
 
     const images = await page.evaluate(() => {
       const imgs = Array.from(document.querySelectorAll('img'));

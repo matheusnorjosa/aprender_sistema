@@ -156,7 +156,7 @@ test.describe('Checklist: Console Errors', () => {
     const collected = attachCollectors(page);
 
     await page.goto('/');
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
 
     // Aguarda um pouco para capturar erros assíncronos
     await page.waitForTimeout(1000);
@@ -169,7 +169,7 @@ test.describe('Checklist: Console Errors', () => {
 
     for (const pageToCheck of PAGES_TO_CHECK) {
       await page.goto(pageToCheck.path);
-      await page.waitForLoadState('load');
+      await page.waitForLoadState('networkidle');
     }
 
     assertNoCollectedErrors(collected, 'Erros durante navegação');
@@ -179,7 +179,7 @@ test.describe('Checklist: Console Errors', () => {
     const collected = attachCollectors(page);
 
     await page.goto('/');
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
 
     // Interage com a página para disparar possíveis erros
     await page.mouse.move(100, 100);
@@ -200,7 +200,7 @@ test.describe('Checklist: Console Warnings (Informativo)', () => {
     });
 
     await page.goto('/');
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
 
     // Este teste é informativo - não falha, apenas reporta
     if (warnings.length > 0) {

@@ -91,7 +91,7 @@ test.describe('Checklist: Broken Links', () => {
     const checkedUrls = new Set<string>();
 
     await page.goto('/');
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
 
     const links = await extractLinks(page);
     const baseUrl = page.url();
@@ -152,7 +152,7 @@ test.describe('Checklist: Broken Links', () => {
     const brokenImages: string[] = [];
 
     await page.goto('/');
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
 
     // Verifica se imagens carregaram
     const images = await page.locator('img').all();
@@ -200,7 +200,7 @@ test.describe('Checklist: Broken Links', () => {
     });
 
     await page.goto('/');
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
 
     expect(
       missingResources,
@@ -214,7 +214,7 @@ test.describe('Checklist: Navigation Links', () => {
     const failedNavigations: string[] = [];
 
     await page.goto('/');
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
 
     // Encontra links de navegação
     const navLinks = await page.locator('nav a, [role="navigation"] a, .nav a').all();
@@ -228,7 +228,7 @@ test.describe('Checklist: Navigation Links', () => {
 
       try {
         await link.click();
-        await page.waitForLoadState('load');
+        await page.waitForLoadState('networkidle');
 
         // Verifica se não é página de erro
         const title = await page.title();
@@ -238,7 +238,7 @@ test.describe('Checklist: Navigation Links', () => {
 
         // Volta para a página inicial
         await page.goto('/');
-        await page.waitForLoadState('load');
+        await page.waitForLoadState('networkidle');
       } catch (error) {
         failedNavigations.push(`${text}: ${href} (erro: ${error})`);
       }

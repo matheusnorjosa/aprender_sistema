@@ -38,6 +38,7 @@ export const E2E_ROLES = [
   'super_geral',
   'formador_vidas',
   'formador_fluir',
+  'dat_e2e', // DAT puro — jornada J18
 ] as const;
 
 export type E2eRole = (typeof E2E_ROLES)[number];
@@ -54,6 +55,7 @@ export const ROLE_CREDENTIALS: Record<E2eRole, { username: string; password: str
   super_geral: { username: 'super_geral@test.com', password: 'testpass123' },
   formador_vidas: { username: 'formador_vidas@test.com', password: 'testpass123' },
   formador_fluir: { username: 'formador_fluir@test.com', password: 'testpass123' },
+  dat_e2e: { username: 'dat_e2e@test.com', password: 'testpass123' },
 };
 
 /**

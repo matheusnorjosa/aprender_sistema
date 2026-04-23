@@ -42,12 +42,6 @@ test.describe(
     test('canônica: coord_vidas vê apenas suas solicitações em /api/solicitacoes/?mine=true', async ({
       baseURL,
     }) => {
-      // BACKLOG: com centenas de solicitações acumuladas no banco dev, a
-      // solicitação recém-criada pode cair na página 2+ da paginação default.
-      // Em CI com DB virgem o teste pode passar. test.fixme evita
-      // falso-positivo de "Expected to fail, but passed".
-      // Fix planejado: usar `expect.poll` + filtro por `inicio` explícito.
-      test.fixme(true, 'Paginação esconde solicitação recém-criada — investigar filtro por inicio');
       const coordVidasApi = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.coord_vidas.username,
@@ -55,7 +49,11 @@ test.describe(
       });
       const solicitacao = await seedSolicitacao(coordVidasApi, { fluxo: 'SUPER' });
 
-      const res = await coordVidasApi.get('/api/solicitacoes/?mine=true');
+      // A view tem `ordering=["-inicio"]` (ordena por data do evento, não
+      // de criação). Seeds usam random 7-365 dias futuros, então a sol
+      // recém-criada cai em qualquer posição da lista paginada. Forçar
+      // `ordering=-id` garante que ela apareça na pag 1 (IDs monotônicos).
+      const res = await coordVidasApi.get('/api/solicitacoes/?mine=true&ordering=-id');
       expect(res.ok()).toBeTruthy();
       const data = (await res.json()) as
         | { results?: Array<{ id: number }> }

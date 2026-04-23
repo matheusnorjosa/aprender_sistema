@@ -1,14 +1,24 @@
 """
 DRF permissions para RBAC funcional (database-driven).
 
+Epic 2 RBAC Refactor (2026-04-23): introduz `HasPerm(codename)`
+parametrizado como padrão canônico + marca as 12 classes factory legacy
+com `warnings.warn(DeprecationWarning)` no `__init__`. Classes legacy
+continuam funcionais — remoção efetiva é Epic 5 (libcst codemod).
+PEP 702 `@typing.deprecated` será readicionado quando subirmos para Python 3.13.
+
+Ver v2/docs/RBAC_NAMING.md para convenção completa.
+
 Backwards compatible:
 - nomes das classes publicas preservados;
-- imports existentes continuam funcionando.
+- imports existentes continuam funcionando;
+- comportamento das legacy idêntico (só emite DeprecationWarning).
 """
 
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportCallIssue=false
 from __future__ import annotations
 
+import warnings
 from typing import cast
 
 from rest_framework import permissions  # type: ignore[attr-defined]
@@ -17,10 +27,87 @@ from rest_framework.views import APIView
 
 from apps.core.services.rbac_permissions import get_user_functional_permissions
 
+# PEP 702 `@typing.deprecated` exige Python 3.13+. Em 3.12 nos baseamos
+# em runtime warnings via `warnings.warn(DeprecationWarning)` no __init__
+# de cada classe legacy. Quando subirmos para 3.13, podemos readicionar
+# o decorator para sinalização em static type-checkers.
+
+
+class HasPerm(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Capability-oriented parametric permission class (DRF).
+
+    Checa uma único functional permission codename via
+    `get_user_functional_permissions`. Preferido sobre subclassing para
+    endpoints novos. Emite a decisão de design do master-plan §3.3
+    (RBAC Refactor): classes DRF devem ser parametrizadas, não 1 classe
+    por capability.
+
+    Composition (DRF 3.9+):
+        HasPerm("a") | HasPerm("b")  # OR — grant se qualquer um
+        HasPerm("a") & HasPerm("b")  # AND — grant só se ambos
+        ~HasPerm("a")                # NOT — grant se não tem a perm
+
+    Usage:
+        class MyView(APIView):
+            permission_classes = [IsAuthenticated, HasPerm("pode_aprovar_superintendencia")]
+
+    Nota sobre app_label:
+        O prefixo "core." é opcional — o sistema funcional usa codename
+        bare. Aceitamos ambas as formas para familiaridade com
+        `user.has_perm()` nativo do Django.
+    """
+
+    def __init__(self, codename: str, *, message: str | None = None) -> None:
+        # Strip "app_label." prefix se presente
+        self.codename = codename.split(".", 1)[-1] if "." in codename else codename
+        if message:
+            self.message = message
+
+    def __call__(self) -> "HasPerm":
+        """DRF composition resolve para uma callable; já somos uma instance."""
+        return self
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if getattr(user, "is_superuser", False):
+            return True
+        return self.codename in get_user_functional_permissions(user)
+
+    def __repr__(self) -> str:
+        return f"HasPerm({self.codename!r})"
+
+    # Composition sobre instances (DRF OperandHolder só opera em classes).
+    # Permite o idioma canônico `HasPerm("a") | HasPerm("b")` em
+    # `permission_classes`. Delegamos para as classes `OR`/`AND`/`NOT` do
+    # próprio DRF. Retornamos Any para evitar strict-type mismatch — DRF
+    # OR/AND/NOT implementam o protocolo BasePermission mas não herdam dele.
+    def __or__(self, other):  # type: ignore[no-untyped-def]
+        return permissions.OR(self, other)
+
+    def __and__(self, other):  # type: ignore[no-untyped-def]
+        return permissions.AND(self, other)
+
+    def __invert__(self):  # type: ignore[no-untyped-def]
+        return permissions.NOT(self)
+
+    def __ror__(self, other):  # type: ignore[no-untyped-def]
+        return permissions.OR(other, self)
+
+    def __rand__(self, other):  # type: ignore[no-untyped-def]
+        return permissions.AND(other, self)
+
 
 class HasFunctionalPermission(permissions.BasePermission):  # type: ignore[misc]
     """
     Base class para checagem por codename funcional.
+
+    NOTA (Epic 2): preferir `HasPerm(codename)` inline em permission_classes
+    para endpoints novos. Esta classe continua servindo de base para as 12
+    factory classes legacy + 2 compostas (`IsGerenteSuperintendencia`,
+    `IsOwnerOrPrivileged`). Remoção das legacy é Epic 5.
     """
 
     functional_codename = ""
@@ -49,6 +136,26 @@ def funcperm_factory(
     return cast(type[HasFunctionalPermission], type(class_name, (HasFunctionalPermission,), attrs))
 
 
+def _warn_legacy(class_name: str, new_codename: str) -> None:
+    """Helper: emite DeprecationWarning padronizado apontando para HasPerm equivalente."""
+    warnings.warn(
+        f"{class_name} is deprecated; use HasPerm({new_codename!r}). "
+        "This class will be removed in Epic 5 of the RBAC refactor. "
+        "See v2/docs/RBAC_NAMING.md.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+# ============================================================================
+# Epic 2 Legacy factory classes (12) — deprecated em favor de HasPerm(codename)
+#
+# Cada uma emite DeprecationWarning no __init__ apontando para HasPerm
+# equivalente. Remoção efetiva no Epic 5 (libcst codemod). Ver master-plan
+# §3.3 e v2/docs/RBAC_NAMING.md.
+# ============================================================================
+
+
 class IsSuperintendencia(
     funcperm_factory(
         "IsSuperintendencia",
@@ -56,7 +163,9 @@ class IsSuperintendencia(
         "Apenas usuários da Superintendência, DAT ou Superusuários podem realizar esta ação.",
     )
 ):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+        _warn_legacy("IsSuperintendencia", "pode_aprovar_superintendencia")
 
 
 class IsSuperintendenciaOnly(
@@ -66,7 +175,9 @@ class IsSuperintendenciaOnly(
         "Apenas usuários da Superintendência podem realizar esta ação.",
     )
 ):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+        _warn_legacy("IsSuperintendenciaOnly", "pode_gerenciar_superintendencia_only")
 
 
 class IsCoordenadorOrDAT(
@@ -76,7 +187,9 @@ class IsCoordenadorOrDAT(
         "Apenas Coordenadores, Apoio de Coordenação ou DAT podem criar solicitações.",
     )
 ):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+        _warn_legacy("IsCoordenadorOrDAT", "pode_criar_solicitacao_coord_dat")
 
 
 class IsControleOrSuper(
@@ -86,7 +199,9 @@ class IsControleOrSuper(
         "Apenas Controle ou Superintendência podem realizar esta ação.",
     )
 ):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+        _warn_legacy("IsControleOrSuper", "pode_importar_controle_super")
 
 
 class IsDATOrSuper(
@@ -96,7 +211,9 @@ class IsDATOrSuper(
         "Apenas usuários do grupo DAT ou superusers podem realizar esta ação.",
     )
 ):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+        _warn_legacy("IsDATOrSuper", "pode_operar_dat")
 
 
 class IsComprasDashboardAccess(
@@ -106,7 +223,9 @@ class IsComprasDashboardAccess(
         "Apenas usuários dos grupos DAT ou Diretoria podem acessar o dashboard de compras.",
     )
 ):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+        _warn_legacy("IsComprasDashboardAccess", "pode_acessar_dashboard_compras")
 
 
 class IsDAT(
@@ -116,7 +235,9 @@ class IsDAT(
         "Apenas usuários do grupo DAT podem realizar esta ação.",
     )
 ):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+        _warn_legacy("IsDAT", "pode_operar_dat_exclusivo")
 
 
 class IsControleOrDAT(
@@ -126,7 +247,9 @@ class IsControleOrDAT(
         "Apenas Controle ou DAT podem realizar esta ação.",
     )
 ):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+        _warn_legacy("IsControleOrDAT", "pode_operar_controle_dat")
 
 
 class IsControle(
@@ -136,7 +259,9 @@ class IsControle(
         "Apenas usuários do grupo Controle podem realizar esta ação.",
     )
 ):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+        _warn_legacy("IsControle", "pode_operar_controle")
 
 
 class IsGerencia(
@@ -146,7 +271,9 @@ class IsGerencia(
         "Apenas usuários com permissão gerencial (Gerência, Superintendência ou Diretoria) podem realizar esta ação.",
     )
 ):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+        _warn_legacy("IsGerencia", "pode_operar_gerencia")
 
 
 class IsDashboardOverview(
@@ -156,7 +283,9 @@ class IsDashboardOverview(
         "Apenas usuários com permissão de dashboard (Superintendência, Gerência ou Diretoria) podem acessar o dashboard geral.",
     )
 ):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+        _warn_legacy("IsDashboardOverview", "pode_acessar_dashboard_overview")
 
 
 class IsMapMetrics(
@@ -166,7 +295,9 @@ class IsMapMetrics(
         "Apenas usuários autorizados podem acessar métricas do mapa.",
     )
 ):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+        _warn_legacy("IsMapMetrics", "pode_acessar_map_metrics")
 
 
 class IsGerenteSuperintendencia(HasFunctionalPermission):  # type: ignore[misc]

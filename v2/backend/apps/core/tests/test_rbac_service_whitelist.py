@@ -34,7 +34,7 @@ class TestRBACServiceWhitelist:
             defaults={
                 "label": "Pode usar grupo dinâmico (service)",
                 "description": "Teste de whitelist dinâmica no serviço.",
-                "category": "admin_dat",
+                "category": "cadastros_administrativos",
                 "is_system": False,
             },
         )
@@ -51,7 +51,7 @@ class TestRBACServiceWhitelist:
             defaults={
                 "label": "Pode invalidar cache de whitelist",
                 "description": "Valida invalidação do cache de grupos atribuíveis.",
-                "category": "admin_dat",
+                "category": "cadastros_administrativos",
                 "is_system": False,
             },
         )

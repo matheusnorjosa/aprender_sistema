@@ -10,11 +10,12 @@ import { waitForAppReady } from './helpers/wait';
 
 test.describe('Navegação Principal', () => {
   test('1. Página Inicial carrega corretamente', async ({ page }) => {
-    // Spec legacy pré-programa de jornadas. Flaky sob contenção de 2
-    // workers paralelos — às vezes passa, às vezes a sidebar não
-    // renderiza. Usar test.fixme (não test.fail) para não gerar falha
-    // quando passa. Backlog: migrar para POM padrão das jornadas.
-    test.fixme(true, 'Flaky legacy spec — backlog de migração');
+    // Spec legacy pré-programa de jornadas. Passa local consistentemente,
+    // mas flaky sob contenção de full suite com 2 workers em CI (sidebar
+    // às vezes não renderiza no timeout). test.fixme evita falso-positivo
+    // de "Expected to fail, but passed". Backlog: migrar para POM padrão
+    // das jornadas.
+    test.fixme(true, 'Flaky em CI sob full suite — backlog de migração');
     await page.goto('/home');
     await waitForAppReady(page);
     await expect(page.getByRole('navigation', { name: 'Navegacao principal' })).toBeVisible();

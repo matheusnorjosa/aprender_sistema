@@ -58,25 +58,29 @@ test.describe('Fluxo de Autenticação', () => {
     });
   });
 
-  // Este teste USA a sessão autenticada do setup
+  // Logout é destrutivo (invalida sessão server-side). Não pode usar o
+  // storageState compartilhado dos setups — runs consecutivos/paralelos
+  // se contaminariam. Isola com storage vazio + login inline.
   test.describe('Logout', () => {
-    test('4. Logout funciona corretamente', async ({ page }) => {
-      // Spec legacy pré-programa de jornadas. Mesma flakiness do
-      // navigation.spec — sidebar às vezes não renderiza sob contenção
-      // de workers paralelos. test.fixme para não falhar quando passa.
-      test.fixme(true, 'Flaky legacy spec — backlog de migração');
-      // Já está logado via setup - ir para home
-      await page.goto('/home');
+    test.use({ storageState: { cookies: [], origins: [] } });
 
-      // Verificar que está logado
+    test('4. Logout funciona corretamente', async ({ page }) => {
+      // Login inline (storage vazio, sessão autocontida)
+      await page.goto('/');
+      await page.fill('input[id="login_username"]', ADMIN_USER.username);
+      await page.fill('input[id="login_password"]', ADMIN_USER.password);
+      await page.click('button[type="submit"]');
       await expect(
         page.getByRole('navigation', { name: 'Navegacao principal' })
-      ).toBeVisible({ timeout: 5000 });
+      ).toBeVisible({ timeout: 15000 });
 
-      // Clicar no botão de logout (selector explícito para evitar ambiguidades)
-      await page.click('[data-testid="app-logout-button"]');
+      // Click no botão "Sair" do AppHeader. Selector antigo
+      // `[data-testid="app-logout-button"]` não existe mais no componente
+      // (AppHeader.tsx:179-186 renderiza `<Button>Sair</Button>` sem
+      // data-testid).
+      await page.getByRole('button', { name: /sair/i }).click();
 
-      // Deve voltar para tela de login (h1, não h2)
+      // Volta para tela de login
       await expect(page.locator('h1:has-text("Login")')).toBeVisible({ timeout: 10000 });
     });
   });

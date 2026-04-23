@@ -330,7 +330,7 @@ class TestAssignGroups:
             defaults={
                 "label": "Pode operar grupo dinâmico",
                 "description": "Permissão para validar whitelist dinâmica.",
-                "category": "admin_dat",
+                "category": "cadastros_administrativos",
                 "is_system": False,
             },
         )

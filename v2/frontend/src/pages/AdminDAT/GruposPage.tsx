@@ -77,18 +77,21 @@ interface GruposPageProps {
   forcedType?: 'setor' | 'funcao';
 }
 
+// Epic 1 RBAC Refactor (2026-04-23): categorias capability-oriented.
+// `admin_dat` → `cadastros_administrativos`; `gerencia` → `supervisao`.
+// Ver v2/docs/plans/rbac-refactor/epic-1-labels.md.
 const CATEGORY_LABELS: Record<string, { title: string; help: string }> = {
-  admin_dat: {
-    title: 'Administração DAT',
-    help: 'Permissões para operar cadastros e configurações administrativas.',
+  cadastros_administrativos: {
+    title: 'Cadastros administrativos',
+    help: 'Permissões para gerenciar cadastros e configurações administrativas.',
   },
   dashboard: {
     title: 'Dashboards',
     help: 'Permissões para visualizar indicadores e painéis analíticos.',
   },
-  gerencia: {
-    title: 'Gerência',
-    help: 'Permissões de atuação gerencial e supervisão operacional.',
+  supervisao: {
+    title: 'Supervisão',
+    help: 'Permissões de supervisão gerencial e atuação de liderança.',
   },
   importacao: {
     title: 'Importações',
@@ -97,6 +100,10 @@ const CATEGORY_LABELS: Record<string, { title: string; help: string }> = {
   operacao: {
     title: 'Operações',
     help: 'Permissões de operação do dia a dia no sistema.',
+  },
+  solicitacao: {
+    title: 'Solicitações',
+    help: 'Permissões sobre o fluxo de aprovação de solicitações.',
   },
 };
 

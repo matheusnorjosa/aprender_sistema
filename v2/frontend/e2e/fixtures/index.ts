@@ -19,6 +19,7 @@ export {
   seedSolicitacao,
   lookupMunicipioId,
   lookupUsuarioId,
+  lookupUsuarioIdByRole,
 } from './seed';
 export type {
   ApiContextOptions,

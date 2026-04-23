@@ -10,7 +10,7 @@ from django.core.management import call_command
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Usuario
+from apps.core.models import Compra, Municipio, Projeto, Usuario
 
 SEED_USERNAMES = [
     "coord_e2e@test.com",
@@ -19,17 +19,32 @@ SEED_USERNAMES = [
     "formador_e2e@test.com",
 ]
 
+SEED_PROJETOS = ["TESTE E2E", "TESTE E2E NAO_SUPER"]
+SEED_MUNICIPIOS = [("Salvador", "BA"), ("Fortaleza", "CE")]
+
+
+def _clean_seed_entities() -> None:
+    """Remove entidades seedadas pelo comando, respeitando FK PROTECT.
+
+    Ordem importa: Compra tem FK PROTECT para Municipio e Projeto. Se
+    apagarmos Municipio/Projeto antes, o Django levanta ProtectedError
+    no teardown.
+    """
+    Compra.objects.filter(
+        projeto__nome__in=SEED_PROJETOS,
+    ).delete()
+    Usuario.objects.filter(username__in=SEED_USERNAMES).delete()
+    Projeto.objects.filter(nome__in=SEED_PROJETOS).delete()
+    for nome, uf in SEED_MUNICIPIOS:
+        Municipio.objects.filter(nome=nome, uf=uf).delete()
+
 
 @pytest.fixture
 def clean_seed_e2e_state(db):
     """Keep seed_e2e tests deterministic and independent."""
-    Usuario.objects.filter(username__in=SEED_USERNAMES).delete()
-    Projeto.objects.filter(nome="TESTE E2E").delete()
-    Municipio.objects.filter(nome="Salvador", uf="BA").delete()
+    _clean_seed_entities()
     yield
-    Usuario.objects.filter(username__in=SEED_USERNAMES).delete()
-    Projeto.objects.filter(nome="TESTE E2E").delete()
-    Municipio.objects.filter(nome="Salvador", uf="BA").delete()
+    _clean_seed_entities()
 
 
 def _run_seed_command() -> str:

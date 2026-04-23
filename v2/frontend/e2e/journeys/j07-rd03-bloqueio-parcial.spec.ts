@@ -29,7 +29,7 @@ import {
   expect,
   createApiContext,
   lookupMunicipioId,
-  lookupUsuarioId,
+  lookupUsuarioIdByRole,
   ROLE_CREDENTIALS,
 } from '../fixtures';
 
@@ -64,7 +64,7 @@ test.describe(
         password: ROLE_CREDENTIALS.super_geral.password,
       });
       const salvadorId = await lookupMunicipioId(superApi, 'Salvador');
-      const formadorId = await lookupUsuarioId(superApi, 'formador_fluir@test.com');
+      const formadorId = await lookupUsuarioIdByRole(superApi, 'formador_fluir');
 
       // Consulta DENTRO do subintervalo (10:00-10:30 cai em 09:00-11:00)
       const checkRes = await superApi.get(
@@ -107,7 +107,7 @@ test.describe(
         password: ROLE_CREDENTIALS.super_geral.password,
       });
       const salvadorId = await lookupMunicipioId(superApi, 'Salvador');
-      const formadorId = await lookupUsuarioId(superApi, 'formador_fluir@test.com');
+      const formadorId = await lookupUsuarioIdByRole(superApi, 'formador_fluir');
 
       // Consulta FORA do intervalo (14:00-16:00, completamente fora de 09:00-11:00)
       const checkRes = await superApi.get(

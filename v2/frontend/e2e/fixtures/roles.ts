@@ -43,19 +43,33 @@ export const E2E_ROLES = [
 
 export type E2eRole = (typeof E2E_ROLES)[number];
 
-export const ROLE_CREDENTIALS: Record<E2eRole, { username: string; password: string }> = {
-  coord_e2e: { username: 'coord_e2e@test.com', password: 'testpass123' },
-  super_e2e: { username: 'super_e2e@test.com', password: 'testpass123' },
-  controle_e2e: { username: 'controle_e2e@test.com', password: 'testpass123' },
-  formador_e2e: { username: 'formador_e2e@test.com', password: 'testpass123' },
-  coord_vidas: { username: 'coord_vidas@test.com', password: 'testpass123' },
-  coord_fluir: { username: 'coord_fluir@test.com', password: 'testpass123' },
-  coord_acerta: { username: 'coord_acerta@test.com', password: 'testpass123' },
-  gerente_vidas: { username: 'gerente_vidas@test.com', password: 'testpass123' },
-  super_geral: { username: 'super_geral@test.com', password: 'testpass123' },
-  formador_vidas: { username: 'formador_vidas@test.com', password: 'testpass123' },
-  formador_fluir: { username: 'formador_fluir@test.com', password: 'testpass123' },
-  dat_e2e: { username: 'dat_e2e@test.com', password: 'testpass123' },
+/**
+ * Credenciais + display name (first_name + last_name) dos usuários seedados.
+ *
+ * O `displayName` é necessário porque `/api/lookup/usuarios/` e
+ * `/api/options/usuarios/` retornam apenas `first_name + last_name`
+ * (não expõem username/email). Para localizar o ID de um usuário a partir
+ * de um spec, usamos o `displayName` como chave de busca no lookup.
+ *
+ * Mantém-se alinhado com os dados hardcoded em
+ * `apps/dev_tools/management/commands/seed_e2e_users.py::_create_users()`.
+ */
+export const ROLE_CREDENTIALS: Record<
+  E2eRole,
+  { username: string; password: string; displayName: string }
+> = {
+  coord_e2e: { username: 'coord_e2e@test.com', password: 'testpass123', displayName: 'Coordenador E2E' },
+  super_e2e: { username: 'super_e2e@test.com', password: 'testpass123', displayName: 'Superintendência E2E' },
+  controle_e2e: { username: 'controle_e2e@test.com', password: 'testpass123', displayName: 'Controle E2E' },
+  formador_e2e: { username: 'formador_e2e@test.com', password: 'testpass123', displayName: 'Formador E2E' },
+  coord_vidas: { username: 'coord_vidas@test.com', password: 'testpass123', displayName: 'Ana Vidas' },
+  coord_fluir: { username: 'coord_fluir@test.com', password: 'testpass123', displayName: 'Carlos Fluir' },
+  coord_acerta: { username: 'coord_acerta@test.com', password: 'testpass123', displayName: 'Diana ACerta' },
+  gerente_vidas: { username: 'gerente_vidas@test.com', password: 'testpass123', displayName: 'Joao GerenteVidas' },
+  super_geral: { username: 'super_geral@test.com', password: 'testpass123', displayName: 'Maria SuperGeral' },
+  formador_vidas: { username: 'formador_vidas@test.com', password: 'testpass123', displayName: 'Rafael FormadorVidas' },
+  formador_fluir: { username: 'formador_fluir@test.com', password: 'testpass123', displayName: 'Luiza FormadorFluir' },
+  dat_e2e: { username: 'dat_e2e@test.com', password: 'testpass123', displayName: 'Daniel DATPuro' },
 };
 
 /**

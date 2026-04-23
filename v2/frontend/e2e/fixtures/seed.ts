@@ -13,6 +13,8 @@
  */
 import { APIRequestContext, expect, request } from '@playwright/test';
 
+import { ROLE_CREDENTIALS } from './roles';
+
 export interface ApiContextOptions {
   baseURL: string;
   username: string;
@@ -28,20 +30,34 @@ export interface ApiContextOptions {
  * O contexto retornado pode fazer GET/POST/PUT/DELETE autenticados no DRF.
  */
 export async function createApiContext(options: ApiContextOptions): Promise<APIRequestContext> {
-  const api = await request.newContext({ baseURL: options.baseURL });
+  // Passo 1: contexto temporário apenas para CSRF + login
+  const tmpCtx = await request.newContext({ baseURL: options.baseURL });
 
-  const csrfRes = await api.get('/api/csrf/');
+  const csrfRes = await tmpCtx.get('/api/csrf/');
   expect(csrfRes.ok(), `[seed] /api/csrf falhou (${csrfRes.status()})`).toBeTruthy();
   const csrfData = (await csrfRes.json()) as { csrfToken?: string };
   const csrfToken = csrfData.csrfToken ?? '';
   expect(csrfToken, '[seed] csrfToken vazio').toBeTruthy();
 
-  const loginRes = await api.post('/api/auth/login/', {
+  const loginRes = await tmpCtx.post('/api/auth/login/', {
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
     data: { username: options.username, password: options.password },
   });
   expect(loginRes.ok(), `[seed] login falhou para ${options.username} (${loginRes.status()})`).toBeTruthy();
 
+  // Extrai cookies pós-login (sessionid + csrftoken podem ter rotacionado)
+  const state = await tmpCtx.storageState();
+  const csrfCookie = state.cookies.find((c) => c.name === 'csrftoken');
+  const finalCsrf = csrfCookie?.value ?? csrfToken;
+  await tmpCtx.dispose();
+
+  // Passo 2: contexto final com cookies + header X-CSRFToken default em TODAS as requests
+  // (DRF exige CSRF em POST/PUT/PATCH/DELETE autenticados)
+  const api = await request.newContext({
+    baseURL: options.baseURL,
+    storageState: state,
+    extraHTTPHeaders: { 'X-CSRFToken': finalCsrf },
+  });
   return api;
 }
 
@@ -81,6 +97,10 @@ export interface SeededSolicitacao {
   status: string;
   projeto: number;
   municipio: number;
+  /** ISO 8601 em UTC. Usado para buscar a linha em tabelas. */
+  inicio: string;
+  /** ISO 8601 em UTC. */
+  fim: string;
 }
 
 /**
@@ -98,10 +118,19 @@ export async function seedSolicitacao(
   const municipioId = input.municipioId ?? (await findMunicipioId(api, 'Salvador'));
   const tipoEventoId = input.tipoEventoId ?? (await findFirstTipoEventoId(api));
 
-  const amanha = new Date();
-  amanha.setDate(amanha.getDate() + 1);
-  amanha.setHours(9, 0, 0, 0);
-  const inicio = input.inicio ?? amanha.toISOString();
+  // Default: evento em horário aleatório dentro de uma janela futura larga
+  // (7-365 dias), usando Date.now() como entrópia extra. Necessário porque
+  // testes paralelos podem colidir em RD-01 (overlap) com o mesmo coord.
+  // Também mixamos ms para diferenciar eventos em menos de 1 minuto de offset.
+  const entropy = Date.now() % 1_000_000;
+  const randomDaysAhead = 7 + ((entropy + Math.floor(Math.random() * 358)) % 358);
+  const randomHour = 7 + Math.floor(Math.random() * 10); // 07:00..16:00
+  const randomMinute = Math.floor(Math.random() * 60);
+  const randomSecond = Math.floor(Math.random() * 60);
+  const defaultInicio = new Date();
+  defaultInicio.setDate(defaultInicio.getDate() + randomDaysAhead);
+  defaultInicio.setHours(randomHour, randomMinute, randomSecond, 0);
+  const inicio = input.inicio ?? defaultInicio.toISOString();
 
   const fim =
     input.fim ??
@@ -131,12 +160,13 @@ export async function seedSolicitacao(
 async function findProjetoId(api: APIRequestContext, nome: string): Promise<number> {
   const res = await api.get(`/api/lookup/projetos/?q=${encodeURIComponent(nome)}`);
   expect(res.ok(), `[seed] lookup projetos falhou (${res.status()})`).toBeTruthy();
+  // Schema do endpoint: [{ id, label: "CODIGO - NOME", kind: "projeto", fluxo: "SUPER"|"NAO_SUPER" }]
   const data = (await res.json()) as
-    | { results?: Array<{ id: number; nome: string }> }
-    | Array<{ id: number; nome: string }>;
+    | { results?: Array<{ id: number; label: string }> }
+    | Array<{ id: number; label: string }>;
   const list = Array.isArray(data) ? data : (data.results ?? []);
-  // Match exato por nome; fallback no primeiro — mas aviso se desambiguou assim.
-  const exact = list.find((p) => p.nome === nome);
+  // Match exato por sufixo " - {nome}" (formato "CODIGO - NOME") ou pelo próprio label
+  const exact = list.find((p) => p.label === nome || p.label.endsWith(` - ${nome}`));
   expect(exact, `[seed] projeto "${nome}" nao encontrado (rode manage.py seed_e2e_users)`).toBeTruthy();
   return exact!.id;
 }
@@ -151,27 +181,56 @@ export async function lookupMunicipioId(api: APIRequestContext, nome: string): P
 }
 
 /**
- * Busca o ID de um usuário pelo username/email. Útil para specs que
- * precisam passar `usuario_id` em endpoints de disponibilidade.
+ * Busca o ID de um usuário pelo display name (first_name + last_name).
+ *
+ * Nota: o endpoint `/api/lookup/usuarios/` retorna apenas `{id, label, kind}`
+ * onde `label` é o display name. Não há filtro por username/email. Para
+ * obter o ID a partir de um role, prefira `lookupUsuarioIdByRole(api, role)`
+ * — que usa o `displayName` já cadastrado em `ROLE_CREDENTIALS`.
  */
-export async function lookupUsuarioId(api: APIRequestContext, usernameOrEmail: string): Promise<number> {
-  const res = await api.get(`/api/lookup/usuarios/?q=${encodeURIComponent(usernameOrEmail)}`);
+export async function lookupUsuarioId(api: APIRequestContext, displayName: string): Promise<number> {
+  // O endpoint /api/lookup/usuarios/?q=X só faz match em first_name OR last_name
+  // (não busca "first last" juntos). Usamos apenas o primeiro token e
+  // filtramos o label completo do lado do cliente.
+  const firstToken = displayName.split(/\s+/)[0] ?? displayName;
+  const res = await api.get(`/api/lookup/usuarios/?q=${encodeURIComponent(firstToken)}`);
   expect(res.ok(), `[seed] lookup usuarios falhou (${res.status()})`).toBeTruthy();
+  // Schema: [{ id, label: "First Last", kind: "usuario" }]
   const data = (await res.json()) as
-    | { results?: Array<{ id: number; username: string; email?: string }> }
-    | Array<{ id: number; username: string; email?: string }>;
+    | { results?: Array<{ id: number; label: string }> }
+    | Array<{ id: number; label: string }>;
   const list = Array.isArray(data) ? data : (data.results ?? []);
-  const match = list.find((u) => u.username === usernameOrEmail || u.email === usernameOrEmail) ?? list[0];
-  expect(match, `[seed] usuario "${usernameOrEmail}" nao encontrado`).toBeTruthy();
+  const match = list.find((u) => u.label === displayName);
+  expect(
+    match,
+    `[seed] usuario com displayName "${displayName}" nao encontrado (q=${firstToken}; candidatos=${list.map((u) => u.label).join(', ')})`
+  ).toBeTruthy();
   return match!.id;
+}
+
+/**
+ * Busca o ID de um usuário a partir do role declarado em `ROLE_CREDENTIALS`.
+ * Helper preferido quando o spec sabe o role, não o display name.
+ */
+export async function lookupUsuarioIdByRole(
+  api: APIRequestContext,
+  role: keyof typeof ROLE_CREDENTIALS
+): Promise<number> {
+  const entry = ROLE_CREDENTIALS[role];
+  expect(entry, `[seed] role "${role}" não está em ROLE_CREDENTIALS`).toBeTruthy();
+  return lookupUsuarioId(api, entry.displayName);
 }
 
 async function findMunicipioId(api: APIRequestContext, nome: string): Promise<number> {
   const res = await api.get(`/api/lookup/municipios/?q=${encodeURIComponent(nome)}`);
   expect(res.ok(), `[seed] lookup municipios falhou (${res.status()})`).toBeTruthy();
-  const data = (await res.json()) as { results?: Array<{ id: number; nome: string }> } | Array<{ id: number; nome: string }>;
-  const list = Array.isArray(data) ? data : data.results ?? [];
-  const match = list.find((m) => m.nome === nome) ?? list[0];
+  // Schema: [{ id, label: "NOME-UF", kind: "municipio" }]
+  const data = (await res.json()) as
+    | { results?: Array<{ id: number; label: string }> }
+    | Array<{ id: number; label: string }>;
+  const list = Array.isArray(data) ? data : (data.results ?? []);
+  // Match por prefixo "{nome}-" (formato "Salvador-BA") ou pelo label completo
+  const match = list.find((m) => m.label === nome || m.label.startsWith(`${nome}-`));
   expect(match, `[seed] municipio "${nome}" nao encontrado`).toBeTruthy();
   return match!.id;
 }

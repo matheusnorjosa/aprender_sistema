@@ -17,8 +17,12 @@ class PermissaoFuncional(models.Model):
     Permissao funcional de alto nivel da aplicacao.
 
     Exemplo:
-    - codename: pode_gerenciar_cadastros
-    - category: admin_dat
+    - codename: pode_operar_dat
+    - category: cadastros_administrativos
+
+    Categorias canônicas (Epic 1 RBAC Refactor, 2026-04-23):
+    solicitacao, importacao, cadastros_administrativos, dashboard,
+    operacao, supervisao. Ver v2/docs/plans/rbac-refactor/master-plan.md §3.4.
     """
 
     codename = models.SlugField(

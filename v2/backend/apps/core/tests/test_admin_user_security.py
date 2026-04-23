@@ -328,7 +328,7 @@ class AdminUserSecurityTests(TestCase):
             defaults={
                 "label": "Pode usar grupo dinâmico no serializer",
                 "description": "Teste de whitelist dinâmica no serializer.",
-                "category": "admin_dat",
+                "category": "cadastros_administrativos",
                 "is_system": False,
             },
         )

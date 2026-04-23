@@ -44,6 +44,9 @@ test.describe(
       await expect(aprovacoes.linhaPorId(solicitacao.id)).toBeVisible();
       await aprovacoes.btnAprovarPorId(solicitacao.id).click();
 
+      // Clique na linha abre Modal.confirm — confirmar pra disparar a API.
+      await aprovacoes.btnConfirmarAprovacao.click();
+
       const superApi = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.super_geral.username,

@@ -42,6 +42,17 @@ export class AprovacoesPage extends BasePage {
     return this.linhaPorId(id).getByRole('button', { name: /reprovar|rejeitar/i });
   }
 
+  /**
+   * Botão "Aprovar" do Modal.confirm do AntD (okText="Aprovar").
+   *
+   * Clique em `btnAprovarPorId` abre `Modal.confirm` (ver
+   * `ApprovalsPage.handleApprove`). A API de approve só é chamada
+   * quando o usuário confirma no modal.
+   */
+  get btnConfirmarAprovacao(): Locator {
+    return this.page.getByRole('dialog').getByRole('button', { name: /^aprovar$/i });
+  }
+
   btnAprovar(textoChave: string): Locator {
     return this.linhaSolicitacao(textoChave).getByRole('button', { name: /aprovar/i });
   }

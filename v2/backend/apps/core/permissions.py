@@ -33,8 +33,6 @@ from apps.core.services.rbac_permissions import get_user_functional_permissions
 # o decorator para sinalização em static type-checkers.
 
 
-
-
 class HasPerm(permissions.BasePermission):  # type: ignore[misc]
     """
     Capability-oriented parametric permission class (DRF).

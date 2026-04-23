@@ -24,7 +24,7 @@ SUPER requer aprovação manual (PA-02); NAO_SUPER é auto-aprovado na criação
 Jornadas que dependem de aprovação têm duas variantes (J01a/J01b).
 
 | ID | Jornada | Tags | Status | Depende de |
-|----|---------|------|--------|-----------|
+| ---- | ---------- | ------ | -------- | ----------- |
 | J01a | SUPER happy path: coord cria → super aprova | `@critical @rf01 @pa-02 @fluxo-super` | ✅ | — |
 | J01b | NAO_SUPER happy path: coord cria → auto-aprovado | `@critical @rf01 @fluxo-nao-super` | ✅ | — |
 | J02 | Wizard de nova solicitação: estrutura, validação, RBAC | `@critical @ux @rf01` | ✅ | — |

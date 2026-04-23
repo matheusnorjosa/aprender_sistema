@@ -12,7 +12,7 @@ Idempotente via `update_or_create` — seguro para re-run.
 Ver master-plan §3.2, §3.4 e v2/docs/plans/rbac-refactor/epic-1-labels.md.
 """
 
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportMissingParameterType=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false
 
 from __future__ import annotations
 

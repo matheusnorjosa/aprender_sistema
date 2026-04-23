@@ -74,12 +74,15 @@ test.describe(
       const approveRes = await superApi.patch(`/api/solicitacoes/${solic.id}/approve/`, { data: {} });
       expect(approveRes.ok()).toBeTruthy();
 
+      // seedSolicitacao pode ter deslocado o dia; use o inicio retornado
+      const actualDay = solic.inicio.slice(0, 10);
+
       // Consulta janela sobreposta: 10:30-12:30 (overlap de 30min com 09:00-11:00)
       const checkRes = await superApi.get(
         `/api/availability/check/` +
           `?usuario_id=${formadorId}` +
-          `&inicio=${encodeURIComponent(`${DAY}T10:30:00-03:00`)}` +
-          `&fim=${encodeURIComponent(`${DAY}T12:30:00-03:00`)}` +
+          `&inicio=${encodeURIComponent(`${actualDay}T10:30:00-03:00`)}` +
+          `&fim=${encodeURIComponent(`${actualDay}T12:30:00-03:00`)}` +
           `&municipio_id=${salvadorId}`
       );
       expect(checkRes.ok()).toBeTruthy();
@@ -116,12 +119,14 @@ test.describe(
       const approveRes = await superApi.patch(`/api/solicitacoes/${solic.id}/approve/`, { data: {} });
       expect(approveRes.ok()).toBeTruthy();
 
+      const actualDay = solic.inicio.slice(0, 10);
+
       // Consulta janela adjacente: 16:00-18:00 (começa exatamente quando o outro acaba)
       const checkRes = await superApi.get(
         `/api/availability/check/` +
           `?usuario_id=${formadorId}` +
-          `&inicio=${encodeURIComponent(`${DAY}T16:00:00-03:00`)}` +
-          `&fim=${encodeURIComponent(`${DAY}T18:00:00-03:00`)}` +
+          `&inicio=${encodeURIComponent(`${actualDay}T16:00:00-03:00`)}` +
+          `&fim=${encodeURIComponent(`${actualDay}T18:00:00-03:00`)}` +
           `&municipio_id=${salvadorId}`
       );
       expect(checkRes.ok()).toBeTruthy();
@@ -143,10 +148,8 @@ test.describe(
       const blockRes = await formadorApi.post('/api/availability-blocks/', {
         data: {
           tipo: 'T',
-          start_date: DAY,
-          end_date: DAY,
-          start_time: '00:00:00',
-          end_time: '23:59:00',
+          inicio: `${DAY}T00:00:00-03:00`,
+          fim: `${DAY}T23:59:00-03:00`,
         },
       });
       expect(blockRes.ok(), `bloqueio total deveria criar: ${blockRes.status()} ${await blockRes.text()}`).toBeTruthy();

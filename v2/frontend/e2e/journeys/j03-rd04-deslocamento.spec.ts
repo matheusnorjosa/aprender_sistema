@@ -75,12 +75,16 @@ test.describe(
       );
       expect(approveRes.ok()).toBeTruthy();
 
+      // O seed pode ter retentado com dia deslocado para evitar conflito RD-01.
+      // Usamos o `inicio` efetivo da solicitação criada (não o DAY original).
+      const actualDay = solicitacaoSalvador.inicio.slice(0, 10); // "YYYY-MM-DD"
+
       // Consulta RD-04: pedir janela em Fortaleza no mesmo dia, 2h depois
       const checkRes = await superApi.get(
         `/api/availability/check/` +
           `?usuario_id=${formadorId}` +
-          `&inicio=${encodeURIComponent(`${DAY}T13:00:00-03:00`)}` +
-          `&fim=${encodeURIComponent(`${DAY}T15:00:00-03:00`)}` +
+          `&inicio=${encodeURIComponent(`${actualDay}T13:00:00-03:00`)}` +
+          `&fim=${encodeURIComponent(`${actualDay}T15:00:00-03:00`)}` +
           `&municipio_id=${fortalezaId}`
       );
       expect(checkRes.ok()).toBeTruthy();

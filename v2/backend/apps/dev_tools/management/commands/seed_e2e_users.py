@@ -31,7 +31,7 @@ from django.core.management.base import BaseCommand
 from django.db import IntegrityError, transaction
 
 from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
-from apps.core.models import Compra, EquipeGerencia, Gerencia, Municipio, Projeto
+from apps.core.models import Compra, EquipeGerencia, Gerencia, Municipio, Projeto, TipoEvento
 
 User = get_user_model()
 
@@ -87,6 +87,16 @@ class Command(BaseCommand):
             fluxo="NAO_SUPER",
             gerencia_setor="Vidas",
         )
+
+        # 4-pre. TipoEvento (pré-requisito: solicitação obrigatoriamente aponta para
+        # um tipo_evento). Em banco virgem do CI, nenhum tipo existe por default.
+        self.stdout.write("\n4-pre. Criando tipo de evento E2E...")
+        tipo_evento, tipo_created = TipoEvento.objects.update_or_create(
+            nome="Formação E2E",
+            defaults={"descricao": "Tipo padrão para testes E2E", "cor": "#1890ff"},
+        )
+        status_te = "✅ Criado" if tipo_created else "⏭️  Já existe"
+        self.stdout.write(f"   {status_te}: {tipo_evento.nome}")
 
         # 4a. EquipeGerencia (vínculos usuário ↔ gerência com papel).
         # Necessário para HasSectorAccess — grade mensal e filtros de setor

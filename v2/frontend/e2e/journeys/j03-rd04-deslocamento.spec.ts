@@ -31,8 +31,11 @@ import {
 } from '../fixtures';
 import { freezeTime } from '../fixtures/time';
 
-const FROZEN_DAY_ISO = '2026-05-15T09:00:00-03:00';
-const SAME_DAY = '2026-05-15';
+function uniqueFutureDay(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 30 + Math.floor(Math.random() * 200));
+  return d.toISOString().slice(0, 10);
+}
 
 test.describe(
   'J03 — RD-04: Deslocamento entre municípios',
@@ -40,11 +43,8 @@ test.describe(
   () => {
     test('canônica: check em Fortaleza no mesmo dia de evento em Salvador → conflito D', async ({
       baseURL,
-      context,
     }) => {
-      // Note: `freezeTime` aplicado a contexts API via request (headers); a página
-      // não é usada aqui mas preservamos o padrão para consistência.
-      // Para API: passamos o header via `extraHTTPHeaders` no contexto.
+      const DAY = uniqueFutureDay();
       const superApi = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.super_geral.username,
@@ -64,8 +64,8 @@ test.describe(
       const solicitacaoSalvador = await seedSolicitacao(coordApi, {
         fluxo: 'SUPER',
         municipioId: salvadorId,
-        inicio: `${SAME_DAY}T09:00:00-03:00`,
-        fim: `${SAME_DAY}T11:00:00-03:00`,
+        inicio: `${DAY}T09:00:00-03:00`,
+        fim: `${DAY}T11:00:00-03:00`,
         formadorIds: [formadorId],
       });
       // Aprova para virar "aprovado" e entrar no cálculo de conflitos
@@ -79,8 +79,8 @@ test.describe(
       const checkRes = await superApi.get(
         `/api/availability/check/` +
           `?usuario_id=${formadorId}` +
-          `&inicio=${encodeURIComponent(`${SAME_DAY}T13:00:00-03:00`)}` +
-          `&fim=${encodeURIComponent(`${SAME_DAY}T15:00:00-03:00`)}` +
+          `&inicio=${encodeURIComponent(`${DAY}T13:00:00-03:00`)}` +
+          `&fim=${encodeURIComponent(`${DAY}T15:00:00-03:00`)}` +
           `&municipio_id=${fortalezaId}`
       );
       expect(checkRes.ok()).toBeTruthy();
@@ -126,11 +126,11 @@ test.describe(
       // Smoke test conceitual: ao aplicar freezeTime numa page, o header
       // X-E2E-Frozen-Time é enviado em todas as requests daquela page.
       // Valida que a fixture não quebra o spec nem causa erros de setup.
-      await freezeTime(page, FROZEN_DAY_ISO);
+      const frozenIso = '2026-05-15T09:00:00-03:00';
+      await freezeTime(page, frozenIso);
       await page.goto('/');
-      // Se o addInitScript funcionar, Date.now() retorna o instante congelado
       const frozenMs = await page.evaluate(() => Date.now());
-      const expectedMs = new Date(FROZEN_DAY_ISO).valueOf();
+      const expectedMs = new Date(frozenIso).valueOf();
       expect(frozenMs, 'freezeTime deveria forçar Date.now() para o instante fixo').toBe(expectedMs);
     });
   }

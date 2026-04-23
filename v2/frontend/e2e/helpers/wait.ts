@@ -10,6 +10,36 @@
 import type { Page } from '@playwright/test';
 
 /**
+ * Formata ISO-8601 como "DD/MM/YYYY HH:mm" em America/Fortaleza.
+ *
+ * Espelha o formato usado pela coluna "Início" em
+ * `pages/Solicitacoes/MySolicitacoesPage.tsx` (via `dayjs(...).format('DD/MM/YYYY HH:mm')`).
+ * Usamos esta função para localizar a linha de uma solicitação específica
+ * na tabela (já que o ID numérico não é exibido).
+ *
+ * @param iso ISO-8601 UTC (ex: saída de `Solicitacao.inicio` do DRF)
+ * @returns string formatada local-time Fortaleza (ex: "15/05/2026 14:02")
+ */
+export function formatInicioForTable(iso: string): string {
+  const d = new Date(iso);
+  // `toLocaleString` respeita o `timezoneId` configurado no playwright.config
+  // (America/Fortaleza) quando rodando no browser. No Node-side, usamos
+  // timeZone explícito via options para garantir determinismo.
+  const parts = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Fortaleza',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+
+  const get = (type: string): string => parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')}`;
+}
+
+/**
  * Aguarda o shell do React hidratar.
  *
  * Critério: `#root` existe e tem children. Esse é o sinal mais leve e

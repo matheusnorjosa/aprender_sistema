@@ -14,16 +14,24 @@ export class AprovacoesPage extends BasePage {
     return this.page.getByRole('table').first();
   }
 
-  linhaSolicitacao(solicitacaoId: number | string): Locator {
-    return this.tabelaPendentes.getByRole('row').filter({ hasText: String(solicitacaoId) });
+  /**
+   * Localiza a linha de uma solicitação na tabela.
+   *
+   * A tabela de aprovações mostra colunas como data/hora, município, projeto
+   * — não expõe ID numérico. Ao invés do ID, aceite o texto-chave que a
+   * linha contém (ex: data formatada `DD/MM/YYYY HH:mm` via
+   * `formatInicioForTable(solicitacao.inicio)` do helpers/wait).
+   */
+  linhaSolicitacao(textoChave: string): Locator {
+    return this.tabelaPendentes.getByRole('row').filter({ hasText: textoChave });
   }
 
-  btnAprovar(solicitacaoId: number | string): Locator {
-    return this.linhaSolicitacao(solicitacaoId).getByRole('button', { name: /aprovar/i });
+  btnAprovar(textoChave: string): Locator {
+    return this.linhaSolicitacao(textoChave).getByRole('button', { name: /aprovar/i });
   }
 
-  btnReprovar(solicitacaoId: number | string): Locator {
-    return this.linhaSolicitacao(solicitacaoId).getByRole('button', { name: /reprovar|rejeitar/i });
+  btnReprovar(textoChave: string): Locator {
+    return this.linhaSolicitacao(textoChave).getByRole('button', { name: /reprovar|rejeitar/i });
   }
 
   /** Campo de motivo no dialog de reprovação (PA-04). */

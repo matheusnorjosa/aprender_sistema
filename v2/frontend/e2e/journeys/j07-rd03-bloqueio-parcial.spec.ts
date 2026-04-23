@@ -21,7 +21,7 @@
  *    check dentro do intervalo → `conflicts` inclui `P`.
  * 2. **Borda**: check fora do intervalo no mesmo dia (ex: 14:00-16:00) →
  *    sem `P` (regra de "fora do subintervalo está livre").
- * 3. **Operação**: após criação, `GET /api/bloqueios/?owner=me` retorna o
+ * 3. **Operação**: após criação, `GET /api/availability-blocks/?owner=me` retorna o
  *    bloqueio com `tipo=P` — espelho de persistência.
  */
 import {
@@ -33,13 +33,23 @@ import {
   ROLE_CREDENTIALS,
 } from '../fixtures';
 
-const DAY = '2026-08-18';
+/**
+ * Gera um dia futuro único por execução (evita colisão entre rodadas
+ * paralelas/retries do mesmo spec no mesmo banco).
+ */
+function uniqueFutureDay(offsetDays = 0): string {
+  const d = new Date();
+  const extra = Math.floor(Math.random() * 200);
+  d.setDate(d.getDate() + 30 + extra + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
 
 test.describe(
   'J07 — RD-03: Bloqueio parcial (P)',
   { tag: ['@critical', '@rd-03'] },
   () => {
     test('canônica: check dentro do subintervalo bloqueado → conflito P', async ({ baseURL }) => {
+      const DAY = uniqueFutureDay();
       // formador_fluir cria bloqueio P 09:00-11:00 no DAY (usa formador diferente do J06 para
       // evitar acoplamento de estado entre jornadas que rodam em paralelo)
       const formadorApi = await createApiContext({
@@ -47,7 +57,7 @@ test.describe(
         username: ROLE_CREDENTIALS.formador_fluir.username,
         password: ROLE_CREDENTIALS.formador_fluir.password,
       });
-      const blockRes = await formadorApi.post('/api/bloqueios/', {
+      const blockRes = await formadorApi.post('/api/availability-blocks/', {
         data: {
           tipo: 'P',
           start_date: DAY,
@@ -83,15 +93,14 @@ test.describe(
     });
 
     test('borda: check fora do subintervalo no mesmo dia → sem conflito P', async ({ baseURL }) => {
-      // Assume que o bloqueio P 09:00-11:00 criado no teste canônico persiste
-      // (ou é recriado idempotentemente — backend trata duplicados).
-      // Para independência, recriamos aqui:
+      const DAY = uniqueFutureDay();
+      // Cria bloqueio P 09:00-11:00 para ESTE dia específico do teste.
       const formadorApi = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.formador_fluir.username,
         password: ROLE_CREDENTIALS.formador_fluir.password,
       });
-      await formadorApi.post('/api/bloqueios/', {
+      await formadorApi.post('/api/availability-blocks/', {
         data: {
           tipo: 'P',
           start_date: DAY,
@@ -133,8 +142,8 @@ test.describe(
       });
 
       // Cria (ou revalida) bloqueio P específico para este teste
-      const MARKER_DAY = '2026-08-19';
-      const createRes = await formadorApi.post('/api/bloqueios/', {
+      const MARKER_DAY = uniqueFutureDay();
+      const createRes = await formadorApi.post('/api/availability-blocks/', {
         data: {
           tipo: 'P',
           start_date: MARKER_DAY,
@@ -146,7 +155,7 @@ test.describe(
       expect(createRes.ok()).toBeTruthy();
 
       // Lista bloqueios do próprio formador
-      const listRes = await formadorApi.get('/api/bloqueios/?owner=me');
+      const listRes = await formadorApi.get('/api/availability-blocks/?owner=me');
       expect(listRes.ok()).toBeTruthy();
       const data = (await listRes.json()) as
         | { results?: Array<{ tipo: string; start_date: string; end_date: string }> }

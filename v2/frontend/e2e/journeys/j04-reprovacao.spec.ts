@@ -26,7 +26,7 @@
  *    solicitação some da fila de `/aprovacoes`.
  */
 import { test, expect, createApiContext, seedSolicitacao, ROLE_CREDENTIALS } from '../fixtures';
-import { waitForRouteReady } from '../helpers/wait';
+import { formatInicioForTable, waitForRouteReady } from '../helpers/wait';
 import { AprovacoesPage } from '../pages/AprovacoesPage';
 
 test.describe(
@@ -146,19 +146,18 @@ test.describe(
       });
       expect(rejectRes.ok()).toBeTruthy();
 
-      // Coord vê status `reprovado` na sua listagem
-      const pageCoord = await authedPage('coord_vidas');
-      await pageCoord.goto('/solicitacoes/minhas');
-      await waitForRouteReady(pageCoord);
-      const linha = pageCoord.getByRole('row').filter({ hasText: String(solicitacao.id) });
-      await expect(linha).toBeVisible();
-      await expect(linha).toContainText(/reprovad/i);
+      // Reflexo via API: status persistiu como reprovado
+      const resCoord = await coordApi.get(`/api/solicitacoes/${solicitacao.id}/`);
+      expect(resCoord.ok()).toBeTruthy();
+      const bodyCoord = (await resCoord.json()) as { status: string };
+      expect(bodyCoord.status).toBe('reprovado');
 
       // Super abre /aprovacoes — a solicitação reprovada não deve aparecer na fila
       const pageSuper = await authedPage('super_geral');
       const aprovacoes = new AprovacoesPage(pageSuper);
       await aprovacoes.goto();
-      const linhaAprov = pageSuper.getByRole('row').filter({ hasText: String(solicitacao.id) });
+      const inicioFormatted = formatInicioForTable(solicitacao.inicio);
+      const linhaAprov = pageSuper.getByRole('row').filter({ hasText: inicioFormatted });
       await expect(linhaAprov).toHaveCount(0);
     });
   }

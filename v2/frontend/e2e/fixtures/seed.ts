@@ -151,10 +151,40 @@ export async function seedSolicitacao(
     payload.formador_ids = input.formadorIds;
   }
 
-  const res = await api.post('/api/solicitacoes/', { data: payload });
-  expect(res.ok(), `[seed] POST /api/solicitacoes falhou: ${res.status()} ${await res.text()}`).toBeTruthy();
-  const created = (await res.json()) as SeededSolicitacao;
-  return created;
+  // Retry loop: se receber 400 `availability_conflict` (RD-01 overlap), regenera
+  // datas aleatórias e tenta de novo. Resolve race-condition entre testes
+  // paralelos que criam solicitações com o mesmo coord.
+  const maxAttempts = input.inicio ? 1 : 5; // se spec passou inicio explícito, não retentar
+  let lastStatus = 0;
+  let lastBody = '';
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const res = await api.post('/api/solicitacoes/', { data: payload });
+    if (res.ok()) {
+      return (await res.json()) as SeededSolicitacao;
+    }
+    lastStatus = res.status();
+    lastBody = await res.text();
+    // Só retenta se for conflito de disponibilidade em default inicio
+    if (res.status() !== 400 || !lastBody.includes('availability_conflict')) {
+      break;
+    }
+    // Regenera inicio/fim com novo offset + janela horária
+    const entropy2 = (Date.now() + attempt * 997) % 1_000_000;
+    const dd = 7 + ((entropy2 + Math.floor(Math.random() * 358)) % 358);
+    const hh = 7 + Math.floor(Math.random() * 10);
+    const mm = Math.floor(Math.random() * 60);
+    const ss = Math.floor(Math.random() * 60);
+    const newStart = new Date();
+    newStart.setDate(newStart.getDate() + dd);
+    newStart.setHours(hh, mm, ss, 0);
+    payload.inicio = newStart.toISOString();
+    const newEnd = new Date(newStart);
+    newEnd.setHours(newEnd.getHours() + 2);
+    payload.fim = newEnd.toISOString();
+  }
+
+  expect(false, `[seed] POST /api/solicitacoes falhou após ${maxAttempts} tentativas: ${lastStatus} ${lastBody}`).toBeTruthy();
+  throw new Error('unreachable');
 }
 
 async function findProjetoId(api: APIRequestContext, nome: string): Promise<number> {

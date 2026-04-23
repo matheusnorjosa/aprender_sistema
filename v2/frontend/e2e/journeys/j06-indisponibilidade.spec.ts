@@ -32,14 +32,24 @@ import {
   ROLE_CREDENTIALS,
 } from '../fixtures';
 
-const DAY_RD01 = '2026-07-05';
-const DAY_RD02 = '2026-07-12';
+/**
+ * Gera um dia futuro único por execução (evita colisão entre rodadas
+ * paralelas/retries do mesmo spec no mesmo banco). Offset: 30-230 dias
+ * a partir de hoje.
+ */
+function uniqueFutureDay(offsetDays = 0): string {
+  const d = new Date();
+  const extra = Math.floor(Math.random() * 200);
+  d.setDate(d.getDate() + 30 + extra + offsetDays);
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
 
 test.describe(
   'J06 — Indisponibilidade: RD-01 (overlap) + RD-02 (bloqueio total)',
   { tag: ['@critical', '@rd-01', '@rd-02'] },
   () => {
     test('canônica (RD-01): overlap ≥ 1min entre eventos aprovados → conflito X', async ({ baseURL }) => {
+      const DAY = uniqueFutureDay();
       const superApi = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.super_geral.username,
@@ -57,8 +67,8 @@ test.describe(
       const solic = await seedSolicitacao(coordApi, {
         fluxo: 'SUPER',
         municipioId: salvadorId,
-        inicio: `${DAY_RD01}T09:00:00-03:00`,
-        fim: `${DAY_RD01}T11:00:00-03:00`,
+        inicio: `${DAY}T09:00:00-03:00`,
+        fim: `${DAY}T11:00:00-03:00`,
         formadorIds: [formadorId],
       });
       const approveRes = await superApi.patch(`/api/solicitacoes/${solic.id}/approve/`, { data: {} });
@@ -68,8 +78,8 @@ test.describe(
       const checkRes = await superApi.get(
         `/api/availability/check/` +
           `?usuario_id=${formadorId}` +
-          `&inicio=${encodeURIComponent(`${DAY_RD01}T10:30:00-03:00`)}` +
-          `&fim=${encodeURIComponent(`${DAY_RD01}T12:30:00-03:00`)}` +
+          `&inicio=${encodeURIComponent(`${DAY}T10:30:00-03:00`)}` +
+          `&fim=${encodeURIComponent(`${DAY}T12:30:00-03:00`)}` +
           `&municipio_id=${salvadorId}`
       );
       expect(checkRes.ok()).toBeTruthy();
@@ -81,6 +91,7 @@ test.describe(
     });
 
     test('borda (RD-01): janela adjacente (end == start) NÃO é conflito X', async ({ baseURL }) => {
+      const DAY = uniqueFutureDay();
       const superApi = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.super_geral.username,
@@ -89,7 +100,7 @@ test.describe(
       const salvadorId = await lookupMunicipioId(superApi, 'Salvador');
       const formadorId = await lookupUsuarioIdByRole(superApi, 'formador_vidas');
 
-      // Seed evento aprovado: 09:00-11:00
+      // Seed evento aprovado: 14:00-16:00
       const coordApi = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.coord_vidas.username,
@@ -98,8 +109,8 @@ test.describe(
       const solic = await seedSolicitacao(coordApi, {
         fluxo: 'SUPER',
         municipioId: salvadorId,
-        inicio: `${DAY_RD01}T14:00:00-03:00`,
-        fim: `${DAY_RD01}T16:00:00-03:00`,
+        inicio: `${DAY}T14:00:00-03:00`,
+        fim: `${DAY}T16:00:00-03:00`,
         formadorIds: [formadorId],
       });
       const approveRes = await superApi.patch(`/api/solicitacoes/${solic.id}/approve/`, { data: {} });
@@ -109,8 +120,8 @@ test.describe(
       const checkRes = await superApi.get(
         `/api/availability/check/` +
           `?usuario_id=${formadorId}` +
-          `&inicio=${encodeURIComponent(`${DAY_RD01}T16:00:00-03:00`)}` +
-          `&fim=${encodeURIComponent(`${DAY_RD01}T18:00:00-03:00`)}` +
+          `&inicio=${encodeURIComponent(`${DAY}T16:00:00-03:00`)}` +
+          `&fim=${encodeURIComponent(`${DAY}T18:00:00-03:00`)}` +
           `&municipio_id=${salvadorId}`
       );
       expect(checkRes.ok()).toBeTruthy();
@@ -122,17 +133,18 @@ test.describe(
     });
 
     test('operação (RD-02): bloqueio total cobre o dia → conflito T', async ({ baseURL }) => {
+      const DAY = uniqueFutureDay();
       // formador_vidas cria bloqueio total para o dia inteiro
       const formadorApi = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.formador_vidas.username,
         password: ROLE_CREDENTIALS.formador_vidas.password,
       });
-      const blockRes = await formadorApi.post('/api/bloqueios/', {
+      const blockRes = await formadorApi.post('/api/availability-blocks/', {
         data: {
           tipo: 'T',
-          start_date: DAY_RD02,
-          end_date: DAY_RD02,
+          start_date: DAY,
+          end_date: DAY,
           start_time: '00:00:00',
           end_time: '23:59:00',
         },
@@ -151,8 +163,8 @@ test.describe(
       const checkRes = await superApi.get(
         `/api/availability/check/` +
           `?usuario_id=${formadorId}` +
-          `&inicio=${encodeURIComponent(`${DAY_RD02}T10:00:00-03:00`)}` +
-          `&fim=${encodeURIComponent(`${DAY_RD02}T12:00:00-03:00`)}` +
+          `&inicio=${encodeURIComponent(`${DAY}T10:00:00-03:00`)}` +
+          `&fim=${encodeURIComponent(`${DAY}T12:00:00-03:00`)}` +
           `&municipio_id=${salvadorId}`
       );
       expect(checkRes.ok()).toBeTruthy();

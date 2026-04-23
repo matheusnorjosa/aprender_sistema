@@ -30,9 +30,15 @@ from .services.availability_service import check_conflicts
 def is_privileged_user(user):
     """
     Verifica se o usuário tem permissão para acessar dados de outros usuários.
-    Privilegiados: superuser, Superintendência, Controle
+
+    Epic 3.2 RBAC Refactor (2026-04-23): hardcoded
+    `groups.filter(name__in=["Superintendência", "Controle"])` trocado por
+    capability `pode_ver_todas_disponibilidades`. Expansão deliberada para
+    Gerência+Diretoria (documentada no PR #1183).
     """
-    return user.is_superuser or user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
+    from apps.core.rbac_helpers import user_has_any_perm
+
+    return user_has_any_perm(user, "pode_ver_todas_disponibilidades")
 
 
 def get_user_gerencias_ids(user) -> list[int]:

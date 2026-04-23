@@ -45,9 +45,17 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         Check if current user has privileged access (can manage any block).
 
         Security (C-03): Define who can edit/delete blocks of other users.
+
+        Epic 3.2 RBAC Refactor (2026-04-23): substitui hardcoded
+        `groups.filter(name__in=["Superintendência", "Controle"])` por
+        capability-based check. O codename `pode_ver_todas_disponibilidades`
+        é concedido aos mesmos 4 grupos (Super, Controle, Gerência,
+        Diretoria) via seed; expansão deliberada para Gerência+Diretoria
+        documentada no PR #1183.
         """
-        user = self.request.user
-        return user.is_superuser or user.groups.filter(name__in=["Superintendência", "Controle"]).exists()
+        from apps.core.rbac_helpers import user_has_any_perm
+
+        return user_has_any_perm(self.request.user, "pode_ver_todas_disponibilidades")
 
     def get_queryset(self) -> QuerySet:
         """

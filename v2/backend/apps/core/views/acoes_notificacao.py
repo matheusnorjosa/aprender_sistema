@@ -34,13 +34,24 @@ from apps.core.serializers import (
 
 
 def _is_dat_or_super(user: AbstractBaseUser | AnonymousUser) -> bool:
-    return bool(getattr(user, "is_superuser", False) or user.groups.filter(name="DAT").exists())  # type: ignore[union-attr]
+    """Epic 3.2 RBAC Refactor (2026-04-23): hardcoded `groups.filter(name="DAT")`
+    trocado por capability `pode_operar_dat_exclusivo`."""
+    from apps.core.rbac_helpers import user_has_any_perm
+
+    return user_has_any_perm(user, "pode_operar_dat_exclusivo")
 
 
 def _has_any_group(user: AbstractBaseUser | AnonymousUser, group_names: set[str]) -> bool:
+    """Data-scope helper: passa group_names como filter para querysets.
+
+    Não é autorização (autorização passa por has_perm). Mantido para
+    contexto específico de notificações onde a semântica é "usuário tem
+    MEMBERSHIP em algum desses grupos" (data scope), não "usuário tem
+    permissão para X".
+    """
     if getattr(user, "is_superuser", False):
         return True
-    return user.groups.filter(name__in=group_names).exists()  # type: ignore[union-attr]
+    return user.groups.filter(name__in=group_names).exists()  # type: ignore[union-attr]  # noqa: RBAC-data-scope-allowed
 
 
 def _visible_cycles_queryset_for_user(user: AbstractBaseUser | AnonymousUser) -> QuerySet[CicloAcoes]:

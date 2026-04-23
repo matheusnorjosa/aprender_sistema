@@ -32,7 +32,7 @@ Jornadas que dependem de aprovação têm duas variantes (J01a/J01b).
 | J04 | Reprovação: fluxo completo + AuditLog (PA-05) | `@critical @pa-02 @pa-05 @fluxo-super` | ✅ | — |
 | J05 | Visão individual vs setor (/solicitacoes vs /disponibilidade) | `@critical @rbac` | ✅ | — |
 | J06 | RD-01 (overlap X) + RD-02 (bloqueio total T) | `@critical @rd-01 @rd-02` | ✅ | — |
-| J07 | Bloqueio pontual impede RD-04 | `@rd-04` | ⏳ | — |
+| J07 | RD-03: bloqueio parcial (P) impede dentro do subintervalo | `@critical @rd-03` | ✅ | — |
 | J08 | Aprovação concorrente (select_for_update integridade) | `@critical @race @pa-07` | ✅ | — |
 | J09 | Cancelamento pós-publicação re-sincroniza GCal | `@rf07` | ⏳ | GCal client |
 | J10 | Coord tenta aprovar própria solicitação → 403 | `@critical @rbac @pa-02` | ✅ | — |

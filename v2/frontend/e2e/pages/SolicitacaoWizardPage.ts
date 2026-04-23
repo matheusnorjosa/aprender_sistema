@@ -31,14 +31,24 @@ export class SolicitacaoWizardPage extends BasePage {
   }
 
   get btnProximo(): Locator {
-    return this.page.getByRole('button', { name: /pr[oó]ximo|avan[cç]ar/i });
+    return this.page.getByRole('button', { name: 'Ir para proximo passo' });
   }
 
-  get btnVoltar(): Locator {
-    return this.page.getByRole('button', { name: /voltar/i });
+  get btnAnterior(): Locator {
+    return this.page.getByRole('button', { name: 'Voltar para passo anterior' });
   }
 
-  get btnSubmeter(): Locator {
-    return this.page.getByRole('button', { name: /submeter|enviar|criar/i });
+  get btnConfirmar(): Locator {
+    return this.page.getByRole('button', { name: /confirmar solicita[cç][aã]o/i });
+  }
+
+  /** Navegação de volta para listagem (fora do wizard propriamente dito). */
+  get btnVoltarListagem(): Locator {
+    return this.page.getByRole('button', { name: 'Voltar para minhas solicitacoes' });
+  }
+
+  /** Lista de passos visíveis (usa AntD Steps — usamos aria-label do `<nav>`). */
+  get passosNav(): Locator {
+    return this.page.getByRole('navigation', { name: 'Passos do wizard' });
   }
 }

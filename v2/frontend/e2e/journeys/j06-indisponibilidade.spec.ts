@@ -28,7 +28,7 @@ import {
   createApiContext,
   seedSolicitacao,
   lookupMunicipioId,
-  lookupUsuarioId,
+  lookupUsuarioIdByRole,
   ROLE_CREDENTIALS,
 } from '../fixtures';
 
@@ -46,7 +46,7 @@ test.describe(
         password: ROLE_CREDENTIALS.super_geral.password,
       });
       const salvadorId = await lookupMunicipioId(superApi, 'Salvador');
-      const formadorId = await lookupUsuarioId(superApi, 'formador_vidas@test.com');
+      const formadorId = await lookupUsuarioIdByRole(superApi, 'formador_vidas');
 
       // Seed evento aprovado: 09:00-11:00
       const coordApi = await createApiContext({
@@ -87,7 +87,7 @@ test.describe(
         password: ROLE_CREDENTIALS.super_geral.password,
       });
       const salvadorId = await lookupMunicipioId(superApi, 'Salvador');
-      const formadorId = await lookupUsuarioId(superApi, 'formador_vidas@test.com');
+      const formadorId = await lookupUsuarioIdByRole(superApi, 'formador_vidas');
 
       // Seed evento aprovado: 09:00-11:00
       const coordApi = await createApiContext({
@@ -145,7 +145,7 @@ test.describe(
         password: ROLE_CREDENTIALS.super_geral.password,
       });
       const salvadorId = await lookupMunicipioId(superApi, 'Salvador');
-      const formadorId = await lookupUsuarioId(superApi, 'formador_vidas@test.com');
+      const formadorId = await lookupUsuarioIdByRole(superApi, 'formador_vidas');
 
       // Consulta janela no dia bloqueado
       const checkRes = await superApi.get(

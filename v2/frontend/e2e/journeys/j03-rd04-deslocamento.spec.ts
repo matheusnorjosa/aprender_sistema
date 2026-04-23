@@ -26,7 +26,7 @@ import {
   createApiContext,
   seedSolicitacao,
   lookupMunicipioId,
-  lookupUsuarioId,
+  lookupUsuarioIdByRole,
   ROLE_CREDENTIALS,
 } from '../fixtures';
 import { freezeTime } from '../fixtures/time';
@@ -53,7 +53,7 @@ test.describe(
 
       const salvadorId = await lookupMunicipioId(superApi, 'Salvador');
       const fortalezaId = await lookupMunicipioId(superApi, 'Fortaleza');
-      const formadorId = await lookupUsuarioId(superApi, 'formador_vidas@test.com');
+      const formadorId = await lookupUsuarioIdByRole(superApi, 'formador_vidas');
 
       // Seed: solicitação aprovada em Salvador (formador_vidas participa como FORMADOR)
       const coordApi = await createApiContext({
@@ -101,7 +101,7 @@ test.describe(
         password: ROLE_CREDENTIALS.super_geral.password,
       });
       const salvadorId = await lookupMunicipioId(superApi, 'Salvador');
-      const formadorId = await lookupUsuarioId(superApi, 'formador_vidas@test.com');
+      const formadorId = await lookupUsuarioIdByRole(superApi, 'formador_vidas');
 
       // Consulta fora do horário de qualquer evento seedado, em Salvador
       const checkRes = await superApi.get(

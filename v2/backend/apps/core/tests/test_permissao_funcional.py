@@ -71,11 +71,11 @@ def test_seed_functional_permissions_idempotent():
     second = seed_functional_permissions()
     snapshot_second = _snapshot()
 
-    assert len(snapshot_first) == 14
+    assert len(snapshot_first) == 15
     assert snapshot_first == snapshot_second
-    assert first["permissions_created"] + first["permissions_updated"] == 14
+    assert first["permissions_created"] + first["permissions_updated"] == 15
     assert second["permissions_created"] == 0
-    assert second["permissions_updated"] == 14
+    assert second["permissions_updated"] == 15
 
 
 def test_seed_functional_permissions_has_no_default_group_links():
@@ -99,7 +99,7 @@ def test_seed_functional_permissions_can_assign_groups_in_legacy_mode():
 def test_seed_rbac_includes_functional_permissions():
     call_command("seed_rbac")
 
-    assert PermissaoFuncional.objects.count() == 14
+    assert PermissaoFuncional.objects.count() == 15
     expected = {item.codename for item in FUNCTIONAL_PERMISSIONS_SEED}
     assert set(PermissaoFuncional.objects.values_list("codename", flat=True)) == expected
 
@@ -109,4 +109,4 @@ def test_seed_functional_permissions_fixture_autouse():
     Fixture autouse de apps.core/tests/conftest.py deve manter baseline disponível.
     """
 
-    assert PermissaoFuncional.objects.count() >= 14
+    assert PermissaoFuncional.objects.count() >= 15

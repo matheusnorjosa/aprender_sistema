@@ -137,22 +137,22 @@ def test_labels_follow_infinitive_verb_form():
     )
 
 
-def test_seed_count_stays_fourteen():
+def test_seed_count_is_fifteen_post_epic_3_1():
     """
-    Epic 1 não adiciona nem remove permissões. Epic 3 adicionará a 15ª
-    (view_all_availability); até lá o count permanece 14.
+    Post-Epic 1: 14. Post-Epic 3.1: 15 (adicionada pode_ver_todas_disponibilidades).
+    Epic 4 (dual-write) e Epic 5 (class sweep) manterão count; apenas
+    quando Epic 4.3 remover os codenames antigos é que cairá para 15 (os
+    novos verb_noun). Até lá, 15 é o valor válido.
     """
-    assert len(FUNCTIONAL_PERMISSIONS_SEED) == 14, (
-        f"Epic 1 não deve alterar o count de permissões (esperado 14, achei "
-        f"{len(FUNCTIONAL_PERMISSIONS_SEED)}). Epic 3 adicionará "
-        "view_all_availability."
+    assert len(FUNCTIONAL_PERMISSIONS_SEED) == 15, (
+        f"Seed deve conter exatamente 15 permissões pós-Epic 3.1. " f"Achei {len(FUNCTIONAL_PERMISSIONS_SEED)}."
     )
 
 
-def test_codenames_unchanged_by_epic_1():
+def test_codenames_stable_through_epic_3_1():
     """
-    Epic 1 é puro rename de texto user-visible. Codenames (identificadores
-    internos) só mudam no Epic 4 (dual-write).
+    Codenames só mudam no Epic 4 (dual-write). Epic 3.1 apenas adiciona
+    `pode_ver_todas_disponibilidades` ao conjunto.
     """
     expected_codenames = frozenset(
         {
@@ -170,10 +170,13 @@ def test_codenames_unchanged_by_epic_1():
             "pode_acessar_dashboard_overview",
             "pode_acessar_map_metrics",
             "pode_editar_como_owner_ou_privilegiado",
+            # Adicionada em Epic 3.1 (2026-04-23) para eliminar hardcoded
+            # groups.filter(name__in=[Super, Controle, Gerência, Diretoria])
+            # em views de availability.
+            "pode_ver_todas_disponibilidades",
         }
     )
     actual = frozenset(seed.codename for seed in FUNCTIONAL_PERMISSIONS_SEED)
     assert actual == expected_codenames, (
-        "Epic 1 não deve alterar codenames. Diferença: "
-        f"faltando {expected_codenames - actual}, extras {actual - expected_codenames}"
+        "Diferença: " f"faltando {expected_codenames - actual}, extras {actual - expected_codenames}"
     )

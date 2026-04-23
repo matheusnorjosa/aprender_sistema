@@ -31,7 +31,7 @@ from django.core.management.base import BaseCommand
 from django.db import IntegrityError, transaction
 
 from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
-from apps.core.models import Compra, Municipio, Projeto
+from apps.core.models import Compra, EquipeGerencia, Gerencia, Municipio, Projeto
 
 User = get_user_model()
 
@@ -87,6 +87,32 @@ class Command(BaseCommand):
             fluxo="NAO_SUPER",
             gerencia_setor="Vidas",
         )
+
+        # 4a. EquipeGerencia (vínculos usuário ↔ gerência com papel).
+        # Necessário para HasSectorAccess — grade mensal e filtros de setor
+        # exigem que o usuário esteja em EquipeGerencia da gerência consultada.
+        # Também usado para resolver gerência do usuário em outras views.
+        self.stdout.write("\n4a. Criando vínculos EquipeGerencia...")
+        vinculos = [
+            # (username, nome_setor, papel)
+            ("coord_vidas@test.com", "Vidas", "COORDENADOR"),
+            ("coord_fluir@test.com", "Fluir", "COORDENADOR"),
+            ("coord_acerta@test.com", "ACerta", "COORDENADOR"),
+            ("gerente_vidas@test.com", "Vidas", "GERENTE"),
+            ("formador_vidas@test.com", "Vidas", "FORMADOR"),
+            ("formador_fluir@test.com", "Fluir", "FORMADOR"),
+        ]
+        by_username = {u.username: u for u in usuarios}
+        for username, nome_setor, papel in vinculos:
+            user_obj = by_username.get(username)
+            if not user_obj:
+                self.stdout.write(f"   ⚠️  Usuário {username} não encontrado — vínculo pulado")
+                continue
+            gerencia = Gerencia.objects.filter(nome_setor=nome_setor, ativo=True).first()
+            if not gerencia:
+                self.stdout.write(f"   ⚠️  Gerência '{nome_setor}' ausente — vínculo pulado")
+                continue
+            self._upsert_equipe_gerencia(usuario=user_obj, gerencia=gerencia, papel=papel)
 
         # 4b. Compras (pré-requisito para criação de solicitação: o serializer
         # exige que exista Compra para o par (municipio, projeto)).
@@ -361,6 +387,29 @@ class Command(BaseCommand):
         )
         self.stdout.write(f"   ✅ Criado: {municipio.nome} ({municipio.uf})")
         return municipio
+
+    def _upsert_equipe_gerencia(
+        self,
+        *,
+        usuario: Any,
+        gerencia: Gerencia,
+        papel: str,
+    ) -> EquipeGerencia:
+        """Upsert idempotente de EquipeGerencia.
+
+        Unique constraint: (gerencia, usuario, papel) — é possível o mesmo
+        usuário ter múltiplos papéis na mesma gerência (raro, mas suportado).
+        Aqui cada (usuario, gerencia, papel) vira um registro independente.
+        """
+        obj, created = EquipeGerencia.objects.update_or_create(
+            gerencia=gerencia,
+            usuario=usuario,
+            papel=papel,
+            defaults={"ativo": True},
+        )
+        status = "✅ Criado" if created else "⏭️  Já existe"
+        self.stdout.write(f"   {status}: {usuario.username} → {gerencia.nome_setor} ({papel})")
+        return obj
 
     def _upsert_compra(
         self,

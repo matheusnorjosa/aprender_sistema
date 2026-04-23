@@ -60,10 +60,8 @@ test.describe(
       const blockRes = await formadorApi.post('/api/availability-blocks/', {
         data: {
           tipo: 'P',
-          start_date: DAY,
-          end_date: DAY,
-          start_time: '09:00:00',
-          end_time: '11:00:00',
+          inicio: `${DAY}T09:00:00-03:00`,
+          fim: `${DAY}T11:00:00-03:00`,
         },
       });
       expect(blockRes.ok(), `bloqueio P deveria criar: ${blockRes.status()} ${await blockRes.text()}`).toBeTruthy();
@@ -103,10 +101,8 @@ test.describe(
       await formadorApi.post('/api/availability-blocks/', {
         data: {
           tipo: 'P',
-          start_date: DAY,
-          end_date: DAY,
-          start_time: '09:00:00',
-          end_time: '11:00:00',
+          inicio: `${DAY}T09:00:00-03:00`,
+          fim: `${DAY}T11:00:00-03:00`,
         },
       });
 
@@ -146,10 +142,8 @@ test.describe(
       const createRes = await formadorApi.post('/api/availability-blocks/', {
         data: {
           tipo: 'P',
-          start_date: MARKER_DAY,
-          end_date: MARKER_DAY,
-          start_time: '13:00:00',
-          end_time: '15:00:00',
+          inicio: `${MARKER_DAY}T13:00:00-03:00`,
+          fim: `${MARKER_DAY}T15:00:00-03:00`,
         },
       });
       expect(createRes.ok()).toBeTruthy();
@@ -158,12 +152,10 @@ test.describe(
       const listRes = await formadorApi.get('/api/availability-blocks/?owner=me');
       expect(listRes.ok()).toBeTruthy();
       const data = (await listRes.json()) as
-        | { results?: Array<{ tipo: string; start_date: string; end_date: string }> }
-        | Array<{ tipo: string; start_date: string; end_date: string }>;
+        | { results?: Array<{ tipo: string; inicio: string; fim: string }> }
+        | Array<{ tipo: string; inicio: string; fim: string }>;
       const list = Array.isArray(data) ? data : (data.results ?? []);
-      const match = list.find(
-        (b) => b.tipo === 'P' && b.start_date === MARKER_DAY && b.end_date === MARKER_DAY
-      );
+      const match = list.find((b) => b.tipo === 'P' && b.inicio.startsWith(MARKER_DAY));
       expect(match, `bloqueio P em ${MARKER_DAY} deveria estar listado`).toBeTruthy();
     });
   }

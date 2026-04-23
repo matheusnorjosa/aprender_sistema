@@ -159,13 +159,18 @@ def csrf_token(request: Request) -> Response:
 # Issue #133: Rate limiting para prevenir brute force (SEC-P1)
 class LoginThrottle(AnonRateThrottle):
     """
-    Rate limiting para endpoint de login: 10 tentativas por minuto por IP.
+    Rate limiting para endpoint de login — configurado por ambiente.
 
-    Previne brute force attacks mantendo taxa aceitável para uso legítimo.
+    Em **produção**: 10 tentativas/minuto por IP (brute-force protection).
+    Em **dev/staging**: relaxado para não bloquear testes E2E multi-role
+    e fluxos de desenvolvimento manual (12+ logins em sequência).
+
+    A taxa é lida de `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["login"]`
+    em `config/settings.py` — `10/minute` por padrão, sobrescrito para
+    `1000/minute` quando `ENVIRONMENT=development`.
     """
 
-    rate = "10/minute"
-    # Usar escopo dedicado para evitar colisão com throttle anon global
+    # Escopo dedicado — DRF resolve a taxa via DEFAULT_THROTTLE_RATES[scope].
     scope = "login"
 
 

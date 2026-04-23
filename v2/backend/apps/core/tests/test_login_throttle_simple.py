@@ -12,20 +12,53 @@ corretamente em produção (validado manualmente).
 
 from __future__ import annotations
 
-import pytest
+from django.conf import settings
 
 from apps.core.views_auth import LoginThrottle
 
 
-def test_login_throttle_rate_is_10_per_minute():
+def test_login_throttle_scope_is_login():
     """
-    SEC-P1: LoginThrottle deve ter rate = '10/minute'.
+    LoginThrottle usa scope 'login' para resolver a taxa via
+    DEFAULT_THROTTLE_RATES (configurável por ambiente).
+    """
+    assert LoginThrottle.scope == "login"
 
-    Previne brute force attacks limitando tentativas de login.
-    Configurado para 10/min (Security Audit 2025).
+
+def test_login_throttle_rate_is_not_hardcoded():
+    """
+    A `rate` não deve estar hardcoded na classe — deve ser resolvida via
+    DEFAULT_THROTTLE_RATES['login'] do settings (permite override por
+    ambiente: 10/minute em prod, 1000/minute em dev).
+    """
+    assert (
+        "rate" not in LoginThrottle.__dict__
+    ), "LoginThrottle.rate está hardcoded; mova para DEFAULT_THROTTLE_RATES['login']"
+
+
+def test_login_rate_is_present_in_throttle_rates():
+    """
+    DEFAULT_THROTTLE_RATES deve ter a chave 'login' — sem ela, o DRF
+    levanta ImproperlyConfigured ao instanciar LoginThrottle.
+    """
+    rates = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
+    assert "login" in rates, (
+        "DEFAULT_THROTTLE_RATES não tem chave 'login' — LoginThrottle não "
+        "conseguirá resolver rate e vai levantar ImproperlyConfigured."
+    )
+    # Sanidade: rate configurado tem formato válido (número/unidade)
+    assert "/" in rates["login"], f"rate malformado: {rates['login']!r}"
+
+
+def test_login_throttle_instantiates_successfully():
+    """
+    Fumaça: LoginThrottle deve instanciar sem erro e ter uma taxa efetiva
+    (não None). Valida que a cadeia scope -> settings -> rate funciona.
     """
     throttle = LoginThrottle()
-    assert throttle.rate == "10/minute", f"LoginThrottle rate = '{throttle.rate}', esperado '10/minute'"
+    assert throttle.rate is not None
+    assert throttle.num_requests > 0
+    assert throttle.duration > 0
 
 
 def test_login_throttle_extends_anon_rate_throttle():

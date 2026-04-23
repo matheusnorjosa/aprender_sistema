@@ -44,9 +44,10 @@ test.describe(
     }) => {
       // BACKLOG: com centenas de solicitações acumuladas no banco dev, a
       // solicitação recém-criada pode cair na página 2+ da paginação default.
+      // Em CI com DB virgem o teste pode passar. test.fixme evita
+      // falso-positivo de "Expected to fail, but passed".
       // Fix planejado: usar `expect.poll` + filtro por `inicio` explícito.
-      // Até lá, marca como fail esperado para estabilizar CI.
-      test.fail(true, 'Paginação esconde solicitação recém-criada — investigar filtro por inicio');
+      test.fixme(true, 'Paginação esconde solicitação recém-criada — investigar filtro por inicio');
       const coordVidasApi = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.coord_vidas.username,

@@ -61,10 +61,10 @@ test.describe('Fluxo de Autenticação', () => {
   // Este teste USA a sessão autenticada do setup
   test.describe('Logout', () => {
     test('4. Logout funciona corretamente', async ({ page }) => {
-      // Spec legacy pré-programa de jornadas. CI do PR #1202 mostrou falha
-      // consistente em 3 retries: mesma sidebar que navigation.spec não
-      // renderiza sob contenção de workers paralelos. Backlog de migração.
-      test.fail(true, 'Spec legacy instável sob contenção de workers paralelos — backlog');
+      // Spec legacy pré-programa de jornadas. Mesma flakiness do
+      // navigation.spec — sidebar às vezes não renderiza sob contenção
+      // de workers paralelos. test.fixme para não falhar quando passa.
+      test.fixme(true, 'Flaky legacy spec — backlog de migração');
       // Já está logado via setup - ir para home
       await page.goto('/home');
 

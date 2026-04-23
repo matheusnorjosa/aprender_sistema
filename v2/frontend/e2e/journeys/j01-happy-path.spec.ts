@@ -14,7 +14,6 @@
  * Este spec cobre ambos: J01a (SUPER) + J01b (NAO_SUPER).
  */
 import { test, expect, createApiContext, seedSolicitacao, ROLE_CREDENTIALS } from '../fixtures';
-import { formatInicioForTable, waitForRouteReady } from '../helpers/wait';
 import { AprovacoesPage } from '../pages/AprovacoesPage';
 
 // ============================================================================
@@ -39,7 +38,11 @@ test.describe(
       await aprovacoes.goto();
       await expect(aprovacoes.tabelaPendentes).toBeVisible();
 
-      await aprovacoes.btnAprovar(formatInicioForTable(solicitacao.inicio)).click();
+      // Linha via AntD data-row-key="{id}" — hasText de data formatada não
+      // casa na ApprovalsPage (DD/MM/YYYY e HH:mm-HH:mm ficam em elementos
+      // separados, não concatenados).
+      await expect(aprovacoes.linhaPorId(solicitacao.id)).toBeVisible();
+      await aprovacoes.btnAprovarPorId(solicitacao.id).click();
 
       const superApi = await createApiContext({
         baseURL: baseURL!,
@@ -149,10 +152,11 @@ test.describe(
       const pageSuper = await authedPage('super_geral');
       const aprovacoes = new AprovacoesPage(pageSuper);
       await aprovacoes.goto();
+      await expect(aprovacoes.tabelaPendentes).toBeVisible();
 
-      // Tentativa de achar a linha — deve falhar
-      const linha = pageSuper.getByRole('row').filter({ hasText: String(solicitacao.id) });
-      await expect(linha).toHaveCount(0);
+      // hasText: String(id) é lossy (casa datas/horas com mesmos dígitos).
+      // Usar AntD data-row-key="{id}" — casa apenas a linha exata.
+      await expect(aprovacoes.linhaPorId(solicitacao.id)).toHaveCount(0);
     });
 
     test('borda: tentar aprovar via API uma solicitação já aprovada retorna 400', async ({ baseURL }) => {

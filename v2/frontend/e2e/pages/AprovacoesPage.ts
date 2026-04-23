@@ -15,15 +15,31 @@ export class AprovacoesPage extends BasePage {
   }
 
   /**
-   * Localiza a linha de uma solicitação na tabela.
+   * Localiza a linha de uma solicitação na tabela via AntD `data-row-key`.
    *
-   * A tabela de aprovações mostra colunas como data/hora, município, projeto
-   * — não expõe ID numérico. Ao invés do ID, aceite o texto-chave que a
-   * linha contém (ex: data formatada `DD/MM/YYYY HH:mm` via
-   * `formatInicioForTable(solicitacao.inicio)` do helpers/wait).
+   * AntD `<Table rowKey="id">` renderiza cada `<tr>` com `data-row-key={id}`.
+   * Isso é mais robusto que filtrar por `hasText(data formatada)` — a coluna
+   * "Data/Horário" na `ApprovalsPage` quebra data e hora em elementos
+   * separados (`DD/MM/YYYY` acima, `HH:mm - HH:mm` embaixo), então um
+   * `hasText("DD/MM/YYYY HH:mm")` concatenado não casa.
+   */
+  linhaPorId(id: number): Locator {
+    return this.page.locator(`tr[data-row-key="${id}"]`);
+  }
+
+  /**
+   * Variante legacy aceitando texto livre. Use `linhaPorId` quando possível.
    */
   linhaSolicitacao(textoChave: string): Locator {
     return this.tabelaPendentes.getByRole('row').filter({ hasText: textoChave });
+  }
+
+  btnAprovarPorId(id: number): Locator {
+    return this.linhaPorId(id).getByRole('button', { name: /aprovar/i });
+  }
+
+  btnReprovarPorId(id: number): Locator {
+    return this.linhaPorId(id).getByRole('button', { name: /reprovar|rejeitar/i });
   }
 
   btnAprovar(textoChave: string): Locator {

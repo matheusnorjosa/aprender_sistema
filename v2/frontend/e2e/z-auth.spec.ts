@@ -61,14 +61,6 @@ test.describe('Fluxo de Autenticação', () => {
   // Este teste USA a sessão autenticada do setup
   test.describe('Logout', () => {
     test('4. Logout funciona corretamente', async ({ page }) => {
-      // Spec legacy pré-programa de jornadas. Mesmo problema do
-      // navigation.spec — sidebar às vezes não renderiza dentro do timeout
-      // quando carrega /home direto. Marcado test.fail() até migração
-      // completa dos specs legacy (backlog).
-      test.fail(
-        true,
-        'Spec legacy instável — sidebar não renderiza dentro do timeout em ~20% das rodadas. Backlog.'
-      );
       // Já está logado via setup - ir para home
       await page.goto('/home');
 

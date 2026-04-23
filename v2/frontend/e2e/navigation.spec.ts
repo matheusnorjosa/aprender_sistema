@@ -10,14 +10,6 @@ import { waitForAppReady } from './helpers/wait';
 
 test.describe('Navegação Principal', () => {
   test('1. Página Inicial carrega corretamente', async ({ page }) => {
-    // Spec legacy pré-programa de jornadas. Em algumas rodadas CI, `/home`
-    // com storageState=coord_e2e não renderiza o `role=navigation` dentro
-    // do timeout default — comportamento a investigar. Marcado test.fail()
-    // até migração completa dos specs legacy (backlog).
-    test.fail(
-      true,
-      'Spec legacy instável — sidebar não renderiza dentro do timeout em ~20% das rodadas. Backlog.'
-    );
     await page.goto('/home');
     await waitForAppReady(page);
     await expect(page.getByRole('navigation', { name: 'Navegacao principal' })).toBeVisible();

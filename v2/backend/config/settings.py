@@ -438,6 +438,10 @@ REST_FRAMEWORK = {
         "gcal_read": "60/min",  # Google Calendar reads
         "gcal_write": "10/min",  # Google Calendar writes (publish)
         "export": "10/min",  # CSV/JSON exports
+        # Login: restrito em produção (brute-force protection — Issue #133),
+        # relaxado fora dela para não atrapalhar dev / testes E2E multi-role.
+        # Sobrescrito abaixo com valor ambiente-dependente.
+        "login": "10/minute",
     },
     # Custom exception handler for standardized error responses
     "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
@@ -504,6 +508,10 @@ if ENVIRONMENT == "development":
         "gcal_read": "600/min",
         "gcal_write": "100/min",
         "export": "100/min",
+        # Login: 1000/min em dev para não bloquear testes E2E multi-role e
+        # desenvolvimento manual (12+ logins em sequência). Em prod mantém
+        # 10/min contra brute force (ver bloco DEFAULT_THROTTLE_RATES acima).
+        "login": "1000/minute",
     }
 
 # ================================================================

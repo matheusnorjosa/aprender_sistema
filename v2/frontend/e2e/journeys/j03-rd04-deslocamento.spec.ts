@@ -44,15 +44,6 @@ test.describe(
     test('canônica: check em Fortaleza no mesmo dia de evento em Salvador → conflito D', async ({
       baseURL,
     }) => {
-      // Flaky em CI: /api/availability/check/ às vezes retorna conflicts=[]
-      // em vez de incluir 'D'. Participation FORMADOR via
-      // extra_participants.formador_ids parece não persistir de forma
-      // consistente. Usar test.fixme() (não test.fail) porque o teste passa
-      // em alguns runs — investigação backend pendente.
-      test.fixme(
-        true,
-        'Flaky: extra_participants.formador_ids não gera Participation consistentemente — investigação backend'
-      );
       const DAY = uniqueFutureDay();
       const superApi = await createApiContext({
         baseURL: baseURL!,
@@ -88,12 +79,15 @@ test.describe(
       // Usamos o `inicio` efetivo da solicitação criada (não o DAY original).
       const actualDay = solicitacaoSalvador.inicio.slice(0, 10); // "YYYY-MM-DD"
 
-      // Consulta RD-04: pedir janela em Fortaleza no mesmo dia, 2h depois
+      // Consulta RD-04: janela em Fortaleza 30 min após o fim do evento em
+      // Salvador. TRAVEL_BUFFER_MINUTES é 60 (dev) ou 120 (prod/CI), então
+      // gap de 30 min é SEMPRE < buffer → força conflito 'D'. Gaps ≥60 min
+      // fariam o teste passar apenas em prod (buffer maior), nunca em dev.
       const checkRes = await superApi.get(
         `/api/availability/check/` +
           `?usuario_id=${formadorId}` +
-          `&inicio=${encodeURIComponent(`${actualDay}T13:00:00-03:00`)}` +
-          `&fim=${encodeURIComponent(`${actualDay}T15:00:00-03:00`)}` +
+          `&inicio=${encodeURIComponent(`${actualDay}T11:30:00-03:00`)}` +
+          `&fim=${encodeURIComponent(`${actualDay}T13:30:00-03:00`)}` +
           `&municipio_id=${fortalezaId}`
       );
       expect(checkRes.ok()).toBeTruthy();

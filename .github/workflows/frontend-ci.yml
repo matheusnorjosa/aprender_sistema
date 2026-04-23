@@ -170,6 +170,115 @@ jobs:
         if-no-files-found: ignore
         retention-days: 7
 
+  e2e-journeys:
+    name: "[info] e2e journeys"
+    # Entra como [info] (não bloqueia PRs) enquanto estabilizamos os ~5
+    # testes residuais com variância entre runs. Após 10+ execuções estáveis
+    # em main, promover para [required] removendo `continue-on-error` e
+    # renomeando para `[required] e2e journeys`.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    env:
+      # Dev env: throttle relaxado + FreezeTimeMiddleware habilitado.
+      ENVIRONMENT: 'development'
+      DEBUG_E2E: 'true'
+      INCLUDE_DEV_TOOLS: 'true'
+      JOURNEYS_PLAYWRIGHT_WORKERS: '2'
+
+    defaults:
+      run:
+        working-directory: v2/frontend
+
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+
+    - uses: ./.github/actions/setup-node-deps
+
+    - name: Install Playwright browsers
+      run: npx playwright install chromium --with-deps
+
+    - name: Start backend services and seed E2E data
+      working-directory: .
+      run: |
+        cp v2/infra/.env.example v2/infra/.env
+        # Sobrescreve/adiciona flags específicas de E2E
+        {
+          echo "ENVIRONMENT=development"
+          echo "DEBUG_E2E=true"
+          echo "INCLUDE_DEV_TOOLS=true"
+        } >> v2/infra/.env
+
+        DB_NAME="$(grep -m1 '^DB_NAME=' v2/infra/.env | cut -d'=' -f2- | tr -d '\r')"
+        DB_USER="$(grep -m1 '^DB_USER=' v2/infra/.env | cut -d'=' -f2- | tr -d '\r')"
+        DB_PASSWORD="$(grep -m1 '^DB_PASSWORD=' v2/infra/.env | cut -d'=' -f2- | tr -d '\r')"
+
+        {
+          echo "POSTGRES_DB=$DB_NAME"
+          echo "POSTGRES_USER=$DB_USER"
+          echo "POSTGRES_PASSWORD=$DB_PASSWORD"
+        } >> v2/infra/.env
+
+        export IMAGE_TAG=latest
+        compose() {
+          docker compose -f v2/infra/docker-compose.yml -f v2/infra/docker-compose.override.yml "$@"
+        }
+
+        compose up -d --build db redis web
+
+        for i in $(seq 1 60); do
+          if compose exec -T db sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1; then
+            break
+          fi
+          if [ "$i" -eq 60 ]; then
+            compose logs db
+            exit 1
+          fi
+          sleep 2
+        done
+
+        for i in $(seq 1 30); do
+          if compose exec -T web getent hosts db >/dev/null 2>&1; then
+            break
+          fi
+          if [ "$i" -eq 30 ]; then
+            compose logs web db
+            exit 1
+          fi
+          sleep 1
+        done
+
+        compose exec -T web python manage.py migrate --noinput
+        # Seed order: seed_rbac (groups + functional permissions base) →
+        # seed_e2e_users (users, municipios, projetos, compras, EquipeGerencia;
+        # internamente chama seed_gerencias se necessário e
+        # seed_functional_permissions com assign_default_groups=True).
+        compose exec -T -e DEBUG_E2E=true -e INCLUDE_DEV_TOOLS=true web python manage.py seed_rbac
+        compose exec -T -e DEBUG_E2E=true -e INCLUDE_DEV_TOOLS=true web python manage.py seed_e2e_users
+
+    - name: Run journeys tests
+      run: npm run test:e2e -- --project=chromium --workers=${JOURNEYS_PLAYWRIGHT_WORKERS}
+      env:
+        CI: 'true'
+
+    - name: Stop backend services
+      if: always()
+      working-directory: .
+      run: IMAGE_TAG=latest docker compose -f v2/infra/docker-compose.yml -f v2/infra/docker-compose.override.yml down -v || true
+
+    - name: Upload Playwright test results
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
+      if: always()
+      continue-on-error: true
+      with:
+        name: e2e-journeys-results
+        path: |
+          v2/frontend/test-results
+          v2/frontend/playwright-report
+          v2/frontend/results.xml
+        if-no-files-found: ignore
+        retention-days: 7
+
   lighthouse-ci:
     name: "[info] lighthouse CI"
     runs-on: ubuntu-latest

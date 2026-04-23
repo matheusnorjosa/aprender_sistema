@@ -31,7 +31,7 @@ from django.core.management.base import BaseCommand
 from django.db import IntegrityError, transaction
 
 from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
-from apps.core.models import Municipio, Projeto
+from apps.core.models import Compra, Municipio, Projeto
 
 User = get_user_model()
 
@@ -53,6 +53,15 @@ class Command(BaseCommand):
             grupos[nome_grupo] = grupo
             status = "✅ Criado" if created else "⏭️  Já existe"
             self.stdout.write(f"   {status}: {nome_grupo}")
+
+        # 1b. Vincular permissions funcionais aos grupos (testes E2E exigem
+        # que Coordenador tenha `pode_criar_solicitacao_coord_dat`, etc.).
+        # Em prod o seed_rbac roda com assign_default_groups=False — aqui
+        # forçamos True porque o ambiente E2E precisa do vínculo padrão.
+        from apps.core.services.functional_permissions_seed import seed_functional_permissions
+
+        fp_stats = seed_functional_permissions(assign_default_groups=True, verbose=False)
+        self.stdout.write(f"   ✅ Permissions funcionais vinculadas (updated={fp_stats['permissions_updated']})")
 
         # 2. Criar usuários
         self.stdout.write("\n2. Criando usuários de teste...")
@@ -78,6 +87,18 @@ class Command(BaseCommand):
             fluxo="NAO_SUPER",
             gerencia_setor="Vidas",
         )
+
+        # 4b. Compras (pré-requisito para criação de solicitação: o serializer
+        # exige que exista Compra para o par (municipio, projeto)).
+        self.stdout.write("\n4b. Criando compras pré-requisitas...")
+        pares_compra = [
+            (municipio_salvador, projeto_super, "COMP-E2E-SALV-SUPER"),
+            (municipio_salvador, projeto_nao_super, "COMP-E2E-SALV-NS"),
+            (municipio_fortaleza, projeto_super, "COMP-E2E-FORT-SUPER"),
+            (municipio_fortaleza, projeto_nao_super, "COMP-E2E-FORT-NS"),
+        ]
+        for muni, proj, codigo in pares_compra:
+            self._upsert_compra(codigo=codigo, municipio=muni, projeto=proj)
 
         # 5. Resumo
         self.stdout.write("\n" + "=" * 80)
@@ -340,6 +361,36 @@ class Command(BaseCommand):
         )
         self.stdout.write(f"   ✅ Criado: {municipio.nome} ({municipio.uf})")
         return municipio
+
+    def _upsert_compra(
+        self,
+        *,
+        codigo: str,
+        municipio: Municipio,
+        projeto: Projeto,
+    ) -> Compra:
+        """Upsert idempotente de Compra para testes E2E.
+
+        Serializer de Solicitacao exige que exista Compra para o par
+        (municipio, projeto). Este helper garante a pré-condição em dev.
+        """
+        import hashlib
+
+        external_hash = hashlib.sha256(f"e2e-{codigo}-{municipio.id}-{projeto.id}".encode()).hexdigest()
+        compra, created = Compra.objects.update_or_create(
+            external_hash=external_hash,
+            defaults={
+                "codigo": codigo,
+                "municipio": municipio,
+                "projeto": projeto,
+                "quantidade": 1,
+                "data": "2026-01-01",
+                "uso": "E2E test fixture",
+            },
+        )
+        status = "✅ Criada" if created else "⏭️  Já existe"
+        self.stdout.write(f"   {status}: {codigo} ({municipio.nome} × {projeto.codigo})")
+        return compra
 
     def _upsert_projeto(
         self,

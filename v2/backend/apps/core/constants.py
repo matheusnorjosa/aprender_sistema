@@ -45,3 +45,23 @@ ALLOWED_USER_GROUPS: set[str] = set(SETOR_GROUPS) | set(FUNCAO_GROUPS)
 
 # === RESERVADOS — Proteção contra delete/rename acidental ===
 RESERVED_GROUPS: frozenset[str] = frozenset(SETOR_GROUPS) | frozenset(FUNCAO_GROUPS)
+
+
+# =======================================================================
+# Data scope constants (Epic 3 RBAC Refactor, 2026-04-23)
+#
+# Nomes de grupos Django usados em filtros de QUERYSET para data scope
+# (ex: "quem é formador para o dropdown?"). NUNCA usar para autorização —
+# autorização passa por user.has_perm() / HasPerm(codename) / user_has_any_perm.
+#
+# Centralizadas aqui para que um rename organizacional futuro seja
+# one-line change (sem caçar strings literais pelo código).
+#
+# Ver v2/docs/RBAC_NAMING.md §4 e master-plan §4.
+# =======================================================================
+
+# Coordenadores (para dropdown /api/options/coordenadores/)
+COORDENADOR_ROLE_GROUPS: tuple[str, ...] = ("Coordenador", "Apoio de Coordenação")
+
+# Formadores (para dropdown /api/options/formadores/)
+FORMADOR_ROLE_GROUPS: tuple[str, ...] = ("Formador",)

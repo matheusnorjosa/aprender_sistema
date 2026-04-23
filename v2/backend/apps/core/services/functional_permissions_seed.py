@@ -126,12 +126,25 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         category="solicitacao",
         group_names=("Superintendência", "DAT"),
     ),
+    # Epic 3.1 RBAC Refactor (2026-04-23): substitui checks hardcoded
+    # `user.groups.filter(name__in=[Super, Controle, Gerência, Diretoria])`
+    # por `user_has_any_perm(user, "pode_ver_todas_disponibilidades")`.
+    # Controle também recebe — na UI antiga Controle era BLOCKED de ver
+    # grade mensal; este refactor torna o check positivo (capability) e
+    # mantém o mesmo conjunto efetivo de usuários autorizados.
+    FunctionalPermissionSeed(
+        codename="pode_ver_todas_disponibilidades",
+        label="Visualizar todas as disponibilidades",
+        description="Acesso à grade mensal completa e bloqueios de qualquer usuário.",
+        category="operacao",
+        group_names=("Superintendência", "Controle", "Gerência", "Diretoria"),
+    ),
 )
 
 
 def _validate_seed() -> None:
-    if len(FUNCTIONAL_PERMISSIONS_SEED) != 14:
-        raise ValueError("Seed de permissoes funcionais deve conter exatamente 14 itens.")
+    if len(FUNCTIONAL_PERMISSIONS_SEED) != 15:
+        raise ValueError("Seed de permissoes funcionais deve conter exatamente 15 itens.")
 
     seen: set[str] = set()
     for item in FUNCTIONAL_PERMISSIONS_SEED:

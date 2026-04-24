@@ -22,134 +22,11 @@ class FunctionalPermissionSeed:
     group_names: tuple[str, ...]
 
 
-# Epic 1 RBAC Refactor (2026-04-23): labels + descriptions + categorias
-# reescritas em forma capability-oriented (o que a pessoa PODE FAZER),
-# não identity-oriented (quem faz hoje). Codenames permanecem intactos —
-# rename de codename é Epic 4. Group_names permanecem intactos — mudança
-# organizacional é deferida permanentemente (ver master-plan §9.1).
+# Seed canônico pós-Epic 4.3 RBAC Refactor (2026-04-24).
+# Codenames em `verb_noun` inglês conforme convenção NIST/Django/GitLab.
+# Labels e descriptions capability-oriented (sem nome de setor).
+# Ver v2/docs/RBAC_NAMING.md §1, §2 e §3.4 para regras vigentes.
 FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
-    FunctionalPermissionSeed(
-        codename="pode_aprovar_superintendencia",
-        label="Aprovar solicitações",
-        description="Aprovar ou reprovar solicitações pendentes.",
-        category="solicitacao",
-        group_names=("Superintendência", "DAT"),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_aprovar_gerente_superintendencia",
-        label="Aprovar solicitações em lote",
-        description="Aprovar múltiplas solicitações em uma operação.",
-        category="solicitacao",
-        group_names=("Superintendência",),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_gerenciar_superintendencia_only",
-        label="Executar operações restritas",
-        description="Operações destrutivas (exclusões críticas).",
-        category="solicitacao",
-        group_names=("Superintendência",),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_criar_solicitacao_coord_dat",
-        label="Criar solicitações de evento",
-        description="Submeter novas solicitações ao fluxo de aprovação.",
-        category="solicitacao",
-        group_names=("Coordenador", "Apoio de Coordenação", "DAT"),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_importar_controle_super",
-        label="Importar planilhas e dados",
-        description="Carregar dados em massa via CSV/XLSX.",
-        category="importacao",
-        group_names=("Controle", "Superintendência"),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_operar_dat",
-        label="Administrar cadastros",
-        description="Gerenciar cadastros e configurações administrativas.",
-        category="cadastros_administrativos",
-        group_names=("DAT",),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_acessar_dashboard_compras",
-        label="Visualizar dashboard de compras",
-        description="Acesso ao painel de indicadores de compras.",
-        category="dashboard",
-        group_names=("DAT", "Diretoria"),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_operar_dat_exclusivo",
-        label="Administrar compras e materiais",
-        description="Operações administrativas restritas sobre compras e materiais.",
-        category="cadastros_administrativos",
-        group_names=("DAT",),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_operar_controle_dat",
-        label="Operar pré-agenda e relatórios",
-        description="Pré-agenda, relatórios gerenciais e publicações operacionais.",
-        category="operacao",
-        group_names=("Controle", "DAT", "Superintendência"),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_operar_controle",
-        label="Executar rotinas operacionais",
-        description="Imports, workflow diário e conferências.",
-        category="operacao",
-        group_names=("Controle",),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_operar_gerencia",
-        label="Exercer supervisão gerencial",
-        description="Atuação gerencial e supervisão de equipe.",
-        category="supervisao",
-        group_names=("Gerência", "Superintendência", "Diretoria"),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_acessar_dashboard_overview",
-        label="Visualizar dashboard geral",
-        description="Painel executivo de visão geral.",
-        category="dashboard",
-        group_names=("Superintendência", "Gerência", "Diretoria"),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_acessar_map_metrics",
-        label="Visualizar métricas geográficas",
-        description="Dashboards com distribuição por região.",
-        category="dashboard",
-        group_names=("Controle", "DAT", "Superintendência", "Gerência", "Diretoria"),
-    ),
-    FunctionalPermissionSeed(
-        codename="pode_editar_como_owner_ou_privilegiado",
-        label="Editar solicitações próprias ou privilegiadas",
-        description="Editar solicitações que você criou ou com privilégio.",
-        category="solicitacao",
-        group_names=("Superintendência", "DAT"),
-    ),
-    # Epic 3.1 RBAC Refactor (2026-04-23): substitui checks hardcoded
-    # `user.groups.filter(name__in=[Super, Controle, Gerência, Diretoria])`
-    # por `user_has_any_perm(user, "pode_ver_todas_disponibilidades")`.
-    # Controle também recebe — na UI antiga Controle era BLOCKED de ver
-    # grade mensal; este refactor torna o check positivo (capability) e
-    # mantém o mesmo conjunto efetivo de usuários autorizados.
-    FunctionalPermissionSeed(
-        codename="pode_ver_todas_disponibilidades",
-        label="Visualizar todas as disponibilidades",
-        description="Acesso à grade mensal completa e bloqueios de qualquer usuário.",
-        category="operacao",
-        group_names=("Superintendência", "Controle", "Gerência", "Diretoria"),
-    ),
-    # ========================================================================
-    # Epic 4.1 RBAC Refactor (2026-04-23): codenames `verb_noun` em inglês
-    # (DUAL-WRITE — coexistem com os antigos `pode_*` por 1 semana de soak).
-    #
-    # Cada novo codename tem o MESMO label/description/category/group_names
-    # do antigo correspondente. Após Epic 4.2 migrar todas as usagens
-    # internas e Epic 4.3 confirmar 1 semana sem erros em staging, os
-    # antigos são removidos.
-    #
-    # Mapeamento canônico: ver epic-4-codenames.md.
-    # ========================================================================
     FunctionalPermissionSeed(
         codename="approve_solicitation",
         label="Aprovar solicitações",
@@ -259,10 +136,9 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
 
 
 def _validate_seed() -> None:
-    # Epic 4.1 dual-write: 15 antigos `pode_*` + 15 novos `verb_noun` = 30.
-    # Após Epic 4.3 remover os antigos, voltará a 15.
-    if len(FUNCTIONAL_PERMISSIONS_SEED) != 30:
-        raise ValueError("Seed de permissoes funcionais deve conter exatamente 30 itens (dual-write Epic 4).")
+    # Epic 4.3 (2026-04-24): dual-write terminado, apenas os 15 `verb_noun`.
+    if len(FUNCTIONAL_PERMISSIONS_SEED) != 15:
+        raise ValueError("Seed de permissoes funcionais deve conter exatamente 15 itens.")
 
     seen: set[str] = set()
     for item in FUNCTIONAL_PERMISSIONS_SEED:

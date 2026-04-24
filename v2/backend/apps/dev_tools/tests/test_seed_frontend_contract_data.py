@@ -89,8 +89,6 @@ class TestSeedFrontendContractDataCommand:
         dat_user = Usuario.objects.get(username=SEED_DAT_USERNAME)
         assert dat_user.check_password("testpass123")
         assert set(dat_user.groups.values_list("name", flat=True)) == {"DAT"}
-        assert (
-            PermissaoFuncional.objects.get(codename="pode_acessar_dashboard_compras").groups.filter(name="DAT").exists()
-        )
+        assert PermissaoFuncional.objects.get(codename="view_compras_dashboard").groups.filter(name="DAT").exists()
 
         assert Usuario.objects.filter(username=SEED_CONTROLE_USERNAME).exists()

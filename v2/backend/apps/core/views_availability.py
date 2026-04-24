@@ -38,7 +38,7 @@ def is_privileged_user(user):
     """
     from apps.core.rbac_helpers import user_has_any_perm
 
-    return user_has_any_perm(user, "pode_ver_todas_disponibilidades")
+    return user_has_any_perm(user, "view_all_availability")
 
 
 def get_user_gerencias_ids(user) -> list[int]:

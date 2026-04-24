@@ -177,7 +177,7 @@ class MonthlyAvailabilityView(APIView):
         allowed_user_ids: list[int] | None = None
         cache_scope = "global"
         if gerencia_id is None:
-            has_wide_scope = user_has_any_perm(request.user, "pode_ver_todas_disponibilidades")
+            has_wide_scope = user_has_any_perm(request.user, "view_all_availability")
             if has_wide_scope:
                 cache_scope = "wide"
             else:

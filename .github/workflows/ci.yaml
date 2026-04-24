@@ -179,6 +179,31 @@ jobs:
           echo "✓ No new /api/v1/ references found outside allowlist."
 
   # ----------------------------------------------------------------
+  # Job 1b: RBAC lint — Epic 6 RBAC Refactor guard
+  # ----------------------------------------------------------------
+  # AST-based custom lint que impede regressão capability → identity.
+  # Regras:
+  #   V001 — user.groups.filter(name=...) em views/services (use HasPerm)
+  #   V002 — classes Is<Role> fora da whitelist (use HasPerm inline)
+  # Ver: v2/backend/scripts/rbac_lint.py + v2/docs/RBAC_NAMING.md
+  rbac-lint:
+    name: "[required] backend rbac-lint"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Run RBAC lint (AST)
+        run: |
+          cd v2/backend
+          python scripts/rbac_lint.py apps/
+
+  # ----------------------------------------------------------------
   # Job 2a: Backend tests - core suite (serial)
   # ----------------------------------------------------------------
   backend-tests-core:

@@ -363,5 +363,6 @@ class EventDetailSerializer(serializers.ModelSerializer):
             .order_by("-created_at")[:20]
         )
 
-        # Serializar
-        return AuditLogTimelineSerializer(logs, many=True).data
+        # Serializar — `.data` em DRF retorna ReturnList | ReturnDict | Any;
+        # com many=True é sempre ReturnList (subclasse de list).
+        return cast(list[dict[str, Any]], AuditLogTimelineSerializer(logs, many=True).data)

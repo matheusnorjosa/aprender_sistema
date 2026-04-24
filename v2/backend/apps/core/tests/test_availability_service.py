@@ -4,7 +4,7 @@ Tests: Availability Service (RD-01 a RD-08)
 Cobertura completa das regras de disponibilidade + endpoint de checagem.
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false, reportMissingTypeStubs=false, reportPrivateUsage=false
 
 from __future__ import annotations
 
@@ -347,7 +347,8 @@ class TestAvailabilityServiceRules:
         event_end_local = datetime.combine(test_date, time(23, 59), tzinfo=fortaleza_tz)
 
         # Criar evento aprovado às 23:30 Fortaleza
-        existing = Solicitacao.objects.create(
+        # (persistido só pelo side effect — check_conflicts vai buscar no DB)
+        Solicitacao.objects.create(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_a,

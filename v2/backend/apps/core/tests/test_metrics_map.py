@@ -2,7 +2,7 @@
 Testes para endpoint de métricas do mapa (PR 11/N).
 
 Cobertura:
-- Permissões (IsMapMetrics)
+- Permissões (HasPerm("view_map_metrics"))
 - Validação de parâmetros
 - Agregação correta por UF
 - Filtros (status + projeto_id)
@@ -28,7 +28,6 @@ import pytest
 from apps.core.models import Compra, Municipio, Participation, Produto, Projeto, Solicitacao, TipoEvento, Usuario
 
 pytestmark = pytest.mark.django_db
-
 
 # ============================================================================
 # FIXTURES

@@ -8,7 +8,7 @@ Endpoints:
 - PUT /api/config/ - Atualiza configurações + AuditLog
 
 Permissions:
-- IsDAT | IsSuperintendencia (RBAC)
+- HasPerm("manage_purchases_and_materials") | HasPerm("approve_solicitation") (RBAC)
 
 Cache:
 - Invalidação automática via signal post_save (apps/core/signals.py)
@@ -30,7 +30,7 @@ from drf_spectacular.utils import extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.models import AuditLog, Config
-from apps.core.permissions import IsDAT, IsSuperintendencia
+from apps.core.permissions import HasPerm
 from apps.core.serializers import ConfigSerializer
 from apps.core.services.config_service import bust_cfg, get_cfg
 
@@ -60,13 +60,13 @@ from apps.core.services.config_service import bust_cfg, get_cfg
     tags=["config"],
 )
 @api_view(["GET", "PUT"])
-@permission_classes([IsDAT | IsSuperintendencia])
+@permission_classes([HasPerm("manage_purchases_and_materials") | HasPerm("approve_solicitation")])
 def config_view(request: Request) -> Response:
     """
     GET: Lê configurações consolidadas do Config model.
     PUT: Atualiza configurações + cria AuditLog.
 
-    Permissions: IsDAT | IsSuperintendencia
+    Permissions: HasPerm("manage_purchases_and_materials") | HasPerm("approve_solicitation")
 
     GET Response (200):
         {

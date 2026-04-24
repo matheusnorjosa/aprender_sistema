@@ -293,7 +293,7 @@ class DATRegistroAPITests(APITestCase):
         cls.super_user.groups.add(cls.super_group)
 
     def test_list_requires_dat_permission(self):
-        """GET /api/dat/registros/ should require DAT permission (IsDATOrSuper)."""
+        """GET /api/dat/registros/ should require DAT permission (HasPerm("manage_admin_registries"))."""
         url = reverse("core:dat-registro-list")
         # Unauthenticated
         response = self.client.get(url)

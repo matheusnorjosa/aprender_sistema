@@ -23,7 +23,7 @@ from drf_spectacular.utils import extend_schema
 
 from apps.core.models import Solicitacao
 from apps.core.pagination import LargePagination
-from apps.core.permissions import IsControleOrSuper
+from apps.core.permissions import HasPerm
 from apps.core.serializers import SolicitacaoSerializer
 from apps.core.serializers.gcal_dashboard_contract import (
     AlertsSummaryResponseSerializer,
@@ -53,7 +53,7 @@ class GCalStatusSummaryView(APIView):
     }
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(responses=GCalStatusSummaryResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -94,7 +94,7 @@ class GCalListView(APIView):
     }
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
     pagination_class = LargePagination
 
     @extend_schema(responses=PaginatedSolicitacaoResponseSerializer)
@@ -159,10 +159,10 @@ class DashboardMetricsView(APIView):
         }
     }
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(responses=DashboardMetricsResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -259,11 +259,11 @@ class AlertsSummaryView(APIView):
         }
     }
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     Timezone-aware: Usa helper _filter_events_queryset (clamp local→UTC)
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(responses=AlertsSummaryResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:

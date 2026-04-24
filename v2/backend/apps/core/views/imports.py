@@ -10,7 +10,7 @@ Endpoints:
     GET    /api/imports/             — lista jobs do usuario (filtros: type, status)
 
 Seguranca:
-    - Upload: IsAuthenticated + IsControleOrSuper + validate_upload (magic bytes)
+    - Upload: IsAuthenticated + HasPerm("import_spreadsheet") + validate_upload (magic bytes)
     - Leitura: IsAuthenticated + filtro por owner (ou super) no queryset
     - error_traceback NAO e exposto (debug-only, fica em logs)
 """
@@ -34,7 +34,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.models import ImportJob
-from apps.core.permissions import IsControleOrSuper
+from apps.core.permissions import HasPerm
 from apps.core.serializers.import_job import ImportJobSerializer, ImportJobUploadRequestSerializer
 from apps.core.serializers.openapi_critical_contract import ImportOperationErrorResponseSerializer
 from apps.core.upload_validators import validate_upload
@@ -63,7 +63,7 @@ class ImportJobBloqueiosUploadView(APIView):
         ImportJobSerializer do job recem criado (status=QUEUED).
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(
         summary="Dispara import assincrono de bloqueios",

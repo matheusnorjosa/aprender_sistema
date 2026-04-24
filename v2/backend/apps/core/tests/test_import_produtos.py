@@ -4,7 +4,7 @@ Testes para importacao de Produtos.
 Cobertura:
 - Service: import_produtos_from_file()
 - View: ImportProdutosView
-- RBAC: Permissoes IsControleOrSuper
+- RBAC: Permissoes HasPerm("import_spreadsheet")
 - Idempotencia: Nao duplica registros (codigo e chave)
 """
 

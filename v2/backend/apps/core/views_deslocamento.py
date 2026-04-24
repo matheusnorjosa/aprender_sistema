@@ -9,7 +9,7 @@ Endpoints:
 - DELETE /api/deslocamentos/{id}/ - Delete (AuditLog)
 
 Permissions:
-- IsControleOrDAT (Controle, DAT, Superintendência)
+- HasPerm("operate_preagenda") (Controle, DAT, Superintendência)
 
 Filters:
 - usuario_id: Filter by usuario ID
@@ -42,7 +42,7 @@ from rest_framework.request import Request
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import AuditLog, Deslocamento
-from .permissions import IsControleOrDAT
+from .permissions import HasPerm
 from .serializers import DeslocamentoSerializer
 
 
@@ -84,7 +84,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
     Provides full CRUD operations for travel records between municipalities.
 
     Permissions:
-        - IsControleOrDAT (Controle, DAT, Superintendência)
+        - HasPerm("operate_preagenda") (Controle, DAT, Superintendência)
 
     Filters:
         - usuario_id: Filter by usuario ID
@@ -108,7 +108,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
 
     queryset = Deslocamento.objects.select_related("usuario").all()
     serializer_class = DeslocamentoSerializer
-    permission_classes = [IsAuthenticated, IsControleOrDAT]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda")]
     pagination_class = DeslocamentoPagination
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ["start_date", "end_date", "origem", "destino"]

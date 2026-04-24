@@ -24,7 +24,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 
 from apps.core.models import Solicitacao
-from apps.core.permissions import IsControleOrSuper
+from apps.core.permissions import HasPerm
 from apps.core.serializers import EventDetailSerializer, SolicitacaoSerializer
 from apps.core.serializers.gcal_dashboard_contract import (
     DetailMessageSerializer,
@@ -47,10 +47,10 @@ class DashboardEventsView(APIView):
     - page: Número da página (default: 1)
     - page_size: Itens por página (default: 20, max: 100)
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(responses=PaginatedSolicitacaoResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -82,10 +82,10 @@ class DashboardEventsExportView(APIView):
     - end (ISO date): Filtro início <= end (formato: YYYY-MM-DD)
     - format: csv|json (default: csv)
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response | HttpResponse:
         # Usar helper unificado timezone-aware (Issue #96 follow-up #124)
@@ -187,10 +187,10 @@ class EventDetailAPIView(APIView):
 
     Retorna detalhes completos de um evento GCal com timeline de AuditLog.
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(
         responses={
@@ -240,7 +240,7 @@ class GCalDriftView(APIView):
     }
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(
         responses={

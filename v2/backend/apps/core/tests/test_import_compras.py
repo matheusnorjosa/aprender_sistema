@@ -326,9 +326,8 @@ def test_import_compras_requires_controle_group():
     csv_path = str(Path(settings.BASE_DIR) / "data/csv-import/compras.csv")
     response = client.post("/api/controle/import-compras/?dry_run=true", data={"path": csv_path})
 
-    # Deve retornar 403 Forbidden
+    # Epic 5.2 (2026-04-24): mensagens capability-oriented não incluem nome de setor.
     assert response.status_code == 403
-    assert "Controle ou Superintendência" in str(response.data)
 
 
 def test_import_compras_allowed_for_controle():

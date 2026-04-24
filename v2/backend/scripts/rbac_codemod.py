@@ -156,6 +156,7 @@ def main() -> int:
         "apps/core/permissions.py",
         "apps/core/migrations/",
         "scripts/rbac_codemod.py",
+        "tests/test_permissions_hasperm.py",
     )
 
     filtered: list[Path] = []

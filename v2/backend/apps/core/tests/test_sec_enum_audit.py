@@ -193,7 +193,7 @@ class TestAuditLogViewSetRedaction(TestCase):
     """SEC-AUDIT-01: AuditLog API returns redacted details for non-superuser."""
 
     def setUp(self):
-        # Create groups for IsControleOrDAT permission
+        # Create groups for HasPerm("operate_preagenda") permission
         self.controle_group, _ = Group.objects.get_or_create(name="Controle")
 
         # Create controle user (can read audit logs but not superuser)

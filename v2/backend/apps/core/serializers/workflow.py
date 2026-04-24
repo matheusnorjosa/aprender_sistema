@@ -111,7 +111,7 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
         - start_date < end_date (error: "Data fim deve ser posterior à data início")
         - origem != destino (error: "Origem e destino devem ser diferentes")
 
-    Permissions: IsControleOrDAT (Controle, DAT, Superintendência)
+    Permissions: HasPerm("operate_preagenda") (Controle, DAT, Superintendência)
     """
 
     usuario_nome = serializers.SerializerMethodField()

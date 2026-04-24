@@ -194,7 +194,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # `groups.filter(name__in=["Superintendência", "Controle", "DAT"])`
         # trocado por capability `pode_operar_controle_dat` (seed Epic 1 dá
         # essa permissão aos 3 grupos). user_has_any_perm trata is_superuser.
-        elif user_has_any_perm(self.request.user, "pode_operar_controle_dat"):
+        elif user_has_any_perm(self.request.user, "operate_preagenda"):
             qs = Solicitacao.objects.select_related(
                 "usuario", "municipio", "tipo_evento", "projeto", "coordenador"
             ).prefetch_related("participations__usuario")

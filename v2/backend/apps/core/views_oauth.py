@@ -32,11 +32,7 @@ from rest_framework.throttling import UserRateThrottle
 
 from apps.core.models import AuditLog, GoogleOAuthCredential
 from apps.core.permissions import IsControleOrSuper
-from apps.core.services.google_oauth import (
-    build_authorization_url,
-    exchange_code_for_tokens,
-    revoke_token,
-)
+from apps.core.services.google_oauth import build_authorization_url, exchange_code_for_tokens, revoke_token
 from apps.core.services.oauth.oauth_flow import _is_safe_url as is_safe_url  # noqa: PLC2701
 from apps.core.services.oauth.token_manager import encrypt_token
 

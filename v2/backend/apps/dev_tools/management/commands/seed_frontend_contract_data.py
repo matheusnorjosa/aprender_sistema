@@ -29,7 +29,7 @@ class Command(BaseCommand):
         call_command("seed_e2e_users")
 
         dat_group, _ = Group.objects.get_or_create(name="DAT")
-        dashboard_perm = PermissaoFuncional.objects.filter(codename="pode_acessar_dashboard_compras").first()
+        dashboard_perm = PermissaoFuncional.objects.filter(codename="view_compras_dashboard").first()
         if dashboard_perm is not None:
             dashboard_perm.groups.add(dat_group)
 

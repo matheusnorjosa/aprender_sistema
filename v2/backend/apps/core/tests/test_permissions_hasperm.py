@@ -248,7 +248,7 @@ def test_legacy_classes_still_work_behaviorally(
     # Conecta a permissão "can_do_test_action" ao codename de uma legacy class
     # para validar que a classe legacy ainda funciona.
     # Usamos IsDAT (codename=pode_operar_dat_exclusivo) como piloto.
-    pode_operar_dat_exclusivo = PermissaoFuncional.objects.filter(codename="pode_operar_dat_exclusivo").first()
+    pode_operar_dat_exclusivo = PermissaoFuncional.objects.filter(codename="manage_purchases_and_materials").first()
     assert pode_operar_dat_exclusivo is not None, "Seed deve ter a permissão."
 
     # Adiciona o group do user à permissão pode_operar_dat_exclusivo

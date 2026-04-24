@@ -38,7 +38,7 @@ def _is_dat_or_super(user: AbstractBaseUser | AnonymousUser) -> bool:
     trocado por capability `pode_operar_dat_exclusivo`."""
     from apps.core.rbac_helpers import user_has_any_perm
 
-    return user_has_any_perm(user, "pode_operar_dat_exclusivo")
+    return user_has_any_perm(user, "manage_purchases_and_materials")
 
 
 def _has_any_group(user: AbstractBaseUser | AnonymousUser, group_names: set[str]) -> bool:

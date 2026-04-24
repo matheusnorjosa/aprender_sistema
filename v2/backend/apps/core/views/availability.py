@@ -55,7 +55,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         """
         from apps.core.rbac_helpers import user_has_any_perm
 
-        return user_has_any_perm(self.request.user, "pode_ver_todas_disponibilidades")
+        return user_has_any_perm(self.request.user, "view_all_availability")
 
     def get_queryset(self) -> QuerySet:
         """

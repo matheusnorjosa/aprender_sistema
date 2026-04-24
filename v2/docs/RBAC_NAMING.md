@@ -208,15 +208,43 @@ Se você for remover uma legacy do código:
 
 ## 7. Enforcement automático
 
-O Epic 6 (#1179) introduzirá um **lint custom** em `.github/workflows/` que falha PRs que:
+Lint AST custom em `v2/backend/scripts/rbac_lint.py` falha PRs que:
 
-- **V001**: usam `user.groups.filter(name=...)` em `views/` ou `services/`
-- **V002**: definem classe `Is<Word>` fora da whitelist
-- **V003**: importam `django.contrib.auth.models.Group` para decisões de autorização
+- **V001**: `user.groups.filter(name=...)` / `exclude(name=...)` em código de produção.
+  Exceção: linha com marcador `# noqa: RBAC-<tipo>-allowed` documentando a justificativa (composite, block, data-scope).
+- **V002**: definem classe `class Is<Word>(...)` fora da whitelist
+  `{IsGerenteSuperintendencia, IsOwnerOrPrivileged}`.
 
-Whitelist do lint: `tests/`, `migrations/`, `fixtures/`, `apps/core/rbac/constants.py`.
+**V003 (import de Group) foi descartado** — V001 já cobre o padrão observável
+na prática; V003 gerava 100+ falsos positivos (seeds, fixtures, serializers,
+admin views têm imports legítimos) com zero violações reais a ganhar.
 
-Até o Epic 6 entrar em vigor, a revisão manual de PR faz esse papel.
+**Paths whitelisted** (o lint pula):
+
+- `tests/`, `migrations/`, `fixtures/`
+- `apps/core/rbac/` (o próprio módulo RBAC)
+- `apps/dev_tools/` (seeds e admin tooling manipulam grupos por design)
+- `apps/core/constants.py`, `apps/core/permissions.py`, `apps/core/rbac_helpers.py` (shims e data-scope SSOT)
+- `scripts/rbac_lint.py`, `scripts/rbac_codemod.py`
+
+**Markers `# noqa: RBAC-*-allowed` em uso**:
+
+| Marker                      | Uso legítimo                                           |
+| --------------------------- | ------------------------------------------------------ |
+| `RBAC-composite-allowed`    | Classe composite (funcperm + grupo Django)             |
+| `RBAC-block-allowed`        | Bloqueio explícito de um grupo por design documentado  |
+| `RBAC-data-scope-allowed`   | Filtro de escopo de dados (não authz)                  |
+
+**CI job**: `[required] backend rbac-lint` em `.github/workflows/ci.yaml` — falha o PR automaticamente.
+
+**Self-test**: `apps/core/tests/test_rbac_lint.py` valida que o lint aceita o baseline atual e rejeita os padrões proibidos (10 testes).
+
+Rodar localmente:
+
+```bash
+cd v2/backend
+python scripts/rbac_lint.py apps/
+```
 
 ---
 

@@ -310,25 +310,30 @@ class TestDeslocamentoAPI:
 
     def test_deslocamento_rbac(self, user_formador, user_controle, user_dat, deslocamento_sample):
         """
-        Test: RBAC - Only Controle/DAT/Superintendência can access.
+        Test: RBAC - Acesso baseado em `view_all_availability` (Issue #1221 Epic 1).
 
-        Expected:
-        - Formador: 403 Forbidden
-        - Controle: 200 OK
-        - DAT: 200 OK
+        Após Issue 1.3, /deslocamentos usa `HasPerm("view_all_availability")`:
+        - Formador: 403 (não tem perm por design)
+        - Controle: 200 (tem `view_all_availability` via seed)
+        - DAT: 403 (DAT não gerencia disponibilidade — não tem a perm)
+
+        Na Issue 1.4 (seed realign), Gerente/Coordenador/Apoio Coord também
+        ganharão `view_all_availability` → testes adicionais para cobrir esses
+        papéis serão criados em Issue 1.4.
         """
-        # Test 1: Formador (no permission) → 403
         client = APIClient()
+
+        # Formador → 403 (sem perm)
         client.force_authenticate(user=user_formador)
         response = client.get("/api/deslocamentos/")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-        # Test 2: Controle → 200
+        # Controle → 200 (tem view_all_availability)
         client.force_authenticate(user=user_controle)
         response = client.get("/api/deslocamentos/")
         assert response.status_code == status.HTTP_200_OK
 
-        # Test 3: DAT → 200
+        # DAT → 403 (agora sem view_all_availability conforme intent Epic 1)
         client.force_authenticate(user=user_dat)
         response = client.get("/api/deslocamentos/")
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == status.HTTP_403_FORBIDDEN

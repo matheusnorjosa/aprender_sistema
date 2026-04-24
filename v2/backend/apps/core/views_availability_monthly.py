@@ -165,16 +165,19 @@ class MonthlyAvailabilityView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         # Sem gerencia_id, restringir escopo para evitar vazamento global:
-        # - Perfis amplos (super/superintendência/gerência/diretoria): visão ampla
+        # - Perfis amplos (super/capability pode_ver_todas_disponibilidades): visão ampla
         # - Demais perfis: limitar aos usuários das gerências vinculadas
+        #
+        # Epic 3.2 RBAC Refactor (2026-04-23): hardcoded
+        # `groups.filter(name__in=["Superintendência", "Gerência", "Diretoria"])`
+        # substituído por capability. user_has_any_perm trata superuser bypass
+        # internamente.
+        from apps.core.rbac_helpers import user_has_any_perm
+
         allowed_user_ids: list[int] | None = None
         cache_scope = "global"
         if gerencia_id is None:
-            has_wide_scope = bool(
-                getattr(request.user, "is_superuser", False)
-                # "Gerência" = grupo Django legacy (não é setor, mas dá acesso amplo a gerentes)
-                or request.user.groups.filter(name__in=["Superintendência", "Gerência", "Diretoria"]).exists()
-            )
+            has_wide_scope = user_has_any_perm(request.user, "pode_ver_todas_disponibilidades")
             if has_wide_scope:
                 cache_scope = "wide"
             else:

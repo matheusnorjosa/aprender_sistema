@@ -368,8 +368,15 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
         if getattr(request.user, "is_superuser", False):
             return True
 
-        # Grupo "Controle" não tem acesso à grade mensal
-        if request.user.groups.filter(name="Controle").exists():  # type: ignore[attr-defined]
+        # Epic 3.2 RBAC Refactor (2026-04-23): `HasSectorAccess` bloqueia
+        # explicitamente "Controle" por design documentado em
+        # PLAN_multi_sector_availability.md (Controle não faz gestão
+        # de setor — opera pré-agenda). Mantemos o block inline porque:
+        # (1) é BLOCK específico, não authz positiva padrão;
+        # (2) o rationale é ancorado em design doc;
+        # (3) Epic 6 lint whitelist permite este caso específico
+        #     (arquivo `permissions.py` é whitelist natural da classe base).
+        if request.user.groups.filter(name="Controle").exists():  # type: ignore[attr-defined]  # noqa: RBAC-block-allowed
             self.message = "O grupo Controle não tem acesso à grade mensal de disponibilidade."
             return False
 

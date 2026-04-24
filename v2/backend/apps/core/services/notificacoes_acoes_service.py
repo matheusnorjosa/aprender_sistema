@@ -124,6 +124,11 @@ class NotificationService:
         executor_group_ids: Iterable[int],
         role_group_names: Iterable[str],
     ) -> QuerySet[Usuario]:
+        # Epic 3.2 RBAC Refactor (2026-04-23): `groups__name__in` aqui é
+        # DATA SCOPE (filtra destinatários de notificação por conjunto de
+        # grupos passado pelo caller), NÃO autorização. O call site do
+        # caller resolve capability separadamente antes de chamar este
+        # helper. Uso legítimo, whitelistado para Epic 6 lint.
         executor_user_ids = Usuario.objects.filter(
             is_active=True,
             groups__id__in=list(executor_group_ids),
@@ -131,14 +136,15 @@ class NotificationService:
         return Usuario.objects.filter(
             is_active=True,
             id__in=executor_user_ids,
-            groups__name__in=list(role_group_names),
+            groups__name__in=list(role_group_names),  # noqa: RBAC-data-scope-allowed
         ).distinct()
 
     @classmethod
     def _active_users_by_roles(cls, *, role_group_names: Iterable[str]) -> QuerySet[Usuario]:
+        """Data scope: filtra usuários ativos por conjunto de grupos. Não é authz."""
         return Usuario.objects.filter(
             is_active=True,
-            groups__name__in=list(role_group_names),
+            groups__name__in=list(role_group_names),  # noqa: RBAC-data-scope-allowed
         ).distinct()
 
     @classmethod

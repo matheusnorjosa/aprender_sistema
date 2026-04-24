@@ -20,12 +20,12 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from .models import Solicitacao
-from .permissions import IsControleOrDAT
+from .permissions import HasPerm
 from .responses import APIResponse
 
 
 @api_view(["GET"])
-@permission_classes([IsControleOrDAT])
+@permission_classes([HasPerm("operate_preagenda")])
 @throttle_classes([ScopedRateThrottle])
 def reports_status_counts(request: Request) -> Response:
     """
@@ -46,7 +46,7 @@ def reports_status_counts(request: Request) -> Response:
         "period": {"start": "2025-01-01", "end": "2025-01-31"}
     }
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     """
     # Parse dates
     end_date = timezone.now().date()
@@ -99,7 +99,7 @@ reports_status_counts.throttle_scope = "reports"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
-@permission_classes([IsControleOrDAT])
+@permission_classes([HasPerm("operate_preagenda")])
 @throttle_classes([ScopedRateThrottle])
 def reports_top_projects(request: Request) -> Response:
     """
@@ -120,7 +120,7 @@ def reports_top_projects(request: Request) -> Response:
         "limit": 10
     }
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     """
     limit = 5  # Default is 5
     limit_param = request.query_params.get("limit")
@@ -161,7 +161,7 @@ reports_top_projects.throttle_scope = "reports"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
-@permission_classes([IsControleOrDAT])
+@permission_classes([HasPerm("operate_preagenda")])
 @throttle_classes([ScopedRateThrottle])
 def reports_weekly_approved(request: Request) -> Response:
     """
@@ -183,7 +183,7 @@ def reports_weekly_approved(request: Request) -> Response:
         "weeks_count": 4
     }
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     """
     weeks = 12  # Default is 12
     weeks_param = request.query_params.get("weeks")
@@ -231,7 +231,7 @@ reports_weekly_approved.throttle_scope = "reports"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
-@permission_classes([IsControleOrDAT])
+@permission_classes([HasPerm("operate_preagenda")])
 @throttle_classes([ScopedRateThrottle])
 def reports_by_uf(request: Request) -> Response:
     """
@@ -249,7 +249,7 @@ def reports_by_uf(request: Request) -> Response:
         ]
     }
 
-    Permissions: IsControleOrDAT
+    Permissions: HasPerm("operate_preagenda")
     """
     # Default: últimos 30 dias
     end_date = timezone.now().date()

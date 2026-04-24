@@ -4,12 +4,12 @@ SSOT (Single Source of Truth) do sistema de autorização do Aprender Sistema v2
 
 ## Módulos
 
-| Arquivo | Conteúdo |
-|---|---|
-| `__init__.py` | API pública (re-exports) |
-| `permissions.py` | DRF permission classes (`HasPerm` + 3 mantidas) |
-| `helpers.py` | `user_has_any_perm`, `user_has_all_perms` |
-| `constants.py` | `COORDENADOR_ROLE_GROUPS`, `FORMADOR_ROLE_GROUPS` (data-scope) |
+| Arquivo          | Conteúdo                                                         |
+| ---------------- | ---------------------------------------------------------------- |
+| `__init__.py`    | API pública (re-exports)                                         |
+| `permissions.py` | DRF permission classes (`HasPerm` + 3 mantidas)                  |
+| `helpers.py`     | `user_has_any_perm`, `user_has_all_perms`                        |
+| `constants.py`   | `COORDENADOR_ROLE_GROUPS`, `FORMADOR_ROLE_GROUPS` (data-scope)   |
 
 ## Como usar
 

@@ -25,11 +25,12 @@ Formato: `<verb>_<noun>[_<qualifier>]`, snake_case, inglês.
 `admin_`, `manage_`, `operate_`, `configure_`, `change_`, `modify_`, `edit_`, `list_`, `set_`, `write_`.
 
 **Nunca no codename**:
+
 - Nome de setor (`dat`, `controle`, `super`, `vidas`, ...)
 - Nome de função (`coordenador`, `formador`, ...)
 - Nome de grupo Django
 
-### Bons exemplos
+### Bons exemplos de codename
 
 ```text
 approve_solicitation
@@ -40,7 +41,7 @@ create_solicitation
 view_all_availability
 ```
 
-### Maus exemplos
+### Maus exemplos de codename
 
 ```text
 pode_operar_dat                   # setor no nome
@@ -65,11 +66,12 @@ Decompor cada uma em `create/read/update/delete` hoje produziria 8+ codenames se
 Formato: `<Verbo infinitivo> <substantivo plural>`.
 
 **Regras**:
+
 - Começar com verbo infinitivo: *Aprovar*, *Criar*, *Importar*, *Visualizar*, *Administrar*.
 - Evitar: gerúndio ("Aprovação de...", "Criando..."), substantivação ("Aprovações"), adjetivo puro ("Owner"), nome de módulo solto ("Dashboard").
 - **Nunca** nome de setor/função (mesma regra dos codenames).
 
-### Bons exemplos
+### Bons exemplos de label
 
 ```text
 Aprovar solicitações
@@ -79,7 +81,7 @@ Administrar cadastros
 Exercer supervisão gerencial
 ```
 
-### Maus exemplos
+### Maus exemplos de label
 
 ```text
 Operacao DAT                       # setor
@@ -200,6 +202,7 @@ user.groups.filter(name__in=["Controle", "DAT"]).exists()
 Se você criar uma nova classe de permission **e** ela puder ser expressa como `HasPerm(codename)`, **não crie** — use `HasPerm` direto.
 
 Se você for remover uma legacy do código:
+
 - Substituir por `HasPerm("codename")` no `permission_classes`
 - Deletar o import
 - Remover a classe do `apps/core/permissions.py` **somente** quando não houver mais nenhum uso (Epic 5 faz isso via libcst).
@@ -250,14 +253,14 @@ python scripts/rbac_lint.py apps/
 
 ## 8. Referência rápida
 
-| Tipo | Forma canônica | Forma proibida |
-|---|---|---|
-| **Codename** | `approve_solicitation` | `pode_aprovar_superintendencia` |
-| **Label** | "Aprovar solicitações" | "Aprovar/Reprovar (Superintendência)" |
-| **Category** | `solicitacao`, `operacao`, ... | `admin_dat`, `gerencia` |
-| **Permission class** | `HasPerm("approve_solicitation")` | `IsSuperintendencia` |
-| **Authz check** | `user.has_perm("approve_solicitation")` | `user.groups.filter(name="Superintendência")` |
-| **Classe dedicada** | `IsSolicitationOwner` (condição) | `IsDAT` (identidade) |
+| Tipo                 | Forma canônica                            | Forma proibida                                    |
+| -------------------- | ----------------------------------------- | ------------------------------------------------- |
+| **Codename**         | `approve_solicitation`                    | `pode_aprovar_superintendencia`                   |
+| **Label**            | "Aprovar solicitações"                    | "Aprovar/Reprovar (Superintendência)"             |
+| **Category**         | `solicitacao`, `operacao`, ...            | `admin_dat`, `gerencia`                           |
+| **Permission class** | `HasPerm("approve_solicitation")`         | `IsSuperintendencia`                              |
+| **Authz check**      | `user.has_perm("approve_solicitation")`   | `user.groups.filter(name="Superintendência")`     |
+| **Classe dedicada**  | `IsSolicitationOwner` (condição)          | `IsDAT` (identidade)                              |
 
 ---
 

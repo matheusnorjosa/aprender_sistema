@@ -50,7 +50,7 @@ class HasPerm(permissions.BasePermission):  # type: ignore[misc]
 
     Usage:
         class MyView(APIView):
-            permission_classes = [IsAuthenticated, HasPerm("pode_aprovar_superintendencia")]
+            permission_classes = [IsAuthenticated, HasPerm("approve_solicitation")]
 
     Nota sobre app_label:
         O prefixo "core." é opcional — o sistema funcional usa codename
@@ -159,155 +159,155 @@ def _warn_legacy(class_name: str, new_codename: str) -> None:
 class IsSuperintendencia(
     funcperm_factory(
         "IsSuperintendencia",
-        "pode_aprovar_superintendencia",
+        "approve_solicitation",
         "Apenas usuários da Superintendência, DAT ou Superusuários podem realizar esta ação.",
     )
 ):
     def __init__(self) -> None:
         super().__init__()
-        _warn_legacy("IsSuperintendencia", "pode_aprovar_superintendencia")
+        _warn_legacy("IsSuperintendencia", "approve_solicitation")
 
 
 class IsSuperintendenciaOnly(
     funcperm_factory(
         "IsSuperintendenciaOnly",
-        "pode_gerenciar_superintendencia_only",
+        "execute_restricted_operations",
         "Apenas usuários da Superintendência podem realizar esta ação.",
     )
 ):
     def __init__(self) -> None:
         super().__init__()
-        _warn_legacy("IsSuperintendenciaOnly", "pode_gerenciar_superintendencia_only")
+        _warn_legacy("IsSuperintendenciaOnly", "execute_restricted_operations")
 
 
 class IsCoordenadorOrDAT(
     funcperm_factory(
         "IsCoordenadorOrDAT",
-        "pode_criar_solicitacao_coord_dat",
+        "create_solicitation",
         "Apenas Coordenadores, Apoio de Coordenação ou DAT podem criar solicitações.",
     )
 ):
     def __init__(self) -> None:
         super().__init__()
-        _warn_legacy("IsCoordenadorOrDAT", "pode_criar_solicitacao_coord_dat")
+        _warn_legacy("IsCoordenadorOrDAT", "create_solicitation")
 
 
 class IsControleOrSuper(
     funcperm_factory(
         "IsControleOrSuper",
-        "pode_importar_controle_super",
+        "import_spreadsheet",
         "Apenas Controle ou Superintendência podem realizar esta ação.",
     )
 ):
     def __init__(self) -> None:
         super().__init__()
-        _warn_legacy("IsControleOrSuper", "pode_importar_controle_super")
+        _warn_legacy("IsControleOrSuper", "import_spreadsheet")
 
 
 class IsDATOrSuper(
     funcperm_factory(
         "IsDATOrSuper",
-        "pode_operar_dat",
+        "manage_admin_registries",
         "Apenas usuários do grupo DAT ou superusers podem realizar esta ação.",
     )
 ):
     def __init__(self) -> None:
         super().__init__()
-        _warn_legacy("IsDATOrSuper", "pode_operar_dat")
+        _warn_legacy("IsDATOrSuper", "manage_admin_registries")
 
 
 class IsComprasDashboardAccess(
     funcperm_factory(
         "IsComprasDashboardAccess",
-        "pode_acessar_dashboard_compras",
+        "view_compras_dashboard",
         "Apenas usuários dos grupos DAT ou Diretoria podem acessar o dashboard de compras.",
     )
 ):
     def __init__(self) -> None:
         super().__init__()
-        _warn_legacy("IsComprasDashboardAccess", "pode_acessar_dashboard_compras")
+        _warn_legacy("IsComprasDashboardAccess", "view_compras_dashboard")
 
 
 class IsDAT(
     funcperm_factory(
         "IsDAT",
-        "pode_operar_dat_exclusivo",
+        "manage_purchases_and_materials",
         "Apenas usuários do grupo DAT podem realizar esta ação.",
     )
 ):
     def __init__(self) -> None:
         super().__init__()
-        _warn_legacy("IsDAT", "pode_operar_dat_exclusivo")
+        _warn_legacy("IsDAT", "manage_purchases_and_materials")
 
 
 class IsControleOrDAT(
     funcperm_factory(
         "IsControleOrDAT",
-        "pode_operar_controle_dat",
+        "operate_preagenda",
         "Apenas Controle ou DAT podem realizar esta ação.",
     )
 ):
     def __init__(self) -> None:
         super().__init__()
-        _warn_legacy("IsControleOrDAT", "pode_operar_controle_dat")
+        _warn_legacy("IsControleOrDAT", "operate_preagenda")
 
 
 class IsControle(
     funcperm_factory(
         "IsControle",
-        "pode_operar_controle",
+        "run_daily_operations",
         "Apenas usuários do grupo Controle podem realizar esta ação.",
     )
 ):
     def __init__(self) -> None:
         super().__init__()
-        _warn_legacy("IsControle", "pode_operar_controle")
+        _warn_legacy("IsControle", "run_daily_operations")
 
 
 class IsGerencia(
     funcperm_factory(
         "IsGerencia",
-        "pode_operar_gerencia",
+        "supervise_operations",
         "Apenas usuários com permissão gerencial (Gerência, Superintendência ou Diretoria) podem realizar esta ação.",
     )
 ):
     def __init__(self) -> None:
         super().__init__()
-        _warn_legacy("IsGerencia", "pode_operar_gerencia")
+        _warn_legacy("IsGerencia", "supervise_operations")
 
 
 class IsDashboardOverview(
     funcperm_factory(
         "IsDashboardOverview",
-        "pode_acessar_dashboard_overview",
+        "view_overview_dashboard",
         "Apenas usuários com permissão de dashboard (Superintendência, Gerência ou Diretoria) podem acessar o dashboard geral.",
     )
 ):
     def __init__(self) -> None:
         super().__init__()
-        _warn_legacy("IsDashboardOverview", "pode_acessar_dashboard_overview")
+        _warn_legacy("IsDashboardOverview", "view_overview_dashboard")
 
 
 class IsMapMetrics(
     funcperm_factory(
         "IsMapMetrics",
-        "pode_acessar_map_metrics",
+        "view_map_metrics",
         "Apenas usuários autorizados podem acessar métricas do mapa.",
     )
 ):
     def __init__(self) -> None:
         super().__init__()
-        _warn_legacy("IsMapMetrics", "pode_acessar_map_metrics")
+        _warn_legacy("IsMapMetrics", "view_map_metrics")
 
 
 class IsGerenteSuperintendencia(HasFunctionalPermission):  # type: ignore[misc]
     """
     Regra composta fixa:
-    - permissão funcional "pode_aprovar_gerente_superintendencia"
+    - permissão funcional "approve_solicitation_batch"
     - grupo de função "Gerente"
     """
 
-    functional_codename = "pode_aprovar_gerente_superintendencia"
+    functional_codename = "approve_solicitation_batch"
     message = "Apenas Gerentes da Superintendência podem realizar esta ação."
 
     def has_permission(self, request: Request, view: APIView) -> bool:
@@ -326,7 +326,7 @@ class IsOwnerOrPrivileged(HasFunctionalPermission):  # type: ignore[misc]
     - owner do objeto: acesso ao próprio objeto
     """
 
-    functional_codename = "pode_editar_como_owner_ou_privilegiado"
+    functional_codename = "edit_solicitation_as_owner_or_privileged"
     message = "Você só pode editar suas próprias solicitações ou possuir privilégio de gestão."
 
     def has_permission(self, request: Request, view: APIView) -> bool:

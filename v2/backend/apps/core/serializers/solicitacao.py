@@ -267,7 +267,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
 
     Note: gcal_payload_hash removed (internal implementation detail)
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     Endpoint: GET /api/gcal/dashboard/events/{id}/detail/
     """
 

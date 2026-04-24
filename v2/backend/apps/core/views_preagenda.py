@@ -14,7 +14,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .models import Solicitacao
-from .permissions import IsControleOrDAT
+from .permissions import HasPerm
 from .serializers import SolicitacaoSerializer
 
 
@@ -30,10 +30,10 @@ class PreAgendaListView(generics.ListAPIView):
       - super=0: apenas projetos NAO_SUPER (auto-aprovados)
       - sem filtro: retorna ambos
 
-    Permissions: IsControleOrDAT
+    Permissions: HasPerm("operate_preagenda")
     """
 
-    permission_classes = [IsControleOrDAT]
+    permission_classes = [HasPerm("operate_preagenda")]
     serializer_class = SolicitacaoSerializer
 
     def get_queryset(self) -> QuerySet[Solicitacao]:

@@ -13,7 +13,7 @@ from rest_framework.test import APIRequestFactory
 import pytest
 
 from apps.core.models import PermissaoFuncional, Usuario
-from apps.core.permissions import IsDAT, IsGerenteSuperintendencia, funcperm_factory
+from apps.core.permissions import HasPerm, IsGerenteSuperintendencia, funcperm_factory
 
 pytestmark = pytest.mark.django_db
 
@@ -40,7 +40,7 @@ def test_functional_permission_allows_access_via_group_mapping():
     user.groups.add(dat_group)
 
     request = _request_with_user(APIRequestFactory(), user)
-    assert IsDAT().has_permission(request, _MockView()) is True
+    assert HasPerm("manage_purchases_and_materials")().has_permission(request, _MockView()) is True
 
 
 def test_functional_permission_denies_user_without_mapping():
@@ -52,7 +52,7 @@ def test_functional_permission_denies_user_without_mapping():
     )
 
     request = _request_with_user(APIRequestFactory(), user)
-    assert IsDAT().has_permission(request, _MockView()) is False
+    assert HasPerm("manage_purchases_and_materials")().has_permission(request, _MockView()) is False
 
 
 def test_functional_permission_cache_hit_miss(django_assert_num_queries):
@@ -67,7 +67,7 @@ def test_functional_permission_cache_hit_miss(django_assert_num_queries):
     user.groups.add(dat_group)
 
     request = _request_with_user(APIRequestFactory(), user)
-    permission = IsDAT()
+    permission = HasPerm("manage_purchases_and_materials")()
 
     with django_assert_num_queries(1):
         assert permission.has_permission(request, _MockView()) is True
@@ -87,7 +87,7 @@ def test_cache_invalidated_when_user_groups_change():
     )
     user.groups.add(dat_group)
 
-    permission = IsDAT()
+    permission = HasPerm("manage_purchases_and_materials")()
     request = _request_with_user(APIRequestFactory(), user)
     assert permission.has_permission(request, _MockView()) is True
 

@@ -4,7 +4,7 @@ Testes para importacao de Usuarios.
 Cobertura:
 - Service: import_usuarios_from_file()
 - View: ImportUsuariosView
-- RBAC: Permissoes IsDATOrSuper
+- RBAC: Permissoes HasPerm("manage_admin_registries")
 - Idempotencia: Nao duplica registros (CPF e chave)
 """
 

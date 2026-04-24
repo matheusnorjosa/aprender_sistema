@@ -2,7 +2,7 @@
 Endpoint DRF para listagem de Compras.
 
 GET /api/controle/compras/
-- Permission: IsControleOrSuper
+- Permission: HasPerm("import_spreadsheet")
 - Query params: municipio, projeto, uf, from, to, q
 - Returns: Lista de compras com campos relacionados
 """
@@ -21,7 +21,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.core.models import Compra
-from apps.core.permissions import IsControleOrSuper
+from apps.core.permissions import HasPerm
 
 
 class CompraSerializer(serializers.ModelSerializer):
@@ -52,7 +52,7 @@ class ControleComprasListView(ListAPIView):
     """
     Lista Compras com filtros opcionais.
 
-    Requer permissão: IsControleOrSuper (grupos Controle ou Superintendência)
+    Requer permissão: HasPerm("import_spreadsheet") (grupos Controle ou Superintendência)
 
     Query params:
         municipio: Filtro por nome do município (icontains)
@@ -79,7 +79,7 @@ class ControleComprasListView(ListAPIView):
         ]
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
     serializer_class = CompraSerializer
 
     def get_queryset(self) -> QuerySet:

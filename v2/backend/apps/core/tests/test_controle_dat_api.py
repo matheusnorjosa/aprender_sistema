@@ -2,9 +2,9 @@
 Testes para APIs de AcaoControle e AcaoDAT.
 
 Endpoints testados:
-- GET /api/controle/acoes/ (IsControleOrSuper)
-- GET /api/dat/acoes/ (IsDATOrSuper)
-- POST /api/dat/acoes/ (IsDATOrSuper)
+- GET /api/controle/acoes/ (HasPerm("import_spreadsheet"))
+- GET /api/dat/acoes/ (HasPerm("manage_admin_registries"))
+- POST /api/dat/acoes/ (HasPerm("manage_admin_registries"))
 
 Valida:
 - RBAC (permissões corretas)
@@ -30,7 +30,6 @@ from apps.core.models import AcaoControle, AcaoDAT, Municipio, Projeto, TipoAcao
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
-
 
 # ════════════════════════════════════════════════════════════════════════════
 # API: GET /api/controle/acoes/

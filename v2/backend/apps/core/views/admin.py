@@ -35,7 +35,7 @@ from apps.core.models import (
     Projeto,
     Usuario,
 )
-from apps.core.permissions import IsControleOrDAT, IsDAT
+from apps.core.permissions import HasPerm
 from apps.core.serializers import (
     AuditLogSerializer,
     CompraSerializer,
@@ -63,7 +63,7 @@ class MunicipioViewSet(viewsets.ModelViewSet):
 
     queryset = Municipio.objects.all()
     serializer_class = MunicipioSerializer
-    permission_classes = [IsDAT]
+    permission_classes = [HasPerm("manage_purchases_and_materials")]
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["uf", "ativo"]
@@ -180,7 +180,7 @@ class ProjetoViewSet(viewsets.ModelViewSet):
 
     queryset = Projeto.objects.all()
     serializer_class = ProjetoSerializer
-    permission_classes = [IsDAT]
+    permission_classes = [HasPerm("manage_purchases_and_materials")]
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["ativo"]
@@ -233,7 +233,7 @@ class ProdutoViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
     def get_permissions(self) -> list:  # type: ignore[type-arg]
         """DAT pode criar/editar/deletar. Outros apenas leitura."""
         if self.action in ["create", "update", "partial_update", "destroy"]:
-            return [IsAuthenticated(), IsDAT()]
+            return [IsAuthenticated(), HasPerm("manage_purchases_and_materials")()]
         return [IsAuthenticated()]
 
 
@@ -267,7 +267,7 @@ class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
     def get_permissions(self) -> list:  # type: ignore[type-arg]
         """DAT pode criar/editar/deletar. Outros apenas leitura."""
         if self.action in ["create", "update", "partial_update", "destroy"]:
-            return [IsAuthenticated(), IsDAT()]
+            return [IsAuthenticated(), HasPerm("manage_purchases_and_materials")()]
         return [IsAuthenticated()]
 
 
@@ -301,8 +301,8 @@ class CompraViewSet(viewsets.ModelViewSet):
         Controle: apenas leitura (list, retrieve)
         """
         if self.action in ["list", "retrieve"]:
-            return [IsControleOrDAT()]
-        return [IsDAT()]
+            return [HasPerm("operate_preagenda")()]
+        return [HasPerm("manage_purchases_and_materials")()]
 
 
 class UsuarioAdminViewSet(viewsets.ModelViewSet):
@@ -322,7 +322,7 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
 
     queryset = Usuario.objects.prefetch_related("groups").all()
     serializer_class = UsuarioAdminSerializer
-    permission_classes = [IsDAT]
+    permission_classes = [HasPerm("manage_purchases_and_materials")]
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["is_active", "is_staff", "is_superuser"]
@@ -330,7 +330,7 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
     ordering_fields = ["username", "email", "date_joined", "id"]
     ordering = ["username"]
 
-    @action(detail=True, methods=["post"], permission_classes=[IsDAT])
+    @action(detail=True, methods=["post"], permission_classes=[HasPerm("manage_purchases_and_materials")])
     def assign_groups(self, request, pk=None):
         """
         Atribui grupos a um usuário.
@@ -418,7 +418,7 @@ class GroupViewSet(viewsets.ModelViewSet):
 
     queryset = Group.objects.prefetch_related("permissions", "permissoes_funcionais").all()
     serializer_class = GroupSerializer
-    permission_classes = [IsDAT]
+    permission_classes = [HasPerm("manage_purchases_and_materials")]
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["name"]
@@ -434,7 +434,12 @@ class GroupViewSet(viewsets.ModelViewSet):
             )
         super().perform_destroy(instance)
 
-    @action(detail=True, methods=["post"], url_path="sync-members", permission_classes=[IsDAT])
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="sync-members",
+        permission_classes=[HasPerm("manage_purchases_and_materials")],
+    )
     def sync_members(self, request: Request, pk: str | None = None) -> Response:
         """
         Sincroniza membros de um grupo em lote.
@@ -510,7 +515,7 @@ class PermissaoFuncionalViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = PermissaoFuncional.objects.prefetch_related("groups").all()
     serializer_class = PermissaoFuncionalSerializer
-    permission_classes = [IsDAT]
+    permission_classes = [HasPerm("manage_purchases_and_materials")]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["category", "is_system"]
     search_fields = ["codename", "label", "description"]
@@ -523,7 +528,7 @@ class RBACMetaView(APIView):
     Metadados de RBAC para telas admin.
     """
 
-    permission_classes = [IsDAT]
+    permission_classes = [HasPerm("manage_purchases_and_materials")]
 
     def get(self, request: Request, *args: object, **kwargs: object) -> Response:
         classificacoes = list(GroupClassificacao.objects.select_related("group").values_list("group__name", "tipo"))
@@ -561,7 +566,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = AuditLog.objects.select_related("usuario").all()
     serializer_class = AuditLogSerializer
-    permission_classes = [IsControleOrDAT]
+    permission_classes = [HasPerm("operate_preagenda")]
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["action", "usuario", "model_name"]

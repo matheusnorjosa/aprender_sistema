@@ -31,13 +31,12 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 
 from apps.core.models import AuditLog, GoogleOAuthCredential
-from apps.core.permissions import IsControleOrSuper
+from apps.core.permissions import HasPerm
 from apps.core.services.google_oauth import build_authorization_url, exchange_code_for_tokens, revoke_token
 from apps.core.services.oauth.oauth_flow import _is_safe_url as is_safe_url  # noqa: PLC2701
 from apps.core.services.oauth.token_manager import encrypt_token
 
 logger = logging.getLogger(__name__)
-
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -165,13 +164,13 @@ class OAuthThrottle(UserRateThrottle):
 
 
 @api_view(["GET"])
-@permission_classes([IsControleOrSuper])
+@permission_classes([HasPerm("import_spreadsheet")])
 @throttle_classes([OAuthThrottle])
 def google_oauth_start(request: Request) -> Response:
     """
     Inicia fluxo OAuth 2.0 com Google.
 
-    **Permissão**: IsControleOrSuper (apenas grupo Controle ou Superintendência)
+    **Permissão**: HasPerm("import_spreadsheet") (apenas grupo Controle ou Superintendência)
     **Throttling**: 10 requests/hour por usuário (GAP-3)
 
     Query Params:
@@ -327,12 +326,12 @@ def google_oauth_callback(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([IsControleOrSuper])
+@permission_classes([HasPerm("import_spreadsheet")])
 def google_oauth_status(request: Request) -> Response:
     """
     Retorna status da conexão OAuth do usuário.
 
-    **Permissão**: IsControleOrSuper
+    **Permissão**: HasPerm("import_spreadsheet")
 
     Returns:
         200 OK: {
@@ -392,12 +391,12 @@ def google_oauth_status(request: Request) -> Response:
 
 
 @api_view(["POST"])
-@permission_classes([IsControleOrSuper])
+@permission_classes([HasPerm("import_spreadsheet")])
 def google_oauth_disconnect(request: Request) -> Response:
     """
     Desconecta conta Google (revoga refresh_token).
 
-    **Permissão**: IsControleOrSuper
+    **Permissão**: HasPerm("import_spreadsheet")
 
     Returns:
         200 OK: {"message": "Conta Google desconectada com sucesso"}
@@ -439,12 +438,12 @@ def google_oauth_disconnect(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([IsControleOrSuper])
+@permission_classes([HasPerm("import_spreadsheet")])
 def google_oauth_list_events(request: Request) -> Response:
     """
     Lista eventos de um calendário Google do usuário.
 
-    **Permissão**: IsControleOrSuper
+    **Permissão**: HasPerm("import_spreadsheet")
 
     Query Params:
         calendar_id (str, opcional): ID do calendário (default: default_calendar_id ou "primary")
@@ -495,12 +494,12 @@ def google_oauth_list_events(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([IsControleOrSuper])
+@permission_classes([HasPerm("import_spreadsheet")])
 def google_oauth_list_calendars(request: Request) -> Response:
     """
     Lista calendários disponíveis do usuário OAuth.
 
-    **Permissão**: IsControleOrSuper
+    **Permissão**: HasPerm("import_spreadsheet")
 
     Returns:
         200 OK: Lista de calendários
@@ -552,12 +551,12 @@ def google_oauth_list_calendars(request: Request) -> Response:
 
 
 @api_view(["POST"])
-@permission_classes([IsControleOrSuper])
+@permission_classes([HasPerm("import_spreadsheet")])
 def google_oauth_select_calendar(request: Request) -> Response:
     """
     Salva calendário selecionado pelo usuário.
 
-    **Permissão**: IsControleOrSuper
+    **Permissão**: HasPerm("import_spreadsheet")
 
     Request Body:
         {

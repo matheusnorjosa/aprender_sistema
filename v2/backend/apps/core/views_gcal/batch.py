@@ -23,7 +23,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 
 from apps.core.models import Solicitacao
-from apps.core.permissions import IsControleOrSuper
+from apps.core.permissions import HasPerm
 from apps.core.serializers.gcal_dashboard_contract import (
     BatchActionRequestSerializer,
     BatchActionResponseSerializer,
@@ -67,7 +67,7 @@ class GCalPublishBatchView(APIView):
     - Inválidas: retorna em 'errors' com motivo
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "gcal_write"  # 10/min (#409)
 
@@ -180,10 +180,10 @@ class GCalBatchReapplyView(APIView):
     - Sem credencial → 403 {code: 'google_not_connected'}
     - Com credencial → passa operator_user_id para task
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "gcal_write"  # 10/min (#409)
 
@@ -312,10 +312,10 @@ class GCalBatchResyncView(APIView):
     - Sem credencial → 403 {code: 'google_not_connected'}
     - Com credencial → passa operator_user_id para task
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "gcal_write"  # 10/min (#409)
 

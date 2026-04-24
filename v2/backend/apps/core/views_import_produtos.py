@@ -2,7 +2,7 @@
 Endpoint DRF para importacao de Produtos.
 
 POST /api/produtos/import/
-- Permission: IsControleOrSuper
+- Permission: HasPerm("import_spreadsheet")
 - Query param: dry_run=true|false (default: true)
 - Body: {file: upload}
 - Returns: Relatorio com stats, pendencias
@@ -27,7 +27,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
-from apps.core.permissions import IsControleOrSuper
+from apps.core.permissions import HasPerm
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -43,7 +43,7 @@ class ImportProdutosView(APIView):
     """
     Importa Produtos de CSV/XLSX.
 
-    Requer permissao: IsControleOrSuper (grupos Controle ou Superintendencia, ou superuser)
+    Requer permissao: HasPerm("import_spreadsheet") (grupos Controle ou Superintendencia, ou superuser)
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -65,7 +65,7 @@ class ImportProdutosView(APIView):
         }
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(
         summary="Importar produtos",

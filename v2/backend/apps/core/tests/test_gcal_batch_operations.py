@@ -17,7 +17,7 @@ Casos:
 Refs:
 - Issue #95
 - OAuth Phase 7
-- RBAC: IsControleOrSuper
+- RBAC: HasPerm("import_spreadsheet")
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false

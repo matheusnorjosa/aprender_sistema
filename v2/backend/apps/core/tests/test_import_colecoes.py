@@ -4,7 +4,7 @@ Testes para importacao de Colecoes.
 Cobertura:
 - Service: import_colecoes_from_file()
 - View: ImportColecoesView
-- RBAC: Permissoes IsDATOrSuper
+- RBAC: Permissoes HasPerm("manage_admin_registries")
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false

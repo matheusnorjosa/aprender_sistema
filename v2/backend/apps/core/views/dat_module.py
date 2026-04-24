@@ -42,7 +42,7 @@ from apps.core.models import (
     MunicipioReferencia,
     Solicitacao,
 )
-from apps.core.permissions import IsComprasDashboardAccess, IsDATOrSuper, IsSuperintendenciaOnly
+from apps.core.permissions import HasPerm
 from apps.core.serializers import (
     DATAcaoListSerializer,
     DATAcaoSerializer,
@@ -62,7 +62,6 @@ from apps.core.serializers import (
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
-
 
 # ============================================================
 # DATArea ViewSet
@@ -142,8 +141,8 @@ class DATCoordenadorViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Permissões baseadas na ação."""
         if self.action == "destroy":
-            return [IsSuperintendenciaOnly()]
-        return [IsDATOrSuper()]
+            return [HasPerm("execute_restricted_operations")()]
+        return [HasPerm("manage_admin_registries")()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -153,7 +152,7 @@ class DATCoordenadorViewSet(viewsets.ModelViewSet):
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
 
-    @action(detail=True, methods=["get"], permission_classes=[IsDATOrSuper])
+    @action(detail=True, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
     def alocacoes(self, request: Request, pk: int | None = None) -> Response:
         """
         Lista alocações (ações e formações) do coordenador.
@@ -240,8 +239,8 @@ class DATAcaoViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Permissões baseadas na ação."""
         if self.action == "destroy":
-            return [IsSuperintendenciaOnly()]
-        return [IsDATOrSuper()]
+            return [HasPerm("execute_restricted_operations")()]
+        return [HasPerm("manage_admin_registries")()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -251,7 +250,7 @@ class DATAcaoViewSet(viewsets.ModelViewSet):
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
 
-    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
     def stats(self, request: Request) -> Response:
         """
         Estatísticas agregadas das ações.
@@ -366,10 +365,10 @@ class DATCompraViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Permissões baseadas na ação."""
         if self.action == "destroy":
-            return [IsSuperintendenciaOnly()]
+            return [HasPerm("execute_restricted_operations")()]
         if self.action in {"dashboard", "pendencias"}:
-            return [IsComprasDashboardAccess()]
-        return [IsDATOrSuper()]
+            return [HasPerm("view_compras_dashboard")()]
+        return [HasPerm("manage_admin_registries")()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -379,7 +378,7 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
 
-    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
     def stats(self, request: Request) -> Response:
         """
         Estatísticas agregadas das compras.
@@ -414,7 +413,7 @@ class DATCompraViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=False, methods=["get"], permission_classes=[IsComprasDashboardAccess])
+    @action(detail=False, methods=["get"], permission_classes=[HasPerm("view_compras_dashboard")])
     def dashboard(self, request: Request) -> Response:
         """
         Dashboard de compras com métricas agregadas.
@@ -556,7 +555,7 @@ class DATCompraViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=False, methods=["get"], permission_classes=[IsComprasDashboardAccess])
+    @action(detail=False, methods=["get"], permission_classes=[HasPerm("view_compras_dashboard")])
     def pendencias(self, request: Request) -> Response:
         """
         Municípios com compra no domínio core_compra e sem solicitação ativa.
@@ -699,8 +698,8 @@ class DATCadastroViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Permissões baseadas na ação."""
         if self.action == "destroy":
-            return [IsSuperintendenciaOnly()]
-        return [IsDATOrSuper()]
+            return [HasPerm("execute_restricted_operations")()]
+        return [HasPerm("manage_admin_registries")()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -710,7 +709,7 @@ class DATCadastroViewSet(viewsets.ModelViewSet):
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
 
-    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
     def stats(self, request: Request) -> Response:
         """
         Estatísticas agregadas dos cadastros.
@@ -758,7 +757,7 @@ class DATCadastroViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=True, methods=["post"], permission_classes=[IsDATOrSuper])
+    @action(detail=True, methods=["post"], permission_classes=[HasPerm("manage_admin_registries")])
     def etapa(self, request: Request, pk: int | None = None) -> Response:
         """
         Atualiza uma etapa específica do cadastro.
@@ -868,8 +867,8 @@ class DATFormacaoViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Permissões baseadas na ação."""
         if self.action == "destroy":
-            return [IsSuperintendenciaOnly()]
-        return [IsDATOrSuper()]
+            return [HasPerm("execute_restricted_operations")()]
+        return [HasPerm("manage_admin_registries")()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -879,7 +878,7 @@ class DATFormacaoViewSet(viewsets.ModelViewSet):
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
 
-    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
     def stats(self, request: Request) -> Response:
         """
         Estatísticas agregadas das formações.
@@ -929,7 +928,7 @@ class DATFormacaoViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
     def calendario(self, request: Request) -> Response:
         """
         Dados otimizados para visualização em calendário.

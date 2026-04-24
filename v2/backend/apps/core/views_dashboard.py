@@ -19,7 +19,7 @@ from rest_framework.response import Response
 
 from drf_spectacular.utils import extend_schema
 
-from apps.core.permissions import IsDashboardOverview
+from apps.core.permissions import HasPerm
 from apps.core.serializers.gcal_dashboard_contract import DashboardOverviewResponseSerializer
 
 
@@ -28,7 +28,7 @@ from apps.core.serializers.gcal_dashboard_contract import DashboardOverviewRespo
     tags=["Dashboard"],
 )
 @api_view(["GET"])
-@permission_classes([IsDashboardOverview])
+@permission_classes([HasPerm("view_overview_dashboard")])
 def dashboard_overview(request: Request) -> Response:
     """
     GET /api/dashboard/overview/
@@ -57,7 +57,7 @@ def dashboard_overview(request: Request) -> Response:
         ]
     }
 
-    Permissions: IsDashboardOverview
+    Permissions: HasPerm("view_overview_dashboard")
     """
     from .models import Participation, Solicitacao
 

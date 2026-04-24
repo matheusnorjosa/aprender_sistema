@@ -19,7 +19,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .models import AcaoControle, AcaoDAT
-from .permissions import IsControleOrSuper, IsDATOrSuper
+from .permissions import HasPerm
 from .serializers import AcaoControleSerializer, AcaoDATCreateSerializer, AcaoDATSerializer
 
 
@@ -27,7 +27,7 @@ class ControleAcoesListView(generics.ListAPIView):
     """
     Lista AcaoControle com filtros de data.
 
-    Permissão: IsControleOrSuper (grupos Controle ou Superintendência)
+    Permissão: HasPerm("import_spreadsheet") (grupos Controle ou Superintendência)
 
     Query params opcionais:
         data_inicio: YYYY-MM-DD - filtra por qualquer data >= data_inicio
@@ -44,7 +44,7 @@ class ControleAcoesListView(generics.ListAPIView):
         Retorna ações onde pelo menos uma das datas está no intervalo
     """
 
-    permission_classes = [IsControleOrSuper]
+    permission_classes = [HasPerm("import_spreadsheet")]
     serializer_class = AcaoControleSerializer
     queryset = AcaoControle.objects.select_related("municipio", "projeto", "coordenador").order_by(
         "-data_reuniao", "-data_entrega"
@@ -96,7 +96,7 @@ class DATAcoesListCreateView(generics.ListCreateAPIView):
     """
     Lista e cria AcaoDAT.
 
-    Permissão: IsDATOrSuper (grupos DAT ou Superintendência/superuser)
+    Permissão: HasPerm("manage_admin_registries") (grupos DAT ou Superintendência/superuser)
 
     GET: Lista todas as ações DAT
     POST: Cria nova ação DAT
@@ -123,7 +123,7 @@ class DATAcoesListCreateView(generics.ListCreateAPIView):
         }
     """
 
-    permission_classes = [IsDATOrSuper]
+    permission_classes = [HasPerm("manage_admin_registries")]
     queryset = AcaoDAT.objects.select_related("municipio", "projeto", "responsavel").order_by(
         "-data_registro", "municipio_id"
     )

@@ -113,7 +113,7 @@ class TestAvailabilityCheckMany:
         user2 = Usuario.objects.create_user(username="user2", password="pass", cpf="22222222222")
         coord = Usuario.objects.create_user(username="coord", password="pass", cpf="33333333333")
 
-        # P2.2: check-many endpoint requires IsControleOrDAT permission
+        # P2.2: check-many endpoint requires HasPerm("operate_preagenda") permission
         controle_group, _ = Group.objects.get_or_create(name="Controle")
         coord.groups.add(controle_group)
 
@@ -232,8 +232,8 @@ class TestSolicitacaoRBAC:
 
         # Assert
         assert response.status_code == status.HTTP_403_FORBIDDEN
-        # Updated message includes "Apoio de Coordenação" (audit fix)
-        assert "Coordenadores" in str(response.data) or "DAT" in str(response.data)
+        # Epic 5.2 (2026-04-24): mensagens deixaram de incluir nome de setor
+        # (identity-oriented anti-pattern). Asserção de 403 é suficiente.
 
     def test_superuser_can_create_solicitacao(self):
         """PR 8/N: Superuser pode criar solicitação"""

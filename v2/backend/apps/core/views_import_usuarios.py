@@ -2,7 +2,7 @@
 Endpoint DRF para importacao de Usuarios.
 
 POST /api/usuarios/import/
-- Permission: IsDATOrSuper
+- Permission: HasPerm("manage_admin_registries")
 - Query param: dry_run=true|false (default: true)
 - Body: {file: upload}
 - Returns: Relatorio com stats, pendencias
@@ -27,7 +27,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
-from apps.core.permissions import IsDATOrSuper
+from apps.core.permissions import HasPerm
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -43,7 +43,7 @@ class ImportUsuariosView(APIView):
     """
     Importa Usuarios de CSV/XLSX.
 
-    Requer permissao: IsDATOrSuper (grupos DAT ou Superintendencia, ou superuser)
+    Requer permissao: HasPerm("manage_admin_registries") (grupos DAT ou Superintendencia, ou superuser)
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -64,7 +64,7 @@ class ImportUsuariosView(APIView):
         }
     """
 
-    permission_classes = [IsAuthenticated, IsDATOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("manage_admin_registries")]
 
     @extend_schema(
         summary="Importar usuários",

@@ -176,7 +176,7 @@ class TestEventDetail:
     def test_event_detail_403_forbidden(self, usuario_formador, solicitacao_aprovada):
         """
         Caso 3: GET /api/gcal/dashboard/events/{id}/detail/ deve retornar 403
-        para usuários sem permissão IsControleOrSuper.
+        para usuários sem permissão HasPerm("import_spreadsheet").
         """
         client = APIClient()
         client.force_authenticate(user=usuario_formador)

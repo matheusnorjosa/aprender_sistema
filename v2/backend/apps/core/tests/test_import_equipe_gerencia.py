@@ -4,7 +4,7 @@ Testes para importacao de EquipeGerencia (vinculos).
 Cobertura:
 - Service: import_equipe_gerencia_from_file()
 - View: ImportEquipeGerenciaView
-- RBAC: Permissoes IsDATOrSuper
+- RBAC: Permissoes HasPerm("manage_admin_registries")
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false

@@ -605,9 +605,9 @@ class TestAvailabilityCheckEndpoint:
             },
         )
 
+        # Epic 5.2 (2026-04-24): mensagens capability-oriented não incluem
+        # nome de setor. 403 é a asserção que importa.
         assert response.status_code == http_status.HTTP_403_FORBIDDEN
-        # Buscar por substring robusta (mensagem: "Apenas Controle ou Superintendência...")
-        assert "controle" in str(response.data).lower() or "superintend" in str(response.data).lower()
 
 
 @pytest.mark.django_db

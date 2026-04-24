@@ -2,8 +2,8 @@
 Testes para endpoints de importação (upload/permissions).
 
 Valida:
-- RBAC: IsControleOrSuper para imports de COMPRAS e AÇÕES
-- RBAC: IsDATOrSuper para imports de CADASTROS
+- RBAC: HasPerm("import_spreadsheet") para imports de COMPRAS e AÇÕES
+- RBAC: HasPerm("manage_admin_registries") para imports de CADASTROS
 - Upload de arquivo com multipart/form-data
 - Trailing slashes nas rotas
 - Resposta 200 OK com dry_run=true

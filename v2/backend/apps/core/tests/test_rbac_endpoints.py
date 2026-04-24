@@ -176,7 +176,7 @@ class TestRBACApprovalEndpoints:
         """DAT pode aprovar (PA-02 Adaptada).
 
         PA-02 foi adaptada para incluir DAT além de Superintendência.
-        Ver IsSuperintendencia permission class.
+        Ver HasPerm("approve_solicitation") permission class.
         """
         client = APIClient()
         client.force_authenticate(user=user_dat)

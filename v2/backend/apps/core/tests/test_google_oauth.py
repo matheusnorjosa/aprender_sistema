@@ -425,8 +425,9 @@ class TestGoogleOAuthEndpoints:
         client.force_authenticate(user=usuario_formador)
 
         response = client.get("/api/oauth/google/start/")
+        # Epic 5.2 (2026-04-24): mensagens capability-oriented não incluem
+        # nome de setor. 403 é a asserção de segurança.
         assert response.status_code == http_status.HTTP_403_FORBIDDEN
-        assert "Controle" in response.data["detail"]
 
     @patch.dict(
         "os.environ",

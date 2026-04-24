@@ -304,7 +304,7 @@ class TestResyncEndpoint:
         assert solicitacao_aprovada.gcal_status == Solicitacao.GCalStatus.PENDING
 
     def test_resync_endpoint_requires_permission(self, api_client, usuario_coordenador, solicitacao_aprovada):
-        """Endpoint retorna 403 para usuários sem permissão (IsControleOrSuper)."""
+        """Endpoint retorna 403 para usuários sem permissão (HasPerm("import_spreadsheet"))."""
         api_client.force_authenticate(user=usuario_coordenador)
 
         response = api_client.post(f"/api/solicitacoes/{solicitacao_aprovada.id}/resync-gcal/")
@@ -354,7 +354,7 @@ class TestCancelEndpoint:
         assert solicitacao_publicada.gcal_status == Solicitacao.GCalStatus.PENDING
 
     def test_cancel_endpoint_requires_permission(self, api_client, usuario_coordenador, solicitacao_publicada):
-        """Endpoint retorna 403 para usuários sem permissão (IsControleOrSuper)."""
+        """Endpoint retorna 403 para usuários sem permissão (HasPerm("import_spreadsheet"))."""
         api_client.force_authenticate(user=usuario_coordenador)
 
         response = api_client.post(f"/api/solicitacoes/{solicitacao_publicada.id}/cancel-gcal/")

@@ -32,6 +32,15 @@ from apps.core.services.rbac_permissions import get_user_functional_permissions
 # de cada classe legacy. Quando subirmos para 3.13, podemos readicionar
 # o decorator para sinalização em static type-checkers.
 
+# Epic 5 (2026-04-24): permitir composition de permission INSTANCES em
+# `permission_classes`. DRF espera callables (classes) em permission_classes
+# e faz `p()` para instanciar. Como HasPerm é parametrizada e a composition
+# retorna `permissions.OR`/`AND`/`NOT` instances, essas classes precisam de
+# `__call__` retornando self para DRF não falhar com "OR object is not callable".
+permissions.OR.__call__ = lambda self: self  # type: ignore[method-assign]
+permissions.AND.__call__ = lambda self: self  # type: ignore[method-assign]
+permissions.NOT.__call__ = lambda self: self  # type: ignore[method-assign]
+
 
 class HasPerm(permissions.BasePermission):  # type: ignore[misc]
     """

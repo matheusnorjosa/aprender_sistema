@@ -26,7 +26,7 @@ from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.core.models import Acompanhamento, Formacao, PlanoFormacoes, Prova
-from apps.core.permissions import IsDATOrSuper, IsSuperintendenciaOnly
+from apps.core.permissions import HasPerm
 from apps.core.serializers import (
     AcompanhamentoSerializer,
     FormacaoSerializer,
@@ -38,7 +38,6 @@ from apps.core.serializers import (
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
-
 
 # ============================================================
 # PlanoFormacoes FilterSet
@@ -110,8 +109,8 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Permissoes baseadas na acao."""
         if self.action == "destroy":
-            return [IsSuperintendenciaOnly()]
-        return [IsDATOrSuper()]
+            return [HasPerm("execute_restricted_operations")()]
+        return [HasPerm("manage_admin_registries")()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -121,7 +120,7 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
 
-    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
     def stats(self, request: Request) -> Response:
         """
         Estatisticas agregadas dos planos de formacoes.
@@ -177,7 +176,7 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
     def calendario(self, request: Request) -> Response:
         """
         Dados para visualizacao de calendario.
@@ -220,7 +219,12 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
 
         return Response(eventos)
 
-    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper], url_path="resumo-projeto")
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[HasPerm("manage_admin_registries")],
+        url_path="resumo-projeto",
+    )
     def resumo_projeto(self, request: Request) -> Response:
         """
         Resumo agregado por projeto.
@@ -265,7 +269,12 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         resumo.sort(key=lambda x: x["projeto_nome"])
         return Response(resumo)
 
-    @action(detail=True, methods=["patch"], url_path=r"formacao/(?P<numero>\d+)", permission_classes=[IsDATOrSuper])
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path=r"formacao/(?P<numero>\d+)",
+        permission_classes=[HasPerm("manage_admin_registries")],
+    )
     def update_formacao(self, request: Request, pk: int | None = None, numero: str | None = None) -> Response:
         """
         Atualiza uma formacao especifica inline.
@@ -291,7 +300,12 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.data)
 
-    @action(detail=True, methods=["patch"], url_path=r"acompanhamento/(?P<tipo>\w+)", permission_classes=[IsDATOrSuper])
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path=r"acompanhamento/(?P<tipo>\w+)",
+        permission_classes=[HasPerm("manage_admin_registries")],
+    )
     def update_acompanhamento(self, request: Request, pk: int | None = None, tipo: str | None = None) -> Response:
         """
         Atualiza um acompanhamento especifico inline.
@@ -314,7 +328,12 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.data)
 
-    @action(detail=True, methods=["patch"], url_path=r"prova/(?P<numero>\d+)", permission_classes=[IsDATOrSuper])
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path=r"prova/(?P<numero>\d+)",
+        permission_classes=[HasPerm("manage_admin_registries")],
+    )
     def update_prova(self, request: Request, pk: int | None = None, numero: str | None = None) -> Response:
         """
         Atualiza uma prova especifica inline.

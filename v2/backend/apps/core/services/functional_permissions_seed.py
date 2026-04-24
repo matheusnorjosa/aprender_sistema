@@ -139,12 +139,130 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         category="operacao",
         group_names=("Superintendência", "Controle", "Gerência", "Diretoria"),
     ),
+    # ========================================================================
+    # Epic 4.1 RBAC Refactor (2026-04-23): codenames `verb_noun` em inglês
+    # (DUAL-WRITE — coexistem com os antigos `pode_*` por 1 semana de soak).
+    #
+    # Cada novo codename tem o MESMO label/description/category/group_names
+    # do antigo correspondente. Após Epic 4.2 migrar todas as usagens
+    # internas e Epic 4.3 confirmar 1 semana sem erros em staging, os
+    # antigos são removidos.
+    #
+    # Mapeamento canônico: ver epic-4-codenames.md.
+    # ========================================================================
+    FunctionalPermissionSeed(
+        codename="approve_solicitation",
+        label="Aprovar solicitações",
+        description="Aprovar ou reprovar solicitações pendentes.",
+        category="solicitacao",
+        group_names=("Superintendência", "DAT"),
+    ),
+    FunctionalPermissionSeed(
+        codename="approve_solicitation_batch",
+        label="Aprovar solicitações em lote",
+        description="Aprovar múltiplas solicitações em uma operação.",
+        category="solicitacao",
+        group_names=("Superintendência",),
+    ),
+    FunctionalPermissionSeed(
+        codename="execute_restricted_operations",
+        label="Executar operações restritas",
+        description="Operações destrutivas (exclusões críticas).",
+        category="solicitacao",
+        group_names=("Superintendência",),
+    ),
+    FunctionalPermissionSeed(
+        codename="create_solicitation",
+        label="Criar solicitações de evento",
+        description="Submeter novas solicitações ao fluxo de aprovação.",
+        category="solicitacao",
+        group_names=("Coordenador", "Apoio de Coordenação", "DAT"),
+    ),
+    FunctionalPermissionSeed(
+        codename="import_spreadsheet",
+        label="Importar planilhas e dados",
+        description="Carregar dados em massa via CSV/XLSX.",
+        category="importacao",
+        group_names=("Controle", "Superintendência"),
+    ),
+    FunctionalPermissionSeed(
+        codename="manage_admin_registries",
+        label="Administrar cadastros",
+        description="Gerenciar cadastros e configurações administrativas.",
+        category="cadastros_administrativos",
+        group_names=("DAT",),
+    ),
+    FunctionalPermissionSeed(
+        codename="view_compras_dashboard",
+        label="Visualizar dashboard de compras",
+        description="Acesso ao painel de indicadores de compras.",
+        category="dashboard",
+        group_names=("DAT", "Diretoria"),
+    ),
+    FunctionalPermissionSeed(
+        codename="manage_purchases_and_materials",
+        label="Administrar compras e materiais",
+        description="Operações administrativas restritas sobre compras e materiais.",
+        category="cadastros_administrativos",
+        group_names=("DAT",),
+    ),
+    FunctionalPermissionSeed(
+        codename="operate_preagenda",
+        label="Operar pré-agenda e relatórios",
+        description="Pré-agenda, relatórios gerenciais e publicações operacionais.",
+        category="operacao",
+        group_names=("Controle", "DAT", "Superintendência"),
+    ),
+    FunctionalPermissionSeed(
+        codename="run_daily_operations",
+        label="Executar rotinas operacionais",
+        description="Imports, workflow diário e conferências.",
+        category="operacao",
+        group_names=("Controle",),
+    ),
+    FunctionalPermissionSeed(
+        codename="supervise_operations",
+        label="Exercer supervisão gerencial",
+        description="Atuação gerencial e supervisão de equipe.",
+        category="supervisao",
+        group_names=("Gerência", "Superintendência", "Diretoria"),
+    ),
+    FunctionalPermissionSeed(
+        codename="view_overview_dashboard",
+        label="Visualizar dashboard geral",
+        description="Painel executivo de visão geral.",
+        category="dashboard",
+        group_names=("Superintendência", "Gerência", "Diretoria"),
+    ),
+    FunctionalPermissionSeed(
+        codename="view_map_metrics",
+        label="Visualizar métricas geográficas",
+        description="Dashboards com distribuição por região.",
+        category="dashboard",
+        group_names=("Controle", "DAT", "Superintendência", "Gerência", "Diretoria"),
+    ),
+    FunctionalPermissionSeed(
+        codename="edit_solicitation_as_owner_or_privileged",
+        label="Editar solicitações próprias ou privilegiadas",
+        description="Editar solicitações que você criou ou com privilégio.",
+        category="solicitacao",
+        group_names=("Superintendência", "DAT"),
+    ),
+    FunctionalPermissionSeed(
+        codename="view_all_availability",
+        label="Visualizar todas as disponibilidades",
+        description="Acesso à grade mensal completa e bloqueios de qualquer usuário.",
+        category="operacao",
+        group_names=("Superintendência", "Controle", "Gerência", "Diretoria"),
+    ),
 )
 
 
 def _validate_seed() -> None:
-    if len(FUNCTIONAL_PERMISSIONS_SEED) != 15:
-        raise ValueError("Seed de permissoes funcionais deve conter exatamente 15 itens.")
+    # Epic 4.1 dual-write: 15 antigos `pode_*` + 15 novos `verb_noun` = 30.
+    # Após Epic 4.3 remover os antigos, voltará a 15.
+    if len(FUNCTIONAL_PERMISSIONS_SEED) != 30:
+        raise ValueError("Seed de permissoes funcionais deve conter exatamente 30 itens (dual-write Epic 4).")
 
     seen: set[str] = set()
     for item in FUNCTIONAL_PERMISSIONS_SEED:

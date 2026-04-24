@@ -137,24 +137,22 @@ def test_labels_follow_infinitive_verb_form():
     )
 
 
-def test_seed_count_is_fifteen_post_epic_3_1():
+def test_seed_count_is_thirty_during_epic_4_dual_write():
     """
-    Post-Epic 1: 14. Post-Epic 3.1: 15 (adicionada pode_ver_todas_disponibilidades).
-    Epic 4 (dual-write) e Epic 5 (class sweep) manterão count; apenas
-    quando Epic 4.3 remover os codenames antigos é que cairá para 15 (os
-    novos verb_noun). Até lá, 15 é o valor válido.
+    Post-Epic 4.1 (dual-write): 15 antigos `pode_*` + 15 novos `verb_noun` = 30.
+    Após Epic 4.3 remover os antigos, voltará para 15.
     """
-    assert len(FUNCTIONAL_PERMISSIONS_SEED) == 15, (
-        f"Seed deve conter exatamente 15 permissões pós-Epic 3.1. " f"Achei {len(FUNCTIONAL_PERMISSIONS_SEED)}."
+    assert len(FUNCTIONAL_PERMISSIONS_SEED) == 30, (
+        f"Seed deve conter exatamente 30 permissões durante o dual-write. " f"Achei {len(FUNCTIONAL_PERMISSIONS_SEED)}."
     )
 
 
-def test_codenames_stable_through_epic_3_1():
+def test_old_codenames_present_during_epic_4_soak():
     """
-    Codenames só mudam no Epic 4 (dual-write). Epic 3.1 apenas adiciona
-    `pode_ver_todas_disponibilidades` ao conjunto.
+    Codenames antigos `pode_*` devem coexistir com novos durante 1 semana
+    de soak (Epic 4.2 → 4.3). Esta assertion vira `not in` após Epic 4.3.
     """
-    expected_codenames = frozenset(
+    expected_old_codenames = frozenset(
         {
             "pode_aprovar_superintendencia",
             "pode_aprovar_gerente_superintendencia",
@@ -170,13 +168,38 @@ def test_codenames_stable_through_epic_3_1():
             "pode_acessar_dashboard_overview",
             "pode_acessar_map_metrics",
             "pode_editar_como_owner_ou_privilegiado",
-            # Adicionada em Epic 3.1 (2026-04-23) para eliminar hardcoded
-            # groups.filter(name__in=[Super, Controle, Gerência, Diretoria])
-            # em views de availability.
             "pode_ver_todas_disponibilidades",
         }
     )
     actual = frozenset(seed.codename for seed in FUNCTIONAL_PERMISSIONS_SEED)
-    assert actual == expected_codenames, (
-        "Diferença: " f"faltando {expected_codenames - actual}, extras {actual - expected_codenames}"
+    assert expected_old_codenames.issubset(
+        actual
+    ), f"Codenames antigos faltando durante soak: {expected_old_codenames - actual}"
+
+
+def test_new_verb_noun_codenames_present_post_epic_4_1():
+    """
+    Codenames novos `verb_noun` em inglês devem existir após Epic 4.1
+    (dual-write seed). Mapeamento canônico em epic-4-codenames.md.
+    """
+    expected_new_codenames = frozenset(
+        {
+            "approve_solicitation",
+            "approve_solicitation_batch",
+            "execute_restricted_operations",
+            "create_solicitation",
+            "import_spreadsheet",
+            "manage_admin_registries",
+            "view_compras_dashboard",
+            "manage_purchases_and_materials",
+            "operate_preagenda",
+            "run_daily_operations",
+            "supervise_operations",
+            "view_overview_dashboard",
+            "view_map_metrics",
+            "edit_solicitation_as_owner_or_privileged",
+            "view_all_availability",
+        }
     )
+    actual = frozenset(seed.codename for seed in FUNCTIONAL_PERMISSIONS_SEED)
+    assert expected_new_codenames.issubset(actual), f"Codenames novos faltando: {expected_new_codenames - actual}"

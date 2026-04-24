@@ -9,7 +9,6 @@ Provides analytical reports for decision-making.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any
 
 from django.db.models import Count
 from django.db.models.functions import TruncWeek

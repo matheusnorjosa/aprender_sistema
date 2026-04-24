@@ -25,11 +25,12 @@ Formato: `<verb>_<noun>[_<qualifier>]`, snake_case, inglês.
 `admin_`, `manage_`, `operate_`, `configure_`, `change_`, `modify_`, `edit_`, `list_`, `set_`, `write_`.
 
 **Nunca no codename**:
+
 - Nome de setor (`dat`, `controle`, `super`, `vidas`, ...)
 - Nome de função (`coordenador`, `formador`, ...)
 - Nome de grupo Django
 
-### Bons exemplos
+### Bons exemplos de codename
 
 ```text
 approve_solicitation
@@ -40,7 +41,7 @@ create_solicitation
 view_all_availability
 ```
 
-### Maus exemplos
+### Maus exemplos de codename
 
 ```text
 pode_operar_dat                   # setor no nome
@@ -65,11 +66,12 @@ Decompor cada uma em `create/read/update/delete` hoje produziria 8+ codenames se
 Formato: `<Verbo infinitivo> <substantivo plural>`.
 
 **Regras**:
+
 - Começar com verbo infinitivo: *Aprovar*, *Criar*, *Importar*, *Visualizar*, *Administrar*.
 - Evitar: gerúndio ("Aprovação de...", "Criando..."), substantivação ("Aprovações"), adjetivo puro ("Owner"), nome de módulo solto ("Dashboard").
 - **Nunca** nome de setor/função (mesma regra dos codenames).
 
-### Bons exemplos
+### Bons exemplos de label
 
 ```text
 Aprovar solicitações
@@ -79,7 +81,7 @@ Administrar cadastros
 Exercer supervisão gerencial
 ```
 
-### Maus exemplos
+### Maus exemplos de label
 
 ```text
 Operacao DAT                       # setor
@@ -200,6 +202,7 @@ user.groups.filter(name__in=["Controle", "DAT"]).exists()
 Se você criar uma nova classe de permission **e** ela puder ser expressa como `HasPerm(codename)`, **não crie** — use `HasPerm` direto.
 
 Se você for remover uma legacy do código:
+
 - Substituir por `HasPerm("codename")` no `permission_classes`
 - Deletar o import
 - Remover a classe do `apps/core/permissions.py` **somente** quando não houver mais nenhum uso (Epic 5 faz isso via libcst).
@@ -208,28 +211,56 @@ Se você for remover uma legacy do código:
 
 ## 7. Enforcement automático
 
-O Epic 6 (#1179) introduzirá um **lint custom** em `.github/workflows/` que falha PRs que:
+Lint AST custom em `v2/backend/scripts/rbac_lint.py` falha PRs que:
 
-- **V001**: usam `user.groups.filter(name=...)` em `views/` ou `services/`
-- **V002**: definem classe `Is<Word>` fora da whitelist
-- **V003**: importam `django.contrib.auth.models.Group` para decisões de autorização
+- **V001**: `user.groups.filter(name=...)` / `exclude(name=...)` em código de produção.
+  Exceção: linha com marcador `# noqa: RBAC-<tipo>-allowed` documentando a justificativa (composite, block, data-scope).
+- **V002**: definem classe `class Is<Word>(...)` fora da whitelist
+  `{IsGerenteSuperintendencia, IsOwnerOrPrivileged}`.
 
-Whitelist do lint: `tests/`, `migrations/`, `fixtures/`, `apps/core/rbac/constants.py`.
+**V003 (import de Group) foi descartado** — V001 já cobre o padrão observável
+na prática; V003 gerava 100+ falsos positivos (seeds, fixtures, serializers,
+admin views têm imports legítimos) com zero violações reais a ganhar.
 
-Até o Epic 6 entrar em vigor, a revisão manual de PR faz esse papel.
+**Paths whitelisted** (o lint pula):
+
+- `tests/`, `migrations/`, `fixtures/`
+- `apps/core/rbac/` (o próprio módulo RBAC)
+- `apps/dev_tools/` (seeds e admin tooling manipulam grupos por design)
+- `apps/core/constants.py`, `apps/core/permissions.py`, `apps/core/rbac_helpers.py` (shims e data-scope SSOT)
+- `scripts/rbac_lint.py`, `scripts/rbac_codemod.py`
+
+**Markers `# noqa: RBAC-*-allowed` em uso**:
+
+| Marker                      | Uso legítimo                                           |
+| --------------------------- | ------------------------------------------------------ |
+| `RBAC-composite-allowed`    | Classe composite (funcperm + grupo Django)             |
+| `RBAC-block-allowed`        | Bloqueio explícito de um grupo por design documentado  |
+| `RBAC-data-scope-allowed`   | Filtro de escopo de dados (não authz)                  |
+
+**CI job**: `[required] backend rbac-lint` em `.github/workflows/ci.yaml` — falha o PR automaticamente.
+
+**Self-test**: `apps/core/tests/test_rbac_lint.py` valida que o lint aceita o baseline atual e rejeita os padrões proibidos (10 testes).
+
+Rodar localmente:
+
+```bash
+cd v2/backend
+python scripts/rbac_lint.py apps/
+```
 
 ---
 
 ## 8. Referência rápida
 
-| Tipo | Forma canônica | Forma proibida |
-|---|---|---|
-| **Codename** | `approve_solicitation` | `pode_aprovar_superintendencia` |
-| **Label** | "Aprovar solicitações" | "Aprovar/Reprovar (Superintendência)" |
-| **Category** | `solicitacao`, `operacao`, ... | `admin_dat`, `gerencia` |
-| **Permission class** | `HasPerm("approve_solicitation")` | `IsSuperintendencia` |
-| **Authz check** | `user.has_perm("approve_solicitation")` | `user.groups.filter(name="Superintendência")` |
-| **Classe dedicada** | `IsSolicitationOwner` (condição) | `IsDAT` (identidade) |
+| Tipo                 | Forma canônica                            | Forma proibida                                    |
+| -------------------- | ----------------------------------------- | ------------------------------------------------- |
+| **Codename**         | `approve_solicitation`                    | `pode_aprovar_superintendencia`                   |
+| **Label**            | "Aprovar solicitações"                    | "Aprovar/Reprovar (Superintendência)"             |
+| **Category**         | `solicitacao`, `operacao`, ...            | `admin_dat`, `gerencia`                           |
+| **Permission class** | `HasPerm("approve_solicitation")`         | `IsSuperintendencia`                              |
+| **Authz check**      | `user.has_perm("approve_solicitation")`   | `user.groups.filter(name="Superintendência")`     |
+| **Classe dedicada**  | `IsSolicitationOwner` (condição)          | `IsDAT` (identidade)                              |
 
 ---
 

@@ -139,10 +139,15 @@ class DATCoordenadorViewSet(viewsets.ModelViewSet):
         return DATCoordenadorSerializer
 
     def get_permissions(self):
-        """Permissões baseadas na ação."""
+        """Permissões baseadas na ação.
+
+        Issue #1220 (Epic 1): setor Controle também edita coordenadores
+        via `run_daily_operations` — não apenas DAT. Composition OR cobre
+        ambos os papéis.
+        """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
-        return [HasPerm("manage_admin_registries")()]
+        return [(HasPerm("manage_admin_registries") | HasPerm("run_daily_operations"))()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -152,7 +157,11 @@ class DATCoordenadorViewSet(viewsets.ModelViewSet):
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
 
-    @action(detail=True, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
+    @action(
+        detail=True,
+        methods=["get"],
+        permission_classes=[HasPerm("manage_admin_registries") | HasPerm("run_daily_operations")],
+    )
     def alocacoes(self, request: Request, pk: int | None = None) -> Response:
         """
         Lista alocações (ações e formações) do coordenador.
@@ -237,10 +246,14 @@ class DATAcaoViewSet(viewsets.ModelViewSet):
         return DATAcaoSerializer
 
     def get_permissions(self):
-        """Permissões baseadas na ação."""
+        """Permissões baseadas na ação.
+
+        Issue #1220 (Epic 1): setor Controle também edita ações DAT via
+        `run_daily_operations` — não apenas DAT. Composition OR cobre ambos.
+        """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
-        return [HasPerm("manage_admin_registries")()]
+        return [(HasPerm("manage_admin_registries") | HasPerm("run_daily_operations"))()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -363,12 +376,24 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         return DATCompraSerializer
 
     def get_permissions(self):
-        """Permissões baseadas na ação."""
+        """Permissões baseadas na ação.
+
+        Issue #1220 (Epic 1): compras é escopo natural do setor Controle
+        (perm `manage_purchases_and_materials`) além de DAT. Controle
+        também edita via `run_daily_operations`. Dashboards de compras
+        continuam restritos a `view_compras_dashboard` (Diretoria).
+        """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
         if self.action in {"dashboard", "pendencias"}:
             return [HasPerm("view_compras_dashboard")()]
-        return [HasPerm("manage_admin_registries")()]
+        return [
+            (
+                HasPerm("manage_admin_registries")
+                | HasPerm("manage_purchases_and_materials")
+                | HasPerm("run_daily_operations")
+            )()
+        ]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -378,7 +403,15 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
 
-    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[
+            HasPerm("manage_admin_registries")
+            | HasPerm("manage_purchases_and_materials")
+            | HasPerm("run_daily_operations")
+        ],
+    )
     def stats(self, request: Request) -> Response:
         """
         Estatísticas agregadas das compras.
@@ -865,10 +898,14 @@ class DATFormacaoViewSet(viewsets.ModelViewSet):
         return DATFormacaoSerializer
 
     def get_permissions(self):
-        """Permissões baseadas na ação."""
+        """Permissões baseadas na ação.
+
+        Issue #1220 (Epic 1): setor Controle também edita formações via
+        `run_daily_operations` — não apenas DAT. Composition OR cobre ambos.
+        """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
-        return [HasPerm("manage_admin_registries")()]
+        return [(HasPerm("manage_admin_registries") | HasPerm("run_daily_operations"))()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""

@@ -13,7 +13,7 @@ from rest_framework.test import APIRequestFactory
 import pytest
 
 from apps.core.models import PermissaoFuncional, Usuario
-from apps.core.permissions import HasPerm, IsGerenteSuperintendencia, funcperm_factory
+from apps.core.permissions import HasPerm, IsGerenteSuperintendencia
 
 pytestmark = pytest.mark.django_db
 
@@ -117,12 +117,8 @@ def test_cache_invalidated_when_permission_m2m_changes():
     )
     custom_perm.groups.set([dat_group])
 
-    CustomPermission = funcperm_factory(
-        "CustomPermissionM2M",
-        "perm_temp_m2m",
-        "Permissão temporária",
-    )
-    permission = CustomPermission()
+    # Epic 5.3 (2026-04-24): funcperm_factory removido. Uso direto de HasPerm.
+    permission = HasPerm("perm_temp_m2m")
     request = _request_with_user(APIRequestFactory(), user)
     assert permission.has_permission(request, _MockView()) is True
 
@@ -152,12 +148,8 @@ def test_cache_invalidated_when_permission_saved():
     )
     custom_perm.groups.set([dat_group])
 
-    CustomPermission = funcperm_factory(
-        "CustomPermissionSave",
-        "perm_temp_save",
-        "Permissão temporária",
-    )
-    permission = CustomPermission()
+    # Epic 5.3: HasPerm substitui funcperm_factory
+    permission = HasPerm("perm_temp_save")
     request = _request_with_user(APIRequestFactory(), user)
     assert permission.has_permission(request, _MockView()) is True
 
@@ -188,12 +180,8 @@ def test_cache_invalidated_when_permission_deleted():
     )
     custom_perm.groups.set([dat_group])
 
-    CustomPermission = funcperm_factory(
-        "CustomPermissionDelete",
-        "perm_temp_delete",
-        "Permissão temporária",
-    )
-    permission = CustomPermission()
+    # Epic 5.3: HasPerm substitui funcperm_factory
+    permission = HasPerm("perm_temp_delete")
     request = _request_with_user(APIRequestFactory(), user)
     assert permission.has_permission(request, _MockView()) is True
 

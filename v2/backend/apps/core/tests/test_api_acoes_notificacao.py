@@ -36,7 +36,13 @@ def api_client():
 def user_factory(db):
     counter = {"n": 0}
 
-    def _create(*, prefix: str, groups: list[str]) -> Usuario:
+    def _create(
+        *,
+        prefix: str,
+        groups: list[str] | None = None,
+        is_superuser: bool = False,
+        is_staff: bool = False,
+    ) -> Usuario:
         counter["n"] += 1
         idx = counter["n"]
         user = Usuario.objects.create_user(
@@ -44,8 +50,10 @@ def user_factory(db):
             email=f"{prefix}_{idx}@example.com",
             password="testpass123",
             cpf=f"{idx:011d}",
+            is_superuser=is_superuser,
+            is_staff=is_staff,
         )
-        for group_name in groups:
+        for group_name in groups or []:
             group, _ = Group.objects.get_or_create(name=group_name)
             user.groups.add(group)
         return user
@@ -93,6 +101,7 @@ def ciclo_com_acao(base_entities, user_factory):
 
 @pytest.mark.django_db
 def test_ciclo_create_auto_instantiates_actions(api_client, user_factory, base_entities):
+    """Issue #1219 (Epic 1): módulo Ações Internas é superuser-only por ora."""
     template = AcaoTemplate.objects.create(
         ordem=701,
         nome="Acao Seed Ciclo",
@@ -104,15 +113,20 @@ def test_ciclo_create_auto_instantiates_actions(api_client, user_factory, base_e
     comercial, _ = Group.objects.get_or_create(name="Comercial")
     AcaoTemplateExecutor.objects.create(acao_template=template, group=comercial, ativo=True)
 
+    # Não-superuser (qualquer grupo) é 403
     gerente = user_factory(prefix="gerente", groups=["Gerente", "Comercial"])
     api_client.force_authenticate(user=gerente)
-
     payload = {
         "projeto_id": base_entities["projeto"].id,
         "municipio_id": base_entities["municipio"].id,
         "semestre": "2S",
         "ano": 2026,
     }
+    assert api_client.post("/api/ciclos-acoes/", payload, format="json").status_code == 403
+
+    # Superuser cria com sucesso
+    admin = user_factory(prefix="admin", is_superuser=True, is_staff=True)
+    api_client.force_authenticate(user=admin)
     response = api_client.post("/api/ciclos-acoes/", payload, format="json")
     assert response.status_code == 201
 
@@ -122,33 +136,32 @@ def test_ciclo_create_auto_instantiates_actions(api_client, user_factory, base_e
 
 
 @pytest.mark.django_db
-def test_ciclo_list_visibility_dat_global_and_setor_restrito(api_client, user_factory, ciclo_com_acao):
+def test_ciclo_list_visibility_superuser_only(api_client, user_factory, ciclo_com_acao):
+    """Issue #1219 (Epic 1): módulo Ações Internas é superuser-only por ora.
+    Não-superuser recebe 403 na listagem de ciclos; superuser vê tudo."""
     ciclo = ciclo_com_acao["ciclo"]
     dat_user = user_factory(prefix="dat", groups=["DAT"])
     coord = user_factory(prefix="coord", groups=["Comercial", "Coordenador"])
     outsider = user_factory(prefix="outsider", groups=["Vidas", "Coordenador"])
 
-    api_client.force_authenticate(user=dat_user)
-    dat_response = api_client.get("/api/ciclos-acoes/")
-    assert dat_response.status_code == 200
-    dat_ids = {item["id"] for item in dat_response.data["results"]}
-    assert ciclo.id in dat_ids
+    # Não-superuser (qualquer papel) é 403
+    for user in [dat_user, coord, outsider]:
+        api_client.force_authenticate(user=user)
+        assert api_client.get("/api/ciclos-acoes/").status_code == 403
 
-    api_client.force_authenticate(user=coord)
-    coord_response = api_client.get("/api/ciclos-acoes/")
-    assert coord_response.status_code == 200
-    coord_ids = {item["id"] for item in coord_response.data["results"]}
-    assert ciclo.id in coord_ids
-
-    api_client.force_authenticate(user=outsider)
-    outsider_response = api_client.get("/api/ciclos-acoes/")
-    assert outsider_response.status_code == 200
-    outsider_ids = {item["id"] for item in outsider_response.data["results"]}
-    assert ciclo.id not in outsider_ids
+    # Superuser vê todos os ciclos
+    admin = user_factory(prefix="admin", is_superuser=True, is_staff=True)
+    api_client.force_authenticate(user=admin)
+    admin_response = api_client.get("/api/ciclos-acoes/")
+    assert admin_response.status_code == 200
+    admin_ids = {item["id"] for item in admin_response.data["results"]}
+    assert ciclo.id in admin_ids
 
 
 @pytest.mark.django_db
-def test_registrar_ancora_permission_matrix_and_audit(api_client, user_factory, ciclo_com_acao):
+def test_registrar_ancora_superuser_only_and_audit(api_client, user_factory, ciclo_com_acao):
+    """Issue #1219 (Epic 1): módulo Ações Internas é superuser-only por ora.
+    Não-superuser (DAT, Gerente, Coord, Apoio) 403; superuser 200."""
     action = ciclo_com_acao["acao"]
     dat_user = user_factory(prefix="dat", groups=["DAT"])
     gerente = user_factory(prefix="gerente", groups=["Comercial", "Gerente"])
@@ -157,35 +170,27 @@ def test_registrar_ancora_permission_matrix_and_audit(api_client, user_factory, 
 
     payload = {"data_ancora": "2026-03-15", "observacao": "ancora via API"}
 
-    api_client.force_authenticate(user=dat_user)
-    dat_response = api_client.post(f"/api/acoes-instancia/{action.id}/registrar-ancora/", payload, format="json")
-    assert dat_response.status_code == 200
+    for user in [dat_user, gerente, coord, apoio]:
+        api_client.force_authenticate(user=user)
+        response = api_client.post(
+            f"/api/acoes-instancia/{action.id}/registrar-ancora/", payload, format="json"
+        )
+        assert response.status_code == 403, f"Expected 403 for {user.username}, got {response.status_code}"
 
-    api_client.force_authenticate(user=gerente)
-    gerente_response = api_client.post(
-        f"/api/acoes-instancia/{action.id}/registrar-ancora/",
-        payload,
-        format="json",
+    # Superuser: sucesso
+    admin = user_factory(prefix="admin", is_superuser=True, is_staff=True)
+    api_client.force_authenticate(user=admin)
+    admin_response = api_client.post(
+        f"/api/acoes-instancia/{action.id}/registrar-ancora/", payload, format="json"
     )
-    assert gerente_response.status_code == 200
-
-    api_client.force_authenticate(user=coord)
-    coord_response = api_client.post(
-        f"/api/acoes-instancia/{action.id}/registrar-ancora/",
-        payload,
-        format="json",
-    )
-    assert coord_response.status_code == 200
-
-    api_client.force_authenticate(user=apoio)
-    apoio_response = api_client.post(f"/api/acoes-instancia/{action.id}/registrar-ancora/", payload, format="json")
-    assert apoio_response.status_code == 403
-
+    assert admin_response.status_code == 200
     assert AuditLog.objects.filter(action="ACAO_REGISTRAR_ANCORA", details__acao_instancia_id=action.id).exists()
 
 
 @pytest.mark.django_db
-def test_concluir_permission_matrix_and_reopen_blocked(api_client, user_factory, ciclo_com_acao):
+def test_concluir_superuser_only_and_reopen_blocked(api_client, user_factory, ciclo_com_acao):
+    """Issue #1219 (Epic 1): módulo Ações Internas é superuser-only por ora.
+    Todos os não-superuser 403; superuser conclui, re-concluir é 400 (regra de negócio)."""
     action = ciclo_com_acao["acao"]
     dat_user = user_factory(prefix="dat", groups=["DAT"])
     gerente = user_factory(prefix="gerente", groups=["Comercial", "Gerente"])
@@ -194,21 +199,19 @@ def test_concluir_permission_matrix_and_reopen_blocked(api_client, user_factory,
 
     payload = {"data_realizacao": "2026-03-16", "observacao": "conclusao via API"}
 
-    api_client.force_authenticate(user=dat_user)
-    dat_response = api_client.post(f"/api/acoes-instancia/{action.id}/concluir/", payload, format="json")
-    assert dat_response.status_code == 403
+    # Não-superuser (qualquer papel) é 403
+    for user in [dat_user, gerente, coord, outsider]:
+        api_client.force_authenticate(user=user)
+        response = api_client.post(f"/api/acoes-instancia/{action.id}/concluir/", payload, format="json")
+        assert response.status_code == 403, f"Expected 403 for {user.username}, got {response.status_code}"
 
-    api_client.force_authenticate(user=outsider)
-    outsider_response = api_client.post(f"/api/acoes-instancia/{action.id}/concluir/", payload, format="json")
-    assert outsider_response.status_code == 403
+    # Superuser conclui
+    admin = user_factory(prefix="admin", is_superuser=True, is_staff=True)
+    api_client.force_authenticate(user=admin)
+    admin_response = api_client.post(f"/api/acoes-instancia/{action.id}/concluir/", payload, format="json")
+    assert admin_response.status_code == 200
 
-    # Coordenador pode concluir
-    api_client.force_authenticate(user=coord)
-    coord_response = api_client.post(f"/api/acoes-instancia/{action.id}/concluir/", payload, format="json")
-    assert coord_response.status_code == 200
-
-    # Reabertura bloqueada
-    api_client.force_authenticate(user=gerente)
+    # Reabertura bloqueada (regra de negócio, não authz)
     reopen_response = api_client.post(f"/api/acoes-instancia/{action.id}/concluir/", payload, format="json")
     assert reopen_response.status_code == 400
 

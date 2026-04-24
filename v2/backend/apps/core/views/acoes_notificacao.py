@@ -15,9 +15,9 @@ from django.db.models import QuerySet
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -33,55 +33,35 @@ from apps.core.serializers import (
 )
 
 
-def _is_dat_or_super(user: AbstractBaseUser | AnonymousUser) -> bool:
-    """Epic 3.2 RBAC Refactor (2026-04-23): hardcoded `groups.filter(name="DAT")`
-    trocado por capability `pode_operar_dat_exclusivo`."""
-    from apps.core.rbac_helpers import user_has_any_perm
-
-    return user_has_any_perm(user, "manage_purchases_and_materials")
-
-
-def _has_any_group(user: AbstractBaseUser | AnonymousUser, group_names: set[str]) -> bool:
-    """Data-scope helper: passa group_names como filter para querysets.
-
-    Não é autorização (autorização passa por has_perm). Mantido para
-    contexto específico de notificações onde a semântica é "usuário tem
-    MEMBERSHIP em algum desses grupos" (data scope), não "usuário tem
-    permissão para X".
-    """
-    if getattr(user, "is_superuser", False):
-        return True
-    return user.groups.filter(name__in=group_names).exists()  # type: ignore[union-attr]  # noqa: RBAC-data-scope-allowed
+# Issue #1219 (Epic 1 RBAC Access Policy Realignment, 2026-04-24):
+# Módulo "Ações Internas" é superuser-only por ora (feature em desenvolvimento).
+# Helpers `_is_dat_or_super` e `_has_any_group` removidos — não são mais
+# necessários porque `IsAdminUser` já filtra acesso a superusers apenas.
+# QuerySets expõem tudo (superuser vê todos os ciclos/ações).
 
 
 def _visible_cycles_queryset_for_user(user: AbstractBaseUser | AnonymousUser) -> QuerySet[CicloAcoes]:
-    qs = CicloAcoes.objects.select_related("projeto", "municipio").all()
-    if _is_dat_or_super(user):
-        return qs
-    user_group_ids = user.groups.values_list("id", flat=True)
-    return qs.filter(acoes__template__executores__group_id__in=user_group_ids).distinct()
+    return CicloAcoes.objects.select_related("projeto", "municipio").all()
 
 
 def _visible_actions_queryset_for_user(user: AbstractBaseUser | AnonymousUser) -> QuerySet[AcaoInstancia]:
-    qs = AcaoInstancia.objects.select_related(
+    return AcaoInstancia.objects.select_related(
         "template",
         "ciclo",
         "ciclo__projeto",
         "ciclo__municipio",
     ).all()
-    if _is_dat_or_super(user):
-        return qs
-    user_group_ids = user.groups.values_list("id", flat=True)
-    return qs.filter(template__executores__group_id__in=user_group_ids).distinct()
 
 
 class CicloAcoesViewSet(viewsets.ModelViewSet):
     """
     CRUD de ciclos + listagem de acoes por ciclo.
+
+    Módulo "Ações Internas" é superuser-only (feature em desenvolvimento).
     """
 
     serializer_class = CicloAcoesSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["projeto", "municipio", "semestre", "ano", "status"]
     search_fields = ["projeto__nome", "municipio__nome"]
@@ -92,9 +72,6 @@ class CicloAcoesViewSet(viewsets.ModelViewSet):
         return _visible_cycles_queryset_for_user(self.request.user)
 
     def perform_create(self, serializer: CicloAcoesSerializer) -> None:
-        if not _has_any_group(self.request.user, {"DAT", "Gerente", "Coordenador"}):
-            raise PermissionDenied("Sem permissão para criar ciclo de ações.")
-
         with transaction.atomic():
             ciclo = serializer.save(created_by=self.request.user)
             templates = list(AcaoTemplate.objects.filter(ativo=True).order_by("ordem"))
@@ -136,10 +113,12 @@ class CicloAcoesViewSet(viewsets.ModelViewSet):
 class AcaoInstanciaViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Listagem de acoes e comandos operacionais (âncora/conclusão).
+
+    Módulo "Ações Internas" é superuser-only (feature em desenvolvimento).
     """
 
     serializer_class = AcaoInstanciaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ["ciclo", "estado", "ordem"]
     ordering_fields = ["ordem", "estado", "data_vencimento", "created_at"]
@@ -150,9 +129,6 @@ class AcaoInstanciaViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="registrar-ancora")
     def registrar_ancora(self, request: Request, pk: Any = None) -> Response:
-        if not _has_any_group(request.user, {"DAT", "Gerente", "Coordenador"}):
-            raise PermissionDenied("Sem permissão para registrar âncora.")
-
         serializer = RegistrarAncoraSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -186,9 +162,6 @@ class AcaoInstanciaViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="concluir")
     def concluir(self, request: Request, pk: Any = None) -> Response:
-        if not _has_any_group(request.user, {"Gerente", "Coordenador"}):
-            raise PermissionDenied("Sem permissão para concluir ação.")
-
         action_instance = self.get_object()
         serializer = ConcluirAcaoSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

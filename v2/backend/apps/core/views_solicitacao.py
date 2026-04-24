@@ -23,6 +23,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema, extend_schema_view
 
+from apps.core.rbac_helpers import user_has_any_perm
+
 from .api_schemas import (
     COMMON_ERROR_RESPONSES,
     SOLICITACAO_BATCH_APPROVE_REQUEST,
@@ -32,12 +34,7 @@ from .api_schemas import (
     SOLICITACAO_CREATED_EXAMPLE,
 )
 from .models import AuditLog, Solicitacao
-from .permissions import (
-    IsControleOrSuper,
-    IsCoordenadorOrDAT,
-    IsOwnerOrPrivileged,
-    IsSuperintendencia,
-)
+from .permissions import IsControleOrSuper, IsCoordenadorOrDAT, IsOwnerOrPrivileged, IsSuperintendencia
 from .serializers import SolicitacaoSerializer
 from .services.solicitacao_approval import (
     approve_solicitacao,
@@ -193,10 +190,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 .select_related("usuario", "municipio", "tipo_evento", "projeto", "coordenador")
                 .prefetch_related("participations__usuario")
             )
-        elif (
-            self.request.user.is_superuser
-            or self.request.user.groups.filter(name__in=["Superintendência", "Controle", "DAT"]).exists()
-        ):
+        # Epic 3.2 RBAC Refactor (2026-04-23): hardcoded
+        # `groups.filter(name__in=["Superintendência", "Controle", "DAT"])`
+        # trocado por capability `pode_operar_controle_dat` (seed Epic 1 dá
+        # essa permissão aos 3 grupos). user_has_any_perm trata is_superuser.
+        elif user_has_any_perm(self.request.user, "pode_operar_controle_dat"):
             qs = Solicitacao.objects.select_related(
                 "usuario", "municipio", "tipo_evento", "projeto", "coordenador"
             ).prefetch_related("participations__usuario")

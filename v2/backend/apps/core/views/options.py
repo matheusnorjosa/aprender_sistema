@@ -104,11 +104,19 @@ class CoordenadorOptionViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ["username", "first_name", "last_name", "email"]
 
     def get_queryset(self) -> QuerySet:
-        """Retorna usuários coordenadores e apoio de coordenação ativos."""
+        """Retorna usuários coordenadores e apoio de coordenação ativos.
+
+        Epic 3.2 RBAC Refactor (2026-04-23): hardcoded list de group names
+        centralizada em `apps.core.constants.COORDENADOR_ROLE_GROUPS`.
+        Este é um filtro de DATA SCOPE (quem aparece no dropdown), não
+        autorização — uso de `groups__name__in` é legítimo aqui.
+        """
+        from apps.core.constants import COORDENADOR_ROLE_GROUPS
+
         return (
             Usuario.objects.filter(
                 is_active=True,
-                groups__name__in=["Coordenador", "Apoio de Coordenação"],
+                groups__name__in=COORDENADOR_ROLE_GROUPS,
             )
             .distinct()
             .order_by("first_name", "last_name")
@@ -134,9 +142,15 @@ class FormadorOptionViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ["username", "first_name", "last_name", "email"]
 
     def get_queryset(self) -> QuerySet:
-        """Retorna apenas usuários formadores ativos"""
+        """Retorna apenas usuários formadores ativos.
+
+        Epic 3.2 RBAC Refactor (2026-04-23): group name centralizado em
+        `apps.core.constants.FORMADOR_ROLE_GROUPS` (data scope, não authz).
+        """
+        from apps.core.constants import FORMADOR_ROLE_GROUPS
+
         return (
-            Usuario.objects.filter(is_active=True, groups__name="Formador")
+            Usuario.objects.filter(is_active=True, groups__name__in=FORMADOR_ROLE_GROUPS)
             .distinct()
             .order_by("first_name", "last_name")
         )

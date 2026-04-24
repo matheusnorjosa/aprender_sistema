@@ -137,22 +137,16 @@ def test_labels_follow_infinitive_verb_form():
     )
 
 
-def test_seed_count_is_thirty_during_epic_4_dual_write():
-    """
-    Post-Epic 4.1 (dual-write): 15 antigos `pode_*` + 15 novos `verb_noun` = 30.
-    Após Epic 4.3 remover os antigos, voltará para 15.
-    """
-    assert len(FUNCTIONAL_PERMISSIONS_SEED) == 30, (
-        f"Seed deve conter exatamente 30 permissões durante o dual-write. " f"Achei {len(FUNCTIONAL_PERMISSIONS_SEED)}."
-    )
+def test_seed_count_is_fifteen_post_epic_4_3():
+    """Pós-Epic 4.3: apenas os 15 codenames `verb_noun` permanecem."""
+    assert (
+        len(FUNCTIONAL_PERMISSIONS_SEED) == 15
+    ), f"Seed deve conter exatamente 15 permissões pós-Epic 4.3. Achei {len(FUNCTIONAL_PERMISSIONS_SEED)}."
 
 
-def test_old_codenames_present_during_epic_4_soak():
-    """
-    Codenames antigos `pode_*` devem coexistir com novos durante 1 semana
-    de soak (Epic 4.2 → 4.3). Esta assertion vira `not in` após Epic 4.3.
-    """
-    expected_old_codenames = frozenset(
+def test_old_pode_codenames_absent_post_epic_4_3():
+    """Epic 4.3 (2026-04-24) removeu todos os codenames `pode_*` legacy."""
+    forbidden_old = frozenset(
         {
             "pode_aprovar_superintendencia",
             "pode_aprovar_gerente_superintendencia",
@@ -172,9 +166,8 @@ def test_old_codenames_present_during_epic_4_soak():
         }
     )
     actual = frozenset(seed.codename for seed in FUNCTIONAL_PERMISSIONS_SEED)
-    assert expected_old_codenames.issubset(
-        actual
-    ), f"Codenames antigos faltando durante soak: {expected_old_codenames - actual}"
+    intruders = forbidden_old & actual
+    assert not intruders, f"Codenames legacy reintroduzidos no seed: {intruders}"
 
 
 def test_new_verb_noun_codenames_present_post_epic_4_1():

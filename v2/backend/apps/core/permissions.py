@@ -18,9 +18,6 @@ Backwards compatible:
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportCallIssue=false
 from __future__ import annotations
 
-import warnings
-from typing import cast
-
 from rest_framework import permissions  # type: ignore[attr-defined]
 from rest_framework.request import Request
 from rest_framework.views import APIView
@@ -133,180 +130,20 @@ class HasFunctionalPermission(permissions.BasePermission):  # type: ignore[misc]
         return self.functional_codename in get_user_functional_permissions(user)
 
 
-def funcperm_factory(
-    class_name: str,
-    functional_codename: str,
-    message: str,
-) -> type[HasFunctionalPermission]:
-    attrs = {
-        "functional_codename": functional_codename,
-        "message": message,
-    }
-    return cast(type[HasFunctionalPermission], type(class_name, (HasFunctionalPermission,), attrs))
-
-
-def _warn_legacy(class_name: str, new_codename: str) -> None:
-    """Helper: emite DeprecationWarning padronizado apontando para HasPerm equivalente."""
-    warnings.warn(
-        f"{class_name} is deprecated; use HasPerm({new_codename!r}). "
-        "This class will be removed in Epic 5 of the RBAC refactor. "
-        "See v2/docs/RBAC_NAMING.md.",
-        DeprecationWarning,
-        stacklevel=3,
-    )
-
-
 # ============================================================================
-# Epic 2 Legacy factory classes (12) — deprecated em favor de HasPerm(codename)
+# Epic 5.3 RBAC Refactor (2026-04-24): as 12 classes factory legacy
+# (`IsSuperintendencia`, `IsDAT`, `IsControleOrDAT`, ...) foram removidas.
+# Callers agora usam `HasPerm("codename")` diretamente via codemod do
+# Epic 5.2. `funcperm_factory` e `_warn_legacy` helper também removidos
+# — não há mais consumidores desses utilitários.
 #
-# Cada uma emite DeprecationWarning no __init__ apontando para HasPerm
-# equivalente. Remoção efetiva no Epic 5 (libcst codemod). Ver master-plan
-# §3.3 e v2/docs/RBAC_NAMING.md.
+# As 3 classes mantidas abaixo (`IsGerenteSuperintendencia`,
+# `IsOwnerOrPrivileged`, `HasSectorAccess`) permanecem porque exprimem
+# lógica que `HasPerm(codename)` não cobre:
+# - Composite rule (funcperm + grupo Django)
+# - Object-level check (obj.usuario)
+# - Dynamic scope via query param
 # ============================================================================
-
-
-class IsSuperintendencia(
-    funcperm_factory(
-        "IsSuperintendencia",
-        "approve_solicitation",
-        "Apenas usuários da Superintendência, DAT ou Superusuários podem realizar esta ação.",
-    )
-):
-    def __init__(self) -> None:
-        super().__init__()
-        _warn_legacy("IsSuperintendencia", "approve_solicitation")
-
-
-class IsSuperintendenciaOnly(
-    funcperm_factory(
-        "IsSuperintendenciaOnly",
-        "execute_restricted_operations",
-        "Apenas usuários da Superintendência podem realizar esta ação.",
-    )
-):
-    def __init__(self) -> None:
-        super().__init__()
-        _warn_legacy("IsSuperintendenciaOnly", "execute_restricted_operations")
-
-
-class IsCoordenadorOrDAT(
-    funcperm_factory(
-        "IsCoordenadorOrDAT",
-        "create_solicitation",
-        "Apenas Coordenadores, Apoio de Coordenação ou DAT podem criar solicitações.",
-    )
-):
-    def __init__(self) -> None:
-        super().__init__()
-        _warn_legacy("IsCoordenadorOrDAT", "create_solicitation")
-
-
-class IsControleOrSuper(
-    funcperm_factory(
-        "IsControleOrSuper",
-        "import_spreadsheet",
-        "Apenas Controle ou Superintendência podem realizar esta ação.",
-    )
-):
-    def __init__(self) -> None:
-        super().__init__()
-        _warn_legacy("IsControleOrSuper", "import_spreadsheet")
-
-
-class IsDATOrSuper(
-    funcperm_factory(
-        "IsDATOrSuper",
-        "manage_admin_registries",
-        "Apenas usuários do grupo DAT ou superusers podem realizar esta ação.",
-    )
-):
-    def __init__(self) -> None:
-        super().__init__()
-        _warn_legacy("IsDATOrSuper", "manage_admin_registries")
-
-
-class IsComprasDashboardAccess(
-    funcperm_factory(
-        "IsComprasDashboardAccess",
-        "view_compras_dashboard",
-        "Apenas usuários dos grupos DAT ou Diretoria podem acessar o dashboard de compras.",
-    )
-):
-    def __init__(self) -> None:
-        super().__init__()
-        _warn_legacy("IsComprasDashboardAccess", "view_compras_dashboard")
-
-
-class IsDAT(
-    funcperm_factory(
-        "IsDAT",
-        "manage_purchases_and_materials",
-        "Apenas usuários do grupo DAT podem realizar esta ação.",
-    )
-):
-    def __init__(self) -> None:
-        super().__init__()
-        _warn_legacy("IsDAT", "manage_purchases_and_materials")
-
-
-class IsControleOrDAT(
-    funcperm_factory(
-        "IsControleOrDAT",
-        "operate_preagenda",
-        "Apenas Controle ou DAT podem realizar esta ação.",
-    )
-):
-    def __init__(self) -> None:
-        super().__init__()
-        _warn_legacy("IsControleOrDAT", "operate_preagenda")
-
-
-class IsControle(
-    funcperm_factory(
-        "IsControle",
-        "run_daily_operations",
-        "Apenas usuários do grupo Controle podem realizar esta ação.",
-    )
-):
-    def __init__(self) -> None:
-        super().__init__()
-        _warn_legacy("IsControle", "run_daily_operations")
-
-
-class IsGerencia(
-    funcperm_factory(
-        "IsGerencia",
-        "supervise_operations",
-        "Apenas usuários com permissão gerencial (Gerência, Superintendência ou Diretoria) podem realizar esta ação.",
-    )
-):
-    def __init__(self) -> None:
-        super().__init__()
-        _warn_legacy("IsGerencia", "supervise_operations")
-
-
-class IsDashboardOverview(
-    funcperm_factory(
-        "IsDashboardOverview",
-        "view_overview_dashboard",
-        "Apenas usuários com permissão de dashboard (Superintendência, Gerência ou Diretoria) podem acessar o dashboard geral.",
-    )
-):
-    def __init__(self) -> None:
-        super().__init__()
-        _warn_legacy("IsDashboardOverview", "view_overview_dashboard")
-
-
-class IsMapMetrics(
-    funcperm_factory(
-        "IsMapMetrics",
-        "view_map_metrics",
-        "Apenas usuários autorizados podem acessar métricas do mapa.",
-    )
-):
-    def __init__(self) -> None:
-        super().__init__()
-        _warn_legacy("IsMapMetrics", "view_map_metrics")
 
 
 class IsGerenteSuperintendencia(HasFunctionalPermission):  # type: ignore[misc]

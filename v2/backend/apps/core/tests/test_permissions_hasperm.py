@@ -15,8 +15,6 @@ Ver v2/docs/plans/rbac-refactor/epic-2-hasperm.md e master-plan §3.3.
 
 from __future__ import annotations
 
-import warnings
-
 from django.contrib.auth.models import AnonymousUser, Group
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
@@ -24,21 +22,7 @@ from rest_framework.test import APIRequestFactory
 import pytest
 
 from apps.core.models import PermissaoFuncional, Usuario
-from apps.core.permissions import (
-    HasPerm,
-    IsComprasDashboardAccess,
-    IsControle,
-    IsControleOrDAT,
-    IsControleOrSuper,
-    IsCoordenadorOrDAT,
-    IsDashboardOverview,
-    IsDAT,
-    IsDATOrSuper,
-    IsGerencia,
-    IsMapMetrics,
-    IsSuperintendencia,
-    IsSuperintendenciaOnly,
-)
+from apps.core.permissions import HasPerm
 
 pytestmark = pytest.mark.django_db
 
@@ -204,58 +188,47 @@ def test_hasperm_composition_not_inverts_grant(request_factory, user_with_capabi
 
 
 # ============================================================================
-# Deprecation — 12 classes factory legacy emitem DeprecationWarning
+# Epic 5.3 (2026-04-24): as 12 classes factory legacy foram REMOVIDAS.
+# Os testes parametrizados de DeprecationWarning que viviam aqui não têm
+# mais alvo. Callers agora usam `HasPerm("codename")` diretamente via
+# codemod do Epic 5.2 (#1213).
 # ============================================================================
 
 
-LEGACY_CLASSES = [
-    IsSuperintendencia,
-    IsSuperintendenciaOnly,
-    IsCoordenadorOrDAT,
-    IsControleOrSuper,
-    IsDATOrSuper,
-    IsComprasDashboardAccess,
-    IsDAT,
-    IsControleOrDAT,
-    IsControle,
-    IsGerencia,
-    IsDashboardOverview,
-    IsMapMetrics,
-]
+def test_legacy_factory_classes_removed():
+    """Sanity test: Epic 5.3 garante que as 12 classes factory foram removidas."""
+    import apps.core.permissions as perms_module
+
+    removed = (
+        "IsSuperintendencia",
+        "IsSuperintendenciaOnly",
+        "IsCoordenadorOrDAT",
+        "IsControleOrSuper",
+        "IsDATOrSuper",
+        "IsComprasDashboardAccess",
+        "IsDAT",
+        "IsControleOrDAT",
+        "IsControle",
+        "IsGerencia",
+        "IsDashboardOverview",
+        "IsMapMetrics",
+    )
+    still_present = [name for name in removed if hasattr(perms_module, name)]
+    assert not still_present, f"Classes removidas no Epic 5.3 ainda existem: {still_present}"
 
 
-@pytest.mark.parametrize("legacy_cls", LEGACY_CLASSES)
-def test_legacy_factory_class_emits_deprecation_warning(legacy_cls):
-    """Cada uma das 12 factory classes deve emitir DeprecationWarning no __init__."""
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        legacy_cls()
-        deprecation_warnings = [w for w in caught if issubclass(w.category, DeprecationWarning)]
-        assert deprecation_warnings, f"{legacy_cls.__name__} não emitiu DeprecationWarning. " "Ver master-plan §3.3."
-        msg = str(deprecation_warnings[0].message)
-        assert (
-            "HasPerm" in msg
-        ), f"Mensagem de deprecation de {legacy_cls.__name__} deve apontar para HasPerm equivalente."
+def test_funcperm_factory_removed():
+    """Epic 5.3: `funcperm_factory` e `_warn_legacy` foram removidos."""
+    import apps.core.permissions as perms_module
+
+    assert not hasattr(perms_module, "funcperm_factory"), "funcperm_factory deveria ter sido removido no Epic 5.3"
+    assert not hasattr(perms_module, "_warn_legacy"), "_warn_legacy deveria ter sido removido no Epic 5.3"
 
 
-def test_legacy_classes_still_work_behaviorally(
-    request_factory, user_with_capability, seeded_permission, group_with_permission
-):
-    """
-    Deprecation é cosmética: comportamento das 12 classes legacy deve
-    permanecer idêntico para garantir backward compat até o Epic 5.
-    """
-    # Conecta a permissão "can_do_test_action" ao codename de uma legacy class
-    # para validar que a classe legacy ainda funciona.
-    # Usamos IsDAT (codename=pode_operar_dat_exclusivo) como piloto.
-    pode_operar_dat_exclusivo = PermissaoFuncional.objects.filter(codename="manage_purchases_and_materials").first()
-    assert pode_operar_dat_exclusivo is not None, "Seed deve ter a permissão."
+def test_kept_classes_still_exported():
+    """As 3 classes mantidas (composite/object-level/dynamic) continuam acessíveis."""
+    from apps.core.permissions import HasSectorAccess, IsGerenteSuperintendencia, IsOwnerOrPrivileged
 
-    # Adiciona o group do user à permissão pode_operar_dat_exclusivo
-    pode_operar_dat_exclusivo.groups.add(group_with_permission)
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        perm = IsDAT()
-    req = _build_request(request_factory, user_with_capability)
-    assert perm.has_permission(req, None) is True
+    assert IsGerenteSuperintendencia is not None
+    assert IsOwnerOrPrivileged is not None
+    assert HasSectorAccess is not None

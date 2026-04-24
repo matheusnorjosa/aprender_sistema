@@ -20,11 +20,11 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from apps.core.models import AuditLog, Solicitacao
-from apps.core.permissions import IsControle, IsGerencia
+from apps.core.permissions import HasPerm
 
 
 @api_view(["GET"])
-@permission_classes([IsControle | IsGerencia])
+@permission_classes([HasPerm("run_daily_operations") | HasPerm("supervise_operations")])
 @throttle_classes([ScopedRateThrottle])
 def productivity_metrics(request: Request) -> Response:
     """
@@ -50,7 +50,7 @@ def productivity_metrics(request: Request) -> Response:
         - avg_approval_time_hours = avg(updated_at - created_at).total_seconds() / 3600
         - gcal_error_rate = (errors / approved) * 100 (0.0 if division by zero)
 
-    Permissions: IsControle | IsGerencia (only authorized users)
+    Permissions: HasPerm("run_daily_operations") | HasPerm("supervise_operations") (only authorized users)
     """
     days = int(request.GET.get("days", 7))
     cutoff = timezone.now() - timedelta(days=days)
@@ -113,7 +113,7 @@ productivity_metrics.throttle_scope = "metrics"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
-@permission_classes([IsControle | IsGerencia])
+@permission_classes([HasPerm("run_daily_operations") | HasPerm("supervise_operations")])
 @throttle_classes([ScopedRateThrottle])
 def quality_metrics(request: Request) -> Response:
     """
@@ -139,7 +139,7 @@ def quality_metrics(request: Request) -> Response:
         - avg_approval_time_hours = avg(updated_at - created_at).total_seconds() / 3600
         - avg_publish_time_minutes = avg(gcal_last_sync_at - updated_at).total_seconds() / 60
 
-    Permissions: IsControle | IsGerencia (only authorized users)
+    Permissions: HasPerm("run_daily_operations") | HasPerm("supervise_operations") (only authorized users)
     """
     days = int(request.GET.get("days", 30))
     cutoff = timezone.now() - timedelta(days=days)

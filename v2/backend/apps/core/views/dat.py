@@ -23,7 +23,7 @@ from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.core.models import DATRegistro, ProjetoGeral
-from apps.core.permissions import IsDATOrSuper, IsSuperintendenciaOnly
+from apps.core.permissions import HasPerm
 from apps.core.serializers import (
     DATRegistroCreateSerializer,
     DATRegistroDetailSerializer,
@@ -159,10 +159,10 @@ class DATRegistroViewSet(viewsets.ModelViewSet):
         - destroy: apenas Superintendência (SPEC_DAT_REGISTROS.md seção 4.3)
         """
         if self.action == "destroy":
-            return [IsSuperintendenciaOnly()]
-        return [IsDATOrSuper()]
+            return [HasPerm("execute_restricted_operations")()]
+        return [HasPerm("manage_admin_registries")()]
 
-    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
     def export(self, request: Request) -> Response:
         """
         Exporta registros para CSV.
@@ -236,7 +236,7 @@ class DATRegistroViewSet(viewsets.ModelViewSet):
         response["Content-Disposition"] = 'attachment; filename="dat_registros.csv"'
         return response
 
-    @action(detail=False, methods=["get"], permission_classes=[IsDATOrSuper])
+    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
     def stats(self, request: Request) -> Response:
         """
         Retorna estatísticas agregadas dos registros.
@@ -336,8 +336,8 @@ class ProjetoGeralViewSet(viewsets.ModelViewSet):
         if self.action in ["list", "retrieve", "projetos"]:
             return [IsAuthenticated()]
         elif self.action == "destroy":
-            return [IsSuperintendenciaOnly()]
-        return [IsDATOrSuper()]
+            return [HasPerm("execute_restricted_operations")()]
+        return [HasPerm("manage_admin_registries")()]
 
     @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated])
     def projetos(self, request: Request, pk=None) -> Response:

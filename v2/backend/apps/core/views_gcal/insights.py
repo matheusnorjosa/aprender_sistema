@@ -21,7 +21,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 
 from apps.core.models import Solicitacao
-from apps.core.permissions import IsControleOrSuper
+from apps.core.permissions import HasPerm
 from apps.core.serializers.gcal_dashboard_contract import (
     DetailMessageSerializer,
     SuccessRateResponseSerializer,
@@ -50,10 +50,10 @@ class SuccessRateView(APIView):
         "window": { "start": "YYYY-MM-DD" | null, "end": "YYYY-MM-DD" | null }
     }
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(responses=SuccessRateResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -123,11 +123,11 @@ class TopInsightsView(APIView):
 
     Response 400: metric inválido
 
-    Permissions: IsControleOrSuper
+    Permissions: HasPerm("import_spreadsheet")
     Ordenação: -error, -count
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(
         responses={

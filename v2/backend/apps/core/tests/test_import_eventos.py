@@ -4,7 +4,7 @@ Testes para importacao de Eventos (Solicitacao + Participation).
 Cobertura:
 - Service: import_eventos_from_file()
 - View: ImportEventosView
-- RBAC: Permissoes IsControleOrSuper
+- RBAC: Permissoes HasPerm("import_spreadsheet")
 - Idempotencia: Nao duplica registros
 - Regras PA: Status baseado em projeto.fluxo
 """

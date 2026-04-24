@@ -20,11 +20,11 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from apps.core.models import Participation
-from apps.core.permissions import IsControle, IsGerencia
+from apps.core.permissions import HasPerm
 
 
 @api_view(["GET"])
-@permission_classes([IsControle | IsGerencia])
+@permission_classes([HasPerm("run_daily_operations") | HasPerm("supervise_operations")])
 @throttle_classes([ScopedRateThrottle])
 def formadores_metrics(request: Request) -> Response:
     """
@@ -53,7 +53,7 @@ def formadores_metrics(request: Request) -> Response:
         - Aggregate by usuario: count events, sum hours, count distinct municipios
         - Order by -eventos, limit to top 10
 
-    Permissions: IsControle | IsGerencia (only authorized users)
+    Permissions: HasPerm("run_daily_operations") | HasPerm("supervise_operations") (only authorized users)
     """
     days = int(request.GET.get("days", 30))
     cutoff = timezone.now() - timedelta(days=days)

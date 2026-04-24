@@ -25,7 +25,6 @@ from apps.core.models import Municipio, PermissaoFuncional, Projeto, Solicitacao
 
 pytestmark = pytest.mark.django_db
 
-
 # ============================================================================
 # FIXTURES
 # ============================================================================
@@ -213,7 +212,7 @@ def test_endpoint_municipios_dat_allowed(run_seed_rbac):
 
 
 def test_endpoint_municipios_coordenador_forbidden(run_seed_rbac):
-    """Coordenador NÃO tem acesso a /api/municipios/ (endpoint protegido por IsDAT)."""
+    """Coordenador NÃO tem acesso a /api/municipios/ (endpoint protegido por HasPerm("manage_purchases_and_materials"))."""
     user = Usuario.objects.create_user(username="coord1", email="coord@x.com", password="x", cpf="22222222222")
     coord = Group.objects.get(name="Coordenador")
     user.groups.add(coord)
@@ -221,7 +220,7 @@ def test_endpoint_municipios_coordenador_forbidden(run_seed_rbac):
     client = APIClient()
     client.force_authenticate(user=user)
 
-    # GET (list) - MunicipioViewSet usa IsDAT permission class
+    # GET (list) - MunicipioViewSet usa HasPerm("manage_purchases_and_materials") permission class
     url = reverse("core:municipio-list")
     res = client.get(url)
     # Coordenador NÃO deve ter acesso (403 esperado)

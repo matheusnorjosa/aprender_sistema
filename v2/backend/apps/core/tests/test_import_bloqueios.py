@@ -4,7 +4,7 @@ Testes para importacao de Bloqueios (AvailabilityBlock).
 Cobertura:
 - Service: import_bloqueios_from_file()
 - View: ImportBloqueiosView
-- RBAC: Permissoes IsControleOrSuper
+- RBAC: Permissoes HasPerm("import_spreadsheet")
 - Idempotencia: Nao duplica registros
 """
 

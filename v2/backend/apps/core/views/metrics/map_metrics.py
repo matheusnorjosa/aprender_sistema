@@ -21,7 +21,7 @@ from rest_framework.throttling import ScopedRateThrottle
 
 from apps.core.exceptions import ValidationAPIError
 from apps.core.models import Compra, Participation, Solicitacao
-from apps.core.permissions import IsMapMetrics
+from apps.core.permissions import HasPerm
 
 MAP_LIMIT_MAX = 1000
 VALID_STATUS_FILTERS = {"pendente", "aprovado", "reprovado"}
@@ -177,7 +177,7 @@ def _apply_filters_to_compras(queryset: QuerySet[Compra], filters: MapFilterValu
 
 
 @api_view(["GET"])
-@permission_classes([IsMapMetrics])
+@permission_classes([HasPerm("view_map_metrics")])
 @throttle_classes([ScopedRateThrottle])
 def metrics_map(request: Request) -> Response:
     """
@@ -215,7 +215,7 @@ def metrics_map(request: Request) -> Response:
         "top_projetos": [{"nome": "Projeto A", "count": 5}, ...]
     }
 
-    Permissions: IsMapMetrics (Controle, DAT, Superintendência, Gerência, Diretoria)
+    Permissions: HasPerm("view_map_metrics") (Controle, DAT, Superintendência, Gerência, Diretoria)
     """
     filters, filters_applied = _parse_map_filter_values(request)
     limit = _parse_map_limit(request)
@@ -371,7 +371,7 @@ metrics_map.throttle_scope = "metrics"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
-@permission_classes([IsMapMetrics])
+@permission_classes([HasPerm("view_map_metrics")])
 @throttle_classes([ScopedRateThrottle])
 def metrics_map_coordinators(request: Request) -> Response:
     """
@@ -402,7 +402,7 @@ def metrics_map_coordinators(request: Request) -> Response:
         ]
     }
 
-    Permissions: IsMapMetrics (Controle, DAT, Superintendência, Gerência, Diretoria)
+    Permissions: HasPerm("view_map_metrics") (Controle, DAT, Superintendência, Gerência, Diretoria)
     """
     filters, filters_applied = _parse_map_filter_values(request, require_uf=True)
     solicitacoes_filtradas = _apply_filters_to_solicitacoes(Solicitacao.objects.all(), filters)

@@ -195,7 +195,7 @@ class TestDashboardMetrics:
 
         response = client.get("/api/gcal/dashboard/metrics/")
 
-        # DRF pode retornar 403 ao invés de 401 com IsControleOrSuper + IsAuthenticated
+        # DRF pode retornar 403 ao invés de 401 com HasPerm("import_spreadsheet") + IsAuthenticated
         assert response.status_code in [http_status.HTTP_401_UNAUTHORIZED, http_status.HTTP_403_FORBIDDEN]
 
     def test_metrics_requires_controle_or_super(self, municipio, projeto, tipo_evento):
@@ -362,7 +362,7 @@ class TestDashboardEvents:
 
         response = client.get("/api/gcal/dashboard/events/")
 
-        # DRF pode retornar 403 ao invés de 401 com IsControleOrSuper + IsAuthenticated
+        # DRF pode retornar 403 ao invés de 401 com HasPerm("import_spreadsheet") + IsAuthenticated
         assert response.status_code in [http_status.HTTP_401_UNAUTHORIZED, http_status.HTTP_403_FORBIDDEN]
 
     def test_events_requires_controle_or_super(self):

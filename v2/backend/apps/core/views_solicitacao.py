@@ -34,7 +34,7 @@ from .api_schemas import (
     SOLICITACAO_CREATED_EXAMPLE,
 )
 from .models import AuditLog, Solicitacao
-from .permissions import IsControleOrSuper, IsCoordenadorOrDAT, IsOwnerOrPrivileged, IsSuperintendencia
+from .permissions import HasPerm, IsOwnerOrPrivileged
 from .serializers import SolicitacaoSerializer
 from .services.solicitacao_approval import (
     approve_solicitacao,
@@ -173,7 +173,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         if self.action in actions_with_custom_permissions:
             return super().get_permissions()
         if self.action == "create":
-            return [IsCoordenadorOrDAT()]
+            return [HasPerm("create_solicitation")()]
         if self.action in ["update", "partial_update", "destroy"]:
             return [IsOwnerOrPrivileged()]
         return [IsAuthenticated()]
@@ -598,7 +598,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["patch"],
-        permission_classes=[IsSuperintendencia],
+        permission_classes=[HasPerm("approve_solicitation")],
         url_path="approve",
     )
     def approve(self, request, pk=None):
@@ -636,7 +636,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["patch"],
-        permission_classes=[IsSuperintendencia],
+        permission_classes=[HasPerm("approve_solicitation")],
         url_path="reject",
     )
     def reject(self, request, pk=None):
@@ -663,7 +663,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["post"],
-        permission_classes=[IsControleOrSuper],
+        permission_classes=[HasPerm("import_spreadsheet")],
         url_path="preview-gcal",
     )
     def preview_gcal(self, request, pk=None):
@@ -688,7 +688,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["post"],
-        permission_classes=[IsControleOrSuper],
+        permission_classes=[HasPerm("import_spreadsheet")],
         url_path="publish",
     )
     def publish(self, request, pk=None):
@@ -718,7 +718,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["post"],
-        permission_classes=[IsControleOrSuper],
+        permission_classes=[HasPerm("import_spreadsheet")],
         url_path="resync-gcal",
     )
     def resync_gcal(self, request, pk=None):
@@ -749,7 +749,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["post"],
-        permission_classes=[IsControleOrSuper],
+        permission_classes=[HasPerm("import_spreadsheet")],
         url_path="cancel-gcal",
     )
     def cancel_gcal(self, request, pk=None):
@@ -790,7 +790,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=["post"],
-        permission_classes=[IsSuperintendencia],
+        permission_classes=[HasPerm("approve_solicitation")],
         url_path="batch-approve",
     )
     def batch_approve(self, request):
@@ -826,7 +826,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=["post"],
-        permission_classes=[IsSuperintendencia],
+        permission_classes=[HasPerm("approve_solicitation")],
         url_path="batch-reject",
     )
     def batch_reject(self, request):

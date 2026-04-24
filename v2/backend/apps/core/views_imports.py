@@ -2,13 +2,13 @@
 Endpoints DRF para importação de Ações de Controle e Cadastros DAT.
 
 POST /api/controle/import-acoes/
-- Permission: IsControleOrSuper
+- Permission: HasPerm("import_spreadsheet")
 - Query param: dry_run=true|false (default: true)
 - Body: {file: upload}
 - Returns: Relatório com stats, pendências
 
 POST /api/dat/import-cadastros/
-- Permission: IsDATOrSuper
+- Permission: HasPerm("manage_admin_registries")
 - Query param: dry_run=true|false (default: true)
 - Body: {file: upload}
 - Returns: Relatório com stats, pendências
@@ -34,7 +34,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
-from apps.core.permissions import IsControleOrSuper, IsDATOrSuper
+from apps.core.permissions import HasPerm
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -51,7 +51,7 @@ class ControleImportAcoesView(APIView):
     """
     Importa Ações de Controle de CSV/XLSX.
 
-    Requer permissão: IsControleOrSuper (grupos Controle ou Superintendência)
+    Requer permissão: HasPerm("import_spreadsheet") (grupos Controle ou Superintendência)
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -72,7 +72,7 @@ class ControleImportAcoesView(APIView):
         }
     """
 
-    permission_classes = [IsAuthenticated, IsControleOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(
         summary="Importar ações de controle",
@@ -147,7 +147,7 @@ class DATImportCadastrosView(APIView):
     """
     Importa Cadastros DAT de CSV/XLSX.
 
-    Requer permissão: IsDATOrSuper (grupos DAT ou Superintendência)
+    Requer permissão: HasPerm("manage_admin_registries") (grupos DAT ou Superintendência)
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -168,7 +168,7 @@ class DATImportCadastrosView(APIView):
         }
     """
 
-    permission_classes = [IsAuthenticated, IsDATOrSuper]
+    permission_classes = [IsAuthenticated, HasPerm("manage_admin_registries")]
 
     @extend_schema(
         summary="Importar cadastros DAT",

@@ -25,7 +25,7 @@ from apps.core.models import Usuario
 
 @pytest.fixture
 def controle_user(db):
-    """Usuário com permissão IsControleOrSuper"""
+    """Usuário com permissão HasPerm("import_spreadsheet")"""
     user = Usuario.objects.create_user(username="controle1", password="test123", email="controle@example.com")
     group, _ = Group.objects.get_or_create(name="Controle")
     user.groups.add(group)
@@ -34,7 +34,7 @@ def controle_user(db):
 
 @pytest.fixture
 def dat_user(db):
-    """Usuário com permissão IsDATOrSuper"""
+    """Usuário com permissão HasPerm("manage_admin_registries")"""
     user = Usuario.objects.create_user(username="dat1", password="test123", email="dat@example.com")
     group, _ = Group.objects.get_or_create(name="DAT")
     user.groups.add(group)

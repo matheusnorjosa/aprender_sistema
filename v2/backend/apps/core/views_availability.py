@@ -22,7 +22,7 @@ from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schem
 
 from .api_schemas import AVAILABILITY_CONFLICT_EXAMPLE, AVAILABILITY_OK_EXAMPLE, COMMON_ERROR_RESPONSES
 from .models import AvailabilityBlock, EquipeGerencia, Municipio, Usuario
-from .permissions import IsControleOrSuper
+from .permissions import HasPerm
 from .serializers import AvailabilityBlockSerializer
 from .services.availability_service import check_conflicts
 
@@ -115,7 +115,7 @@ class AvailabilityCheckView(APIView):
         - municipio_id (opcional)
     """
 
-    permission_classes = [IsControleOrSuper]
+    permission_classes = [HasPerm("import_spreadsheet")]
     throttle_scope = "availability_check"
 
     @extend_schema(
@@ -240,7 +240,7 @@ class AvailabilityCheckManyView(APIView):
     Body: {"usuarios_ids": [1, 2], "inicio": "...", "fim": "...", "municipio_id": ...}
     """
 
-    permission_classes = [IsControleOrSuper]
+    permission_classes = [HasPerm("import_spreadsheet")]
     throttle_scope = "availability_check"
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:

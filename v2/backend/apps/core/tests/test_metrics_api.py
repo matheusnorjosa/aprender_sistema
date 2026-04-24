@@ -664,7 +664,7 @@ class TestMetricsRBAC:
     """
     Test RBAC for metrics endpoints (Issue #189).
 
-    All endpoints require IsControle | IsGerencia permission.
+    All endpoints require HasPerm("run_daily_operations") | HasPerm("supervise_operations") permission.
     Unauthorized users (Formador, Coordenador) should get 403.
     """
 

@@ -25,7 +25,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
-from apps.core.permissions import IsControleOrSuper
+from apps.core.permissions import HasPerm
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -48,7 +48,7 @@ class ImportComprasView(APIView):
     """
     Importa Compras de CSV/XLSX.
 
-    Requer permissão: IsControleOrSuper (grupos Controle ou Superintendência)
+    Requer permissão: HasPerm("import_spreadsheet") (grupos Controle ou Superintendência)
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -71,7 +71,7 @@ class ImportComprasView(APIView):
         }
     """
 
-    permission_classes = [IsControleOrSuper]
+    permission_classes = [HasPerm("import_spreadsheet")]
 
     @extend_schema(
         summary="Importar compras",

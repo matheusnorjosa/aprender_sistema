@@ -4,7 +4,7 @@ Testes para importacao de Deslocamentos.
 Cobertura:
 - Service: import_deslocamentos_from_file()
 - View: ImportDeslocamentosView
-- RBAC: Permissoes IsControleOrSuper
+- RBAC: Permissoes HasPerm("import_spreadsheet")
 - Idempotencia: Nao duplica registros
 """
 

@@ -61,7 +61,12 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
 
     queryset = AvailabilityBlock.objects.select_related("usuario").all()
     serializer_class = AvailabilityBlockSerializer
-    permission_classes = [IsAuthenticated]
+    # Issue #1221 (Epic 1 RBAC Access Policy Realignment): acesso para
+    # Gerente/Coordenador/Apoio Coordenação de qualquer setor via
+    # `view_all_availability` (atribuída aos papéis acima na Issue 1.4).
+    # Formador NÃO tem essa perm — continua bloqueado. Antes era apenas
+    # `IsAuthenticated` (qualquer autenticado acessava).
+    permission_classes = [IsAuthenticated, HasPerm("view_all_availability")]
 
     def get_queryset(self) -> QuerySet:
         user = self.request.user
@@ -115,7 +120,11 @@ class AvailabilityCheckView(APIView):
         - municipio_id (opcional)
     """
 
-    permission_classes = [HasPerm("import_spreadsheet")]
+    # Issue #1222 (Epic 1 RBAC Access Policy Realignment): semântica correta
+    # é `view_all_availability` (visualizar disponibilidades), não
+    # `import_spreadsheet` (artefato do codemod Epic 5.2 que aplicou o mesmo
+    # codename em múltiplas views com intent semântico diferente).
+    permission_classes = [HasPerm("view_all_availability")]
     throttle_scope = "availability_check"
 
     @extend_schema(
@@ -240,7 +249,11 @@ class AvailabilityCheckManyView(APIView):
     Body: {"usuarios_ids": [1, 2], "inicio": "...", "fim": "...", "municipio_id": ...}
     """
 
-    permission_classes = [HasPerm("import_spreadsheet")]
+    # Issue #1222 (Epic 1 RBAC Access Policy Realignment): semântica correta
+    # é `view_all_availability` (visualizar disponibilidades), não
+    # `import_spreadsheet` (artefato do codemod Epic 5.2 que aplicou o mesmo
+    # codename em múltiplas views com intent semântico diferente).
+    permission_classes = [HasPerm("view_all_availability")]
     throttle_scope = "availability_check"
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:

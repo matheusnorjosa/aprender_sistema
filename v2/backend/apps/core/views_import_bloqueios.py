@@ -64,7 +64,14 @@ class ImportBloqueiosView(APIView):
         }
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    # Issue #1222 (Epic 1 RBAC Access Policy Realignment): importar bloqueios
+    # é função operacional de gestão de availability (Controle/Gerente/Coord/Apoio)
+    # e também faz parte do fluxo de importação genérico (DAT). Composition OR
+    # cobre ambos.
+    permission_classes = [
+        IsAuthenticated,
+        HasPerm("import_spreadsheet") | HasPerm("view_all_availability"),
+    ]
 
     @extend_schema(
         summary="Importar bloqueios de disponibilidade",

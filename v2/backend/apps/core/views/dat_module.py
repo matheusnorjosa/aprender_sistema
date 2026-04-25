@@ -385,8 +385,20 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
-        if self.action in {"dashboard", "pendencias"}:
+        # Issue #1222 (Epic 1): `dashboard` é dashboard executivo (Diretoria);
+        # `pendencias` aceita gestão (DAT/Controle) + dashboard (Diretoria) —
+        # tem permission_classes próprio no @action decorator.
+        if self.action == "dashboard":
             return [HasPerm("view_compras_dashboard")()]
+        if self.action == "pendencias":
+            return [
+                (
+                    HasPerm("manage_admin_registries")
+                    | HasPerm("manage_purchases_and_materials")
+                    | HasPerm("run_daily_operations")
+                    | HasPerm("view_compras_dashboard")
+                )()
+            ]
         return [
             (
                 HasPerm("manage_admin_registries")
@@ -588,7 +600,16 @@ class DATCompraViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=False, methods=["get"], permission_classes=[HasPerm("view_compras_dashboard")])
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[
+            HasPerm("manage_admin_registries")
+            | HasPerm("manage_purchases_and_materials")
+            | HasPerm("run_daily_operations")
+            | HasPerm("view_compras_dashboard")
+        ],
+    )
     def pendencias(self, request: Request) -> Response:
         """
         Municípios com compra no domínio core_compra e sem solicitação ativa.
@@ -597,6 +618,11 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         a regra de negócio da operação.
 
         GET /api/dat/compras-materiais/pendencias/
+
+        Issue #1222 (Epic 1): pendências é operacional (gestão de compras),
+        não dashboard executivo. Acessível por DAT/Controle/Super; dashboard
+        agregado mantém `view_compras_dashboard` (Diretoria).
+
         Query params opcionais:
             - uf: filtra por UF
             - projeto_id: filtra por projeto

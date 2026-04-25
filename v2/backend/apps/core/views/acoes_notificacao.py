@@ -32,7 +32,6 @@ from apps.core.serializers import (
     RegistrarAncoraSerializer,
 )
 
-
 # Issue #1219 (Epic 1 RBAC Access Policy Realignment, 2026-04-24):
 # Módulo "Ações Internas" é superuser-only por ora (feature em desenvolvimento).
 # Helpers `_is_dat_or_super` e `_has_any_group` removidos — não são mais

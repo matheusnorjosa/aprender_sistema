@@ -172,17 +172,13 @@ def test_registrar_ancora_superuser_only_and_audit(api_client, user_factory, cic
 
     for user in [dat_user, gerente, coord, apoio]:
         api_client.force_authenticate(user=user)
-        response = api_client.post(
-            f"/api/acoes-instancia/{action.id}/registrar-ancora/", payload, format="json"
-        )
+        response = api_client.post(f"/api/acoes-instancia/{action.id}/registrar-ancora/", payload, format="json")
         assert response.status_code == 403, f"Expected 403 for {user.username}, got {response.status_code}"
 
     # Superuser: sucesso
     admin = user_factory(prefix="admin", is_superuser=True, is_staff=True)
     api_client.force_authenticate(user=admin)
-    admin_response = api_client.post(
-        f"/api/acoes-instancia/{action.id}/registrar-ancora/", payload, format="json"
-    )
+    admin_response = api_client.post(f"/api/acoes-instancia/{action.id}/registrar-ancora/", payload, format="json")
     assert admin_response.status_code == 200
     assert AuditLog.objects.filter(action="ACAO_REGISTRAR_ANCORA", details__acao_instancia_id=action.id).exists()
 

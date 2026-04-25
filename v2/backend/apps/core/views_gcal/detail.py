@@ -50,7 +50,7 @@ class DashboardEventsView(APIView):
     Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
 
     @extend_schema(responses=PaginatedSolicitacaoResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -85,7 +85,7 @@ class DashboardEventsExportView(APIView):
     Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response | HttpResponse:
         # Usar helper unificado timezone-aware (Issue #96 follow-up #124)
@@ -190,7 +190,7 @@ class EventDetailAPIView(APIView):
     Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
 
     @extend_schema(
         responses={
@@ -240,7 +240,7 @@ class GCalDriftView(APIView):
     }
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
 
     @extend_schema(
         responses={

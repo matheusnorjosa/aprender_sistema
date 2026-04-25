@@ -38,6 +38,7 @@ pytestmark = pytest.mark.django_db
 def grupos():
     """Criar grupos necessários para os testes."""
     return {
+        "diretoria": Group.objects.get_or_create(name="Diretoria")[0],
         "controle": Group.objects.get_or_create(name="Controle")[0],
         "dat": Group.objects.get_or_create(name="DAT")[0],
         "superintendencia": Group.objects.get_or_create(name="Superintendência")[0],
@@ -47,8 +48,18 @@ def grupos():
 
 
 @pytest.fixture
+def user_diretoria(grupos):
+    """Issue #1222 (Epic 1): Diretoria tem `view_map_metrics` no seed realinhado."""
+    user = Usuario.objects.create_user(
+        username="diretoria1", email="dir@x.com", password="x", cpf="99999999991"
+    )
+    user.groups.add(grupos["diretoria"])
+    return user
+
+
+@pytest.fixture
 def user_controle(grupos):
-    """Usuário do grupo Controle."""
+    """Usuário do grupo Controle (sem view_map_metrics no seed realinhado)."""
     user = Usuario.objects.create_user(username="controle1", email="controle@x.com", password="x", cpf="11111111111")
     user.groups.add(grupos["controle"])
     return user
@@ -183,26 +194,37 @@ def test_map_metrics_requires_authentication():
     assert res.status_code == 403, "Deve retornar 403 para não autenticado"
 
 
-def test_map_metrics_controle_allowed(user_controle):
-    """Usuário do grupo Controle tem acesso."""
+def test_map_metrics_diretoria_allowed(user_diretoria):
+    """Issue #1222 (Epic 1): Diretoria tem view_map_metrics no seed realinhado."""
+    client = APIClient()
+    client.force_authenticate(user=user_diretoria)
+
+    url = reverse("core:metrics-map")
+    res = client.get(url)
+
+    assert res.status_code == 200, f"Diretoria deve ter acesso: {res.data}"
+
+
+def test_map_metrics_controle_forbidden(user_controle):
+    """Issue #1222 (Epic 1): Controle não tem view_map_metrics no seed realinhado."""
     client = APIClient()
     client.force_authenticate(user=user_controle)
 
     url = reverse("core:metrics-map")
     res = client.get(url)
 
-    assert res.status_code == 200, f"Controle deve ter acesso: {res.data}"
+    assert res.status_code == 403
 
 
-def test_map_metrics_dat_allowed(user_dat):
-    """Usuário do grupo DAT tem acesso."""
+def test_map_metrics_dat_forbidden(user_dat):
+    """Issue #1222 (Epic 1): DAT não tem view_map_metrics no seed realinhado."""
     client = APIClient()
     client.force_authenticate(user=user_dat)
 
     url = reverse("core:metrics-map")
     res = client.get(url)
 
-    assert res.status_code == 200, f"DAT deve ter acesso: {res.data}"
+    assert res.status_code == 403
 
 
 def test_map_metrics_coordenador_forbidden(user_coordenador):
@@ -244,10 +266,10 @@ def test_map_metrics_superuser_allowed():
 # ============================================================================
 
 
-def test_map_metrics_response_structure(user_controle, solicitacoes_variedade):
+def test_map_metrics_response_structure(user_diretoria, solicitacoes_variedade):
     """Resposta tem estrutura esperada com by_municipio e by_uf."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     res = client.get(url)
@@ -304,10 +326,10 @@ def test_map_metrics_response_structure(user_controle, solicitacoes_variedade):
 # ============================================================================
 
 
-def test_map_metrics_by_municipio_aggregation(user_controle, solicitacoes_variedade):
+def test_map_metrics_by_municipio_aggregation(user_diretoria, solicitacoes_variedade):
     """Agregação por município está correta."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     res = client.get(url)
@@ -330,10 +352,10 @@ def test_map_metrics_by_municipio_aggregation(user_controle, solicitacoes_varied
         assert mun["longitude"] is not None
 
 
-def test_map_metrics_by_municipio_ordered_descending(user_controle, solicitacoes_variedade):
+def test_map_metrics_by_municipio_ordered_descending(user_diretoria, solicitacoes_variedade):
     """Municípios ordenados por eventos decrescente."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     res = client.get(url)
@@ -353,10 +375,10 @@ def test_map_metrics_by_municipio_ordered_descending(user_controle, solicitacoes
         assert by_municipio[i]["eventos"] >= by_municipio[i + 1]["eventos"]
 
 
-def test_map_metrics_coordenadores_homonimos_nao_colidem_por_nome(user_controle):
+def test_map_metrics_coordenadores_homonimos_nao_colidem_por_nome(user_diretoria):
     """Municípios homônimos em UFs diferentes não devem compartilhar contagem de coordenadores."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     projeto = Projeto.objects.create(nome="Projeto Homônimos", codigo="PH01", fluxo="SUPER")
     tipo = TipoEvento.objects.create(nome="Tipo Homônimos")
@@ -423,10 +445,10 @@ def test_map_metrics_coordenadores_homonimos_nao_colidem_por_nome(user_controle)
     assert by_mun["Santa Maria-SP"]["coordenadores"] == 1
 
 
-def test_map_metrics_eventos_e_compras_separados_no_payload(user_controle):
+def test_map_metrics_eventos_e_compras_separados_no_payload(user_diretoria):
     """Métrica de eventos não deve ser contaminada por compras."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     projeto = Projeto.objects.create(nome="Projeto Compras", codigo="PC01", fluxo="SUPER")
     tipo = TipoEvento.objects.create(nome="Tipo Compras")
@@ -497,10 +519,10 @@ def test_map_metrics_eventos_e_compras_separados_no_payload(user_controle):
 # ============================================================================
 
 
-def test_map_metrics_filter_by_status(user_controle, solicitacoes_variedade):
+def test_map_metrics_filter_by_status(user_diretoria, solicitacoes_variedade):
     """Filtro por status funciona corretamente."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
 
@@ -523,10 +545,10 @@ def test_map_metrics_filter_by_status(user_controle, solicitacoes_variedade):
     assert data["by_municipio"][0]["eventos"] == 3
 
 
-def test_map_metrics_filter_by_projeto(user_controle, solicitacoes_variedade, dados_basicos):
+def test_map_metrics_filter_by_projeto(user_diretoria, solicitacoes_variedade, dados_basicos):
     """Filtro por projeto_id funciona corretamente."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     projeto_matematica_id = dados_basicos["projetos"]["matematica"].id
@@ -549,10 +571,10 @@ def test_map_metrics_filter_by_projeto(user_controle, solicitacoes_variedade, da
     assert len(data["by_municipio"]) == 2
 
 
-def test_map_metrics_filter_combined(user_controle, solicitacoes_variedade, dados_basicos):
+def test_map_metrics_filter_combined(user_diretoria, solicitacoes_variedade, dados_basicos):
     """Filtros combinados (status + projeto_id) funcionam corretamente."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     projeto_matematica_id = dados_basicos["projetos"]["matematica"].id
@@ -573,10 +595,10 @@ def test_map_metrics_filter_combined(user_controle, solicitacoes_variedade, dado
     assert data["by_municipio"][0]["eventos"] == 3
 
 
-def test_map_metrics_filter_by_date_range(user_controle, solicitacoes_variedade):
+def test_map_metrics_filter_by_date_range(user_diretoria, solicitacoes_variedade):
     """Filtro por data_inicio/data_fim deve alterar resultado de forma verificável."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     today = timezone.localdate()
@@ -606,10 +628,10 @@ def test_map_metrics_filter_by_date_range(user_controle, solicitacoes_variedade)
 # ============================================================================
 
 
-def test_map_metrics_invalid_status(user_controle):
+def test_map_metrics_invalid_status(user_diretoria):
     """Status inválido retorna 400."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     res = client.get(url, {"status": "invalido"})
@@ -618,10 +640,10 @@ def test_map_metrics_invalid_status(user_controle):
     assert "detail" in res.json()
 
 
-def test_map_metrics_invalid_projeto_id(user_controle):
+def test_map_metrics_invalid_projeto_id(user_diretoria):
     """projeto_id não numérico retorna 400."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     res = client.get(url, {"projeto_id": "nao-numero"})
@@ -630,10 +652,10 @@ def test_map_metrics_invalid_projeto_id(user_controle):
     assert "detail" in res.json()
 
 
-def test_map_metrics_invalid_data_inicio(user_controle):
+def test_map_metrics_invalid_data_inicio(user_diretoria):
     """data_inicio inválida retorna 400."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     res = client.get(url, {"data_inicio": "2026/01/01"})
@@ -642,10 +664,10 @@ def test_map_metrics_invalid_data_inicio(user_controle):
     assert "detail" in res.json()
 
 
-def test_map_metrics_invalid_date_range(user_controle):
+def test_map_metrics_invalid_date_range(user_diretoria):
     """data_inicio > data_fim retorna 400."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     res = client.get(url, {"data_inicio": "2026-02-10", "data_fim": "2026-02-01"})
@@ -654,10 +676,10 @@ def test_map_metrics_invalid_date_range(user_controle):
     assert "detail" in res.json()
 
 
-def test_map_metrics_invalid_limit(user_controle):
+def test_map_metrics_invalid_limit(user_diretoria):
     """limit inválido retorna 400."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     res = client.get(url, {"limit": "invalido"})
@@ -671,10 +693,10 @@ def test_map_metrics_invalid_limit(user_controle):
 # ============================================================================
 
 
-def test_map_metrics_empty_database(user_controle):
+def test_map_metrics_empty_database(user_diretoria):
     """Com banco vazio, retorna arrays vazios e counts = 0."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     res = client.get(url)
@@ -694,10 +716,10 @@ def test_map_metrics_empty_database(user_controle):
 # ============================================================================
 
 
-def test_map_metrics_top_projetos(user_controle, solicitacoes_variedade, dados_basicos):
+def test_map_metrics_top_projetos(user_diretoria, solicitacoes_variedade, dados_basicos):
     """Top projetos ordenados por contagem."""
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_diretoria)
 
     url = reverse("core:metrics-map")
     res = client.get(url)

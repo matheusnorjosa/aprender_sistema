@@ -12,6 +12,7 @@ const DATPage = lazy(() => import('../pages/DAT/DATPage'));
 const NewSolicitacaoWizard = lazy(() => import('../pages/Solicitacoes/NewSolicitacaoWizard'));
 const EditSolicitacaoPage = lazy(() => import('../pages/Solicitacoes/EditSolicitacaoPage'));
 const MySolicitacoesPage = lazy(() => import('../pages/Solicitacoes/MySolicitacoesPage'));
+const MeusEventosPage = lazy(() => import('../pages/MeusEventos/MeusEventosPage'));
 const ApprovalsPage = lazy(() => import('../pages/Aprovacoes/ApprovalsPage'));
 const PreAgendaPage = lazy(() => import('../pages/PreAgenda/PreAgendaPage'));
 const HomePage = lazy(() => import('../pages/Home/HomePage'));
@@ -84,6 +85,9 @@ export function AppRoutes({ user, permissions }: AppRoutesProps): JSX.Element {
         {/* Disponibilidade */}
         <Route path="/disponibilidade" element={canDisponibilidade ? <MonthlyPage /> : <Forbidden />} />
         <Route path="/bloqueios" element={<DisponibilidadeBlocks />} />
+
+        {/* Meus Eventos — qualquer user autenticado (Issue #1225, Epic 2) */}
+        <Route path="/meus-eventos" element={user ? <MeusEventosPage /> : <Forbidden />} />
 
         {/* Solicitações */}
         <Route path="/solicitacoes/minhas" element={canCoordenador ? <MySolicitacoesPage /> : <Forbidden />} />

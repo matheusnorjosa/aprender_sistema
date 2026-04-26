@@ -222,4 +222,8 @@ def test_is_gerente_superintendencia_requires_funcperm_and_gerente_group():
 
     assert permission.has_permission(_request_with_user(factory, user_ok), _MockView()) is True
     assert permission.has_permission(_request_with_user(factory, user_without_gerente), _MockView()) is False
-    assert permission.has_permission(_request_with_user(factory, user_without_super), _MockView()) is False
+    # Issue #1222 (Epic 1): após realign, `approve_solicitation_batch` é
+    # atribuído ao grupo Gerente (e Super). User só com Gerente passa o
+    # composite (tem perm + tem grupo Gerente). Antes era restrito a quem
+    # estava em Super.
+    assert permission.has_permission(_request_with_user(factory, user_without_super), _MockView()) is True

@@ -50,9 +50,7 @@ def grupos():
 @pytest.fixture
 def user_diretoria(grupos):
     """Issue #1222 (Epic 1): Diretoria tem `view_map_metrics` no seed realinhado."""
-    user = Usuario.objects.create_user(
-        username="diretoria1", email="dir@x.com", password="x", cpf="99999999991"
-    )
+    user = Usuario.objects.create_user(username="diretoria1", email="dir@x.com", password="x", cpf="99999999991")
     user.groups.add(grupos["diretoria"])
     return user
 

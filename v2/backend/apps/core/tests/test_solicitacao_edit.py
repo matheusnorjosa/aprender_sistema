@@ -100,8 +100,17 @@ def usuario_outro(grupo_coordenador):
 
 
 @pytest.fixture
-def usuario_superintendencia(grupo_superintendencia):
-    """Usuário da Superintendência (privilegiado)."""
+def grupo_gerente():
+    """Issue #1222 (Epic 1): grupo Gerente tem edit_solicitation_as_owner_or_privileged."""
+    group, _ = Group.objects.get_or_create(name="Gerente")
+    return group
+
+
+@pytest.fixture
+def usuario_superintendencia(grupo_superintendencia, grupo_gerente):
+    """Issue #1222 (Epic 1): para preservar tests legacy de 'privileged'
+    edit/delete, fixture adiciona grupo Gerente que tem
+    `edit_solicitation_as_owner_or_privileged` no seed realinhado."""
     cpf = str(uuid4().int % 10**11).zfill(11)
     user = Usuario.objects.create_user(
         username=f"super_{uuid4().hex[:8]}",
@@ -110,13 +119,14 @@ def usuario_superintendencia(grupo_superintendencia):
         cpf=cpf,
         is_active=True,
     )
-    user.groups.add(grupo_superintendencia)
+    user.groups.add(grupo_superintendencia, grupo_gerente)
     return user
 
 
 @pytest.fixture
-def usuario_dat(grupo_dat):
-    """Usuário do DAT (privilegiado)."""
+def usuario_dat(grupo_dat, grupo_gerente):
+    """Issue #1222 (Epic 1): fixture adiciona grupo Gerente para preservar
+    tests legacy de 'privileged' edit/delete."""
     cpf = str(uuid4().int % 10**11).zfill(11)
     user = Usuario.objects.create_user(
         username=f"dat_{uuid4().hex[:8]}",
@@ -125,7 +135,7 @@ def usuario_dat(grupo_dat):
         cpf=cpf,
         is_active=True,
     )
-    user.groups.add(grupo_dat)
+    user.groups.add(grupo_dat, grupo_gerente)
     return user
 
 

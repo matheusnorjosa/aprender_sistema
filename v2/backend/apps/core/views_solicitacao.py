@@ -197,7 +197,13 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # após realinhamento do seed, `operate_preagenda` ficou só em Controle.
         # Super (que aprova solicitações) precisa ver todas; adicionada
         # `approve_solicitation` ao OR para preservar visibilidade de Super.
-        elif user_has_any_perm(self.request.user, "operate_preagenda", "approve_solicitation"):
+        elif user_has_any_perm(
+            self.request.user,
+            "operate_preagenda",
+            "approve_solicitation",
+            "approve_solicitation_batch",
+            "manage_admin_registries",
+        ):
             qs = Solicitacao.objects.select_related(
                 "usuario", "municipio", "tipo_evento", "projeto", "coordenador"
             ).prefetch_related("participations__usuario")

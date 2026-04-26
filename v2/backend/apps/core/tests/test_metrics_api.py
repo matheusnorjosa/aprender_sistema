@@ -684,21 +684,16 @@ class TestMetricsRBAC:
             response = client.get(endpoint)
             assert response.status_code == http_status.HTTP_200_OK, f"Controle user should access {endpoint}"
 
+    @pytest.mark.skip(
+        reason=(
+            "Issue #1222 (Epic 1 RBAC Access Policy Realignment): grupo "
+            "'Gerência' (legacy) foi descontinuado em favor de 'Gerente' "
+            "(função). Endpoints metrics/team/* exigem `supervise_operations` "
+            "que agora é exclusivo da Diretoria."
+        )
+    )
     def test_metrics_rbac_gerencia_allowed(self, gerencia_user):
-        """Test that Gerência users can access metrics"""
-        client = APIClient()
-        client.force_authenticate(user=gerencia_user)
-
-        # Test all 3 endpoints
-        endpoints = [
-            "/api/metrics/team/productivity/",
-            "/api/metrics/team/formadores/",
-            "/api/metrics/team/quality/",
-        ]
-
-        for endpoint in endpoints:
-            response = client.get(endpoint)
-            assert response.status_code == http_status.HTTP_200_OK, f"Gerência user should access {endpoint}"
+        """OBSOLETO após Issue #1222 — ver docstring do skip."""
 
     def test_metrics_rbac_formador_forbidden(self, formador_user):
         """Test that Formador users get 403 (forbidden)"""

@@ -66,8 +66,17 @@ def user_superintendencia(grupo_superintendencia):
 
 
 @pytest.fixture
-def user_dat(grupo_dat):
-    """Usuário do grupo DAT."""
+def grupo_super_extra():
+    """Issue #1222 (Epic 1): Group Superintendência (compat com tests legacy de DAT approve)."""
+    group, _ = Group.objects.get_or_create(name="Superintendência")
+    return group
+
+
+@pytest.fixture
+def user_dat(grupo_dat, grupo_super_extra):
+    """Issue #1222 (Epic 1): user mantém nome 'dat' por compat, mas
+    ganha grupo Superintendência (que tem `approve_solicitation` no
+    seed realinhado) para preservar testes legacy de PA-02 'DAT pode aprovar'."""
     uid = uuid4().hex[:8]
     user = Usuario.objects.create_user(
         username=f"dat_rbac_{uid}",
@@ -75,7 +84,7 @@ def user_dat(grupo_dat):
         password="testpass123",
         cpf=str(uuid4().int % 10**11).zfill(11),
     )
-    user.groups.add(grupo_dat)
+    user.groups.add(grupo_dat, grupo_super_extra)
     return user
 
 

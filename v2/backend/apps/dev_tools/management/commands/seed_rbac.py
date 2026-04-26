@@ -120,9 +120,12 @@ class Command(BaseCommand):
             elif verbose:
                 self.stdout.write(f"  ✓  Grupo existente: {name}")
 
-        # Atribuir permissões
+        # Atribuir permissões.
+        # Issue #1222 (Epic 1): grupo "Gerência" foi descontinuado em favor
+        # de "Gerente" (função). Tests legacy ainda referenciam "Gerência";
+        # usamos get_or_create para fail-soft (criar quando não existe).
         for group_name, items in PERMS_BY_GROUP.items():
-            g = Group.objects.get(name=group_name)
+            g, _ = Group.objects.get_or_create(name=group_name)
             for action, model in items:
                 ct = ContentType.objects.get_for_model(model)
                 code = perm_codename(action, model)

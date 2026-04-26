@@ -21,7 +21,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 
 from apps.core.models import Solicitacao
-from apps.core.permissions import HasPerm
+from apps.core.rbac.policies import CanUseGcal
 from apps.core.serializers.gcal_dashboard_contract import (
     DetailMessageSerializer,
     SuccessRateResponseSerializer,
@@ -53,7 +53,7 @@ class SuccessRateView(APIView):
     Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
+    permission_classes = [IsAuthenticated, CanUseGcal]
 
     @extend_schema(responses=SuccessRateResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -127,7 +127,7 @@ class TopInsightsView(APIView):
     Ordenação: -error, -count
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
+    permission_classes = [IsAuthenticated, CanUseGcal]
 
     @extend_schema(
         responses={

@@ -24,13 +24,19 @@ from apps.core.tests.conftest import get_field_errors
 
 @pytest.fixture
 def user_test(db):
-    """Cria um usuário de teste"""
-    return Usuario.objects.create_user(
+    """Issue #1222 (Epic 1): user adicionado ao Controle (que tem
+    `view_all_availability`) para criar/CRUD bloqueios via /api/availability-blocks/."""
+    from django.contrib.auth.models import Group
+
+    user = Usuario.objects.create_user(
         username="testuser",
         email="testuser@example.com",
         password="testpass123",
         cpf="12345678901",
     )
+    grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+    user.groups.add(grupo_controle)
+    return user
 
 
 @pytest.fixture

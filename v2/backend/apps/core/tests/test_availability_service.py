@@ -525,13 +525,18 @@ class TestAvailabilityCheckEndpoint:
     def test_check_many_endpoint_batch_processing(self, usuario_test, tipo_evento_test, municipio_a, db):
         """
         Test: Endpoint check-many/ processa múltiplos usuários.
-        Requer usuário privilegiado para checar outros usuários.
+        Requer usuário privilegiado (com `view_all_availability`) para
+        checar outros usuários.
+
+        Issue #1222 (Epic 1): após realinhamento do seed, Controle/Gerente/
+        Coordenador/Apoio Coord têm `view_all_availability`. Superintendência
+        deixou de ter (Diretoria assumiu dashboards executivos).
         """
         from django.contrib.auth.models import Group
 
-        # Tornar usuario_test privilegiado (adicionar ao grupo Superintendência)
-        grupo_super, _ = Group.objects.get_or_create(name="Superintendência")
-        usuario_test.groups.add(grupo_super)
+        # Tornar usuario_test privilegiado (grupo Controle tem view_all_availability)
+        grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+        usuario_test.groups.add(grupo_controle)
 
         # Criar segundo usuário
         usuario_2 = Usuario.objects.create_user(

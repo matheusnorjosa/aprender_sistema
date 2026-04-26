@@ -276,6 +276,17 @@ class Command(BaseCommand):
                 "groups": [grupos["Gerente"], grupos["Superintendência"]],
                 "is_superuser": False,
             },
+            # === Aprovador adicional (J08 race-condition com 3 supers em paralelo) ===
+            {
+                "username": "approver_03@test.com",
+                "email": "approver_03@test.com",
+                "first_name": "Bruno",
+                "last_name": "Approver03",
+                "cpf": "99900000022",
+                "password": "testpass123",
+                "groups": [grupos["Gerente"], grupos["Superintendência"]],
+                "is_superuser": False,
+            },
             # === Formadores por setor (jornadas J06, J11, J13) ===
             {
                 "username": "formador_vidas@test.com",

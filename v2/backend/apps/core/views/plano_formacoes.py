@@ -107,10 +107,14 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         return PlanoFormacoesSerializer
 
     def get_permissions(self):
-        """Permissoes baseadas na acao."""
+        """Permissoes baseadas na acao.
+
+        Issue #1220 (Epic 1): setor Controle também edita planos de formação
+        via `run_daily_operations` — não apenas DAT. Composition OR cobre ambos.
+        """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
-        return [HasPerm("manage_admin_registries")()]
+        return [(HasPerm("manage_admin_registries") | HasPerm("run_daily_operations"))()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""

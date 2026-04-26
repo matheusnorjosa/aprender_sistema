@@ -316,9 +316,19 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
+@pytest.mark.skip(
+    reason=(
+        "Issue #1221 (Epic 1 RBAC Access Policy Realignment): após mudança de "
+        "`IsAuthenticated` para `HasPerm('view_all_availability')` em "
+        "AvailabilityBlockViewSet, usuário comum sem perm é 403 GLOBAL. "
+        "O cenário 'multi-sector data scope para usuários comuns' não existe "
+        "mais — quem tem view_all_availability é privileged e vê tudo."
+    )
+)
 @pytest.mark.django_db
 class TestAvailabilityBlockViewSetMultiSector(TestCase):
-    """Testes para AvailabilityBlockViewSet filtro por gerência (conforme plano Seção 3.4)."""
+    """Testes para AvailabilityBlockViewSet filtro por gerência (conforme plano Seção 3.4).
+    OBSOLETO após Issue #1221 — ver docstring do skip."""
 
     def setUp(self):
         """Cria fixtures de teste."""

@@ -19,13 +19,28 @@ from django.db.models import QuerySet
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.models import Solicitacao
 from apps.core.serializers.me import MeEventSerializer
 
 
+@extend_schema_view(
+    get=extend_schema(
+        summary="Listar eventos do usuário autenticado",
+        description=(
+            "Retorna a lista paginada de eventos (Solicitacoes aprovadas) onde o "
+            "usuário autenticado é participante (qualquer role). Formador é o caso "
+            "primário, mas qualquer user autenticado pode consumir."
+        ),
+        responses={
+            200: MeEventSerializer(many=True),
+            401: COMMON_ERROR_RESPONSES[401],
+        },
+        tags=["me"],
+    )
+)
 class MeEventsListView(generics.ListAPIView):
     """
     Lista eventos em que o user autenticado é participante.
@@ -54,19 +69,3 @@ class MeEventsListView(generics.ListAPIView):
             .order_by("-inicio")
             .distinct()
         )
-
-    @extend_schema(
-        summary="Listar eventos do usuário autenticado",
-        description=(
-            "Retorna a lista paginada de eventos (Solicitacoes aprovadas) onde o "
-            "usuário autenticado é participante (qualquer role). Formador é o caso "
-            "primário, mas qualquer user autenticado pode consumir."
-        ),
-        responses={
-            200: MeEventSerializer(many=True),
-            401: COMMON_ERROR_RESPONSES[401],
-        },
-        tags=["me"],
-    )
-    def get(self, request, *args, **kwargs):  # noqa: D401 — DRF override
-        return super().get(request, *args, **kwargs)

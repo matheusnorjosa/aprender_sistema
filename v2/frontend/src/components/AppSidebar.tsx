@@ -56,6 +56,7 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/dat/importacao': 'dat-importacao',
   '/dat/registros': 'dat-registros',
   '/disponibilidade': 'grade-mensal',
+  '/meus-eventos': 'meus-eventos',
   '/solicitacoes/minhas': 'minhas-solicitacoes',
   '/solicitacoes/nova': 'nova-solicitacao',
 };
@@ -257,6 +258,11 @@ export function AppSidebar({
           >
             <Menu.Item key="home" icon={<HomeOutlined />} onClick={closeAllSubmenus}>
               <Link to="/home">Página Inicial</Link>
+            </Menu.Item>
+
+            {/* Meus Eventos — qualquer user autenticado (Issue #1225, Epic 2) */}
+            <Menu.Item key="meus-eventos" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
+              <Link to="/meus-eventos">Meus Eventos</Link>
             </Menu.Item>
 
             {canApproveSuper && (

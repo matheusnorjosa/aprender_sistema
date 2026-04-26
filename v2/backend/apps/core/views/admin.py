@@ -36,6 +36,7 @@ from apps.core.models import (
     Usuario,
 )
 from apps.core.permissions import HasPerm
+from apps.core.rbac.policies import CanAccessAuditLogs
 from apps.core.serializers import (
     AuditLogSerializer,
     CompraSerializer,
@@ -573,18 +574,12 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = AuditLog.objects.select_related("usuario").all()
     serializer_class = AuditLogSerializer
-    # Issue #1237 (Epic 1.6): logs visíveis por motivo legítimo de acesso —
+    # Issue #1233 (Epic 4.2.a): logs visíveis por motivo legítimo de acesso —
     # DAT (suporte/admin transversal), Controle (operação diária),
     # Superintendência (auditar próprias aprovações/reprovações),
-    # Gerente (auditar batch). PA-05 audit precisa ser legível por quem
-    # executa o fluxo de aprovação. Refactor estrutural pra Policy
-    # `access_audit_logs` em Epic 4 (Issue #1232).
-    permission_classes = [
-        HasPerm("manage_admin_registries")
-        | HasPerm("operate_preagenda")
-        | HasPerm("approve_solicitation")
-        | HasPerm("approve_solicitation_batch")
-    ]
+    # Gerente (auditar batch). Encapsulado na Policy `access_audit_logs`
+    # (Epic 1.6 já tinha consolidado a composição OR; agora vira Policy nomeada).
+    permission_classes = [CanAccessAuditLogs]
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["action", "usuario", "model_name"]

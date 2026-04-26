@@ -23,7 +23,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 
 from apps.core.models import Solicitacao
-from apps.core.permissions import HasPerm
+from apps.core.rbac.policies import CanUseGcal
 from apps.core.serializers.gcal_dashboard_contract import (
     BatchActionRequestSerializer,
     BatchActionResponseSerializer,
@@ -67,7 +67,7 @@ class GCalPublishBatchView(APIView):
     - Inválidas: retorna em 'errors' com motivo
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
+    permission_classes = [IsAuthenticated, CanUseGcal]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "gcal_write"  # 10/min (#409)
 
@@ -183,7 +183,7 @@ class GCalBatchReapplyView(APIView):
     Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
+    permission_classes = [IsAuthenticated, CanUseGcal]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "gcal_write"  # 10/min (#409)
 
@@ -315,7 +315,7 @@ class GCalBatchResyncView(APIView):
     Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
+    permission_classes = [IsAuthenticated, CanUseGcal]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "gcal_write"  # 10/min (#409)
 

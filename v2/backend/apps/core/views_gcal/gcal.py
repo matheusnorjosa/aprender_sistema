@@ -18,7 +18,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.core.exceptions import ServiceUnavailableError
-from apps.core.permissions import HasPerm
+from apps.core.rbac.policies import CanUseGcal
 from apps.core.services.gcal.circuit_breaker import gcal_breaker, get_circuit_state
 from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
 
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("operate_preagenda") | HasPerm("approve_solicitation")])
+@permission_classes([CanUseGcal])
 def gcal_calendars(request: Request) -> Response:
     """
     GET /api/gcal/calendars/
@@ -58,7 +58,7 @@ def gcal_calendars(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("operate_preagenda") | HasPerm("approve_solicitation")])
+@permission_classes([CanUseGcal])
 def gcal_health(request: Request) -> Response:
     """
     GET /api/gcal/health/
@@ -102,7 +102,7 @@ def gcal_health(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("operate_preagenda") | HasPerm("approve_solicitation")])
+@permission_classes([CanUseGcal])
 def gcal_circuit_breaker_state(request: Request) -> Response:
     """
     GET /api/gcal/circuit-breaker/

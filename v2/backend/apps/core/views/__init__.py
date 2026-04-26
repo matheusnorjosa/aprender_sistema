@@ -32,6 +32,7 @@ from apps.core.views.dat_module import (
     DATFormacaoViewSet,
 )
 from apps.core.views.imports import ImportJobBloqueiosUploadView, ImportJobDetailView, ImportJobListView
+from apps.core.views.me import MeEventsListView
 from apps.core.views.options import (
     CoordenadorOptionViewSet,
     FormadorOptionViewSet,

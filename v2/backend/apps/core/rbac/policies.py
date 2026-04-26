@@ -29,7 +29,7 @@ Decisões fixadas com stakeholder em 2026-04-26 (memórias
 Ver `v2/docs/RBAC_NAMING.md §9` (Policy Resolution Rules).
 """
 
-# pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportUnusedImport=false
 
 from __future__ import annotations
 

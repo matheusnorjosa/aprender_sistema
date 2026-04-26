@@ -11,7 +11,7 @@ Cobertura:
 Padrão: TDD-first — testes escritos antes da implementação.
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false, reportPrivateUsage=false
 
 from __future__ import annotations
 
@@ -65,6 +65,15 @@ def _camelize(snake: str) -> str:
     return "".join(part.capitalize() for part in snake.split("_"))
 
 
+_USER_COUNTER = {"i": 0}
+
+
+def _next_cpf() -> str:
+    """CPF único determinístico por test session (evita colisão de hash não-determinístico)."""
+    _USER_COUNTER["i"] += 1
+    return f"99988{_USER_COUNTER['i']:06d}"
+
+
 def _make_user(username: str, *codenames: str):
     """Cria User autenticado e atribui capabilities via PermissaoFuncional groups."""
     User = get_user_model()
@@ -72,7 +81,7 @@ def _make_user(username: str, *codenames: str):
         username=username,
         email=f"{username}@example.com",
         password="testpass123",
-        cpf=f"99988877{abs(hash(username)) % 1000:03d}",
+        cpf=_next_cpf(),
     )
     if codenames:
         # Atribui capabilities via grupo dedicado (consistent com pattern atual)

@@ -164,7 +164,7 @@ class OAuthThrottle(UserRateThrottle):
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("import_spreadsheet")])
+@permission_classes([HasPerm("operate_preagenda") | HasPerm("approve_solicitation")])
 @throttle_classes([OAuthThrottle])
 def google_oauth_start(request: Request) -> Response:
     """
@@ -326,7 +326,7 @@ def google_oauth_callback(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("import_spreadsheet")])
+@permission_classes([HasPerm("operate_preagenda") | HasPerm("approve_solicitation")])
 def google_oauth_status(request: Request) -> Response:
     """
     Retorna status da conexão OAuth do usuário.
@@ -391,7 +391,7 @@ def google_oauth_status(request: Request) -> Response:
 
 
 @api_view(["POST"])
-@permission_classes([HasPerm("import_spreadsheet")])
+@permission_classes([HasPerm("operate_preagenda") | HasPerm("approve_solicitation")])
 def google_oauth_disconnect(request: Request) -> Response:
     """
     Desconecta conta Google (revoga refresh_token).
@@ -438,7 +438,7 @@ def google_oauth_disconnect(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("import_spreadsheet")])
+@permission_classes([HasPerm("operate_preagenda") | HasPerm("approve_solicitation")])
 def google_oauth_list_events(request: Request) -> Response:
     """
     Lista eventos de um calendário Google do usuário.
@@ -494,7 +494,7 @@ def google_oauth_list_events(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("import_spreadsheet")])
+@permission_classes([HasPerm("operate_preagenda") | HasPerm("approve_solicitation")])
 def google_oauth_list_calendars(request: Request) -> Response:
     """
     Lista calendários disponíveis do usuário OAuth.
@@ -551,7 +551,7 @@ def google_oauth_list_calendars(request: Request) -> Response:
 
 
 @api_view(["POST"])
-@permission_classes([HasPerm("import_spreadsheet")])
+@permission_classes([HasPerm("operate_preagenda") | HasPerm("approve_solicitation")])
 def google_oauth_select_calendar(request: Request) -> Response:
     """
     Salva calendário selecionado pelo usuário.

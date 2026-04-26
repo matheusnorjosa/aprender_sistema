@@ -63,7 +63,8 @@ class ImportJobBloqueiosUploadView(APIView):
         ImportJobSerializer do job recem criado (status=QUEUED).
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    # Issue #1222 (Epic 1): import operacional aceita Controle (run_daily_operations) ou DAT (import_spreadsheet)
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet") | HasPerm("run_daily_operations")]
 
     @extend_schema(
         summary="Dispara import assincrono de bloqueios",

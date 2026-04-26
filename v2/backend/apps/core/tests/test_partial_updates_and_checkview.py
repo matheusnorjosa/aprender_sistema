@@ -42,9 +42,16 @@ def projeto():
 
 
 def auth_client(user=None):
-    """Helper para criar cliente autenticado."""
+    """Issue #1222 (Epic 1): user adicionado ao grupo Controle (que tem
+    `view_all_availability`) para CRUD de bloqueios e operate_preagenda
+    para acessar /api/solicitacoes/."""
+    from django.contrib.auth.models import Group
+
     client = APIClient()
-    user = user or Usuario.objects.create_user(username="u1", email="u1@x.com", password="x")
+    if user is None:
+        user = Usuario.objects.create_user(username="u1", email="u1@x.com", password="x")
+        grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+        user.groups.add(grupo_controle)
     client.force_authenticate(user=user)
     return client, user
 

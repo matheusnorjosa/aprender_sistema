@@ -67,7 +67,7 @@ class GCalPublishBatchView(APIView):
     - Inválidas: retorna em 'errors' com motivo
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "gcal_write"  # 10/min (#409)
 
@@ -183,7 +183,7 @@ class GCalBatchReapplyView(APIView):
     Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "gcal_write"  # 10/min (#409)
 
@@ -315,7 +315,7 @@ class GCalBatchResyncView(APIView):
     Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "gcal_write"  # 10/min (#409)
 

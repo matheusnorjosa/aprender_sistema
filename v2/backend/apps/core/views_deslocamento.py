@@ -108,7 +108,12 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
 
     queryset = Deslocamento.objects.select_related("usuario").all()
     serializer_class = DeslocamentoSerializer
-    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda")]
+    # Issue #1221 (Epic 1 RBAC Access Policy Realignment): acesso para
+    # Gerente/Coordenador/Apoio Coordenação de qualquer setor via
+    # `view_all_availability` (atribuída aos papéis acima na Issue 1.4).
+    # Formador NÃO tem essa perm — continua bloqueado. Antes era
+    # `operate_preagenda` que restringia só ao Controle.
+    permission_classes = [IsAuthenticated, HasPerm("view_all_availability")]
     pagination_class = DeslocamentoPagination
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ["start_date", "end_date", "origem", "destino"]

@@ -79,7 +79,12 @@ class ControleComprasListView(ListAPIView):
         ]
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    # Issue #1222 (Epic 1 RBAC Access Policy Realignment): /controle/compras/
+    # é listagem operacional **exclusiva** do Controle (boundary: DAT tem o
+    # endpoint próprio /dat/compras-materiais/). Usa `run_daily_operations`
+    # — perm exclusiva do Controle. Antes era `import_spreadsheet` (artefato
+    # do codemod Epic 5.2).
+    permission_classes = [IsAuthenticated, HasPerm("run_daily_operations")]
     serializer_class = CompraSerializer
 
     def get_queryset(self) -> QuerySet:

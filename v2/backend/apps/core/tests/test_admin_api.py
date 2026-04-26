@@ -340,8 +340,9 @@ class TestCompraAPI:
         assert response.status_code == status.HTTP_201_CREATED
         assert Compra.objects.filter(codigo="COMP-002").exists()
 
-    def test_controle_cannot_create_compra(self, api_client, usuario_controle, municipio_sample, projeto_sample):
-        """Controle NÃO pode criar compra (apenas importar)"""
+    def test_controle_can_create_compra(self, api_client, usuario_controle, municipio_sample, projeto_sample):
+        """Issue #1222 (Epic 1): Controle agora pode criar compras
+        (`manage_purchases_and_materials` foi atribuído a DAT + Controle)."""
         api_client.force_authenticate(user=usuario_controle)
         payload = {
             "codigo": "COMP-003",
@@ -349,10 +350,11 @@ class TestCompraAPI:
             "municipio": municipio_sample.id,
             "quantidade": 5,
             "data": "2025-02-01",
-            "external_hash": "hash123",
+            "uso": "Formação continuada",
+            "external_hash": "hash_controle_create_001",
         }
         response = api_client.post("/api/compras/", payload, format="json")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_201_CREATED
 
     def test_formador_cannot_access_compras(self, api_client, usuario_formador, compra_sample):
         """Formador NÃO pode acessar compras"""

@@ -71,7 +71,12 @@ class ImportComprasView(APIView):
         }
     """
 
-    permission_classes = [HasPerm("import_spreadsheet")]
+    # Issue #1222 (Epic 1 RBAC Access Policy Realignment): importar compras
+    # é operação do Controle (`run_daily_operations` / `manage_purchases_and_materials`).
+    # DAT também (`import_spreadsheet`). Composition OR cobre ambos.
+    permission_classes = [
+        HasPerm("import_spreadsheet") | HasPerm("manage_purchases_and_materials") | HasPerm("run_daily_operations")
+    ]
 
     @extend_schema(
         summary="Importar compras",

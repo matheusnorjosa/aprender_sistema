@@ -36,6 +36,7 @@ export const E2E_ROLES = [
   'coord_acerta',
   'gerente_vidas',
   'super_geral',
+  'approver_03', // 3º aprovador real (Super+Gerente) — J08 race com 3 paralelos
   'formador_vidas',
   'formador_fluir',
   'dat_e2e', // DAT puro — jornada J18
@@ -67,6 +68,7 @@ export const ROLE_CREDENTIALS: Record<
   coord_acerta: { username: 'coord_acerta@test.com', password: 'testpass123', displayName: 'Diana ACerta' },
   gerente_vidas: { username: 'gerente_vidas@test.com', password: 'testpass123', displayName: 'Joao GerenteVidas' },
   super_geral: { username: 'super_geral@test.com', password: 'testpass123', displayName: 'Maria SuperGeral' },
+  approver_03: { username: 'approver_03@test.com', password: 'testpass123', displayName: 'Bruno Approver03' },
   formador_vidas: { username: 'formador_vidas@test.com', password: 'testpass123', displayName: 'Rafael FormadorVidas' },
   formador_fluir: { username: 'formador_fluir@test.com', password: 'testpass123', displayName: 'Luiza FormadorFluir' },
   dat_e2e: { username: 'dat_e2e@test.com', password: 'testpass123', displayName: 'Daniel DATPuro' },

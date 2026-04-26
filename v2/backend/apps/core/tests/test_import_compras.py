@@ -361,11 +361,19 @@ def test_import_compras_allowed_for_controle():
     assert response.status_code in (200, 400)
 
 
+@pytest.mark.skip(
+    reason=(
+        "Issue #1222 (Epic 1 RBAC Access Policy Realignment): após "
+        "realinhamento do seed, Superintendência não tem mais "
+        "`import_spreadsheet`/`manage_purchases_and_materials`/"
+        "`run_daily_operations`. Importação de compras é escopo do "
+        "Controle (operacional) ou DAT (importação genérica). "
+        "Superintendência aprova solicitações, não importa compras."
+    )
+)
 def test_import_compras_allowed_for_superintendencia():
     """
-    Testa que grupo Superintendência pode importar.
-
-    - Usuário do grupo Superintendência → 200 ou 400 (não 403)
+    OBSOLETO após Issue #1222 — ver docstring do skip.
     """
     # Criar usuário do grupo Superintendência
     user = Usuario.objects.create_user(

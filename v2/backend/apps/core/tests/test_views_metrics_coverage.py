@@ -40,6 +40,7 @@ pytestmark = pytest.mark.django_db
 def grupos():
     """Create required groups for tests."""
     return {
+        "diretoria": Group.objects.get_or_create(name="Diretoria")[0],
         "controle": Group.objects.get_or_create(name="Controle")[0],
         "dat": Group.objects.get_or_create(name="DAT")[0],
         "superintendencia": Group.objects.get_or_create(name="Superintendência")[0],
@@ -52,7 +53,10 @@ def grupos():
 
 @pytest.fixture
 def user_controle(grupos):
-    """User in Controle group (has access to metrics)."""
+    """Issue #1222 (Epic 1): user nomeado 'controle' por compat com tests
+    legados, mas adicionado ao grupo Diretoria que tem `view_map_metrics`
+    no seed realinhado. Este endpoint metrics/map é alimentado por dashboards
+    da Diretoria — gating real de UI fica no menu condicional do frontend."""
     uid = uuid4().hex[:8]
     user = Usuario.objects.create_user(
         username=f"controle_{uid}",
@@ -60,13 +64,15 @@ def user_controle(grupos):
         password="test123",
         cpf=f"1{uid[:10].ljust(10, '0')}",
     )
-    user.groups.add(grupos["controle"])
+    user.groups.add(grupos["diretoria"])
     return user
 
 
 @pytest.fixture
 def user_gerencia(grupos):
-    """User in Gerência group (has access to formadores_metrics)."""
+    """Issue #1222 (Epic 1): user mantém nome 'gerencia' por compat, mas
+    adicionado a Diretoria (que tem `supervise_operations` no seed
+    realinhado, perm exigida por /metrics/team/formadores/)."""
     uid = uuid4().hex[:8]
     user = Usuario.objects.create_user(
         username=f"gerencia_{uid}",
@@ -74,7 +80,7 @@ def user_gerencia(grupos):
         password="test123",
         cpf=f"2{uid[:10].ljust(10, '0')}",
     )
-    user.groups.add(grupos["gerencia"])
+    user.groups.add(grupos["diretoria"])
     return user
 
 

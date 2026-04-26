@@ -196,10 +196,12 @@ def test_seed_rbac_assigns_permissions_to_formador(run_seed_rbac):
 
 
 def test_endpoint_municipios_dat_allowed(run_seed_rbac):
-    """DAT tem acesso CRUD a /api/municipios/."""
+    """Issue #1222 (Epic 1): DAT acessa /api/municipios/ via `manage_admin_registries`
+    (cadastro admin DAT puro). `seed_rbac` cria grupo DAT mas não atribui
+    funcperms por default; explicitamente atribui aqui pra simular estado realista."""
     user = Usuario.objects.create_user(username="dat1", email="dat@x.com", password="x", cpf="11111111111")
     dat = Group.objects.get(name="DAT")
-    PermissaoFuncional.objects.get(codename="manage_purchases_and_materials").groups.add(dat)
+    PermissaoFuncional.objects.get(codename="manage_admin_registries").groups.add(dat)
     user.groups.add(dat)
 
     client = APIClient()

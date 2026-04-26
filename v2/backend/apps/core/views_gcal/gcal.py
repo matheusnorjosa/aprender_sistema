@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("import_spreadsheet")])
+@permission_classes([HasPerm("operate_preagenda") | HasPerm("approve_solicitation")])
 def gcal_calendars(request: Request) -> Response:
     """
     GET /api/gcal/calendars/
@@ -58,7 +58,7 @@ def gcal_calendars(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("import_spreadsheet")])
+@permission_classes([HasPerm("operate_preagenda") | HasPerm("approve_solicitation")])
 def gcal_health(request: Request) -> Response:
     """
     GET /api/gcal/health/
@@ -102,7 +102,7 @@ def gcal_health(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("import_spreadsheet")])
+@permission_classes([HasPerm("operate_preagenda") | HasPerm("approve_solicitation")])
 def gcal_circuit_breaker_state(request: Request) -> Response:
     """
     GET /api/gcal/circuit-breaker/

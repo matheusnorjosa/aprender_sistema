@@ -17,6 +17,8 @@ from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory
 
+import pytest
+
 from apps.core.models import PermissaoFuncional, Usuario
 from apps.core.serializers import UsuarioAdminSerializer
 
@@ -284,18 +286,15 @@ class AdminUserSecurityTests(TestCase):
         # Verificar que group_ids NÃO está na resposta (write-only)
         self.assertNotIn("group_ids", response_data)
 
+    @pytest.mark.skip(
+        reason=(
+            "Issue #1222 (Epic 1 RBAC Access Policy Realignment): grupo "
+            "'Gerência' (legacy) foi descontinuado em favor de 'Gerente' "
+            "(função). Whitelist dinâmica não inclui mais 'Gerência'."
+        )
+    )
     def test_gerencia_is_whitelisted(self):
-        """
-        Whitelist - Grupo Gerência (legacy, não é setor) deve estar permitido
-        via functional_permissions_seed.
-
-        Cenário:
-        - DAT atribui grupo Gerência a um usuário
-
-        Expectativa:
-        - Atribuição bem-sucedida (Gerência entra na whitelist dinâmica)
-        - Usuário recebe o grupo Gerência
-        """
+        """OBSOLETO após Issue #1222 — ver docstring do skip."""
         data = {
             "group_ids": [self.group_gerencia.id],
         }

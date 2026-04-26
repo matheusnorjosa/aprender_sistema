@@ -53,27 +53,30 @@ def _user_with_groups(username: str, groups: list[str]) -> Usuario:
 
 
 def test_superintendencia_tem_view_all_availability(rbac_seeded):
+    """Issue #1222 (Epic 1): Super NÃO tem mais view_all_availability no seed
+    realinhado (passa para Controle/Gerente/Coord/Apoio Coord)."""
     u = _user_with_groups("paridade_super", ["Superintendência"])
-    assert user_has_any_perm(u, "view_all_availability") is True
+    assert user_has_any_perm(u, "view_all_availability") is False
 
 
 def test_controle_tem_view_all_availability(rbac_seeded):
-    """Preserva comportamento de views/availability._is_privileged_user
-    (Controle tinha acesso via filter name in [Super, Controle])."""
+    """Controle mantém view_all_availability."""
     u = _user_with_groups("paridade_controle", ["Controle"])
     assert user_has_any_perm(u, "view_all_availability") is True
 
 
 def test_gerencia_tem_view_all_availability(rbac_seeded):
-    """Preserva comportamento de views_availability_monthly
-    (Gerência tinha acesso via filter name in [Super, Gerência, Diretoria])."""
+    """Issue #1222 (Epic 1): grupo 'Gerência' descontinuado; Gerente (função)
+    é quem tem view_all_availability agora."""
     u = _user_with_groups("paridade_ger", ["Gerência"])
-    assert user_has_any_perm(u, "view_all_availability") is True
+    assert user_has_any_perm(u, "view_all_availability") is False
 
 
 def test_diretoria_tem_view_all_availability(rbac_seeded):
+    """Issue #1222 (Epic 1): Diretoria perdeu view_all_availability (escopo
+    é Controle + funções operacionais)."""
     u = _user_with_groups("paridade_dir", ["Diretoria"])
-    assert user_has_any_perm(u, "view_all_availability") is True
+    assert user_has_any_perm(u, "view_all_availability") is False
 
 
 def test_formador_nao_tem_view_all_availability(rbac_seeded):
@@ -81,9 +84,10 @@ def test_formador_nao_tem_view_all_availability(rbac_seeded):
     assert user_has_any_perm(u, "view_all_availability") is False
 
 
-def test_coordenador_nao_tem_view_all_availability(rbac_seeded):
+def test_coordenador_tem_view_all_availability(rbac_seeded):
+    """Issue #1222 (Epic 1): Coordenador agora tem view_all_availability."""
     u = _user_with_groups("paridade_coord", ["Coordenador"])
-    assert user_has_any_perm(u, "view_all_availability") is False
+    assert user_has_any_perm(u, "view_all_availability") is True
 
 
 # ============================================================================
@@ -93,18 +97,21 @@ def test_coordenador_nao_tem_view_all_availability(rbac_seeded):
 
 
 def test_super_tem_operar_controle_dat(rbac_seeded):
+    """Issue #1222 (Epic 1): Super não tem mais operate_preagenda (só Controle)."""
     u = _user_with_groups("paridade_scd_super", ["Superintendência"])
-    assert user_has_any_perm(u, "operate_preagenda") is True
+    assert user_has_any_perm(u, "operate_preagenda") is False
 
 
 def test_controle_tem_operar_controle_dat(rbac_seeded):
+    """Controle mantém operate_preagenda."""
     u = _user_with_groups("paridade_scd_ctrl", ["Controle"])
     assert user_has_any_perm(u, "operate_preagenda") is True
 
 
 def test_dat_tem_operar_controle_dat(rbac_seeded):
+    """Issue #1222 (Epic 1): DAT não tem mais operate_preagenda (só Controle)."""
     u = _user_with_groups("paridade_scd_dat", ["DAT"])
-    assert user_has_any_perm(u, "operate_preagenda") is True
+    assert user_has_any_perm(u, "operate_preagenda") is False
 
 
 def test_formador_nao_tem_operar_controle_dat(rbac_seeded):
@@ -119,10 +126,12 @@ def test_formador_nao_tem_operar_controle_dat(rbac_seeded):
 
 
 def test_dat_tem_operar_dat_exclusivo(rbac_seeded):
+    """DAT mantém manage_purchases_and_materials."""
     u = _user_with_groups("paridade_dex_dat", ["DAT"])
     assert user_has_any_perm(u, "manage_purchases_and_materials") is True
 
 
-def test_controle_nao_tem_operar_dat_exclusivo(rbac_seeded):
+def test_controle_tem_operar_dat_exclusivo(rbac_seeded):
+    """Issue #1222 (Epic 1): Controle agora também tem manage_purchases_and_materials."""
     u = _user_with_groups("paridade_dex_ctrl", ["Controle"])
-    assert user_has_any_perm(u, "manage_purchases_and_materials") is False
+    assert user_has_any_perm(u, "manage_purchases_and_materials") is True

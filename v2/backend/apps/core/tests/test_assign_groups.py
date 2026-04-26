@@ -193,11 +193,15 @@ class TestAssignGroups:
         assert "integers" in response.data["error"]
 
     def test_assign_groups_replaces_existing(self, api_client, usuario_dat, usuario_formador):
-        """Deve substituir grupos existentes (não adicionar)."""
+        """Deve substituir grupos existentes (não adicionar).
+
+        Issue #1222 (Epic 1): trocado grupo legacy 'Gerência' por 'Gerente'
+        (função canônica pós-realign).
+        """
         # Configurar grupos iniciais
         grupo1, _ = Group.objects.get_or_create(name="Formador")
         grupo2, _ = Group.objects.get_or_create(name="Coordenador")
-        grupo3, _ = Group.objects.get_or_create(name="Gerência")
+        grupo3, _ = Group.objects.get_or_create(name="Gerente")
 
         usuario_formador.groups.set([grupo1, grupo2])
         assert usuario_formador.groups.count() == 2

@@ -22,9 +22,16 @@ class FunctionalPermissionSeed:
     group_names: tuple[str, ...]
 
 
-# Seed canônico pós-Epic 4.3 RBAC Refactor (2026-04-24).
+# Seed canônico pós-Issue 1.4 (Epic 1 RBAC Access Policy Realignment, 2026-04-24).
 # Codenames em `verb_noun` inglês conforme convenção NIST/Django/GitLab.
 # Labels e descriptions capability-oriented (sem nome de setor).
+# Atribuições alinhadas à intent confirmada pelo stakeholder:
+#   - DAT: módulo administrativo (cadastros, importação, compras DAT)
+#   - Controle: operações diárias (controle, pre-agenda, gestão availability)
+#   - Diretoria: dashboards executivos
+#   - Superintendência: aprovações e operações restritas
+#   - Funções (Gerente, Coordenador, Apoio Coord): solicitações + availability
+#   - Formador: nenhuma perm (acessa só /meus-eventos via IsAuthenticated)
 # Ver v2/docs/RBAC_NAMING.md §1, §2 e §3.4 para regras vigentes.
 FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
     FunctionalPermissionSeed(
@@ -32,14 +39,14 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Aprovar solicitações",
         description="Aprovar ou reprovar solicitações pendentes.",
         category="solicitacao",
-        group_names=("Superintendência", "DAT"),
+        group_names=("Superintendência",),
     ),
     FunctionalPermissionSeed(
         codename="approve_solicitation_batch",
         label="Aprovar solicitações em lote",
         description="Aprovar múltiplas solicitações em uma operação.",
         category="solicitacao",
-        group_names=("Superintendência",),
+        group_names=("Gerente", "Superintendência"),
     ),
     FunctionalPermissionSeed(
         codename="execute_restricted_operations",
@@ -53,14 +60,14 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Criar solicitações de evento",
         description="Submeter novas solicitações ao fluxo de aprovação.",
         category="solicitacao",
-        group_names=("Coordenador", "Apoio de Coordenação", "DAT"),
+        group_names=("Coordenador", "Apoio de Coordenação", "Gerente"),
     ),
     FunctionalPermissionSeed(
         codename="import_spreadsheet",
         label="Importar planilhas e dados",
         description="Carregar dados em massa via CSV/XLSX.",
         category="importacao",
-        group_names=("Controle", "Superintendência"),
+        group_names=("DAT",),
     ),
     FunctionalPermissionSeed(
         codename="manage_admin_registries",
@@ -74,21 +81,21 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Visualizar dashboard de compras",
         description="Acesso ao painel de indicadores de compras.",
         category="dashboard",
-        group_names=("DAT", "Diretoria"),
+        group_names=("Diretoria",),
     ),
     FunctionalPermissionSeed(
         codename="manage_purchases_and_materials",
         label="Administrar compras e materiais",
         description="Operações administrativas restritas sobre compras e materiais.",
         category="cadastros_administrativos",
-        group_names=("DAT",),
+        group_names=("DAT", "Controle"),
     ),
     FunctionalPermissionSeed(
         codename="operate_preagenda",
         label="Operar pré-agenda e relatórios",
         description="Pré-agenda, relatórios gerenciais e publicações operacionais.",
         category="operacao",
-        group_names=("Controle", "DAT", "Superintendência"),
+        group_names=("Controle",),
     ),
     FunctionalPermissionSeed(
         codename="run_daily_operations",
@@ -102,35 +109,35 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Exercer supervisão gerencial",
         description="Atuação gerencial e supervisão de equipe.",
         category="supervisao",
-        group_names=("Gerência", "Superintendência", "Diretoria"),
+        group_names=("Diretoria",),
     ),
     FunctionalPermissionSeed(
         codename="view_overview_dashboard",
         label="Visualizar dashboard geral",
         description="Painel executivo de visão geral.",
         category="dashboard",
-        group_names=("Superintendência", "Gerência", "Diretoria"),
+        group_names=("Diretoria",),
     ),
     FunctionalPermissionSeed(
         codename="view_map_metrics",
         label="Visualizar métricas geográficas",
         description="Dashboards com distribuição por região.",
         category="dashboard",
-        group_names=("Controle", "DAT", "Superintendência", "Gerência", "Diretoria"),
+        group_names=("Diretoria",),
     ),
     FunctionalPermissionSeed(
         codename="edit_solicitation_as_owner_or_privileged",
         label="Editar solicitações próprias ou privilegiadas",
         description="Editar solicitações que você criou ou com privilégio.",
         category="solicitacao",
-        group_names=("Superintendência", "DAT"),
+        group_names=("Gerente", "Coordenador", "Apoio de Coordenação"),
     ),
     FunctionalPermissionSeed(
         codename="view_all_availability",
         label="Visualizar todas as disponibilidades",
         description="Acesso à grade mensal completa e bloqueios de qualquer usuário.",
         category="operacao",
-        group_names=("Superintendência", "Controle", "Gerência", "Diretoria"),
+        group_names=("Controle", "Gerente", "Coordenador", "Apoio de Coordenação"),
     ),
 )
 

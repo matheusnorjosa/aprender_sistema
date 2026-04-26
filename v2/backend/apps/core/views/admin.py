@@ -63,7 +63,8 @@ class MunicipioViewSet(viewsets.ModelViewSet):
 
     queryset = Municipio.objects.all()
     serializer_class = MunicipioSerializer
-    permission_classes = [HasPerm("manage_purchases_and_materials")]
+    # Issue #1222 (Epic 1): cadastro admin DAT puro
+    permission_classes = [HasPerm("manage_admin_registries")]
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["uf", "ativo"]
@@ -180,7 +181,8 @@ class ProjetoViewSet(viewsets.ModelViewSet):
 
     queryset = Projeto.objects.all()
     serializer_class = ProjetoSerializer
-    permission_classes = [HasPerm("manage_purchases_and_materials")]
+    # Issue #1222 (Epic 1): cadastro admin DAT puro
+    permission_classes = [HasPerm("manage_admin_registries")]
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["ativo"]
@@ -300,8 +302,10 @@ class CompraViewSet(viewsets.ModelViewSet):
         DAT: full CRUD
         Controle: apenas leitura (list, retrieve)
         """
+        # Issue #1222 (Epic 1): list/retrieve aberto pra DAT (manage_purchases)
+        # ou Controle (operate_preagenda); CUD restrito a quem gerencia compras.
         if self.action in ["list", "retrieve"]:
-            return [HasPerm("operate_preagenda")()]
+            return [(HasPerm("manage_purchases_and_materials") | HasPerm("operate_preagenda"))()]
         return [HasPerm("manage_purchases_and_materials")()]
 
 
@@ -322,7 +326,8 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
 
     queryset = Usuario.objects.prefetch_related("groups").all()
     serializer_class = UsuarioAdminSerializer
-    permission_classes = [HasPerm("manage_purchases_and_materials")]
+    # Issue #1222 (Epic 1): admin usuários é cadastro admin DAT puro
+    permission_classes = [HasPerm("manage_admin_registries")]
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["is_active", "is_staff", "is_superuser"]
@@ -515,7 +520,8 @@ class PermissaoFuncionalViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = PermissaoFuncional.objects.prefetch_related("groups").all()
     serializer_class = PermissaoFuncionalSerializer
-    permission_classes = [HasPerm("manage_purchases_and_materials")]
+    # Issue #1222 (Epic 1): admin de permissões funcionais é DAT puro
+    permission_classes = [HasPerm("manage_admin_registries")]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["category", "is_system"]
     search_fields = ["codename", "label", "description"]
@@ -528,7 +534,8 @@ class RBACMetaView(APIView):
     Metadados de RBAC para telas admin.
     """
 
-    permission_classes = [HasPerm("manage_purchases_and_materials")]
+    # Issue #1222 (Epic 1): admin RBAC é DAT puro
+    permission_classes = [HasPerm("manage_admin_registries")]
 
     def get(self, request: Request, *args: object, **kwargs: object) -> Response:
         classificacoes = list(GroupClassificacao.objects.select_related("group").values_list("group__name", "tipo"))
@@ -566,7 +573,18 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = AuditLog.objects.select_related("usuario").all()
     serializer_class = AuditLogSerializer
-    permission_classes = [HasPerm("operate_preagenda")]
+    # Issue #1237 (Epic 1.6): logs visíveis por motivo legítimo de acesso —
+    # DAT (suporte/admin transversal), Controle (operação diária),
+    # Superintendência (auditar próprias aprovações/reprovações),
+    # Gerente (auditar batch). PA-05 audit precisa ser legível por quem
+    # executa o fluxo de aprovação. Refactor estrutural pra Policy
+    # `access_audit_logs` em Epic 4 (Issue #1232).
+    permission_classes = [
+        HasPerm("manage_admin_registries")
+        | HasPerm("operate_preagenda")
+        | HasPerm("approve_solicitation")
+        | HasPerm("approve_solicitation_batch")
+    ]
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["action", "usuario", "model_name"]

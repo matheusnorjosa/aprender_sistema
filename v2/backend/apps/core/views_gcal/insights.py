@@ -53,7 +53,7 @@ class SuccessRateView(APIView):
     Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
 
     @extend_schema(responses=SuccessRateResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -127,7 +127,7 @@ class TopInsightsView(APIView):
     Ordenação: -error, -count
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
 
     @extend_schema(
         responses={

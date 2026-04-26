@@ -116,13 +116,16 @@ def test_dat_endpoint_exposes_dat_compra_contract(
     assert dat_record["municipio_nome"] == compra_dat.municipio.nome
 
 
-def test_controle_user_cannot_access_dat_compra_domain(
+def test_controle_user_can_access_dat_compra_domain(
     api_client: APIClient,
     controle_user: Usuario,
 ) -> None:
+    """Issue #1220 (Epic 1): setor Controle tem `run_daily_operations` e
+    agora acessa DAT Compras via composition OR. Antes (pré-Epic 1 realignment)
+    era 403 porque DAT Compras exigia só `manage_admin_registries`."""
     api_client.force_authenticate(user=controle_user)
     response = api_client.get("/api/dat/compras-materiais/", secure=True)
-    assert response.status_code == 403
+    assert response.status_code == 200
 
 
 def test_dat_user_cannot_access_controle_compra_domain(

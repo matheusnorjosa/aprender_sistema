@@ -139,10 +139,15 @@ class DATCoordenadorViewSet(viewsets.ModelViewSet):
         return DATCoordenadorSerializer
 
     def get_permissions(self):
-        """Permissões baseadas na ação."""
+        """Permissões baseadas na ação.
+
+        Issue #1220 (Epic 1): setor Controle também edita coordenadores
+        via `run_daily_operations` — não apenas DAT. Composition OR cobre
+        ambos os papéis.
+        """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
-        return [HasPerm("manage_admin_registries")()]
+        return [(HasPerm("manage_admin_registries") | HasPerm("run_daily_operations"))()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -152,7 +157,11 @@ class DATCoordenadorViewSet(viewsets.ModelViewSet):
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
 
-    @action(detail=True, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
+    @action(
+        detail=True,
+        methods=["get"],
+        permission_classes=[HasPerm("manage_admin_registries") | HasPerm("run_daily_operations")],
+    )
     def alocacoes(self, request: Request, pk: int | None = None) -> Response:
         """
         Lista alocações (ações e formações) do coordenador.
@@ -237,10 +246,14 @@ class DATAcaoViewSet(viewsets.ModelViewSet):
         return DATAcaoSerializer
 
     def get_permissions(self):
-        """Permissões baseadas na ação."""
+        """Permissões baseadas na ação.
+
+        Issue #1220 (Epic 1): setor Controle também edita ações DAT via
+        `run_daily_operations` — não apenas DAT. Composition OR cobre ambos.
+        """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
-        return [HasPerm("manage_admin_registries")()]
+        return [(HasPerm("manage_admin_registries") | HasPerm("run_daily_operations"))()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -363,12 +376,38 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         return DATCompraSerializer
 
     def get_permissions(self):
-        """Permissões baseadas na ação."""
+        """Permissões baseadas na ação.
+
+        Issue #1220 (Epic 1): compras é escopo natural do setor Controle
+        (perm `manage_purchases_and_materials`) além de DAT. Controle
+        também edita via `run_daily_operations`. Dashboards de compras
+        continuam restritos a `view_compras_dashboard` (Diretoria).
+        """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
-        if self.action in {"dashboard", "pendencias"}:
-            return [HasPerm("view_compras_dashboard")()]
-        return [HasPerm("manage_admin_registries")()]
+        # Issue #1237 (Epic 1.6): `dashboard` aceita Diretoria (decisão
+        # executiva) + DAT (suporte/validação transversal). DAT é ator
+        # transversal — entra em policies de suporte sem ser bypass.
+        # `pendencias` aceita gestão (DAT/Controle) + dashboard (Diretoria) —
+        # tem permission_classes próprio no @action decorator.
+        if self.action == "dashboard":
+            return [(HasPerm("view_compras_dashboard") | HasPerm("manage_admin_registries"))()]
+        if self.action == "pendencias":
+            return [
+                (
+                    HasPerm("manage_admin_registries")
+                    | HasPerm("manage_purchases_and_materials")
+                    | HasPerm("run_daily_operations")
+                    | HasPerm("view_compras_dashboard")
+                )()
+            ]
+        return [
+            (
+                HasPerm("manage_admin_registries")
+                | HasPerm("manage_purchases_and_materials")
+                | HasPerm("run_daily_operations")
+            )()
+        ]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -378,7 +417,15 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
 
-    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[
+            HasPerm("manage_admin_registries")
+            | HasPerm("manage_purchases_and_materials")
+            | HasPerm("run_daily_operations")
+        ],
+    )
     def stats(self, request: Request) -> Response:
         """
         Estatísticas agregadas das compras.
@@ -413,7 +460,15 @@ class DATCompraViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=False, methods=["get"], permission_classes=[HasPerm("view_compras_dashboard")])
+    @action(
+        detail=False,
+        methods=["get"],
+        # Issue #1237 (Epic 1.6): DAT é ator transversal — acessa dashboards
+        # como suporte/validação/manutenção (não como decisão executiva, que é
+        # papel de Diretoria). Refactor estrutural pra Policy
+        # `view_compras_dashboard` em Epic 4 (Issue #1232).
+        permission_classes=[HasPerm("view_compras_dashboard") | HasPerm("manage_admin_registries")],
+    )
     def dashboard(self, request: Request) -> Response:
         """
         Dashboard de compras com métricas agregadas.
@@ -555,7 +610,16 @@ class DATCompraViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=False, methods=["get"], permission_classes=[HasPerm("view_compras_dashboard")])
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[
+            HasPerm("manage_admin_registries")
+            | HasPerm("manage_purchases_and_materials")
+            | HasPerm("run_daily_operations")
+            | HasPerm("view_compras_dashboard")
+        ],
+    )
     def pendencias(self, request: Request) -> Response:
         """
         Municípios com compra no domínio core_compra e sem solicitação ativa.
@@ -564,6 +628,11 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         a regra de negócio da operação.
 
         GET /api/dat/compras-materiais/pendencias/
+
+        Issue #1222 (Epic 1): pendências é operacional (gestão de compras),
+        não dashboard executivo. Acessível por DAT/Controle/Super; dashboard
+        agregado mantém `view_compras_dashboard` (Diretoria).
+
         Query params opcionais:
             - uf: filtra por UF
             - projeto_id: filtra por projeto
@@ -865,10 +934,14 @@ class DATFormacaoViewSet(viewsets.ModelViewSet):
         return DATFormacaoSerializer
 
     def get_permissions(self):
-        """Permissões baseadas na ação."""
+        """Permissões baseadas na ação.
+
+        Issue #1220 (Epic 1): setor Controle também edita formações via
+        `run_daily_operations` — não apenas DAT. Composition OR cobre ambos.
+        """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
-        return [HasPerm("manage_admin_registries")()]
+        return [(HasPerm("manage_admin_registries") | HasPerm("run_daily_operations"))()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""

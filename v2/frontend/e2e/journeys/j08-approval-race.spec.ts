@@ -35,35 +35,38 @@ test.describe(
       });
       const solicitacao = await seedSolicitacao(coordApi, { fluxo: 'SUPER' });
 
-      // Dois aprovadores distintos: super_geral + dat_e2e (ambos passam IsSuperintendencia)
-      const superApi = await createApiContext({
+      // Issue #1237: aprovação só por quem tem `approve_solicitation`
+      // (Superintendência). DAT é ator transversal mas NÃO aprova solicitações
+      // (não é função dele — refer reference_rbac_intent_matrix). Race testa
+      // aprovadores reais: super_geral (Gerente+Super) + super_e2e (Super+Gerente).
+      const superApi1 = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.super_geral.username,
         password: ROLE_CREDENTIALS.super_geral.password,
       });
-      const datApi = await createApiContext({
+      const superApi2 = await createApiContext({
         baseURL: baseURL!,
-        username: ROLE_CREDENTIALS.dat_e2e.username,
-        password: ROLE_CREDENTIALS.dat_e2e.password,
+        username: ROLE_CREDENTIALS.super_e2e.username,
+        password: ROLE_CREDENTIALS.super_e2e.password,
       });
 
       // Promise.all dispara as duas requests simultaneamente.
-      const [resSuper, resDat] = await Promise.all([
-        superApi.patch(`/api/solicitacoes/${solicitacao.id}/approve/`, { data: {} }),
-        datApi.patch(`/api/solicitacoes/${solicitacao.id}/approve/`, { data: {} }),
+      const [res1, res2] = await Promise.all([
+        superApi1.patch(`/api/solicitacoes/${solicitacao.id}/approve/`, { data: {} }),
+        superApi2.patch(`/api/solicitacoes/${solicitacao.id}/approve/`, { data: {} }),
       ]);
 
-      const statuses = [resSuper.status(), resDat.status()].sort();
+      const statuses = [res1.status(), res2.status()].sort();
       // Exatamente 1 sucesso (200) + 1 conflito (400)
       expect(statuses, `statuses=${statuses} — esperado [200, 400]`).toEqual([200, 400]);
 
       // Lado que falhou deve ter code `already_approved`
-      const loser = resSuper.status() === 400 ? resSuper : resDat;
+      const loser = res1.status() === 400 ? res1 : res2;
       const body = (await loser.json()) as { code?: string; detail?: string };
       expect([body.code, body.detail].some((v) => v && /already.?approved|aprovad/i.test(v))).toBeTruthy();
 
       // Status final persistido
-      const check = await superApi.get(`/api/solicitacoes/${solicitacao.id}/`);
+      const check = await superApi1.get(`/api/solicitacoes/${solicitacao.id}/`);
       expect(((await check.json()) as { status: string }).status).toBe('aprovado');
     });
 
@@ -75,6 +78,9 @@ test.describe(
       });
       const solicitacao = await seedSolicitacao(coordApi, { fluxo: 'SUPER' });
 
+      // Issue #1237: 3 aprovadores reais (todos Super+Gerente) — DAT excluído
+      // por intent matrix (não aprova). approver_03 adicionado ao seed para
+      // este caso de N=3 paralelos sem usar superuser bypass.
       const ctx1 = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.super_geral.username,
@@ -87,8 +93,8 @@ test.describe(
       });
       const ctx3 = await createApiContext({
         baseURL: baseURL!,
-        username: ROLE_CREDENTIALS.dat_e2e.username,
-        password: ROLE_CREDENTIALS.dat_e2e.password,
+        username: ROLE_CREDENTIALS.approver_03.username,
+        password: ROLE_CREDENTIALS.approver_03.password,
       });
 
       const responses = await Promise.all([
@@ -110,23 +116,23 @@ test.describe(
       });
       const solicitacao = await seedSolicitacao(coordApi, { fluxo: 'SUPER' });
 
-      const superApi = await createApiContext({
+      const superApi1 = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.super_geral.username,
         password: ROLE_CREDENTIALS.super_geral.password,
       });
-      const datApi = await createApiContext({
+      const superApi2 = await createApiContext({
         baseURL: baseURL!,
-        username: ROLE_CREDENTIALS.dat_e2e.username,
-        password: ROLE_CREDENTIALS.dat_e2e.password,
+        username: ROLE_CREDENTIALS.super_e2e.username,
+        password: ROLE_CREDENTIALS.super_e2e.password,
       });
 
       await Promise.all([
-        superApi.patch(`/api/solicitacoes/${solicitacao.id}/approve/`, { data: {} }),
-        datApi.patch(`/api/solicitacoes/${solicitacao.id}/approve/`, { data: {} }),
+        superApi1.patch(`/api/solicitacoes/${solicitacao.id}/approve/`, { data: {} }),
+        superApi2.patch(`/api/solicitacoes/${solicitacao.id}/approve/`, { data: {} }),
       ]);
 
-      const logsRes = await superApi.get(`/api/audit-logs/?action=APPROVE&model_name=Solicitacao`);
+      const logsRes = await superApi1.get(`/api/audit-logs/?action=APPROVE&model_name=Solicitacao`);
       expect(logsRes.ok()).toBeTruthy();
       const logsData = (await logsRes.json()) as
         | { results?: Array<{ details: Record<string, unknown> }> }

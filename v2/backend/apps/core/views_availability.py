@@ -61,6 +61,12 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
 
     queryset = AvailabilityBlock.objects.select_related("usuario").all()
     serializer_class = AvailabilityBlockSerializer
+    # Issue #1237 (Epic 1.6 fix CI E2E): Formador define os próprios bloqueios
+    # (regra RD-02/RD-03 — bloqueio é fato declarado pelo formador). Escopo
+    # do queryset já restringe leitura (Formador → próprios; Gerente/Coord →
+    # mesma gerência; privilegiados → todos via `view_all_availability`).
+    # Tentativa anterior de exigir `view_all_availability` aqui (Issue #1221)
+    # quebrou J06/J07 ao bloquear formador de criar/listar próprio bloqueio.
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self) -> QuerySet:
@@ -115,7 +121,11 @@ class AvailabilityCheckView(APIView):
         - municipio_id (opcional)
     """
 
-    permission_classes = [HasPerm("import_spreadsheet")]
+    # Issue #1222 (Epic 1 RBAC Access Policy Realignment): semântica correta
+    # é `view_all_availability` (visualizar disponibilidades), não
+    # `import_spreadsheet` (artefato do codemod Epic 5.2 que aplicou o mesmo
+    # codename em múltiplas views com intent semântico diferente).
+    permission_classes = [HasPerm("view_all_availability")]
     throttle_scope = "availability_check"
 
     @extend_schema(
@@ -240,7 +250,11 @@ class AvailabilityCheckManyView(APIView):
     Body: {"usuarios_ids": [1, 2], "inicio": "...", "fim": "...", "municipio_id": ...}
     """
 
-    permission_classes = [HasPerm("import_spreadsheet")]
+    # Issue #1222 (Epic 1 RBAC Access Policy Realignment): semântica correta
+    # é `view_all_availability` (visualizar disponibilidades), não
+    # `import_spreadsheet` (artefato do codemod Epic 5.2 que aplicou o mesmo
+    # codename em múltiplas views com intent semântico diferente).
+    permission_classes = [HasPerm("view_all_availability")]
     throttle_scope = "availability_check"
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:

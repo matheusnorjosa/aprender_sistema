@@ -127,10 +127,22 @@ def bloqueio_outro_usuario(db, outro_usuario):
     )
 
 
+@pytest.mark.skip(
+    reason=(
+        "Issue #1221 (Epic 1 RBAC Access Policy Realignment): após a mudança "
+        "de `IsAuthenticated` para `HasPerm('view_all_availability')` em "
+        "AvailabilityBlockViewSet, o cenário 'usuario comum sem perm acessa "
+        "bloqueio próprio' deixou de existir. Agora qualquer user sem "
+        "view_all_availability é 403 GLOBAL no endpoint. IDOR scope original "
+        "(C-03 issue #560) virou data-scope dentro de privileged users — "
+        "ver test_multi_sector_permissions para cenários ainda relevantes."
+    )
+)
 @pytest.mark.django_db
 class TestAvailabilityBlockIDOR:
     """
     C-03: Tests for IDOR protection in AvailabilityBlockViewSet.
+    OBSOLETO após Issue #1221 — ver docstring do skip.
     """
 
     # =========================================================================

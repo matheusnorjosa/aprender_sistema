@@ -264,6 +264,62 @@ python scripts/rbac_lint.py apps/
 
 ---
 
-## 9. Changelog
+## 9. Policy Resolution Rules (Epic 4 — Capability Policy Layer)
+
+**Em planejamento (Issue #1231)** — adiciona 3ª camada NIST RBAC: `User → Roles → Capabilities → Policies → Views`.
+
+### Princípios
+
+1. **Policy key = contrato externo estável**
+   Quando uma Policy é exposta via `/api/me/policies/`, a key (ex: `view_compras_dashboard`) torna-se contrato público. **Renomear key = breaking change**. Adicionar nova policy = compatível.
+
+2. **Eligibility matrix = implementação interna mutável**
+   O conjunto de capabilities que satisfaz uma Policy pode mudar sem breaking. Ex: adicionar `manage_admin_registries` ao set `view_compras_dashboard` para incluir DAT — mudança compatível, frontend não depende.
+
+3. **Não usar sufixo `_policy` em keys públicas**
+   Policy key representa **capacidade funcional** (linguagem de produto), não implementação. Exemplo:
+   - ✅ `view_compras_dashboard`
+   - ❌ `view_compras_dashboard_policy`
+   - Class name: `CanViewComprasDashboard` (linguagem de código)
+
+4. **Não misturar roles e capabilities na matriz**
+   `ACCESS_POLICIES` guarda APENAS capabilities. Roles → capabilities é responsabilidade do seed/admin.
+   - ✅ `frozenset({"manage_admin_registries", "operate_preagenda"})`
+   - ❌ `frozenset({"DAT", "approve_solicitation"})`
+
+5. **Motivo legítimo de acesso > Cargo puro**
+   Decidir Policy pelo **motivo** (decidir / operar / aprovar / auditar / suportar / validar), não por cargo. Se qualquer motivo for verdadeiro, acesso é legítimo. Ex: AuditLog tem 4 motivos legítimos → 4 capabilities na composition.
+
+### Vocabulário canônico de verbos
+
+Limitar prefixos de Policy keys ao vocabulário:
+
+- `access_X` — acesso de leitura ao módulo (ex: `access_audit_logs`)
+- `use_X` — operação ativa (ex: `use_gcal_endpoints`)
+- `import_X` — importação de dados
+- `manage_X` — CRUD administrativo
+- `view_X` — visualização específica (dashboards, métricas)
+
+### Anti-pattern: hardcode de role no código
+
+NUNCA usar `if user.is_dat: return True` espalhado em views. DAT-as-suporte SEMPRE entra via matriz/policy. Razão: hardcode bypassa toda lógica RBAC, cria acoplamento invisível, impossibilita audit pelo código (precisa olhar grep em N lugares).
+
+```python
+# ❌ ERRADO
+if user.groups.filter(name="DAT").exists():
+    return True
+
+# ✅ CORRETO
+ACCESS_POLICIES["access_audit_logs"] = frozenset({
+    "manage_admin_registries",  # DAT entra como capability declarada
+    "operate_preagenda",
+    "approve_solicitation",
+})
+```
+
+---
+
+## 10. Changelog
 
 - **2026-04-23** — v1.0 criada com Epic 2 (#1181). `HasPerm` introduzido, 12 classes factory marcadas com `warnings.warn(DeprecationWarning)` + aviso para remoção no Epic 5.
+- **2026-04-26** — v1.1 adicionou §9 Policy Resolution Rules em planejamento para Epic 4 (Issue #1231). Documenta princípios de naming, vocabulário canônico, motivo legítimo de acesso, e anti-pattern de hardcode de role.

@@ -44,7 +44,12 @@ class ControleAcoesListView(generics.ListAPIView):
         Retorna ações onde pelo menos uma das datas está no intervalo
     """
 
-    permission_classes = [HasPerm("import_spreadsheet")]
+    # Issue #1219 (Epic 1 RBAC Access Policy Realignment): semântica correta é
+    # "operações diárias do Controle" — listar ações do controle é escopo de
+    # `run_daily_operations`, não de `import_spreadsheet` (artefato do codemod
+    # Epic 5.2 que aplicou o mesmo codename em múltiplas views com intent
+    # semântico diferente).
+    permission_classes = [HasPerm("run_daily_operations")]
     serializer_class = AcaoControleSerializer
     queryset = AcaoControle.objects.select_related("municipio", "projeto", "coordenador").order_by(
         "-data_reuniao", "-data_entrega"

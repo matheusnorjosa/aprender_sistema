@@ -53,7 +53,7 @@ class GCalStatusSummaryView(APIView):
     }
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
 
     @extend_schema(responses=GCalStatusSummaryResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -94,7 +94,7 @@ class GCalListView(APIView):
     }
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
     pagination_class = LargePagination
 
     @extend_schema(responses=PaginatedSolicitacaoResponseSerializer)
@@ -162,7 +162,7 @@ class DashboardMetricsView(APIView):
     Permissions: HasPerm("import_spreadsheet")
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
 
     @extend_schema(responses=DashboardMetricsResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -263,7 +263,7 @@ class AlertsSummaryView(APIView):
     Timezone-aware: Usa helper _filter_events_queryset (clamp local→UTC)
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    permission_classes = [IsAuthenticated, HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]
 
     @extend_schema(responses=AlertsSummaryResponseSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:

@@ -39,6 +39,26 @@ from apps.core.rbac.permissions import (
     IsOwnerOrPrivileged,
 )
 
+# Capability Policy Layer (Epic 4.1, Issue #1232)
+from apps.core.rbac.policies import (
+    ACCESS_POLICIES,
+    CanAccessAuditLogs,
+    CanImportAvailabilityBlocks,
+    CanImportCompras,
+    CanImportGenericSpreadsheet,
+    CanManageAdminRegistries,
+    CanManagePurchasesAndMaterials,
+    CanManageSolicitacaoStatus,
+    CanUseGcal,
+    CanViewAllAvailability,
+    CanViewComprasDashboard,
+    CanViewComprasPendencias,
+    CanViewComprasStats,
+    CanViewMapMetrics,
+    CanViewOverviewDashboard,
+    CanViewReports,
+)
+
 __all__ = [
     "HasPerm",
     "HasFunctionalPermission",
@@ -49,4 +69,21 @@ __all__ = [
     "user_has_all_perms",
     "COORDENADOR_ROLE_GROUPS",
     "FORMADOR_ROLE_GROUPS",
+    # Capability Policy Layer (Epic 4.1)
+    "ACCESS_POLICIES",
+    "CanAccessAuditLogs",
+    "CanImportAvailabilityBlocks",
+    "CanImportCompras",
+    "CanImportGenericSpreadsheet",
+    "CanManageAdminRegistries",
+    "CanManagePurchasesAndMaterials",
+    "CanManageSolicitacaoStatus",
+    "CanUseGcal",
+    "CanViewAllAvailability",
+    "CanViewComprasDashboard",
+    "CanViewComprasPendencias",
+    "CanViewComprasStats",
+    "CanViewMapMetrics",
+    "CanViewOverviewDashboard",
+    "CanViewReports",
 ]

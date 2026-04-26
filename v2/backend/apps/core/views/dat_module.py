@@ -385,11 +385,13 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
-        # Issue #1222 (Epic 1): `dashboard` é dashboard executivo (Diretoria);
+        # Issue #1237 (Epic 1.6): `dashboard` aceita Diretoria (decisão
+        # executiva) + DAT (suporte/validação transversal). DAT é ator
+        # transversal — entra em policies de suporte sem ser bypass.
         # `pendencias` aceita gestão (DAT/Controle) + dashboard (Diretoria) —
         # tem permission_classes próprio no @action decorator.
         if self.action == "dashboard":
-            return [HasPerm("view_compras_dashboard")()]
+            return [(HasPerm("view_compras_dashboard") | HasPerm("manage_admin_registries"))()]
         if self.action == "pendencias":
             return [
                 (

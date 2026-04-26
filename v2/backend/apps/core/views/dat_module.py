@@ -43,6 +43,7 @@ from apps.core.models import (
     Solicitacao,
 )
 from apps.core.permissions import HasPerm
+from apps.core.rbac.policies import CanViewComprasDashboard, CanViewComprasPendencias, CanViewComprasStats
 from apps.core.serializers import (
     DATAcaoListSerializer,
     DATAcaoSerializer,
@@ -378,36 +379,17 @@ class DATCompraViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Permissões baseadas na ação.
 
-        Issue #1220 (Epic 1): compras é escopo natural do setor Controle
-        (perm `manage_purchases_and_materials`) além de DAT. Controle
-        também edita via `run_daily_operations`. Dashboards de compras
-        continuam restritos a `view_compras_dashboard` (Diretoria).
+        Issue #1233 (Epic 4.2.b1): cada action mapeada para Policy
+        nomeada. Capabilities idênticas à composição OR anterior
+        (paridade exata) — encapsulamento arquitetural na Policy.
         """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
-        # Issue #1237 (Epic 1.6): `dashboard` aceita Diretoria (decisão
-        # executiva) + DAT (suporte/validação transversal). DAT é ator
-        # transversal — entra em policies de suporte sem ser bypass.
-        # `pendencias` aceita gestão (DAT/Controle) + dashboard (Diretoria) —
-        # tem permission_classes próprio no @action decorator.
         if self.action == "dashboard":
-            return [(HasPerm("view_compras_dashboard") | HasPerm("manage_admin_registries"))()]
+            return [CanViewComprasDashboard()]
         if self.action == "pendencias":
-            return [
-                (
-                    HasPerm("manage_admin_registries")
-                    | HasPerm("manage_purchases_and_materials")
-                    | HasPerm("run_daily_operations")
-                    | HasPerm("view_compras_dashboard")
-                )()
-            ]
-        return [
-            (
-                HasPerm("manage_admin_registries")
-                | HasPerm("manage_purchases_and_materials")
-                | HasPerm("run_daily_operations")
-            )()
-        ]
+            return [CanViewComprasPendencias()]
+        return [CanViewComprasStats()]
 
     def perform_create(self, serializer: Any) -> None:
         """Set created_by on create."""
@@ -420,11 +402,9 @@ class DATCompraViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=["get"],
-        permission_classes=[
-            HasPerm("manage_admin_registries")
-            | HasPerm("manage_purchases_and_materials")
-            | HasPerm("run_daily_operations")
-        ],
+        # NOTA: get_permissions() do ViewSet decide; este permission_classes é
+        # informativo. Ambos apontam para CanViewComprasStats (paridade).
+        permission_classes=[CanViewComprasStats],
     )
     def stats(self, request: Request) -> Response:
         """
@@ -463,11 +443,9 @@ class DATCompraViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=["get"],
-        # Issue #1237 (Epic 1.6): DAT é ator transversal — acessa dashboards
-        # como suporte/validação/manutenção (não como decisão executiva, que é
-        # papel de Diretoria). Refactor estrutural pra Policy
-        # `view_compras_dashboard` em Epic 4 (Issue #1232).
-        permission_classes=[HasPerm("view_compras_dashboard") | HasPerm("manage_admin_registries")],
+        # NOTA: get_permissions() do ViewSet decide; este permission_classes é
+        # informativo. Ambos apontam para CanViewComprasDashboard (paridade).
+        permission_classes=[CanViewComprasDashboard],
     )
     def dashboard(self, request: Request) -> Response:
         """
@@ -613,12 +591,9 @@ class DATCompraViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=["get"],
-        permission_classes=[
-            HasPerm("manage_admin_registries")
-            | HasPerm("manage_purchases_and_materials")
-            | HasPerm("run_daily_operations")
-            | HasPerm("view_compras_dashboard")
-        ],
+        # NOTA: get_permissions() do ViewSet decide; este permission_classes é
+        # informativo. Ambos apontam para CanViewComprasPendencias (paridade).
+        permission_classes=[CanViewComprasPendencias],
     )
     def pendencias(self, request: Request) -> Response:
         """

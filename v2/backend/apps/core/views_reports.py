@@ -19,14 +19,12 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from .models import Solicitacao
-from .permissions import HasPerm
+from .rbac.policies import CanViewReports
 from .responses import APIResponse
 
 
 @api_view(["GET"])
-@permission_classes(
-    [HasPerm("operate_preagenda") | HasPerm("approve_solicitation") | HasPerm("manage_admin_registries")]
-)
+@permission_classes([CanViewReports])
 @throttle_classes([ScopedRateThrottle])
 def reports_status_counts(request: Request) -> Response:
     """
@@ -100,9 +98,7 @@ reports_status_counts.throttle_scope = "reports"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
-@permission_classes(
-    [HasPerm("operate_preagenda") | HasPerm("approve_solicitation") | HasPerm("manage_admin_registries")]
-)
+@permission_classes([CanViewReports])
 @throttle_classes([ScopedRateThrottle])
 def reports_top_projects(request: Request) -> Response:
     """
@@ -164,9 +160,7 @@ reports_top_projects.throttle_scope = "reports"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
-@permission_classes(
-    [HasPerm("operate_preagenda") | HasPerm("approve_solicitation") | HasPerm("manage_admin_registries")]
-)
+@permission_classes([CanViewReports])
 @throttle_classes([ScopedRateThrottle])
 def reports_weekly_approved(request: Request) -> Response:
     """
@@ -236,9 +230,7 @@ reports_weekly_approved.throttle_scope = "reports"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
-@permission_classes(
-    [HasPerm("operate_preagenda") | HasPerm("approve_solicitation") | HasPerm("manage_admin_registries")]
-)
+@permission_classes([CanViewReports])
 @throttle_classes([ScopedRateThrottle])
 def reports_by_uf(request: Request) -> Response:
     """

@@ -35,6 +35,7 @@ from .api_schemas import (
 )
 from .models import AuditLog, Solicitacao
 from .permissions import HasPerm, IsOwnerOrPrivileged
+from .rbac.policies import CanUseGcal
 from .serializers import SolicitacaoSerializer
 from .services.solicitacao_approval import (
     approve_solicitacao,
@@ -672,11 +673,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["post"],
-        # Issue #1222 (Epic 1): operações GCal (preview/publish/resync/cancel)
-        # são responsabilidade do Controle (operate_preagenda) e Super
-        # (approve_solicitation, que publica eventos aprovados). Antes era
-        # `import_spreadsheet` (artefato do codemod Epic 5.2).
-        permission_classes=[HasPerm("operate_preagenda") | HasPerm("approve_solicitation")],
+        # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
+        # (Controle + Super). Antes Epic 1.6 já havia composto `operate_preagenda
+        # | approve_solicitation` aqui — agora encapsulado em CanUseGcal.
+        permission_classes=[CanUseGcal],
         url_path="preview-gcal",
     )
     def preview_gcal(self, request, pk=None):
@@ -701,11 +701,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["post"],
-        # Issue #1222 (Epic 1): operações GCal (preview/publish/resync/cancel)
-        # são responsabilidade do Controle (operate_preagenda) e Super
-        # (approve_solicitation, que publica eventos aprovados). Antes era
-        # `import_spreadsheet` (artefato do codemod Epic 5.2).
-        permission_classes=[HasPerm("operate_preagenda") | HasPerm("approve_solicitation")],
+        # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
+        # (Controle + Super). Antes Epic 1.6 já havia composto `operate_preagenda
+        # | approve_solicitation` aqui — agora encapsulado em CanUseGcal.
+        permission_classes=[CanUseGcal],
         url_path="publish",
     )
     def publish(self, request, pk=None):
@@ -735,11 +734,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["post"],
-        # Issue #1222 (Epic 1): operações GCal (preview/publish/resync/cancel)
-        # são responsabilidade do Controle (operate_preagenda) e Super
-        # (approve_solicitation, que publica eventos aprovados). Antes era
-        # `import_spreadsheet` (artefato do codemod Epic 5.2).
-        permission_classes=[HasPerm("operate_preagenda") | HasPerm("approve_solicitation")],
+        # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
+        # (Controle + Super). Antes Epic 1.6 já havia composto `operate_preagenda
+        # | approve_solicitation` aqui — agora encapsulado em CanUseGcal.
+        permission_classes=[CanUseGcal],
         url_path="resync-gcal",
     )
     def resync_gcal(self, request, pk=None):
@@ -770,11 +768,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["post"],
-        # Issue #1222 (Epic 1): operações GCal (preview/publish/resync/cancel)
-        # são responsabilidade do Controle (operate_preagenda) e Super
-        # (approve_solicitation, que publica eventos aprovados). Antes era
-        # `import_spreadsheet` (artefato do codemod Epic 5.2).
-        permission_classes=[HasPerm("operate_preagenda") | HasPerm("approve_solicitation")],
+        # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
+        # (Controle + Super). Antes Epic 1.6 já havia composto `operate_preagenda
+        # | approve_solicitation` aqui — agora encapsulado em CanUseGcal.
+        permission_classes=[CanUseGcal],
         url_path="cancel-gcal",
     )
     def cancel_gcal(self, request, pk=None):

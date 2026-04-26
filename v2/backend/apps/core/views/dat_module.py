@@ -458,7 +458,15 @@ class DATCompraViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=False, methods=["get"], permission_classes=[HasPerm("view_compras_dashboard")])
+    @action(
+        detail=False,
+        methods=["get"],
+        # Issue #1237 (Epic 1.6): DAT é ator transversal — acessa dashboards
+        # como suporte/validação/manutenção (não como decisão executiva, que é
+        # papel de Diretoria). Refactor estrutural pra Policy
+        # `view_compras_dashboard` em Epic 4 (Issue #1232).
+        permission_classes=[HasPerm("view_compras_dashboard") | HasPerm("manage_admin_registries")],
+    )
     def dashboard(self, request: Request) -> Response:
         """
         Dashboard de compras com métricas agregadas.

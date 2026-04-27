@@ -1,24 +1,57 @@
 #!/usr/bin/env python3
 """
-RBAC lint — enforça a convenção capability-oriented do programa Epic 6 do
-RBAC Refactor (2026-04-24). Sem este guard, em 6-12 meses alguém escreveria
-`user.groups.filter(name="DAT")` em uma view e a dívida voltaria.
+RBAC lint — enforça a convenção capability-oriented + Capability Policy Layer.
 
-Regras enforçadas:
+Histórico:
+- Epic 6 (2026-04-24): introduziu V001/V002 banindo `user.groups.filter(name=...)`
+  e classes legacy `IsControleOrSuper` etc.
+- Epic 4.3 (2026-04-26): atualizou docs/mensagens para refletir Capability Policy
+  Layer (`Can*` classes) como forma canônica nova alongside `HasPerm("codename")`.
+
+Sem este guard, em 6-12 meses alguém escreveria `user.groups.filter(name="DAT")`
+em uma view e a dívida voltaria.
+
+## Formas canônicas (PERMITIDAS)
+
+1. **Capability Policy Layer (Epic 4.1, preferida quando há OR semântico)**:
+   ```python
+   from apps.core.rbac import CanAccessAuditLogs
+   permission_classes = [CanAccessAuditLogs]
+   ```
+
+2. **HasPerm direto (single capability)**:
+   ```python
+   from apps.core.rbac import HasPerm
+   permission_classes = [HasPerm("approve_solicitation")]
+   ```
+
+3. **DRF built-ins**: `IsAuthenticated`, `AllowAny`, `IsAdminUser` (via
+   `rest_framework.permissions`).
+
+4. **Composition OR temporária** (`HasPerm("a") | HasPerm("b")`): aceita pelo
+   lint atual; cleanup via Policy Layer é incremental (Epic 4.6 follow-up).
+
+5. **Whitelist de classes não-reduzíveis**: `IsGerenteSuperintendencia` (composite
+   funcperm + grupo Django) e `IsOwnerOrPrivileged` (object-level).
+
+## Regras enforçadas
 
 - **V001** `user.groups.filter(name=...)` em `apps/core/views*/` ou
   `apps/core/services/`. Usar `user_has_any_perm(user, "<codename>")` ou
   `HasPerm("<codename>")`. Se o uso for legítimo (composite, block, data scope),
   adicionar marcador `# noqa: RBAC-<tipo>-allowed` na mesma linha.
 
-- **V002** `class Is<Word>(...):` fora da whitelist de classes mantidas
-  (`IsGerenteSuperintendencia`, `IsOwnerOrPrivileged`). Usar `HasPerm(codename)`
-  inline em `permission_classes`.
+- **V002** `class Is<Word>(...):` fora da whitelist (`IsGerenteSuperintendencia`,
+  `IsOwnerOrPrivileged`). Use a forma canônica nova:
+  `Can<Word>` (Capability Policy Layer) ou `HasPerm(codename)` inline.
+
+  Nota: classes `Can*` são automaticamente aceitas (não match no V002 — só
+  prefixo `Is<Upper>` é banido). Não precisam whitelist.
 
 Whitelist de paths (não linta):
 - `tests/`, `migrations/`, `fixtures/` (test data e data migrations podem
   referenciar nomes de grupos por design)
-- `apps/core/rbac/` (o próprio módulo RBAC)
+- `apps/core/rbac/` (o próprio módulo RBAC, incluindo `policies.py` Epic 4.1)
 - `apps/core/constants.py`, `apps/core/permissions.py`, `apps/core/rbac_helpers.py`
   (shims e data-scope constants)
 - `scripts/rbac_lint.py`, `scripts/rbac_codemod.py` (o próprio lint e histórico)
@@ -108,9 +141,12 @@ class RBACLintVisitor(ast.NodeVisitor):
                     lineno=node.lineno,
                     code="V002",
                     message=(
-                        f"Classe '{name}' viola convenção RBAC: "
-                        f"prefira HasPerm('codename') inline em permission_classes "
-                        f"(whitelist mantida: {sorted(WHITELISTED_CLASS_NAMES)})"
+                        f"Classe '{name}' viola convenção RBAC. Formas canônicas:\n"
+                        f"    1. Capability Policy Layer:  permission_classes = [CanXxx]\n"
+                        f"    2. HasPerm direto:           permission_classes = [HasPerm('codename')]\n"
+                        f"    3. DRF built-ins:            IsAuthenticated, AllowAny, IsAdminUser\n"
+                        f"  Whitelist (não-reduzíveis): {sorted(WHITELISTED_CLASS_NAMES)}\n"
+                        f"  Ver v2/docs/RBAC_NAMING.md §3 e §9 (Policy Resolution Rules)."
                     ),
                 )
             )

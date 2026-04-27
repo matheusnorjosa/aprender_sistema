@@ -129,3 +129,100 @@ def test_lint_v001_variants(tmp_path, bad_call):
     result = _run_lint(views_dir)
     assert result.returncode == 1, f"Esperava V001 em '{bad_call}', mas passou."
     assert "V001" in result.stderr
+
+
+# ============================================================================
+# Epic 4.3 — Capability Policy Layer (Can*) é forma canônica nova
+# ============================================================================
+
+
+@pytest.mark.parametrize(
+    "policy_class_name",
+    [
+        "CanAccessAuditLogs",
+        "CanUseGcal",
+        "CanViewReports",
+        "CanViewComprasDashboard",
+        "CanImportGenericSpreadsheet",
+    ],
+)
+def test_lint_accepts_can_policy_classes(tmp_path, policy_class_name):
+    """Classes Can* (Capability Policy Layer, Epic 4.1) passam — não há prefixo Is*."""
+    mod = tmp_path / "apps" / "sample" / "policies_fake.py"
+    mod.parent.mkdir(parents=True)
+    mod.write_text(f"class {policy_class_name}:\n    pass\n")
+    result = _run_lint(mod.parent)
+    assert result.returncode == 0, f"Esperava {policy_class_name} passar (Can* é forma canônica), mas: {result.stderr}"
+
+
+@pytest.mark.parametrize(
+    "drf_builtin_usage",
+    [
+        # Imports e usos típicos de built-ins DRF — não devem disparar nenhum lint
+        "from rest_framework.permissions import IsAuthenticated\n" "permission_classes = [IsAuthenticated]\n",
+        "from rest_framework.permissions import AllowAny\n" "permission_classes = [AllowAny]\n",
+        "from rest_framework.permissions import IsAdminUser\n" "permission_classes = [IsAdminUser]\n",
+    ],
+)
+def test_lint_accepts_drf_builtins(tmp_path, drf_builtin_usage):
+    """Uso de IsAuthenticated/AllowAny/IsAdminUser passa (built-ins DRF, não classes legacy)."""
+    views_dir = tmp_path / "apps" / "core" / "views_fake"
+    views_dir.mkdir(parents=True)
+    (views_dir / "view.py").write_text(drf_builtin_usage)
+    result = _run_lint(views_dir)
+    assert result.returncode == 0, f"Esperava DRF builtin passar: {result.stderr}"
+
+
+def test_lint_accepts_hasperm_inline(tmp_path):
+    """`HasPerm("codename")` direto em permission_classes passa (idioma canônico Epic 2)."""
+    views_dir = tmp_path / "apps" / "core" / "views_fake"
+    views_dir.mkdir(parents=True)
+    (views_dir / "view.py").write_text(
+        "from apps.core.rbac import HasPerm\n" 'permission_classes = [HasPerm("approve_solicitation")]\n'
+    )
+    result = _run_lint(views_dir)
+    assert result.returncode == 0, f"Esperava HasPerm direto passar: {result.stderr}"
+
+
+def test_lint_accepts_hasperm_or_composition(tmp_path):
+    """Composition OR `HasPerm("a") | HasPerm("b")` ainda é aceita (Epic 4.6 fará cleanup futuro)."""
+    views_dir = tmp_path / "apps" / "core" / "views_fake"
+    views_dir.mkdir(parents=True)
+    (views_dir / "view.py").write_text(
+        "from apps.core.rbac import HasPerm\n"
+        'permission_classes = [HasPerm("operate_preagenda") | HasPerm("approve_solicitation")]\n'
+    )
+    result = _run_lint(views_dir)
+    assert result.returncode == 0, f"Esperava composition OR passar (cleanup é Epic 4.6): {result.stderr}"
+
+
+@pytest.mark.parametrize(
+    "legacy_class_name",
+    [
+        "IsControleOrSuper",
+        "IsGerente",
+        "IsDATAdmin",
+        "IsFormador",
+        "IsFooBar",
+    ],
+)
+def test_lint_blocks_legacy_is_classes(tmp_path, legacy_class_name):
+    """Classes Is<Word> legacy (fora da whitelist) continuam proibidas — V002."""
+    mod = tmp_path / "bad_class.py"
+    mod.write_text(f"class {legacy_class_name}:\n    pass\n")
+    result = _run_lint(mod)
+    assert result.returncode == 1, f"Esperava V002 em '{legacy_class_name}', mas passou."
+    assert "V002" in result.stderr
+
+
+def test_v002_message_suggests_can_or_hasperm(tmp_path):
+    """Mensagem de V002 deve guiar pra forma canônica (Can* ou HasPerm), não só whitelist."""
+    mod = tmp_path / "bad.py"
+    mod.write_text("class IsControleOrSuper:\n    pass\n")
+    result = _run_lint(mod)
+    assert result.returncode == 1
+    # Mensagem deve mencionar Can* ou HasPerm como forma correta
+    stderr_lower = result.stderr.lower()
+    assert (
+        "can" in stderr_lower or "policy" in stderr_lower or "hasperm" in stderr_lower
+    ), f"Mensagem V002 deveria sugerir Can* / Policy / HasPerm:\n{result.stderr}"

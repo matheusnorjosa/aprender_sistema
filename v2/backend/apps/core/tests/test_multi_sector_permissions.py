@@ -306,14 +306,23 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
         self.assertIn(self.user_vidas.email, emails)
         self.assertNotIn(user_fluir.email, emails)
 
-    def test_controle_user_is_blocked(self):
-        """Grupo Controle não tem acesso à grade mensal."""
+    def test_controle_user_with_view_all_availability_is_allowed(self):
+        """
+        Bug 1 fix (2026-04-27): grupo Controle tem `view_all_availability`
+        atribuído via seed 0077 do RBAC Access Policy Realignment. A composition
+        `[IsAuthenticated, CanViewAllAvailability | HasSectorAccess]` em
+        `MonthlyAvailabilityView` libera acesso pela capability — bypassa o
+        scope de gerência (ver memória `reference_rbac_intent_matrix.md`).
+
+        Antes do fix: 403 "O grupo Controle não tem acesso à grade mensal".
+        Depois do fix: 200 (capability libera).
+        """
         self.client.force_authenticate(user=self.user_controle)
         response = self.client.get(
             "/api/availability/monthly/",
             {"year": 2025, "month": 1, "role": "FORMADOR", "gerencia_id": self.gerencia_vidas.id},
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
 
 
 @pytest.mark.skip(

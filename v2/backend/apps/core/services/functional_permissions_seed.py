@@ -135,9 +135,14 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
     FunctionalPermissionSeed(
         codename="view_all_availability",
         label="Visualizar todas as disponibilidades",
-        description="Acesso à grade mensal completa e bloqueios de qualquer usuário.",
+        description=(
+            "Acesso transversal à grade mensal completa e bloqueios de qualquer "
+            "usuário, sem restrição por escopo. Atribuída apenas a papéis com "
+            "alcance organizacional amplo. Papéis restritos caem em verificação "
+            "de escopo por vínculo (autorização por dado, não por feature)."
+        ),
         category="operacao",
-        group_names=("Controle", "Gerente", "Coordenador", "Apoio de Coordenação"),
+        group_names=("Controle", "Gerente"),
     ),
 )
 

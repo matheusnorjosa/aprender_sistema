@@ -184,13 +184,26 @@ class IsOwnerOrPrivileged(HasFunctionalPermission):  # type: ignore[misc]
 
 class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
     """
-    Permissão para acesso à grade mensal de disponibilidade por setor.
+    Permissão de scope por gerência para a grade mensal de disponibilidade.
 
-    Regras (conforme PLAN_multi_sector_availability.md):
-    - Superusers: acesso a todos os setores
-    - Grupo "Controle": BLOQUEADO (não tem acesso à grade mensal)
-    - Sem gerencia_id: permite (assume SUPER - comportamento atual)
-    - Com gerencia_id: verifica se usuário pertence à gerência via EquipeGerencia
+    Regras:
+    - Superusers: acesso a todos os setores.
+    - Sem gerencia_id: permite (comportamento SUPER — escopo "todos os setores").
+    - Com gerencia_id: verifica se usuário pertence à gerência via EquipeGerencia.
+
+    Block antigo de "grupo Controle" foi REMOVIDO em 2026-04-27 (Bug 1 fix
+    pós RBAC Access Policy Realignment). Razão: o seed 0077 atribui a
+    capability `view_all_availability` ao grupo Controle por design da
+    intent matrix (memória `reference_rbac_intent_matrix.md`). O block por
+    nome de grupo contradizia a capability declarada.
+
+    Para autorização ampla baseada em capability, prefira compor com
+    `CanViewAllAvailability` no `permission_classes`:
+
+        permission_classes = [IsAuthenticated, CanViewAllAvailability | HasSectorAccess]
+
+    Quem tem `view_all_availability` bypassa o scope; quem não tem cai no
+    check de gerência via `HasSectorAccess`.
 
     Usado em: MonthlyAvailabilityView
     """
@@ -204,17 +217,6 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
         # Superusers sempre podem acessar tudo
         if getattr(request.user, "is_superuser", False):
             return True
-
-        # `HasSectorAccess` bloqueia explicitamente "Controle" por design
-        # documentado em PLAN_multi_sector_availability.md (Controle não faz
-        # gestão de setor — opera pré-agenda). Mantemos o block inline porque:
-        # (1) é BLOCK específico, não authz positiva padrão;
-        # (2) o rationale é ancorado em design doc;
-        # (3) Epic 6 lint whitelist permite este caso específico
-        #     (arquivo `permissions.py` é whitelist natural da classe base).
-        if request.user.groups.filter(name="Controle").exists():  # type: ignore[attr-defined]  # noqa: RBAC-block-allowed
-            self.message = "O grupo Controle não tem acesso à grade mensal de disponibilidade."
-            return False
 
         # Obter gerencia_id da URL (via kwargs) ou query params
         gerencia_id_raw = view.kwargs.get("gerencia_id")  # type: ignore[attr-defined]

@@ -41,8 +41,8 @@ from rest_framework.request import Request
 
 from django_filters.rest_framework import DjangoFilterBackend
 
-from .models import AuditLog, Deslocamento
-from .permissions import HasPerm
+from .models import AuditLog, Deslocamento, EquipeGerencia
+from .rbac.helpers import user_has_any_perm
 from .serializers import DeslocamentoSerializer
 
 
@@ -108,12 +108,14 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
 
     queryset = Deslocamento.objects.select_related("usuario").all()
     serializer_class = DeslocamentoSerializer
-    # Issue #1221 (Epic 1 RBAC Access Policy Realignment): acesso para
-    # Gerente/Coordenador/Apoio Coordenação de qualquer setor via
-    # `view_all_availability` (atribuída aos papéis acima na Issue 1.4).
-    # Formador NÃO tem essa perm — continua bloqueado. Antes era
-    # `operate_preagenda` que restringia só ao Controle.
-    permission_classes = [IsAuthenticated, HasPerm("view_all_availability")]
+    # Onda 1 C2 (2026-04-27): camada de tradução semântica.
+    # Quem tem capability `view_all_availability` (Controle/Gerente via seed
+    # 0078) bypassa scope. Quem não tem cai em filtro por gerência via
+    # `EquipeGerencia` (aplicado em `get_queryset`). Coord/Apoio/DAT
+    # autenticados veem APENAS deslocamentos de usuários nas próprias
+    # gerências vinculadas. Formador autenticado sem EquipeGerencia → 0
+    # resultados (fail-safe).
+    permission_classes = [IsAuthenticated]
     pagination_class = DeslocamentoPagination
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ["start_date", "end_date", "origem", "destino"]
@@ -121,14 +123,25 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self) -> QuerySet:
         """
-        Apply custom filters via query params:
-        - usuario_id: Filter by usuario ID
-        - data_inicio: Filter by start_date >= value (YYYY-MM-DD)
-        - data_fim: Filter by end_date <= value (YYYY-MM-DD)
-        - origem: Case-insensitive partial match
-        - destino: Case-insensitive partial match
+        Apply scope filter (RBAC) + query param filters.
+
+        Scope (Onda 1 C2, 2026-04-27):
+        - Superuser: vê tudo (bypass)
+        - Capability `view_all_availability` (Controle/Gerente): vê tudo
+        - Demais autenticados: vê apenas deslocamentos de usuários em
+          gerências vinculadas via EquipeGerencia. Sem vínculo → 0 resultados.
+
+        Query param filters:
+        - usuario_id, data_inicio, data_fim, origem, destino
         """
         queryset = super().get_queryset()
+        user = self.request.user
+
+        # Scope filter — aplicar APÓS auth (IsAuthenticated em permission_classes)
+        # mas antes dos filtros de query params (não filtra duas vezes).
+        if not getattr(user, "is_superuser", False) and not user_has_any_perm(user, "view_all_availability"):
+            user_gerencia_ids = list(EquipeGerencia.objects.filter(usuario=user).values_list("gerencia_id", flat=True))
+            queryset = queryset.filter(usuario__equipes__gerencia_id__in=user_gerencia_ids).distinct()
 
         # Filter by usuario_id
         usuario_id = self.request.query_params.get("usuario_id")

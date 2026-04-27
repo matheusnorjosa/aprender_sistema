@@ -321,19 +321,33 @@ class TestDeslocamentoAPI:
         ganharão `view_all_availability` → testes adicionais para cobrir esses
         papéis serão criados em Issue 1.4.
         """
+        # Onda 1 C2 (PR fix/rbac-critical-divergences-wave1, 2026-04-27):
+        # Permission_classes virou `[IsAuthenticated]` + scope filter por
+        # gerência via EquipeGerencia. Comportamento esperado:
+        # - Anonymous → 401/403
+        # - Autenticado SEM EquipeGerencia → 200 + lista vazia (fail-safe)
+        # - Autenticado COM EquipeGerencia + sem capability → 200 + scope
+        # - Capability `view_all_availability` (Controle/Gerente) → 200 + tudo
+        # Cobertura granular do scope em test_deslocamento_rbac.py (Onda 1 C2).
         client = APIClient()
 
-        # Formador → 403 (sem perm)
+        # Formador autenticado sem EquipeGerencia → 200 + 0 deslocamentos
+        # (antes: 403; bloqueio agora vira fail-safe via scope filter)
         client.force_authenticate(user=user_formador)
         response = client.get("/api/deslocamentos/")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_200_OK
+        results = response.json().get("results", response.json())
+        assert results == []
 
-        # Controle → 200 (tem view_all_availability)
+        # Controle → 200 + tudo (capability view_all_availability libera)
         client.force_authenticate(user=user_controle)
         response = client.get("/api/deslocamentos/")
         assert response.status_code == status.HTTP_200_OK
 
-        # DAT → 403 (agora sem view_all_availability conforme intent Epic 1)
+        # DAT autenticado sem EquipeGerencia → 200 + 0 deslocamentos
+        # (DAT sem capability cai em scope; sem vínculo, vê 0)
         client.force_authenticate(user=user_dat)
         response = client.get("/api/deslocamentos/")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_200_OK
+        results = response.json().get("results", response.json())
+        assert results == []

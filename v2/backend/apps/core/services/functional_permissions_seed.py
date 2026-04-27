@@ -133,6 +133,18 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         group_names=("Gerente", "Coordenador", "Apoio de Coordenação"),
     ),
     FunctionalPermissionSeed(
+        codename="manage_internal_actions",
+        label="Administrar ações internas",
+        description=(
+            "CRUD de templates de ações, ciclos, instâncias e notificações "
+            "internas. Feature em desenvolvimento — capability sem grupos "
+            "atribuídos por padrão (apenas superuser bypassa por ora). Quando "
+            "a feature for liberada, atribuir via admin UI ao papel correto."
+        ),
+        category="cadastros_administrativos",
+        group_names=(),
+    ),
+    FunctionalPermissionSeed(
         codename="view_all_availability",
         label="Visualizar todas as disponibilidades",
         description=(
@@ -149,8 +161,10 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
 
 def _validate_seed() -> None:
     # Epic 4.3 (2026-04-24): dual-write terminado, apenas os 15 `verb_noun`.
-    if len(FUNCTIONAL_PERMISSIONS_SEED) != 15:
-        raise ValueError("Seed de permissoes funcionais deve conter exatamente 15 itens.")
+    # Onda 1 C3 (2026-04-27): +1 capability `manage_internal_actions` (zero
+    # grupos atribuídos por seed; só superuser bypassa). Total: 16.
+    if len(FUNCTIONAL_PERMISSIONS_SEED) != 16:
+        raise ValueError("Seed de permissoes funcionais deve conter exatamente 16 itens.")
 
     seen: set[str] = set()
     for item in FUNCTIONAL_PERMISSIONS_SEED:

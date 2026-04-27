@@ -10,11 +10,12 @@ Query params:
     - sector: str (opcional) - Filtro por nome do projeto
     - q: str (opcional) - Filtro por nome/email
 
-Permissões (conforme PLAN_multi_sector_availability.md):
+Permissões (Bug 1 fix pós RBAC Access Policy Realignment, 2026-04-27):
     - Superusers: acesso a todas as gerências
-    - Controle: BLOQUEADO (sem acesso à grade mensal)
-    - Com gerencia_id: verifica se usuário pertence à gerência
-    - Sem gerencia_id: escopo filtrado por gerências vinculadas do usuário
+    - Capability `view_all_availability` (Controle/Gerente/Coordenador/
+      Apoio de Coordenação por seed 0077): acesso a todas as gerências
+    - Sem capability + sem gerencia_id: comportamento SUPER (permitido)
+    - Sem capability + com gerencia_id: verifica EquipeGerencia
 
 Cache Redis 5 minutos por (year, month, role, escopo, sector, q).
 """
@@ -38,6 +39,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.models import EquipeGerencia
 from apps.core.permissions import HasSectorAccess
+from apps.core.rbac.policies import CanViewAllAvailability
 from apps.core.serializers.openapi_critical_contract import (
     MonthlyAvailabilityErrorResponseSerializer,
     MonthlyAvailabilityResponseSerializer,
@@ -69,7 +71,11 @@ class MonthlyAvailabilityView(APIView):
         }
     """
 
-    permission_classes = [IsAuthenticated, HasSectorAccess]
+    # Bug 1 fix (2026-04-27): camada de tradução semântica.
+    # Quem tem capability `view_all_availability` (Controle/Gerente/Coord/Apoio
+    # via seed 0077) bypassa scope. Quem não tem cai em HasSectorAccess
+    # (verificação por gerencia_id via EquipeGerencia).
+    permission_classes = [IsAuthenticated, CanViewAllAvailability | HasSectorAccess]
 
     @extend_schema(
         summary="Grade mensal de disponibilidade",

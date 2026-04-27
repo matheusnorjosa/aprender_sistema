@@ -39,6 +39,7 @@ import {
   rejectSolicitacao,
 } from '../api/solicitacoes';
 import { getMe } from '../api/availability';
+import { computePermissions } from '../hooks/usePermissions';
 import { MeetLink } from '../components/MeetLink';
 import { TIMING } from '../constants/timing';
 import { usePolling } from '../hooks/usePolling';
@@ -104,13 +105,9 @@ function Solicitacoes(): JSX.Element {
       try {
         const user = await getMe();
 
-        // PA-06: Verificar se usuário pertence ao grupo "Superintendência" ou é superuser
-        const isSuper =
-          user?.is_superuser ||
-          user?.is_superintendencia ||
-          user?.groups?.includes('Superintendência') ||
-          false;
-        setIsSuperintendencia(isSuper);
+        // PA-06: Superintendência pode aprovar/reprovar.
+        // Epic 3.3 cleanup: usa flag derivada (SSOT em usePermissions).
+        setIsSuperintendencia(computePermissions(user).canSeeAllSectors);
       } catch (error) {
         logger.error('Erro ao buscar usuário:', error);
         setIsSuperintendencia(false);

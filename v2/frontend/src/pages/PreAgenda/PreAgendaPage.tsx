@@ -68,6 +68,7 @@ import {
 import { getStatusSummary, reapplyBatch, resyncBatch, type GCalStatusSummary } from '../../api/gcal';
 import { MeetLink } from '../../components/MeetLink';
 import { getMe } from '../../api/availability';
+import { computePermissions } from '../../hooks/usePermissions';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
 import useGoogleGuard from '../../hooks/useGoogleGuard';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
@@ -599,10 +600,10 @@ export default function PreAgendaPage(): JSX.Element {
     },
   ];
 
-  // OAuth Phase 5: RBAC - verificar se é Controle ou Super
-  const canControle = user?.is_superuser || user?.groups?.includes('Controle');
-  const canSuper = user?.is_superuser || user?.is_superintendencia || user?.groups?.includes('Superintendência');
-  const showGoogleCard = canControle || canSuper;
+  // OAuth Phase 5: RBAC — verificar se é Controle ou Super.
+  // Epic 3.3 cleanup: usa flags derivadas do usePermissions (SSOT).
+  const userPerms = user ? computePermissions(user) : null;
+  const showGoogleCard = !!(userPerms?.canControle || userPerms?.canSeeAllSectors);
 
   // Handlers para o card Google
   const handleGoogleConnect = (): void => {
@@ -977,8 +978,8 @@ export default function PreAgendaPage(): JSX.Element {
               </Card>
             )}
 
-            {/* Informações Técnicas (Colapsável) - Apenas superuser */}
-            {user?.is_superuser && (
+            {/* Informações Técnicas (Colapsável) — apenas superuser (debug widget). Epic 3.3: usa flag isAdmin (SSOT). */}
+            {userPerms?.isAdmin && (
               <Collapse
                 size="small"
                 items={[

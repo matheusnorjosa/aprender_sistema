@@ -266,7 +266,7 @@ python scripts/rbac_lint.py apps/
 
 ## 9. Policy Resolution Rules (Epic 4 — Capability Policy Layer)
 
-**Em planejamento (Issue #1231)** — adiciona 3ª camada NIST RBAC: `User → Roles → Capabilities → Policies → Views`.
+**Implementada (Issues #1231, #1232, #1233, #1234, #1235)** — 3ª camada NIST RBAC: `User → Roles → Capabilities → Policies → Views`.
 
 ### Princípios
 
@@ -317,9 +317,75 @@ ACCESS_POLICIES["access_audit_logs"] = frozenset({
 })
 ```
 
+### Public surface — `GET /api/me/policies/` (Epic 4.4, Issue #1235)
+
+Endpoint público que expõe a lista ordenada de policy keys que o usuário autenticado possui. Frontend consome para menu condicional, redirects e mensagens de erro genéricas.
+
+**Contract**:
+
+```http
+GET /api/me/policies/
+Authorization: required (IsAuthenticated)
+
+200 OK
+["access_audit_logs", "use_gcal", "view_compras_dashboard"]
+```
+
+- Response: JSON array de strings, alfabético, **sem leakage de capability codenames**.
+- Anonymous → `401`. Superuser → todas as `PUBLIC_POLICY_KEYS`. User regular → subset baseado em capabilities (OR semantics).
+
+**Public registry**:
+
+`apps.core.rbac.policies.PUBLIC_POLICY_KEYS` é o `frozenset` que define **o que é público**. Subset de `ACCESS_POLICIES`:
+
+```python
+PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset({
+    "access_audit_logs",
+    "use_gcal",
+    "view_compras_dashboard",
+    # ... 12 outras
+})
+```
+
+Internal-only policies futuras (não expostas via endpoint) ficam fora deste registro. Test de paridade em `test_me_policies.py::TestParity` garante que dev não esqueça de registrar Can* nova como pública conscientemente.
+
+**Stability rules**:
+
+| Operação                                              | Compatibilidade                                            |
+| ----------------------------------------------------- | ---------------------------------------------------------- |
+| Adicionar key em `PUBLIC_POLICY_KEYS`                 | Compatível (frontend opt-in via `policies.includes`)       |
+| Remover key de `PUBLIC_POLICY_KEYS`                   | Breaking (deprecation period 2 releases)                   |
+| Renomear key                                          | Breaking (deprecation period 2 releases)                   |
+| Alterar `ACCESS_POLICIES[k]` (capabilities elegíveis) | Compatível (frontend não depende)                          |
+
+**Procedure para nova policy pública**:
+
+1. Adicionar entrada em `ACCESS_POLICIES` (matriz interna)
+2. Criar classe `Can<CamelCase>(_PolicyPermission)` com `policy = "<key>"`
+3. Adicionar `<key>` em `PUBLIC_POLICY_KEYS`
+4. Atualizar snapshot (Epic 4.5 #1236)
+5. Re-export classe em `apps/core/rbac/__init__.py`
+
+**SSOT da semântica**:
+
+`apps.core.rbac.policies.user_has_policy(user, key)` é a fonte única de verdade. `_PolicyPermission.has_permission` delega para essa função (DRY); view, tests e helpers compartilham a mesma avaliação. Mudar política = mudar `user_has_policy` num único lugar.
+
+```python
+def user_has_policy(user, key: str) -> bool:
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    codenames = ACCESS_POLICIES.get(key)
+    if not codenames:
+        return False
+    return user_has_any_perm(user, *codenames)
+```
+
 ---
 
 ## 10. Changelog
 
 - **2026-04-23** — v1.0 criada com Epic 2 (#1181). `HasPerm` introduzido, 12 classes factory marcadas com `warnings.warn(DeprecationWarning)` + aviso para remoção no Epic 5.
 - **2026-04-26** — v1.1 adicionou §9 Policy Resolution Rules em planejamento para Epic 4 (Issue #1231). Documenta princípios de naming, vocabulário canônico, motivo legítimo de acesso, e anti-pattern de hardcode de role.
+- **2026-04-26** — v1.2 §9 atualizado para "implementada" (Epics 4.1–4.4) + adicionado bloco "Public surface" descrevendo `GET /api/me/policies/`, `PUBLIC_POLICY_KEYS`, stability rules, procedure para nova policy pública, e SSOT da semântica via `user_has_policy` (Epic 4.4, Issue #1235).

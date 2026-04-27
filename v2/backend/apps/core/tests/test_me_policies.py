@@ -77,11 +77,7 @@ def _public_policies_for_cap(cap: str) -> list[str]:
     Subset de PUBLIC_POLICY_KEYS cujas capabilities elegíveis incluem `cap`.
     Usa a matriz como SSOT para o assert (não hand-written).
     """
-    return sorted(
-        key
-        for key, caps in ACCESS_POLICIES.items()
-        if key in PUBLIC_POLICY_KEYS and cap in caps
-    )
+    return sorted(key for key, caps in ACCESS_POLICIES.items() if key in PUBLIC_POLICY_KEYS and cap in caps)
 
 
 # ============================================================================
@@ -172,9 +168,7 @@ class TestContract:
         client.force_authenticate(user=user)
         res = client.get(reverse(ENDPOINT_URL_NAME))
         body = res.json()
-        assert isinstance(body, list), (
-            f"Response deve ser JSON list (flat), não object. Got: {type(body).__name__}"
-        )
+        assert isinstance(body, list), f"Response deve ser JSON list (flat), não object. Got: {type(body).__name__}"
 
     def test_response_is_alphabetically_sorted(self, seeded_db):
         User = get_user_model()
@@ -285,6 +279,4 @@ class TestParity:
     def test_all_public_keys_exist_in_access_policies_matrix(self):
         """PUBLIC_POLICY_KEYS é subset de ACCESS_POLICIES (sem keys fantasmas)."""
         orphans = set(PUBLIC_POLICY_KEYS) - set(ACCESS_POLICIES.keys())
-        assert not orphans, (
-            f"PUBLIC_POLICY_KEYS contém keys ausentes de ACCESS_POLICIES: {sorted(orphans)}"
-        )
+        assert not orphans, f"PUBLIC_POLICY_KEYS contém keys ausentes de ACCESS_POLICIES: {sorted(orphans)}"

@@ -35,6 +35,7 @@ from __future__ import annotations
 
 from typing import Final
 
+from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 from rest_framework import permissions
 from rest_framework.request import Request
 from rest_framework.views import APIView
@@ -304,7 +305,7 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
 # ============================================================================
 
 
-def user_has_policy(user, key: str) -> bool:
+def user_has_policy(user: AbstractBaseUser | AnonymousUser | None, key: str) -> bool:
     """
     True sse o usuário possui a policy identificada por `key`.
 
@@ -331,7 +332,7 @@ def user_has_policy(user, key: str) -> bool:
     return user_has_any_perm(user, *codenames)
 
 
-def resolve_public_policies(user) -> list[str]:
+def resolve_public_policies(user: AbstractBaseUser | AnonymousUser | None) -> list[str]:
     """
     Retorna lista ordenada (alfabética) das `PUBLIC_POLICY_KEYS` que o
     usuário possui. Backend de `GET /api/me/policies/`.

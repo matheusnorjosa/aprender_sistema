@@ -25,6 +25,8 @@ export interface LegacyAccessFlags {
   canBloqueios?: boolean;
   /** Hoje 100% legacy. Sem policy pública pra "criar solicitação" (apenas auth + role). */
   canCoordenador?: boolean;
+  /** Hardcoded `is_superuser || inDiretoria || inDAT`. Migrável agora — policy `view_compras_dashboard` em PUBLIC_POLICY_KEYS. */
+  canDashboardCompras?: boolean;
 }
 
 /**
@@ -58,6 +60,13 @@ export interface AccessState {
    * Sem policy pública mapeada — frontend confere flag, backend ainda valida via permission_classes específica.
    */
   canCreateSolicitation: boolean;
+
+  /**
+   * Pode ver Dashboard de Compras. Onda 2 A2 (2026-04-27): consome policy
+   * pública `view_compras_dashboard` (atribuída a Diretoria + DAT no seed).
+   * Legacy fallback preservado durante transição.
+   */
+  canViewComprasDashboard: boolean;
 }
 
 /**
@@ -83,12 +92,17 @@ export function computeAccess(
   const canCreateSolicitation =
     legacy.canCoordenador === true;
 
+  const canViewComprasDashboard =
+    can('view_compras_dashboard') ||
+    legacy.canDashboardCompras === true;
+
   return {
     policies,
     can,
     canAccessApprovals,
     canAccessBlocks,
     canCreateSolicitation,
+    canViewComprasDashboard,
   };
 }
 
@@ -104,6 +118,12 @@ export function useCanAccess(
     () => computeAccess(policies, legacy),
     // Dependências granulares — `legacy` é objeto, vamos por chaves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [policies, legacy.canApproveSuper, legacy.canBloqueios, legacy.canCoordenador]
+    [
+      policies,
+      legacy.canApproveSuper,
+      legacy.canBloqueios,
+      legacy.canCoordenador,
+      legacy.canDashboardCompras,
+    ]
   );
 }

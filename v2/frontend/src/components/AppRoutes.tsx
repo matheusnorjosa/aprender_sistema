@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route, } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Spin, Result } from 'antd';
 import type { Permissions } from '../hooks/usePermissions';
+import { useCanAccess } from '../hooks/useCanAccess';
 import type { CurrentUser } from '../types';
 
 // Lazy-loaded pages (code-splitting)
@@ -60,14 +61,24 @@ function Forbidden(): JSX.Element {
 interface AppRoutesProps {
   user: CurrentUser;
   permissions: Permissions;
+  policies: readonly string[];
 }
 
-export function AppRoutes({ user, permissions }: AppRoutesProps): JSX.Element {
+export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.Element {
   const {
     canApproveSuper, canCoordenador, canControle, canDAT, canAcoesInternas,
     canDashboardOverview, canDashboardEquipe, canDashboardGcal, canDashboardCompras,
-    canMapaBrasil, canDisponibilidade,
+    canMapaBrasil, canDisponibilidade, isFormador,
   } = permissions;
+
+  // Camada de tradução semântica (Epic 3): derived flags a partir de policies + legacy.
+  // Componentes consomem `access.canAccessApprovals` em vez de `canApproveSuper` direto.
+  // Quando Epic 4.6 introduzir policy `approve_*` pública, a fonte muda no hook sem ripple.
+  const access = useCanAccess(policies, {
+    canApproveSuper,
+    canBloqueios: canControle || canCoordenador || isFormador,
+    canCoordenador,
+  });
 
   return (
     <Suspense fallback={<PageLoader />}>
@@ -82,20 +93,25 @@ export function AppRoutes({ user, permissions }: AppRoutesProps): JSX.Element {
         <Route path="/dashboards/gcal" element={canDashboardGcal ? <GCalDashboardPage /> : <Forbidden />} />
         <Route path="/mapa-brasil" element={canMapaBrasil ? <MapaBrasilPage /> : <Forbidden />} />
 
-        {/* Disponibilidade */}
-        <Route path="/disponibilidade" element={canDisponibilidade ? <MonthlyPage /> : <Forbidden />} />
-        <Route path="/bloqueios" element={<DisponibilidadeBlocks />} />
-
-        {/* Meus Eventos — qualquer user autenticado (Issue #1225, Epic 2) */}
-        <Route path="/meus-eventos" element={user ? <MeusEventosPage /> : <Forbidden />} />
-
-        {/* Solicitações */}
-        <Route path="/solicitacoes/minhas" element={canCoordenador ? <MySolicitacoesPage /> : <Forbidden />} />
-        <Route path="/solicitacoes/nova" element={canCoordenador ? <NewSolicitacaoWizard /> : <Forbidden />} />
+        {/* === Solicitações (agrupamento — Epic 3, Issue #1227) === */}
+        {/* Páginas pré-existentes mantidas */}
+        <Route path="/solicitacoes/minhas" element={access.canCreateSolicitation ? <MySolicitacoesPage /> : <Forbidden />} />
+        <Route path="/solicitacoes/nova" element={access.canCreateSolicitation ? <NewSolicitacaoWizard /> : <Forbidden />} />
         <Route path="/solicitacoes/:id/editar" element={user ? <EditSolicitacaoPage /> : <Forbidden />} />
 
-        {/* Aprovações */}
-        <Route path="/aprovacoes" element={canApproveSuper ? <ApprovalsPage /> : <Forbidden />} />
+        {/* Páginas movidas para sob /solicitacoes/* (com redirects abaixo) */}
+        <Route path="/solicitacoes/aprovacoes" element={access.canAccessApprovals ? <ApprovalsPage /> : <Forbidden />} />
+        <Route path="/solicitacoes/disponibilidade" element={access.can('view_all_availability') || canDisponibilidade ? <MonthlyPage /> : <Forbidden />} />
+        <Route path="/solicitacoes/bloqueios" element={access.canAccessBlocks ? <DisponibilidadeBlocks /> : <Forbidden />} />
+        <Route path="/solicitacoes/deslocamentos" element={access.can('view_all_availability') || canControle || canCoordenador || canDAT ? <DeslocamentosPage /> : <Forbidden />} />
+        <Route path="/solicitacoes/meus-eventos" element={user ? <MeusEventosPage /> : <Forbidden />} />
+
+        {/* Redirects de URLs legadas → novas (preserva deep-links/bookmarks) */}
+        <Route path="/aprovacoes" element={<Navigate to="/solicitacoes/aprovacoes" replace />} />
+        <Route path="/disponibilidade" element={<Navigate to="/solicitacoes/disponibilidade" replace />} />
+        <Route path="/bloqueios" element={<Navigate to="/solicitacoes/bloqueios" replace />} />
+        <Route path="/deslocamentos" element={<Navigate to="/solicitacoes/deslocamentos" replace />} />
+        <Route path="/meus-eventos" element={<Navigate to="/solicitacoes/meus-eventos" replace />} />
 
         {/* Controle Module */}
         <Route path="/controle" element={canControle ? <ControlePage /> : <Forbidden />} />
@@ -103,7 +119,7 @@ export function AppRoutes({ user, permissions }: AppRoutesProps): JSX.Element {
         <Route path="/controle/compras" element={(canControle || canDAT) ? <DATComprasPage /> : <Forbidden />} />
         <Route path="/controle/coordenadores" element={canControle ? <CoordenadoresPage /> : <Forbidden />} />
         <Route path="/compras-materiais" element={(canControle || canDAT) ? <DATComprasPage /> : <Forbidden />} />
-        <Route path="/deslocamentos" element={(canControle || canCoordenador || canDAT) ? <DeslocamentosPage /> : <Forbidden />} />
+        {/* /deslocamentos movido para /solicitacoes/deslocamentos (Epic 3, Issue #1227 — redirect já registrado acima) */}
         <Route path="/controle/formacoes" element={canControle ? <FormacoesPage /> : <Forbidden />} />
         <Route path="/controle/plano-formacoes" element={canControle ? <PlanoFormacoesPage /> : <Forbidden />} />
         <Route path="/controle/pre-agenda" element={canControle ? <PreAgendaPage /> : <Forbidden />} />

@@ -13,6 +13,7 @@ import {
   TableOutlined,
 } from '@ant-design/icons';
 import type { Permissions } from '../hooks/usePermissions';
+import { useCanAccess } from '../hooks/useCanAccess';
 import { LAYOUT } from '../constants';
 
 const { Sider } = Layout;
@@ -25,8 +26,20 @@ const { SubMenu } = Menu;
 const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/': 'home',
   '/home': 'home',
+  // Solicitações (Epic 3, Issue #1227 — agrupamento sob /solicitacoes/*)
+  '/solicitacoes/aprovacoes': 'aprovacoes',
+  '/solicitacoes/bloqueios': 'bloqueios',
+  '/solicitacoes/deslocamentos': 'deslocamentos',
+  '/solicitacoes/disponibilidade': 'grade-mensal',
+  '/solicitacoes/meus-eventos': 'meus-eventos',
+  '/solicitacoes/minhas': 'minhas-solicitacoes',
+  '/solicitacoes/nova': 'nova-solicitacao',
+  // Backward-compat: rotas legadas redirecionam, mas o menu key segue válido para deep-links cacheados
   '/aprovacoes': 'aprovacoes',
   '/bloqueios': 'bloqueios',
+  '/deslocamentos': 'deslocamentos',
+  '/disponibilidade': 'grade-mensal',
+  '/meus-eventos': 'meus-eventos',
   '/controle': 'controle-ops',
   '/controle/acoes': 'controle-acoes',
   '/controle/compras': 'controle-compras',
@@ -39,7 +52,6 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/acoes-notificacao': 'acoes-notificacao-ciclo',
   '/acoes-notificacao/timeline': 'acoes-notificacao-timeline',
   '/notificacoes-internas': 'acoes-notificacao-inbox',
-  '/deslocamentos': 'deslocamentos',
   '/dashboards': 'dashboard-geral',
   '/dashboards/compras': 'dashboard-compras',
   '/dashboards/equipe': 'dashboard-equipe',
@@ -55,10 +67,6 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/dat/coordenadores': 'controle-coordenadores',
   '/dat/importacao': 'dat-importacao',
   '/dat/registros': 'dat-registros',
-  '/disponibilidade': 'grade-mensal',
-  '/meus-eventos': 'meus-eventos',
-  '/solicitacoes/minhas': 'minhas-solicitacoes',
-  '/solicitacoes/nova': 'nova-solicitacao',
 };
 
 const MENU_KEY_TO_PARENT: Record<string, string> = {
@@ -163,6 +171,7 @@ function SidebarMenu({ openKeys, onOpenChange, onItemClick, children }: SidebarM
 
 interface AppSidebarProps {
   permissions: Permissions;
+  policies: readonly string[];
   gcalErrorCount: number;
   unreadNotifications: number;
   isMobile: boolean;
@@ -176,6 +185,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({
   permissions,
+  policies,
   gcalErrorCount,
   unreadNotifications,
   isMobile,
@@ -190,7 +200,14 @@ export function AppSidebar({
     canDashboardOverview, canDashboardEquipe, canDashboardGcal, canDashboardCompras,
     canMapaBrasil, canDashboardsMenu, canDisponibilidade,
   } = permissions;
-  const canBloqueios = canControle || canCoordenador || isFormador;
+
+  // Camada de tradução semântica (Epic 3, Issue #1228): derived flags do policy layer.
+  // Itens de menu consomem `access.canAccessApprovals` etc. — origem (policy vs legacy) é detalhe.
+  const access = useCanAccess(policies, {
+    canApproveSuper,
+    canBloqueios: canControle || canCoordenador || isFormador,
+    canCoordenador,
+  });
 
   return (
     <>
@@ -260,20 +277,20 @@ export function AppSidebar({
               <Link to="/home">Página Inicial</Link>
             </Menu.Item>
 
-            {/* Meus Eventos — qualquer user autenticado (Issue #1225, Epic 2) */}
+            {/* Meus Eventos — qualquer user autenticado (Issue #1225, Epic 2 / Epic 3 #1227 — sob /solicitacoes/*) */}
             <Menu.Item key="meus-eventos" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
-              <Link to="/meus-eventos">Meus Eventos</Link>
+              <Link to="/solicitacoes/meus-eventos">Meus Eventos</Link>
             </Menu.Item>
 
-            {canApproveSuper && (
+            {access.canAccessApprovals && (
               <Menu.Item key="aprovacoes" icon={<SafetyOutlined />} onClick={closeAllSubmenus}>
-                <Link to="/aprovacoes">Aprovações</Link>
+                <Link to="/solicitacoes/aprovacoes">Aprovações</Link>
               </Menu.Item>
             )}
 
-            {canBloqueios && (
+            {access.canAccessBlocks && (
               <Menu.Item key="bloqueios" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
-                <Link to="/bloqueios">Bloqueios</Link>
+                <Link to="/solicitacoes/bloqueios">Bloqueios</Link>
               </Menu.Item>
             )}
 
@@ -301,9 +318,9 @@ export function AppSidebar({
               </SubMenu>
             )}
 
-            {(canControle || canCoordenador || canDAT) && (
+            {(access.can('view_all_availability') || canControle || canCoordenador || canDAT) && (
               <Menu.Item key="deslocamentos" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
-                <Link to="/deslocamentos">Deslocamentos</Link>
+                <Link to="/solicitacoes/deslocamentos">Deslocamentos</Link>
               </Menu.Item>
             )}
 
@@ -342,9 +359,9 @@ export function AppSidebar({
               </SubMenu>
             )}
 
-            {canDisponibilidade && (
+            {(access.can('view_all_availability') || canDisponibilidade) && (
               <Menu.Item key="grade-mensal" icon={<TableOutlined />} onClick={closeAllSubmenus}>
-                <Link to="/disponibilidade">Grade Mensal</Link>
+                <Link to="/solicitacoes/disponibilidade">Grade Mensal</Link>
               </Menu.Item>
             )}
 

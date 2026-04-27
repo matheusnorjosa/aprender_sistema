@@ -72,10 +72,11 @@ class MonthlyAvailabilityView(APIView):
     """
 
     # Bug 1 fix (2026-04-27): camada de tradução semântica.
-    # Quem tem capability `view_all_availability` (Controle/Gerente/Coord/Apoio
-    # via seed 0077) bypassa scope. Quem não tem cai em HasSectorAccess
+    # Quem tem capability `view_all_availability` (Controle/Gerente via seed
+    # 0078 — realinhada para excluir Coord/Apoio que devem ser scoped por
+    # setor vinculado) bypassa scope. Quem não tem cai em HasSectorAccess
     # (verificação por gerencia_id via EquipeGerencia).
-    permission_classes = [IsAuthenticated, CanViewAllAvailability | HasSectorAccess]
+    permission_classes = [IsAuthenticated, CanViewAllAvailability | HasSectorAccess]  # type: ignore[list-item]
 
     @extend_schema(
         summary="Grade mensal de disponibilidade",

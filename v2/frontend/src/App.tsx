@@ -15,6 +15,7 @@ import { isAuthError } from './utils/errors';
 import { ThemeProvider, useTheme, useBrandColors } from './contexts/ThemeContext';
 import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
+import { getMyPolicies } from './api/me';
 import { logout as apiLogout } from './api/auth';
 import { Toaster } from 'react-hot-toast';
 import { LAYOUT } from './constants';
@@ -42,6 +43,9 @@ function AppContent(): JSX.Element {
 
   // ── User state ──
   const [user, setUser] = useState<CurrentUser | null>(null);
+  // Policies do user via GET /api/me/policies/ (Epic 4.4 + Epic 3 #1228).
+  // Empty array = "ainda não carregadas" OU "anonymous" — distinção via `loading`.
+  const [policies, setPolicies] = useState<readonly string[]>([]);
   const [loading, setLoading] = useState(true);
   const isMountedRef = useRef(true);
 
@@ -52,11 +56,21 @@ function AppContent(): JSX.Element {
   const permissions = usePermissions(user);
 
   // ── Load user ──
+  // Fetch de `getMe()` e `getMyPolicies()` em paralelo. Erro em policies não
+  // bloqueia login — degrada graciosamente para `[]` (componentes mostram
+  // Forbidden em rotas com policy). Erro em getMe → não autenticado.
   const loadUser = useCallback(async () => {
     try {
-      const userData = await getMe();
+      const [userData, policiesData] = await Promise.all([
+        getMe(),
+        getMyPolicies().catch((err) => {
+          logger.warn('Erro ao carregar policies (degradando para []):', err);
+          return [] as string[];
+        }),
+      ]);
       if (isMountedRef.current) {
         setUser(userData);
+        setPolicies(policiesData);
       }
     } catch (error) {
       if (isMountedRef.current) {
@@ -64,6 +78,7 @@ function AppContent(): JSX.Element {
           logger.error('Erro ao carregar usuário:', error);
         }
         setUser(null);
+        setPolicies([]);
       }
     } finally {
       if (isMountedRef.current) setLoading(false);
@@ -134,6 +149,7 @@ function AppContent(): JSX.Element {
         <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
           <AppSidebar
             permissions={permissions}
+            policies={policies}
             gcalErrorCount={alerts.errors}
             unreadNotifications={unreadNotifications}
             isMobile={isMobile}
@@ -162,7 +178,7 @@ function AppContent(): JSX.Element {
               role="main"
               style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: colors.pageBackground }}
             >
-              <AppRoutes user={user} permissions={permissions} />
+              <AppRoutes user={user} permissions={permissions} policies={policies} />
             </Content>
           </Layout>
         </Layout>

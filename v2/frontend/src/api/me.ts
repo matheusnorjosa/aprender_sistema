@@ -51,3 +51,24 @@ export async function getMyEvents(
   const url = buildUrl('/me/events/', filters as QueryParams);
   return await fetchAPI<PaginatedResponse<MeEvent>>(url);
 }
+
+/**
+ * Lista policy keys públicas que o usuário autenticado possui.
+ * Backend: `GET /api/me/policies/` (Epic 4.4, Issue #1235).
+ *
+ * Subset de `PUBLIC_POLICY_KEYS` definido em `apps.core.rbac.policies`.
+ * Frontend usa para menu condicional, redirects e mensagens de erro
+ * via `useCanAccess` hook (Epic 3, Issue #1228).
+ *
+ * Contrato:
+ * - Anonymous → 401 (chamada nunca deve ocorrer pré-login)
+ * - Superuser → todas as PUBLIC_POLICY_KEYS
+ * - User regular → subset baseado em capabilities (OR semantics)
+ * - Response: array ordenado de strings, sem capability codenames brutos
+ *
+ * Estabilidade do contrato: keys são imutáveis após release (renomear =
+ * breaking; ver `v2/docs/RBAC_NAMING.md §9`).
+ */
+export async function getMyPolicies(): Promise<string[]> {
+  return await fetchAPI<string[]>('/me/policies/');
+}

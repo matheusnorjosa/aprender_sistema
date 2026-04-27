@@ -137,11 +137,15 @@ def test_labels_follow_infinitive_verb_form():
     )
 
 
-def test_seed_count_is_fifteen_post_epic_4_3():
-    """Pós-Epic 4.3: apenas os 15 codenames `verb_noun` permanecem."""
+def test_seed_count_is_sixteen_post_wave1_c3():
+    """
+    Pós-Onda 1 C3 (2026-04-27): 16 codenames `verb_noun`.
+    +1 vs Epic 4.3: `manage_internal_actions` (capability sem grupos
+    atribuídos por seed; apenas superuser bypassa por ora).
+    """
     assert (
-        len(FUNCTIONAL_PERMISSIONS_SEED) == 15
-    ), f"Seed deve conter exatamente 15 permissões pós-Epic 4.3. Achei {len(FUNCTIONAL_PERMISSIONS_SEED)}."
+        len(FUNCTIONAL_PERMISSIONS_SEED) == 16
+    ), f"Seed deve conter exatamente 16 permissões pós-Onda 1 C3. Achei {len(FUNCTIONAL_PERMISSIONS_SEED)}."
 
 
 def test_old_pode_codenames_absent_post_epic_4_3():

@@ -17,13 +17,14 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.core.models import AcaoInstancia, AcaoTemplate, AuditLog, CicloAcoes, NotificacaoInterna
+from apps.core.rbac import HasPerm
 from apps.core.serializers import (
     AcaoInstanciaSerializer,
     CicloAcoesSerializer,
@@ -60,7 +61,7 @@ class CicloAcoesViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = CicloAcoesSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [HasPerm("manage_internal_actions")]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["projeto", "municipio", "semestre", "ano", "status"]
     search_fields = ["projeto__nome", "municipio__nome"]
@@ -117,7 +118,7 @@ class AcaoInstanciaViewSet(viewsets.ReadOnlyModelViewSet):
     """
 
     serializer_class = AcaoInstanciaSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [HasPerm("manage_internal_actions")]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ["ciclo", "estado", "ordem"]
     ordering_fields = ["ordem", "estado", "data_vencimento", "created_at"]

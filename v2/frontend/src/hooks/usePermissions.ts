@@ -94,11 +94,16 @@ function computePermissionsInternal(user: CurrentUser): Permissions {
   const canControle = user.is_superuser || inControle;
   const canDAT = user.is_superuser || inDAT;
   const canAcoesInternas = user.is_superuser || inDAT || isCoordenador || isGerente;
-  const canDashboardOverview = user.is_superuser || inSuperintendencia || inGerencia || inDiretoria;
-  const canDashboardEquipe = user.is_superuser || inControle || inGerencia || inSuperintendencia || inDiretoria;
-  const canDashboardGcal = user.is_superuser || inControle || inSuperintendencia;
+  // Dashboards — alinhado com `v2/docs/rbac_authorization_matrix.md` §3 + decisão D7.
+  // Bug 2 fix (Onda 1, C1, 2026-04-27): regras antigas tinham Controle/Gerência/
+  // Superintendência indevidamente em vários dashboards. Corrigido para refletir
+  // a tabela canônica: Diretoria é o decisor; DAT é ator transversal de
+  // suporte/validação; Controle vê apenas Dashboard GCal (operação do calendário).
+  const canDashboardOverview = user.is_superuser || inDiretoria;
+  const canDashboardEquipe = user.is_superuser || inDiretoria || inDAT;
+  const canDashboardGcal = user.is_superuser || inDiretoria || inDAT || inControle;
   const canDashboardCompras = user.is_superuser || inDiretoria || inDAT;
-  const canMapaBrasil = user.is_superuser || inControle || inDAT || inSuperintendencia || inGerencia || inDiretoria;
+  const canMapaBrasil = user.is_superuser || inDiretoria || inDAT;
   const canDashboardsMenu =
     canDashboardOverview || canDashboardCompras || canDashboardEquipe || canDashboardGcal || canMapaBrasil;
   const canDisponibilidade = user.is_superuser || !inControle;

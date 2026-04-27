@@ -155,6 +155,10 @@ class _PolicyPermission(permissions.BasePermission):  # type: ignore[misc]
       3. Policy key ausente / matriz vazia → False (fail-secure)
       4. Caso geral → `user_has_any_perm(user, *capabilities)`
 
+    DRY (Epic 4.4): a semântica vive em `user_has_policy`. Esta classe
+    apenas delega — view, tests e helpers compartilham a mesma fonte de
+    verdade. Mudar política de avaliação = mudar `user_has_policy`.
+
     Composition `CanA() | CanB()` funciona via DRF OR (monkey-patch de
     `permissions.OR.__call__` aplicado em `apps.core.rbac.permissions`).
     """
@@ -162,15 +166,7 @@ class _PolicyPermission(permissions.BasePermission):  # type: ignore[misc]
     policy: str = ""  # subclasses override
 
     def has_permission(self, request: Request, view: APIView) -> bool:
-        user = request.user
-        if not user or not user.is_authenticated:
-            return False
-        if getattr(user, "is_superuser", False):
-            return True
-        codenames = ACCESS_POLICIES.get(self.policy)
-        if not codenames:
-            return False
-        return user_has_any_perm(user, *codenames)
+        return user_has_policy(request.user, self.policy)
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(policy={self.policy!r})"
@@ -259,9 +255,102 @@ class CanManagePurchasesAndMaterials(_PolicyPermission):
     policy = "manage_purchases_and_materials"
 
 
+# ============================================================================
+# Public surface (Epic 4.4, Issue #1235): contrato externo `/api/me/policies/`
+# ============================================================================
+#
+# `PUBLIC_POLICY_KEYS` é o conjunto de policy keys EXPOSTAS via
+# `GET /api/me/policies/`. Subset de `ACCESS_POLICIES` — futuras policies
+# internas (não públicas) ficariam fora deste registro.
+#
+# Stability rules (memória `feedback_capability_policy_layer_pattern.md §6`):
+#   - Adicionar key aqui = compatível (frontend opt-in via `policies.includes`)
+#   - Renomear key = BREAKING (deprecation period de 2 releases)
+#   - Remover key = BREAKING (deprecation period)
+#   - Mudar capabilities elegíveis (ACCESS_POLICIES[k]) = compatível
+#
+# Procedure para nova policy pública:
+#   1. Adicionar entrada em ACCESS_POLICIES
+#   2. Criar classe Can<CamelCase>(_PolicyPermission)
+#   3. Adicionar key aqui em PUBLIC_POLICY_KEYS
+#   4. Atualizar snapshot test (Epic 4.5)
+#   5. Re-export classe em apps/core/rbac/__init__.py
+#
+# Test de paridade em test_me_policies.py garante que dev não esqueça step 3.
+
+PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "access_audit_logs",
+        "manage_solicitacao_status",
+        "view_compras_dashboard",
+        "view_compras_pendencias",
+        "view_compras_stats",
+        "view_overview_dashboard",
+        "view_map_metrics",
+        "view_reports",
+        "use_gcal",
+        "view_all_availability",
+        "import_availability_blocks",
+        "import_compras",
+        "import_generic_spreadsheet",
+        "manage_admin_registries",
+        "manage_purchases_and_materials",
+    }
+)
+
+
+# ============================================================================
+# Helpers (SSOT da semântica de Policy — usado por View, tests, admin futuro)
+# ============================================================================
+
+
+def user_has_policy(user, key: str) -> bool:
+    """
+    True sse o usuário possui a policy identificada por `key`.
+
+    Semântica (idêntica a `_PolicyPermission.has_permission` — esta função
+    é a fonte única de verdade; `_PolicyPermission` delega para cá):
+
+        anonymous / None  → False
+        superuser         → True
+        key não na matriz → False (fail-secure)
+        caso geral        → user_has_any_perm(user, *capabilities) (OR)
+
+    Aceita keys de ACCESS_POLICIES inteiro (públicas OU internas), porque
+    a função é o universal "user holds this policy?" — exposição pública
+    é responsabilidade de `resolve_public_policies` / endpoint, não da
+    semântica subjacente.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    codenames = ACCESS_POLICIES.get(key)
+    if not codenames:
+        return False
+    return user_has_any_perm(user, *codenames)
+
+
+def resolve_public_policies(user) -> list[str]:
+    """
+    Retorna lista ordenada (alfabética) das `PUBLIC_POLICY_KEYS` que o
+    usuário possui. Backend de `GET /api/me/policies/`.
+
+    - Anonymous → [] (endpoint trata 401 antes via IsAuthenticated)
+    - Superuser → todas as PUBLIC_POLICY_KEYS sorted
+    - User regular → subset baseado em capabilities (OR semantics)
+
+    Não vaza capability codenames — só keys do registro público.
+    """
+    return sorted(k for k in PUBLIC_POLICY_KEYS if user_has_policy(user, k))
+
+
 __all__ = [
     "ACCESS_POLICIES",
+    "PUBLIC_POLICY_KEYS",
     "_PolicyPermission",
+    "user_has_policy",
+    "resolve_public_policies",
     "CanAccessAuditLogs",
     "CanManageSolicitacaoStatus",
     "CanViewComprasDashboard",

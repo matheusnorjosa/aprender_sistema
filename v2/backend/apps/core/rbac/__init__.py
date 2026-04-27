@@ -39,9 +39,10 @@ from apps.core.rbac.permissions import (
     IsOwnerOrPrivileged,
 )
 
-# Capability Policy Layer (Epic 4.1, Issue #1232)
+# Capability Policy Layer (Epic 4.1, Issue #1232 + Epic 4.4, Issue #1235)
 from apps.core.rbac.policies import (
     ACCESS_POLICIES,
+    PUBLIC_POLICY_KEYS,
     CanAccessAuditLogs,
     CanImportAvailabilityBlocks,
     CanImportCompras,
@@ -57,6 +58,8 @@ from apps.core.rbac.policies import (
     CanViewMapMetrics,
     CanViewOverviewDashboard,
     CanViewReports,
+    resolve_public_policies,
+    user_has_policy,
 )
 
 __all__ = [
@@ -69,8 +72,11 @@ __all__ = [
     "user_has_all_perms",
     "COORDENADOR_ROLE_GROUPS",
     "FORMADOR_ROLE_GROUPS",
-    # Capability Policy Layer (Epic 4.1)
+    # Capability Policy Layer (Epic 4.1 + 4.4)
     "ACCESS_POLICIES",
+    "PUBLIC_POLICY_KEYS",
+    "user_has_policy",
+    "resolve_public_policies",
     "CanAccessAuditLogs",
     "CanImportAvailabilityBlocks",
     "CanImportCompras",

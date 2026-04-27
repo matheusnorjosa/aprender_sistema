@@ -28,7 +28,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
-from apps.core.permissions import HasPerm
+from apps.core.rbac.policies import CanImportGenericSpreadsheet
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -73,7 +73,7 @@ class ImportEventosView(APIView):
     """
 
     # Issue #1222 (Epic 1): import operacional aceita Controle (run_daily_operations) ou DAT (import_spreadsheet)
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet") | HasPerm("run_daily_operations")]
+    permission_classes = [IsAuthenticated, CanImportGenericSpreadsheet]
 
     @extend_schema(
         summary="Importar solicitações/eventos",

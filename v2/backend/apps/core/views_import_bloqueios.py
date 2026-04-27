@@ -27,7 +27,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
-from apps.core.permissions import HasPerm
+from apps.core.rbac.policies import CanImportAvailabilityBlocks
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -68,10 +68,7 @@ class ImportBloqueiosView(APIView):
     # é função operacional de gestão de availability (Controle/Gerente/Coord/Apoio)
     # e também faz parte do fluxo de importação genérico (DAT). Composition OR
     # cobre ambos.
-    permission_classes = [
-        IsAuthenticated,
-        HasPerm("import_spreadsheet") | HasPerm("view_all_availability"),
-    ]
+    permission_classes = [IsAuthenticated, CanImportAvailabilityBlocks]
 
     @extend_schema(
         summary="Importar bloqueios de disponibilidade",

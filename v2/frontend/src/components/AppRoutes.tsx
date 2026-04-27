@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { Spin, Result } from 'antd';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import { Spin, Result, Button } from 'antd';
 import type { Permissions } from '../hooks/usePermissions';
 import { useCanAccess } from '../hooks/useCanAccess';
 import type { CurrentUser } from '../types';
@@ -54,8 +54,24 @@ function PageLoader(): JSX.Element {
   );
 }
 
+/**
+ * Forbidden inline (mantido para rotas que ainda não usam <RequirePolicy>).
+ * Mesma mensagem genérica do `RequirePolicy` (OWASP — não revelar
+ * existência do recurso ou permission necessária).
+ */
 function Forbidden(): JSX.Element {
-  return <Result status="403" title="Sem permissão" subTitle="Você não tem permissão para acessar esta página." />;
+  return (
+    <Result
+      status="info"
+      title="Recurso indisponível"
+      subTitle="Esta página não está disponível ou não pode ser acessada pela sua conta."
+      extra={
+        <Link to="/">
+          <Button type="primary">Voltar ao início</Button>
+        </Link>
+      }
+    />
+  );
 }
 
 interface AppRoutesProps {

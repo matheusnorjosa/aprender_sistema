@@ -82,6 +82,28 @@ describe('computeAccess.canAccessBlocks — semantic translation', () => {
   });
 });
 
+describe('computeAccess.canViewComprasDashboard — Onda 2 A2 consome policy', () => {
+  test('public policy view_compras_dashboard → true', () => {
+    const access = computeAccess(['view_compras_dashboard'], {});
+    expect(access.canViewComprasDashboard).toBe(true);
+  });
+
+  test('legacy canDashboardCompras=true → true (fallback durante transição)', () => {
+    const access = computeAccess([], { canDashboardCompras: true });
+    expect(access.canViewComprasDashboard).toBe(true);
+  });
+
+  test('sem policy + sem legacy → false', () => {
+    const access = computeAccess([], {});
+    expect(access.canViewComprasDashboard).toBe(false);
+  });
+
+  test('legacy false + policy ausente → false', () => {
+    const access = computeAccess(['use_gcal'], { canDashboardCompras: false });
+    expect(access.canViewComprasDashboard).toBe(false);
+  });
+});
+
 describe('computeAccess.canCreateSolicitation — legacy-only today', () => {
   test('legacy canCoordenador=true → true', () => {
     const access = computeAccess([], { canCoordenador: true });

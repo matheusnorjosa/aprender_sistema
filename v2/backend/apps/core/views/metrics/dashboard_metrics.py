@@ -24,7 +24,17 @@ from apps.core.permissions import HasPerm
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("run_daily_operations") | HasPerm("supervise_operations")])
+@permission_classes(
+    # Onda 2 A3 (β, 2026-04-27): adicionado `manage_admin_registries` para DAT
+    # como ator transversal (validar/suportar). Composition OR mantida em vez
+    # de policy unificada — decisão Lote 4.2.b2 preservada (3 endpoints
+    # protegem objetos semanticamente diferentes: pessoas vs fluxo).
+    # Motivos legítimos:
+    #   run_daily_operations    → Controle (operar)
+    #   supervise_operations    → Diretoria (supervisionar)
+    #   manage_admin_registries → DAT (validar/suportar)
+    [HasPerm("run_daily_operations") | HasPerm("supervise_operations") | HasPerm("manage_admin_registries")]
+)
 @throttle_classes([ScopedRateThrottle])
 def productivity_metrics(request: Request) -> Response:
     """
@@ -113,7 +123,17 @@ productivity_metrics.throttle_scope = "metrics"  # type: ignore[attr-defined]
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("run_daily_operations") | HasPerm("supervise_operations")])
+@permission_classes(
+    # Onda 2 A3 (β, 2026-04-27): adicionado `manage_admin_registries` para DAT
+    # como ator transversal (validar/suportar). Composition OR mantida em vez
+    # de policy unificada — decisão Lote 4.2.b2 preservada (3 endpoints
+    # protegem objetos semanticamente diferentes: pessoas vs fluxo).
+    # Motivos legítimos:
+    #   run_daily_operations    → Controle (operar)
+    #   supervise_operations    → Diretoria (supervisionar)
+    #   manage_admin_registries → DAT (validar/suportar)
+    [HasPerm("run_daily_operations") | HasPerm("supervise_operations") | HasPerm("manage_admin_registries")]
+)
 @throttle_classes([ScopedRateThrottle])
 def quality_metrics(request: Request) -> Response:
     """

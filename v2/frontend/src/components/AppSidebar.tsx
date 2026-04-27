@@ -206,6 +206,7 @@ export function AppSidebar({
   const access = useCanAccess(policies, {
     canApproveSuper,
     canBloqueios: canControle || canCoordenador || isFormador,
+    canDashboardCompras,
     canCoordenador,
   });
 
@@ -329,7 +330,7 @@ export function AppSidebar({
                 {canDashboardOverview && (
                   <Menu.Item key="dashboard-geral"><Link to="/dashboards">Dashboard Geral</Link></Menu.Item>
                 )}
-                {canDashboardCompras && (
+                {access.canViewComprasDashboard && (
                   <Menu.Item key="dashboard-compras"><Link to="/dashboards/compras">Dashboard Compras</Link></Menu.Item>
                 )}
                 {canDashboardEquipe && (

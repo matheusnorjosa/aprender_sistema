@@ -24,7 +24,13 @@ from apps.core.permissions import HasPerm
 
 
 @api_view(["GET"])
-@permission_classes([HasPerm("run_daily_operations") | HasPerm("supervise_operations")])
+@permission_classes(
+    # Onda 2 A3 (β, 2026-04-27): adicionado `manage_admin_registries` para DAT
+    # como ator transversal (validar/suportar). Mesma decisão dos demais
+    # endpoints metrics — preserva Lote 4.2.b2 (composition OR ad-hoc por
+    # objetos semanticamente diferentes).
+    [HasPerm("run_daily_operations") | HasPerm("supervise_operations") | HasPerm("manage_admin_registries")]
+)
 @throttle_classes([ScopedRateThrottle])
 def formadores_metrics(request: Request) -> Response:
     """

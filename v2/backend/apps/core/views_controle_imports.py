@@ -25,7 +25,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
-from apps.core.permissions import HasPerm
+from apps.core.rbac.policies import CanImportCompras
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -71,12 +71,10 @@ class ImportComprasView(APIView):
         }
     """
 
-    # Issue #1222 (Epic 1 RBAC Access Policy Realignment): importar compras
-    # é operação do Controle (`run_daily_operations` / `manage_purchases_and_materials`).
-    # DAT também (`import_spreadsheet`). Composition OR cobre ambos.
-    permission_classes = [
-        HasPerm("import_spreadsheet") | HasPerm("manage_purchases_and_materials") | HasPerm("run_daily_operations")
-    ]
+    # Issue #1233 (Epic 4.2.c): import de compras é Policy `import_compras`
+    # (DAT importa + Compras/Controle operam). Paridade com composition OR
+    # anterior (`import_spreadsheet | manage_purchases_and_materials | run_daily_operations`).
+    permission_classes = [CanImportCompras]
 
     @extend_schema(
         summary="Importar compras",

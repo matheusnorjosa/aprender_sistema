@@ -94,6 +94,7 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
     canApproveSuper,
     canBloqueios: canControle || canCoordenador || isFormador,
     canCoordenador,
+    canDashboardCompras,
   });
 
   return (
@@ -104,7 +105,7 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
 
         {/* Dashboards */}
         <Route path="/dashboards" element={canDashboardOverview ? <DashboardsPage /> : <Forbidden />} />
-        <Route path="/dashboards/compras" element={canDashboardCompras ? <ComprasDashboardPage /> : <Forbidden />} />
+        <Route path="/dashboards/compras" element={access.canViewComprasDashboard ? <ComprasDashboardPage /> : <Forbidden />} />
         <Route path="/dashboards/equipe" element={canDashboardEquipe ? <EquipeDashboardPage /> : <Forbidden />} />
         <Route path="/dashboards/gcal" element={canDashboardGcal ? <GCalDashboardPage /> : <Forbidden />} />
         <Route path="/mapa-brasil" element={canMapaBrasil ? <MapaBrasilPage /> : <Forbidden />} />

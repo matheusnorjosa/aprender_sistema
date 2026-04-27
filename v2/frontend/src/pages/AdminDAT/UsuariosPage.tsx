@@ -33,6 +33,7 @@ import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant
 import { Link } from 'react-router-dom';
 import { checkAuth } from '../../api/auth';
 import { listUsers, createUser, updateUser, deleteUser, listGroups, getRBACMeta } from '../../api/adminDAT';
+import { buildUsuarioPayload } from './usuario_form_helpers';
 import type { PermissaoFuncional, RBACMetaPayload } from '../../api/adminDAT';
 import { importUsuarios } from '../../api/ops';
 import type { ImportResult } from '../../api/ops';
@@ -151,6 +152,11 @@ export default function UsuariosPage(): JSX.Element {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  // Bug 3 fix (2026-04-27): CPF é write-only por LGPD (serializer), então API
+  // nunca retorna o CPF raw — apenas `cpf_masked`. No modo edit, manter o
+  // campo disabled mostrando o mascarado, e exigir clique em "Alterar CPF"
+  // para liberar nova entrada. Submit omite `cpf` do payload se locked.
+  const [cpfEditUnlocked, setCpfEditUnlocked] = useState(false);
   const [grupos, setGrupos] = useState<GroupRecord[]>([]);
   const [rbacMeta, setRbacMeta] = useState<RBACMetaPayload | null>(null);
   const [currentIsSuperuser, setCurrentIsSuperuser] = useState(false);
@@ -278,6 +284,7 @@ export default function UsuariosPage(): JSX.Element {
 
   const handleCreate = (): void => {
     setEditingUser(null);
+    setCpfEditUnlocked(true);  // Create: campo CPF sempre liberado
     form.resetFields();
     form.setFieldsValue({
       is_active: true,
@@ -290,6 +297,7 @@ export default function UsuariosPage(): JSX.Element {
 
   const handleEdit = (user: UserRecord): void => {
     setEditingUser(user);
+    setCpfEditUnlocked(false);  // Edit: CPF locked até user clicar "Alterar"
     // Separar IDs de grupos por tipo
     const userGroupIds = user.group_ids_display || [];
     const setorIds = grupos
@@ -304,7 +312,8 @@ export default function UsuariosPage(): JSX.Element {
       email: user.email,
       first_name: user.first_name,
       last_name: user.last_name,
-      cpf: user.cpf,
+      // CPF não é populado no modo edit — write-only por LGPD; o input mostra
+      // `cpf_masked` como placeholder/valor visual via prop, não via setFieldsValue.
       telefone: user.telefone,
       cargo: user.cargo,
       is_active: user.is_active,
@@ -336,13 +345,13 @@ export default function UsuariosPage(): JSX.Element {
 
   const handleSave = async (values: UserFormValues): Promise<void> => {
     try {
-      // Combinar setor_ids e funcao_ids em group_ids
-      const { setor_ids = [], funcao_ids = [], is_superuser, ...rest } = values;
-      const payload = {
-        ...rest,
-        ...(currentIsSuperuser ? { is_superuser } : {}),
-        group_ids: [...setor_ids, ...funcao_ids],
-      };
+      // Bug 3 fix (2026-04-27): payload construído via helper puro testável.
+      // Regras LGPD para CPF: omitir do payload se edit+locked (mantém atual).
+      const payload = buildUsuarioPayload(values, {
+        isEditing: !!editingUser,
+        cpfEditUnlocked,
+        currentIsSuperuser,
+      });
 
       if (editingUser) {
         await updateUser(editingUser.id, payload);
@@ -598,15 +607,47 @@ export default function UsuariosPage(): JSX.Element {
           <Form.Item
             name="cpf"
             label="CPF"
-            rules={[
-              { required: true, message: 'CPF é obrigatório' },
-              {
-                pattern: /^[0-9]{11}$/,
-                message: 'CPF deve conter exatamente 11 dígitos numéricos',
-              },
-            ]}
+            // Bug 3 fix (2026-04-27): no edit, CPF não é required (write-only
+            // por LGPD; backend mantém valor existente se omitido). No create
+            // segue obrigatório.
+            rules={
+              !editingUser || cpfEditUnlocked
+                ? [
+                    { required: !editingUser, message: 'CPF é obrigatório' },
+                    {
+                      pattern: /^[0-9]{11}$/,
+                      message: 'CPF deve conter exatamente 11 dígitos numéricos',
+                    },
+                  ]
+                : []
+            }
+            // Em edit + locked, mostra cpf_masked como valor visual; o form
+            // não captura porque o input fica disabled.
+            help={
+              editingUser && !cpfEditUnlocked
+                ? 'CPF protegido por LGPD. Clique em "Alterar CPF" para editar.'
+                : undefined
+            }
           >
-            <Input placeholder="12345678901 (apenas números)" maxLength={11} />
+            {editingUser && !cpfEditUnlocked ? (
+              <Input
+                value={editingUser.cpf_masked || ''}
+                disabled
+                addonAfter={
+                  <Button
+                    type="link"
+                    size="small"
+                    onClick={() => setCpfEditUnlocked(true)}
+                    data-testid="alterar-cpf-button"
+                    style={{ padding: 0, height: 'auto' }}
+                  >
+                    Alterar CPF
+                  </Button>
+                }
+              />
+            ) : (
+              <Input placeholder="12345678901 (apenas números)" maxLength={11} />
+            )}
           </Form.Item>
 
           <Form.Item name="telefone" label="Telefone">

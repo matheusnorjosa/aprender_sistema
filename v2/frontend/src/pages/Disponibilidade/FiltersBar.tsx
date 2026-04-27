@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useMemo, ChangeEvent, JSX } from 'react';
 import { getGerencias, getMe } from '../../api/availability';
+import { computePermissions } from '../../hooks/usePermissions';
 import type { ID, CurrentUser, Gerencia } from '../../types';
 import logger from '../../utils/logger';
 
@@ -58,9 +59,10 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
         setAllGerencias(gerenciasData);
         setUserInfo(meData);
 
-        // Auto-seleciona gerência se usuário não é Superintendência
-        // e ainda não tem gerência selecionada
-        if (!meData.is_superintendencia && meData.setores?.length > 0) {
+        // Auto-seleciona gerência se usuário não vê todos os setores e tem setor próprio.
+        // Epic 3.3 cleanup: substitui `!is_superintendencia` por flag derivada (SSOT).
+        const meDataPerms = computePermissions(meData);
+        if (!meDataPerms.canSeeAllSectors && meData.setores?.length > 0) {
           const userSetores = meData.setores;
           // Converte grupos RBAC para nome_setor
           const userNomeSetores = userSetores.map(
@@ -90,8 +92,10 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
   const gerencias = useMemo((): Gerencia[] => {
     if (!userInfo || !allGerencias.length) return [];
 
-    // Superintendência ou superuser vê todas as gerências
-    if (userInfo.is_superintendencia || userInfo.is_superuser) {
+    const perms = computePermissions(userInfo);
+
+    // Vê todas as gerências (canSeeAllSectors: superuser/Superintendência/etc.)
+    if (perms.canSeeAllSectors) {
       return allGerencias;
     }
 
@@ -109,8 +113,9 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
 
   /**
    * Verifica se pode ver todas as gerências (opção "Todas").
+   * Epic 3.3 cleanup: usa flag derivada (SSOT em usePermissions).
    */
-  const canSeeAll = userInfo?.is_superintendencia || userInfo?.is_superuser;
+  const canSeeAll = userInfo ? computePermissions(userInfo).canSeeAllSectors : false;
 
   /**
    * Incrementa/decrementa mês.

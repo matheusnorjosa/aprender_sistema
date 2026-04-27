@@ -15,6 +15,7 @@ import { isAuthError } from './utils/errors';
 import { ThemeProvider, useTheme, useBrandColors } from './contexts/ThemeContext';
 import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
+import { getMyPolicies } from './api/me';
 import { logout as apiLogout } from './api/auth';
 import { Toaster } from 'react-hot-toast';
 import { LAYOUT } from './constants';
@@ -42,6 +43,9 @@ function AppContent(): JSX.Element {
 
   // ── User state ──
   const [user, setUser] = useState<CurrentUser | null>(null);
+  // Policies do user via GET /api/me/policies/ (Epic 4.4 + Epic 3 #1228).
+  // Empty array = "ainda não carregadas" OU "anonymous" — distinção via `loading`.
+  const [policies, setPolicies] = useState<readonly string[]>([]);
   const [loading, setLoading] = useState(true);
   const isMountedRef = useRef(true);
 
@@ -52,11 +56,25 @@ function AppContent(): JSX.Element {
   const permissions = usePermissions(user);
 
   // ── Load user ──
+  // `getMe()` primeiro (estabelece sessão); `getMyPolicies()` depois APENAS se
+  // autenticado. Sequencial é trade-off consciente — paralelo gerava 403 no
+  // console pre-login (DRF IsAuthenticated → 403) que poluía console-errors
+  // E2E checks. Latência adicional ~100-300ms apenas no primeiro mount.
   const loadUser = useCallback(async () => {
     try {
       const userData = await getMe();
-      if (isMountedRef.current) {
-        setUser(userData);
+      if (!isMountedRef.current) return;
+      setUser(userData);
+
+      // Só busca policies se user autenticado (evita 403 espúrio pre-login).
+      try {
+        const policiesData = await getMyPolicies();
+        if (isMountedRef.current) setPolicies(policiesData);
+      } catch (err) {
+        if (!isAuthError(err)) {
+          logger.warn('Erro ao carregar policies (degradando para []):', err);
+        }
+        if (isMountedRef.current) setPolicies([]);
       }
     } catch (error) {
       if (isMountedRef.current) {
@@ -64,6 +82,7 @@ function AppContent(): JSX.Element {
           logger.error('Erro ao carregar usuário:', error);
         }
         setUser(null);
+        setPolicies([]);
       }
     } finally {
       if (isMountedRef.current) setLoading(false);
@@ -134,6 +153,7 @@ function AppContent(): JSX.Element {
         <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
           <AppSidebar
             permissions={permissions}
+            policies={policies}
             gcalErrorCount={alerts.errors}
             unreadNotifications={unreadNotifications}
             isMobile={isMobile}
@@ -162,7 +182,7 @@ function AppContent(): JSX.Element {
               role="main"
               style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: colors.pageBackground }}
             >
-              <AppRoutes user={user} permissions={permissions} />
+              <AppRoutes user={user} permissions={permissions} policies={policies} />
             </Content>
           </Layout>
         </Layout>

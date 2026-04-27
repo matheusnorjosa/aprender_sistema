@@ -42,6 +42,7 @@ import {
   lookupTiposEvento,
 } from '../../api/lookup';
 import { getMe } from '../../api/availability';
+import { computePermissions } from '../../hooks/usePermissions';
 import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
 import FormadoresPicker from '../../components/FormadoresPicker';
@@ -145,7 +146,9 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       try {
         const me = await getMe();
         if (mounted) {
-          setIsSuperuser(Boolean(me?.is_superuser));
+          // Epic 3.3 cleanup: usa flag derivada (SSOT). Admin escape hatch
+          // do wizard — bypassa exigência de projeto/município no Step 2.
+          setIsSuperuser(computePermissions(me).isAdmin);
         }
       } catch (error) {
         logger.warn('Falha ao carregar perfil do usuário no wizard:', error);

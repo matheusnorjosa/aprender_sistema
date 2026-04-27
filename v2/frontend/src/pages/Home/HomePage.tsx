@@ -22,6 +22,7 @@ import {
 } from '@ant-design/icons';
 import { getMe } from '../../api/availability';
 import { getHomeStats } from '../../api/stats';
+import { computePermissions } from '../../hooks/usePermissions';
 import logger from '../../utils/logger';
 import type { CurrentUser } from '../../types';
 
@@ -130,21 +131,14 @@ export default function HomePage(): JSX.Element {
     );
   }
 
-  // Calcular permissões (RBAC com Setor + Função)
-  const setores = user?.setores || [];
-  const funcoes = user?.funcoes || [];
-
-  // isAdmin = apenas superusers (acesso administrativo completo)
-  const isAdmin = user?.is_superuser;
-  // canApproveSuper = pode aprovar/reprovar solicitações (Superintendência/DAT)
-  const canApproveSuper = user?.can_approve_super || false;
-  // isManager = Gerente de qualquer setor (dashboards, métricas)
-  const isGerente = user?.is_superuser || funcoes.includes('Gerente');
-  const isManager = isGerente && (setores.includes('Gerência') || isAdmin);
-  // isCoordenador = pode criar solicitações
-  const isCoordenador = user?.is_superuser || funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação') || setores.includes('DAT');
-  // canDAT = acesso ao Admin DAT
-  const canDAT = user?.is_superuser || setores.includes('DAT');
+  // Calcular permissões (RBAC com Setor + Função).
+  // Epic 3.3 cleanup: usa computePermissions (SSOT) em vez de hardcodes inline.
+  const perms = computePermissions(user);
+  const isAdmin = perms.isAdmin;
+  const canApproveSuper = perms.canApproveSuper;
+  const isManager = perms.isGerente && (perms.inGerencia || perms.isAdmin);
+  const isCoordenador = perms.canCoordenador;
+  const canDAT = perms.canDAT;
 
   return (
     <div className="p-6">

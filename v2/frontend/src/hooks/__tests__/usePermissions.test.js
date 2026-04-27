@@ -46,6 +46,31 @@ describe('computePermissions', () => {
     expect(perms.canAcoesInternas).toBe(false)
     expect(perms.canDashboardsMenu).toBe(false)
     expect(perms.canDisponibilidade).toBe(false)
+    expect(perms.canSeeAllSectors).toBe(false)
+  })
+
+  // Epic 3.3: SSOT para "vê todos os setores/gerências".
+  // Substitui hardcodes is_superuser || is_superintendencia || groups.includes(Super) em 4+ páginas.
+  describe('canSeeAllSectors', () => {
+    test('superuser → true', () => {
+      const perms = computePermissions(makeUser({ is_superuser: true }))
+      expect(perms.canSeeAllSectors).toBe(true)
+    })
+
+    test('is_superintendencia flag (backend) → true', () => {
+      const perms = computePermissions(makeUser({ is_superintendencia: true }))
+      expect(perms.canSeeAllSectors).toBe(true)
+    })
+
+    test('setor Superintendência → true', () => {
+      const perms = computePermissions(makeUser({ setores: ['Superintendência'] }))
+      expect(perms.canSeeAllSectors).toBe(true)
+    })
+
+    test('user sem nenhum desses → false', () => {
+      const perms = computePermissions(makeUser({ setores: ['Controle'], funcoes: ['Coordenador'] }))
+      expect(perms.canSeeAllSectors).toBe(false)
+    })
   })
 
   test('superuser gets all capabilities', () => {

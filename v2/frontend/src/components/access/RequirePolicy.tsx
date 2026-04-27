@@ -17,7 +17,8 @@
  */
 
 import type { ReactNode } from 'react';
-import { Result } from 'antd';
+import { Button, Result } from 'antd';
+import { Link } from 'react-router-dom';
 
 interface RequirePolicyProps {
   children: ReactNode;
@@ -35,12 +36,26 @@ interface RequirePolicyProps {
   loadingFallback?: ReactNode;
 }
 
+/**
+ * Fallback genérico (OWASP Authorization Cheat Sheet):
+ * - NÃO revela que o recurso existe ("403 sem permissão" é vazamento)
+ * - NÃO menciona qual permission/role é necessária
+ * - NÃO usa código HTTP visível
+ * - Mensagem ambígua: pode ser "não existe" ou "não disponível para você"
+ *
+ * Status visual `info` (não `403`) — neutralidade. CTA único: voltar ao início.
+ */
 function DefaultForbidden(): JSX.Element {
   return (
     <Result
-      status="403"
-      title="Sem permissão"
-      subTitle="Você não tem permissão para acessar esta página."
+      status="info"
+      title="Recurso indisponível"
+      subTitle="Esta página não está disponível ou não pode ser acessada pela sua conta."
+      extra={
+        <Link to="/">
+          <Button type="primary">Voltar ao início</Button>
+        </Link>
+      }
     />
   );
 }

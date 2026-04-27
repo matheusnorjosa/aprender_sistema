@@ -105,8 +105,8 @@ function AppContent(): JSX.Element {
   }, [user]);
 
   // ── GCal alerts polling ──
-  const gcalEnabled = !!(user?.setores?.includes('Controle') || user?.is_superuser);
-  const { alerts } = useGCalAlertsPolling({ enabled: gcalEnabled });
+  // Epic 3.3 cleanup: usa flag derivada do usePermissions (canControle já cobre superuser).
+  const { alerts } = useGCalAlertsPolling({ enabled: permissions.canControle });
 
   // ── Notification badge polling ──
   const { unreadNotifications } = useUnreadNotificationsPolling({

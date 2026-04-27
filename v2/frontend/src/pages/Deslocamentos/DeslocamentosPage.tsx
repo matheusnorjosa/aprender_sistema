@@ -49,6 +49,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getMe } from '../../api/availability';
+import { computePermissions } from '../../hooks/usePermissions';
 import { importDeslocamentos } from '../../api/ops';
 import ImportUploader, { ValidationResult, ApplyResult } from '../../components/ImportUploader';
 import logger from '../../utils/logger';
@@ -259,18 +260,16 @@ export default function DeslocamentosPage(): JSX.Element {
   const [form] = Form.useForm<FormValuesType>();
 
   // Load user and check permissions
+  // Epic 3.3 cleanup: substitui hardcode `is_superuser || is_superintendencia` por
+  // `computePermissions(userData)` (SSOT). Nota: a rota já é protegida por
+  // <RequirePolicy> no AppRoutes (Epic 3.1+3.2) — este check local é defesa
+  // em camadas e fonte do banner de loading da página.
   useEffect(() => {
     async function loadUser(): Promise<void> {
       try {
         const userData = await getMe();
-
-        // Check RBAC: Controle, Coordenador, or DAT
-        const canControle = userData.groups?.includes('Controle');
-        const canCoordenador = userData.groups?.includes('Coordenador');
-        const canDAT = userData.groups?.includes('DAT');
-        const canSuper = userData.is_superuser || userData.is_superintendencia;
-
-        setCanAccess(!!(canControle || canCoordenador || canDAT || canSuper));
+        const perms = computePermissions(userData);
+        setCanAccess(perms.canControle || perms.canCoordenador || perms.canDAT || perms.inSuperintendencia);
       } catch (error) {
         logger.error('Erro ao carregar usuário:', error);
         setCanAccess(false);

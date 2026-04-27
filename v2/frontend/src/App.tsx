@@ -56,21 +56,25 @@ function AppContent(): JSX.Element {
   const permissions = usePermissions(user);
 
   // ── Load user ──
-  // Fetch de `getMe()` e `getMyPolicies()` em paralelo. Erro em policies não
-  // bloqueia login — degrada graciosamente para `[]` (componentes mostram
-  // Forbidden em rotas com policy). Erro em getMe → não autenticado.
+  // `getMe()` primeiro (estabelece sessão); `getMyPolicies()` depois APENAS se
+  // autenticado. Sequencial é trade-off consciente — paralelo gerava 403 no
+  // console pre-login (DRF IsAuthenticated → 403) que poluía console-errors
+  // E2E checks. Latência adicional ~100-300ms apenas no primeiro mount.
   const loadUser = useCallback(async () => {
     try {
-      const [userData, policiesData] = await Promise.all([
-        getMe(),
-        getMyPolicies().catch((err) => {
+      const userData = await getMe();
+      if (!isMountedRef.current) return;
+      setUser(userData);
+
+      // Só busca policies se user autenticado (evita 403 espúrio pre-login).
+      try {
+        const policiesData = await getMyPolicies();
+        if (isMountedRef.current) setPolicies(policiesData);
+      } catch (err) {
+        if (!isAuthError(err)) {
           logger.warn('Erro ao carregar policies (degradando para []):', err);
-          return [] as string[];
-        }),
-      ]);
-      if (isMountedRef.current) {
-        setUser(userData);
-        setPolicies(policiesData);
+        }
+        if (isMountedRef.current) setPolicies([]);
       }
     } catch (error) {
       if (isMountedRef.current) {

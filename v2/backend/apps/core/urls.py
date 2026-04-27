@@ -40,7 +40,7 @@ from .views import (  # ASQ-005: async imports; DAT Module ViewSets; Plano Forma
 )
 
 # Imports de módulos isolados (GAP-001 fix)
-from .views.me import MeEventsListView
+from .views.me import MeEventsListView, MePoliciesView
 from .views.stats import HomeStatsView
 from .views_auth import csrf_token, login, logout, ping
 from .views_availability import AvailabilityBlockViewSet, AvailabilityCheckManyView, AvailabilityCheckView
@@ -162,6 +162,7 @@ urlpatterns = [
     path("features/", features, name="features"),
     path("me/", CurrentUserView.as_view(), name="current-user"),
     path("me/events/", MeEventsListView.as_view(), name="me-events"),
+    path("me/policies/", MePoliciesView.as_view(), name="me-policies"),
     path("rbac/meta/", RBACMetaView.as_view(), name="rbac-meta"),
     path("stats/home/", HomeStatsView.as_view(), name="stats-home"),
     # CSRF Token (Issue #135)

@@ -129,10 +129,20 @@ _ALL_AUTH: Final[dict[str, int]] = {actor: ALLOW for actor in ACTORS}
 
 
 ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
-    # Grade Mensal: composition `[IsAuthenticated, CanViewAllAvailability | HasSectorAccess]`.
-    # Sem gerencia_id, HasSectorAccess retorna True (SUPER comportamento) → todos autenticados 200.
-    # Scope discriminante coberto em test_availability_monthly_rbac.py (Bug 1 PR #1248).
-    "grade_mensal": _ALL_AUTH,
+    # Grade Mensal — D8 (2026-04-28): composition `[IsAuthenticated, CanViewAllAvailability | HasSectorAccess]`
+    # com HasSectorAccess endurecida (sem gerencia_id exige EquipeGerencia ativa).
+    # Para Coord/Apoio retornar 200, a fixture `_make_user_for_actor` cria EquipeGerencia.
+    # Scope discriminante coberto em test_availability_monthly_rbac.py.
+    "grade_mensal": {
+        SUPERUSER: ALLOW,
+        DAT: DENY,           # D8: sem motivo legítimo + sem cap + fixture sem EquipeGerencia
+        CONTROLE: ALLOW,     # view_all_availability via seed 0078 (D6)
+        DIRETORIA: DENY,     # D8: decisão executiva, não consulta operacional
+        GERENTE: ALLOW,      # view_all_availability via seed 0078 (D6)
+        COORDENADOR: ALLOW,  # scoped via EquipeGerencia (D6) — fixture cria vínculo
+        APOIO: ALLOW,        # scoped via EquipeGerencia (D6) — fixture cria vínculo
+        FORMADOR: DENY,      # D8: caso especial; só Meus Eventos + Bloqueios próprios
+    },
     #
     # Deslocamentos: `[IsAuthenticated]` + queryset scope filter (Onda 1 C2).
     # Todos autenticados retornam 200; queryset filtra cross-table via EquipeGerencia.

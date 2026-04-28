@@ -142,25 +142,36 @@ class TestHasSectorAccessPermission(TestCase):
         view = MockView()
         self.assertFalse(self.permission.has_permission(request, view))
 
-    def test_user_without_gerencia_id_is_allowed_super_behavior(self):
-        """Sem gerencia_id = assume SUPER (permitido para autenticados)."""
+    def test_user_with_gerencia_without_gerencia_id_is_allowed(self):
+        """
+        Usuário com EquipeGerencia ativa (qualquer gerência) e sem gerencia_id na query → permitido.
+        D8 (2026-04-28): vínculo organizacional autoriza acesso; view escopa dados em runtime.
+        """
         request = self.factory.get("/")
-        request.user = self.user_vidas
+        request.user = self.user_vidas  # tem EquipeGerencia (Vidas)
         request.query_params = {}
 
         view = MockView()
-        # Conforme plano: sem gerencia_id assume SUPER (comportamento atual)
         self.assertTrue(self.permission.has_permission(request, view))
 
-    def test_user_without_gerencia_without_gerencia_id_is_allowed(self):
-        """Usuário sem gerência vinculada mas sem gerencia_id = permitido (SUPER)."""
+    def test_user_without_gerencia_without_gerencia_id_is_blocked(self):
+        """
+        D8 (2026-04-28): usuário sem EquipeGerencia ativa e sem capability
+        global → 403, mesmo sem gerencia_id na query.
+
+        Antes era "SUPER comportamento" (200), mas isso permitia que
+        Formador/DAT/Diretoria sem vínculo organizacional entrassem na Grade
+        Mensal indevidamente. Agora HasSectorAccess exige vínculo positivo —
+        a composition `CanViewAllAvailability | HasSectorAccess` em
+        `MonthlyAvailabilityView` ainda permite que Controle/Gerente passem
+        pela cap, sem precisar de EquipeGerencia.
+        """
         request = self.factory.get("/")
         request.user = self.user_sem_gerencia
         request.query_params = {}
 
         view = MockView()
-        # Conforme plano: sem gerencia_id assume SUPER (comportamento atual)
-        self.assertTrue(self.permission.has_permission(request, view))
+        self.assertFalse(self.permission.has_permission(request, view))
 
 
 @pytest.mark.django_db

@@ -30,7 +30,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import PermissaoFuncional, Usuario
+from apps.core.models import EquipeGerencia, Gerencia, PermissaoFuncional, Usuario
 
 pytestmark = pytest.mark.django_db
 
@@ -132,20 +132,26 @@ class TestControleAccessViaCapability:
 
 
 class TestSectorScopePreserved:
-    def test_user_without_capability_no_gerencia_returns_200(self):
+    def test_user_without_capability_no_gerencia_no_vinculo_returns_403(self):
         """
-        Sem capability + sem gerencia_id = SUPER comportamento (permitido).
-        Mantém regra original de HasSectorAccess.
+        D8 (2026-04-28): sem capability + sem gerencia_id na query + sem
+        EquipeGerencia ativa → 403. Antes era "SUPER comportamento" (200) mas
+        permitia que Formador/DAT/Diretoria entrassem na Grade Mensal sem
+        vínculo organizacional. Agora HasSectorAccess exige `view_all_availability`
+        OU pelo menos 1 EquipeGerencia ativo.
         """
         user = _make_user_with_groups_and_caps(
             "no_cap_user",
             group_names=["Coordenador"],
-            capability_codenames=[],  # propositalmente vazio
+            capability_codenames=[],
         )
+        # Sem EquipeGerencia ativa para esse user.
         client = APIClient()
         client.force_authenticate(user=user)
         res = client.get(URL + QS)
-        assert res.status_code == 200
+        assert res.status_code == 403, (
+            f"Coord sem cap E sem EquipeGerencia deve receber 403 (D8). " f"Got {res.status_code}: {res.content!r}"
+        )
 
     def test_user_without_capability_with_invalid_gerencia_returns_403(self):
         """
@@ -161,6 +167,118 @@ class TestSectorScopePreserved:
         client.force_authenticate(user=user)
         res = client.get(URL + QS + "&gerencia_id=99999")
         assert res.status_code == 403
+
+
+# ============================================================================
+# D8 (2026-04-28) — Formador, DAT e Diretoria não acessam Grade Mensal
+# ============================================================================
+
+
+class TestFormadorAndOthersDenied:
+    """
+    Decisão D8: Formador, DAT e Diretoria não devem acessar Grade Mensal.
+
+    - Formador: caso especial RD-02/RD-03; acessa apenas Meus Eventos + Bloqueios próprios
+    - DAT: não tem motivo legítimo para consultar grade
+    - Diretoria: decisão executiva, não consulta operacional
+
+    Regra do backend após D8: sem `view_all_availability` E sem EquipeGerencia
+    ativa → 403, mesmo sem `gerencia_id` na query.
+    """
+
+    def test_formador_returns_403(self):
+        user = _make_user_with_groups_and_caps(
+            "formador_user",
+            group_names=["Formador"],
+            capability_codenames=[],
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+        res = client.get(URL + QS)
+        assert res.status_code == 403, (
+            f"Formador NÃO deve acessar Grade Mensal (D8). " f"Got {res.status_code}: {res.content!r}"
+        )
+
+    def test_dat_returns_403(self):
+        user = _make_user_with_groups_and_caps(
+            "dat_user",
+            group_names=["DAT"],
+            capability_codenames=[],
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+        res = client.get(URL + QS)
+        assert res.status_code == 403, (
+            f"DAT NÃO deve acessar Grade Mensal (D8). " f"Got {res.status_code}: {res.content!r}"
+        )
+
+    def test_diretoria_returns_403(self):
+        user = _make_user_with_groups_and_caps(
+            "diretoria_user",
+            group_names=["Diretoria"],
+            capability_codenames=[],
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+        res = client.get(URL + QS)
+        assert res.status_code == 403, (
+            f"Diretoria NÃO deve acessar Grade Mensal (D8). " f"Got {res.status_code}: {res.content!r}"
+        )
+
+
+class TestCoordenadorScopedAccess:
+    """
+    Coordenador/Apoio acessam Grade Mensal apenas com vínculo de EquipeGerencia
+    ativa (D6 — scope via gerência). Sem vínculo, 403.
+    """
+
+    def test_coordenador_with_equipe_gerencia_returns_200(self):
+        """
+        Coordenador com EquipeGerencia ativa → 200. View escopa pessoas pela
+        gerência vinculada. Sem `gerencia_id` na query, HasSectorAccess
+        confirma que tem ao menos 1 vínculo e libera; view filtra dados.
+        """
+        user = _make_user_with_groups_and_caps(
+            "coord_with_gerencia",
+            group_names=["Coordenador"],
+            capability_codenames=[],
+        )
+        gerencia = Gerencia.objects.create(
+            nome="GERENCIA D8 TEST",
+            nome_setor="Vidas D8",
+        )
+        EquipeGerencia.objects.create(
+            gerencia=gerencia,
+            usuario=user,
+            papel="COORDENADOR",
+            ativo=True,
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+        res = client.get(URL + QS)
+        assert res.status_code == 200, (
+            f"Coord com EquipeGerencia ativa deve acessar Grade Mensal (escopo "
+            f"resolvido em runtime). Got {res.status_code}: {res.content!r}"
+        )
+
+    def test_coordenador_without_equipe_gerencia_returns_403(self):
+        """
+        Coordenador SEM EquipeGerencia ativa → 403 (D8).
+
+        Esse é o ponto-chave do hardening: antes era 200 com lista vazia; agora
+        é 403 explícito porque nem cap global nem vínculo de gerência.
+        """
+        user = _make_user_with_groups_and_caps(
+            "coord_no_gerencia",
+            group_names=["Coordenador"],
+            capability_codenames=[],
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+        res = client.get(URL + QS)
+        assert res.status_code == 403, (
+            f"Coord sem EquipeGerencia deve receber 403 (D8). " f"Got {res.status_code}: {res.content!r}"
+        )
 
 
 # ============================================================================

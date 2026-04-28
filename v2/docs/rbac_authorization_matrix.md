@@ -156,6 +156,7 @@ permission_classes = [IsAdminUser]                    # ❌ DRF built-in fora da
 | D5 | Frontend tem **camada de tradução semântica** (`canAccessApprovals` etc.) | 2026-04-26 | Componentes não conhecem origem (policy vs legacy) — migrar p/ Epic 4.6 = 1 linha sem ripple |
 | D6 | Coordenador/Apoio são SCOPED (não recebem `view_all_availability`) | 2026-04-27 (Bug 1) | E2E J05 protegia regra de privacidade legítima; capability deve ser literal "ver TODAS sem restrição" |
 | D7 | Dashboards = Diretoria + DAT + superuser only | 2026-04-26 | `project_rbac_invariants.md` — Controle não vê Dashboards (Onda 1 corrige `usePermissions` hardcoded) |
+| D8 | Formador, DAT e Diretoria **não acessam** Grade Mensal; Coord/Apoio só com `EquipeGerencia` ativa | 2026-04-28 (issue #1287) | Formador é caso especial RD-02/RD-03 (acessa só Meus Eventos + Bloqueios). DAT/Diretoria não têm motivo legítimo de consultar grade. Antes do fix, frontend `canDisponibilidade=!inControle` (lógica invertida) e backend `HasSectorAccess` retornava True sem `gerencia_id` — Formador via menu e abria página com 200. Reescrita como lista positiva no frontend + endurecimento no backend (sem `gerencia_id` exige vínculo de gerência) |
 
 ---
 

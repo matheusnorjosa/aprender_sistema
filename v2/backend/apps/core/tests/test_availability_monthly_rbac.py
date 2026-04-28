@@ -150,8 +150,7 @@ class TestSectorScopePreserved:
         client.force_authenticate(user=user)
         res = client.get(URL + QS)
         assert res.status_code == 403, (
-            f"Coord sem cap E sem EquipeGerencia deve receber 403 (D8). "
-            f"Got {res.status_code}: {res.content!r}"
+            f"Coord sem cap E sem EquipeGerencia deve receber 403 (D8). " f"Got {res.status_code}: {res.content!r}"
         )
 
     def test_user_without_capability_with_invalid_gerencia_returns_403(self):
@@ -197,8 +196,7 @@ class TestFormadorAndOthersDenied:
         client.force_authenticate(user=user)
         res = client.get(URL + QS)
         assert res.status_code == 403, (
-            f"Formador NÃO deve acessar Grade Mensal (D8). "
-            f"Got {res.status_code}: {res.content!r}"
+            f"Formador NÃO deve acessar Grade Mensal (D8). " f"Got {res.status_code}: {res.content!r}"
         )
 
     def test_dat_returns_403(self):
@@ -211,8 +209,7 @@ class TestFormadorAndOthersDenied:
         client.force_authenticate(user=user)
         res = client.get(URL + QS)
         assert res.status_code == 403, (
-            f"DAT NÃO deve acessar Grade Mensal (D8). "
-            f"Got {res.status_code}: {res.content!r}"
+            f"DAT NÃO deve acessar Grade Mensal (D8). " f"Got {res.status_code}: {res.content!r}"
         )
 
     def test_diretoria_returns_403(self):
@@ -225,8 +222,7 @@ class TestFormadorAndOthersDenied:
         client.force_authenticate(user=user)
         res = client.get(URL + QS)
         assert res.status_code == 403, (
-            f"Diretoria NÃO deve acessar Grade Mensal (D8). "
-            f"Got {res.status_code}: {res.content!r}"
+            f"Diretoria NÃO deve acessar Grade Mensal (D8). " f"Got {res.status_code}: {res.content!r}"
         )
 
 
@@ -281,8 +277,7 @@ class TestCoordenadorScopedAccess:
         client.force_authenticate(user=user)
         res = client.get(URL + QS)
         assert res.status_code == 403, (
-            f"Coord sem EquipeGerencia deve receber 403 (D8). "
-            f"Got {res.status_code}: {res.content!r}"
+            f"Coord sem EquipeGerencia deve receber 403 (D8). " f"Got {res.status_code}: {res.content!r}"
         )
 
 

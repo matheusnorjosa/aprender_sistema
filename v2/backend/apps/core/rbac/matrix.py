@@ -135,13 +135,13 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
     # Scope discriminante coberto em test_availability_monthly_rbac.py.
     "grade_mensal": {
         SUPERUSER: ALLOW,
-        DAT: DENY,           # D8: sem motivo legítimo + sem cap + fixture sem EquipeGerencia
-        CONTROLE: ALLOW,     # view_all_availability via seed 0078 (D6)
-        DIRETORIA: DENY,     # D8: decisão executiva, não consulta operacional
-        GERENTE: ALLOW,      # view_all_availability via seed 0078 (D6)
+        DAT: DENY,  # D8: sem motivo legítimo + sem cap + fixture sem EquipeGerencia
+        CONTROLE: ALLOW,  # view_all_availability via seed 0078 (D6)
+        DIRETORIA: DENY,  # D8: decisão executiva, não consulta operacional
+        GERENTE: ALLOW,  # view_all_availability via seed 0078 (D6)
         COORDENADOR: ALLOW,  # scoped via EquipeGerencia (D6) — fixture cria vínculo
-        APOIO: ALLOW,        # scoped via EquipeGerencia (D6) — fixture cria vínculo
-        FORMADOR: DENY,      # D8: caso especial; só Meus Eventos + Bloqueios próprios
+        APOIO: ALLOW,  # scoped via EquipeGerencia (D6) — fixture cria vínculo
+        FORMADOR: DENY,  # D8: caso especial; só Meus Eventos + Bloqueios próprios
     },
     #
     # Deslocamentos: `[IsAuthenticated]` + queryset scope filter (Onda 1 C2).

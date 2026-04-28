@@ -186,10 +186,17 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
     """
     Permissão de scope por gerência para a grade mensal de disponibilidade.
 
-    Regras:
+    Regras (D8 — 2026-04-28):
     - Superusers: acesso a todos os setores.
-    - Sem gerencia_id: permite (comportamento SUPER — escopo "todos os setores").
-    - Com gerencia_id: verifica se usuário pertence à gerência via EquipeGerencia.
+    - Sem `gerencia_id` na query: exige pelo menos 1 vínculo de
+      `EquipeGerencia` ativa. Antes era "comportamento SUPER" (permitido a
+      todos autenticados), mas isso permitia que Formador/DAT/Diretoria
+      sem cap global e sem vínculo entrassem na Grade Mensal indevidamente.
+      A composition `CanViewAllAvailability | HasSectorAccess` em
+      `MonthlyAvailabilityView` ainda permite que Controle/Gerente passem
+      pela cap, sem precisar de vínculo de gerência.
+    - Com `gerencia_id`: verifica se usuário pertence à gerência específica
+      via `EquipeGerencia`.
 
     Block antigo de "grupo Controle" foi REMOVIDO em 2026-04-27 (Bug 1 fix
     pós RBAC Access Policy Realignment). Razão: o seed 0077 atribui a
@@ -197,8 +204,7 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
     intent matrix (memória `reference_rbac_intent_matrix.md`). O block por
     nome de grupo contradizia a capability declarada.
 
-    Para autorização ampla baseada em capability, prefira compor com
-    `CanViewAllAvailability` no `permission_classes`:
+    Composição idiomática:
 
         permission_classes = [IsAuthenticated, CanViewAllAvailability | HasSectorAccess]
 
@@ -223,9 +229,21 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
         if gerencia_id_raw is None:
             gerencia_id_raw = request.query_params.get("gerencia_id")
 
-        # Sem gerencia_id = comportamento SUPER (permitido para todos autenticados)
+        # Importação local para evitar circular import na inicialização do módulo.
+        from apps.core.models import EquipeGerencia
+
+        # D8 (2026-04-28): sem `gerencia_id` exige vínculo organizacional.
+        # Quem precisa de visão ampla (Controle/Gerente) bate antes em
+        # `CanViewAllAvailability` na composition; quem cai aqui sem vínculo
+        # é Formador/DAT/Diretoria/sem-vínculo → 403.
         if gerencia_id_raw is None:
-            return True
+            has_any_vinculo = EquipeGerencia.objects.filter(
+                usuario=request.user,
+                ativo=True,
+            ).exists()
+            if not has_any_vinculo:
+                self.message = "Você não tem acesso à grade mensal de disponibilidade."
+            return has_any_vinculo
 
         # Hardening: evitar ValueError em query params inválidos
         try:
@@ -235,8 +253,6 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
             return False
 
         # Com gerencia_id = verificar se usuário pertence à gerência
-        from apps.core.models import EquipeGerencia
-
         has_access = EquipeGerencia.objects.filter(
             usuario=request.user,
             gerencia_id=gerencia_id,

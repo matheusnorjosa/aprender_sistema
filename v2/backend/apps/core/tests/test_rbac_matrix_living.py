@@ -19,11 +19,13 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Usuario
+from apps.core.models import EquipeGerencia, Gerencia, Usuario
 from apps.core.rbac.matrix import (
     ACCESS_MATRIX,
     ACTOR_GROUPS,
     ACTORS,
+    APOIO,
+    COORDENADOR,
     RESOURCES,
     SUPERUSER,
     ResourceCase,
@@ -46,6 +48,12 @@ def _make_user_for_actor(actor: str) -> Usuario:
     """
     Cria user com grupos correspondentes ao ator. Superuser é caso especial.
     Cada test gera CPF/username único via atomic counter.
+
+    D8 (2026-04-28): Coordenador e Apoio de Coordenação ganham EquipeGerencia
+    ativa pré-criada. Sem o vínculo, eles cairiam em 403 pelo HasSectorAccess
+    endurecido (sem cap global E sem gerência → DENY). Outros atores não
+    precisam — Controle/Gerente passam pela cap; DAT/Diretoria/Formador são
+    DENY por design.
     """
     if actor == SUPERUSER:
         return Usuario.objects.create_superuser(
@@ -63,6 +71,44 @@ def _make_user_for_actor(actor: str) -> Usuario:
     for gname in ACTOR_GROUPS[actor]:
         group, _ = Group.objects.get_or_create(name=gname)
         user.groups.add(group)
+
+    # D8: Coord/Apoio precisam de vínculo organizacional para passar HasSectorAccess.
+    if actor in (COORDENADOR, APOIO):
+        gerencia, _ = Gerencia.objects.get_or_create(
+            nome=f"GERENCIA MATRIX {_USER_COUNTER['i']:06d}",
+            defaults={"nome_setor": "Vidas"},
+        )
+        if actor == COORDENADOR:
+            # Coordenador: papel direto, sem supervisor.
+            EquipeGerencia.objects.create(
+                gerencia=gerencia,
+                usuario=user,
+                papel="COORDENADOR",
+                ativo=True,
+            )
+        else:
+            # Apoio: check constraint `apoio_requires_supervisor` exige
+            # `coordenador_supervisor` (FK Usuario) não-nulo. Criamos um Coord
+            # auxiliar para servir de supervisor.
+            supervisor_user = Usuario.objects.create_user(
+                username=f"matrix_supervisor_{_USER_COUNTER['i']:06d}",
+                email=f"matrix_supervisor_{_USER_COUNTER['i']:06d}@example.com",
+                password="testpass123",
+                cpf=_next_cpf(),
+            )
+            EquipeGerencia.objects.create(
+                gerencia=gerencia,
+                usuario=supervisor_user,
+                papel="COORDENADOR",
+                ativo=True,
+            )
+            EquipeGerencia.objects.create(
+                gerencia=gerencia,
+                usuario=user,
+                papel="APOIO",
+                ativo=True,
+                coordenador_supervisor=supervisor_user,
+            )
     return user
 
 

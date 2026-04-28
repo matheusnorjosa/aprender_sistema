@@ -114,8 +114,8 @@ describe('computePermissions', () => {
     const perms = computePermissions(makeUser({ setores: ['Controle'] }))
     expect(perms.inControle).toBe(true)
     expect(perms.canControle).toBe(true)
-    // Controle cannot access Disponibilidade
-    expect(perms.canDisponibilidade).toBe(false)
+    // D8 (2026-04-28): Controle agora ACESSA Grade Mensal via view_all_availability (D6).
+    expect(perms.canDisponibilidade).toBe(true)
   })
 
   test('Gerente role grants canAcoesInternas', () => {
@@ -222,9 +222,69 @@ describe('computePermissions', () => {
     expect(perms.isFormador).toBe(true)
   })
 
-  test('canDisponibilidade is true for non-Controle users', () => {
-    const perms = computePermissions(makeUser({ setores: ['Vidas'] }))
-    expect(perms.canDisponibilidade).toBe(true)
+  // ============================================================================
+  // canDisponibilidade — alinhado com decisão D8 (2026-04-28)
+  //
+  // Acesso à Grade Mensal:
+  //   - Superuser, Controle, Gerente, Coordenador, Apoio → ALLOW
+  //   - DAT, Diretoria, Formador → DENY
+  //
+  // Antes de D8, a flag era `!inControle` (lógica invertida) — qualquer não-Controle
+  // entrava, incluindo Formador. Bug reportado em 2026-04-28: Formador via item
+  // "Grade Mensal" no menu sem ter acesso real. Lógica reescrita como positiva.
+  // Backend reforça via composition `CanViewAllAvailability | HasSectorAccess`.
+  // ============================================================================
+
+  describe('canDisponibilidade (D8)', () => {
+    test('Superuser → ALLOW', () => {
+      const perms = computePermissions(makeUser({ is_superuser: true }))
+      expect(perms.canDisponibilidade).toBe(true)
+    })
+
+    test('Controle → ALLOW (view_all_availability via D6)', () => {
+      const perms = computePermissions(makeUser({ setores: ['Controle'] }))
+      expect(perms.canDisponibilidade).toBe(true)
+    })
+
+    test('Gerente → ALLOW (view_all_availability via D6)', () => {
+      const perms = computePermissions(makeUser({ funcoes: ['Gerente'] }))
+      expect(perms.canDisponibilidade).toBe(true)
+    })
+
+    test('Coordenador → ALLOW (scoped via EquipeGerencia)', () => {
+      const perms = computePermissions(makeUser({ funcoes: ['Coordenador'], setores: ['Vidas'] }))
+      expect(perms.canDisponibilidade).toBe(true)
+    })
+
+    test('Apoio de Coordenação → ALLOW (scoped via EquipeGerencia)', () => {
+      const perms = computePermissions(makeUser({ funcoes: ['Apoio de Coordenação'], setores: ['Vidas'] }))
+      expect(perms.canDisponibilidade).toBe(true)
+    })
+
+    test('Formador → DENY (caso especial: só Meus Eventos + Bloqueios próprios)', () => {
+      const perms = computePermissions(makeUser({ funcoes: ['Formador'] }))
+      expect(perms.canDisponibilidade).toBe(false)
+    })
+
+    test('DAT → DENY (não tem capability nem precisa consultar grade)', () => {
+      const perms = computePermissions(makeUser({ setores: ['DAT'] }))
+      expect(perms.canDisponibilidade).toBe(false)
+    })
+
+    test('Diretoria → DENY (decisão executiva, não consulta operacional)', () => {
+      const perms = computePermissions(makeUser({ setores: ['Diretoria'] }))
+      expect(perms.canDisponibilidade).toBe(false)
+    })
+
+    test('Usuário sem setor/função → DENY', () => {
+      const perms = computePermissions(makeUser())
+      expect(perms.canDisponibilidade).toBe(false)
+    })
+
+    test('Usuário só com setor "Vidas" (sem função) → DENY', () => {
+      const perms = computePermissions(makeUser({ setores: ['Vidas'] }))
+      expect(perms.canDisponibilidade).toBe(false)
+    })
   })
 
   test('regular user with no roles/sectors has minimal permissions', () => {
@@ -236,8 +296,8 @@ describe('computePermissions', () => {
     expect(perms.canDAT).toBe(false)
     expect(perms.canAcoesInternas).toBe(false)
     expect(perms.canDashboardsMenu).toBe(false)
-    // Non-Controle user can access Disponibilidade
-    expect(perms.canDisponibilidade).toBe(true)
+    // D8 (2026-04-28): user sem nada não acessa Grade Mensal.
+    expect(perms.canDisponibilidade).toBe(false)
   })
 
   test('multiple sectors combine permissions', () => {

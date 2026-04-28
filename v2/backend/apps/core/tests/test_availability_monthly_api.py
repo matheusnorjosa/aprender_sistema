@@ -34,8 +34,15 @@ def api_client():
 
 @pytest.fixture
 def user_auth():
-    """Usuário autenticado para requisições."""
-    user = Usuario.objects.create_user(
+    """
+    Usuário autenticado privilegiado (superuser) para requisições.
+
+    Estes tests focam em cache e validação de parâmetros — não em RBAC.
+    Pós D8 (issue #1287, 2026-04-28), `MonthlyAvailabilityView` exige
+    `view_all_availability` OU `EquipeGerencia` ativa quando `gerencia_id`
+    é omitido. Superuser bypassa, mantendo o foco do test.
+    """
+    user = Usuario.objects.create_superuser(
         username="api_user",
         email="api@example.com",
         password="test123",

@@ -106,7 +106,19 @@ function computePermissionsInternal(user: CurrentUser): Permissions {
   const canMapaBrasil = user.is_superuser || inDiretoria || inDAT;
   const canDashboardsMenu =
     canDashboardOverview || canDashboardCompras || canDashboardEquipe || canDashboardGcal || canMapaBrasil;
-  const canDisponibilidade = user.is_superuser || !inControle;
+  // canDisponibilidade — decisão D8 (2026-04-28).
+  //
+  // Acesso à Grade Mensal:
+  //   ALLOW: Superuser, Controle, Gerente, Coordenador, Apoio (scoped via EquipeGerencia)
+  //   DENY:  DAT, Diretoria, Formador, sem vínculo organizacional
+  //
+  // Antes era `!inControle` (lógica invertida) — qualquer não-Controle entrava,
+  // incluindo Formador, que viola RD-02/RD-03 (Formador acessa apenas Meus
+  // Eventos + Bloqueios próprios). Reescrita como lista positiva alinhada com
+  // o backend: Controle/Gerente passam pela cap `view_all_availability`,
+  // Coord/Apoio pelo HasSectorAccess (vínculo de gerência validado em runtime).
+  const canDisponibilidade =
+    user.is_superuser || inControle || isGerente || isCoordenador;
   // Epic 3.3: derived flag unificada para "vê todos os setores/gerências".
   // Substitui hardcodes is_superuser || is_superintendencia || groups.includes('Superintendência')
   // em FiltersBar, PreAgendaPage, Solicitacoes, ApprovalsPage.

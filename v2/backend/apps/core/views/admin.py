@@ -48,6 +48,7 @@ from apps.core.serializers import (
     ProjetoSerializer,
     UsuarioAdminSerializer,
 )
+from apps.core.services.options_cache import invalidate_municipios_options_cache
 from apps.core.services.rbac_service import get_assignable_group_names
 
 
@@ -72,6 +73,18 @@ class MunicipioViewSet(viewsets.ModelViewSet):
     search_fields = ["nome", "ibge_code"]
     ordering_fields = ["nome", "uf", "id"]
     ordering = ["nome"]
+
+    def perform_create(self, serializer: MunicipioSerializer) -> None:
+        serializer.save()
+        transaction.on_commit(invalidate_municipios_options_cache)
+
+    def perform_update(self, serializer: MunicipioSerializer) -> None:
+        serializer.save()
+        transaction.on_commit(invalidate_municipios_options_cache)
+
+    def perform_destroy(self, instance: Municipio) -> None:
+        instance.delete()
+        transaction.on_commit(invalidate_municipios_options_cache)
 
     @action(detail=False, methods=["get"], url_path="autocomplete")
     def autocomplete(self, request: Request) -> Response:

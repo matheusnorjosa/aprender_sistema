@@ -170,19 +170,21 @@ class TestSectorScopePreserved:
 
 
 # ============================================================================
-# D8 (2026-04-28) — Formador, DAT e Diretoria não acessam Grade Mensal
+# D8 (2026-04-28) — Formador e Diretoria não acessam Grade Mensal
+# D9 (2026-04-28) — DAT recebe view_all_availability global (transversal admin)
 # ============================================================================
 
 
 class TestFormadorAndOthersDenied:
     """
-    Decisão D8: Formador, DAT e Diretoria não devem acessar Grade Mensal.
+    Decisão D8: Formador e Diretoria não acessam Grade Mensal.
+    Decisão D9: DAT recebe view_all_availability global (ator transversal admin).
 
     - Formador: caso especial RD-02/RD-03; acessa apenas Meus Eventos + Bloqueios próprios
-    - DAT: não tem motivo legítimo para consultar grade
     - Diretoria: decisão executiva, não consulta operacional
+    - DAT: ator transversal admin com motivo legítimo (suporte/validação cross-setor)
 
-    Regra do backend após D8: sem `view_all_availability` E sem EquipeGerencia
+    Regra do backend após D8/D9: sem `view_all_availability` E sem EquipeGerencia
     ativa → 403, mesmo sem `gerencia_id` na query.
     """
 
@@ -199,19 +201,6 @@ class TestFormadorAndOthersDenied:
             f"Formador NÃO deve acessar Grade Mensal (D8). " f"Got {res.status_code}: {res.content!r}"
         )
 
-    def test_dat_returns_403(self):
-        user = _make_user_with_groups_and_caps(
-            "dat_user",
-            group_names=["DAT"],
-            capability_codenames=[],
-        )
-        client = APIClient()
-        client.force_authenticate(user=user)
-        res = client.get(URL + QS)
-        assert res.status_code == 403, (
-            f"DAT NÃO deve acessar Grade Mensal (D8). " f"Got {res.status_code}: {res.content!r}"
-        )
-
     def test_diretoria_returns_403(self):
         user = _make_user_with_groups_and_caps(
             "diretoria_user",
@@ -223,6 +212,83 @@ class TestFormadorAndOthersDenied:
         res = client.get(URL + QS)
         assert res.status_code == 403, (
             f"Diretoria NÃO deve acessar Grade Mensal (D8). " f"Got {res.status_code}: {res.content!r}"
+        )
+
+
+class TestDATGlobalAccess:
+    """
+    D9 (2026-04-28): DAT é ator transversal admin e recebe `view_all_availability`
+    global. Sem precisar de EquipeGerencia, acessa Grade Mensal completa para
+    suporte/validação cross-setor.
+    """
+
+    def test_dat_returns_200_via_view_all_availability(self):
+        """DAT (D9) recebe `view_all_availability` global via seed/migration 0080.
+
+        Test atribui a cap explicitamente (test isolation: migrations data-only
+        não rodam reatribuição em ambiente de teste). O seed declarativo é
+        validado em test separado abaixo.
+        """
+        user = _make_user_with_groups_and_caps(
+            "dat_global_user",
+            group_names=["DAT"],
+            capability_codenames=["view_all_availability"],
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+        res = client.get(URL + QS)
+        assert res.status_code == 200, (
+            f"DAT com view_all_availability deve acessar Grade Mensal global (D9). "
+            f"Got {res.status_code}: {res.content!r}"
+        )
+
+
+class TestGerenteScopedAccess:
+    """
+    D9 (2026-04-28): Gerente perde `view_all_availability` global e cai em
+    scope via EquipeGerencia (igual Coord/Apoio).
+
+    Razão: Gerente pedagógico (Vidas, Fluir, ACerta, Brincando, Sou da Paz,
+    Gestão Escolar) deve ver apenas a própria gerência. Gerente da
+    Superintendência também é scoped (vê só Sup, não global). Diferenciação
+    semântica entre subtipos de Gerente fica em PR 8 (Matriz Viva escopo).
+    """
+
+    def test_gerente_without_equipe_gerencia_returns_403(self):
+        user = _make_user_with_groups_and_caps(
+            "gerente_no_gerencia",
+            group_names=["Gerente"],
+            capability_codenames=[],
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+        res = client.get(URL + QS)
+        assert res.status_code == 403, (
+            f"Gerente sem EquipeGerencia deve receber 403 (D9). " f"Got {res.status_code}: {res.content!r}"
+        )
+
+    def test_gerente_with_equipe_gerencia_returns_200(self):
+        user = _make_user_with_groups_and_caps(
+            "gerente_with_gerencia",
+            group_names=["Gerente"],
+            capability_codenames=[],
+        )
+        gerencia = Gerencia.objects.create(
+            nome="GERENCIA D9 GERENTE TEST",
+            nome_setor="Vidas",
+        )
+        EquipeGerencia.objects.create(
+            gerencia=gerencia,
+            usuario=user,
+            papel="GERENTE",
+            ativo=True,
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+        res = client.get(URL + QS)
+        assert res.status_code == 200, (
+            f"Gerente com EquipeGerencia ativa deve acessar Grade Mensal scoped (D9). "
+            f"Got {res.status_code}: {res.content!r}"
         )
 
 
@@ -284,6 +350,32 @@ class TestCoordenadorScopedAccess:
 # ============================================================================
 # Sanity (anonymous, superuser)
 # ============================================================================
+
+
+class TestSeedDeclaresDatNotGerente:
+    """
+    D9 (2026-04-28): seed canônico em `functional_permissions_seed.py` deve
+    declarar `view_all_availability` para Controle + DAT (não mais Gerente).
+    Migration 0080 aplica a redistribuição em prod.
+
+    Testar o seed garante que mesmo que migrations não rodem reatribuição em
+    ambiente isolado, a fonte canônica do código está correta.
+    """
+
+    def test_seed_view_all_availability_groups(self):
+        from apps.core.services.functional_permissions_seed import FUNCTIONAL_PERMISSIONS_SEED
+
+        item = next(
+            (i for i in FUNCTIONAL_PERMISSIONS_SEED if i.codename == "view_all_availability"),
+            None,
+        )
+        assert item is not None, "view_all_availability deve estar no seed"
+        groups = set(item.group_names)
+        assert "DAT" in groups, f"D9: DAT deve estar em view_all_availability. Got: {groups}"
+        assert "Controle" in groups, f"Controle deve estar em view_all_availability. Got: {groups}"
+        assert "Gerente" not in groups, (
+            f"D9: Gerente NÃO deve estar em view_all_availability (cai em scope via " f"EquipeGerencia). Got: {groups}"
+        )
 
 
 class TestSanity:

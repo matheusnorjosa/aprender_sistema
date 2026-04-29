@@ -1,5 +1,5 @@
 /**
- * Tests de visibilidade da Grade Mensal (D8 — 2026-04-28).
+ * Tests de visibilidade da Grade Mensal (D8 + D9 — 2026-04-28).
  *
  * Valida o predicate exato usado em `AppSidebar.tsx` e `AppRoutes.tsx`:
  *
@@ -9,13 +9,14 @@
  * `feedback_stabilization_pos_programa_pattern.md` — modal/router antd
  * gigante mockear é flaky; testar a regra pura do predicate é suficiente).
  *
- * Regra D8:
- *   ALLOW: Superuser, Controle, Gerente, Coordenador, Apoio
- *   DENY:  DAT, Diretoria, Formador, user sem nada
+ * Regra D8 + D9:
+ *   ALLOW global  (cap view_all_availability): Superuser, Controle, DAT
+ *   ALLOW scoped (canDisponibilidade + EquipeGerencia em runtime): Gerente, Coordenador, Apoio
+ *   DENY:  Diretoria, Formador, user sem nada
  *
- * Quem é ALLOW pelo `view_all_availability` (Controle/Gerente) basta a policy.
- * Quem é ALLOW pelo `canDisponibilidade` (Coord/Apoio) entra pelo segundo termo
- * do OR e o backend valida scope via `EquipeGerencia` em runtime.
+ * Quem é ALLOW pelo `view_all_availability` (Controle/DAT) basta a policy.
+ * Quem é ALLOW pelo `canDisponibilidade` (Gerente/Coord/Apoio) entra pelo segundo
+ * termo do OR e o backend valida scope via `EquipeGerencia` em runtime.
  */
 
 import { describe, test, expect } from 'vitest';
@@ -51,7 +52,7 @@ function shouldShowGradeMensal(user: ReturnType<typeof makeUser>, policies: read
   return access.can('view_all_availability') || perms.canDisponibilidade;
 }
 
-describe('Grade Mensal visibility (D8 — 2026-04-28)', () => {
+describe('Grade Mensal visibility (D8 + D9 — 2026-04-28)', () => {
   describe('ALLOW', () => {
     test('Superuser', () => {
       // Superuser bypassa policies no backend; useCanAccess recebe lista vazia
@@ -60,16 +61,26 @@ describe('Grade Mensal visibility (D8 — 2026-04-28)', () => {
     });
 
     test('Controle (via view_all_availability)', () => {
-      // Backend atribui `view_all_availability` ao grupo Controle no seed 0078.
+      // Backend atribui `view_all_availability` ao grupo Controle no seed 0080.
       // Frontend recebe a policy via GET /api/me/policies/.
       expect(
         shouldShowGradeMensal(makeUser({ setores: ['Controle'] }), ['view_all_availability']),
       ).toBe(true);
     });
 
-    test('Gerente (via view_all_availability)', () => {
+    test('DAT (D9 — via view_all_availability, ator transversal admin)', () => {
+      // D9 (PR 2 RBAC hardening): DAT recebe `view_all_availability` no seed 0080.
+      // Razão: papel transversal admin com motivo legítimo (suporte/validação).
       expect(
-        shouldShowGradeMensal(makeUser({ funcoes: ['Gerente'] }), ['view_all_availability']),
+        shouldShowGradeMensal(makeUser({ setores: ['DAT'] }), ['view_all_availability']),
+      ).toBe(true);
+    });
+
+    test('Gerente (D9 — scoped via EquipeGerencia em runtime; sem cap global)', () => {
+      // D9: Gerente perdeu `view_all_availability` global e cai em scope.
+      // Frontend mostra menu/permite rota; backend valida vínculo de gerência.
+      expect(
+        shouldShowGradeMensal(makeUser({ funcoes: ['Gerente'] }), []),
       ).toBe(true);
     });
 
@@ -91,10 +102,6 @@ describe('Grade Mensal visibility (D8 — 2026-04-28)', () => {
   describe('DENY', () => {
     test('Formador (caso especial — só Meus Eventos + Bloqueios)', () => {
       expect(shouldShowGradeMensal(makeUser({ funcoes: ['Formador'] }), [])).toBe(false);
-    });
-
-    test('DAT (não consulta disponibilidade — D8)', () => {
-      expect(shouldShowGradeMensal(makeUser({ setores: ['DAT'] }), [])).toBe(false);
     });
 
     test('Diretoria (decisão executiva, não consulta operacional — D8)', () => {

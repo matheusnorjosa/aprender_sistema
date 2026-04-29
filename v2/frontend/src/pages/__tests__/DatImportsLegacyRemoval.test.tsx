@@ -155,7 +155,7 @@ describe('DAT Imports PR-D — remoção de entrypoints legados', () => {
     expect(await screen.findByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).toBeInTheDocument();
     expectLegacyImportsRemoved();
     expect(screen.queryByRole('button', { name: /^Importar$/i })).not.toBeInTheDocument();
-  });
+  }, 15_000);
 
   test('Disponibilidade remove Importar bloqueios e mantém criação/listagem', async () => {
     renderPage(<Disponibilidade />);

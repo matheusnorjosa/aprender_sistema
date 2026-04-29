@@ -28,7 +28,10 @@ describe('useGoogleIntegration', () => {
 
     const { result } = renderHook(() => useGoogleIntegration());
 
-    await waitFor(() => { expect(result.current.loading).toBe(false); });
+    await waitFor(() => {
+      expect(fetchAPIMock).toHaveBeenCalledWith('/integrations/google/status/');
+      expect(result.current.loading).toBe(false);
+    });
     expect(result.current.status.connected).toBe(false);
   });
 
@@ -55,7 +58,11 @@ describe('useGoogleIntegration', () => {
 
     const { result } = renderHook(() => useGoogleIntegration());
 
-    await waitFor(() => { expect(result.current.status.connected).toBe(false); });
+    await waitFor(() => {
+      expect(fetchAPIMock).toHaveBeenCalledWith('/integrations/google/status/');
+      expect(result.current.loading).toBe(false);
+    });
+    expect(result.current.status.connected).toBe(false);
     expect(result.current.loading).toBe(false);
   });
 

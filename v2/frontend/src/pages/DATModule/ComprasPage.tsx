@@ -28,7 +28,6 @@ import {
   Row,
   Col,
   Progress,
-  Radio,
 } from 'antd';
 import {
   ReloadOutlined,
@@ -40,7 +39,6 @@ import {
   ClearOutlined,
   ShoppingCartOutlined,
 } from '@ant-design/icons';
-import type { RadioChangeEvent } from 'antd/es/radio';
 import {
   listCompras,
   createCompra,
@@ -50,17 +48,9 @@ import {
   getProjetosOptions,
   getProdutosOptions,
 } from '../../api/datModule';
-import {
-  importCompras,
-  importAcoes,
-  importEventos,
-  importProdutos,
-  type ImportResult as OpsImportResult,
-} from '../../api/ops';
 import type { PaginatedResponse } from '../../types';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
-import ImportUploader from '../../components/ImportUploader';
-import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
+import DatImportsCentralizedBanner from '../../components/DatImportsCentralizedBanner';
 import dayjs from 'dayjs';
 import { UF_OPTIONS } from '../../constants';
 
@@ -123,29 +113,6 @@ interface ProdutoOption {
   nome: string;
 }
 
-type ViewMode = 'lista' | 'importar';
-
-function toValidationResult(result: OpsImportResult): ValidationResult {
-  return {
-    stats: {
-      created: result.created,
-      updated: result.updated,
-      unchanged: result.skipped,
-    },
-    errors: result.errors.map((e) => `Linha ${e.row}: ${e.message}`),
-  };
-}
-
-function toApplyResult(result: OpsImportResult): ApplyResult {
-  return {
-    stats: {
-      created: result.created,
-      updated: result.updated,
-      unchanged: result.skipped,
-    },
-  };
-}
-
 // Status options
 const STATUS_OPTIONS = [
   { label: 'Disponível', value: 'disponivel', color: 'green' },
@@ -190,8 +157,6 @@ const buildComprasParams = (f: ComprasFilters): TableFilterParams => ({
 });
 
 export default function ComprasPage(): JSX.Element {
-  const [viewMode, setViewMode] = useState<ViewMode>('lista');
-
   // Options for dropdowns
   const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
   const [projetos, setProjetos] = useState<ProjetoOption[]>([]);
@@ -481,34 +446,20 @@ export default function ComprasPage(): JSX.Element {
               Gestão de Compras/Materiais
             </Title>
             <Text type="secondary">
-              {viewMode === 'lista'
-                ? 'Controle de estoque, distribuição e utilização de materiais didáticos'
-                : 'Importe dados de compras e bases relacionadas (ações, eventos e produtos).'}
+              Controle de estoque, distribuição e utilização de materiais didáticos
             </Text>
           </div>
           <Space wrap>
-            <Radio.Group
-              value={viewMode}
-              onChange={(event: RadioChangeEvent) => setViewMode(event.target.value)}
-              buttonStyle="solid"
-            >
-              <Radio.Button value="lista">Lista</Radio.Button>
-              <Radio.Button value="importar">Importar</Radio.Button>
-            </Radio.Group>
-            {viewMode === 'lista' && (
-              <>
-                <Button icon={<DownloadOutlined />}>Exportar</Button>
-                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                  Nova Compra
-                </Button>
-              </>
-            )}
+            <Button icon={<DownloadOutlined />}>Exportar</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              Nova Compra
+            </Button>
           </Space>
         </div>
       </header>
 
-      {viewMode === 'lista' ? (
-        <>
+      <DatImportsCentralizedBanner className="mb-4" />
+
       {/* Filters Card */}
       <nav aria-label="Filtros de busca">
       <Card className="mb-4" bodyStyle={{ paddingBottom: 12 }}>
@@ -733,42 +684,6 @@ export default function ComprasPage(): JSX.Element {
         </Space>
       </Card>
       </aside>
-        </>
-      ) : (
-        <section aria-label="Importação de dados de compras" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <ImportUploader
-            label="Importar COMPRAS"
-            description="CSV/XLSX com colunas: codigo, produto, quant, municipio, uf, data, uso"
-            onDryRun={async (file: File) => toValidationResult(await importCompras(file, true))}
-            onApply={async (file: File) => {
-              const result = await importCompras(file, false);
-              await fetchData(1);
-              return toApplyResult(result);
-            }}
-          />
-
-          <ImportUploader
-            label="Importar AÇÕES"
-            description="CSV/XLSX de Ações de Controle (Município, Projeto, Coordenador, Datas, Observação)"
-            onDryRun={async (file: File) => toValidationResult(await importAcoes(file, true))}
-            onApply={async (file: File) => toApplyResult(await importAcoes(file, false))}
-          />
-
-          <ImportUploader
-            label="Importar EVENTOS"
-            description="CSV/XLSX: municipio, projeto, tipo_evento, data, hora_inicio, hora_fim, coordenador, formador1-5"
-            onDryRun={async (file: File) => toValidationResult(await importEventos(file, true))}
-            onApply={async (file: File) => toApplyResult(await importEventos(file, false))}
-          />
-
-          <ImportUploader
-            label="Importar PRODUTOS"
-            description="CSV/XLSX: codigo, nome, projeto (obrigatórios), descricao (opcional)"
-            onDryRun={async (file: File) => toValidationResult(await importProdutos(file, true))}
-            onApply={async (file: File) => toApplyResult(await importProdutos(file, false))}
-          />
-        </section>
-      )}
 
       {/* Create/Edit Modal */}
       <Modal

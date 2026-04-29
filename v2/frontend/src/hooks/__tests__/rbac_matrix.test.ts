@@ -44,7 +44,7 @@ const ACTORS: ActorSnapshot[] = [
     // Superuser recebe TODAS as PUBLIC_POLICY_KEYS via /api/me/policies/.
     policies: [
       'access_audit_logs',
-      'access_solicitacao_approvals',
+      'access_solicitation_approvals',
       'import_availability_blocks',
       'import_compras',
       'import_generic_spreadsheet',
@@ -142,10 +142,10 @@ const ACTORS: ActorSnapshot[] = [
   {
     actor: 'Gerente da Superintendência',
     // PR 3 hardening RBAC (2026-04-29): composite Setor Superintendência +
-    // Função Gerente. Recebe a policy nova `access_solicitacao_approvals`.
+    // Função Gerente. Recebe a policy nova `access_solicitation_approvals`.
     policies: [
       'access_audit_logs',
-      'access_solicitacao_approvals',
+      'access_solicitation_approvals',
       'manage_solicitacao_status',
       'use_gcal',
       'view_all_availability',
@@ -158,7 +158,7 @@ const ACTORS: ActorSnapshot[] = [
       canDashboardCompras: false,
     },
     expected: {
-      canAccessApprovals: true, // policy access_solicitacao_approvals presente
+      canAccessApprovals: true, // policy access_solicitation_approvals presente
       canAccessBlocks: true, // view_all_availability presente
       canCreateSolicitation: false,
       canViewComprasDashboard: false,

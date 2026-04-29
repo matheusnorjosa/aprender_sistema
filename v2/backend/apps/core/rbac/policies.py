@@ -72,7 +72,7 @@ from apps.core.rbac.helpers import user_has_any_perm
 # como sentinela; a lógica vive em helpers dedicados despachados por
 # `user_has_policy`. Tests que assumem "frozenset não-vazio" devem
 # excluir essas keys.
-COMPOSITE_POLICY_KEYS: Final[frozenset[str]] = frozenset({"access_solicitacao_approvals"})
+COMPOSITE_POLICY_KEYS: Final[frozenset[str]] = frozenset({"access_solicitation_approvals"})
 
 
 ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
@@ -150,7 +150,7 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     # exige composite Setor × Função (Gerente da Superintendência OU
     # Assistente Administrativo do Controle). Frozenset vazio é sentinela —
     # `user_has_policy` trata a key via `_user_has_solicitation_approvals`.
-    "access_solicitacao_approvals": frozenset(),
+    "access_solicitation_approvals": frozenset(),
 }
 
 
@@ -274,7 +274,7 @@ class CanManagePurchasesAndMaterials(_PolicyPermission):
     policy = "manage_purchases_and_materials"
 
 
-class CanAccessSolicitacaoApprovals(_PolicyPermission):
+class CanAccessSolicitationApprovals(_PolicyPermission):
     """
     Policy composta de aprovação de solicitações (PR 3, 2026-04-29).
 
@@ -289,7 +289,7 @@ class CanAccessSolicitacaoApprovals(_PolicyPermission):
     consumido pelos 4 endpoints de aprovação.
     """
 
-    policy = "access_solicitacao_approvals"
+    policy = "access_solicitation_approvals"
     message = "Apenas Gerentes da Superintendência ou Assistente Administrativo do Controle podem aprovar solicitações."
 
     def has_permission(self, request: Request, view: APIView) -> bool:
@@ -322,7 +322,7 @@ class CanAccessSolicitacaoApprovals(_PolicyPermission):
 PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
     {
         "access_audit_logs",
-        "access_solicitacao_approvals",
+        "access_solicitation_approvals",
         "manage_solicitacao_status",
         "view_compras_dashboard",
         "view_compras_pendencias",
@@ -353,8 +353,8 @@ def _user_has_solicitation_approvals(user: AbstractBaseUser | AnonymousUser | No
     - Assistente Administrativo do Controle (Setor "Controle" + Função
       "Assistente Administrativo")
 
-    SSOT chamado tanto pela Policy class `CanAccessSolicitacaoApprovals`
-    quanto por `user_has_policy("access_solicitacao_approvals")`. Mudar
+    SSOT chamado tanto pela Policy class `CanAccessSolicitationApprovals`
+    quanto por `user_has_policy("access_solicitation_approvals")`. Mudar
     a regra = mudar aqui e atualizar tests da matriz.
     """
     if not user or not getattr(user, "is_authenticated", False):
@@ -397,7 +397,7 @@ def user_has_policy(user: AbstractBaseUser | AnonymousUser | None, key: str) -> 
     if getattr(user, "is_superuser", False):
         return True
     # Composite policies — semântica não cabe em "OR de capabilities".
-    if key == "access_solicitacao_approvals":
+    if key == "access_solicitation_approvals":
         return _user_has_solicitation_approvals(user)
     codenames = ACCESS_POLICIES.get(key)
     if not codenames:
@@ -426,7 +426,7 @@ __all__ = [
     "user_has_policy",
     "resolve_public_policies",
     "CanAccessAuditLogs",
-    "CanAccessSolicitacaoApprovals",
+    "CanAccessSolicitationApprovals",
     "CanManageSolicitacaoStatus",
     "CanViewComprasDashboard",
     "CanViewComprasPendencias",

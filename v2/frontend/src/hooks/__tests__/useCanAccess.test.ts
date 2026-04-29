@@ -47,13 +47,13 @@ describe('computeAccess.canAccessApprovals — semantic translation layer', () =
     expect(access.canAccessApprovals).toBe(true);
   });
 
-  test('public policy access_solicitacao_approvals present → true (PR 3 hardening RBAC)', () => {
-    const access = computeAccess(['access_solicitacao_approvals'], {});
+  test('public policy access_solicitation_approvals present → true (PR 3 hardening RBAC)', () => {
+    const access = computeAccess(['access_solicitation_approvals'], {});
     expect(access.canAccessApprovals).toBe(true);
   });
 
-  test('public policy access_solicitacao_approvals overrides legacy=false', () => {
-    const access = computeAccess(['access_solicitacao_approvals'], { canApproveSuper: false });
+  test('public policy access_solicitation_approvals overrides legacy=false', () => {
+    const access = computeAccess(['access_solicitation_approvals'], { canApproveSuper: false });
     expect(access.canAccessApprovals).toBe(true);
   });
 

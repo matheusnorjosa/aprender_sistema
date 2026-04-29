@@ -101,7 +101,7 @@ class CurrentUserView(APIView):
 
         # Pode aprovar/reprovar solicitações?
         # PR 3 hardening RBAC (2026-04-29): regra alinhada à policy nova
-        # `access_solicitacao_approvals`. Frontend deve consumir a policy
+        # `access_solicitation_approvals`. Frontend deve consumir a policy
         # via `/api/me/policies/`; este flag fica como **legado** durante a
         # transição (sem ser mais fonte de verdade). DAT removido.
         is_gerente_super = ("Superintendência" in setores) and ("Gerente" in funcoes)

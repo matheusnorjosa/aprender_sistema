@@ -50,7 +50,7 @@ pytestmark = pytest.mark.django_db
 
 EXPECTED_PUBLIC_POLICY_KEYS_SORTED: list[str] = [
     "access_audit_logs",
-    "access_solicitacao_approvals",
+    "access_solicitation_approvals",
     "import_availability_blocks",
     "import_compras",
     "import_generic_spreadsheet",

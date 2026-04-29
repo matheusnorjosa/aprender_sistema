@@ -149,7 +149,7 @@ export default function ApprovalsPage(): JSX.Element {
   }, [loadData]);
 
   // PA-06 + PR 3 hardening RBAC (2026-04-29): preferir policy pública
-  // `access_solicitacao_approvals` (Gerente Sup OU Asst Admin Controle).
+  // `access_solicitation_approvals` (Gerente Sup OU Asst Admin Controle).
   // Mantém `can_approve_super` como fallback compat durante a transição.
   useEffect(() => {
     const loadAccess = async (): Promise<void> => {

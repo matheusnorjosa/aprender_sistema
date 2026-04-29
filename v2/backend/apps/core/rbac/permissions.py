@@ -161,7 +161,7 @@ class IsAssistenteAdministrativoControle(permissions.BasePermission):  # type: i
     - Função Django "Assistente Administrativo"
 
     Combinada via OR com `IsGerenteSuperintendencia` em
-    `CanAccessSolicitacaoApprovals` para autorizar aprovação/reprovação de
+    `CanAccessSolicitationApprovals` para autorizar aprovação/reprovação de
     solicitações (individual e lote).
 
     Por design não usa `HasFunctionalPermission` como base: a regra é

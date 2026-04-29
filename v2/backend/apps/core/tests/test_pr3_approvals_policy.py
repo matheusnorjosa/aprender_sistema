@@ -1,6 +1,6 @@
 """
 PR 3 hardening RBAC (2026-04-29): matriz consolidada para a Policy
-`access_solicitacao_approvals` (composite Setor × Função).
+`access_solicitation_approvals` (composite Setor × Função).
 
 Endpoints cobertos:
 - POST /api/solicitacoes/{id}/approve/
@@ -257,7 +257,7 @@ def test_anonymous_blocked_on_approve(pendente_solicitacao):
 
 
 # =============================================================================
-# /api/me/policies — exposição da policy access_solicitacao_approvals
+# /api/me/policies — exposição da policy access_solicitation_approvals
 # =============================================================================
 
 
@@ -275,7 +275,7 @@ PUBLIC_POLICY_PERSONAS_HAS_NOT: list[tuple[str, tuple[str, ...]]] = [
 
 
 @pytest.mark.parametrize("persona", PUBLIC_POLICY_PERSONAS_HAS, ids=[p[0] for p in PUBLIC_POLICY_PERSONAS_HAS])
-def test_me_policies_exposes_access_solicitacao_approvals(persona):
+def test_me_policies_exposes_access_solicitation_approvals(persona):
     label, group_names = persona
     user = _user_in_groups(*group_names, label=label)
     client = APIClient()
@@ -283,11 +283,11 @@ def test_me_policies_exposes_access_solicitacao_approvals(persona):
     response = client.get(reverse("core:me-policies"))
     assert response.status_code == 200
     body = response.json()
-    assert "access_solicitacao_approvals" in body, f"{label} deveria receber a policy; payload={body}"
+    assert "access_solicitation_approvals" in body, f"{label} deveria receber a policy; payload={body}"
 
 
 @pytest.mark.parametrize("persona", PUBLIC_POLICY_PERSONAS_HAS_NOT, ids=[p[0] for p in PUBLIC_POLICY_PERSONAS_HAS_NOT])
-def test_me_policies_does_not_expose_access_solicitacao_approvals(persona):
+def test_me_policies_does_not_expose_access_solicitation_approvals(persona):
     label, group_names = persona
     user = _user_in_groups(*group_names, label=label)
     client = APIClient()
@@ -295,4 +295,4 @@ def test_me_policies_does_not_expose_access_solicitacao_approvals(persona):
     response = client.get(reverse("core:me-policies"))
     assert response.status_code == 200
     body = response.json()
-    assert "access_solicitacao_approvals" not in body, f"{label} NÃO deveria receber a policy; payload={body}"
+    assert "access_solicitation_approvals" not in body, f"{label} NÃO deveria receber a policy; payload={body}"

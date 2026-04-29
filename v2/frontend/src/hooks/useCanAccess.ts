@@ -47,7 +47,7 @@ export interface AccessState {
    * Pode acessar fila de aprovações.
    * Composite Setor × Função aprovado em PR 3 hardening RBAC (2026-04-29):
    * Gerente da Superintendência OU Assistente Administrativo do Controle.
-   * Fonte de verdade: policy pública `access_solicitacao_approvals`.
+   * Fonte de verdade: policy pública `access_solicitation_approvals`.
    * `legacy.canApproveSuper` permanece como fallback compat durante a
    * transição para clientes que ainda não consomem `/api/me/policies/`.
    */
@@ -85,7 +85,7 @@ export function computeAccess(
   const can = (key: string): boolean => policySet.has(key);
 
   const canAccessApprovals =
-    can('access_solicitacao_approvals') ||   // PR 3 hardening RBAC (2026-04-29)
+    can('access_solicitation_approvals') ||   // PR 3 hardening RBAC (2026-04-29)
     legacy.canApproveSuper === true;
 
   const canAccessBlocks =

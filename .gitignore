@@ -557,6 +557,7 @@ v2/docs/memoria/
 
 # Agent instruction files (local only)
 AGENTS.md
+CLAUDE.md
 v2/docs/AGENTS.md
 
 # Session/handoff notes (local only)
@@ -596,6 +597,16 @@ nul
 # Code Review Graph (development tool)
 .code-review-graph/
 .code-review-graphignore
+
+# Graphify knowledge graph (development tool)
+.graphifyignore
+**/.graphifyignore
+.graphify/
+graphify-out/
+**/graphify-out/
+graphify-out/cache/
+graphify-out/manifest.json
+graphify-out/cost.json
 
 # VS Code Background Shell extension
 .bg-shell/

@@ -10,7 +10,7 @@ Este documento é a **fonte da verdade declarativa** para autorização no Apren
 
 ## 1. Princípios fundamentais (NIST RBAC 3-tier)
 
-```
+```text
 User → Roles (Groups Django) → Capabilities (PermissaoFuncional) ← Policies (CanXxx) ← Views/Routes
 ```
 

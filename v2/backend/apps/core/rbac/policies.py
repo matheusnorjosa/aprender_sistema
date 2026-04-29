@@ -117,14 +117,23 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     # --- Availability ---
     # Visualização ampla de disponibilidades — Controle/Gerente/Coord/Apoio.
     "view_all_availability": frozenset({"view_all_availability"}),
-    # --- Imports operacionais (DAT-only após PR-A1 DAT-Imports 2026-04-29) ---
-    # Centralização: todas as importações em massa ficam em /dat/importacoes
-    # via `HasPerm("import_spreadsheet")`. Lançamento individual continua
-    # acessível via UIs próprias (formador declara bloqueio próprio etc.).
-    # Keys mantidas em PUBLIC_POLICY_KEYS para preservar contrato externo.
-    "import_availability_blocks": frozenset({"import_spreadsheet"}),
-    "import_compras": frozenset({"import_spreadsheet"}),
-    "import_generic_spreadsheet": frozenset({"import_spreadsheet"}),
+    # --- Imports operacionais ---
+    # Import de bloqueios: DAT importa, Controle/Gerente/Coord operam.
+    "import_availability_blocks": frozenset({"import_spreadsheet", "view_all_availability"}),
+    # Import de compras: DAT importa, Compras/Controle operam.
+    "import_compras": frozenset(
+        {
+            "import_spreadsheet",
+            "manage_purchases_and_materials",
+            "run_daily_operations",
+        }
+    ),
+    # Imports operacionais genéricos (eventos, produtos, deslocamentos): DAT + Controle.
+    # Nota: as 6 views síncronas migram para `HasPerm("import_spreadsheet")` direto
+    # em PR-A1 DAT-Imports (2026-04-29). Esta policy continua usada por views
+    # async (ASQ-005, /api/imports/*) e pelo contrato `/api/me/policies/` —
+    # PR-D do plano DAT-Imports limpa botões antigos no frontend.
+    "import_generic_spreadsheet": frozenset({"import_spreadsheet", "run_daily_operations"}),
     # --- Admin registries (single-cap, mas vira policy pra estabilizar contrato) ---
     "manage_admin_registries": frozenset({"manage_admin_registries"}),
     "manage_purchases_and_materials": frozenset({"manage_purchases_and_materials"}),

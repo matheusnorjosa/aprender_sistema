@@ -116,18 +116,22 @@ class TestCapacidadeAmpla:
         results = res.json().get("results", res.json())
         assert len(results) == 2
 
-    def test_gerente_user_sees_all_deslocamentos(self, gerencia_vidas, gerencia_fluir):
-        """Função Gerente tem `view_all_availability` → bypass scope."""
-        user_vidas = _user_in_gerencia("g_user_v", ["Coordenador"], gerencia_vidas)
-        _create_deslocamento(user_vidas)
+    def test_dat_user_sees_all_deslocamentos(self, gerencia_vidas, gerencia_fluir):
+        """D9 (PR 2 RBAC hardening, 2026-04-28): DAT recebe `view_all_availability`
+        no seed 0080 (papel transversal admin). Mesma cap libera bypass de scope —
+        DAT vê todos os deslocamentos como Controle."""
+        user_vidas = _user_in_gerencia("dt_user_v", ["Coordenador"], gerencia_vidas)
+        user_fluir = _user_in_gerencia("dt_user_f", ["Coordenador"], gerencia_fluir)
+        _create_deslocamento(user_vidas, "Vidas-A", "Vidas-B")
+        _create_deslocamento(user_fluir, "Fluir-A", "Fluir-B")
 
-        gerente_user = _make_user("gerente_user", ["Gerente"])
+        dat_user = _make_user("dat_user", ["DAT"])
         client = APIClient()
-        client.force_authenticate(user=gerente_user)
+        client.force_authenticate(user=dat_user)
         res = client.get(URL)
         assert res.status_code == 200
         results = res.json().get("results", res.json())
-        assert len(results) == 1
+        assert len(results) == 2
 
 
 # ============================================================================
@@ -187,16 +191,19 @@ class TestScopePorGerencia:
         assert len(results) == 1
         assert results[0]["id"] == desl_vidas.id
 
-    def test_dat_user_with_gerencia_sees_only_own_sector(self, gerencia_vidas, gerencia_fluir):
-        """DAT (sem capability `view_all_availability` por seed 0078) é scoped também."""
-        user_vidas = _user_in_gerencia("dt_v", ["Formador"], gerencia_vidas)
-        user_fluir = _user_in_gerencia("dt_f", ["Formador"], gerencia_fluir)
-        desl_vidas = _create_deslocamento(user_vidas, "DV-A", "DV-B")
-        _create_deslocamento(user_fluir, "DF-A", "DF-B")
+    def test_gerente_user_with_gerencia_sees_only_own_sector(self, gerencia_vidas, gerencia_fluir):
+        """D9 (PR 2 RBAC hardening, 2026-04-28): Gerente perde `view_all_availability`
+        global (seed 0080) e cai em scope via EquipeGerencia (igual Coord/Apoio).
+        Gerente pedagógico (Vidas, Fluir, ACerta, etc.) ou Gerente Sup vê apenas
+        a própria gerência via vínculo organizacional."""
+        user_vidas = _user_in_gerencia("gv_user", ["Formador"], gerencia_vidas)
+        user_fluir = _user_in_gerencia("gf_user", ["Formador"], gerencia_fluir)
+        desl_vidas = _create_deslocamento(user_vidas, "GV-A", "GV-B")
+        _create_deslocamento(user_fluir, "GF-A", "GF-B")
 
-        dat_vidas = _user_in_gerencia("dat_vidas", ["DAT"], gerencia_vidas)
+        gerente_vidas = _user_in_gerencia("gerente_vidas", ["Gerente"], gerencia_vidas)
         client = APIClient()
-        client.force_authenticate(user=dat_vidas)
+        client.force_authenticate(user=gerente_vidas)
         res = client.get(URL)
         assert res.status_code == 200
         results = res.json().get("results", res.json())

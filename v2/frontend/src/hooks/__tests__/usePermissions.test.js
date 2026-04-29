@@ -246,7 +246,7 @@ describe('computePermissions', () => {
       expect(perms.canDisponibilidade).toBe(true)
     })
 
-    test('Gerente → ALLOW (view_all_availability via D6)', () => {
+    test('Gerente → ALLOW (D9: scoped via EquipeGerencia; backend filtra por gerência)', () => {
       const perms = computePermissions(makeUser({ funcoes: ['Gerente'] }))
       expect(perms.canDisponibilidade).toBe(true)
     })
@@ -266,9 +266,9 @@ describe('computePermissions', () => {
       expect(perms.canDisponibilidade).toBe(false)
     })
 
-    test('DAT → DENY (não tem capability nem precisa consultar grade)', () => {
+    test('DAT → ALLOW (D9: ator transversal admin recebe view_all_availability)', () => {
       const perms = computePermissions(makeUser({ setores: ['DAT'] }))
-      expect(perms.canDisponibilidade).toBe(false)
+      expect(perms.canDisponibilidade).toBe(true)
     })
 
     test('Diretoria → DENY (decisão executiva, não consulta operacional)', () => {

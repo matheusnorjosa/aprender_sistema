@@ -35,10 +35,41 @@ def is_privileged_user(user):
     `groups.filter(name__in=["Superintendência", "Controle"])` trocado por
     capability `pode_ver_todas_disponibilidades`. Expansão deliberada para
     Gerência+Diretoria (documentada no PR #1183).
+
+    Semântica restrita a `view_all_availability`. NÃO incluir caps de
+    create/approve solicitação aqui — esse helper governa visibilidade de
+    bloqueios de terceiros em `AvailabilityBlockViewSet.get_queryset` e
+    alargá-lo expõe dados sensíveis. Para consulta de conflito (RD-04 etc.)
+    via /api/availability/check/, usar `can_check_availability_for_others`.
     """
     from apps.core.rbac_helpers import user_has_any_perm
 
     return user_has_any_perm(user, "view_all_availability")
+
+
+def can_check_availability_for_others(user):
+    """
+    D9 (PR 2 RBAC hardening, 2026-04-28): autorização específica para o
+    fluxo de consulta de conflito de outro usuário via
+    `/api/availability/check/` e `/api/availability/check-many/`.
+
+    Quem precisa consultar disponibilidade de OUTRO usuário (não o próprio):
+    - Privilegiado (`view_all_availability`) — Controle/DAT visão global
+    - Coord/Apoio/Gerente ao criar solicitação (`create_solicitation`)
+    - Gerente Sup ao aprovar/reprovar em lote (`approve_solicitation_batch`)
+
+    Este helper é deliberadamente separado de `is_privileged_user` porque
+    `AvailabilityBlockViewSet.get_queryset` usa o último para decidir leitura
+    de bloqueios — fluxo distinto, escopo distinto. Não unificar.
+    """
+    from apps.core.rbac_helpers import user_has_any_perm
+
+    return user_has_any_perm(
+        user,
+        "view_all_availability",
+        "create_solicitation",
+        "approve_solicitation_batch",
+    )
 
 
 def get_user_gerencias_ids(user) -> list[int]:
@@ -125,7 +156,19 @@ class AvailabilityCheckView(APIView):
     # é `view_all_availability` (visualizar disponibilidades), não
     # `import_spreadsheet` (artefato do codemod Epic 5.2 que aplicou o mesmo
     # codename em múltiplas views com intent semântico diferente).
-    permission_classes = [HasPerm("view_all_availability")]
+    #
+    # D9 (PR 2 RBAC hardening, 2026-04-28): composition expandida — endpoint
+    # de check de conflito é ferramenta consultiva usada por:
+    #   - Coordenador/Apoio/Gerente: ao criar solicitação (create_solicitation)
+    #   - Superintendência/Gerente Sup: ao aprovar (approve_solicitation_batch)
+    #   - Controle/DAT: visão global (view_all_availability)
+    # Antes do PR 2, Gerente tinha view_all_availability; após D9 perdeu cap
+    # global mas continua precisando do check para aprovações. Idem Coord
+    # para fluxo de criação. Filtro fino (consulta própria vs outros) é
+    # aplicado em runtime via `is_privileged_user`.
+    permission_classes = [
+        HasPerm("view_all_availability") | HasPerm("create_solicitation") | HasPerm("approve_solicitation_batch")
+    ]
     throttle_scope = "availability_check"
 
     @extend_schema(
@@ -178,8 +221,10 @@ class AvailabilityCheckView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Verificar permissão: só pode consultar próprio ou se for privilegiado
-        if usuario_id != request.user.id and not is_privileged_user(request.user):
+        # Verificar permissão: só pode consultar próprio ou se autorizado
+        # (D9 — `can_check_availability_for_others` cobre Coord criando,
+        # Gerente Sup aprovando, Controle/DAT visão global).
+        if usuario_id != request.user.id and not can_check_availability_for_others(request.user):
             return Response(
                 {"detail": "Você não tem permissão para consultar a disponibilidade de outros usuários."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -254,7 +299,19 @@ class AvailabilityCheckManyView(APIView):
     # é `view_all_availability` (visualizar disponibilidades), não
     # `import_spreadsheet` (artefato do codemod Epic 5.2 que aplicou o mesmo
     # codename em múltiplas views com intent semântico diferente).
-    permission_classes = [HasPerm("view_all_availability")]
+    #
+    # D9 (PR 2 RBAC hardening, 2026-04-28): composition expandida — endpoint
+    # de check de conflito é ferramenta consultiva usada por:
+    #   - Coordenador/Apoio/Gerente: ao criar solicitação (create_solicitation)
+    #   - Superintendência/Gerente Sup: ao aprovar (approve_solicitation_batch)
+    #   - Controle/DAT: visão global (view_all_availability)
+    # Antes do PR 2, Gerente tinha view_all_availability; após D9 perdeu cap
+    # global mas continua precisando do check para aprovações. Idem Coord
+    # para fluxo de criação. Filtro fino (consulta própria vs outros) é
+    # aplicado em runtime via `is_privileged_user`.
+    permission_classes = [
+        HasPerm("view_all_availability") | HasPerm("create_solicitation") | HasPerm("approve_solicitation_batch")
+    ]
     throttle_scope = "availability_check"
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -266,9 +323,10 @@ class AvailabilityCheckManyView(APIView):
             )
 
         # Verificar permissão: filtrar IDs para apenas os permitidos
-        privileged = is_privileged_user(request.user)
-        if not privileged:
-            # Usuário não-privilegiado só pode consultar ele mesmo
+        # (D9 — `can_check_availability_for_others` cobre Coord criando,
+        # Gerente Sup aprovando, Controle/DAT visão global).
+        if not can_check_availability_for_others(request.user):
+            # Usuário não autorizado só pode consultar ele mesmo
             unauthorized_ids = [uid for uid in usuarios_ids if uid != request.user.id]
             if unauthorized_ids:
                 return Response(

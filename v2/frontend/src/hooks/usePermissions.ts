@@ -106,19 +106,21 @@ function computePermissionsInternal(user: CurrentUser): Permissions {
   const canMapaBrasil = user.is_superuser || inDiretoria || inDAT;
   const canDashboardsMenu =
     canDashboardOverview || canDashboardCompras || canDashboardEquipe || canDashboardGcal || canMapaBrasil;
-  // canDisponibilidade — decisão D8 (2026-04-28).
+  // canDisponibilidade — decisões D8 + D9 (2026-04-28).
   //
   // Acesso à Grade Mensal:
-  //   ALLOW: Superuser, Controle, Gerente, Coordenador, Apoio (scoped via EquipeGerencia)
-  //   DENY:  DAT, Diretoria, Formador, sem vínculo organizacional
+  //   ALLOW global (cap view_all_availability): Superuser, Controle, DAT
+  //   ALLOW scoped (via EquipeGerencia ativa):  Gerente, Coordenador, Apoio
+  //   DENY:                                      Diretoria, Formador, sem vínculo
   //
-  // Antes era `!inControle` (lógica invertida) — qualquer não-Controle entrava,
-  // incluindo Formador, que viola RD-02/RD-03 (Formador acessa apenas Meus
-  // Eventos + Bloqueios próprios). Reescrita como lista positiva alinhada com
-  // o backend: Controle/Gerente passam pela cap `view_all_availability`,
-  // Coord/Apoio pelo HasSectorAccess (vínculo de gerência validado em runtime).
+  // D8 (PR #1288): Formador removido (caso especial RD-02/RD-03). Diretoria
+  // mantém DENY (decisão executiva, não consulta operacional).
+  //
+  // D9 (PR atual): Gerente pedagógico/Sup perde cap global e cai em scope
+  // via EquipeGerencia (Gerente Vidas vê só Vidas; Gerente Sup vê só Sup).
+  // DAT recebe cap global (ator transversal admin).
   const canDisponibilidade =
-    user.is_superuser || inControle || isGerente || isCoordenador;
+    user.is_superuser || inControle || inDAT || isGerente || isCoordenador;
   // Epic 3.3: derived flag unificada para "vê todos os setores/gerências".
   // Substitui hardcodes is_superuser || is_superintendencia || groups.includes('Superintendência')
   // em FiltersBar, PreAgendaPage, Solicitacoes, ApprovalsPage.

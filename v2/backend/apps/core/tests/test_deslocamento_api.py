@@ -344,10 +344,10 @@ class TestDeslocamentoAPI:
         response = client.get("/api/deslocamentos/")
         assert response.status_code == status.HTTP_200_OK
 
-        # DAT autenticado sem EquipeGerencia → 200 + 0 deslocamentos
-        # (DAT sem capability cai em scope; sem vínculo, vê 0)
+        # D9 (2026-04-28, PR 2 RBAC hardening): DAT recebe `view_all_availability`
+        # global no seed 0080 (papel transversal admin). Mesma cap libera bypass
+        # de scope em views_deslocamento.py — DAT passa a ver todos os
+        # deslocamentos como Controle.
         client.force_authenticate(user=user_dat)
         response = client.get("/api/deslocamentos/")
         assert response.status_code == status.HTTP_200_OK
-        results = response.json().get("results", response.json())
-        assert results == []

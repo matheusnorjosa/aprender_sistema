@@ -26,6 +26,7 @@ from apps.core.rbac.matrix import (
     ACTORS,
     APOIO,
     COORDENADOR,
+    GERENTE,
     RESOURCES,
     SUPERUSER,
     ResourceCase,
@@ -52,8 +53,12 @@ def _make_user_for_actor(actor: str) -> Usuario:
     D8 (2026-04-28): Coordenador e Apoio de Coordenação ganham EquipeGerencia
     ativa pré-criada. Sem o vínculo, eles cairiam em 403 pelo HasSectorAccess
     endurecido (sem cap global E sem gerência → DENY). Outros atores não
-    precisam — Controle/Gerente passam pela cap; DAT/Diretoria/Formador são
-    DENY por design.
+    precisam — Controle passa pela cap; DAT/Diretoria/Formador são DENY/ALLOW
+    por design.
+
+    D9 (2026-04-28): Gerente perde cap global e cai em scope via EquipeGerencia
+    (igual Coord/Apoio). Fixture cria vínculo papel="GERENTE" para que o ator
+    GERENTE retorne 200 na Matriz Viva. DAT recebe cap global (sem fixture).
     """
     if actor == SUPERUSER:
         return Usuario.objects.create_superuser(
@@ -72,8 +77,8 @@ def _make_user_for_actor(actor: str) -> Usuario:
         group, _ = Group.objects.get_or_create(name=gname)
         user.groups.add(group)
 
-    # D8: Coord/Apoio precisam de vínculo organizacional para passar HasSectorAccess.
-    if actor in (COORDENADOR, APOIO):
+    # D8 + D9: Coord/Apoio/Gerente precisam de vínculo organizacional para passar HasSectorAccess.
+    if actor in (COORDENADOR, APOIO, GERENTE):
         gerencia, _ = Gerencia.objects.get_or_create(
             nome=f"GERENCIA MATRIX {_USER_COUNTER['i']:06d}",
             defaults={"nome_setor": "Vidas"},
@@ -84,6 +89,14 @@ def _make_user_for_actor(actor: str) -> Usuario:
                 gerencia=gerencia,
                 usuario=user,
                 papel="COORDENADOR",
+                ativo=True,
+            )
+        elif actor == GERENTE:
+            # Gerente: papel direto, sem supervisor (D9 — perdeu cap global).
+            EquipeGerencia.objects.create(
+                gerencia=gerencia,
+                usuario=user,
+                papel="GERENTE",
                 ativo=True,
             )
         else:

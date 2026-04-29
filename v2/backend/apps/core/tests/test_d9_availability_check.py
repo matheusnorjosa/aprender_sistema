@@ -1,5 +1,9 @@
 """Tests para D9 fix: AvailabilityCheckView libera consulta para Coord/Gerente Sup."""
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false, reportPrivateUsage=false, reportUnusedFunction=false
+
+from __future__ import annotations
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.cache import cache
@@ -109,7 +113,6 @@ class TestD9CheckAvailabilityForOthers:
     def test_block_viewset_nao_afetado_para_coord(self):
         """REGRESSION GUARD: AvailabilityBlockViewSet.get_queryset NÃO foi afetado.
         Coord sem view_all_availability NÃO deve ver bloqueios cross-gerência."""
-        from apps.core.models import AvailabilityBlock
         from apps.core.views_availability import is_privileged_user
 
         coord = _make_user_with_caps("coord_block", ["Coordenador"], ["create_solicitation"])

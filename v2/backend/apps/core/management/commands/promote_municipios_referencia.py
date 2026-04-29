@@ -136,7 +136,9 @@ class Command(BaseCommand):
                 if target_key != ref_key:
                     code_owned_by_other += 1
                     if len(code_conflict_examples) < 10:
-                        code_conflict_examples.append(f"{ref_name}/{ref_uf} -> {code} (owner={target.nome}/{target.uf})")
+                        code_conflict_examples.append(
+                            f"{ref_name}/{ref_uf} -> {code} (owner={target.nome}/{target.uf})"
+                        )
                     continue
             else:
                 candidates = existing_by_key.get(ref_key, [])
@@ -151,9 +153,7 @@ class Command(BaseCommand):
                     if target.ibge_code and target.ibge_code != code:
                         mismatched_existing_code += 1
                         if len(mismatched_examples) < 10:
-                            mismatched_examples.append(
-                                f"{ref_name}/{ref_uf} -> ref={code} existing={target.ibge_code}"
-                            )
+                            mismatched_examples.append(f"{ref_name}/{ref_uf} -> ref={code} existing={target.ibge_code}")
                         continue
 
             if target is None:

@@ -125,7 +125,21 @@ class AvailabilityCheckView(APIView):
     # é `view_all_availability` (visualizar disponibilidades), não
     # `import_spreadsheet` (artefato do codemod Epic 5.2 que aplicou o mesmo
     # codename em múltiplas views com intent semântico diferente).
-    permission_classes = [HasPerm("view_all_availability")]
+    #
+    # D9 (PR 2 RBAC hardening, 2026-04-28): composition expandida — endpoint
+    # de check de conflito é ferramenta consultiva usada por:
+    #   - Coordenador/Apoio/Gerente: ao criar solicitação (create_solicitation)
+    #   - Superintendência/Gerente Sup: ao aprovar (approve_solicitation_batch)
+    #   - Controle/DAT: visão global (view_all_availability)
+    # Antes do PR 2, Gerente tinha view_all_availability; após D9 perdeu cap
+    # global mas continua precisando do check para aprovações. Idem Coord
+    # para fluxo de criação. Filtro fino (consulta própria vs outros) é
+    # aplicado em runtime via `is_privileged_user`.
+    permission_classes = [
+        HasPerm("view_all_availability")
+        | HasPerm("create_solicitation")
+        | HasPerm("approve_solicitation_batch")
+    ]
     throttle_scope = "availability_check"
 
     @extend_schema(
@@ -254,7 +268,21 @@ class AvailabilityCheckManyView(APIView):
     # é `view_all_availability` (visualizar disponibilidades), não
     # `import_spreadsheet` (artefato do codemod Epic 5.2 que aplicou o mesmo
     # codename em múltiplas views com intent semântico diferente).
-    permission_classes = [HasPerm("view_all_availability")]
+    #
+    # D9 (PR 2 RBAC hardening, 2026-04-28): composition expandida — endpoint
+    # de check de conflito é ferramenta consultiva usada por:
+    #   - Coordenador/Apoio/Gerente: ao criar solicitação (create_solicitation)
+    #   - Superintendência/Gerente Sup: ao aprovar (approve_solicitation_batch)
+    #   - Controle/DAT: visão global (view_all_availability)
+    # Antes do PR 2, Gerente tinha view_all_availability; após D9 perdeu cap
+    # global mas continua precisando do check para aprovações. Idem Coord
+    # para fluxo de criação. Filtro fino (consulta própria vs outros) é
+    # aplicado em runtime via `is_privileged_user`.
+    permission_classes = [
+        HasPerm("view_all_availability")
+        | HasPerm("create_solicitation")
+        | HasPerm("approve_solicitation_batch")
+    ]
     throttle_scope = "availability_check"
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:

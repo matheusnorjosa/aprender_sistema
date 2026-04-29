@@ -9,7 +9,10 @@ import type { CurrentUser } from '../types';
 const DisponibilidadeBlocks = lazy(() => import('../pages/Disponibilidade'));
 const MonthlyPage = lazy(() => import('../pages/Disponibilidade/MonthlyPage'));
 const ControlePage = lazy(() => import('../pages/Controle/ControlePage'));
-const DATPage = lazy(() => import('../pages/DAT/DATPage'));
+// DATPage (página antiga de /dat/importacao, Cadastros DAT) deixou de ser
+// usada após PR-C DAT Imports (2026-04-29) — rota agora redireciona para
+// /dat/importacoes. O componente continua existindo para o card "Cadastros
+// DAT" dentro de ImportacoesPage; remoção definitiva fica em PR-D.
 const DATImportacoesPage = lazy(() => import('../pages/DAT/ImportacoesPage'));
 const NewSolicitacaoWizard = lazy(() => import('../pages/Solicitacoes/NewSolicitacaoWizard'));
 const EditSolicitacaoPage = lazy(() => import('../pages/Solicitacoes/EditSolicitacaoPage'));
@@ -163,7 +166,10 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/dat/cadastros" element={canDAT ? <CadastrosPage /> : <Forbidden />} />
         <Route path="/dat/compras-materiais" element={(canControle || canDAT) ? <DATComprasPage /> : <Forbidden />} />
         <Route path="/dat/coordenadores" element={canControle ? <CoordenadoresPage /> : <Forbidden />} />
-        <Route path="/dat/importacao" element={canDAT ? <DATPage /> : <Forbidden />} />
+        {/* PR-C DAT Imports (2026-04-29): /dat/importacao (singular, página antiga
+            de Cadastros DAT) redireciona para /dat/importacoes (plural, página
+            unificada de imports). Evita 404 em links antigos. */}
+        <Route path="/dat/importacao" element={<Navigate to="/dat/importacoes" replace />} />
         <Route path="/dat/importacoes" element={canDAT ? <DATImportacoesPage /> : <Forbidden />} />
         <Route path="/dat/registros" element={canDAT ? <DATRegistrosPage /> : <Forbidden />} />
       </Routes>

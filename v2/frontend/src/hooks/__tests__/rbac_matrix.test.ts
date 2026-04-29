@@ -44,6 +44,7 @@ const ACTORS: ActorSnapshot[] = [
     // Superuser recebe TODAS as PUBLIC_POLICY_KEYS via /api/me/policies/.
     policies: [
       'access_audit_logs',
+      'access_solicitacao_approvals',
       'import_availability_blocks',
       'import_compras',
       'import_generic_spreadsheet',
@@ -139,17 +140,25 @@ const ACTORS: ActorSnapshot[] = [
     },
   },
   {
-    actor: 'Gerente',
-    // Gerente: approve_solicitation_batch + view_all_availability (após 0078)
-    policies: ['access_audit_logs', 'manage_solicitacao_status', 'use_gcal', 'view_all_availability', 'view_reports'],
+    actor: 'Gerente da Superintendência',
+    // PR 3 hardening RBAC (2026-04-29): composite Setor Superintendência +
+    // Função Gerente. Recebe a policy nova `access_solicitacao_approvals`.
+    policies: [
+      'access_audit_logs',
+      'access_solicitacao_approvals',
+      'manage_solicitacao_status',
+      'use_gcal',
+      'view_all_availability',
+      'view_reports',
+    ],
     legacy: {
-      canApproveSuper: true, // user.can_approve_super=true para Gerente da Super
-      canBloqueios: true, // canControle || canCoordenador (false) || isFormador → false; mas isGerente não direto
+      canApproveSuper: true, // can_approve_super=true para Gerente da Super
+      canBloqueios: true,
       canCoordenador: false,
       canDashboardCompras: false,
     },
     expected: {
-      canAccessApprovals: true, // canApproveSuper legacy
+      canAccessApprovals: true, // policy access_solicitacao_approvals presente
       canAccessBlocks: true, // view_all_availability presente
       canCreateSolicitation: false,
       canViewComprasDashboard: false,
@@ -235,7 +244,7 @@ describe('RBAC Living Matrix (frontend)', () => {
       'DAT',
       'Controle',
       'Diretoria',
-      'Gerente',
+      'Gerente da Superintendência',
       'Coordenador',
       'Apoio de Coordenação',
       'Formador',

@@ -154,6 +154,39 @@ class IsGerenteSuperintendencia(HasFunctionalPermission):  # type: ignore[misc]
         return bool(user and user.groups.filter(name="Gerente").exists())  # noqa: RBAC-composite-allowed
 
 
+class IsAssistenteAdministrativoControle(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Regra composta fixa (PR 3 hardening RBAC, 2026-04-29):
+    - Setor Django "Controle"
+    - Função Django "Assistente Administrativo"
+
+    Combinada via OR com `IsGerenteSuperintendencia` em
+    `CanAccessSolicitacaoApprovals` para autorizar aprovação/reprovação de
+    solicitações (individual e lote).
+
+    Por design não usa `HasFunctionalPermission` como base: a regra é
+    estritamente composite role (Setor × Função). Cap funcional permanece
+    `approve_solicitation` no Setor `Superintendência` — composite garante
+    que apenas Setor `Controle` + Função `Assistente Administrativo` passe
+    por esta classe (Assistente fora do Controle ou Controle puro → 403).
+
+    Whitelist natural — composite documentado em RBAC_NAMING §3.
+    """
+
+    message = "Apenas Assistente Administrativo do Controle pode realizar esta ação."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if getattr(user, "is_superuser", False):
+            return True
+        return bool(
+            user.groups.filter(name="Controle").exists()  # noqa: RBAC-composite-allowed
+            and user.groups.filter(name="Assistente Administrativo").exists()  # noqa: RBAC-composite-allowed
+        )
+
+
 class IsOwnerOrPrivileged(HasFunctionalPermission):  # type: ignore[misc]
     """
     Permissão para edição de solicitações.

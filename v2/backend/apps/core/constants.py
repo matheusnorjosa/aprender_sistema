@@ -32,12 +32,16 @@ SETOR_GROUPS: list[str] = [
     "Logística Galpão",
 ]
 
-# === FUNÇÕES (4) — O que o usuário pode fazer ===
+# === FUNÇÕES (5) — O que o usuário pode fazer ===
 FUNCAO_GROUPS: list[str] = [
     "Formador",
     "Coordenador",
     "Apoio de Coordenação",
     "Gerente",
+    # PR 3 hardening RBAC (2026-04-29): função formal usada com Setor
+    # "Controle" pelo composite `IsAssistenteAdministrativoControle` para
+    # autorizar aprovação de solicitações.
+    "Assistente Administrativo",
 ]
 
 # === WHITELIST — Grupos atribuíveis a usuários via admin/API ===

@@ -100,8 +100,13 @@ class CurrentUserView(APIView):
         is_superintendencia: bool = user.is_superuser or ("Superintendência" in setores)
 
         # Pode aprovar/reprovar solicitações?
-        # Regra: Superintendência, DAT ou superuser (PA-02 Adaptada)
-        can_approve_super = user.is_superuser or ("Superintendência" in setores) or ("DAT" in setores)
+        # PR 3 hardening RBAC (2026-04-29): regra alinhada à policy nova
+        # `access_solicitacao_approvals`. Frontend deve consumir a policy
+        # via `/api/me/policies/`; este flag fica como **legado** durante a
+        # transição (sem ser mais fonte de verdade). DAT removido.
+        is_gerente_super = ("Superintendência" in setores) and ("Gerente" in funcoes)
+        is_asst_admin_controle = ("Controle" in setores) and ("Assistente Administrativo" in funcoes)
+        can_approve_super = user.is_superuser or is_gerente_super or is_asst_admin_controle
 
         # Compute display name
         name: str = f"{user.first_name or ''} {user.last_name or ''}".strip()

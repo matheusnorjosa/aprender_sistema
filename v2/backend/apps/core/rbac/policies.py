@@ -29,7 +29,7 @@ Decisões fixadas com stakeholder em 2026-04-26 (memórias
 Ver `v2/docs/RBAC_NAMING.md §9` (Policy Resolution Rules).
 """
 
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportUnusedImport=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportUnusedImport=false
 
 from __future__ import annotations
 
@@ -65,6 +65,14 @@ from apps.core.rbac.helpers import user_has_any_perm
 #
 # Renomear key:
 #   - BREAKING após exposição via `/api/me/policies/` (deprecation period)
+
+
+# Composite policies: keys cuja semântica não cabe em "OR de capabilities"
+# (ex: composite Setor × Função). `ACCESS_POLICIES[k]` é frozenset() vazio
+# como sentinela; a lógica vive em helpers dedicados despachados por
+# `user_has_policy`. Tests que assumem "frozenset não-vazio" devem
+# excluir essas keys.
+COMPOSITE_POLICY_KEYS: Final[frozenset[str]] = frozenset({"access_solicitacao_approvals"})
 
 
 ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
@@ -137,6 +145,12 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     # --- Admin registries (single-cap, mas vira policy pra estabilizar contrato) ---
     "manage_admin_registries": frozenset({"manage_admin_registries"}),
     "manage_purchases_and_materials": frozenset({"manage_purchases_and_materials"}),
+    # --- Aprovação de solicitações (PR 3 hardening RBAC, 2026-04-29) ---
+    # Policy COMPOSITE: a semântica não cabe em "OR de capabilities" porque
+    # exige composite Setor × Função (Gerente da Superintendência OU
+    # Assistente Administrativo do Controle). Frozenset vazio é sentinela —
+    # `user_has_policy` trata a key via `_user_has_solicitation_approvals`.
+    "access_solicitacao_approvals": frozenset(),
 }
 
 
@@ -260,6 +274,28 @@ class CanManagePurchasesAndMaterials(_PolicyPermission):
     policy = "manage_purchases_and_materials"
 
 
+class CanAccessSolicitacaoApprovals(_PolicyPermission):
+    """
+    Policy composta de aprovação de solicitações (PR 3, 2026-04-29).
+
+    Habilitada para:
+    - Gerente da Superintendência (Setor `Superintendência` + Função `Gerente`)
+    - Assistente Administrativo do Controle (Setor `Controle` + Função
+      `Assistente Administrativo`)
+
+    Implementação composite (não OR de capabilities): a semântica vive em
+    `_user_has_solicitation_approvals` e é compartilhada com
+    `user_has_policy` para que `/api/me/policies/` exponha o mesmo gate
+    consumido pelos 4 endpoints de aprovação.
+    """
+
+    policy = "access_solicitacao_approvals"
+    message = "Apenas Gerentes da Superintendência ou Assistente Administrativo do Controle podem aprovar solicitações."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        return _user_has_solicitation_approvals(request.user)
+
+
 # ============================================================================
 # Public surface (Epic 4.4, Issue #1235): contrato externo `/api/me/policies/`
 # ============================================================================
@@ -286,6 +322,7 @@ class CanManagePurchasesAndMaterials(_PolicyPermission):
 PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
     {
         "access_audit_logs",
+        "access_solicitacao_approvals",
         "manage_solicitacao_status",
         "view_compras_dashboard",
         "view_compras_pendencias",
@@ -309,6 +346,33 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
 # ============================================================================
 
 
+def _user_has_solicitation_approvals(user: AbstractBaseUser | AnonymousUser | None) -> bool:
+    """
+    Composite check (PR 3 hardening RBAC, 2026-04-29):
+    - Gerente da Superintendência (Setor "Superintendência" + Função "Gerente")
+    - Assistente Administrativo do Controle (Setor "Controle" + Função
+      "Assistente Administrativo")
+
+    SSOT chamado tanto pela Policy class `CanAccessSolicitacaoApprovals`
+    quanto por `user_has_policy("access_solicitacao_approvals")`. Mudar
+    a regra = mudar aqui e atualizar tests da matriz.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    groups = user.groups  # type: ignore[attr-defined]
+    is_gerente_super = (
+        groups.filter(name="Gerente").exists()  # noqa: RBAC-composite-allowed
+        and groups.filter(name="Superintendência").exists()  # noqa: RBAC-composite-allowed
+    )
+    is_asst_admin_controle = (
+        groups.filter(name="Assistente Administrativo").exists()  # noqa: RBAC-composite-allowed
+        and groups.filter(name="Controle").exists()  # noqa: RBAC-composite-allowed
+    )
+    return bool(is_gerente_super or is_asst_admin_controle)
+
+
 def user_has_policy(user: AbstractBaseUser | AnonymousUser | None, key: str) -> bool:
     """
     True sse o usuário possui a policy identificada por `key`.
@@ -316,10 +380,12 @@ def user_has_policy(user: AbstractBaseUser | AnonymousUser | None, key: str) -> 
     Semântica (idêntica a `_PolicyPermission.has_permission` — esta função
     é a fonte única de verdade; `_PolicyPermission` delega para cá):
 
-        anonymous / None  → False
-        superuser         → True
-        key não na matriz → False (fail-secure)
-        caso geral        → user_has_any_perm(user, *capabilities) (OR)
+        anonymous / None         → False
+        superuser                → True
+        composite policy         → delega para helper específico (ex:
+                                   `_user_has_solicitation_approvals`)
+        key não na matriz        → False (fail-secure)
+        caso geral               → user_has_any_perm(user, *capabilities) (OR)
 
     Aceita keys de ACCESS_POLICIES inteiro (públicas OU internas), porque
     a função é o universal "user holds this policy?" — exposição pública
@@ -330,6 +396,9 @@ def user_has_policy(user: AbstractBaseUser | AnonymousUser | None, key: str) -> 
         return False
     if getattr(user, "is_superuser", False):
         return True
+    # Composite policies — semântica não cabe em "OR de capabilities".
+    if key == "access_solicitacao_approvals":
+        return _user_has_solicitation_approvals(user)
     codenames = ACCESS_POLICIES.get(key)
     if not codenames:
         return False
@@ -357,6 +426,7 @@ __all__ = [
     "user_has_policy",
     "resolve_public_policies",
     "CanAccessAuditLogs",
+    "CanAccessSolicitacaoApprovals",
     "CanManageSolicitacaoStatus",
     "CanViewComprasDashboard",
     "CanViewComprasPendencias",

@@ -27,7 +27,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
-from apps.core.rbac.policies import CanImportAvailabilityBlocks
+from apps.core.permissions import HasPerm
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -43,7 +43,7 @@ class ImportBloqueiosView(APIView):
     """
     Importa Bloqueios de CSV/XLSX.
 
-    Requer permissao: HasPerm("import_spreadsheet") (grupos Controle ou Superintendencia)
+    Requer permissao: HasPerm("import_spreadsheet") (grupo DAT, ou superuser).
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -64,11 +64,11 @@ class ImportBloqueiosView(APIView):
         }
     """
 
-    # Issue #1222 (Epic 1 RBAC Access Policy Realignment): importar bloqueios
-    # é função operacional de gestão de availability (Controle/Gerente/Coord/Apoio)
-    # e também faz parte do fluxo de importação genérico (DAT). Composition OR
-    # cobre ambos.
-    permission_classes = [IsAuthenticated, CanImportAvailabilityBlocks]
+    # PR-A1 DAT-Imports (2026-04-29): centralização DAT-only via
+    # `HasPerm("import_spreadsheet")`. Bloqueio individual continua via
+    # AvailabilityBlockViewSet (formador declara o próprio); só o import
+    # em massa é restrito (D-2 do plano).
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(
         summary="Importar bloqueios de disponibilidade",

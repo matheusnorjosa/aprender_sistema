@@ -129,6 +129,10 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
         }
     ),
     # Imports operacionais genéricos (eventos, produtos, deslocamentos): DAT + Controle.
+    # Nota: as 6 views síncronas migram para `HasPerm("import_spreadsheet")` direto
+    # em PR-A1 DAT-Imports (2026-04-29). Esta policy continua usada por views
+    # async (ASQ-005, /api/imports/*) e pelo contrato `/api/me/policies/` —
+    # PR-D do plano DAT-Imports limpa botões antigos no frontend.
     "import_generic_spreadsheet": frozenset({"import_spreadsheet", "run_daily_operations"}),
     # --- Admin registries (single-cap, mas vira policy pra estabilizar contrato) ---
     "manage_admin_registries": frozenset({"manage_admin_registries"}),

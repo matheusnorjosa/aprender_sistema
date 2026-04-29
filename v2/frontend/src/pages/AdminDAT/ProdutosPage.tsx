@@ -7,10 +7,12 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Checkbox, Select } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { listProdutos, createProduto, updateProduto, deleteProduto, listProjetos } from '../../api/adminDAT';
 import type { ProdutoRecord, ProdutoPayload } from '../../api/adminDAT';
+import { DEFAULT_PAGE_SIZE } from '../../constants';
 import type { ID, Projeto } from '../../types';
 
 const { Title } = Typography;
@@ -34,17 +36,33 @@ export default function ProdutosPage(): JSX.Element {
   const [searchText, setSearchText] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProduto, setEditingProduto] = useState<ProdutoRecord | null>(null);
+  const [pagination, setPagination] = useState<TablePaginationConfig>({
+    current: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    total: 0,
+  });
 
   const [form] = Form.useForm<ProdutoFormValues>();
 
-  const fetchProdutos = async (): Promise<void> => {
+  const fetchProdutos = async (
+    current = pagination.current || 1,
+    pageSize = pagination.pageSize || DEFAULT_PAGE_SIZE,
+  ): Promise<void> => {
     setLoading(true);
     try {
       const data = await listProdutos({
         search: searchText,
         ordering: 'nome',
+        page: current,
+        page_size: pageSize,
       });
       setProdutos(data.results as unknown as ProdutoRecord[]);
+      setPagination((prev) => ({
+        ...prev,
+        current,
+        pageSize,
+        total: data.count,
+      }));
     } catch (error) {
       message.error(`Erro ao carregar produtos: ${(error as Error).message}`);
     } finally {
@@ -62,8 +80,15 @@ export default function ProdutosPage(): JSX.Element {
   };
 
   useEffect(() => {
-    fetchProdutos();
+    fetchProdutos(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText]);
+
+  const handleTableChange = (newPagination: TablePaginationConfig): void => {
+    fetchProdutos(
+      newPagination.current || 1,
+      newPagination.pageSize || pagination.pageSize || DEFAULT_PAGE_SIZE,
+    );
+  };
 
   useEffect(() => {
     fetchProjetos();
@@ -105,7 +130,7 @@ export default function ProdutosPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchProdutos();
+      fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -122,7 +147,7 @@ export default function ProdutosPage(): JSX.Element {
         try {
           await deleteProduto(produto.id);
           message.success('Produto excluido com sucesso');
-          fetchProdutos();
+          fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
@@ -179,7 +204,7 @@ export default function ProdutosPage(): JSX.Element {
       <Card>
         <header className="flex justify-between items-center mb-4">
           <Title level={3} className="m-0" id="produtos-title">
-            Produtos ({produtos.length})
+            Produtos ({pagination.total || 0})
           </Title>
           <Space>
             <Search
@@ -189,7 +214,11 @@ export default function ProdutosPage(): JSX.Element {
               onSearch={setSearchText}
               onChange={(e) => !e.target.value && setSearchText('')}
             />
-            <Button icon={<ReloadOutlined />} onClick={fetchProdutos} loading={loading}>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE)}
+              loading={loading}
+            >
               Atualizar
             </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
@@ -203,7 +232,13 @@ export default function ProdutosPage(): JSX.Element {
           dataSource={produtos}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 15, showTotal: (total) => `Total: ${total}` }}
+          onChange={handleTableChange}
+          pagination={{
+            ...pagination,
+            showSizeChanger: true,
+            pageSizeOptions: ['15', '30', '50', '100'],
+            showTotal: (total) => `Total: ${total}`,
+          }}
           scroll={{ x: 900 }}
         />
       </Card>

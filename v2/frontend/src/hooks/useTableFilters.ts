@@ -66,7 +66,7 @@ export interface UseTableFiltersReturn<F, T, S> {
   setFilters: Dispatch<SetStateAction<F>>;
   pagination: PaginationState;
   setPagination: Dispatch<SetStateAction<PaginationState>>;
-  fetchData: (page?: number) => Promise<void>;
+  fetchData: (page?: number, pageSize?: number) => Promise<void>;
   handleClearFilters: () => void;
   handleTableChange: (page: number, newPageSize?: number) => void;
   refresh: () => Promise<void>;
@@ -109,15 +109,21 @@ export function useTableFilters<F extends object, T, S = unknown>({
   defaultFiltersRef.current = defaultFilters;
 
   const fetchData = useCallback(
-    async (page = 1): Promise<void> => {
+    async (page = 1, pageSizeOverride?: number): Promise<void> => {
       setLoading(true);
       try {
+        const requestPageSize = pageSizeOverride ?? pagination.pageSize;
+        const requestPagination = {
+          ...pagination,
+          current: page,
+          pageSize: requestPageSize,
+        };
         const mapped = buildParams
-          ? buildParams(filters, pagination)
+          ? buildParams(filters, requestPagination)
           : defaultBuildParams(filters);
         const params: TableFilterParams = {
           page,
-          page_size: pagination.pageSize,
+          page_size: requestPageSize,
           ...(defaultOrdering ? { ordering: defaultOrdering } : {}),
           ...mapped,
         };
@@ -133,7 +139,7 @@ export function useTableFilters<F extends object, T, S = unknown>({
         const total = (listResp as PaginatedResponse<T>).count ?? results.length;
 
         setData(results);
-        setPagination((prev) => ({ ...prev, current: page, total }));
+        setPagination((prev) => ({ ...prev, current: page, pageSize: requestPageSize, total }));
 
         if (statsFn) {
           setStats((statsResp as S) ?? null);
@@ -163,17 +169,14 @@ export function useTableFilters<F extends object, T, S = unknown>({
 
   const handleTableChange = useCallback(
     (page: number, newPageSize?: number): void => {
-      if (newPageSize && newPageSize !== pagination.pageSize) {
-        setPagination((prev) => ({ ...prev, current: page, pageSize: newPageSize }));
-      }
-      fetchData(page);
+      fetchData(page, newPageSize);
     },
-    [fetchData, pagination.pageSize],
+    [fetchData],
   );
 
   const refresh = useCallback((): Promise<void> => {
-    return fetchData(pagination.current);
-  }, [fetchData, pagination.current]);
+    return fetchData(pagination.current, pagination.pageSize);
+  }, [fetchData, pagination.current, pagination.pageSize]);
 
   return {
     data,

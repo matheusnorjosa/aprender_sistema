@@ -10,6 +10,7 @@ const DisponibilidadeBlocks = lazy(() => import('../pages/Disponibilidade'));
 const MonthlyPage = lazy(() => import('../pages/Disponibilidade/MonthlyPage'));
 const ControlePage = lazy(() => import('../pages/Controle/ControlePage'));
 const DATPage = lazy(() => import('../pages/DAT/DATPage'));
+const DATImportacoesPage = lazy(() => import('../pages/DAT/ImportacoesPage'));
 const NewSolicitacaoWizard = lazy(() => import('../pages/Solicitacoes/NewSolicitacaoWizard'));
 const EditSolicitacaoPage = lazy(() => import('../pages/Solicitacoes/EditSolicitacaoPage'));
 const MySolicitacoesPage = lazy(() => import('../pages/Solicitacoes/MySolicitacoesPage'));
@@ -163,6 +164,7 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/dat/compras-materiais" element={(canControle || canDAT) ? <DATComprasPage /> : <Forbidden />} />
         <Route path="/dat/coordenadores" element={canControle ? <CoordenadoresPage /> : <Forbidden />} />
         <Route path="/dat/importacao" element={canDAT ? <DATPage /> : <Forbidden />} />
+        <Route path="/dat/importacoes" element={canDAT ? <DATImportacoesPage /> : <Forbidden />} />
         <Route path="/dat/registros" element={canDAT ? <DATRegistrosPage /> : <Forbidden />} />
       </Routes>
     </Suspense>

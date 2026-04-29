@@ -47,9 +47,9 @@ def _user_in_group(group_name: str):
     return u
 
 
-def test_import_compras_requires_controle():
-    """Import de COMPRAS requer grupo Controle."""
-    user = _user_in_group("Controle")
+def test_import_compras_requires_dat():
+    """PR-A1 DAT-Imports: import de COMPRAS requer grupo DAT."""
+    user = _user_in_group("DAT")
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -65,9 +65,9 @@ def test_import_compras_requires_controle():
     assert r.json()["dry_run"] is True
 
 
-def test_import_acoes_requires_controle():
-    """Import de AÇÕES requer grupo Controle."""
-    user = _user_in_group("Controle")
+def test_import_acoes_requires_dat():
+    """PR-A1 DAT-Imports: import de AÇÕES requer grupo DAT."""
+    user = _user_in_group("DAT")
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -137,7 +137,7 @@ def test_import_unauthorized_returns_403():
 
 def test_import_acoes_without_file_returns_400():
     """Import sem arquivo retorna 400 Bad Request."""
-    user = _user_in_group("Controle")
+    user = _user_in_group("DAT")
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -161,7 +161,7 @@ def test_import_cadastros_without_file_returns_400():
 
 def test_trailing_slash_in_import_endpoints():
     """Endpoints de import devem ter trailing slash."""
-    user = _user_in_group("Controle")
+    user = _user_in_group("DAT")
     client = APIClient()
     client.force_authenticate(user=user)
 

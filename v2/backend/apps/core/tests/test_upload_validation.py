@@ -24,17 +24,9 @@ from apps.core.models import Usuario
 
 
 @pytest.fixture
-def controle_user(db):
-    """Usuário com permissão HasPerm("import_spreadsheet")"""
-    user = Usuario.objects.create_user(username="controle1", password="test123", email="controle@example.com")
-    group, _ = Group.objects.get_or_create(name="Controle")
-    user.groups.add(group)
-    return user
-
-
-@pytest.fixture
 def dat_user(db):
-    """Usuário com permissão HasPerm("manage_admin_registries")"""
+    """Usuário em grupo DAT (PR-A1 DAT-Imports: detentor de import_spreadsheet
+    + manage_admin_registries via seed_functional_permissions)."""
     user = Usuario.objects.create_user(username="dat1", password="test123", email="dat@example.com")
     group, _ = Group.objects.get_or_create(name="DAT")
     user.groups.add(group)
@@ -42,16 +34,8 @@ def dat_user(db):
 
 
 @pytest.fixture
-def authenticated_controle_client(controle_user):
-    """APIClient autenticado como Controle"""
-    client = APIClient()
-    client.force_authenticate(user=controle_user)
-    return client
-
-
-@pytest.fixture
 def authenticated_dat_client(dat_user):
-    """APIClient autenticado como DAT"""
+    """APIClient autenticado como DAT (cobre todos os imports DAT-only)."""
     client = APIClient()
     client.force_authenticate(user=dat_user)
     return client
@@ -62,28 +46,26 @@ def authenticated_dat_client(dat_user):
 # ============================================================================
 
 
-def test_controle_upload_file_too_large(authenticated_controle_client):
+def test_controle_upload_file_too_large(authenticated_dat_client):
     """SEC-P0: Arquivo >10MB deve ser rejeitado com 413"""
     # Criar arquivo de 11MB (10MB + 1 byte)
     large_file_size = 10 * 1024 * 1024 + 1
     large_file = SimpleUploadedFile("acoes.csv", b"x" * large_file_size, content_type="text/csv")
 
-    response = authenticated_controle_client.post(
-        "/api/controle/import-acoes/", {"file": large_file}, format="multipart"
-    )
+    response = authenticated_dat_client.post("/api/controle/import-acoes/", {"file": large_file}, format="multipart")
 
     assert response.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
     assert "muito grande" in response.data["detail"].lower()
     assert "10MB" in response.data["detail"] or "10" in response.data["detail"]
 
 
-def test_controle_upload_invalid_mime_type(authenticated_controle_client):
+def test_controle_upload_invalid_mime_type(authenticated_dat_client):
     """SEC-P0: MIME type inválido (.exe, .sh, etc.) deve ser rejeitado com 400"""
     malicious_file = SimpleUploadedFile(
         "malicious.exe", b"MZ\x90\x00", content_type="application/x-msdownload"  # PE header (Windows executable)
     )
 
-    response = authenticated_controle_client.post(
+    response = authenticated_dat_client.post(
         "/api/controle/import-acoes/", {"file": malicious_file}, format="multipart"
     )
 
@@ -91,12 +73,12 @@ def test_controle_upload_invalid_mime_type(authenticated_controle_client):
     assert "tipo de arquivo não permitido" in response.data["detail"].lower()
 
 
-def test_controle_upload_valid_csv(authenticated_controle_client):
+def test_controle_upload_valid_csv(authenticated_dat_client):
     """Upload de CSV válido deve ser aceito"""
     csv_content = "cod_projeto,nome_projeto,cod_municipio\n1,Projeto A,001\n"
     valid_csv = SimpleUploadedFile("acoes.csv", csv_content.encode("utf-8"), content_type="text/csv")
 
-    response = authenticated_controle_client.post(
+    response = authenticated_dat_client.post(
         "/api/controle/import-acoes/?dry_run=true", {"file": valid_csv}, format="multipart"
     )
 
@@ -109,7 +91,7 @@ def test_controle_upload_valid_csv(authenticated_controle_client):
         assert "tipo de arquivo" not in response.data.get("detail", "").lower()
 
 
-def test_controle_upload_valid_xlsx(authenticated_controle_client):
+def test_controle_upload_valid_xlsx(authenticated_dat_client):
     """Upload de XLSX válido deve ser aceito"""
     # Criar arquivo XLSX mínimo (ZIP com structure correto)
     # Simplificado: apenas testar MIME type
@@ -119,7 +101,7 @@ def test_controle_upload_valid_xlsx(authenticated_controle_client):
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
-    response = authenticated_controle_client.post(
+    response = authenticated_dat_client.post(
         "/api/controle/import-acoes/?dry_run=true", {"file": xlsx_file}, format="multipart"
     )
 
@@ -132,12 +114,12 @@ def test_controle_upload_valid_xlsx(authenticated_controle_client):
 # ============================================================================
 
 
-def test_controle_import_compras_upload_file_too_large(authenticated_controle_client):
+def test_controle_import_compras_upload_file_too_large(authenticated_dat_client):
     """Issue #569: Arquivo >10MB deve ser rejeitado com 413 no import-compras."""
     large_file_size = 10 * 1024 * 1024 + 1
     large_file = SimpleUploadedFile("compras.csv", b"x" * large_file_size, content_type="text/csv")
 
-    response = authenticated_controle_client.post(
+    response = authenticated_dat_client.post(
         "/api/controle/import-compras/?dry_run=true", {"file": large_file}, format="multipart"
     )
 
@@ -145,13 +127,13 @@ def test_controle_import_compras_upload_file_too_large(authenticated_controle_cl
     assert "muito grande" in response.data["detail"].lower()
 
 
-def test_controle_import_compras_upload_invalid_mime_type(authenticated_controle_client):
+def test_controle_import_compras_upload_invalid_mime_type(authenticated_dat_client):
     """Issue #569: MIME inválido deve ser rejeitado com 400 no import-compras."""
     malicious_file = SimpleUploadedFile(
         "malicious.exe", b"MZ\x90\x00", content_type="application/x-msdownload"  # PE header (Windows executable)
     )
 
-    response = authenticated_controle_client.post(
+    response = authenticated_dat_client.post(
         "/api/controle/import-compras/?dry_run=true", {"file": malicious_file}, format="multipart"
     )
 
@@ -203,12 +185,12 @@ def test_dat_upload_valid_csv(authenticated_dat_client):
 # ============================================================================
 
 
-def test_controle_upload_exactly_10mb(authenticated_controle_client):
+def test_controle_upload_exactly_10mb(authenticated_dat_client):
     """Arquivo de exatamente 10MB deve ser aceito"""
     exact_10mb = 10 * 1024 * 1024
     file_10mb = SimpleUploadedFile("acoes_10mb.csv", b"x" * exact_10mb, content_type="text/csv")
 
-    response = authenticated_controle_client.post(
+    response = authenticated_dat_client.post(
         "/api/controle/import-acoes/?dry_run=true", {"file": file_10mb}, format="multipart"
     )
 
@@ -216,13 +198,13 @@ def test_controle_upload_exactly_10mb(authenticated_controle_client):
     assert response.status_code != status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
 
 
-def test_controle_upload_xls_legacy_format(authenticated_controle_client):
+def test_controle_upload_xls_legacy_format(authenticated_dat_client):
     """Upload de XLS (formato legado) deve ser aceito"""
     xls_file = SimpleUploadedFile(
         "acoes.xls", b"\xd0\xcf\x11\xe0", content_type="application/vnd.ms-excel"  # OLE2 header (XLS legacy)
     )
 
-    response = authenticated_controle_client.post(
+    response = authenticated_dat_client.post(
         "/api/controle/import-acoes/?dry_run=true", {"file": xls_file}, format="multipart"
     )
 

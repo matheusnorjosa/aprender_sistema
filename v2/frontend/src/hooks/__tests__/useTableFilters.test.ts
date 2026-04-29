@@ -218,6 +218,7 @@ describe('useTableFilters', () => {
 
     await waitFor(() => expect(mockListFn).toHaveBeenCalledTimes(2));
     expect(mockListFn.mock.calls[1][0].page).toBe(3);
+    expect(mockListFn.mock.calls[1][0].page_size).toBe(30);
     expect(result.current.pagination.pageSize).toBe(30);
   });
 

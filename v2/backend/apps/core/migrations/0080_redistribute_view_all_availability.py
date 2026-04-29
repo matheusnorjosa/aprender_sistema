@@ -41,6 +41,7 @@ Apoio) → cai em scope via EquipeGerencia (D8 fortaleceu HasSectorAccess
 para exigir vínculo ativo).
 """
 
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingParameterType=false, reportUnknownParameterType=false
 from __future__ import annotations
 
 from django.db import migrations

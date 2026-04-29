@@ -15,6 +15,7 @@ import {
   getProjetosOptions,
   listCompras as listDatCompras,
 } from '../../api/datModule';
+import { useTableFilters } from '../../hooks/useTableFilters';
 import { DAT_IMPORTS_CENTRALIZED_MESSAGE } from '../../components/DatImportsCentralizedBanner';
 import type { CurrentUser } from '../../types';
 
@@ -45,6 +46,10 @@ vi.mock('../../api/datModule', () => ({
   getMunicipiosOptions: vi.fn(),
   getProjetosOptions: vi.fn(),
   getProdutosOptions: vi.fn(),
+}));
+
+vi.mock('../../hooks/useTableFilters', () => ({
+  useTableFilters: vi.fn(),
 }));
 
 const controleUser: CurrentUser = {
@@ -87,6 +92,26 @@ describe('DAT Imports PR-D — remoção de entrypoints legados', () => {
     vi.mocked(getMunicipiosOptions).mockResolvedValue([]);
     vi.mocked(getProjetosOptions).mockResolvedValue([]);
     vi.mocked(getProdutosOptions).mockResolvedValue([]);
+    vi.mocked(useTableFilters).mockReturnValue({
+      data: [],
+      loading: false,
+      filters: {
+        search: '',
+        uf: undefined,
+        municipio: undefined,
+        projeto: undefined,
+        produto: undefined,
+        status: undefined,
+        ano_uso: undefined,
+        tipo_compra: undefined,
+      },
+      setFilters: vi.fn(),
+      pagination: { current: 1, pageSize: 15, total: 0 },
+      fetchData: vi.fn(),
+      handleClearFilters: vi.fn(),
+      handleTableChange: vi.fn(),
+      refresh: vi.fn(),
+    });
 
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url.startsWith('/api/deslocamentos/')) {

@@ -136,9 +136,7 @@ class AvailabilityCheckView(APIView):
     # para fluxo de criação. Filtro fino (consulta própria vs outros) é
     # aplicado em runtime via `is_privileged_user`.
     permission_classes = [
-        HasPerm("view_all_availability")
-        | HasPerm("create_solicitation")
-        | HasPerm("approve_solicitation_batch")
+        HasPerm("view_all_availability") | HasPerm("create_solicitation") | HasPerm("approve_solicitation_batch")
     ]
     throttle_scope = "availability_check"
 
@@ -279,9 +277,7 @@ class AvailabilityCheckManyView(APIView):
     # para fluxo de criação. Filtro fino (consulta própria vs outros) é
     # aplicado em runtime via `is_privileged_user`.
     permission_classes = [
-        HasPerm("view_all_availability")
-        | HasPerm("create_solicitation")
-        | HasPerm("approve_solicitation_batch")
+        HasPerm("view_all_availability") | HasPerm("create_solicitation") | HasPerm("approve_solicitation_batch")
     ]
     throttle_scope = "availability_check"
 

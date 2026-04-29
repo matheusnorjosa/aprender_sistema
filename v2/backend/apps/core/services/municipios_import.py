@@ -22,6 +22,7 @@ from django.db import transaction
 import pandas as pd
 
 from apps.core.models import Municipio
+from apps.core.services.options_cache import invalidate_municipios_options_cache
 
 
 def import_municipios_from_file(*, path: str, dry_run: bool = True) -> dict[str, Any]:
@@ -73,6 +74,8 @@ def import_municipios_from_file(*, path: str, dry_run: bool = True) -> dict[str,
 
         if dry_run:
             transaction.set_rollback(True)
+        elif stats["created"] or stats["updated"]:
+            transaction.on_commit(invalidate_municipios_options_cache)
 
     return {
         "stats": stats,

@@ -8,9 +8,11 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Radio, Checkbox } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { listProjetos, createProjeto, updateProjeto, deleteProjeto } from '../../api/adminDAT';
+import { DEFAULT_PAGE_SIZE } from '../../constants';
 import type { ID } from '../../types';
 
 const { Title } = Typography;
@@ -43,19 +45,35 @@ export default function ProjetosPage(): JSX.Element {
   const [searchText, setSearchText] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProjeto, setEditingProjeto] = useState<ProjetoRecord | null>(null);
+  const [pagination, setPagination] = useState<TablePaginationConfig>({
+    current: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    total: 0,
+  });
 
   const [form] = Form.useForm<ProjetoFormValues>();
 
-  const fetchProjetos = async (): Promise<void> => {
+  const fetchProjetos = async (
+    current = pagination.current || 1,
+    pageSize = pagination.pageSize || DEFAULT_PAGE_SIZE,
+  ): Promise<void> => {
     setLoading(true);
     try {
       const data = await listProjetos({
         search: searchText,
         ordering: 'nome',
+        page: current,
+        page_size: pageSize,
       });
       // Note: API returns Projeto with is_active, but component uses ativo field name
       // This is acceptable during migration - will be unified in strict mode phase
       setProjetos(data.results as unknown as ProjetoRecord[]);
+      setPagination((prev) => ({
+        ...prev,
+        current,
+        pageSize,
+        total: data.count,
+      }));
     } catch (error) {
       message.error(`Erro ao carregar projetos: ${(error as Error).message}`);
     } finally {
@@ -64,8 +82,15 @@ export default function ProjetosPage(): JSX.Element {
   };
 
   useEffect(() => {
-    fetchProjetos();
+    fetchProjetos(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText]);
+
+  const handleTableChange = (newPagination: TablePaginationConfig): void => {
+    fetchProjetos(
+      newPagination.current || 1,
+      newPagination.pageSize || pagination.pageSize || DEFAULT_PAGE_SIZE,
+    );
+  };
 
   const handleCreate = (): void => {
     setEditingProjeto(null);
@@ -95,7 +120,7 @@ export default function ProjetosPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchProjetos();
+      fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -112,7 +137,7 @@ export default function ProjetosPage(): JSX.Element {
         try {
           await deleteProjeto(projeto.id);
           message.success('Projeto excluído com sucesso');
-          fetchProjetos();
+          fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
@@ -179,7 +204,7 @@ export default function ProjetosPage(): JSX.Element {
       <Card>
         <header className="flex justify-between items-center mb-4">
           <Title level={3} className="m-0" id="projetos-title">
-            Projetos ({projetos.length})
+            Projetos ({pagination.total || 0})
           </Title>
           <Space>
             <Search
@@ -189,7 +214,11 @@ export default function ProjetosPage(): JSX.Element {
               onSearch={setSearchText}
               onChange={(e) => !e.target.value && setSearchText('')}
             />
-            <Button icon={<ReloadOutlined />} onClick={fetchProjetos} loading={loading}>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE)}
+              loading={loading}
+            >
               Atualizar
             </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
@@ -203,7 +232,13 @@ export default function ProjetosPage(): JSX.Element {
           dataSource={projetos}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 15, showTotal: (total) => `Total: ${total}` }}
+          onChange={handleTableChange}
+          pagination={{
+            ...pagination,
+            showSizeChanger: true,
+            pageSizeOptions: ['15', '30', '50', '100'],
+            showTotal: (total) => `Total: ${total}`,
+          }}
           scroll={{ x: 900 }}
         />
       </Card>

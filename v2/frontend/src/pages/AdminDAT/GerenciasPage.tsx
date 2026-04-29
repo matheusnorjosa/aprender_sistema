@@ -7,10 +7,12 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Checkbox } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { listGerencias, createGerencia, updateGerencia, deleteGerencia } from '../../api/adminDAT';
 import type { GerenciaRecord, GerenciaPayload } from '../../api/adminDAT';
+import { DEFAULT_PAGE_SIZE } from '../../constants';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -31,17 +33,33 @@ export default function GerenciasPage(): JSX.Element {
   const [searchText, setSearchText] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingGerencia, setEditingGerencia] = useState<GerenciaRecord | null>(null);
+  const [pagination, setPagination] = useState<TablePaginationConfig>({
+    current: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    total: 0,
+  });
 
   const [form] = Form.useForm<GerenciaFormValues>();
 
-  const fetchGerencias = async (): Promise<void> => {
+  const fetchGerencias = async (
+    current = pagination.current || 1,
+    pageSize = pagination.pageSize || DEFAULT_PAGE_SIZE,
+  ): Promise<void> => {
     setLoading(true);
     try {
       const data = await listGerencias({
         search: searchText,
         ordering: 'nome',
+        page: current,
+        page_size: pageSize,
       });
       setGerencias(data.results as unknown as GerenciaRecord[]);
+      setPagination((prev) => ({
+        ...prev,
+        current,
+        pageSize,
+        total: data.count,
+      }));
     } catch (error) {
       message.error(`Erro ao carregar gerencias: ${(error as Error).message}`);
     } finally {
@@ -50,8 +68,15 @@ export default function GerenciasPage(): JSX.Element {
   };
 
   useEffect(() => {
-    fetchGerencias();
+    fetchGerencias(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText]);
+
+  const handleTableChange = (newPagination: TablePaginationConfig): void => {
+    fetchGerencias(
+      newPagination.current || 1,
+      newPagination.pageSize || pagination.pageSize || DEFAULT_PAGE_SIZE,
+    );
+  };
 
   const handleCreate = (): void => {
     setEditingGerencia(null);
@@ -87,7 +112,7 @@ export default function GerenciasPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchGerencias();
+      fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -104,7 +129,7 @@ export default function GerenciasPage(): JSX.Element {
         try {
           await deleteGerencia(gerencia.id);
           message.success('Gerencia excluida com sucesso');
-          fetchGerencias();
+          fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
@@ -168,7 +193,7 @@ export default function GerenciasPage(): JSX.Element {
       <Card>
         <header className="flex justify-between items-center mb-4">
           <Title level={3} className="m-0" id="gerencias-title">
-            Gerencias ({gerencias.length})
+            Gerencias ({pagination.total || 0})
           </Title>
           <Space>
             <Search
@@ -178,7 +203,11 @@ export default function GerenciasPage(): JSX.Element {
               onSearch={setSearchText}
               onChange={(e) => !e.target.value && setSearchText('')}
             />
-            <Button icon={<ReloadOutlined />} onClick={fetchGerencias} loading={loading}>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE)}
+              loading={loading}
+            >
               Atualizar
             </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
@@ -192,7 +221,13 @@ export default function GerenciasPage(): JSX.Element {
           dataSource={gerencias}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 15, showTotal: (total) => `Total: ${total}` }}
+          onChange={handleTableChange}
+          pagination={{
+            ...pagination,
+            showSizeChanger: true,
+            pageSizeOptions: ['15', '30', '50', '100'],
+            showTotal: (total) => `Total: ${total}`,
+          }}
           scroll={{ x: 900 }}
         />
       </Card>

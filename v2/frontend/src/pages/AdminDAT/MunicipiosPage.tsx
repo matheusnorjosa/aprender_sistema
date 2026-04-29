@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Table, Button, Input, Space, Tag, Typography, Card, message, Select, Modal, Form, Checkbox, AutoComplete } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import {
@@ -21,7 +22,7 @@ import type { MunicipioAutocompleteItem } from '../../api/adminDAT';
 import { importMunicipios } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
 import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
-import { UF_NORDESTE_OPTIONS } from '../../constants';
+import { DEFAULT_PAGE_SIZE, UF_NORDESTE_OPTIONS } from '../../constants';
 import type { ID } from '../../types';
 
 const { Title } = Typography;
@@ -91,6 +92,11 @@ export default function MunicipiosPage(): JSX.Element {
   const [lookupOptions, setLookupOptions] = useState<MunicipioAutocompleteItem[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [ibgeLocked, setIbgeLocked] = useState(false);
+  const [pagination, setPagination] = useState<TablePaginationConfig>({
+    current: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    total: 0,
+  });
 
   const [form] = Form.useForm<MunicipioFormValues>();
   const watchedNome = Form.useWatch('nome', form);
@@ -98,15 +104,26 @@ export default function MunicipiosPage(): JSX.Element {
   const lookupRequestRef = useRef(0);
   const selectingSuggestionRef = useRef(false);
 
-  const fetchMunicipios = async (): Promise<void> => {
+  const fetchMunicipios = async (
+    current = pagination.current || 1,
+    pageSize = pagination.pageSize || DEFAULT_PAGE_SIZE,
+  ): Promise<void> => {
     setLoading(true);
     try {
       const data = await listMunicipios({
         search: searchText,
         uf: ufFilter,
         ordering: 'nome',
+        page: current,
+        page_size: pageSize,
       });
       setMunicipios(data.results as MunicipioRecord[]);
+      setPagination((prev) => ({
+        ...prev,
+        current,
+        pageSize,
+        total: data.count,
+      }));
     } catch (error) {
       message.error(`Erro ao carregar municípios: ${(error as Error).message}`);
     } finally {
@@ -115,8 +132,15 @@ export default function MunicipiosPage(): JSX.Element {
   };
 
   useEffect(() => {
-    fetchMunicipios();
+    fetchMunicipios(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText, ufFilter]);
+
+  const handleTableChange = (newPagination: TablePaginationConfig): void => {
+    fetchMunicipios(
+      newPagination.current || 1,
+      newPagination.pageSize || pagination.pageSize || DEFAULT_PAGE_SIZE,
+    );
+  };
 
   useEffect(() => {
     if (!modalVisible) {
@@ -230,7 +254,7 @@ export default function MunicipiosPage(): JSX.Element {
       setLookupOptions([]);
       setIbgeLocked(false);
       form.resetFields();
-      fetchMunicipios();
+      fetchMunicipios(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -289,7 +313,7 @@ export default function MunicipiosPage(): JSX.Element {
         try {
           await deleteMunicipio(municipio.id);
           message.success('Município excluído com sucesso');
-          fetchMunicipios();
+          fetchMunicipios(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
@@ -346,7 +370,7 @@ export default function MunicipiosPage(): JSX.Element {
       <Card>
         <header className="flex justify-between items-center mb-4">
           <Title level={3} className="m-0" id="municipios-title">
-            Municípios ({municipios.length})
+            Municípios ({pagination.total || 0})
           </Title>
           <Space>
             <Search
@@ -363,7 +387,11 @@ export default function MunicipiosPage(): JSX.Element {
               onChange={setUfFilter}
               options={UF_NORDESTE_OPTIONS}
             />
-            <Button icon={<ReloadOutlined />} onClick={fetchMunicipios} loading={loading}>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => fetchMunicipios(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE)}
+              loading={loading}
+            >
               Atualizar
             </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
@@ -377,7 +405,13 @@ export default function MunicipiosPage(): JSX.Element {
           dataSource={municipios}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 15, showTotal: (total) => `Total: ${total}` }}
+          onChange={handleTableChange}
+          pagination={{
+            ...pagination,
+            showSizeChanger: true,
+            pageSizeOptions: ['15', '30', '50', '100'],
+            showTotal: (total) => `Total: ${total}`,
+          }}
           scroll={{ x: 1000 }}
         />
       </Card>

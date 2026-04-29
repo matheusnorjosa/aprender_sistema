@@ -18,6 +18,7 @@ from typing import Any
 
 from django.utils.datastructures import MultiValueDictKeyError
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -25,7 +26,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
-from apps.core.rbac.policies import CanImportCompras
+from apps.core.permissions import HasPerm
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -48,7 +49,7 @@ class ImportComprasView(APIView):
     """
     Importa Compras de CSV/XLSX.
 
-    Requer permissão: HasPerm("import_spreadsheet") (grupos Controle ou Superintendência)
+    Requer permissão: HasPerm("import_spreadsheet") (grupo DAT, ou superuser).
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -71,10 +72,10 @@ class ImportComprasView(APIView):
         }
     """
 
-    # Issue #1233 (Epic 4.2.c): import de compras é Policy `import_compras`
-    # (DAT importa + Compras/Controle operam). Paridade com composition OR
-    # anterior (`import_spreadsheet | manage_purchases_and_materials | run_daily_operations`).
-    permission_classes = [CanImportCompras]
+    # PR-A1 DAT-Imports (2026-04-29): centralização. Importações de massa
+    # passam a ser DAT-only via `HasPerm("import_spreadsheet")`. Controle
+    # consome o dado mas não importa (D-1 do plano DAT-Imports).
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(
         summary="Importar compras",

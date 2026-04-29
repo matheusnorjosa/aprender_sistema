@@ -35,17 +35,17 @@ User = get_user_model()
 
 
 @pytest.fixture
-def controle_user(db):
-    """Usuario do grupo Controle."""
+def dat_import_user(db):
+    """Usuario do grupo DAT (PR-A1 DAT-Imports: detentor de import_spreadsheet)."""
     user = User.objects.create_user(
-        username="controle_user",
-        email="controle@test.com",
+        username="dat_import_user",
+        email="dat_imports@test.com",
         password="testpass123",
         cpf="11111111111",
-        first_name="Controle",
-        last_name="User",
+        first_name="DAT",
+        last_name="Imports",
     )
-    group, _ = Group.objects.get_or_create(name="Controle")
+    group, _ = Group.objects.get_or_create(name="DAT")
     user.groups.add(group)
     return user
 
@@ -327,11 +327,11 @@ class TestImportEventosView:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_controle_user_can_import(
-        self, api_client, controle_user, sample_csv, coordenador_user, municipio, projeto_super, tipo_evento
+    def test_dat_import_user_can_import(
+        self, api_client, dat_import_user, sample_csv, coordenador_user, municipio, projeto_super, tipo_evento
     ):
         """Usuario Controle pode importar."""
-        api_client.force_authenticate(user=controle_user)
+        api_client.force_authenticate(user=dat_import_user)
 
         with open(sample_csv, "rb") as f:
             response = api_client.post(
@@ -345,10 +345,10 @@ class TestImportEventosView:
         assert response.data["stats"]["solicitacoes"]["created"] == 2
 
     def test_apply_mode_persists(
-        self, api_client, controle_user, sample_csv, coordenador_user, municipio, projeto_super, tipo_evento
+        self, api_client, dat_import_user, sample_csv, coordenador_user, municipio, projeto_super, tipo_evento
     ):
         """dry_run=false persiste os dados."""
-        api_client.force_authenticate(user=controle_user)
+        api_client.force_authenticate(user=dat_import_user)
 
         with open(sample_csv, "rb") as f:
             response = api_client.post(
@@ -361,9 +361,9 @@ class TestImportEventosView:
         assert response.data["dry_run"] is False
         assert Solicitacao.objects.count() == 2
 
-    def test_missing_file_returns_400(self, api_client, controle_user):
+    def test_missing_file_returns_400(self, api_client, dat_import_user):
         """Arquivo ausente retorna 400."""
-        api_client.force_authenticate(user=controle_user)
+        api_client.force_authenticate(user=dat_import_user)
 
         response = api_client.post(
             IMPORT_EVENTOS_URL,
@@ -374,11 +374,11 @@ class TestImportEventosView:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "file" in response.data["detail"].lower()
 
-    def test_invalid_mime_type_returns_400(self, api_client, controle_user):
+    def test_invalid_mime_type_returns_400(self, api_client, dat_import_user):
         """Tipo de arquivo invalido retorna 400."""
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        api_client.force_authenticate(user=controle_user)
+        api_client.force_authenticate(user=dat_import_user)
 
         # Usar MIME type explicitamente inválido (não text/plain, pois CSVs podem ser text/plain)
         fake_file = SimpleUploadedFile("malicious.exe", b"MZ\x90\x00", content_type="application/x-msdownload")

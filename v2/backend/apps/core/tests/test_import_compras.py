@@ -28,15 +28,16 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def user_controle():
-    """Cria usuário com permissões de Controle."""
+def user_dat():
+    """Cria usuário no grupo DAT (PR-A1 DAT-Imports: detentor de
+    `import_spreadsheet` via seed_functional_permissions)."""
     user = Usuario.objects.create_user(
-        username="controle",
-        email="controle@test.com",
+        username="dat_imports",
+        email="dat_imports@test.com",
         password="testpass",
         cpf="11111111111",
     )
-    group, _ = Group.objects.get_or_create(name="Controle")
+    group, _ = Group.objects.get_or_create(name="DAT")
     user.groups.add(group)
     return user
 
@@ -168,7 +169,7 @@ def test_import_compras_idempotence(csv_compras_temp, setup_data):
     assert Compra.objects.count() == 2  # Não duplicou
 
 
-def test_import_compras_endpoint_dry_run(user_controle, csv_compras_temp, setup_data):
+def test_import_compras_endpoint_dry_run(user_dat, csv_compras_temp, setup_data):
     """
     Testa endpoint POST /api/controle/import-compras/ com dry_run=true.
 
@@ -179,7 +180,7 @@ def test_import_compras_endpoint_dry_run(user_controle, csv_compras_temp, setup_
     Compra.objects.all().delete()
 
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_dat)
 
     # Upload de arquivo
     with open(csv_compras_temp, "rb") as f:
@@ -200,7 +201,7 @@ def test_import_compras_endpoint_dry_run(user_controle, csv_compras_temp, setup_
     assert Compra.objects.count() == 0
 
 
-def test_import_compras_endpoint_apply(user_controle, csv_compras_temp, setup_data):
+def test_import_compras_endpoint_apply(user_dat, csv_compras_temp, setup_data):
     """
     Testa endpoint POST /api/controle/import-compras/ com dry_run=false.
 
@@ -211,7 +212,7 @@ def test_import_compras_endpoint_apply(user_controle, csv_compras_temp, setup_da
     Compra.objects.all().delete()
 
     client = APIClient()
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_dat)
 
     # Upload de arquivo
     with open(csv_compras_temp, "rb") as f:
@@ -298,45 +299,33 @@ COMP-888,PRODUTO DESCONHECIDO,5,Acarape,CE,2025-04-01,Teste
         Path(tmp.name).unlink(missing_ok=True)
 
 
-def test_import_compras_requires_controle_group():
+def test_import_compras_forbidden_for_formador():
     """
-    Testa que endpoint exige grupo Controle ou Superintendência.
-
-    - Usuário sem grupo → 403 Forbidden
+    PR-A1 DAT-Imports (2026-04-29): endpoint é DAT-only via
+    `HasPerm("import_spreadsheet")`. Formador → 403.
     """
-    # Criar usuário sem grupo Controle/Superintendência
     user = Usuario.objects.create_user(
         username="formador",
         email="formador@test.com",
         password="testpass",
         cpf="22222222222",
     )
-    # Adicionar a um grupo diferente (Formador)
     group, _ = Group.objects.get_or_create(name="Formador")
     user.groups.add(group)
 
     client = APIClient()
     client.force_authenticate(user=user)
 
-    # Tentar importar
-    from pathlib import Path
-
-    from django.conf import settings
-
-    csv_path = str(Path(settings.BASE_DIR) / "data/csv-import/compras.csv")
-    response = client.post("/api/controle/import-compras/?dry_run=true", data={"path": csv_path})
-
-    # Epic 5.2 (2026-04-24): mensagens capability-oriented não incluem nome de setor.
+    response = client.post("/api/controle/import-compras/?dry_run=true", data={})
     assert response.status_code == 403
 
 
-def test_import_compras_allowed_for_controle():
+def test_import_compras_forbidden_for_controle_after_pr_a1():
     """
-    Testa que grupo Controle pode importar.
-
-    - Usuário do grupo Controle → 200 ou 400 (não 403)
+    PR-A1 DAT-Imports (2026-04-29): Controle perde auto-serviço de import
+    em massa. Compras continuam visíveis em /controle, mas o upload é
+    feito em /dat/importacoes (D-1 do plano DAT-Imports).
     """
-    # Criar usuário do grupo Controle
     user = Usuario.objects.create_user(
         username="controle2",
         email="controle2@test.com",
@@ -349,52 +338,5 @@ def test_import_compras_allowed_for_controle():
     client = APIClient()
     client.force_authenticate(user=user)
 
-    # Tentar importar (arquivo não existe, mas não deve dar 403)
-    from pathlib import Path
-
-    from django.conf import settings
-
-    csv_path = str(Path(settings.BASE_DIR) / "data/csv-import/compras_nao_existe.csv")
-    response = client.post("/api/controle/import-compras/?dry_run=true", data={"path": csv_path})
-
-    # Deve retornar 400 (arquivo não encontrado) ou 200, mas NÃO 403
-    assert response.status_code in (200, 400)
-
-
-@pytest.mark.skip(
-    reason=(
-        "Issue #1222 (Epic 1 RBAC Access Policy Realignment): após "
-        "realinhamento do seed, Superintendência não tem mais "
-        "`import_spreadsheet`/`manage_purchases_and_materials`/"
-        "`run_daily_operations`. Importação de compras é escopo do "
-        "Controle (operacional) ou DAT (importação genérica). "
-        "Superintendência aprova solicitações, não importa compras."
-    )
-)
-def test_import_compras_allowed_for_superintendencia():
-    """
-    OBSOLETO após Issue #1222 — ver docstring do skip.
-    """
-    # Criar usuário do grupo Superintendência
-    user = Usuario.objects.create_user(
-        username="super",
-        email="super@test.com",
-        password="testpass",
-        cpf="44444444444",
-    )
-    group, _ = Group.objects.get_or_create(name="Superintendência")
-    user.groups.add(group)
-
-    client = APIClient()
-    client.force_authenticate(user=user)
-
-    # Tentar importar (arquivo não existe, mas não deve dar 403)
-    from pathlib import Path
-
-    from django.conf import settings
-
-    csv_path = str(Path(settings.BASE_DIR) / "data/csv-import/compras_nao_existe.csv")
-    response = client.post("/api/controle/import-compras/?dry_run=true", data={"path": csv_path})
-
-    # Deve retornar 400 (arquivo não encontrado) ou 200, mas NÃO 403
-    assert response.status_code in (200, 400)
+    response = client.post("/api/controle/import-compras/?dry_run=true", data={})
+    assert response.status_code == 403

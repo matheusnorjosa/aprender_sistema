@@ -70,6 +70,9 @@ def test_happy_path_import_compra_create_solicitacao_approve_and_publish():
     """
     client = APIClient()
 
+    # PR-A1 DAT-Imports (2026-04-29): import-compras agora é DAT-only;
+    # publish continua sendo operação Controle.
+    user_dat = _create_user_in_group(prefix="dat_chain", group_name="DAT")
     user_controle = _create_user_in_group(prefix="controle_chain", group_name="Controle")
     user_coordenador = _create_user_in_group(prefix="coord_chain", group_name="Coordenador")
     user_super = _create_user_in_group(prefix="super_chain", group_name="Superintendência")
@@ -78,8 +81,8 @@ def test_happy_path_import_compra_create_solicitacao_approve_and_publish():
     projeto = Projeto.objects.create(nome="Novo Lendo", codigo="NL", fluxo="SUPER", ativo=True)
     tipo_evento = TipoEvento.objects.create(nome="Formacao")
 
-    # 1) Import compras via endpoint real.
-    client.force_authenticate(user=user_controle)
+    # 1) Import compras via endpoint real (DAT-only após PR-A1 DAT-Imports).
+    client.force_authenticate(user=user_dat)
     import_report = _upload_compras_csv(
         client,
         codigo="COMP-CHAIN-001",
@@ -144,7 +147,8 @@ def test_invalid_path_blocks_solicitacao_when_pair_municipio_projeto_has_no_comp
     """
     client = APIClient()
 
-    user_controle = _create_user_in_group(prefix="controle_invalid", group_name="Controle")
+    # PR-A1 DAT-Imports (2026-04-29): import-compras agora é DAT-only.
+    user_controle = _create_user_in_group(prefix="dat_invalid", group_name="DAT")
     user_coordenador = _create_user_in_group(prefix="coord_invalid", group_name="Coordenador")
 
     municipio = Municipio.objects.create(nome="Sobral", uf="CE", ativo=True)

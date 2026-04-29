@@ -23,7 +23,6 @@ import os
 import tempfile
 from typing import Any
 
-from django.db.models import QuerySet
 from django.utils.datastructures import MultiValueDictKeyError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -35,7 +34,6 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.permissions import HasPerm
-from apps.core.rbac.policies import CanImportGenericSpreadsheet
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -52,7 +50,7 @@ class ControleImportAcoesView(APIView):
     """
     Importa Ações de Controle de CSV/XLSX.
 
-    Requer permissão: HasPerm("import_spreadsheet") (grupos Controle ou Superintendência)
+    Requer permissão: HasPerm("import_spreadsheet") (grupo DAT, ou superuser).
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -73,8 +71,9 @@ class ControleImportAcoesView(APIView):
         }
     """
 
-    # Issue #1222 (Epic 1): import operacional aceita Controle (run_daily_operations) ou DAT (import_spreadsheet)
-    permission_classes = [IsAuthenticated, CanImportGenericSpreadsheet]
+    # PR-A1 DAT-Imports (2026-04-29): centralização DAT-only via
+    # `HasPerm("import_spreadsheet")`. Controle perde acesso (D-1).
+    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
 
     @extend_schema(
         summary="Importar ações de controle",

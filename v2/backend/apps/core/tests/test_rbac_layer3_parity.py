@@ -104,11 +104,18 @@ def test_apoio_coordenacao_nao_tem_view_all_availability(rbac_seeded):
     assert user_has_any_perm(u, "view_all_availability") is False
 
 
-def test_gerente_funcao_tem_view_all_availability(rbac_seeded):
-    """Gerente (função) é transversal — mantém capability ampla. Distingue
-    de `test_gerencia_tem_view_all_availability` acima que testa o GRUPO
-    'Gerência' (descontinuado, sempre False)."""
+def test_gerente_funcao_nao_tem_view_all_availability(rbac_seeded):
+    """D9 (PR 2 RBAC hardening, 2026-04-28): Gerente perdeu `view_all_availability`
+    global. Gerente pedagógico (ACerta, Vidas, Fluir, etc.) e Gerente da
+    Superintendência caem em scope via EquipeGerencia (igual Coord/Apoio)."""
     u = _user_with_groups("paridade_ger_funcao", ["Gerente"])
+    assert user_has_any_perm(u, "view_all_availability") is False
+
+
+def test_dat_setor_tem_view_all_availability(rbac_seeded):
+    """D9 (PR 2 RBAC hardening, 2026-04-28): DAT recebe `view_all_availability`
+    no seed 0080. Razão: papel transversal admin (suporte/validação cross-setor)."""
+    u = _user_with_groups("paridade_dat", ["DAT"])
     assert user_has_any_perm(u, "view_all_availability") is True
 
 

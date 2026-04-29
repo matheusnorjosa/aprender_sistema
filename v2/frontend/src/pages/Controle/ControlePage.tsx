@@ -2,44 +2,15 @@
  * Página de Controle - Gestão de COMPRAS e AÇÕES
  *
  * Features:
- * - Upload de COMPRAS (import-compras)
- * - Upload de AÇÕES (import-acoes)
  * - Listagem de COMPRAS com filtros
+ * - Aviso de centralização de importações em DAT > Importações
  * - Campos corretos: Data, Município, UF, Projeto, Código, Quant., Uso
  */
 
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import { importCompras, importAcoes, importEventos, importProdutos, listCompras } from '../../api/ops';
-import type { Compra, ComprasFilters, ImportResult } from '../../api/ops';
-import ImportUploader from '../../components/ImportUploader';
-import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
-
-/**
- * Helper to convert ImportResult to ValidationResult format
- */
-function toValidationResult(result: ImportResult): ValidationResult {
-  return {
-    stats: {
-      created: result.created,
-      updated: result.updated,
-      unchanged: result.skipped,
-    },
-    errors: result.errors.map((e) => `Linha ${e.row}: ${e.message}`),
-  };
-}
-
-/**
- * Helper to convert ImportResult to ApplyResult format
- */
-function toApplyResult(result: ImportResult): ApplyResult {
-  return {
-    stats: {
-      created: result.created,
-      updated: result.updated,
-      unchanged: result.skipped,
-    },
-  };
-}
+import { listCompras } from '../../api/ops';
+import type { Compra, ComprasFilters } from '../../api/ops';
+import DatImportsCentralizedBanner from '../../components/DatImportsCentralizedBanner';
 
 export default function ControlePage(): JSX.Element {
   const [compras, setCompras] = useState<Compra[]>([]);
@@ -80,14 +51,6 @@ export default function ControlePage(): JSX.Element {
   };
 
   /**
-   * Callback após apply bem-sucedido.
-   */
-  const handleAfterApply = () => {
-    // Recarregar lista de compras
-    fetchCompras();
-  };
-
-  /**
    * Carrega compras ao montar ou quando filtros mudam.
    */
   useEffect(() => {
@@ -104,44 +67,7 @@ export default function ControlePage(): JSX.Element {
         </p>
       </header>
 
-      {/* Cards de Upload */}
-      <section aria-label="Importação de dados" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Upload COMPRAS */}
-        <ImportUploader
-          label="Importar COMPRAS"
-          description="CSV/XLSX com colunas: codigo, produto, quant, municipio, uf, data, uso"
-          onDryRun={async (file: File) => toValidationResult(await importCompras(file, true))}
-          onApply={async (file: File) => {
-            const result = await importCompras(file, false);
-            handleAfterApply();
-            return toApplyResult(result);
-          }}
-        />
-
-        {/* Upload AÇÕES */}
-        <ImportUploader
-          label="Importar AÇÕES"
-          description="CSV/XLSX de Ações de Controle (Município, Projeto, Coordenador, Datas, Observação)"
-          onDryRun={async (file: File) => toValidationResult(await importAcoes(file, true))}
-          onApply={async (file: File) => toApplyResult(await importAcoes(file, false))}
-        />
-
-        {/* Upload EVENTOS */}
-        <ImportUploader
-          label="Importar EVENTOS"
-          description="CSV/XLSX: municipio, projeto, tipo_evento, data, hora_inicio, hora_fim, coordenador, formador1-5"
-          onDryRun={async (file: File) => toValidationResult(await importEventos(file, true))}
-          onApply={async (file: File) => toApplyResult(await importEventos(file, false))}
-        />
-
-        {/* Upload PRODUTOS */}
-        <ImportUploader
-          label="Importar PRODUTOS"
-          description="CSV/XLSX: codigo, nome, projeto (obrigatórios), descricao (opcional)"
-          onDryRun={async (file: File) => toValidationResult(await importProdutos(file, true))}
-          onApply={async (file: File) => toApplyResult(await importProdutos(file, false))}
-        />
-      </section>
+      <DatImportsCentralizedBanner />
 
       {/* Filtros de COMPRAS */}
       <section aria-label="Filtros de compras" className="bg-white rounded-lg shadow p-4">

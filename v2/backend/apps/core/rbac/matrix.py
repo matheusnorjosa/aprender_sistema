@@ -43,10 +43,15 @@ SUPERUSER: Final = "Superuser"
 DAT: Final = "DAT"
 CONTROLE: Final = "Controle"
 DIRETORIA: Final = "Diretoria"
-GERENTE: Final = "Gerente"
+GERENTE: Final = "Gerente"  # legacy — Setor Vidas + Função Gerente (Gerente pedagógico)
 COORDENADOR: Final = "Coordenador"
 APOIO: Final = "Apoio de Coordenação"
 FORMADOR: Final = "Formador"
+
+# PR 8 hardening RBAC (2026-04-30): atores compostos para distinguir
+# regras endurecidas em PRs 3-6 (Aprovações + Audit Logs).
+GERENTE_SUPER: Final = "Gerente da Superintendência"  # Setor Sup + Função Gerente
+ASST_ADMIN_CONTROLE: Final = "Assistente Administrativo do Controle"  # Setor Controle + Função Asst Admin
 
 ACTORS: Final[tuple[str, ...]] = (
     SUPERUSER,
@@ -54,18 +59,23 @@ ACTORS: Final[tuple[str, ...]] = (
     CONTROLE,
     DIRETORIA,
     GERENTE,
+    GERENTE_SUPER,
+    ASST_ADMIN_CONTROLE,
     COORDENADOR,
     APOIO,
     FORMADOR,
 )
 
 # Mapping ator → group_names usados em `_make_user`. Superuser é caso especial.
+# Atores compostos têm múltiplos grupos (Setor + Função).
 ACTOR_GROUPS: Final[dict[str, list[str]]] = {
     SUPERUSER: [],  # is_superuser=True (não usa grupos)
     DAT: ["DAT"],
     CONTROLE: ["Controle"],
     DIRETORIA: ["Diretoria"],
     GERENTE: ["Gerente"],
+    GERENTE_SUPER: ["Superintendência", "Gerente"],
+    ASST_ADMIN_CONTROLE: ["Controle", "Assistente Administrativo"],
     COORDENADOR: ["Coordenador"],
     APOIO: ["Apoio de Coordenação"],
     FORMADOR: ["Formador"],
@@ -79,12 +89,17 @@ ACTOR_GROUPS: Final[dict[str, list[str]]] = {
 
 @dataclass(frozen=True)
 class ResourceCase:
-    """Endpoint a auditar. `query` adicionado à URL via querystring."""
+    """Endpoint a auditar. `query` adicionado à URL via querystring.
+
+    `body` permite payload válido em POST (ex: `{"ids": []}` para
+    batch-approve evitar 400 por ids_required quando o gate aprova).
+    """
 
     name: str
     method: str
     url: str
     query: dict[str, str] = field(default_factory=dict)
+    body: dict[str, object] = field(default_factory=dict)
 
     def full_url(self) -> str:
         if not self.query:
@@ -96,6 +111,13 @@ class ResourceCase:
 # Status codes canônicos. Manter como int para que pytest exiba diff legível.
 ALLOW = 200
 DENY = 403
+# PR 8 hardening RBAC (2026-04-30): para endpoints POST cujo gate de
+# autorização passa antes da validação de payload, o test runner usa
+# `ALLOW_PAYLOAD_INVALID` — significa "gate aprovou; serviço rejeitou
+# payload por motivo não-RBAC". Útil para batch-approve com `ids: []`
+# (gate aprova; serviço retorna 400 ids_required). Permanece distinto
+# de DENY (403) para garantir que o gate diferenciou o ator.
+ALLOW_PAYLOAD_INVALID = 400
 
 
 RESOURCES: Final[tuple[ResourceCase, ...]] = (
@@ -112,6 +134,20 @@ RESOURCES: Final[tuple[ResourceCase, ...]] = (
     ResourceCase("audit_logs", "GET", "/api/audit-logs/"),
     ResourceCase("me_events", "GET", "/api/me/events/"),
     ResourceCase("solicitacoes_list", "GET", "/api/solicitacoes/"),
+    # PR 8 hardening RBAC (2026-04-30): cobre regras endurecidas em PRs 3-6.
+    # Aprovação composite (PR 3 #1308): batch-approve representa os 4 endpoints
+    # de aprovação (mesmo gate `CanAccessSolicitationApprovals`). approve/reject
+    # individuais e batch-reject têm cobertura dedicada em test_pr3_approvals_policy.
+    ResourceCase(
+        "solicitacoes_batch_approve",
+        "POST",
+        "/api/solicitacoes/batch-approve/",
+        body={"ids": []},  # lista vazia é no-op (200 com approved=0); evita 400 por ids_required
+    ),
+    # ProdutoViewSet (PR 4 #1309): list restrito a DAT/Controle.
+    ResourceCase("produtos_list", "GET", "/api/produtos/"),
+    # UsuarioLookup (PR 5 #1310): cap-gated, sem hardcode de grupos.
+    ResourceCase("usuario_lookup", "GET", "/api/lookup/usuarios/"),
 )
 
 
@@ -140,6 +176,8 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         CONTROLE: ALLOW,  # view_all_availability via seed 0080 (mantém de D6)
         DIRETORIA: DENY,  # D8: decisão executiva, não consulta operacional
         GERENTE: ALLOW,  # D9: scoped via EquipeGerencia (perdeu cap global) — fixture cria vínculo
+        GERENTE_SUPER: ALLOW,  # PR 8: composite Sup+Gerente — fixture cria EquipeGerencia
+        ASST_ADMIN_CONTROLE: ALLOW,  # PR 8: setor Controle herda view_all_availability via seed 0080
         COORDENADOR: ALLOW,  # scoped via EquipeGerencia (D6) — fixture cria vínculo
         APOIO: ALLOW,  # scoped via EquipeGerencia (D6) — fixture cria vínculo
         FORMADOR: DENY,  # D8: caso especial; só Meus Eventos + Bloqueios próprios
@@ -159,6 +197,8 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         CONTROLE: DENY,
         DIRETORIA: ALLOW,  # view_compras_dashboard
         GERENTE: DENY,
+        GERENTE_SUPER: DENY,
+        ASST_ADMIN_CONTROLE: DENY,
         COORDENADOR: DENY,
         APOIO: DENY,
         FORMADOR: DENY,
@@ -173,6 +213,8 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         CONTROLE: ALLOW,  # run_daily_operations
         DIRETORIA: ALLOW,  # supervise_operations
         GERENTE: DENY,
+        GERENTE_SUPER: DENY,
+        ASST_ADMIN_CONTROLE: ALLOW,  # herda Controle (run_daily_operations)
         COORDENADOR: DENY,
         APOIO: DENY,
         FORMADOR: DENY,
@@ -187,6 +229,8 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         CONTROLE: DENY,
         DIRETORIA: DENY,
         GERENTE: DENY,
+        GERENTE_SUPER: DENY,
+        ASST_ADMIN_CONTROLE: DENY,
         COORDENADOR: DENY,
         APOIO: DENY,
         FORMADOR: DENY,
@@ -196,14 +240,15 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
     # Capabilities: manage_admin_registries | operate_preagenda.
     # PR 6 (2026-04-30): removidos `approve_solicitation` e
     # `approve_solicitation_batch` para evitar liberação indevida a
-    # Gerente pedagógico, Sup pura e Gerente da Sup. Auditoria por
-    # aprovador volta como escopo isolado se necessário em onda futura.
+    # Gerente pedagógico, Sup pura e Gerente da Sup.
     "audit_logs": {
         SUPERUSER: ALLOW,
         DAT: ALLOW,  # manage_admin_registries (suportar)
         CONTROLE: ALLOW,  # operate_preagenda (operar)
         DIRETORIA: DENY,
         GERENTE: DENY,  # PR 6: removido approve_solicitation_batch do gate
+        GERENTE_SUPER: DENY,  # PR 6: idem (já não tem mais approve_solicitation no gate)
+        ASST_ADMIN_CONTROLE: ALLOW,  # herda Controle (operate_preagenda)
         COORDENADOR: DENY,
         APOIO: DENY,
         FORMADOR: DENY,
@@ -216,6 +261,67 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
     # /api/solicitacoes/ list: `[IsAuthenticated]` via get_permissions (sem create).
     # Queryset filtra por permissions de quem pode ver tudo vs próprias.
     "solicitacoes_list": _ALL_AUTH,
+    #
+    # PR 8 (2026-04-30): consolida regras dos PRs 3, 4, 5 na matriz.
+    #
+    # Aprovação de solicitação (PR 3 #1308): policy composta
+    # `CanAccessSolicitationApprovals` = Gerente Sup OR Asst Admin Controle.
+    # Os 4 endpoints (approve/reject individual + batch) compartilham o mesmo
+    # gate; batch-approve representa todos. Cobertura granular fica em
+    # `test_pr3_approvals_policy.py`.
+    # Status code esperado para POST sem ids = 200 (lista vazia → no-op) para
+    # personas allowed; demais perfis recebem 403 antes do payload.
+    "solicitacoes_batch_approve": {
+        # ALLOW_PAYLOAD_INVALID (400) = gate aprovou; serviço rejeita payload
+        # `ids: []` por ids_required. Cobertura granular dos 4 endpoints com
+        # solicitação pendente real está em test_pr3_approvals_policy.py.
+        SUPERUSER: ALLOW_PAYLOAD_INVALID,
+        DAT: DENY,
+        CONTROLE: DENY,  # Controle puro não aprova (precisa Função Asst Admin)
+        DIRETORIA: DENY,
+        GERENTE: DENY,  # Gerente pedagógico (Vidas + Gerente) NÃO aprova
+        GERENTE_SUPER: ALLOW_PAYLOAD_INVALID,  # composite Setor Sup + Função Gerente
+        ASST_ADMIN_CONTROLE: ALLOW_PAYLOAD_INVALID,  # composite Setor Controle + Função Asst Admin
+        COORDENADOR: DENY,
+        APOIO: DENY,
+        FORMADOR: DENY,
+    },
+    #
+    # ProdutoViewSet list (PR 4 #1309): list/retrieve restrito a operação/admin.
+    # Composition: `manage_admin_registries | manage_purchases_and_materials | run_daily_operations`.
+    # DAT (admin) + Controle (operação). Dropdowns/selects de Coord/Apoio
+    # consomem `/api/options/produtos/` (IsAuthenticated, intocado).
+    "produtos_list": {
+        SUPERUSER: ALLOW,
+        DAT: ALLOW,  # manage_admin_registries
+        CONTROLE: ALLOW,  # run_daily_operations + manage_purchases_and_materials
+        DIRETORIA: DENY,
+        GERENTE: DENY,
+        GERENTE_SUPER: DENY,
+        ASST_ADMIN_CONTROLE: ALLOW,  # herda Controle
+        COORDENADOR: DENY,
+        APOIO: DENY,
+        FORMADOR: DENY,
+    },
+    #
+    # UsuarioLookup (PR 5 #1310): cap-gated, sem hardcode de grupos.
+    # Composition: `create_solicitation | manage_admin_registries`.
+    # Coord/Apoio/Gerente (pedagógico ou Sup) usam `create_solicitation` para
+    # popular pickers em NewSolicitacaoWizard. DAT usa manage_admin_registries.
+    # Asst Admin Controle puro não tem create_solicitation no seed; só passa
+    # se também tiver Função Coord/Apoio/Gerente — não esse ator.
+    "usuario_lookup": {
+        SUPERUSER: ALLOW,
+        DAT: ALLOW,  # manage_admin_registries
+        CONTROLE: DENY,  # PR 5: sem create_solicitation nem manage_admin_registries
+        DIRETORIA: DENY,
+        GERENTE: ALLOW,  # create_solicitation (seed atribui a Função Gerente)
+        GERENTE_SUPER: ALLOW,  # idem (composite tem Função Gerente)
+        ASST_ADMIN_CONTROLE: DENY,  # composite Asst Admin não tem create_solicitation
+        COORDENADOR: ALLOW,  # create_solicitation
+        APOIO: ALLOW,  # create_solicitation
+        FORMADOR: DENY,
+    },
 }
 
 

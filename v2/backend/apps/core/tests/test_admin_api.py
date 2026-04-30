@@ -266,12 +266,17 @@ class TestProjetoAPI:
         assert len(response.data["results"]) == 1
 
     def test_dat_can_create_projeto(self, api_client, usuario_dat):
-        """DAT pode criar projeto"""
+        """DAT pode criar projeto.
+
+        PR 7 hardening RBAC (2026-04-30): `fluxo` agora é obrigatório
+        explicitamente no payload da API.
+        """
         api_client.force_authenticate(user=usuario_dat)
         payload = {
             "nome": "Matemática Básica",
             "codigo": "MAT-01",
             "descricao": "Projeto de matemática",
+            "fluxo": "NAO_SUPER",
             "ativo": True,
         }
         response = api_client.post("/api/projetos/", payload, format="json")

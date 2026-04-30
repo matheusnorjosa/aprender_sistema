@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from django import forms
 from django.conf import settings
 from django.contrib import admin
 from django.db.models import QuerySet
@@ -125,10 +126,32 @@ class MunicipioAdmin(admin.ModelAdmin):
     list_filter = ("uf", "ativo")
 
 
+class ProjetoAdminForm(forms.ModelForm):  # type: ignore[type-arg]
+    """
+    PR 7 hardening RBAC (2026-04-30): força escolha explícita de `fluxo` no
+    admin. Antes, como o field model tem `default="NAO_SUPER"`, o admin
+    pre-selecionava o default sem exigir confirmação. O formulário agora
+    exige escolha explícita (sem valor inicial), evitando criação
+    silenciosa com fluxo padrão.
+    """
+
+    fluxo = forms.ChoiceField(
+        choices=Projeto.FLUXO_CHOICES,
+        required=True,
+        label="Fluxo de aprovação",
+        help_text="Obrigatório. SUPER: requer aprovação da Superintendência. NAO_SUPER: auto-aprovado.",
+    )
+
+    class Meta:  # type: ignore[misc]
+        model = Projeto
+        fields = "__all__"
+
+
 class ProjetoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "ativo")
+    form = ProjetoAdminForm
+    list_display = ("nome", "fluxo", "ativo")
     search_fields = ("nome", "descricao")
-    list_filter = ("ativo",)
+    list_filter = ("fluxo", "ativo")
 
 
 class TipoEventoAdmin(admin.ModelAdmin):

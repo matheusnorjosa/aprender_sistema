@@ -192,16 +192,18 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         FORMADOR: DENY,
     },
     #
-    # AuditLog: `[CanAccessAuditLogs]` (Epic 4.2.a).
-    # Capabilities: manage_admin_registries | operate_preagenda |
-    #               approve_solicitation | approve_solicitation_batch.
-    # 4 motivos legítimos: auditar/operar/suportar.
+    # AuditLog: `[CanAccessAuditLogs]` (Epic 4.2.a + PR 6 hardening RBAC 2026-04-30).
+    # Capabilities: manage_admin_registries | operate_preagenda.
+    # PR 6 (2026-04-30): removidos `approve_solicitation` e
+    # `approve_solicitation_batch` para evitar liberação indevida a
+    # Gerente pedagógico, Sup pura e Gerente da Sup. Auditoria por
+    # aprovador volta como escopo isolado se necessário em onda futura.
     "audit_logs": {
         SUPERUSER: ALLOW,
         DAT: ALLOW,  # manage_admin_registries (suportar)
         CONTROLE: ALLOW,  # operate_preagenda (operar)
-        DIRETORIA: DENY,  # sem nenhuma das 4 capabilities elegíveis
-        GERENTE: ALLOW,  # approve_solicitation_batch (auditar batch)
+        DIRETORIA: DENY,
+        GERENTE: DENY,  # PR 6: removido approve_solicitation_batch do gate
         COORDENADOR: DENY,
         APOIO: DENY,
         FORMADOR: DENY,
